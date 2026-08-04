@@ -42,7 +42,7 @@ Users review it through diffs and builder diagnostics rather than editing it as 
 
 Append-only records of successful migrations, reconciliations, persistent-data authorizations, and known remaining drift. Failed or merely planned transformations do not appear as successful records.
 
-State and migration records update only after transformation, verification, and post-change inference succeed. A failure before that point leaves the previous authoritative state intact and produces recovery evidence separately.
+State and migration records update only after transformation, verification, and post-change inference succeed. State/inference verification then runs again, and the records are included in the exact diff submitted for verified-final-diff approval. A failure before the successful record update leaves the previous authoritative state intact and produces recovery evidence separately.
 
 Inference uses manifest, packages, registration, environment schema, routes, composition roots, bindings, data/content schemas, CI/deployment configuration, migration history, and managed-surface fingerprints. Results use `confirmed`, `probable`, `partial`, `contradictory`, or `ambiguous`; no fabricated numeric confidence is used.
 

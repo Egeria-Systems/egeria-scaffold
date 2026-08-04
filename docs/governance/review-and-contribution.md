@@ -32,6 +32,8 @@ Repository-changing builder commands require:
 
 The builder never stashes, commits, discards, restores, or force-bypasses user work automatically. P0.1 repository-constitution development on `main` is a one-time explicit bootstrap exception; it does not modify the permanent builder rule.
 
+For builder transformations, state is part of the exact diff under review. After the source transformation passes proportional verification and post-change inference, update `.egeria` state and migration records, rerun state/inference verification, and only then prepare the verified final diff and request Gate 3 approval. Nothing may mutate the approved diff before it is committed.
+
 ## Test-driven implementation
 
 For each independently reviewable task:

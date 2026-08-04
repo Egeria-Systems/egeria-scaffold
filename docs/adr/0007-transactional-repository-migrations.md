@@ -31,10 +31,10 @@ The modifying lifecycle is:
 8. execute the transformation exactly once in the isolated worktree;
 9. install dependencies when approved and run proportional verification;
 10. re-infer the result;
-11. prepare the verified final diff and review packet;
-12. obtain verified-final-diff approval;
-13. update `.egeria` state and migration records last;
-14. rerun state/inference verification;
+11. update `.egeria` state and migration records after transformation verification and post-change inference succeed;
+12. rerun state/inference verification;
+13. prepare the exact verified final diff and review packet, including the state records;
+14. obtain verified-final-diff approval;
 15. commit the exact result, and create a pull request only when separately requested.
 
 The transformation is never executed again against the primary working tree. Informational extension may continue only when non-interference is proven. Reconcilable drift stops for an explicit reconciliation plan. Partial, contradictory, or ambiguous evidence blocks the operation. There is no generic force bypass.
@@ -49,7 +49,7 @@ Recovery treats these as separate domains:
 - queue/provider cleanup;
 - Stripe and other provider operational reversal.
 
-Git rollback is never represented as persistent-data or provider rollback.
+Git rollback is never represented as persistent-data or provider rollback. This ordering resolves the source plan's inconsistent placement of the state update after final-diff approval: the approved diff must already contain the final verified state records.
 
 ## Consequences
 

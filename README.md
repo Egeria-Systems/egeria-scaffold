@@ -32,4 +32,4 @@ The Volta Node.js `22.23.0` pin is the approved P0.1 development runtime. It is 
 
 ## Deferred to P0.3
 
-P0.3 creates `apps/cli`, private `packages/builder-core`, public `packages/standards`, the public observability package shell, and approved release tooling. Project and state schemas remain inside `builder-core`; no separate schema package is created initially.
+P0.3 creates `apps/cli`, the private `packages/builder-core` ownership boundary, public `packages/standards`, the public observability package shell, and approved release tooling. P1 implements project and state schemas inside `builder-core`; no separate schema package is created initially.

@@ -15,11 +15,11 @@ Builder inference, capability resolution, transactional planning, ownership, mig
 P0.3 may create:
 
 - thin `apps/cli` for command input/output;
-- private `packages/builder-core` containing builder internals and project/state schemas;
+- private `packages/builder-core` with ownership of future builder internals and project/state schemas;
 - public ordinary dependency `@egeria-systems/standards`;
 - public ordinary dependency `@egeria-systems/observability`.
 
-No separate `project-schema` package is created initially. Static schema artifacts may be emitted without introducing another release unit.
+P0.3 establishes package and API ownership, but does not implement the executable project/state schemas or builder kernel assigned to P1. No separate `project-schema` package is created initially. Static schema artifacts may later be emitted without introducing another release unit.
 
 A new public package requires all of:
 
@@ -35,7 +35,7 @@ Generated applications keep behavior in cohesive `apps/web` modules until the sa
 
 ## Consequences
 
-- `builder-core` can evolve with its internal schemas during the early program.
+- `builder-core` can evolve with its internal schemas after their P1 implementation.
 - Public packages remain replaceable and client-owned in ordinary dependency terms.
 - An editor, IDE integration, management service, or other independent schema consumer may trigger later extraction through a new accepted decision.
 - Package count remains a result of evidence rather than roadmap symmetry.

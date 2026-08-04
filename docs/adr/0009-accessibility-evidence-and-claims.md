@@ -38,6 +38,6 @@ Passing automation must never be presented as WCAG 2.2 AA conformance. A version
 
 ## Enforcement
 
-`INV-ACCESSIBILITY-AUTOMATION` is planned for the P0.2 proof and P2 generated projects through Playwright and axe. `INV-ACCESSIBILITY-CLAIMS` is recorded by the P0.1 constitution contract and gains release-check enforcement in P2.
+`INV-ACCESSIBILITY-AUTOMATION` is planned for the P0.2 proof and P2 generated projects through Playwright and axe. In P0.1, bounded requirements and architecture review check the documented `INV-ACCESSIBILITY-CLAIMS` policy; no automated semantic gate exists yet. Release-check enforcement begins in P2.
 
 W3C states that [no tool alone can determine accessibility](https://www.w3.org/WAI/test-evaluate/) and that conformance testing combines [automated testing and human evaluation](https://www.w3.org/WAI/WCAG21/Understanding/conformance.html).

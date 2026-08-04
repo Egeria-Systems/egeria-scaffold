@@ -67,14 +67,14 @@ The intended builder workspace is:
 
 ```text
 apps/cli                  thin command input/output
-packages/builder-core     private builder internals and project/state schemas
+packages/builder-core     private builder internals; future project/state schema owner
 packages/standards        public replaceable standards package
 packages/observability    public replaceable observability package
 ```
 
-P0.1 creates none of those paths. P0.2 creates only the separately scoped compatibility proof. P0.3 may create the listed builder boundaries after its own approved plan.
+P0.1 creates none of those paths. P0.2 creates only the separately scoped compatibility proof. P0.3 may create the listed package and ownership boundaries after its own approved plan. P1 implements the project/state schemas and builder kernel inside the already-private `builder-core` boundary.
 
-`builder-core` is justified by cohesive private responsibilities: capability resolution, manifest/state schemas, inference, ownership, planning, migrations, repository transformation, and verification. A separate `project-schema` package is not justified until a second consumer requires an independently versioned contract.
+`builder-core` is justified by cohesive private responsibilities: capability resolution, manifest/state schemas, inference, ownership, planning, migrations, repository transformation, and verification. Reserving that ownership in P0.3 does not implement the schemas early. A separate `project-schema` package is not justified until a second consumer requires an independently versioned contract.
 
 Public packages remain ordinary dependencies. Public availability does not remove versioning, bundle, debugging, security, migration, or coordinated-release costs. Extraction requires concrete consumers or a true runtime/security boundary, a stable API, independent lifecycle value, contract tests, ownership, migration policy, and evidence that packaging costs less than local code.
 
@@ -90,7 +90,7 @@ All user-visible or translatable copy originates from validated content or local
 
 Desired state will live in human-reviewable `.egeria/project.yaml`; installed resolved state in generator-owned `.egeria/state.json`; successful migration and reconciliation history in append-only `.egeria/migrations.jsonl`. None is created before P1.
 
-Repository-changing builder operations require clean state, inference, capability resolution, an isolated worktree, an approval-ready dry-run plan, one execution, verification, post-change inference, a verified-final-diff approval, and state updates last. Source, dependencies, deployment, persistent data, and provider state have separate rollback procedures.
+Repository-changing builder operations require clean state, inference, capability resolution, an isolated worktree, an approval-ready dry-run plan, one execution, verification, and post-change inference. State and migration records update only after those checks succeed; state/inference verification then runs again. The resulting exact diff and review packet require verified-final-diff approval before commit. Source, dependencies, deployment, persistent data, and provider state have separate rollback procedures.
 
 ## P0.1 boundary
 

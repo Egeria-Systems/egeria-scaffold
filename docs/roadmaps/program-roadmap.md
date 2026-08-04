@@ -22,7 +22,7 @@ Build the smallest Next.js/Cloudflare proof that validates the approved Volta No
 
 ### P0.3 — Lean builder monorepo
 
-Create thin `apps/cli`, private `packages/builder-core` with project/state schemas and builder internals, public `packages/standards`, the public observability package shell, and approved release tooling with accidental-publication safeguards. Do not create a separate project-schema package.
+Create thin `apps/cli`, the private `packages/builder-core` package and its ownership boundary, public `packages/standards`, the public observability package shell, and approved release tooling with accidental-publication safeguards. Reserve project/state schema ownership for `builder-core`, but defer the executable schemas and builder kernel to P1. Do not create a separate project-schema package.
 
 **Exit:** Package APIs and owners are explicit, publication safeguards pass, extraction decisions are justified, and no profile functionality is implemented.
 

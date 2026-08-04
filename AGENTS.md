@@ -37,7 +37,7 @@ Prefer the smallest resilient change. Every changed line must trace to the appro
 
 Capabilities declare delivery mode, state classifications, one removal policy, security metadata, managed surfaces, inference probes, migrations, verification, and removal/recovery requirements.
 
-Repository-changing builder operations must infer current state, produce an approval-ready plan, transform once in isolation, verify, re-infer, and obtain verified-final-diff approval. Update `.egeria` state and migration records only after transformation, verification, and post-change inference succeed. Source, dependency, deployment, persistent-data, and provider rollback are separate domains.
+Repository-changing builder operations must infer current state, produce an approval-ready plan, transform once in isolation, verify, and re-infer. Only after those checks succeed may they update `.egeria` state and migration records and rerun state/inference verification. The resulting exact diff then requires verified-final-diff approval. Source, dependency, deployment, persistent-data, and provider rollback are separate domains.
 
 ## Copy, privacy, and accessibility
 
