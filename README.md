@@ -28,7 +28,7 @@ pnpm run test:constitution
 
 P0.2 selects and proves the exact compatible pnpm, Next.js, OpenNext Cloudflare adapter, Wrangler, TypeScript, ESLint, Vitest, Playwright, and axe versions. It must demonstrate local Next development, production-like workerd preview, generated binding types, unit and Cloudflare integration tests, accessibility smoke tests, and a non-production GitHub Actions deployment.
 
-The Volta Node.js `22.23.0` pin is the approved P0.1 development runtime. It is not deployed compatibility proof.
+Node.js `22.23.0` is pinned for local development through both `.nvmrc` and `package.json` Volta configuration. These matching pins are not deployed compatibility proof.
 
 ## Deferred to P0.3
 

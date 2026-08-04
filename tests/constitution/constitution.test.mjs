@@ -42,6 +42,7 @@ function isInsideRepository(path) {
 
 test("the root workspace is private and dependency-free in P0.1", async () => {
   const manifest = JSON.parse(await readRepositoryFile("package.json"));
+  const nvmVersion = await readRepositoryFile(".nvmrc");
 
   assert.equal(manifest.name, "@egeria-systems/scaffold");
   assert.equal(manifest.private, true);
@@ -55,6 +56,7 @@ test("the root workspace is private and dependency-free in P0.1", async () => {
   assert.equal("packageManager" in manifest, false);
   assert.equal("engines" in manifest, false);
   assert.deepEqual(manifest.volta, { node: "22.23.0" });
+  assert.equal(nvmVersion, `${manifest.volta.node}\n`);
 });
 
 test("the workspace declares only the approved future package roots", async () => {
