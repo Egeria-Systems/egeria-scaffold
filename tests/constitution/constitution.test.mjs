@@ -38,3 +38,48 @@ test("the workspace declares only the approved future package roots", async () =
     'packages:\n  - "apps/*"\n  - "packages/*"\n',
   );
 });
+
+const governanceDocuments = {
+  "README.md": [
+    "P0.1 — Constitution and ADRs",
+    "No production profile is implemented",
+    "docs/architecture/overview.md",
+    "docs/roadmaps/program-roadmap.md",
+  ],
+  "AGENTS.md": [
+    "Plan approval is not final-diff approval",
+    "Never create a pull request unless explicitly asked",
+    "Cloudflare types and bindings",
+    "No WCAG conformance claim",
+    "Canonical owners and cohesion",
+    "Update the canonical owner and every direct consumer",
+  ],
+  "CONTRIBUTING.md": [
+    "docs/governance/review-and-contribution.md",
+    "docs/architecture/enforcement-map.md",
+  ],
+  "docs/governance/review-and-contribution.md": [
+    "Gate 1: preparation evidence",
+    "Gate 2: implementation-plan approval",
+    "Gate 3: verified-final-diff approval",
+    "Requirements reviewer",
+    "Architecture and anti-overengineering reviewer",
+    "Test-evidence reviewer",
+    "Pull-request creation requires a separate explicit request",
+  ],
+};
+
+test("governance documents preserve the approval and action boundaries", async () => {
+  for (const [relativePath, requiredFragments] of Object.entries(
+    governanceDocuments,
+  )) {
+    const document = await readRepositoryFile(relativePath);
+
+    for (const fragment of requiredFragments) {
+      assert.ok(
+        document.includes(fragment),
+        `${relativePath} must include: ${fragment}`,
+      );
+    }
+  }
+});
