@@ -1,0 +1,13 @@
+{
+  "name": "@egeria-systems/scaffold",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Builds versioned materialized Next.js recipes for Egeria Systems projects.",
+  "scripts": {
+    "test": "pnpm run test:constitution",
+    "test:constitution": "node --test tests/constitution/constitution.test.mjs"
+  },
+  "volta": {
+    "node": "22.23.0"
+  }
+}
