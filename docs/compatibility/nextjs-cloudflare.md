@@ -66,9 +66,9 @@ The shared Playwright suite checks a selected axe ruleset, keyboard focus, 320 C
 
 Deployment is manual GitHub Actions work against the non-production GitHub environment `compatibility` and Worker `egeria-scaffold-nextjs-cloudflare-proof`. GitHub Actions is the sole deployment authority.
 
-The manual workflow at [`.github/workflows/compatibility-proof.yml`](../../.github/workflows/compatibility-proof.yml) is ready but has not yet been pushed, dispatched, or deployed. It verifies the complete local-equivalent suite before deployment and runs the deployed smoke check afterward.
+The manual workflow at [`.github/workflows/compatibility-proof.yml`](../../.github/workflows/compatibility-proof.yml) is pushed on `main` and recognized by GitHub Actions. The `compatibility` environment exists with an explicit `main`-only deployment policy. The required secret and variable names are not yet configured, so no workflow has been dispatched and no Worker has been deployed.
 
-The environment requires `CLOUDFLARE_API_TOKEN` as an environment secret with the narrow Workers Scripts edit permission for the target account, `CLOUDFLARE_ACCOUNT_ID` as an environment secret, and `COMPATIBILITY_URL` as an environment variable. Values must never be committed or copied into logs or evidence. Access is restricted to the deployment step, the workflow runs only from `main`, and environment reviewers or other protection rules should be enabled when the private repository's current GitHub plan exposes them.
+The environment requires `CLOUDFLARE_API_TOKEN` as an environment secret with the narrow Workers Scripts edit permission for the target account, `CLOUDFLARE_ACCOUNT_ID` as an environment secret, and `COMPATIBILITY_URL` as an environment variable. Values must never be committed or copied into logs or evidence. Access is restricted to the deploy-only step, which publishes the previously verified OpenNext artifact without rebuilding it. The workflow runs only from `main`, and environment reviewers or other protection rules should be enabled when the private repository's current GitHub plan exposes them.
 
 Source recovery uses a revert commit. Cloudflare rollback or Worker deletion is a separate external action and requires explicit authorization. P0.2 has no persistent data to recover.
 

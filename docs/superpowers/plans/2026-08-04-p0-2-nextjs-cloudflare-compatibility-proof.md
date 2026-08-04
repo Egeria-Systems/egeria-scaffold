@@ -337,7 +337,7 @@ Create `proofs/nextjs-cloudflare/package.json` with exact versions:
     "build": "next build",
     "build:cloudflare": "opennextjs-cloudflare build",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview -- --ip 127.0.0.1 --port 3101",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "deploy": "opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv --include-runtime=false cloudflare-env.d.ts",
     "cf-typegen:check": "wrangler types --env-interface CloudflareEnv --include-runtime=false cloudflare-env.d.ts --check",
     "lint": "eslint . --max-warnings 0",

@@ -143,9 +143,11 @@ test("workspace documentation reserves apps for builder code and proofs for evid
 });
 
 test("the compatibility deployment workflow is manual, bounded, and secret-minimal", async () => {
-  const workflow = await readRepositoryFile(
-    ".github/workflows/compatibility-proof.yml",
-  );
+  const [workflow, proofManifestSource] = await Promise.all([
+    readRepositoryFile(".github/workflows/compatibility-proof.yml"),
+    readRepositoryFile("proofs/nextjs-cloudflare/package.json"),
+  ]);
+  const proofManifest = JSON.parse(proofManifestSource);
 
   assert.match(workflow, /^on:\n  workflow_dispatch:\n/m);
   assert.doesNotMatch(workflow, /^  (?:push|pull_request|schedule):/m);
@@ -166,6 +168,7 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
     /actions\/setup-node@a0853c24544627f65ddf259abe73b1d18a591444/,
   );
   assert.match(workflow, /pnpm install --frozen-lockfile/);
+  assert.equal(proofManifest.scripts.deploy, "opennextjs-cloudflare deploy");
 
   const verifyIndex = workflow.indexOf("- name: Verify compatibility proof");
   const deployIndex = workflow.indexOf("- name: Deploy compatibility Worker");

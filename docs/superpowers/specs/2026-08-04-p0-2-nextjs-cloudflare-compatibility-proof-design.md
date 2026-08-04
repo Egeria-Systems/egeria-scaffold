@@ -1,6 +1,6 @@
 # P0.2 Next.js and Cloudflare Compatibility Proof Design
 
-**Status:** Proposed for written-spec review
+**Status:** Approved
 
 **Date:** 2026-08-04
 

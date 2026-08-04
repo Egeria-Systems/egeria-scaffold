@@ -61,7 +61,7 @@ The original supplied file remains available at `/Users/CoveMB/Downloads/2026-08
 | Tool | Observed result | Interpretation |
 |---|---|---|
 | Node.js | `v22.23.0` | Matches `.nvmrc` and `volta.node`; includes the reviewed June 2026 fixes for Node 22 |
-| Volta | `2.0.2` | Resolves the repository Node pin and can pin an exact package-manager version |
+| Volta | `2.0.2` | Resolves the repository Node pin; project-level pnpm pinning is unsupported |
 | pnpm | `10.32.1` | Existing global/default tool; not the P0.2 candidate |
 | Corepack | command not found | The local Volta-managed Node distribution does not expose Corepack; the plan must not assume it exists |
 
