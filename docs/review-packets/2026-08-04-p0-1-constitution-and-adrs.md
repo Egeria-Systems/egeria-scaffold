@@ -2,7 +2,7 @@
 
 **Recorded:** 2026-08-04
 
-**Status:** Ready for Gate 3 verified-final-diff approval
+**Status:** Ready for revised Gate 3 verified-final-diff approval
 
 ## Scope and acceptance decision
 
@@ -14,6 +14,8 @@ The candidate satisfies the increment acceptance criteria:
 - future profiles and capabilities are visible without runtime implementation;
 - each enforceable invariant names an actual manual/static gate or a future automated owner without overstating current enforcement;
 - root `AGENTS.md` is substantive, self-contained, and establishes canonical ownership and cohesion rules;
+- `.nvmrc` and Volta both pin Node.js `22.23.0`, protected by an exact-value contract;
+- builder-repository development and generated-client transformations have explicit, non-conflicting Git/isolation boundaries;
 - no application, production profile, builder/public package, dependency, lockfile, `.egeria` state/schema, workflow, binding, provider resource, or deployment was created.
 
 ## Frozen comparison
@@ -22,9 +24,12 @@ The candidate satisfies the increment acceptance criteria:
 - Independent-review candidate: `8303aeda2d25ccf1087a3af0e1b3616ccf1a20c3`
 - Repaired candidate: `f10ecc21ee8eec13df988b8d99027ec3d23762dd`
 - Evidence-complete candidate before this delivery packet: `1747210c6c45919dcc3101839b9ad6ad2b3bdc34`
-- Branch: `main`, explicitly approved as a one-time P0.1 bootstrap exception
+- Gate 3 revision planning base: `965d1c0c868bcd9b66a5f46381dc12ba93389d2d`
+- Initial Gate 3 revision candidate: `d04ef9f623fdec9a35b74c178854d37615882128`
+- Repaired Gate 3 revision candidate before this packet update: `a635bc9978098f8a058d4a5f1f7d7b343e65e6b7`
+- Branch: `main`, explicitly approved for clean, sequential builder-repository development
 
-This packet is the final delivery-only commit on top of `1747210c`; its exact commit is reported alongside the packet at Gate 3. The approved source plan remains byte-identical to the base version with SHA-256 `f8d3f7db149f18c28ac3c6e41781405e3661c4a5ab710ee28290b184864c1027`.
+The final packet commit is reported alongside this file at Gate 3 because a packet cannot contain its own commit identifier. The approved source plan's original pre-revision SHA-256 is `f8d3f7db149f18c28ac3c6e41781405e3661c4a5ab710ee28290b184864c1027`. Its current SHA-256 is `821c175a8ce8c8a46ff4ec75f855e5cc9c867e0dfa9988ee2865dadbf969829d` after delegating builder-repository execution policy to canonical governance. The generated-client transactional boundary remains unchanged in substance and is now explicit about its dedicated branch.
 
 No remote ref was refreshed because the preparation check found that the configured remote had no heads or tags. No push, pull request, merge, deployment, publication, provider mutation, or external message occurred.
 
@@ -32,6 +37,7 @@ No remote ref was refreshed because the preparation check found that the configu
 
 Workspace and executable contracts:
 
+- `.nvmrc`
 - `.gitignore`
 - `package.json`
 - `pnpm-workspace.yaml`
@@ -49,6 +55,7 @@ Architecture and roadmap:
 - `docs/architecture/overview.md`
 - `docs/architecture/capability-model.md`
 - `docs/architecture/enforcement-map.md`
+- `docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md`
 - `docs/roadmaps/program-roadmap.md`
 
 Accepted decisions:
@@ -71,9 +78,11 @@ Evidence, plan, and packet:
 - `docs/implementation-evidence/2026-08-04-p0-1-constitution-preparation.md`
 - `docs/implementation-evidence/2026-08-04-p0-1-constitution-verification.md`
 - `docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md`
+- `docs/superpowers/plans/2026-08-04-p0-1-gate-3-revisions.md`
+- `docs/superpowers/specs/2026-08-04-p0-1-gate-3-revisions-design.md`
 - `docs/review-packets/2026-08-04-p0-1-constitution-and-adrs.md`
 
-The approved source plan at `docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md` was persisted in the base commit and not changed by the implementation range.
+The approved source plan at `docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md` was persisted in the base commit. The Gate 3 revision changes only its builder-repository execution rule so that canonical governance owns that policy.
 
 ## Test-driven evidence
 
@@ -82,6 +91,7 @@ The detailed RED/GREEN record is in the [verification evidence](../implementatio
 | Cycle | RED | GREEN |
 |---|---|---|
 | Root workspace | Missing `package.json` and `pnpm-workspace.yaml` produced two `ENOENT` failures | Private dependency-free workspace and Volta Node pin passed |
+| Classic Node version manager | Missing `.nvmrc` produced focused `ENOENT` | Exact `22.23.0` file matched `volta.node`; focused and full six-test suites passed |
 | Governance | Missing `README.md` produced focused `ENOENT` | Entry points, constitution, and governance protocol passed |
 | Architecture | Missing architecture overview produced focused `ENOENT` | Architecture, capability model, enforcement map, and roadmap passed |
 | ADR groups | Missing ADR index, then missing ADR-0006, produced focused `ENOENT` | All eleven accepted ADRs passed the structural contract |
@@ -96,12 +106,12 @@ Phrase-presence tests used during early prose authoring were removed before revi
 
 | Command | Result |
 |---|---|
-| `node --version` | `v22.23.0` through Volta |
+| `node --version` | `v22.23.0`, matching `.nvmrc` and Volta |
 | `pnpm --version` | `10.32.1` |
 | `git --version` | `git version 2.50.1 (Apple Git-155)` |
 | `pnpm run test:constitution` at repaired/evidence candidates | 6 passed; 0 failed, skipped, or cancelled |
 | `git diff --check 98ff2f4...HEAD` | Passed before packet creation |
-| Source-plan SHA-256 | Matched `f8d3f7db149f18c28ac3c6e41781405e3661c4a5ab710ee28290b184864c1027` |
+| Source-plan SHA-256 | Current `821c175a8ce8c8a46ff4ec75f855e5cc9c867e0dfa9988ee2865dadbf969829d`; original pre-revision provenance `f8d3f7db149f18c28ac3c6e41781405e3661c4a5ab710ee28290b184864c1027` |
 | Absence checks for `apps`, `packages`, `.egeria`, `pnpm-lock.yaml`, and `.github` | All passed |
 | Reviewer repair verification | All three reviewers returned READY; test-evidence reviewer independently reran 6 tests and the repair-range diff check |
 
@@ -118,6 +128,11 @@ The controller reruns the full suite, comparison whitespace check, source hash, 
 | Test evidence | Markdown discovery included ignored/user-local trees and permitted outside targets | Material-kept; Git-bounded discovery and pre-access repository containment added | READY |
 | Test evidence | Accessibility claim policy overstated P0.1 semantic automation | Material-kept; P0.1 is documented/manual review and release automation remains planned | READY |
 | Test evidence | ADR test did not protect accepted authority or ordered non-empty decisions | Material-kept; strict document/index validator and negative control added | READY |
+| Requirements, Gate 3 revision | Generated-client rules omitted the required dedicated branch | Material-kept; added it to root and canonical generated-client boundaries | READY |
+| Architecture, Gate 3 revision | Source plan still unconditionally required isolated worktrees for builder-repository increments | Material-kept; delegated builder-repository execution policy to canonical governance | READY |
+| Architecture, Gate 3 revision | Dedicated-branch omission duplicated the requirements finding | Duplicate; covered by the same repair and independently rechecked | READY |
+| Architecture, Gate 3 revision | Repair-plan command lists omitted the changed source plan | Material-kept; corrected verification and staging lists | READY |
+| Test evidence, Gate 3 revision | No material test or evidence defect | No repair required; exact bytes, equality contract, RED/GREEN record, six tests, and limits independently checked | READY |
 
 No reviewer reported a Critical or Minor finding. No finding was rejected, deferred, or classified as low-value churn. No additional specialist was justified for this documentation-only, dependency-free increment.
 
@@ -133,9 +148,9 @@ P0.2 must refresh official documentation and advisories, select exact dependency
 
 - The constitution is documentation plus static repository contracts. Review reduces semantic contradiction risk but does not make prose executable.
 - The profile-inclusion catalog is an accepted initial policy. P1 must encode it in schemas/resolution tests and can change it only through an explicit accepted architecture decision.
-- The persisted source plan contains a lifecycle sequence that updates `.egeria` state after final-diff approval. ADR-0007 explicitly resolves that conflict: state is part of the exact diff and must be updated and re-verified before final approval.
+- The source plan remains a broad program artifact. Accepted ADRs and the canonical governance protocol own narrower execution details where the plan delegates to them.
 - Node.js `22.23.0` was selected by explicit user decision, but framework/adapter compatibility and the eventual pnpm version remain unproved until P0.2.
-- Direct work on `main` was explicitly allowed only for this bootstrap. Permanent builder behavior and later repository-changing increments still require a clean isolated worktree unless separately approved.
+- Clean, approved, sequential builder-repository work may run directly on `main`. Parallel work or materially useful isolation requires dedicated branches and isolated worktrees. Generated-client mutations always require a clean state, dedicated branch, isolated worktree, and transactional lifecycle.
 
 ## Deferred work
 
