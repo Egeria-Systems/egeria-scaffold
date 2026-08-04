@@ -34,7 +34,7 @@ Repository-changing builder commands always require:
 - no relevant untracked files;
 - no merge, rebase, revert, or cherry-pick in progress;
 - no unresolved conflict;
-- an isolated worktree created from the approved base.
+- a dedicated branch and isolated worktree created from the approved base.
 
 The builder never stashes, commits, discards, restores, or force-bypasses user work automatically.
 

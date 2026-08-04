@@ -34,6 +34,7 @@ Modify:
 - `AGENTS.md` — summarize the approved builder-repository development policy while preserving generated-client isolation.
 - `docs/governance/review-and-contribution.md` — canonical separation between builder-repository development and generated-client transformations.
 - `docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md` — record that the later Gate 3 workflow decision supersedes the earlier P0.1-only `main` exception.
+- `docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md` — delegate builder-repository development mode to the canonical governance protocol while preserving generated-client migration isolation.
 - `docs/implementation-evidence/2026-08-04-p0-1-constitution-verification.md` — add the revision RED/GREEN, commands, candidate commits, and reviewer dispositions.
 - `docs/review-packets/2026-08-04-p0-1-constitution-and-adrs.md` — present the revised exact candidate and final verification.
 
@@ -49,6 +50,8 @@ Explicitly unchanged:
 - `docs/adr/0007-transactional-repository-migrations.md` — already owns generated-client isolation and transaction ordering.
 - `docs/architecture/capability-model.md` and `docs/adr/0005-evidence-driven-package-extraction.md` — already retain `@egeria-systems/*`.
 - `docs/implementation-evidence/2026-08-04-p0-1-constitution-preparation.md` — historical preparation evidence remains unchanged.
+
+The source plan's original SHA-256 remains historical provenance in preparation evidence. Verification evidence and the review packet record the revised source-plan hash after this approved Gate 3 policy correction.
 
 ---
 
@@ -138,6 +141,7 @@ Expected: one commit containing only the pin, its contract, and direct README do
 
 - Modify: `AGENTS.md`
 - Modify: `docs/governance/review-and-contribution.md`
+- Modify: `docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md`
 - Modify: `docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md`
 
 **Interfaces:**
@@ -184,7 +188,7 @@ Remove only the obsolete sentence that calls direct `main` development a P0.1-on
 Replace the P0.1-only exception bullet in root `AGENTS.md` with:
 
 ```markdown
-- Development of this builder repository may proceed directly on clean `main` for one approved sequential implementation stream when repository protections permit it and isolation has no material safety or coordination benefit. Use a dedicated branch and isolated worktree when implementation becomes parallel or isolation is otherwise materially useful. Repository-changing builder commands that target generated client repositories always require clean state and one isolated-worktree execution.
+- Development of this builder repository may proceed directly on clean `main` for one approved sequential implementation stream when repository protections permit it and isolation has no material safety or coordination benefit. Use a dedicated branch and isolated worktree when implementation becomes parallel or isolation is otherwise materially useful. Repository-changing builder commands that target generated client repositories always require clean state, a dedicated branch, and one isolated-worktree execution.
 ```
 
 In `docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md`:
@@ -193,6 +197,12 @@ In `docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md`:
 2. state that the approved 2026-08-04 Gate 3 decision supersedes only that plan's P0.1-only builder-repository development exception;
 3. copy the repository-development and generated-client boundary from the approved design without changing transactional builder behavior;
 4. state that the new revision plan is the exact-file execution owner.
+
+In the source plan's `## 20. AI-agent governance` checklist, replace the unconditional isolated-worktree development item with:
+
+```markdown
+6. test-driven development under the canonical builder-repository development boundary in `docs/governance/review-and-contribution.md`;
+```
 
 Do not rewrite the historical preparation evidence or ADR-0007.
 

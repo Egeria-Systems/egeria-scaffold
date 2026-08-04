@@ -1094,7 +1094,7 @@ Every implementation increment requires:
 3. current official-documentation and advisory review;
 4. dated implementation evidence;
 5. an exact-file implementation plan under `docs/superpowers/plans/`;
-6. test-driven development in an isolated worktree;
+6. test-driven development under the canonical builder-repository development boundary in `docs/governance/review-and-contribution.md`;
 7. small focused commits;
 8. independent non-overlapping reviewers;
 9. remediation and renewed verification;

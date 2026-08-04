@@ -74,6 +74,8 @@ The approved 2026-08-04 Gate 3 decision supersedes only this plan's earlier P0.1
 
 This amendment does not change generated-client transformation safety. Repository-changing builder commands that target generated client repositories still require clean state, a dedicated branch and isolated worktree, transactional execution and verification, and separate plan and exact-final-diff approvals. The [P0.1 Gate 3 revisions plan](2026-08-04-p0-1-gate-3-revisions.md) is the exact-file execution owner for this amendment.
 
+The persisted source plan's AI-agent-governance checklist now delegates builder-repository development mode to the canonical governance protocol. Its original byte-for-byte hash remains historical preparation provenance; the revised hash is recorded in verification evidence and the Gate 3 review packet.
+
 ## Exact File Map
 
 Preparation artifacts already created and unchanged during implementation:
