@@ -137,3 +137,29 @@ test("architecture and roadmap cover every authoritative program decision", asyn
     }
   }
 });
+
+const acceptedAdrs = [
+  ["0001-materialized-profile-recipes.md", "ADR-0001"],
+  ["0002-capability-delivery-and-state.md", "ADR-0002"],
+  ["0003-hybrid-ownership.md", "ADR-0003"],
+  ["0004-cloudflare-isolation.md", "ADR-0004"],
+  ["0005-evidence-driven-package-extraction.md", "ADR-0005"],
+];
+
+test("accepted ADRs use the repository decision contract", async () => {
+  const index = await readRepositoryFile("docs/adr/README.md");
+
+  for (const [fileName, identifier] of acceptedAdrs) {
+    const relativePath = `docs/adr/${fileName}`;
+    const document = await readRepositoryFile(relativePath);
+
+    assert.ok(document.startsWith(`# ${identifier}:`));
+    assert.ok(document.includes("**Status:** Accepted"));
+    assert.ok(document.includes("**Date:** 2026-08-04"));
+    assert.ok(document.includes("## Context"));
+    assert.ok(document.includes("## Decision"));
+    assert.ok(document.includes("## Consequences"));
+    assert.ok(document.includes("## Enforcement"));
+    assert.ok(index.includes(fileName));
+  }
+});
