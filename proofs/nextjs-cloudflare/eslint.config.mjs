@@ -32,6 +32,9 @@ export default defineConfig([
   globalIgnores([
     ".next/**",
     ".open-next/**",
+    ".wrangler/**",
+    "playwright-report/**",
+    "test-results/**",
     "cloudflare-env.d.ts",
     "next-env.d.ts",
   ]),
