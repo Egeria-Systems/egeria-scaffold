@@ -83,3 +83,57 @@ test("governance documents preserve the approval and action boundaries", async (
     }
   }
 });
+
+const architectureCoverage = {
+  "docs/architecture/overview.md": [
+    "Profiles are versioned materialized recipes",
+    "app = app-foundation",
+    "Pure presentation components",
+    "No generic `PlatformService`",
+    "apps/jobs is generated only",
+    "No production profile is implemented in P0.1",
+  ],
+  "docs/architecture/capability-model.md": [
+    "type CapabilityDeliveryMode",
+    "stateClassifications",
+    "removalPolicy",
+    "application-persistence",
+    "transactional-email-resend",
+    "background-job-delivery",
+    "durable-contact-submissions",
+    "identity-2fa",
+    "identity-passkeys",
+    "payments-stripe",
+  ],
+  "docs/architecture/enforcement-map.md": [
+    "INV-PROFILE-MATERIALIZATION",
+    "INV-CLOUDFLARE-ISOLATION",
+    "INV-COPY-EXTERNALIZATION",
+    "INV-ACCESSIBILITY-CLAIMS",
+    "INV-DEPLOYMENT-AUTHORITY",
+    "planned",
+  ],
+  "docs/roadmaps/program-roadmap.md": [
+    "P0.1 — Constitution and ADRs",
+    "P0.2 — Deployed compatibility proof",
+    "P0.3 — Lean builder monorepo",
+    "P2 — Client-ready portfolio",
+    "P10 — Fleet hardening",
+    "Stop gate",
+  ],
+};
+
+test("architecture and roadmap cover every authoritative program decision", async () => {
+  for (const [relativePath, requiredFragments] of Object.entries(
+    architectureCoverage,
+  )) {
+    const document = await readRepositoryFile(relativePath);
+
+    for (const fragment of requiredFragments) {
+      assert.ok(
+        document.includes(fragment),
+        `${relativePath} must include: ${fragment}`,
+      );
+    }
+  }
+});
