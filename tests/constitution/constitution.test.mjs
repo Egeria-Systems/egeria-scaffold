@@ -142,6 +142,29 @@ test("workspace documentation reserves apps for builder code and proofs for evid
   assert.match(overview, /`packages\/\*` contains deliberately owned packages/);
 });
 
+function validateCompatibilityDeploymentCredentialBoundary(workflow) {
+  const deployIndex = workflow.indexOf("- name: Deploy compatibility Worker");
+  const deployedTestIndex = workflow.indexOf(
+    "- name: Test deployed compatibility proof",
+  );
+  const deployBlock = workflow.slice(deployIndex, deployedTestIndex);
+  const problems = [];
+
+  if (
+    !deployBlock.includes(
+      "pnpm --filter @egeria-systems/nextjs-cloudflare-proof deploy",
+    )
+  ) {
+    problems.push("credential-bearing step must invoke the deploy-only script");
+  }
+
+  if (/(?:pnpm|opennextjs-cloudflare)[^\n]*\bbuild\b/.test(deployBlock)) {
+    problems.push("credential-bearing step must not build under Cloudflare credentials");
+  }
+
+  return problems.join("; ");
+}
+
 test("the compatibility deployment workflow is manual, bounded, and secret-minimal", async () => {
   const [workflow, proofManifestSource] = await Promise.all([
     readRepositoryFile(".github/workflows/compatibility-proof.yml"),
@@ -169,6 +192,7 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   );
   assert.match(workflow, /pnpm install --frozen-lockfile/);
   assert.equal(proofManifest.scripts.deploy, "opennextjs-cloudflare deploy");
+  assert.equal(validateCompatibilityDeploymentCredentialBoundary(workflow), "");
 
   const verifyIndex = workflow.indexOf("- name: Verify compatibility proof");
   const deployIndex = workflow.indexOf("- name: Deploy compatibility Worker");
@@ -192,6 +216,21 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
     /COMPATIBILITY_URL: \$\{\{ vars\.COMPATIBILITY_URL \}\}/,
   );
   assert.doesNotMatch(workflow, /production/i);
+});
+
+test("the deployment credential contract rejects build work in the secret-bearing block", async () => {
+  const workflow = await readRepositoryFile(
+    ".github/workflows/compatibility-proof.yml",
+  );
+  const insecureWorkflow = workflow.replace(
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof deploy",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof build:cloudflare\n          pnpm --filter @egeria-systems/nextjs-cloudflare-proof deploy",
+  );
+
+  assert.match(
+    validateCompatibilityDeploymentCredentialBoundary(insecureWorkflow),
+    /must not build under Cloudflare credentials/,
+  );
 });
 
 test("repository documentation has no broken local Markdown links", async () => {
