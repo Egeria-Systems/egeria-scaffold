@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -11,6 +11,27 @@ const repositoryRoot = resolve(
 
 async function readRepositoryFile(relativePath) {
   return readFile(resolve(repositoryRoot, relativePath), "utf8");
+}
+
+async function listMarkdownFiles(directory = repositoryRoot) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    if (entry.name === ".git" || entry.name === "node_modules") {
+      continue;
+    }
+
+    const path = resolve(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(...(await listMarkdownFiles(path)));
+    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      files.push(path);
+    }
+  }
+
+  return files;
 }
 
 test("the root workspace is private and dependency-free in P0.1", async () => {
@@ -39,103 +60,38 @@ test("the workspace declares only the approved future package roots", async () =
   );
 });
 
-const governanceDocuments = {
-  "README.md": [
-    "P0.1 — Constitution and ADRs",
-    "No production profile is implemented",
-    "docs/architecture/overview.md",
-    "docs/roadmaps/program-roadmap.md",
-  ],
-  "AGENTS.md": [
-    "Plan approval is not final-diff approval",
-    "Never create a pull request unless explicitly asked",
-    "Cloudflare types and bindings",
-    "No WCAG conformance claim",
-    "Canonical owners and cohesion",
-    "Update the canonical owner and every direct consumer",
-  ],
-  "CONTRIBUTING.md": [
-    "docs/governance/review-and-contribution.md",
-    "docs/architecture/enforcement-map.md",
-  ],
-  "docs/governance/review-and-contribution.md": [
-    "Gate 1: preparation evidence",
-    "Gate 2: implementation-plan approval",
-    "Gate 3: verified-final-diff approval",
-    "Requirements reviewer",
-    "Architecture and anti-overengineering reviewer",
-    "Test-evidence reviewer",
-    "Pull-request creation requires a separate explicit request",
-  ],
-};
+test("repository documentation has no broken local Markdown links", async () => {
+  const markdownFiles = await listMarkdownFiles();
+  const brokenLinks = [];
 
-test("governance documents preserve the approval and action boundaries", async () => {
-  for (const [relativePath, requiredFragments] of Object.entries(
-    governanceDocuments,
-  )) {
-    const document = await readRepositoryFile(relativePath);
+  for (const markdownFile of markdownFiles) {
+    const document = await readFile(markdownFile, "utf8");
+    const links = document.matchAll(/\[[^\]]+\]\(([^)]+)\)/g);
 
-    for (const fragment of requiredFragments) {
-      assert.ok(
-        document.includes(fragment),
-        `${relativePath} must include: ${fragment}`,
-      );
+    for (const [, destination] of links) {
+      if (
+        destination.startsWith("#") ||
+        destination.startsWith("https://") ||
+        destination.startsWith("http://") ||
+        destination.startsWith("mailto:")
+      ) {
+        continue;
+      }
+
+      const [path] = destination.split("#", 1);
+      const target = resolve(dirname(markdownFile), decodeURI(path));
+
+      try {
+        await access(target);
+      } catch {
+        brokenLinks.push(
+          `${markdownFile.slice(repositoryRoot.length + 1)} -> ${destination}`,
+        );
+      }
     }
   }
-});
 
-const architectureCoverage = {
-  "docs/architecture/overview.md": [
-    "Profiles are versioned materialized recipes",
-    "app = app-foundation",
-    "Pure presentation components",
-    "No generic `PlatformService`",
-    "apps/jobs is generated only",
-    "No production profile is implemented in P0.1",
-  ],
-  "docs/architecture/capability-model.md": [
-    "type CapabilityDeliveryMode",
-    "stateClassifications",
-    "removalPolicy",
-    "application-persistence",
-    "transactional-email-resend",
-    "background-job-delivery",
-    "durable-contact-submissions",
-    "identity-2fa",
-    "identity-passkeys",
-    "payments-stripe",
-  ],
-  "docs/architecture/enforcement-map.md": [
-    "INV-PROFILE-MATERIALIZATION",
-    "INV-CLOUDFLARE-ISOLATION",
-    "INV-COPY-EXTERNALIZATION",
-    "INV-ACCESSIBILITY-CLAIMS",
-    "INV-DEPLOYMENT-AUTHORITY",
-    "planned",
-  ],
-  "docs/roadmaps/program-roadmap.md": [
-    "P0.1 — Constitution and ADRs",
-    "P0.2 — Deployed compatibility proof",
-    "P0.3 — Lean builder monorepo",
-    "P2 — Client-ready portfolio",
-    "P10 — Fleet hardening",
-    "Stop gate",
-  ],
-};
-
-test("architecture and roadmap cover every authoritative program decision", async () => {
-  for (const [relativePath, requiredFragments] of Object.entries(
-    architectureCoverage,
-  )) {
-    const document = await readRepositoryFile(relativePath);
-
-    for (const fragment of requiredFragments) {
-      assert.ok(
-        document.includes(fragment),
-        `${relativePath} must include: ${fragment}`,
-      );
-    }
-  }
+  assert.deepEqual(brokenLinks, []);
 });
 
 const acceptedAdrs = [

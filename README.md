@@ -16,7 +16,7 @@ Canonical project documents:
 - [Architecture decision records](docs/adr/README.md)
 - [Review and contribution protocol](docs/governance/review-and-contribution.md)
 - [Implementation evidence](docs/implementation-evidence/)
-- [Review packets](docs/review-packets/)
+- Review packets are added under `docs/review-packets/` after final verification.
 
 Run the dependency-free constitution contract with:
 

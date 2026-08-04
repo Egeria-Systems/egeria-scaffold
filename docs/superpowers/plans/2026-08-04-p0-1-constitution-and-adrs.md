@@ -50,6 +50,10 @@ Plan approval also approves these normalizations of contradictions in the source
 7. Ignore the missing repository-external `/Users/CoveMB/.codex/RTK.md`. Root `AGENTS.md` must be self-contained and must not depend on personal machine instructions.
 8. Execute P0.1 directly on clean `main` as explicitly approved. Preserve isolated-worktree requirements as permanent builder behavior and the default for later implementation increments.
 
+## Execution Test Amendment
+
+The phrase-presence assertions shown in Tasks 2 and 3 were useful during initial RED/GREEN authoring but are not retained in the final suite. The required test-design guidance classifies human-prose grep assertions as change detectors rather than behavioral protection. Before independent review, replace them with a real local Markdown-link integrity test, retain the workspace and ADR-structure contracts, and rely on the three independent reviewers for semantic requirements and architecture evaluation. Record the original RED/GREEN cycles and the final test design honestly in verification evidence.
+
 ## Exact File Map
 
 Preparation artifacts already created and unchanged during implementation:

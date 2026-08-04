@@ -7,10 +7,10 @@
 **Frozen comparison:**
 
 - Base: `98ff2f4054fb7c1b27a217726e40ba9f2fc5bca3`
-- Candidate before review: `14360119a371942727527642a9d6640f61050eb9`
+- Content candidate before test-quality refinement: `14360119a371942727527642a9d6640f61050eb9`
 - Branch: `main`, explicitly approved for the P0.1 bootstrap
 
-The base commit contains the approved source plan, preparation evidence, and exact-file plan. The candidate range is `98ff2f4...1436011`.
+The base commit contains the approved source plan, preparation evidence, and exact-file plan. The content range verified before test-quality refinement was `98ff2f4...1436011`; reviewer dispatch freezes a later exact HEAD that also includes this evidence and the test refinement below.
 
 ## Toolchain observation
 
@@ -34,13 +34,16 @@ No third-party dependency was installed. There is no lockfile, so a package advi
 | ADR-0001–0005 | Focused failure with `ENOENT` for missing `docs/adr/README.md` | ADR contract and full suite passed after the first accepted ADR group |
 | ADR-0006–0011 | Focused failure with `ENOENT` for missing `docs/adr/0006-egeria-state-files.md` | ADR contract and full suite passed after completing all eleven ADRs |
 
-The contract tests use only Node.js built-in modules and read the real repository files; no mocks or generated fixtures are involved.
+The authoring cycles initially included phrase-presence contracts for governance and architecture prose. Before independent review, the required test-design guidance identified those as change detectors: they proved text presence rather than repository behavior. The final suite removes those two assertions and adds a real local Markdown-link integrity contract. That new test first failed on the broken `README.md -> docs/review-packets/` link, then passed after the premature link became plain path guidance.
+
+The retained contract tests use only Node.js built-in modules and read the real repository files; no mocks or generated fixtures are involved. Semantic requirements and architecture completeness are evaluated by the required independent reviewers rather than source-text grep assertions.
 
 ## Final pre-review commands
 
 | Command | Exit | Result |
 |---|---:|---|
-| `pnpm run test:constitution` | 0 | 5 tests passed; 0 failed, skipped, or cancelled |
+| `pnpm run test:constitution` | 0 | Initial coherent-tree run: 5 tests passed; the post-refinement run below supersedes this count |
+| `pnpm run test:constitution` after test-quality refinement | 0 | 4 meaningful contracts passed; 0 failed, skipped, or cancelled |
 | `git diff --check 98ff2f4...HEAD` | 0 | No whitespace errors |
 | `shasum -a 256 docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md` | 0 | `f8d3f7db149f18c28ac3c6e41781405e3661c4a5ab710ee28290b184864c1027` |
 | `test ! -e apps` | 0 | No application directory |
@@ -124,7 +127,7 @@ The candidate contains no:
 
 ## Evidence limits
 
-These static document contracts prove that the required files and selected authoritative phrases exist and that ADRs follow the repository decision structure. They do not by themselves prove semantic completeness or absence of contradiction; the required independent reviews address those risks before the final packet.
+The final static contracts prove the root workspace metadata, approved workspace roots, local documentation-link integrity, and ADR decision structure. They do not prove prose semantics, architecture completeness, or absence of contradiction; the required independent reviews address those risks before the final packet.
 
 Nothing in P0.1 proves:
 
