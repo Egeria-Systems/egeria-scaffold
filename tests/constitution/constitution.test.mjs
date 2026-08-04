@@ -144,6 +144,12 @@ const acceptedAdrs = [
   ["0003-hybrid-ownership.md", "ADR-0003"],
   ["0004-cloudflare-isolation.md", "ADR-0004"],
   ["0005-evidence-driven-package-extraction.md", "ADR-0005"],
+  ["0006-egeria-state-files.md", "ADR-0006"],
+  ["0007-transactional-repository-migrations.md", "ADR-0007"],
+  ["0008-copy-externalization.md", "ADR-0008"],
+  ["0009-accessibility-evidence-and-claims.md", "ADR-0009"],
+  ["0010-analytics-and-observability.md", "ADR-0010"],
+  ["0011-github-actions-deployment-authority.md", "ADR-0011"],
 ];
 
 test("accepted ADRs use the repository decision contract", async () => {
