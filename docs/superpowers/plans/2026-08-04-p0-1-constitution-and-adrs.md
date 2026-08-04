@@ -54,6 +54,20 @@ Plan approval also approves these normalizations of contradictions in the source
 
 The phrase-presence assertions shown in Tasks 2 and 3 were useful during initial RED/GREEN authoring but are not retained in the final suite. The required test-design guidance classifies human-prose grep assertions as change detectors rather than behavioral protection. Before independent review, replace them with a real local Markdown-link integrity test, retain the workspace and ADR-structure contracts, and rely on the three independent reviewers for semantic requirements and architecture evaluation. Record the original RED/GREEN cycles and the final test design honestly in verification evidence.
 
+## Independent Review Reconciliation
+
+The required reviewers inspected frozen candidate `8303aeda2d25ccf1087a3af0e1b3616ccf1a20c3` and reported seven Important findings. All seven were verified against the tree, kept as material, and repaired in `f10ecc21ee8eec13df988b8d99027ec3d23762dd`:
+
+1. Move state/migration updates and their verification before preparation and approval of the exact final diff. ADR-0007 explicitly resolves the conflicting order in the source plan because final-diff approval cannot precede a mutation of that diff.
+2. Limit P0.3 to package/API ownership boundaries; defer executable project/state schemas and the builder kernel to P1.
+3. Classify source-generated `booking-calendly` as repository-stateful and exclude Calendly provider configuration from builder authority.
+4. Declare default, optional, or dependency-only profile inclusion for every catalog capability.
+5. Bound Markdown discovery to Git-tracked or unignored repository files and reject link targets outside the repository before access.
+6. Describe the accessibility-claim invariant as documented/manual review in P0.1, with semantic automation planned later.
+7. Strengthen the ADR contract to require identifier/file binding, unique accepted metadata, ordered non-empty sections, one exact Accepted index row, and ordered index entries.
+
+Each original reviewer rechecked only its repair scope against the exact repair commit and returned READY with no material repair-caused regression.
+
 ## Exact File Map
 
 Preparation artifacts already created and unchanged during implementation:

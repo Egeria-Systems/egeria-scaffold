@@ -8,9 +8,11 @@
 
 - Base: `98ff2f4054fb7c1b27a217726e40ba9f2fc5bca3`
 - Content candidate before test-quality refinement: `14360119a371942727527642a9d6640f61050eb9`
+- Independent-review candidate: `8303aeda2d25ccf1087a3af0e1b3616ccf1a20c3`
+- Repaired candidate: `f10ecc21ee8eec13df988b8d99027ec3d23762dd`
 - Branch: `main`, explicitly approved for the P0.1 bootstrap
 
-The base commit contains the approved source plan, preparation evidence, and exact-file plan. The content range verified before test-quality refinement was `98ff2f4...1436011`; reviewer dispatch freezes a later exact HEAD that also includes this evidence and the test refinement below.
+The base commit contains the approved source plan, preparation evidence, and exact-file plan. The content range verified before test-quality refinement was `98ff2f4...1436011`. Required reviewers inspected `98ff2f4...8303aed`; repair verification compared `8303aed...f10ecc2`. The final evidence and review-packet commits are recorded in the packet itself.
 
 ## Toolchain observation
 
@@ -33,17 +35,21 @@ No third-party dependency was installed. There is no lockfile, so a package advi
 | Architecture | Focused failure with `ENOENT` for missing `docs/architecture/overview.md` | Focused architecture/roadmap test and full suite passed after adding four canonical documents |
 | ADR-0001–0005 | Focused failure with `ENOENT` for missing `docs/adr/README.md` | ADR contract and full suite passed after the first accepted ADR group |
 | ADR-0006–0011 | Focused failure with `ENOENT` for missing `docs/adr/0006-egeria-state-files.md` | ADR contract and full suite passed after completing all eleven ADRs |
+| Capability profile inclusion | Focused catalog failure: `` `standards` has invalid profile inclusion: None `` | Normalized catalog contract passed after all 24 capabilities declared default, optional, or dependency-only inclusion |
+| Repository-bounded Markdown discovery | A temporary ignored `.worktrees/ignored-contract-fixture.md` made the old link scan fail | The focused test passed while the ignored fixture existed after discovery changed to Git tracked/unignored files; the fixture was then removed |
+| Authoritative ADR/index validation | Focused negative-control test failed with `validateAcceptedAdr is not defined` | Negative control and all eleven real ADR/index records passed after the validator enforced binding, uniqueness, ordering, and non-empty sections |
 
 The authoring cycles initially included phrase-presence contracts for governance and architecture prose. Before independent review, the required test-design guidance identified those as change detectors: they proved text presence rather than repository behavior. The final suite removes those two assertions and adds a real local Markdown-link integrity contract. That new test first failed on the broken `README.md -> docs/review-packets/` link, then passed after the premature link became plain path guidance.
 
-The retained contract tests use only Node.js built-in modules and read the real repository files; no mocks or generated fixtures are involved. Semantic requirements and architecture completeness are evaluated by the required independent reviewers rather than source-text grep assertions.
+The retained contract tests use only Node.js built-in modules and Git, and read the real repository files. The inline invalid ADR is a negative control for the validator; the temporary ignored Markdown fixture was deleted after its RED/GREEN cycle. Semantic prose requirements and architecture completeness are evaluated by the required independent reviewers rather than source-text grep assertions.
 
-## Final pre-review commands
+## Repaired-candidate commands
 
 | Command | Exit | Result |
 |---|---:|---|
 | `pnpm run test:constitution` | 0 | Initial coherent-tree run: 5 tests passed; the post-refinement run below supersedes this count |
 | `pnpm run test:constitution` after test-quality refinement | 0 | 4 meaningful contracts passed; 0 failed, skipped, or cancelled |
+| `pnpm run test:constitution` at `f10ecc2` | 0 | 6 contracts passed; 0 failed, skipped, or cancelled |
 | `git diff --check 98ff2f4...HEAD` | 0 | No whitespace errors |
 | `shasum -a 256 docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md` | 0 | `f8d3f7db149f18c28ac3c6e41781405e3661c4a5ab710ee28290b184864c1027` |
 | `test ! -e apps` | 0 | No application directory |
@@ -51,13 +57,16 @@ The retained contract tests use only Node.js built-in modules and read the real 
 | `test ! -e .egeria` | 0 | No project/state files or schemas |
 | `test ! -e pnpm-lock.yaml` | 0 | No lockfile |
 | `test ! -e .github` | 0 | No workflow or deployment configuration |
-| `git status --short --branch` | 0 | Clean `main` before this evidence file was added |
+| `git status --short --branch` | 0 | Clean `main` at repaired candidate `f10ecc2`, before this evidence update |
 
 During the architecture commit, a staged check reported Markdown hard-break trailing spaces but the commit command still ran in the same tool batch. Commit `088f2b3` removed those spaces without changing architecture content. The fresh final comparison check above passes.
 
 ## Candidate commits
 
 ```text
+f10ecc2 docs: reconcile P0.1 review findings
+8303aed test: replace prose change detectors
+7dcc589 docs: record P0.1 verification evidence
 1436011 docs: accept state and governance decisions
 c256a95 docs: accept recipe and ownership decisions
 088f2b3 style: remove markdown trailing whitespace
@@ -66,6 +75,16 @@ d276da8 docs: define review and contribution protocol
 8e5e50d build: initialize private pnpm workspace
 d0475f6 docs: record approved P0.1 amendments
 ```
+
+## Independent review dispositions
+
+All findings were classified as material-kept, repaired, and verified by the originating reviewer:
+
+- **Requirements:** added explicit profile inclusion for every capability and a normalized catalog contract. Follow-up readiness: READY.
+- **Architecture and anti-overengineering:** corrected state/final-diff ordering, made the P0.3/P1 schema boundary unambiguous, and corrected Calendly repository/provider ownership. Follow-up readiness: READY.
+- **Test evidence:** bounded Markdown discovery and targets to the repository, corrected the accessibility-enforcement claim, and strengthened ADR/index authority validation. Follow-up readiness: READY; the reviewer independently ran the six-test suite and diff check.
+
+No Critical or Minor finding was reported. No finding was rejected, deferred, or treated as low-value churn. No specialist reviewer was needed because P0.1 installed no runtime, dependency, Cloudflare resource, provider integration, or production surface.
 
 ## Candidate changed files
 
@@ -127,7 +146,7 @@ The candidate contains no:
 
 ## Evidence limits
 
-The final static contracts prove the root workspace metadata, approved workspace roots, local documentation-link integrity, and ADR decision structure. They do not prove prose semantics, architecture completeness, or absence of contradiction; the required independent reviews address those risks before the final packet.
+The final static contracts prove the root workspace metadata, approved workspace roots, repository-bounded local documentation-link integrity, normalized documented capability rows, and ADR/index decision structure. They do not prove prose semantics, runtime capability behavior, or general absence of contradiction; the required independent reviews address the P0.1 semantic risks recorded above.
 
 Nothing in P0.1 proves:
 
