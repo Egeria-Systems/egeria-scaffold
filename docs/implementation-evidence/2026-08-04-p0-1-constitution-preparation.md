@@ -48,7 +48,7 @@ Reviewed on 2026-08-04. Version and advisory facts must be refreshed at the star
 
 - The [official release table](https://nodejs.org/en/about/previous-releases) lists Node.js 24 as LTS and Node.js 26 as Current. It recommends Active LTS or Maintenance LTS for production.
 - The [June 2026 security release](https://nodejs.org/en/blog/vulnerability/june-2026-security-releases) fixed issues up to HIGH severity in the supported 22, 24, and 26 lines, with patched releases `22.23.0`, `24.17.0`, and `26.3.1`.
-- Consequence for this increment: use only dependency-free document-contract tests. Before P0.2 executes third-party toolchains, switch to a currently patched Node.js 24 release and record the exact selected version.
+- Initial consequence for this increment: use only dependency-free document-contract tests and select a patched runtime before P0.2 executes third-party toolchains. The later user disposition below selects Volta-pinned Node.js `22.23.0`; P0.2 must validate that exact pin against the selected Next.js/OpenNext pair.
 
 ### pnpm
 
@@ -88,3 +88,13 @@ The following items must be explicit in the P0.1 plan and approved with it:
 6. **Accessibility review wording:** “Accessibility review complete” means the automated evidence and policy-required review for the selected scope. It does not silently make human evaluation a default release gate and does not authorize a conformance claim.
 
 No other direct contradiction blocks planning P0.1. Package versions, Cloudflare account identifiers, GitHub environment configuration, and deployed proof remain deliberately deferred to P0.2.
+
+## User dispositions after preparation
+
+Approved on 2026-08-04:
+
+1. The user created bootstrap commit `98ff2f4` containing exactly the three preparation artifacts.
+2. P0.1 implementation may run directly on clean `main`. This is a narrow development-process exception; the permanent builder rule still requires clean isolated worktrees for repository-changing builder commands, and later implementation increments require their own scope decision.
+3. Root `package.json` will pin Node.js `22.23.0` through `volta.node`. This is the P0.1 development runtime decision, not deployed compatibility proof.
+4. Root `AGENTS.md` will be substantive and self-contained, with explicit canonical-owner, cohesion, and documentation-drift rules from the first implementation increment.
+5. The missing personal `/Users/CoveMB/.codex/RTK.md` include is ignored. Repository behavior must not depend on that missing machine-local file.

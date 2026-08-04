@@ -4,7 +4,7 @@
 
 **Goal:** Create the repository constitution, private root pnpm workspace, architecture overview, roadmap, eleven accepted ADRs, review protocol, and dependency-free enforcement tests without implementing a production profile or speculative runtime package.
 
-**Architecture:** The repository remains documentation-first in P0.1. Canonical architecture and governance live in small Markdown documents linked from root `AGENTS.md`; a dependency-free Node.js contract test verifies their presence, decision coverage, ADR shape, and the deliberately empty runtime/package surface. Exact framework and package versions remain candidates until P0.2 proves them under Next development, workerd preview, integration tests, accessibility smoke tests, and a non-production deployment.
+**Architecture:** The repository remains documentation-first in P0.1. Canonical architecture and governance live in small Markdown documents linked from a substantive root `AGENTS.md`; a dependency-free Node.js contract test verifies their presence, decision coverage, ADR shape, and the deliberately empty runtime/package surface. Node.js is pinned to `22.23.0` through Volta by explicit user decision; exact framework and package versions remain candidates until P0.2 proves them under Next development, workerd preview, integration tests, accessibility smoke tests, and a non-production deployment.
 
 **Tech Stack:** Markdown, JSON, YAML, Git, a private pnpm workspace, and the Node.js built-in test runner. P0.1 installs no third-party packages and creates no application or public package.
 
@@ -27,6 +27,7 @@
 - Every capability declares delivery mode, state classifications, one removal policy, security metadata, managed surfaces, inference probes, migrations, and verification.
 - Public packages are ordinary replaceable dependencies, and extraction requires evidence.
 - Repository-changing builder commands require a clean Git state and isolated worktree.
+- By explicit approval, P0.1 repository-constitution development runs directly on clean `main`; this one-time bootstrap exception does not apply to builder commands or later increments.
 - Plan approval and verified-final-diff approval are separate gates.
 - `.egeria` state changes only after transformation, verification, and post-change inference succeed.
 - Persistent-data and provider rollback remain separate from source rollback.
@@ -45,6 +46,9 @@ Plan approval also approves these normalizations of contradictions in the source
 3. Normalize delivery labels to exactly `package-backed`, `source-generated`, or `hybrid`; “public package” is an ownership/publication fact rather than another delivery mode.
 4. Preserve the strict action boundary: plan approval does not authorize pull-request creation, merge, push, publication, or deployment.
 5. Treat “accessibility review complete” as the automated and policy-required evidence for the selected scope, not an implicit conformance claim or universal human-release gate.
+6. Pin Node.js `22.23.0` through the root manifest's Volta configuration. Treat this as the approved P0.1 development pin; P0.2 still owns deployed compatibility proof.
+7. Ignore the missing repository-external `/Users/CoveMB/.codex/RTK.md`. Root `AGENTS.md` must be self-contained and must not depend on personal machine instructions.
+8. Execute P0.1 directly on clean `main` as explicitly approved. Preserve isolated-worktree requirements as permanent builder behavior and the default for later implementation increments.
 
 ## Exact File Map
 
@@ -57,10 +61,10 @@ Preparation artifacts already created and unchanged during implementation:
 Files created by P0.1 implementation:
 
 - `.gitignore` — dependency, local environment, coverage, and editor exclusions.
-- `package.json` — private dependency-free workspace root and constitution test scripts.
+- `package.json` — private dependency-free workspace root, Volta Node.js `22.23.0` pin, and constitution test scripts.
 - `pnpm-workspace.yaml` — future `apps/*` and `packages/*` workspace boundaries without creating either directory.
 - `README.md` — repository purpose, current phase, canonical-document index, and explicit non-goals.
-- `AGENTS.md` — concise repository constitution and links to canonical owners.
+- `AGENTS.md` — substantive, self-contained repository constitution with cohesion/drift rules and links to canonical owners.
 - `CONTRIBUTING.md` — contributor entry point that delegates the normative lifecycle to one governance document.
 - `docs/governance/review-and-contribution.md` — canonical approval, Git, TDD, reviewer, verification, review-packet, and external-action protocol.
 - `docs/architecture/overview.md` — builder and generated-repository architecture, application layers, portability boundaries, and current P0.1 scope.
@@ -87,42 +91,40 @@ No other file is in scope.
 
 ---
 
-### Task 0: Approve and bootstrap an auditable isolated-worktree base
+### Task 0: Confirm the approved main-branch bootstrap and amendments
 
 **Files:**
 
-- Commit unchanged: `docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md`
-- Commit unchanged: `docs/implementation-evidence/2026-08-04-p0-1-constitution-preparation.md`
-- Commit unchanged: `docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md`
+- Modify: `docs/implementation-evidence/2026-08-04-p0-1-constitution-preparation.md`
+- Modify: `docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md`
+- Verify unchanged: `docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md`
 
 **Interfaces:**
 
-- Consumes: Explicit user approval of this plan, the five reconciliation decisions, and the one-time bootstrap commit.
-- Produces: A committed `main` base and isolated branch `p0-1-constitution` in sibling worktree `../egeria-scaffold-p0-1-constitution`.
+- Consumes: User-created bootstrap commit `98ff2f4`, explicit P0.1 main-branch approval, the Volta Node.js pin, and the self-contained `AGENTS.md` requirement.
+- Produces: A clean approved `main` execution base with permanent builder isolation rules preserved for later implementation.
 
-- [ ] **Step 1: Obtain the gate approval**
-
-Do not continue unless the user explicitly approves this file, the reconciliation decisions, the one-time bootstrap commit on unborn `main`, and creation of the isolated worktree. Approval does not include a push, pull request, merge, deployment, publication, or P0.2 work.
-
-- [ ] **Step 2: Recheck the exact primary-worktree scope**
+- [ ] **Step 1: Verify the user-created bootstrap commit**
 
 Run:
 
 ```bash
 git status --short --branch
 git branch --show-current
-git ls-remote --heads --tags origin
+git show --stat --oneline HEAD
 ```
 
-Expected:
+Expected: clean `main` at commit `98ff2f4`, containing only the approved source plan, preparation evidence, and implementation plan. Stop if any unrelated work appears.
 
-```text
-## No commits yet on main
-?? docs/
-main
-```
+- [ ] **Step 2: Record the explicit execution amendments**
 
-The remote query must still return no refs. Stop if any other staged, unstaged, untracked, local-branch, or remote work appears.
+Update this plan and preparation evidence to state:
+
+- P0.1 implementation is explicitly approved directly on clean `main`;
+- this is not a precedent for repository-changing builder commands or later increments;
+- `package.json` pins Node.js `22.23.0` through `volta.node`;
+- root `AGENTS.md` is substantive, self-contained, and owns cohesion/drift rules;
+- the missing personal `RTK.md` include is ignored and never becomes a repository dependency.
 
 - [ ] **Step 3: Revalidate the approved source copy**
 
@@ -138,30 +140,18 @@ Expected:
 f8d3f7db149f18c28ac3c6e41781405e3661c4a5ab710ee28290b184864c1027
 ```
 
-- [ ] **Step 4: Create the one-time bootstrap commit**
+- [ ] **Step 4: Commit only the approved amendments**
 
 Run:
 
 ```bash
-git add docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md docs/implementation-evidence/2026-08-04-p0-1-constitution-preparation.md docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md
+git add docs/implementation-evidence/2026-08-04-p0-1-constitution-preparation.md docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md
 git diff --cached --check
 git diff --cached --stat
-git commit -m "docs: record P0.1 implementation plan"
+git commit -m "docs: record approved P0.1 amendments"
 ```
 
-Expected: one initial commit containing only the three approved preparation artifacts.
-
-- [ ] **Step 5: Create and verify the isolated implementation worktree**
-
-Run:
-
-```bash
-git worktree add -b p0-1-constitution ../egeria-scaffold-p0-1-constitution main
-git -C ../egeria-scaffold-p0-1-constitution status --short --branch
-git -C ../egeria-scaffold-p0-1-constitution log -1 --oneline
-```
-
-Expected: clean branch `p0-1-constitution` at the bootstrap commit. All following tasks run only in that worktree.
+Expected: one focused amendment commit on `main`. No branch, worktree, push, pull request, or external action is created.
 
 ---
 
@@ -213,6 +203,7 @@ test("the root workspace is private and dependency-free in P0.1", async () => {
   assert.equal("devDependencies" in manifest, false);
   assert.equal("packageManager" in manifest, false);
   assert.equal("engines" in manifest, false);
+  assert.deepEqual(manifest.volta, { node: "22.23.0" });
 });
 
 test("the workspace declares only the approved future package roots", async () => {
@@ -248,6 +239,9 @@ Create `package.json` with:
   "scripts": {
     "test": "pnpm run test:constitution",
     "test:constitution": "node --test tests/constitution/constitution.test.mjs"
+  },
+  "volta": {
+    "node": "22.23.0"
   }
 }
 ```
@@ -274,7 +268,7 @@ coverage/
 .worktrees/
 ```
 
-The absent `packageManager` and `engines` fields are deliberate: P0.2 owns exact compatibility selection. Do not create a lockfile or run an install in P0.1.
+The absent `packageManager` and `engines` fields are deliberate: P0.2 owns package-manager and deployed compatibility selection. The Volta pin is the user-approved P0.1 Node.js development runtime. Do not create a lockfile or run an install in P0.1.
 
 - [ ] **Step 4: Run the tests to verify GREEN**
 
@@ -283,9 +277,10 @@ Run:
 ```bash
 node --test tests/constitution/constitution.test.mjs
 pnpm run test:constitution
+node --version
 ```
 
-Expected: both commands pass. Record the local Node.js and pnpm versions without describing them as the selected compatibility pair.
+Expected: both test commands pass and Volta resolves `node --version` to `v22.23.0`. Record the pnpm version without describing it as the selected compatibility pair.
 
 - [ ] **Step 5: Commit the workspace contract**
 
@@ -331,6 +326,8 @@ const governanceDocuments = {
     "Never create a pull request unless explicitly asked",
     "Cloudflare types and bindings",
     "No WCAG conformance claim",
+    "Canonical owners and cohesion",
+    "Update the canonical owner and every direct consumer",
   ],
   "CONTRIBUTING.md": [
     "docs/governance/review-and-contribution.md",
@@ -390,7 +387,10 @@ Create root `AGENTS.md` with these normative sections:
 5. `State and migrations`: repeat update ordering and rollback-domain separation.
 6. `Copy and accessibility`: externalize user-visible/translatable copy; require automated gates; prohibit automation-only conformance claims; keep human review conditional.
 7. `Testing and review`: TDD, smallest relevant checks, one full relevant suite on the final tree, the three independent reviewer scopes required by the program, evidence-backed material repairs only, and a review packet before the stop gate.
-8. Canonical links to `docs/governance/review-and-contribution.md` and `docs/architecture/enforcement-map.md` instead of duplicating their full procedures.
+8. `Canonical owners and cohesion`: identify one owner for each decision, schema, workflow, and invariant; update the canonical owner and every direct consumer in the same focused change; never copy normative rules when a precise link is sufficient; stop when documentation and implementation conflict and ownership is unclear; keep terminology and identifiers consistent across architecture, ADR, roadmap, tests, evidence, and review packets.
+9. Canonical links to `docs/governance/review-and-contribution.md` and `docs/architecture/enforcement-map.md` instead of duplicating their full procedures.
+
+The file must be self-contained and must not reference `/Users/CoveMB/.codex/RTK.md`, another personal path, conversation memory, or machine-local policy.
 
 Create `CONTRIBUTING.md` as a concise entry point containing:
 
@@ -847,13 +847,13 @@ node --version
 pnpm --version
 git --version
 pnpm run test:constitution
-git diff --check main...HEAD
+git diff --check 98ff2f4...HEAD
 shasum -a 256 docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md
 test ! -e apps
 test ! -e packages
 test ! -e .egeria
 git status --short --branch
-git log --oneline --decorate main..HEAD
+git log --oneline --decorate 98ff2f4..HEAD
 ```
 
 Expected:
@@ -871,14 +871,14 @@ Do not rerun an unchanged successful check.
 
 Create `docs/implementation-evidence/2026-08-04-p0-1-constitution-verification.md` with:
 
-- exact commit range `main...HEAD` and commit IDs;
+- exact commit range `98ff2f4...HEAD` and commit IDs;
 - every command and exit result;
 - local Node.js, pnpm, and Git versions;
 - source-plan hash;
 - list of created files;
 - confirmation that no dependencies, lockfile, app, public/private package, `.egeria` state, workflow, Cloudflare resource, or production profile exists;
 - explicit limits: static document tests do not prove Next.js runtime behavior, OpenNext compatibility, workerd behavior, deployment, accessibility conformance, production safety, or package security;
-- P0.2 entry requirement to refresh versions/advisories and use a patched Node.js 24 plus current stable pnpm before installing dependencies.
+- P0.2 entry requirement to refresh versions/advisories, validate the approved Volta Node.js `22.23.0` pin against the exact Next.js/OpenNext pair, and select the current compatible pnpm before installing dependencies.
 
 - [ ] **Step 3: Commit the pre-review evidence**
 
@@ -901,7 +901,7 @@ git commit -m "docs: record P0.1 verification evidence"
 
 **Interfaces:**
 
-- Consumes: Read-only diff `main...HEAD`, approved source plan, preparation evidence, and this implementation plan.
+- Consumes: Read-only diff `98ff2f4...HEAD`, approved source plan, preparation evidence, and this implementation plan.
 - Produces: Three non-overlapping review reports, controller reconciliation, and a verified repaired tree if required.
 
 - [ ] **Step 1: Dispatch the requirements reviewer read-only**
@@ -937,7 +937,7 @@ Run only if relevant inputs changed:
 
 ```bash
 pnpm run test:constitution
-git diff --check main...HEAD
+git diff --check 98ff2f4...HEAD
 git status --short --branch
 ```
 
@@ -970,7 +970,7 @@ Because repairs may modify only already tracked files in the exact P0.1 map, `gi
 Create `docs/review-packets/2026-08-04-p0-1-constitution-and-adrs.md` with these sections:
 
 1. Scope and acceptance decision.
-2. Frozen comparison: `base: main`, `candidate: p0-1-constitution`, exact commit IDs.
+2. Frozen comparison: `base: 98ff2f4`, `candidate: main`, exact commit IDs.
 3. Changed files grouped as workspace, governance, architecture, ADRs, tests, evidence, and source plan.
 4. Commands and results, including RED/GREEN focused tests and final full checks.
 5. Reviewer reports and every disposition.
@@ -987,9 +987,9 @@ Run:
 
 ```bash
 pnpm run test:constitution
-git diff --check main...HEAD
+git diff --check 98ff2f4...HEAD
 git status --short --branch
-git log --oneline --decorate main..HEAD
+git log --oneline --decorate 98ff2f4..HEAD
 ```
 
 Expected: tests pass; diff is clean; only the new review packet is uncommitted.
@@ -1010,8 +1010,8 @@ Run:
 
 ```bash
 git status --short --branch
-git diff --stat main...HEAD
-git log --oneline --decorate main..HEAD
+git diff --stat 98ff2f4...HEAD
+git log --oneline --decorate 98ff2f4..HEAD
 ```
 
 Expected: clean implementation worktree and only P0.1 commits. Present the review packet and stop for explicit user approval. Do not push, create a pull request, merge, deploy, publish, alter Cloudflare/GitHub settings, or begin P0.2.
