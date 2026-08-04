@@ -95,6 +95,53 @@ test("the compatibility proof has a private non-app workspace boundary", async (
   );
 });
 
+test("the P0.2 compatibility record has its required evidence boundaries", async () => {
+  const compatibility = await readRepositoryFile(
+    "docs/compatibility/nextjs-cloudflare.md",
+  );
+
+  for (const heading of [
+    "Status and evidence date",
+    "Exact matrix",
+    "What each check proves",
+    "Runtime distinctions",
+    "Known limitations",
+    "Accessibility evidence and claim boundary",
+    "Deployment boundary",
+    "Revalidation triggers",
+  ]) {
+    assert.match(compatibility, new RegExp(`^## ${heading}$`, "m"));
+  }
+
+  assert.match(compatibility, /candidate until deployed Gate 3 evidence/i);
+  assert.match(compatibility, /do(?:es)? not establish WCAG conformance/i);
+});
+
+test("canonical documentation points to the non-product compatibility proof", async () => {
+  const documents = await Promise.all([
+    readRepositoryFile("README.md"),
+    readRepositoryFile("AGENTS.md"),
+    readRepositoryFile("docs/architecture/overview.md"),
+    readRepositoryFile("docs/architecture/enforcement-map.md"),
+    readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+  ]);
+
+  assert.match(documents[0], /\(docs\/compatibility\/nextjs-cloudflare\.md\)/);
+  assert.match(documents[0], /\(proofs\/nextjs-cloudflare\/\)/);
+  assert.match(documents[1], /\(proofs\/nextjs-cloudflare\/AGENTS\.md\)/);
+  assert.match(documents[2], /\.\.\/compatibility\/nextjs-cloudflare\.md/);
+  assert.match(documents[3], /\.\.\/compatibility\/nextjs-cloudflare\.md/);
+  assert.match(documents[4], /\.\.\/compatibility\/nextjs-cloudflare\.md/);
+});
+
+test("workspace documentation reserves apps for builder code and proofs for evidence", async () => {
+  const overview = await readRepositoryFile("docs/architecture/overview.md");
+
+  assert.match(overview, /`apps\/\*` contains builder applications/);
+  assert.match(overview, /`proofs\/\*` contains disposable infrastructure evidence/);
+  assert.match(overview, /`packages\/\*` contains deliberately owned packages/);
+});
+
 test("repository documentation has no broken local Markdown links", async () => {
   const markdownFiles = await listRepositoryMarkdownFiles();
   const brokenLinks = [];

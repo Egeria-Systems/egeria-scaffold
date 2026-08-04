@@ -1,10 +1,10 @@
 # Architecture Overview
 
-**Status:** Controlling P0.1 architecture summary
+**Status:** Controlling architecture summary through P0.2
 
 **Source:** [Approved reconciled program plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md)
 
-Accepted [ADRs](../adr/README.md) own individual decisions. This overview explains how those decisions fit together; it does not replace them. The [enforcement map](enforcement-map.md) owns automation status.
+Accepted [ADRs](../adr/README.md) own individual decisions. This overview explains how those decisions fit together; it does not replace them. The [enforcement map](enforcement-map.md) owns automation status, and the [Next.js and Cloudflare compatibility record](../compatibility/nextjs-cloudflare.md) owns the current executable proof matrix and evidence boundary.
 
 ## Product model
 
@@ -63,6 +63,8 @@ In-memory adapters and shared behavioral contract tests are required where ports
 
 ## Builder repository boundary
 
+`apps/*` contains builder applications. `proofs/*` contains disposable infrastructure evidence and is not a product-application namespace. `packages/*` contains deliberately owned packages created only at an approved package-boundary stage.
+
 The intended builder workspace is:
 
 ```text
@@ -72,7 +74,7 @@ packages/standards        public replaceable standards package
 packages/observability    public replaceable observability package
 ```
 
-P0.1 creates none of those paths. P0.2 creates only the separately scoped compatibility proof. P0.3 may create the listed package and ownership boundaries after its own approved plan. P1 implements the project/state schemas and builder kernel inside the already-private `builder-core` boundary.
+P0.1 created none of those paths. P0.2 creates only the separately scoped private proof at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). P0.3 may create the listed application and package ownership boundaries after its own approved plan. P1 implements the project/state schemas and builder kernel inside the already-private `builder-core` boundary.
 
 `builder-core` is justified by cohesive private responsibilities: capability resolution, manifest/state schemas, inference, ownership, planning, migrations, repository transformation, and verification. Reserving that ownership in P0.3 does not implement the schemas early. A separate `project-schema` package is not justified until a second consumer requires an independently versioned contract.
 
@@ -92,6 +94,6 @@ Desired state will live in human-reviewable `.egeria/project.yaml`; installed re
 
 Repository-changing builder operations require clean state, inference, capability resolution, an isolated worktree, an approval-ready dry-run plan, one execution, verification, and post-change inference. State and migration records update only after those checks succeed; state/inference verification then runs again. The resulting exact diff and review packet require verified-final-diff approval before commit. Source, dependencies, deployment, persistent data, and provider state have separate rollback procedures.
 
-## P0.1 boundary
+## Current stage boundary
 
-No production profile is implemented in P0.1. This increment creates no application, builder package, profile code, `.egeria` state or schema, lockfile, dependency, workflow, Cloudflare resource, or deployment. Future behavior in these documents is architecture visibility, not shipped functionality.
+P0.1 created no application, builder package, profile code, `.egeria` state or schema, dependency, workflow, Cloudflare resource, or deployment. P0.2 adds only private, non-production infrastructure evidence and its exact toolchain. No production profile, builder package, generated client repository, state schema, or product capability is implemented. Future behavior in these documents remains architecture visibility until its roadmap stage is approved and verified.

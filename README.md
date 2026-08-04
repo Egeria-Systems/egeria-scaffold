@@ -2,9 +2,9 @@
 
 Egeria Scaffold will build versioned, materialized Next.js recipes for Egeria Systems projects. Generated repositories remain ordinary, understandable client-owned codebases; installed capabilities, not a live profile inheritance chain, become authoritative after generation.
 
-## Current phase: P0.1 — Constitution and ADRs
+## Current phase: P0.2 — Deployed compatibility proof
 
-P0.1 establishes the repository constitution, architecture decisions, governance, and enforcement ownership. No production profile is implemented in P0.1.
+P0.1 established the repository constitution, architecture decisions, governance, and enforcement ownership. P0.2 now owns the smallest private Next.js and Cloudflare compatibility proof. The local Node.js, Next.js, OpenNext, workerd, Chromium, and axe gates are implemented; deployed Gate 3 evidence remains required before P0.2 is complete. No production profile is implemented.
 
 Canonical project documents:
 
@@ -13,22 +13,26 @@ Canonical project documents:
 - [Capability model](docs/architecture/capability-model.md)
 - [Enforcement map](docs/architecture/enforcement-map.md)
 - [Program roadmap](docs/roadmaps/program-roadmap.md)
+- [Next.js and Cloudflare compatibility record](docs/compatibility/nextjs-cloudflare.md)
+- [Executable compatibility proof](proofs/nextjs-cloudflare/)
 - [Architecture decision records](docs/adr/README.md)
 - [Review and contribution protocol](docs/governance/review-and-contribution.md)
 - [Implementation evidence](docs/implementation-evidence/)
 - Review packets are added under `docs/review-packets/` after final verification.
 
-Run the dependency-free constitution contract with:
+Run the constitution contract with:
 
 ```bash
 pnpm run test:constitution
 ```
 
-## Deferred to P0.2
+Run the complete local P0.2 proof with:
 
-P0.2 selects and proves the exact compatible pnpm, Next.js, OpenNext Cloudflare adapter, Wrangler, TypeScript, ESLint, Vitest, Playwright, and axe versions. It must demonstrate local Next development, production-like workerd preview, generated binding types, unit and Cloudflare integration tests, accessibility smoke tests, and a non-production GitHub Actions deployment.
+```bash
+pnpm run verify:p0.2
+```
 
-Node.js `22.23.0` is pinned for local development through both `.nvmrc` and `package.json` Volta configuration. These matching pins are not deployed compatibility proof.
+Node.js `22.23.0` is pinned through `.nvmrc` and `package.json` Volta configuration. pnpm `11.20.0` is pinned through `packageManager` and exact engine policy. The [compatibility record](docs/compatibility/nextjs-cloudflare.md) owns the exact matrix, runtime distinctions, known limitations, and evidence boundary.
 
 ## Deferred to P0.3
 

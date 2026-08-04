@@ -63,3 +63,5 @@ Assign one canonical owner to every decision, schema, workflow, invariant, and l
 Keep profile names, capability identifiers, state terminology, ADR numbers, invariant IDs, approval gates, and phase names consistent across architecture, ADRs, roadmaps, tests, evidence, and review packets. When documentation and implementation disagree, identify the canonical owner before changing either. Do not treat documentation as authoritative merely because it exists.
 
 The [review and contribution protocol](docs/governance/review-and-contribution.md) owns the implementation lifecycle. The [enforcement map](docs/architecture/enforcement-map.md) owns the mapping from invariants to actual or planned automated gates. Root and nested instructions should link to those owners instead of duplicating their full procedures.
+
+The current P0.2 infrastructure proof lives under [`proofs/nextjs-cloudflare`](proofs/nextjs-cloudflare/AGENTS.md); read its nested instructions and the [compatibility record](docs/compatibility/nextjs-cloudflare.md) before changing that surface.

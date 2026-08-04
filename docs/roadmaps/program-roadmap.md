@@ -16,6 +16,8 @@ Create the private root pnpm workspace, substantive root `AGENTS.md`, architectu
 
 Build the smallest Next.js/Cloudflare proof that validates the approved Volta Node.js pin and current compatible pnpm, Next.js App Router, OpenNext Cloudflare adapter, local Next development, production-like workerd preview, generated binding types, strict TypeScript, ESLint flat config, ordinary Vitest, Cloudflare integration testing, Playwright, and axe. Deploy only to an approved non-production environment through GitHub Actions. Record current official documentation, advisories, beta status, known limitations, and runtime distinctions.
 
+**Current status (2026-08-04):** The locked local proof, Node.js development checks, built-Worker harness, workerd preview, and shared Chromium/axe smoke suite pass. The manual deployment workflow, non-production deployment, deployed smoke, independent reviews, and Gate 3 evidence remain required. See the [compatibility record](../compatibility/nextjs-cloudflare.md).
+
 **Exit:** The exact locked combination works locally, under workerd, in tests, and at the non-production URL. Static or local success alone is insufficient.
 
 **Stop gate:** Present the P0.2 review packet and deployed evidence; obtain approval before P0.3.

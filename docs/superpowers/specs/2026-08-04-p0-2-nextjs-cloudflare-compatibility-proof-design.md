@@ -111,7 +111,7 @@ The Wrangler configuration uses:
 - `.open-next/assets` through the `ASSETS` binding;
 - non-secret `PROOF_ENVIRONMENT: "compatibility"`.
 
-`wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts` generates the binding and runtime declarations. CI uses `wrangler types --check` to detect drift.
+`wrangler types --env-interface CloudflareEnv --include-runtime=false cloudflare-env.d.ts` generates the binding declarations. CI runs the same command with `--check` to detect drift. P0.2 excludes the unrelated full runtime declaration bundle: the installed Wrangler generator emitted trailing whitespace in that generated surface, while this proof consumes only the binding contract.
 
 ## Local and runtime verification
 
