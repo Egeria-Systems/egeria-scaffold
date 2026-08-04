@@ -68,6 +68,12 @@ The required reviewers inspected frozen candidate `8303aeda2d25ccf1087a3af0e1b36
 
 Each original reviewer rechecked only its repair scope against the exact repair commit and returned READY with no material repair-caused regression.
 
+## Gate 3 Development Workflow Amendment
+
+The approved 2026-08-04 Gate 3 decision supersedes only this plan's earlier P0.1-only exception for development of the builder repository. Development of this repository may proceed directly on clean `main` when the approved work is one sequential implementation stream, repository protections permit it, no user-owned work is at risk, and isolation has no material safety or coordination benefit. A dedicated branch and isolated worktree are required when implementation becomes parallel or isolation is otherwise materially useful.
+
+This amendment does not change generated-client transformation safety. Repository-changing builder commands that target generated client repositories still require clean state, a dedicated branch and isolated worktree, transactional execution and verification, and separate plan and exact-final-diff approvals. The [P0.1 Gate 3 revisions plan](2026-08-04-p0-1-gate-3-revisions.md) is the exact-file execution owner for this amendment.
+
 ## Exact File Map
 
 Preparation artifacts already created and unchanged during implementation:

@@ -20,9 +20,15 @@ Write an exact-file, test-driven plan under `docs/superpowers/plans/`. It must d
 
 Stop for explicit approval. Plan approval authorizes only the bounded local implementation and commits described by the approved plan. It does not authorize a different increment, push, pull request, merge, deployment, publication, provider mutation, production action, permission change, or external message.
 
-## Clean execution boundary
+## Builder-repository development boundary
 
-Repository-changing builder commands require:
+Development of this repository may proceed directly on `main` only when the approved work is one clean, sequential implementation stream, no user-owned work is at risk, repository protections permit it, and isolation has no material safety or coordination benefit.
+
+A dedicated branch and isolated worktree are required when implementation becomes parallel or when isolation is materially useful for risk containment, experimentation, conflicting changes, or preservation of another active tree. Before either mode, verify the branch, status, comparison, and approval scope. Development workflow permission never authorizes push, pull-request creation, merge, deployment, publication, or another external action.
+
+## Generated-client transformation boundary
+
+Repository-changing builder commands always require:
 
 - no staged or tracked modifications;
 - no relevant untracked files;
@@ -30,7 +36,7 @@ Repository-changing builder commands require:
 - no unresolved conflict;
 - an isolated worktree created from the approved base.
 
-The builder never stashes, commits, discards, restores, or force-bypasses user work automatically. P0.1 repository-constitution development on `main` is a one-time explicit bootstrap exception; it does not modify the permanent builder rule.
+The builder never stashes, commits, discards, restores, or force-bypasses user work automatically.
 
 For builder transformations, state is part of the exact diff under review. After the source transformation passes proportional verification and post-change inference, update `.egeria` state and migration records, rerun state/inference verification, and only then prepare the verified final diff and request Gate 3 approval. Nothing may mutate the approved diff before it is committed.
 
