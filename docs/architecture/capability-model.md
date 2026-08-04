@@ -1,6 +1,7 @@
 # Capability Model
 
-**Status:** Controlling P0.1 capability vocabulary  
+**Status:** Controlling P0.1 capability vocabulary
+
 **Runtime status:** Documentation only; no capability descriptor is executable in P0.1.
 
 ## Descriptor contract

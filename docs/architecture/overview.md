@@ -1,6 +1,7 @@
 # Architecture Overview
 
-**Status:** Controlling P0.1 architecture summary  
+**Status:** Controlling P0.1 architecture summary
+
 **Source:** [Approved reconciled program plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md)
 
 Accepted [ADRs](../adr/README.md) own individual decisions. This overview explains how those decisions fit together; it does not replace them. The [enforcement map](enforcement-map.md) owns automation status.
