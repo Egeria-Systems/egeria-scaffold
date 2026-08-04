@@ -16,10 +16,10 @@ This document is the canonical owner for mapping invariants to actual or planned
 | `INV-ACCESSIBILITY-AUTOMATION` | Generated applications run automated WCAG 2.2 AA-relevant checks | actual for P0.2 proof; generated-repository gate planned | Playwright development/preview/deployed smoke suite with axe, keyboard, reflow, and motion checks | P0.2/P2 |
 | `INV-ACCESSIBILITY-CLAIMS` | Automation alone never supports a conformance claim | actual for P0.2 documentation; generated release check planned | constitution compatibility-record contract plus bounded review | P0.2/P2 |
 | `INV-ANALYTICS-SEPARATION` | Cloudflare Web Analytics and other analytics never arrive through observability | planned | capability graph and generated-configuration tests | P5B |
-| `INV-DEPLOYMENT-AUTHORITY` | GitHub Actions is the sole deployment authority | planned | workflow-policy and environment checks | P0.2 |
+| `INV-DEPLOYMENT-AUTHORITY` | GitHub Actions is the sole deployment authority | actual for the P0.2 workflow contract; external environment proof pending | constitution workflow-policy contract and manual `compatibility-proof.yml` workflow | P0.2 |
 | `INV-P0-1-NO-PREMATURE-RUNTIME` | P0.1 contains constitution files only, with no app/package/state/workflow/provider surface | actual | final-tree inspection and review packet | P0.1 |
 
-The exact P0.2 matrix, command meanings, runtime distinctions, and claim limits are recorded in the [Next.js and Cloudflare compatibility record](../compatibility/nextjs-cloudflare.md). `INV-DEPLOYMENT-AUTHORITY` remains planned until the workflow contract exists; local runtime success cannot mark it actual.
+The exact P0.2 matrix, command meanings, runtime distinctions, and claim limits are recorded in the [Next.js and Cloudflare compatibility record](../compatibility/nextjs-cloudflare.md). The deployment-authority contract is actual, but local workflow structure cannot prove the external environment, run, or deployment.
 
 ## Updating enforcement ownership
 

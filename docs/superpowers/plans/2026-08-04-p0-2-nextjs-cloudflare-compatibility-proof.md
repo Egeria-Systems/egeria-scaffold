@@ -1443,21 +1443,14 @@ jobs:
       - name: Verify compatibility proof
         run: pnpm run verify:p0.2
 
-      - name: Verify deployment inputs
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          COMPATIBILITY_URL: ${{ vars.COMPATIBILITY_URL }}
-        run: |
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$COMPATIBILITY_URL"
-
       - name: Deploy compatibility Worker
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: pnpm --filter @egeria-systems/nextjs-cloudflare-proof deploy
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          pnpm --filter @egeria-systems/nextjs-cloudflare-proof deploy
 
       - name: Test deployed compatibility proof
         env:

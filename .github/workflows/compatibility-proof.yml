@@ -1,0 +1,56 @@
+name: Compatibility proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compatibility-proof
+  cancel-in-progress: false
+
+jobs:
+  verify-and-deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment:
+      name: compatibility
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa
+        with:
+          version: 11.20.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec playwright install --with-deps chromium
+
+      - name: Verify compatibility proof
+        run: pnpm run verify:p0.2
+
+      - name: Deploy compatibility Worker
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          pnpm --filter @egeria-systems/nextjs-cloudflare-proof deploy
+
+      - name: Test deployed compatibility proof
+        env:
+          COMPATIBILITY_URL: ${{ vars.COMPATIBILITY_URL }}
+        run: pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:e2e:deployed

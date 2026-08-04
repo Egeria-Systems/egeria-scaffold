@@ -142,6 +142,55 @@ test("workspace documentation reserves apps for builder code and proofs for evid
   assert.match(overview, /`packages\/\*` contains deliberately owned packages/);
 });
 
+test("the compatibility deployment workflow is manual, bounded, and secret-minimal", async () => {
+  const workflow = await readRepositoryFile(
+    ".github/workflows/compatibility-proof.yml",
+  );
+
+  assert.match(workflow, /^on:\n  workflow_dispatch:\n/m);
+  assert.doesNotMatch(workflow, /^  (?:push|pull_request|schedule):/m);
+  assert.match(workflow, /^permissions:\n  contents: read\n/m);
+  assert.match(workflow, /^  group: compatibility-proof\n  cancel-in-progress: false$/m);
+  assert.match(workflow, /if: github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /^      name: compatibility$/m);
+  assert.match(
+    workflow,
+    /actions\/checkout@d23441a48e516b6c34aea4fa41551a30e30af803/,
+  );
+  assert.match(
+    workflow,
+    /pnpm\/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa/,
+  );
+  assert.match(
+    workflow,
+    /actions\/setup-node@a0853c24544627f65ddf259abe73b1d18a591444/,
+  );
+  assert.match(workflow, /pnpm install --frozen-lockfile/);
+
+  const verifyIndex = workflow.indexOf("- name: Verify compatibility proof");
+  const deployIndex = workflow.indexOf("- name: Deploy compatibility Worker");
+  const deployedTestIndex = workflow.indexOf(
+    "- name: Test deployed compatibility proof",
+  );
+
+  assert.ok(verifyIndex > -1 && verifyIndex < deployIndex);
+  assert.ok(deployIndex < deployedTestIndex);
+
+  const deployBlock = workflow.slice(deployIndex, deployedTestIndex);
+  assert.match(deployBlock, /secrets\.CLOUDFLARE_ACCOUNT_ID/);
+  assert.match(deployBlock, /secrets\.CLOUDFLARE_API_TOKEN/);
+  assert.doesNotMatch(workflow.slice(0, deployIndex), /secrets\.CLOUDFLARE_/);
+  assert.doesNotMatch(
+    workflow.slice(deployedTestIndex),
+    /secrets\.CLOUDFLARE_/,
+  );
+  assert.match(
+    workflow.slice(deployedTestIndex),
+    /COMPATIBILITY_URL: \$\{\{ vars\.COMPATIBILITY_URL \}\}/,
+  );
+  assert.doesNotMatch(workflow, /production/i);
+});
+
 test("repository documentation has no broken local Markdown links", async () => {
   const markdownFiles = await listRepositoryMarkdownFiles();
   const brokenLinks = [];
