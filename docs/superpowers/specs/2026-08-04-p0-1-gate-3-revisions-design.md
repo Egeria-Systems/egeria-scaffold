@@ -1,6 +1,6 @@
 # P0.1 Gate 3 Revisions Design
 
-**Status:** Approved design awaiting written-spec review
+**Status:** Approved
 
 **Date:** 2026-08-04
 
