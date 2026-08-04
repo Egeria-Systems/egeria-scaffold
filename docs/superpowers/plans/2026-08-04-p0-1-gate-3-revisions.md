@@ -213,7 +213,7 @@ Run:
 ```bash
 pnpm run test:constitution
 git diff --check
-git diff -- AGENTS.md docs/governance/review-and-contribution.md docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md
+git diff -- AGENTS.md docs/governance/review-and-contribution.md docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md
 ```
 
 Expected: all tests pass; no whitespace error; the diff clearly distinguishes the two repositories and preserves generated-client isolation.
@@ -223,7 +223,7 @@ Expected: all tests pass; no whitespace error; the diff clearly distinguishes th
 Run:
 
 ```bash
-git add AGENTS.md docs/governance/review-and-contribution.md docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md
+git add AGENTS.md docs/governance/review-and-contribution.md docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md docs/superpowers/plans/2026-08-04-p0-1-constitution-and-adrs.md
 git diff --cached --check
 git commit -m "docs: allow sequential development on main"
 ```
