@@ -6,7 +6,7 @@
 
 **Architecture:** Infrastructure evidence lives at `proofs/nextjs-cloudflare`, outside builder `apps/*` and future public `packages/*`. The proof has one semantic App Router page, one provider-neutral runtime-report contract, a Cloudflare adapter, an API composition root, and externalized `en-CA` copy. Ordinary Vitest protects pure parsing; a Wrangler test harness exercises the built Worker; Playwright and axe exercise Next development, workerd preview, and the deployed non-production URL. GitHub Actions is the only deployment authority.
 
-**Tech Stack:** Node.js `22.23.0`, pnpm `11.20.0`, Next.js `16.3.0`, React `19.2.8`, OpenNext Cloudflare `1.20.2`, Wrangler `4.118.0`, TypeScript `6.0.3`, ESLint `10.8.0`, Vitest `4.1.10`, Playwright `1.62.1`, and axe `4.12.1`.
+**Tech Stack:** Node.js `22.23.0`, pnpm `11.20.0`, Next.js `16.3.0`, React `19.2.8`, OpenNext Cloudflare `1.20.2`, Wrangler `4.118.0`, TypeScript `6.0.3`, ESLint `9.39.5`, Vitest `4.1.10`, Playwright `1.62.1`, and axe `4.12.1`.
 
 ## Approval and execution boundary
 
@@ -31,6 +31,7 @@
 - Externalize all proof UI copy in `content/en-CA.json` and validate it before rendering.
 - Keep semantic platform differences explicit: `next dev` is Node.js development; OpenNext preview, the test harness, and deployment exercise workerd-compatible output.
 - Pin exact dependency versions and action commit SHAs. Do not use `latest`, caret, tilde, moving action tags, or peer-dependency overrides.
+- Keep the one evidence-backed transitive security override scoped to `miniflare>undici: 7.29.0`; remove it when Wrangler adopts an equal or newer patched release.
 - Preserve pnpm's one-day package maturity policy and a narrow install-script allowlist.
 - Do not install the beta `@cloudflare/vitest-pool-workers`; use ordinary Vitest plus Wrangler `createTestHarness()`.
 - Run automated accessibility gates, but make no WCAG conformance claim. Human evaluation is not added as a default release gate.
@@ -51,7 +52,7 @@ Refresh live registry metadata and official advisories immediately before Task 1
 | OpenNext Cloudflare | `1.20.2` |
 | Wrangler | `4.118.0` |
 | TypeScript | `6.0.3` |
-| ESLint | `10.8.0` |
+| ESLint | `9.39.5` |
 | Next ESLint config | `16.3.0` |
 | typescript-eslint | `8.66.0` |
 | Vitest | `4.1.10` |
@@ -172,7 +173,7 @@ npm view react-dom@19.2.8 version peerDependencies --json
 npm view @opennextjs/cloudflare@1.20.2 version engines peerDependencies --json
 npm view wrangler@4.118.0 version engines exports --json
 npm view typescript@6.0.3 version engines --json
-npm view eslint@10.8.0 version engines --json
+npm view eslint@9.39.5 version engines --json
 npm view eslint-config-next@16.3.0 version peerDependencies dependencies --json
 npm view typescript-eslint@8.66.0 version peerDependencies --json
 npm view vitest@4.1.10 version engines peerDependencies --json
@@ -213,7 +214,7 @@ gh api --method GET /advisories -f ecosystem=npm -f affects='react-dom@19.2.8' -
 gh api --method GET /advisories -f ecosystem=npm -f affects='@opennextjs/cloudflare@1.20.2' --jq 'length'
 gh api --method GET /advisories -f ecosystem=npm -f affects='wrangler@4.118.0' --jq 'length'
 gh api --method GET /advisories -f ecosystem=npm -f affects='typescript@6.0.3' --jq 'length'
-gh api --method GET /advisories -f ecosystem=npm -f affects='eslint@10.8.0' --jq 'length'
+gh api --method GET /advisories -f ecosystem=npm -f affects='eslint@9.39.5' --jq 'length'
 gh api --method GET /advisories -f ecosystem=npm -f affects='eslint-config-next@16.3.0' --jq 'length'
 gh api --method GET /advisories -f ecosystem=npm -f affects='typescript-eslint@8.66.0' --jq 'length'
 gh api --method GET /advisories -f ecosystem=npm -f affects='vitest@4.1.10' --jq 'length'
@@ -274,10 +275,7 @@ test("P0.2 pins one compatible Node and pnpm toolchain", async () => {
     node: "22.23.0",
     pnpm: "11.20.0",
   });
-  assert.deepEqual(manifest.volta, {
-    node: "22.23.0",
-    pnpm: "11.20.0",
-  });
+  assert.deepEqual(manifest.volta, { node: "22.23.0" });
 });
 
 test("the compatibility proof has a private non-app workspace boundary", async () => {
@@ -322,8 +320,7 @@ Update root `package.json` to retain existing metadata and use:
     "pnpm": "11.20.0"
   },
   "volta": {
-    "node": "22.23.0",
-    "pnpm": "11.20.0"
+    "node": "22.23.0"
   }
 }
 ```
@@ -365,7 +362,7 @@ Create `proofs/nextjs-cloudflare/package.json` with exact versions:
     "@types/node": "22.20.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
-    "eslint": "10.8.0",
+    "eslint": "9.39.5",
     "eslint-config-next": "16.3.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.66.0",
@@ -383,7 +380,12 @@ packages:
   - "packages/*"
   - "proofs/*"
 
+pmOnFail: error
+
 minimumReleaseAge: 1440
+
+overrides:
+  "miniflare>undici": 7.29.0
 
 allowBuilds:
   "@parcel/watcher": true
@@ -424,7 +426,7 @@ test-results/
 Run:
 
 ```bash
-volta pin pnpm@11.20.0
+volta install pnpm@11.20.0
 pnpm --version
 pnpm install
 pnpm install --frozen-lockfile
@@ -432,7 +434,7 @@ pnpm ignored-builds
 pnpm audit --audit-level=moderate
 ```
 
-Expected: pnpm `11.20.0`; a new `pnpm-lock.yaml`; the frozen reinstall succeeds; no required lifecycle build remains ignored; audit exits zero. If another lifecycle package is required, an advisory is present, or the maturity policy blocks a selected release, stop for evidence and a plan amendment.
+Expected: pnpm `11.20.0`; a new `pnpm-lock.yaml`; the frozen reinstall succeeds; no required lifecycle build remains ignored; peer checks and audit exit zero. The project pin is the exact `packageManager` field enforced by `pmOnFail: error`; Volta owns only the Node project pin because Volta `2.0.2` cannot project-pin pnpm. The exact `miniflare>undici: 7.29.0` override repairs the current Wrangler transitive advisory and must be proven by both audit and integration tests. If another lifecycle package is required, another advisory is present, or the maturity policy blocks a selected release, stop for evidence and a plan amendment.
 
 - [ ] **Step 5: Run GREEN and inspect the locked graph**
 

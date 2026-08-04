@@ -14,9 +14,13 @@ The approved design is:
 
 `docs/superpowers/specs/2026-08-04-p0-2-nextjs-cloudflare-compatibility-proof-design.md`
 
-Design SHA-256:
+Approved design SHA-256 before implementation revalidation amendments:
 
 `a0fd3ea222cb7fe05d5f7d2c70f854d01b68715842af445037068481e205f4d4`
+
+Current amended design SHA-256 after recording the Volta/pnpm, ESLint, and transitive Undici findings:
+
+`713892ed50fd39a2dc7e265fefa4e30b8844d8a9ba91c6cbe5c39536c241807b`
 
 ## Repository and Git evidence
 
@@ -61,7 +65,7 @@ The original supplied file remains available at `/Users/CoveMB/Downloads/2026-08
 | pnpm | `10.32.1` | Existing global/default tool; not the P0.2 candidate |
 | Corepack | command not found | The local Volta-managed Node distribution does not expose Corepack; the plan must not assume it exists |
 
-P0.2 therefore pins pnpm `11.20.0` in both `packageManager` and `volta.pnpm`. Local implementation must use `volta pin pnpm@11.20.0` before dependency installation. CI will use the fully SHA-pinned `pnpm/action-setup` action rather than depending on Corepack.
+P0.2 pins pnpm `11.20.0` through the standard root `packageManager` field and pnpm 11's `pmOnFail: error` workspace policy. The implementation originally planned `volta.pnpm`, but Volta `2.0.2` rejected `volta pin pnpm@11.20.0` with `Only node and yarn can be pinned in a project`. Current Volta documentation still describes pnpm support as experimental and lists limitations, while current pnpm 11 documentation replaces the removed `packageManagerStrictVersion` setting with `pmOnFail: error`. The corrected local bootstrap uses `volta install pnpm@11.20.0` only to install the approved CLI on this machine; Volta remains the project pin owner only for Node. CI uses the fully SHA-pinned `pnpm/action-setup` action rather than depending on Corepack.
 
 ## Live-source freshness method
 
@@ -96,7 +100,7 @@ Consequence: P0.2 uses ordinary Node Vitest for the unit test and Wrangler `crea
 ### TypeScript, ESLint, browser testing, and accessibility
 
 - Live npm metadata reports TypeScript `7.0.2` as latest, but `typescript-eslint@8.66.0` declares TypeScript `>=4.8.4 <6.1.0`. P0.2 therefore selects TypeScript `6.0.3`, the newest candidate inside the current supported peer range, rather than forcing TypeScript 7.
-- `eslint-config-next` is selected at `16.3.0` to match Next.js. ESLint `10.8.0` and `typescript-eslint@8.66.0` satisfy the selected configuration's live peer ranges.
+- `eslint-config-next` is selected at `16.3.0` to match Next.js. Initial direct metadata suggested ESLint `10.8.0` satisfied its top-level peer range, but the first locked-graph `pnpm peers check` showed that `eslint-plugin-import@2.32.0`, `eslint-plugin-jsx-a11y@6.10.2`, and `eslint-plugin-react@7.37.5` accept ESLint 9 but not ESLint 10. Live metadata and an exact-version advisory query then selected ESLint `9.39.5`, the newest maintained ESLint 9 release, with zero advisory records on the evidence date.
 - The live [Playwright CI documentation](https://playwright.dev/docs/ci) supports a managed web server, exact browser installation, retries/workers suitable for CI, and Chromium smoke testing.
 - The live [W3C evaluation overview](https://www.w3.org/WAI/test-evaluate/) continues to state that tools support evaluation but do not replace knowledgeable human evaluation.
 
@@ -127,7 +131,7 @@ The following versions were selected from live registry and peer metadata on 202
 | `@opennextjs/cloudflare` | `1.20.2` |
 | `wrangler` | `4.118.0` |
 | `typescript` | `6.0.3` |
-| `eslint` | `10.8.0` |
+| `eslint` | `9.39.5` |
 | `eslint-config-next` | `16.3.0` |
 | `typescript-eslint` | `8.66.0` |
 | `vitest` | `4.1.10` |
@@ -141,16 +145,20 @@ Exact-version GitHub Advisory Database queries for the direct package candidates
 
 Expected install-script packages in the candidate graph are `@parcel/watcher`, `@swc/core`, `esbuild`, `unrs-resolver`, and `workerd`. The implementation plan permits only those exact package names through pnpm `allowBuilds`. If the locked graph requires another lifecycle script, implementation stops for evidence and a plan amendment instead of broadening the allowlist silently. The optional `rclone.js` peer is not selected.
 
+The first full-graph audit found five new advisories—one HIGH and four MODERATE—on `undici@7.28.0`, reached only through Wrangler's exact `miniflare@5.20260730.0-alpha` dependency. All five list `7.29.0` as patched. Wrangler `4.118.0` is current and its Miniflare dependency pins `7.28.0`, so ordinary resolution cannot select the patch. Live registry metadata confirms `undici@7.29.0` supports Node `>=20.18.1`, was published on 2026-07-24, and has no exact-version GitHub advisory records on the evidence date. P0.2 therefore owns one narrow `miniflare>undici: 7.29.0` override. The post-override audit and real Wrangler/OpenNext integration tests must both pass; the override is removed when upstream adopts an equal or newer patched release.
+
 ## Reconciled contradictions and blocking uncertainties
 
 1. **Proof placement:** An executable compatibility proof under `apps/*` would blur builder-product boundaries. The approved location is `proofs/nextjs-cloudflare`; `apps/*` remains reserved for builder applications beginning with `apps/cli` in P0.3.
 2. **Cloudflare integration mechanism:** Earlier material referenced the Workers Vitest pool, but current Cloudflare documentation recommends `createTestHarness()` for a whole built Worker while the pool remains beta. The approved proof uses ordinary Vitest plus the harness and documents the beta limitation without installing the beta pool.
 3. **TypeScript latest-version conflict:** TypeScript 7 is newer but outside the current `typescript-eslint` peer range. Select `6.0.3`; do not use peer overrides or ignore warnings.
-4. **Corepack assumption:** Corepack is absent locally. Local setup uses Volta's exact pnpm pin; CI uses a SHA-pinned pnpm setup action.
+4. **Package-manager pinning:** Corepack is absent locally and Volta cannot project-pin pnpm. The repository uses `packageManager: pnpm@11.20.0` plus `pmOnFail: error`; local setup installs that exact CLI with Volta, while CI uses a SHA-pinned pnpm setup action.
 5. **Remote deployment prerequisites:** The private GitHub repository currently has no remote default branch or environment, and local commits have not been pushed. Push, creation/configuration of `compatibility`, setting `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `COMPATIBILITY_URL`, workflow dispatch, and Cloudflare deployment each require explicit external-action authorization. Local implementation is not blocked; deployed P0.2 exit evidence is blocked until those actions are approved and configured.
 6. **Environment protection availability:** Some GitHub environment protection rules vary by repository plan. The implementation must record what is actually available and must not claim reviewer protection if GitHub does not expose it for this private repository.
 7. **Runtime distinction:** `next dev` proves the Node.js development path; only OpenNext preview, the harness, and deployed checks exercise the workerd path. Results must remain separately labeled.
 8. **Accessibility claim:** Passing axe and bounded Playwright checks is automated evidence only and cannot be described as WCAG conformance.
+9. **ESLint major:** ESLint 10 satisfies `eslint-config-next`'s direct peer range but not three plugins in its actual dependency graph. The compatibility proof uses ESLint `9.39.5`; no peer override or warning suppression is allowed.
+10. **Transitive Undici security floor:** Current Wrangler pins Miniflare to vulnerable `undici@7.28.0`. Apply only the exact same-major `miniflare>undici: 7.29.0` security override, then require clean audit and runtime integration evidence.
 
 No other contradiction blocks the exact-file implementation plan. The external deployment prerequisites block only the deployed-proof exit, not local implementation and review of the workflow.
 

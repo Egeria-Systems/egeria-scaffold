@@ -40,31 +40,58 @@ function isInsideRepository(path) {
   );
 }
 
-test("the root workspace is private and dependency-free in P0.1", async () => {
+test("the root workspace remains private and pins the P0.2 toolchain", async () => {
   const manifest = JSON.parse(await readRepositoryFile("package.json"));
   const nvmVersion = await readRepositoryFile(".nvmrc");
 
   assert.equal(manifest.name, "@egeria-systems/scaffold");
   assert.equal(manifest.private, true);
-  assert.equal(manifest.scripts.test, "pnpm run test:constitution");
+  assert.equal(
+    manifest.scripts.test,
+    "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit",
+  );
   assert.equal(
     manifest.scripts["test:constitution"],
     "node --test tests/constitution/constitution.test.mjs",
   );
+  assert.equal(
+    manifest.scripts["verify:p0.2"],
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof verify",
+  );
   assert.equal("dependencies" in manifest, false);
   assert.equal("devDependencies" in manifest, false);
-  assert.equal("packageManager" in manifest, false);
-  assert.equal("engines" in manifest, false);
+  assert.equal(manifest.packageManager, "pnpm@11.20.0");
+  assert.deepEqual(manifest.engines, {
+    node: "22.23.0",
+    pnpm: "11.20.0",
+  });
   assert.deepEqual(manifest.volta, { node: "22.23.0" });
   assert.equal(nvmVersion, `${manifest.volta.node}\n`);
 });
 
-test("the workspace declares only the approved future package roots", async () => {
+test("the workspace declares the approved proof root and install policy", async () => {
   const workspace = await readRepositoryFile("pnpm-workspace.yaml");
 
   assert.equal(
     workspace,
-    'packages:\n  - "apps/*"\n  - "packages/*"\n',
+    'packages:\n  - "apps/*"\n  - "packages/*"\n  - "proofs/*"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  "miniflare>undici": 7.29.0\n\nallowBuilds:\n  "@parcel/watcher": true\n  "@swc/core": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n',
+  );
+});
+
+test("the compatibility proof has a private non-app workspace boundary", async () => {
+  const proofManifest = JSON.parse(
+    await readRepositoryFile("proofs/nextjs-cloudflare/package.json"),
+  );
+
+  assert.equal(
+    proofManifest.name,
+    "@egeria-systems/nextjs-cloudflare-proof",
+  );
+  assert.equal(proofManifest.private, true);
+  await assert.rejects(readRepositoryFile("apps/web/package.json"));
+  await assert.rejects(readRepositoryFile("apps/compatibility/package.json"));
+  await assert.rejects(
+    readRepositoryFile("packages/project-schema/package.json"),
   );
 });
 

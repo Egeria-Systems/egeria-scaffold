@@ -7,3 +7,8 @@ coverage/
 .env.*
 !.env.example
 .worktrees/
+.next/
+.open-next/
+.wrangler/
+playwright-report/
+test-results/

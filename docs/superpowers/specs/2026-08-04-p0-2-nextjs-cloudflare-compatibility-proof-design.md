@@ -69,7 +69,7 @@ The initial matrix from live, cache-revalidated official pages and current regis
 | `@opennextjs/cloudflare` | `1.20.2` | Current stable adapter; peer range accepts Next.js `>=16.2.11` and Wrangler `^4.86.0` |
 | Wrangler | `4.118.0` | Current stable release; exports `createTestHarness()` and supports generated runtime/binding types |
 | TypeScript | `6.0.3` | Latest version inside current `typescript-eslint` peer range `<6.1.0`; TypeScript 7.0.2 is intentionally not selected |
-| ESLint | `10.8.0` | Current stable release supported by current `typescript-eslint` |
+| ESLint | `9.39.5` | Current maintained ESLint 9 release; the Next.js plugin graph does not yet accept ESLint 10 |
 | `eslint-config-next` | `16.3.0` | Exact match for Next.js |
 | Vitest | `4.1.10` | Current stable release |
 | Playwright | `1.62.1` | Current stable release; Chromium only for this proof |
@@ -81,6 +81,8 @@ The initial matrix from live, cache-revalidated official pages and current regis
 The latest package is not selected when its consumers do not currently accept it. That is why TypeScript 7 is excluded. If the live pre-lock refresh changes a version or peer range, implementation stops for a plan amendment instead of silently upgrading or downgrading.
 
 The root manifest adds exact `packageManager: pnpm@11.20.0`; `.nvmrc` and Volta continue to agree on Node `22.23.0`. `pnpm-workspace.yaml` explicitly retains pnpm 11's one-day package maturity policy and records the narrow reviewed dependency-build allowlist needed by the locked graph. Unreviewed install scripts remain blocked.
+
+Implementation revalidation corrected two preparation assumptions without changing the design: Volta `2.0.2` cannot project-pin pnpm, so pnpm is pinned by `packageManager` plus pnpm 11 `pmOnFail: error`; and `pnpm peers check` showed that the plugins shipped by `eslint-config-next@16.3.0` accept ESLint 9 but not ESLint 10, so the exact compatible candidate is ESLint `9.39.5`. The first transitive audit also found Wrangler's exact Miniflare dependency pinned vulnerable `undici@7.28.0`; the workspace therefore owns one narrow `miniflare>undici` override to the advisory-cleared, same-major `7.29.0` security release, protected by audit and runtime integration tests.
 
 ## Proof application
 

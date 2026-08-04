@@ -4,8 +4,14 @@
   "private": true,
   "description": "Builds versioned materialized Next.js recipes for Egeria Systems projects.",
   "scripts": {
-    "test": "pnpm run test:constitution",
-    "test:constitution": "node --test tests/constitution/constitution.test.mjs"
+    "test": "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit",
+    "test:constitution": "node --test tests/constitution/constitution.test.mjs",
+    "verify:p0.2": "pnpm --filter @egeria-systems/nextjs-cloudflare-proof verify"
+  },
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": "22.23.0",
+    "pnpm": "11.20.0"
   },
   "volta": {
     "node": "22.23.0"
