@@ -11,6 +11,7 @@
 ## Global Constraints
 
 - Preparation evidence: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-preparation.md`.
+- Task 2 applicability evidence: `docs/implementation-evidence/2026-08-05-p1-task2-plan-applicability.md`. It re-freezes Task 2 at `5da4dfc8a40a4317730c08e2ef7b5cd139737aa6`, preserves the approved six-capability design, and owns the targeted file-map and validation-interface amendments below.
 - Task 1 schema-review evidence: `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`. The capability-version name and empty P1 capability-settings contract are assigned to the separately gated Task 1A plan; the other recorded questions remain deferred to Task 9.
 - Frozen starting commit: `303ee9d35e19f9191948d994159f77c82c90a1ed` on clean sequential local `main`; re-freeze before execution if it changes.
 - Run shell commands through `rtk`; use `/Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm` and `CI=true` where pnpm may refresh generated dependencies.
@@ -338,8 +339,14 @@ Do not treat the other recorded schema questions as authorized Task 1A work. Sto
 - Create: `packages/builder-core/src/resolution/resolve-capabilities.ts`
 - Create: `packages/builder-core/src/manifest/create-installed-manifest.ts`
 - Create: `packages/builder-core/tests/resolution.test.mjs`
+- Modify: `packages/builder-core/AGENTS.md`
+- Modify: `packages/builder-core/README.md`
 - Modify: `packages/builder-core/src/index.ts`
+- Modify: `tests/package-boundaries/private-packages.test.mjs`
+- Modify: `README.md`
 - Modify: `docs/architecture/capability-model.md`
+- Modify: `docs/architecture/enforcement-map.md`
+- Modify: `docs/architecture/package-ownership.md`
 
 **Interfaces:**
 
@@ -360,6 +367,8 @@ export type ResolvedCapabilities = Readonly<{
   capabilities: readonly CapabilityDescriptor[];
 }>;
 
+export const p1ProfileRecipes: readonly ProfileRecipe[];
+
 export function resolveCapabilities(
   request: ResolutionRequest,
   catalog: readonly CapabilityDescriptor[],
@@ -368,7 +377,7 @@ export function resolveCapabilities(
 
 export function createP1CapabilityCatalog(
   packageVersions: P1PackageVersions,
-): readonly CapabilityDescriptor[];
+): ValidationResult<readonly CapabilityDescriptor[]>;
 
 export function createInstalledManifest(
   resolved: ResolvedCapabilities,
@@ -387,6 +396,17 @@ The exact P1 catalog matrix is:
 | `site-routing` | `0.1.0` | source-generated | repository-stateful | reviewed | content-files, section-composition | site |
 
 Every P1 descriptor declares all metadata arrays. P1 uses no secret, browser storage, persistent data, privileged operation, migration planner, analytics domain, or provider mutation. `deployment-cloudflare` declares Cloudflare Worker/static assets as platform resources and OpenNext/Wrangler verification identifiers. `observability` declares only its ordinary package dependency and source registration marker; Better Stack transport behavior remains P2.
+
+Every descriptor uses `threatReviewLevel: "standard"`; `optionalIntegrations`, `conflicts`, `environmentVariables`, `secrets`, `externalDomains`, `contentSecurityPolicyContributions`, `browserStorage`, `dataClassifications`, `retentionAssumptions`, `privilegedOperations`, and `migrationPlanners` are empty. The exact remaining metadata is:
+
+| Identifier | Required packages | Platform resources | Adapter semantics | Verification plan | Documentation evidence | Removal and recovery |
+| --- | --- | --- | --- | --- | --- | --- |
+| `standards` | `@egeria-systems/standards` | none | none | `package-resolution`, `lint`, `typecheck` | `public-package-version-and-provenance` | `review-package-and-configuration-removal` |
+| `content-files` | none | none | none | `content-contracts`, `typecheck` | `copy-externalization` | `review-content-and-source-removal` |
+| `section-composition` | none | none | none | `typecheck`, `next-build` | `bounded-section-composition` | `review-route-and-presentation-removal` |
+| `deployment-cloudflare` | `@opennextjs/cloudflare`, `wrangler` | `cloudflare-worker`, `cloudflare-static-assets` | `node-runtime`, `worker-static-assets` | `next-build`, `opennext-build`, `wrangler-types` | `nextjs-opennext-cloudflare-compatibility` | `review-deployment-source-and-provider-state-separately` |
+| `observability` | `@egeria-systems/observability` | none | none | `package-resolution`, `typecheck`, `next-build` | `public-package-version-and-provenance`, `analytics-separation` | `review-package-and-registration-removal` |
+| `site-routing` | none | none | none | `typecheck`, `next-build` | `multi-page-routing-contract` | `review-route-and-content-removal` |
 
 The recipes are exact:
 
@@ -416,46 +436,76 @@ The required P1 inference probes are exact:
 | `standards` | package `apps/web/package.json#/devDependencies/@egeria-systems~1standards = packageVersions.standards`; files `apps/web/tsconfig.json`, `apps/web/eslint.config.mjs` |
 | `content-files` | files `apps/web/content/en-CA/site.json`, `apps/web/src/content/content-schema.ts`, `apps/web/src/content/read-content.ts` |
 | `section-composition` | files `apps/web/app/page.tsx`, `apps/web/src/presentation/content-page.tsx` |
-| `deployment-cloudflare` | package `apps/web/package.json#/dependencies/@opennextjs~1cloudflare = 1.20.2`; files `apps/web/next.config.ts`, `apps/web/open-next.config.ts`, `apps/web/wrangler.jsonc` |
+| `deployment-cloudflare` | package `apps/web/package.json#/dependencies/@opennextjs~1cloudflare = 1.20.2`; package `apps/web/package.json#/devDependencies/wrangler = 4.118.0`; files `apps/web/next.config.ts`, `apps/web/open-next.config.ts`, `apps/web/wrangler.jsonc` |
 | `observability` | package `apps/web/package.json#/dependencies/@egeria-systems~1observability = packageVersions.observability`; file `apps/web/src/infrastructure/observability/installed-capability.ts` |
 | `site-routing` | files `apps/web/app/about/page.tsx`, `apps/web/content/en-CA/about.json` |
 
 Capability-managed surfaces use those exact package JSON pointers and files. Baseline workspace files not semantically owned by one capability use `owner: { kind: "builder-kernel" }`. Configuration files are `managed`, package JSON pointers are `merge-managed` with `json-property`, and generated content/presentation/README/AGENTS surfaces are `application-owned` after creation.
 
-- [ ] **Step 1: Write resolution tests**
+The exact Task 2 surface identifiers and ownership are:
 
-Cover exact recipes, dependency-before-dependant order, catalog permutation stability, duplicate requested capability collapse, unknown identifiers, unsupported profile selection, synthetic missing dependency, cycle, conflict, released-package version validation, and manifest fields. Reject `workspace:`, `file:`, Git, URL, range, and prerelease package values. Assert `app` and all later capability identifiers are rejected as unknown executable P1 inputs.
+| Identifier | Owner | Path and target | Ownership and merge |
+| --- | --- | --- | --- |
+| `standards-package` | `standards` | `apps/web/package.json#/devDependencies/@egeria-systems~1standards` | `merge-managed`, `json-property` |
+| `standards-typescript-configuration` | `standards` | `apps/web/tsconfig.json` file | `managed`, `replace-file` |
+| `standards-eslint-configuration` | `standards` | `apps/web/eslint.config.mjs` file | `managed`, `replace-file` |
+| `content-files-site-content` | `content-files` | `apps/web/content/en-CA/site.json` file | `application-owned`, `replace-file` |
+| `content-files-schema` | `content-files` | `apps/web/src/content/content-schema.ts` file | `application-owned`, `replace-file` |
+| `content-files-reader` | `content-files` | `apps/web/src/content/read-content.ts` file | `application-owned`, `replace-file` |
+| `section-composition-home-route` | `section-composition` | `apps/web/app/page.tsx` file | `application-owned`, `replace-file` |
+| `section-composition-presentation` | `section-composition` | `apps/web/src/presentation/content-page.tsx` file | `application-owned`, `replace-file` |
+| `deployment-cloudflare-package` | `deployment-cloudflare` | `apps/web/package.json#/dependencies/@opennextjs~1cloudflare` | `merge-managed`, `json-property` |
+| `deployment-cloudflare-wrangler-package` | `deployment-cloudflare` | `apps/web/package.json#/devDependencies/wrangler` | `merge-managed`, `json-property` |
+| `deployment-cloudflare-next-configuration` | `deployment-cloudflare` | `apps/web/next.config.ts` file | `managed`, `replace-file` |
+| `deployment-cloudflare-open-next-configuration` | `deployment-cloudflare` | `apps/web/open-next.config.ts` file | `managed`, `replace-file` |
+| `deployment-cloudflare-wrangler-configuration` | `deployment-cloudflare` | `apps/web/wrangler.jsonc` file | `managed`, `replace-file` |
+| `observability-package` | `observability` | `apps/web/package.json#/dependencies/@egeria-systems~1observability` | `merge-managed`, `json-property` |
+| `observability-registration` | `observability` | `apps/web/src/infrastructure/observability/installed-capability.ts` file | `managed`, `replace-file` |
+| `site-routing-about-route` | `site-routing` | `apps/web/app/about/page.tsx` file | `application-owned`, `replace-file` |
+| `site-routing-about-content` | `site-routing` | `apps/web/content/en-CA/about.json` file | `application-owned`, `replace-file` |
+
+- [ ] **Step 1: Write resolution and direct-boundary tests**
+
+In `resolution.test.mjs`, cover exact recipes, dependency-before-dependant order, catalog permutation stability, duplicate requested capability collapse, unknown identifiers, unsupported profile selection, invalid/duplicate catalog and profile entries, synthetic missing dependency, cycle, conflict, exact stable package-version syntax, descriptor metadata, surface identity, and manifest fields. Reject `workspace:`, `file:`, Git, URL, range, and prerelease package values through `P1_PACKAGE_VERSION_INVALID` without echoing the value. Assert `app` and all later capability identifiers are rejected as unknown executable P1 inputs.
+
+In `private-packages.test.mjs`, replace the exact Task 1 source list with the exact Task 2 source list and assert that the nested instructions, package README, and package-ownership matrix describe the private schema/catalog/resolver/manifest boundary while still prohibiting codecs, inference, diagnostics, generation, CLI commands, providers, and later capabilities.
 
 - [ ] **Step 2: Run RED**
 
 ```bash
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
 rtk node --test packages/builder-core/tests/resolution.test.mjs
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:package-boundaries
 ```
 
-Expected: missing resolver/catalog exports.
+Expected: the resolution test fails because the resolver/catalog/profile/manifest exports do not exist; the package-boundary suite fails because its approved Task 2 source and documentation boundary does not exist. Failures must not be dependency-install or test-loader errors.
 
 - [ ] **Step 3: Implement deterministic resolution**
 
-Validate the catalog before resolution. Walk profile defaults in declared recipe order, sort every descriptor dependency list lexically before depth-first resolution, append each capability once after its dependencies, and report stable `CAPABILITY_UNKNOWN`, `PROFILE_UNKNOWN`, `CAPABILITY_UNSUPPORTED`, `CAPABILITY_DEPENDENCY_MISSING`, `CAPABILITY_CYCLE`, and `CAPABILITY_CONFLICT` issues.
+Validate exact stable `major.minor.patch` package values before constructing the catalog and return `P1_PACKAGE_VERSION_INVALID` issues in standards/observability field order. Validate catalog/profile contracts and unique identifiers before resolution. Walk profile defaults followed by requested capabilities in first-declared order, sort every descriptor dependency list lexically before depth-first resolution, append each capability once after its dependencies, and report stable `CAPABILITY_CATALOG_INVALID`, `CAPABILITY_DUPLICATE`, `PROFILE_CATALOG_INVALID`, `PROFILE_DUPLICATE`, `CAPABILITY_UNKNOWN`, `PROFILE_UNKNOWN`, `CAPABILITY_UNSUPPORTED`, `CAPABILITY_DEPENDENCY_MISSING`, `CAPABILITY_CYCLE`, and `CAPABILITY_CONFLICT` issues. Do not include rejected package specifications or unrelated descriptor data in issue context.
 
-- [ ] **Step 4: Update the canonical capability model**
+- [ ] **Step 4: Update the canonical owners and direct consumers**
 
-Replace `managedSurfaces: readonly string[]` and `inferenceProbes: readonly string[]` in the executable contract example with the typed descriptor/probe shapes from Task 1. State clearly that the full table remains program visibility while P1 executes only the six listed identifiers.
+Replace `managedSurfaces: readonly string[]` and `inferenceProbes: readonly string[]` in the executable capability-model example with the typed descriptor/probe shapes from Task 1. State clearly that the full table remains program visibility while P1 executes only the six listed identifiers.
+
+Update builder-core's nested instructions and README from Task 1 to the exact Task 2 boundary. Update package ownership from the obsolete empty-shell description to the private Task 1/2 root exports and consumers. Mark `INV-CAPABILITY-METADATA` actual only for the tested six-capability P1 catalog; leave `INV-PROFILE-MATERIALIZATION` planned until inference agreement exists. Correct the root README's claim that builder-core has no executable schemas while retaining P1's in-progress and no-production-profile limits.
 
 - [ ] **Step 5: Run GREEN**
 
 ```bash
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
 rtk node --test packages/builder-core/tests/contracts.test.mjs packages/builder-core/tests/resolution.test.mjs
-rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:constitution
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run typecheck
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run lint
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:package-boundaries
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:constitution
 rtk git diff --check
 ```
 
 - [ ] **Step 6: Commit and stop**
 
 ```bash
-git add packages/builder-core/src packages/builder-core/tests/resolution.test.mjs docs/architecture/capability-model.md
+git add README.md packages/builder-core/AGENTS.md packages/builder-core/README.md packages/builder-core/src packages/builder-core/tests/resolution.test.mjs tests/package-boundaries/private-packages.test.mjs docs/architecture/capability-model.md docs/architecture/enforcement-map.md docs/architecture/package-ownership.md
 git commit -m "Resolve P1 capabilities"
 ```
 
