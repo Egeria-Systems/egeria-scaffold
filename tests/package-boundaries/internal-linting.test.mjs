@@ -68,6 +68,27 @@ test("ESLint 10 applies the builder root config to standards source", async () =
   );
 });
 
+test("ESLint 10 applies typed strict linting through the builder root config", async () => {
+  const { ESLint } = await import("eslint");
+  const eslint = new ESLint({
+    cwd: repositoryRoot,
+    overrideConfigFile: resolve(repositoryRoot, "eslint.config.mjs"),
+  });
+  const filePath = resolve(repositoryRoot, "apps/cli/src/index.ts");
+  const [invalidResult] = await eslint.lintText("Promise.resolve();\n", {
+    filePath,
+  });
+  const [validResult] = await eslint.lintText("await Promise.resolve();\n", {
+    filePath,
+  });
+
+  assert.deepEqual(
+    invalidResult.messages.map(({ ruleId, severity }) => ({ ruleId, severity })),
+    [{ ruleId: "@typescript-eslint/no-floating-promises", severity: 2 }],
+  );
+  assert.deepEqual(validResult.messages, []);
+});
+
 test("each immediate builder application and package delegates zero-warning lint to the root", async () => {
   const expectedScripts = new Map([
     [

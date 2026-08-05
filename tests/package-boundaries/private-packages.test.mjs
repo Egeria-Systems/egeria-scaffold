@@ -61,14 +61,11 @@ async function listWorkspacePackages() {
 }
 
 test("the workspace materializes the approved private builder boundaries", async () => {
-  const workspacePackages = await listWorkspacePackages();
-  const packagesByPath = new Map(
-    workspacePackages.map((workspacePackage) => [
-      workspacePackage.path,
-      workspacePackage,
-    ]),
+  const workspacePackages = (await listWorkspacePackages()).sort((left, right) =>
+    left.path.localeCompare(right.path),
   );
-  const expectedPackages = [
+
+  assert.deepEqual(workspacePackages, [
     {
       name: "@egeria-systems/scaffold",
       path: ".",
@@ -88,29 +85,24 @@ test("the workspace materializes the approved private builder boundaries", async
       version: "0.0.0",
     },
     {
+      name: "@egeria-systems/observability",
+      path: "packages/observability",
+      private: false,
+      version: "0.0.0",
+    },
+    {
+      name: "@egeria-systems/standards",
+      path: "packages/standards",
+      private: false,
+      version: "0.0.0",
+    },
+    {
       name: "@egeria-systems/nextjs-cloudflare-proof",
       path: "proofs/nextjs-cloudflare",
       private: true,
       version: "0.0.0",
     },
-  ];
-
-  for (const expectedPackage of expectedPackages) {
-    assert.deepEqual(
-      packagesByPath.get(expectedPackage.path),
-      expectedPackage,
-      `${expectedPackage.path} is not materialized with its approved private boundary`,
-    );
-  }
-
-  assert.equal(
-    workspacePackages.some(
-      (workspacePackage) =>
-        workspacePackage.name.includes("project-schema") ||
-        workspacePackage.path.includes("project-schema"),
-    ),
-    false,
-  );
+  ]);
 });
 
 test("the private package manifests consume standards without a runtime API", async () => {
