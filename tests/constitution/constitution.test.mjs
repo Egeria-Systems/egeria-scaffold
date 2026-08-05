@@ -152,7 +152,7 @@ function validateCompatibilityDeploymentCredentialBoundary(workflow) {
 
   if (
     !deployBlock.includes(
-      "pnpm --filter @egeria-systems/nextjs-cloudflare-proof deploy",
+      "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run deploy",
     )
   ) {
     problems.push("credential-bearing step must invoke the deploy-only script");
@@ -224,8 +224,8 @@ test("the deployment credential contract rejects build work in the secret-bearin
     ".github/workflows/compatibility-proof.yml",
   );
   const insecureWorkflow = workflow.replace(
-    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof deploy",
-    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof build:cloudflare\n          pnpm --filter @egeria-systems/nextjs-cloudflare-proof deploy",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run deploy",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof build:cloudflare\n          pnpm --filter @egeria-systems/nextjs-cloudflare-proof run deploy",
   );
 
   assert.match(
