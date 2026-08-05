@@ -21,6 +21,14 @@ Implement only the approved increment. Future capabilities may be documented wit
 
 Prefer the smallest resilient change. Every changed line must trace to the approved increment or a directly required correction. Reuse existing patterns and avoid speculative abstractions, generic frameworks, and unrelated refactors.
 
+## Semantic naming
+
+Roadmap phase labels such as `P0.3` and `P1` describe sequencing and provenance, not software responsibility. They may appear when the phase itself is the subject: roadmap headings, task or approval-gate references, historical status, dated plans, implementation evidence, compatibility records, review packets, and explicitly phase-scoped invariants.
+
+Do not use roadmap phase labels in executable source, configuration, or workflow filenames/directories; package-script or configuration keys; exported or internal API symbols; stable error identifiers; schema identifiers or titles; CLI commands or flags; generated paths; or ordinary test and fixture identifiers. Name these surfaces for the responsibility or domain behavior they provide. A test may retain a phase label only when its actual subject is a historical phase record or phase-specific invariant.
+
+Do not add a temporary phase-labelled alias unless an approved compatibility migration names its real external consumer and exact removal gate. Rename a live surface and every direct consumer atomically under an approved plan.
+
 ## Architecture invariants
 
 - Profiles are versioned materialized recipes. Installed capabilities become authoritative immediately after generation.

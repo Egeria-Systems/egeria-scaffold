@@ -12,6 +12,7 @@
 
 - Preparation evidence: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-preparation.md`.
 - Task 2 applicability evidence: `docs/implementation-evidence/2026-08-05-p1-task2-plan-applicability.md`. It re-freezes Task 2 at `5da4dfc8a40a4317730c08e2ef7b5cd139737aa6`, preserves the approved six-capability design, and owns the targeted file-map and validation-interface amendments below.
+- Semantic naming evidence: `docs/implementation-evidence/2026-08-05-semantic-naming-preparation.md`. It inventories every live and planned phase-labelled executable name, preserves historical phase records, and assigns one atomic normalization task immediately before Task 3.
 - Task 1 schema-review evidence: `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`. The capability-version name and empty P1 capability-settings contract are assigned to the separately gated Task 1A plan; the other recorded questions remain deferred to Task 9.
 - Frozen starting commit: `303ee9d35e19f9191948d994159f77c82c90a1ed` on clean sequential local `main`; re-freeze before execution if it changes.
 - Run shell commands through `rtk`; use `/Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm` and `CI=true` where pnpm may refresh generated dependencies.
@@ -34,6 +35,7 @@
 - Tasks 1 through 6 are within the plan, but plan approval authorizes beginning Task 1 only; every later task still requires the preceding checkpoint approval. Task 7 is additionally a hard stop until standards and observability are separately versioned/published under explicit approval and their exact public versions pass current registry/advisory checks.
 - A portable generated `pnpm-lock.yaml`, fresh public-registry install, and pre-state generated-project verification are mandatory for Tasks 7 and 8. The P1 packet must not mark them passed before they exist.
 - No push, pull request, merge, deployment, npm versioning/publication, permission change, external message, or review-comment response is authorized.
+- Roadmap labels remain valid in phase-subject plans, evidence, review packets, status, and gates, but executable paths, APIs, errors, scripts, workflows, schemas, CLI surfaces, generated paths, and ordinary test identifiers use semantic responsibility names. Task 2A normalizes the current exceptions before later P1 consumers are added.
 
 ## File and Interface Map
 
@@ -50,8 +52,8 @@
 
 ### Resolution and state
 
-- `packages/builder-core/src/catalog/p1-capabilities.ts`: the exact six P1 descriptors.
-- `packages/builder-core/src/profiles/p1-profiles.ts`: exact `portfolio` and `site` recipes.
+- `packages/builder-core/src/catalog/capability-catalog.ts`: the exact six executable descriptors.
+- `packages/builder-core/src/profiles/profile-recipes.ts`: exact `portfolio` and `site` recipes.
 - `packages/builder-core/src/resolution/resolve-capabilities.ts`: dependency closure and deterministic ordering.
 - `packages/builder-core/src/manifest/create-installed-manifest.ts`: authoritative installed entries from resolved descriptors.
 - `packages/builder-core/src/state/codecs.ts`: YAML 1.2, JSON, and JSONL parsing/serialization.
@@ -332,6 +334,8 @@ Do not treat the other recorded schema questions as authorized Task 1A work. Sto
 
 ## Task 2: P1 Capability Catalog, Profiles, and Resolution
 
+Task 2 is complete. Its phase-labelled executable names below are retained as the exact record of what was approved and committed; Task 2A immediately following owns their semantic replacement before any new consumer is added.
+
 **Files:**
 
 - Create: `packages/builder-core/src/catalog/p1-capabilities.ts`
@@ -507,6 +511,111 @@ rtk git diff --check
 ```bash
 git add README.md packages/builder-core/AGENTS.md packages/builder-core/README.md packages/builder-core/src packages/builder-core/tests/resolution.test.mjs tests/package-boundaries/private-packages.test.mjs docs/architecture/capability-model.md docs/architecture/enforcement-map.md docs/architecture/package-ownership.md
 git commit -m "Resolve P1 capabilities"
+```
+
+Stop for explicit user approval before Task 2A.
+
+## Task 2A: Semantic Executable Naming Normalization
+
+Task 2A is intentionally placed before state codecs, inference, generation, and CLI consumers multiply. It changes names only; Task 2 behavior and metadata remain byte-for-byte equivalent apart from the semantic profile-schema title and renamed stable package-version issue code.
+
+**Preparation evidence:** `docs/implementation-evidence/2026-08-05-semantic-naming-preparation.md`
+
+**Design:** `docs/superpowers/specs/2026-08-05-semantic-executable-naming-design.md`
+
+**Frozen executable state:** `3d2f0042bb7993a1e745c36b81962677a9a27b43` on clean local `main`. This planning increment changes documentation only. Immediately before RED, require a clean worktree and record the then-current HEAD as Task 2A's exact implementation comparison base.
+
+**Files:**
+
+- Rename: `packages/builder-core/src/catalog/p1-capabilities.ts` to `packages/builder-core/src/catalog/capability-catalog.ts`
+- Rename: `packages/builder-core/src/profiles/p1-profiles.ts` to `packages/builder-core/src/profiles/profile-recipes.ts`
+- Modify: `packages/builder-core/src/catalog/capability-catalog.ts`
+- Modify: `packages/builder-core/src/profiles/profile-recipes.ts`
+- Modify: `packages/builder-core/src/contracts/profile.ts`
+- Modify generated artifact: `packages/builder-core/schemas/profile.schema.json`
+- Modify: `packages/builder-core/src/index.ts`
+- Modify: `packages/builder-core/tests/contracts.test.mjs`
+- Modify: `packages/builder-core/tests/resolution.test.mjs`
+- Modify: `package.json`
+- Modify: `.github/workflows/compatibility-proof.yml`
+- Modify: `README.md`
+- Modify: `CONTRIBUTING.md`
+- Modify: `tests/constitution/constitution.test.mjs`
+- Modify: `tests/package-boundaries/internal-linting.test.mjs`
+- Modify: `tests/package-boundaries/private-packages.test.mjs`
+- Modify: `tests/package-boundaries/release-safeguards.test.mjs`
+
+**Exact live-name mapping:**
+
+| Current executable name | Semantic name |
+| --- | --- |
+| `catalog/p1-capabilities.ts` | `catalog/capability-catalog.ts` |
+| `profiles/p1-profiles.ts` | `profiles/profile-recipes.ts` |
+| `P1PackageVersions` | `CapabilityPackageVersions` |
+| `createP1CapabilityCatalog` | `createCapabilityCatalog` |
+| `p1ProfileRecipes` | `profileRecipes` |
+| `P1_PACKAGE_VERSION_INVALID` | `CAPABILITY_PACKAGE_VERSION_INVALID` |
+| `Egeria P1 profile recipe` | `Egeria portfolio and site profile recipe` |
+| `build:p0.3` | `build:builder` |
+| `lint:p0.3` | `lint:builder` |
+| `typecheck:p0.3` | `typecheck:builder` |
+| `verify:p0.2` | `verify:compatibility-proof` |
+| `verify:p0.3` | `verify:builder-packages` |
+
+Normalize these ordinary current-behavior test titles in the same change:
+
+| Current test title | Semantic replacement |
+| --- | --- |
+| `builder-core exports the executable P1 contract boundary` | `builder-core exports the executable contract boundary` |
+| `the P1 catalog declares the exact six executable capability contracts` | `the portfolio and site catalog declares the exact six executable capability contracts` |
+| `P1 package versions must be exact stable releases and issues do not echo inputs` | `capability package versions must be exact stable releases and issues do not echo inputs` |
+| `P1 keeps schemas private and reserves every later-stage builder surface` | `builder-core keeps schemas private and reserves every later-stage builder surface` |
+| `the root workspace remains private and pins the P0.2 toolchain` | `the root workspace remains private and pins the compatibility-proof toolchain` |
+
+Do not retain compatibility aliases. Historical plans, evidence, review packets, compatibility records, phase status, roadmap headings, and phase-specific invariants retain the labels and exact commands that were true when accepted.
+
+- [ ] **Step 1: Write semantic-name and direct-consumer tests**
+
+Update the executable contract tests first. Require the semantic builder-core source paths, exports, schema title, issue code, root script keys, README/contributing commands, and compatibility-workflow command. Assert that the old source paths, exports, issue code, package-script keys, and each exact current test title listed above are absent. Rename ordinary test titles whose subject is current runtime behavior; retain phase labels only in tests whose actual subject is an accepted historical phase record or phase-specific invariant.
+
+- [ ] **Step 2: Run RED**
+
+```bash
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk node --test packages/builder-core/tests/contracts.test.mjs packages/builder-core/tests/resolution.test.mjs
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:package-boundaries
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:constitution
+```
+
+Expected: builder-core tests fail on missing semantic exports/schema title/issue code; package-boundary tests fail on old source paths and script keys; constitution fails because the compatibility workflow still calls the old root script. Failures must not be dependency-install or loader errors.
+
+- [ ] **Step 3: Rename implementation and executable consumers atomically**
+
+Rename the two source files, exported API symbols, stable issue code, schema title, five current root scripts, workflow command, and current documentation consumers exactly as mapped. Regenerate `profile.schema.json` through `pnpm --filter @egeria-systems/builder-core run schema:generate`; do not hand-edit it. Retain the active plan's semantic future names `verified-package-versions.ts` and `verify:builder-kernel` when those surfaces are implemented.
+
+Do not change resolution logic, capability metadata, recipe content, dependencies, lockfile, provider behavior, generated output, or public package APIs.
+
+- [ ] **Step 4: Run GREEN and affected compatibility verification**
+
+```bash
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run verify
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:package-boundaries
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:constitution
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run verify:builder-packages
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run verify:compatibility-proof
+rtk git diff --check
+rtk git status --short --branch
+```
+
+The compatibility proof is rerun because its GitHub workflow calls the renamed root command. It remains local verification only and performs no deployment or provider mutation.
+
+- [ ] **Step 5: Review, commit, and stop**
+
+Dispatch the required independent requirements, architecture/anti-overengineering, and test-evidence reviewers. Repair only validated material findings and rerun affected verification. Confirm the final diff contains no old live names or compatibility aliases and does not rewrite historical records.
+
+```bash
+git add .github/workflows/compatibility-proof.yml README.md CONTRIBUTING.md package.json packages/builder-core/src packages/builder-core/schemas/profile.schema.json packages/builder-core/tests tests/constitution/constitution.test.mjs tests/package-boundaries
+git commit -m "Normalize executable names"
 ```
 
 Stop for explicit user approval before Task 3.
@@ -785,7 +894,7 @@ export type GenerationRequest = Readonly<{
   profile: "portfolio" | "site";
   projectName: string;
   displayName: string;
-  packageVersions: P1PackageVersions;
+  packageVersions: CapabilityPackageVersions;
 }>;
 
 export type GeneratedFile = Readonly<{
@@ -807,7 +916,7 @@ export async function renderSkeleton(
 
 Allowed template tokens are exactly `projectName`, `displayNameJson`, and `workerName`. Unknown, repeated-unresolved, or malformed tokens fail with `TEMPLATE_TOKEN_INVALID`; every destination path is validated and duplicate destinations fail with `TEMPLATE_DESTINATION_DUPLICATE`.
 
-Generated `apps/web/package.json` pins the accepted exact proof versions. It declares standards and observability as ordinary exact stable versions supplied by `P1PackageVersions` and never uses `workspace:`, `file:`, a Git source, URL source, range, or prerelease. Before the separate release prerequisite is complete, render tests use explicit synthetic `0.1.0` values only as in-memory contract data and do not write or claim an installable generated repository.
+Generated `apps/web/package.json` pins the accepted exact proof versions. It declares standards and observability as ordinary exact stable versions supplied by `CapabilityPackageVersions` and never uses `workspace:`, `file:`, a Git source, URL source, range, or prerelease. Before the separate release prerequisite is complete, render tests use explicit synthetic `0.1.0` values only as in-memory contract data and do not write or claim an installable generated repository.
 
 Generated visible copy exists only in JSON:
 
@@ -868,7 +977,7 @@ After separately authorized publication, verify both exact public manifests, tar
 
 **Files:**
 
-- Create: `packages/builder-core/src/catalog/p1-release-catalog.ts`
+- Create: `packages/builder-core/src/catalog/verified-package-versions.ts`
 - Create: `packages/builder-core/src/generation/verify-generated-project.ts`
 - Create: `packages/builder-core/src/generation/write-generated-project.ts`
 - Create: `packages/builder-core/tests/generate-project.test.mjs`
@@ -969,7 +1078,7 @@ Use `mkdtemp`, `mkdir`, `open` with exclusive creation, `writeFile`, `lstat`, `c
 
 - [ ] **Step 4: Implement the CLI adapter**
 
-Add `p1-release-catalog.ts` with exact separately verified standards/observability `0.1.0` versions. Add `bin: { "egeria": "./dist/index.js" }`, runtime dependency `@egeria-systems/builder-core: "workspace:*"`, a Node shebang on the entry point, and package test/build scripts. `arguments.ts` owns only the `parseArgs` configuration; `run-cli.ts` maps inputs/outputs without reimplementing core validation and constructs the pnpm verifier with the approved executable.
+Add `verified-package-versions.ts` with exact separately verified standards/observability `0.1.0` versions. Add `bin: { "egeria": "./dist/index.js" }`, runtime dependency `@egeria-systems/builder-core: "workspace:*"`, a Node shebang on the entry point, and package test/build scripts. `arguments.ts` owns only the `parseArgs` configuration; `run-cli.ts` maps inputs/outputs without reimplementing core validation and constructs the pnpm verifier with the approved executable.
 
 - [ ] **Step 5: Run GREEN**
 
@@ -1072,7 +1181,7 @@ Root scripts become:
   "test:cli": "pnpm --filter @egeria-systems/cli run build && node --test apps/cli/tests/*.test.mjs",
   "test:generated-fixtures": "node --test tests/generated-fixtures/*.test.mjs",
   "verify:generated-skeletons": "node scripts/verify-generated-skeletons.mjs",
-  "verify:p1": "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:generated-fixtures && pnpm run lint:p0.3 && pnpm run build:p0.3 && pnpm run typecheck:p0.3 && pnpm run verify:generated-skeletons && pnpm run changeset:status"
+  "verify:builder-kernel": "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run build:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run changeset:status"
 }
 ```
 
@@ -1124,8 +1233,8 @@ Update package ownership from P0.3 shells to the exact P1 APIs/consumers. Mark `
 rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm install --frozen-lockfile
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm audit --audit-level=moderate
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm peers check
-rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run verify:p1
-rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run verify:p0.2
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run verify:builder-kernel
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run verify:compatibility-proof
 rtk git diff --check 303ee9d35e19f9191948d994159f77c82c90a1ed...HEAD
 rtk git status --short --branch
 ```
@@ -1157,7 +1266,7 @@ Validate every finding against the shared final tree. Classify each as `material
 
 - [ ] **Step 9: Re-run settled final verification**
 
-After the last relevant input changes, run `verify:p1`, the affected P0.2 proof if shared inputs changed after its prior run, audit, peers, range diff-check, final status, changed-file list, and commit range. Do not repeat a successful expensive check against an unchanged tested tree.
+After the last relevant input changes, run `verify:builder-kernel`, the affected compatibility proof if shared inputs changed after its prior run, audit, peers, range diff-check, final status, changed-file list, and commit range. Do not repeat a successful expensive check against an unchanged tested tree.
 
 - [ ] **Step 10: Write the settled implementation verification evidence**
 
