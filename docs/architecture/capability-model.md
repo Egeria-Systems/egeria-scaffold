@@ -29,7 +29,7 @@ type CapabilityRemovalPolicy =
 
 interface CapabilityDescriptor {
   identifier: string;
-  schemaVersion: string;
+  version: string;
   deliveryMode: CapabilityDeliveryMode;
   stateClassifications: readonly [
     CapabilityStateClassification,
@@ -60,6 +60,8 @@ interface CapabilityDescriptor {
   removalAndRecoveryRequirements: readonly string[];
 }
 ```
+
+`version` is the capability release version used by catalogs and installed manifests. The descriptor schema-format version is owned by the schema identifier, such as `urn:egeria-systems:schema:capability:1.0.0`, rather than a second descriptor field.
 
 An implementation must model `stateClassifications` as a non-empty set without duplicate members. `stateless` cannot be combined with another classification. Privileged operations, data sensitivity, retention, and provider cleanup stay in their dedicated metadata.
 

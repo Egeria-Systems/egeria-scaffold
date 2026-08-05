@@ -412,9 +412,6 @@
       "readOnly": true,
       "type": "array"
     },
-    "schemaVersion": {
-      "$ref": "#/$defs/urn:egeria-systems:schema:semantic-version:1.0.0"
-    },
     "secrets": {
       "items": {
         "maxLength": 512,
@@ -461,12 +458,15 @@
       },
       "readOnly": true,
       "type": "array"
+    },
+    "version": {
+      "$ref": "#/$defs/urn:egeria-systems:schema:semantic-version:1.0.0"
     }
   },
   "readOnly": true,
   "required": [
     "identifier",
-    "schemaVersion",
+    "version",
     "deliveryMode",
     "stateClassifications",
     "removalPolicy",

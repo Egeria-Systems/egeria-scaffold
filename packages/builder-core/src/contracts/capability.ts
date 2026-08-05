@@ -148,7 +148,7 @@ export const managedSurfaceDescriptorSchema = z
 export const capabilityDescriptorSchema = z
   .strictObject({
     identifier: stableIdentifierSchema,
-    schemaVersion: semanticVersionSchema,
+    version: semanticVersionSchema,
     deliveryMode: capabilityDeliveryModeSchema,
     stateClassifications: capabilityStateClassificationsSchema,
     removalPolicy: capabilityRemovalPolicySchema,

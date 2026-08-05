@@ -201,7 +201,7 @@ Every capability descriptor declares:
 
 ```text
 identifier
-schema version
+capability version
 delivery mode
 state classification
 removal policy

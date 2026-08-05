@@ -43,10 +43,9 @@ export const projectConfigurationSchema = z
     recipeVersion: z.literal("0.1.0"),
     platformAdapter: z.literal("cloudflare-workers"),
     selectedCapabilities: capabilityIdentifierListSchema,
-    capabilitySettings: z.record(
-      stableIdentifierSchema,
-      z.record(z.string().min(1), z.unknown()),
-    ),
+    capabilitySettings: z
+      .record(stableIdentifierSchema, z.never())
+      .readonly(),
     ejectedAreas: ejectedAreaListSchema,
   })
   .readonly()

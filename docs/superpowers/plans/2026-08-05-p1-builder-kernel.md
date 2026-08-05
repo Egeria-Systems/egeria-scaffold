@@ -233,7 +233,7 @@ type ProjectConfiguration = Readonly<{
   recipeVersion: "0.1.0";
   platformAdapter: "cloudflare-workers";
   selectedCapabilities: readonly string[];
-  capabilitySettings: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  capabilitySettings: Readonly<Record<string, never>>;
   ejectedAreas: readonly string[];
 }>;
 ```
@@ -325,7 +325,7 @@ Present the exact changed-file list and focused results. Stop for explicit user 
 
 ## Task 1A: Pre-Task2 Schema Contract Clarifications
 
-Task 1A resolves only the two contract questions whose ambiguity or permissiveness would otherwise be materialized by later P1 consumers: capability `version` naming and an empty P1 `capabilitySettings` map. Its exact files, RED/GREEN sequence, documentation reconciliation, reviewers, verification, and rollback are owned by `docs/superpowers/plans/2026-08-05-p1-pre-task2-schema-contract-clarifications.md`.
+Task 1A resolves only the two contract questions whose ambiguity or permissiveness would otherwise be materialized by later P1 consumers: `CapabilityDescriptor.version` is the capability release version, and P1 requires an empty `capabilitySettings` map. Its exact files, RED/GREEN sequence, documentation reconciliation, reviewers, verification, and rollback are owned by `docs/superpowers/plans/2026-08-05-p1-pre-task2-schema-contract-clarifications.md`.
 
 Do not treat the other recorded schema questions as authorized Task 1A work. Stop after its focused commit for explicit user approval before Task 2.
 
@@ -1151,10 +1151,10 @@ This task revisits the Task 1 schema questions only after Tasks 2 through 8 have
 
 Verify the current branch, status, exact Task 1-to-final-P1 comparison, and all direct consumers before judging the recorded questions. Re-evaluate:
 
-1. whether capability `schemaVersion` is a capability release version or a descriptor-format version;
+1. whether Task 1A's capability `version` release-version contract remained correct in actual P1 consumers;
 2. whether constant migration `outcome` carries necessary persisted meaning;
 3. whether constant verification `kind` carries necessary persisted meaning;
-4. whether P1 `capabilitySettings` permits unsupported or secret-bearing states;
+4. whether Task 1A's empty P1 `capabilitySettings` contract remained correct in actual P1 consumers;
 5. whether `threatReviewLevel` has a sufficiently closed vocabulary;
 6. whether surface target/merge validation has one canonical owner and represents only valid combinations;
 7. whether path-only ejection identity can represent every managed surface safely; and

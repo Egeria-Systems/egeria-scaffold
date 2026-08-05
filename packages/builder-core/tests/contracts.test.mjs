@@ -21,7 +21,7 @@ const schemaArtifactNames = [
 
 const validCapability = {
   identifier: "standards",
-  schemaVersion: "0.1.0",
+  version: "0.1.0",
   deliveryMode: "package-backed",
   stateClassifications: ["repository-stateful"],
   removalPolicy: "reviewed",
@@ -77,7 +77,7 @@ const validProject = {
   recipeVersion: "0.1.0",
   platformAdapter: "cloudflare-workers",
   selectedCapabilities: ["standards"],
-  capabilitySettings: { standards: {} },
+  capabilitySettings: {},
   ejectedAreas: [],
 };
 
@@ -254,6 +254,16 @@ test("capability descriptors are strict and preserve state-classification invari
     inferenceProbes: [],
   });
 
+  const { version, ...capabilityWithoutVersion } = validCapability;
+  assertRejects(contracts.capabilityDescriptorSchema, {
+    ...capabilityWithoutVersion,
+    schemaVersion: version,
+  });
+  assertRejects(contracts.capabilityDescriptorSchema, {
+    ...validCapability,
+    schemaVersion: validCapability.version,
+  });
+
   assertRejects(contracts.capabilityDescriptorSchema, {
     ...validCapability,
     stateClassifications: [],
@@ -314,6 +324,10 @@ test("project configuration is strict and materializes safe capability identifie
   assertAccepts(contracts.projectConfigurationSchema, validProject);
   assertAccepts(contracts.profileRecipeSchema, validProfile);
 
+  assertRejects(contracts.projectConfigurationSchema, {
+    ...validProject,
+    capabilitySettings: { standards: {} },
+  });
   assertRejects(contracts.projectConfigurationSchema, {
     ...validProject,
     selectedCapabilities: ["standards", "standards"],

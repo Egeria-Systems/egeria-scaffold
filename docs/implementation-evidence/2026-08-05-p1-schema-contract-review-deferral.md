@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-05 (America/Toronto)
 
-**Status:** split disposition recorded; Task 1A plan awaiting approval; no schema change authorized
+**Status:** two Task 1A dispositions implemented, verified, and independently reviewed; six questions remain deferred
 
 **Source state:** clean local `main` at `d6892c0e02b9f2138c484311eed2aa6530552869` before this evidence record and plan amendment
 
@@ -84,7 +84,7 @@ Their results therefore do not contradict each other:
 - the simplification workflow did not establish an approved behavior-preserving removal or consolidation; and
 - correctness or product-vocabulary questions must not be relabeled as code bloat.
 
-User direction is to address none of these questions now. All eight are deferred to Task 9, after actual P1 consumers and verification evidence exist.
+The initial user direction was to preserve all eight questions for Task 9. The later timing authorization and bounded reassessment below supersede that timing for only two pre-consumer corrections; Task 9 still revalidates all eight against actual P1 consumers.
 
 ## Pre-Task2 reassessment
 
@@ -92,8 +92,8 @@ The user subsequently authorized using implementation judgment to address an ite
 
 | Item | Timing decision | Basis |
 | --- | --- | --- |
-| Capability `schemaVersion` | Address in separately approved Task 1A before Task 2. | Task 2 must map this value into `InstalledCapability.version`; retaining two names would cement an avoidable semantic contradiction. The descriptor schema-format version already has its `1.0.0` schema identifier. |
-| `capabilitySettings` | Address in separately approved Task 1A before later project generation. | P1 defines no capability settings, while the current arbitrary nested values create unsupported desired states and cannot enforce the no-secrets contract. An explicit empty map preserves the accepted field without inventing later settings. |
+| Capability `schemaVersion` | Implemented and independently reviewed in Task 1A as capability release `version`. | Task 2 must map this value into `InstalledCapability.version`; retaining two names would cement an avoidable semantic contradiction. The descriptor schema-format version already has its `1.0.0` schema identifier. |
+| `capabilitySettings` | Implemented and independently reviewed in Task 1A as a required empty map. | P1 defines no capability settings, while the prior arbitrary nested values created unsupported desired states and could not enforce the no-secrets contract. An explicit empty map preserves the accepted field without inventing later settings. |
 | Migration `outcome` | Keep unchanged through P1 and re-evaluate in Task 9. | The literal makes successful-only raw JSONL records self-describing; no current maintenance or compatibility evidence establishes that deletion is beneficial. |
 | Verification `kind` | Keep unchanged through P1 and re-evaluate in Task 9. | It names the verification receipt's operation and may distinguish later operations; removing it now offers little benefit. |
 | `threatReviewLevel` | Defer to Task 9. | A closed security vocabulary needs an accepted product/security owner; Task 1A must not invent one. |
@@ -101,7 +101,7 @@ The user subsequently authorized using implementation judgment to address an ite
 | Ejection identity | Defer to Task 9 or its later migration owner. | P1 emits no ejections, so changing the format now would be speculative. |
 | Runtime/static schema parity | Defer to Task 9. | The accepted preparation record deliberately permits runtime-only cross-field refinements; the final P1 review can evaluate the actual static-schema consumers and claim wording. |
 
-The exact pre-consumer implementation remains subject to `docs/superpowers/plans/2026-08-05-p1-pre-task2-schema-contract-clarifications.md` and its approval gate. Task 9 still revalidates all eight recorded items against the final P1 tree, including whether the two Task 1A dispositions remained correct in actual consumers.
+Task 1A followed `docs/superpowers/plans/2026-08-05-p1-pre-task2-schema-contract-clarifications.md`: its causal RED run failed only the descriptor-name, populated-settings, and canonical-documentation controls; GREEN passed all 24 focused tests, schema currency, typecheck, lint, all 21 package-boundary tests, and diff whitespace validation. Requirements and architecture reviewers reported no material findings. The test-evidence reviewer identified one material negative-control gap; the repaired control passed and bounded follow-up closed the finding. Task 9 still revalidates all eight recorded items against the final P1 tree, including whether the two Task 1A dispositions remained correct in actual consumers.
 
 ## Task 9 review requirements
 

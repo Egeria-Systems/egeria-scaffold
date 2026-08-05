@@ -527,6 +527,13 @@ test("the documented capability catalog uses the normalized contract", async () 
   const document = await readRepositoryFile(
     "docs/architecture/capability-model.md",
   );
+  const descriptorMatch = document.match(
+    /interface CapabilityDescriptor \{([\s\S]*?)\n\}/,
+  );
+  assert.ok(descriptorMatch, "capability descriptor contract is missing");
+  assert.match(descriptorMatch[1], /^  version: string;$/m);
+  assert.doesNotMatch(descriptorMatch[1], /^  schemaVersion: string;$/m);
+
   const catalog = document
     .split("## Initial catalog\n", 2)[1]
     .split("## Independent and conditional behavior", 1)[0];

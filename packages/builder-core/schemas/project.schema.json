@@ -22,16 +22,12 @@
     },
     "capabilitySettings": {
       "additionalProperties": {
-        "additionalProperties": {},
-        "propertyNames": {
-          "minLength": 1,
-          "type": "string"
-        },
-        "type": "object"
+        "not": {}
       },
       "propertyNames": {
         "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
       },
+      "readOnly": true,
       "type": "object"
     },
     "ejectedAreas": {

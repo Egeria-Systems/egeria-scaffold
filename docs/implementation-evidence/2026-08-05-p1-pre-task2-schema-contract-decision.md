@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-05 (America/Toronto)
 
-**Status:** preparation complete; exact-file plan awaiting approval; runtime implementation not started
+**Status:** Task 1A implemented, verified, and independently reviewed; final-diff approval pending
 
 **Approved program stage:** P1 builder kernel, between Task 1 and Task 2
 
@@ -65,3 +65,76 @@ The capability version name is a direct contradiction between the canonical desc
 No blocking uncertainty remains for the empty settings decision because P1 exposes no capability setting. A later stage that introduces one must version and type it explicitly.
 
 No source, test, generated schema, manifest, lockfile, state file, or runtime behavior changed during this preparation. The exact implementation is in `docs/superpowers/plans/2026-08-05-p1-pre-task2-schema-contract-clarifications.md` and remains approval-gated.
+
+## Task 1A implementation evidence
+
+The user approved the exact-file Task 1A plan on 2026-08-05. The implementation comparison starts at clean local `main` commit `468558d4248665d1d99ac2e971dfc8771e488715`, which adds the approved plan without changing the frozen Task 1 contracts.
+
+The RED cycle rebuilt builder-core successfully, then ran the focused runtime and constitution tests against the unchanged implementation. Result: 21 of 24 tests passed and exactly three failed:
+
+- the valid descriptor's new `version` field was rejected while missing `schemaVersion` was reported;
+- the populated `capabilitySettings: { standards: {} }` negative control was still accepted; and
+- the canonical capability descriptor example did not contain `version: string`.
+
+The minimum implementation then:
+
+- renamed only `CapabilityDescriptor.schemaVersion` to `CapabilityDescriptor.version`;
+- kept profile, project, installed-state, and migration schema-format fields unchanged;
+- retained required top-level `capabilitySettings` and constrained it to an empty record with `z.record(stableIdentifierSchema, z.never()).readonly()`;
+- regenerated only the capability and project JSON Schema artifacts; and
+- reconciled the capability model, approved source plan, and P1 plan terminology.
+
+The first artifact-generation invocation stopped before generation because pnpm required a non-interactive module-directory refresh and `CI` was not set. Rerunning the same command with `CI=true`, as required by the error and repository instructions for dependency refresh, succeeded. No dependency manifest or lockfile changed.
+
+Initial GREEN results on the implementation tree:
+
+- builder-core build: passed;
+- checked-schema generation and currency check: passed;
+- focused runtime and constitution tests: 24 of 24 passed;
+- builder-core typecheck: passed;
+- builder-core zero-warning lint: passed;
+- package-boundary tests: 21 of 21 passed; and
+- `git diff --check`: passed.
+
+These checks establish the two selected runtime/static contract changes, artifact currency, documentation terminology, type safety, linting, and unchanged package boundaries. They do not establish Task 2 catalog behavior, persisted-state migration compatibility, deployed behavior, accessibility conformance, or the correctness of the six questions deferred to Task 9.
+
+## Independent review dispositions
+
+- Requirements: no material findings. The reviewer confirmed that the 11 changed paths implement exactly the two approved behaviors while preserving the other schema-format fields, non-goals, and six deferred questions.
+- Architecture and anti-overengineering: no material findings. The reviewer confirmed private Zod ownership, generated artifact ownership, one capability release-version concept, no compatibility alias or settings framework, and unchanged stage boundaries.
+- Test evidence: one material gap was validated. The obsolete-only descriptor fixture could be rejected because required `version` was missing, so it did not independently prove that an otherwise-valid descriptor rejects `schemaVersion`. A second negative control now supplies valid `version` and the obsolete key together. The focused suite remained 24 of 24 passing, and bounded follow-up closed the finding with no remaining material test-evidence findings.
+
+## Task 1A review packet
+
+**Comparison:** committed base `468558d4248665d1d99ac2e971dfc8771e488715` to the settled Task 1A working tree on local `main`. Remote refs were not refreshed because the approved work depends on the frozen local contracts and current official evidence, not remote branch freshness.
+
+**Changed files:**
+
+- `packages/builder-core/src/contracts/capability.ts`;
+- `packages/builder-core/src/contracts/project.ts`;
+- `packages/builder-core/tests/contracts.test.mjs`;
+- `packages/builder-core/schemas/capability.schema.json`;
+- `packages/builder-core/schemas/project.schema.json`;
+- `tests/constitution/constitution.test.mjs`;
+- `docs/architecture/capability-model.md`;
+- `docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md`;
+- `docs/superpowers/plans/2026-08-05-p1-builder-kernel.md`;
+- `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`; and
+- this decision and review evidence.
+
+**Commands and results:**
+
+- builder-core build under `CI=true`: passed;
+- focused runtime and constitution RED run: 21 of 24 passed, with exactly the three intended failures;
+- schema generation: the first invocation stopped before generation because `CI` was absent; the same invocation under `CI=true` passed;
+- schema currency check: passed;
+- focused runtime and constitution GREEN run: 24 of 24 passed initially and again after the review repair;
+- builder-core typecheck and zero-warning lint: passed;
+- package-boundary suite: 21 of 21 passed; and
+- diff whitespace validation: passed initially and after the review repair.
+
+**Risks and claim limits:** No persisted `.egeria` document or downstream catalog exists yet, so no compatibility bridge is required or demonstrated. The generated empty-object representation uses an impossible additional-property schema derived from canonical Zod. These checks do not establish Task 2 behavior, deployed behavior, accessibility conformance, or resolution of the six deferred schema questions.
+
+**Deferred work:** Task 9 revalidates all eight original field-purpose and simplification questions against actual P1 consumers. Migration `outcome`, verification `kind`, threat-review vocabulary, surface target/merge structure, ejection identity, and runtime/static parity are unchanged in Task 1A. Any future capability setting requires a separately approved, versioned, typed contract.
+
+**Rollback and recovery:** Before commit, restore only these 11 files to the comparison base. After commit, revert the focused Task 1A commit and regenerate checked artifacts from the runtime Zod owners; do not reset shared `main` or hand-edit generated JSON. No dependency, generated client, provider, deployment, persistent-data, or migration-history rollback exists for this increment.
