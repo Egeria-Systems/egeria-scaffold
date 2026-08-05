@@ -155,6 +155,78 @@ test("workspace documentation reserves apps for builder code and proofs for evid
   assert.match(overview, /`packages\/\*` contains deliberately owned packages/);
 });
 
+test("P0.3 documentation exposes current package ownership and review status", async () => {
+  const [
+    rootInstructions,
+    readme,
+    contributing,
+    overview,
+    enforcementMap,
+    roadmap,
+  ] = await Promise.all([
+    readRepositoryFile("AGENTS.md"),
+    readRepositoryFile("README.md"),
+    readRepositoryFile("CONTRIBUTING.md"),
+    readRepositoryFile("docs/architecture/overview.md"),
+    readRepositoryFile("docs/architecture/enforcement-map.md"),
+    readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+  ]);
+
+  for (const nestedInstructions of [
+    "apps/cli/AGENTS.md",
+    "packages/builder-core/AGENTS.md",
+    "packages/observability/AGENTS.md",
+    "packages/standards/AGENTS.md",
+  ]) {
+    assert.match(rootInstructions, new RegExp(`\\(${nestedInstructions}\\)`));
+  }
+  assert.match(
+    rootInstructions,
+    /\(docs\/architecture\/package-ownership\.md\)/,
+  );
+
+  assert.match(overview, /\(package-ownership\.md\)/);
+  assert.match(overview, /P0\.3 is review-pending/i);
+  assert.match(overview, /P1 is the first executable project\/state schema stage/i);
+
+  assert.match(
+    enforcementMap,
+    /INV-PACKAGE-EXTRACTION[^\n]+actual for P0\.3/i,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-PACKAGE-PUBLICATION[^\n]+actual/i,
+  );
+  assert.match(
+    enforcementMap,
+    /@egeria-systems\/standards\/eslint\/cloudflare-isolation/,
+  );
+  assert.match(
+    enforcementMap,
+    /proofs\/nextjs-cloudflare\/eslint\.config\.mjs/,
+  );
+  assert.match(enforcementMap, /generated-repository gate planned/i);
+
+  const p03Section = roadmap
+    .split("### P0.3 — Lean builder monorepo", 2)[1]
+    .split("## P1 — Builder kernel", 1)[0];
+  assert.match(p03Section, /review-pending/i);
+  assert.doesNotMatch(p03Section, /\*\*(?:Completed|Accepted)/i);
+  assert.match(
+    roadmap,
+    /P1 is the first executable project\/state schema stage/i,
+  );
+
+  for (const document of [readme, contributing]) {
+    assert.match(document, /apps\/cli/);
+    assert.match(document, /packages\/builder-core/);
+    assert.match(document, /packages\/standards/);
+    assert.match(document, /packages\/observability/);
+    assert.match(document, /Changeset/i);
+    assert.match(document, /publication[^\n]+explicit[^\n]+approval/i);
+  }
+});
+
 function validateCompatibilityDeploymentCredentialBoundary(workflow) {
   const deployIndex = workflow.indexOf("- name: Deploy compatibility Worker");
   const deployedTestIndex = workflow.indexOf(

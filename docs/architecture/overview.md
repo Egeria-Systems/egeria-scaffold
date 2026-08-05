@@ -1,10 +1,10 @@
 # Architecture Overview
 
-**Status:** Controlling architecture summary through P0.2
+**Status:** Controlling architecture summary for the P0.3 review candidate
 
 **Source:** [Approved reconciled program plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md)
 
-Accepted [ADRs](../adr/README.md) own individual decisions. This overview explains how those decisions fit together; it does not replace them. The [enforcement map](enforcement-map.md) owns automation status, and the [Next.js and Cloudflare compatibility record](../compatibility/nextjs-cloudflare.md) owns the current executable proof matrix and evidence boundary.
+Accepted [ADRs](../adr/README.md) own individual decisions. This overview explains how those decisions fit together; it does not replace them. The [enforcement map](enforcement-map.md) owns automation status, [package ownership](package-ownership.md) owns the exact package matrix and publication boundaries, and the [Next.js and Cloudflare compatibility record](../compatibility/nextjs-cloudflare.md) owns the current executable proof matrix and evidence boundary.
 
 ## Product model
 
@@ -65,16 +65,9 @@ In-memory adapters and shared behavioral contract tests are required where ports
 
 `apps/*` contains builder applications. `proofs/*` contains disposable infrastructure evidence and is not a product-application namespace. `packages/*` contains deliberately owned packages created only at an approved package-boundary stage.
 
-The intended builder workspace is:
+P0.1 created none of those paths. P0.2 created only the separately scoped private proof at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). P0.3 has now materialized a private CLI shell, private builder-core shell, public standards package, public observability shell, and local release safeguards. P0.3 is review-pending; [package ownership](package-ownership.md) is the canonical owner of their exact visibility, APIs, consumers, and publication guards.
 
-```text
-apps/cli                  thin command input/output
-packages/builder-core     private builder internals; future project/state schema owner
-packages/standards        public replaceable standards package
-packages/observability    public replaceable observability package
-```
-
-P0.1 created none of those paths. P0.2 creates only the separately scoped private proof at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). P0.3 may create the listed application and package ownership boundaries after its own approved plan. P1 implements the project/state schemas and builder kernel inside the already-private `builder-core` boundary.
+P1 is the first executable project/state schema stage. It implements the schemas and builder kernel inside the already-private `builder-core` boundary.
 
 `builder-core` is justified by cohesive private responsibilities: capability resolution, manifest/state schemas, inference, ownership, planning, migrations, repository transformation, and verification. Reserving that ownership in P0.3 does not implement the schemas early. A separate `project-schema` package is not justified until a second consumer requires an independently versioned contract.
 
@@ -96,4 +89,4 @@ Repository-changing builder operations require clean state, inference, capabilit
 
 ## Current stage boundary
 
-P0.1 created no application, builder package, profile code, `.egeria` state or schema, dependency, workflow, Cloudflare resource, or deployment. P0.2 adds only private, non-production infrastructure evidence and its exact toolchain. No production profile, builder package, generated client repository, state schema, or product capability is implemented. Future behavior in these documents remains architecture visibility until its roadmap stage is approved and verified.
+P0.1 created the constitution and architecture surfaces. P0.2 added only private, non-production infrastructure evidence and its exact toolchain. P0.3 adds builder package ownership shells, consumed standards configurations, local versioning safeguards, and no production profile, generated client repository, state schema, or product capability. Future behavior in these documents remains architecture visibility until its roadmap stage is approved and verified.

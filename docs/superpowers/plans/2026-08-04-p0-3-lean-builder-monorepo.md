@@ -626,11 +626,11 @@ Modify:
 - `docs/architecture/enforcement-map.md`
 - `docs/architecture/package-ownership.md`
 - `docs/roadmaps/program-roadmap.md`
-- `tests/constitution/architecture-contracts.test.mjs`
+- `tests/constitution/constitution.test.mjs`
 
 ### RED
 
-Extend `tests/constitution/architecture-contracts.test.mjs` first. It must assert:
+Extend `tests/constitution/constitution.test.mjs` first. It must assert:
 
 - root instructions link directly to each new nested instruction boundary and to the canonical package-ownership document;
 - architecture overview points to package ownership instead of duplicating its normative matrix;
@@ -643,7 +643,7 @@ Extend `tests/constitution/architecture-contracts.test.mjs` first. It must asser
 Run:
 
 ```bash
-rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm exec node --test tests/constitution/architecture-contracts.test.mjs
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm exec node --test tests/constitution/constitution.test.mjs
 ```
 
 Expected RED: missing canonical links/status, not a test harness failure.

@@ -26,7 +26,7 @@ Build the smallest Next.js/Cloudflare proof that validates the approved Volta No
 
 Create thin `apps/cli`, the private `packages/builder-core` package and its ownership boundary, public `packages/standards`, the public observability package shell, and approved release tooling with accidental-publication safeguards. Reserve project/state schema ownership for `builder-core`, but defer the executable schemas and builder kernel to P1. Do not create a separate project-schema package.
 
-**Current status (2026-08-04):** Preparation and exact-file planning are authorized. Implementation has not begun and remains plan-gated.
+**Current status (2026-08-04):** Implementation is review-pending. The lean ownership shells, consumed standards APIs, internal ESLint 10 boundary, dual ESLint-major tests, and local release safeguards are materialized, but P0.3 is not accepted until verified-final-diff approval.
 
 **Exit:** Package APIs and owners are explicit, publication safeguards pass, extraction decisions are justified, and no profile functionality is implemented.
 
@@ -34,7 +34,7 @@ Create thin `apps/cli`, the private `packages/builder-core` package and its owne
 
 ## P1 — Builder kernel
 
-Implement private builder-core schemas, capability resolution, installed manifests, `.egeria` state contracts, read-only inference/doctor/diff, deterministic portfolio/site skeleton generation, hybrid ownership, and fixture infrastructure.
+P1 is the first executable project/state schema stage. Implement private builder-core schemas, capability resolution, installed manifests, `.egeria` state contracts, read-only inference/doctor/diff, deterministic portfolio/site skeleton generation, hybrid ownership, and fixture infrastructure.
 
 **Stop gate:** Generated skeletons build, manifest and inference agree, and the P1 review packet is approved.
 
