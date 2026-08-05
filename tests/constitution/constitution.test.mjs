@@ -184,12 +184,13 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   );
   assert.match(
     workflow,
-    /pnpm\/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa/,
+    /pnpm\/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c/,
   );
-  assert.match(
-    workflow,
-    /actions\/setup-node@a0853c24544627f65ddf259abe73b1d18a591444/,
-  );
+  assert.doesNotMatch(workflow, /pnpm\/action-setup|actions\/setup-node/);
+  assert.match(workflow, /^          version: 11\.20\.0$/m);
+  assert.match(workflow, /^          runtime: node@22\.23\.0$/m);
+  assert.match(workflow, /^          cache: true$/m);
+  assert.match(workflow, /^          install: false$/m);
   assert.match(workflow, /pnpm install --frozen-lockfile/);
   assert.equal(proofManifest.scripts.deploy, "opennextjs-cloudflare deploy");
   assert.equal(validateCompatibilityDeploymentCredentialBoundary(workflow), "");
