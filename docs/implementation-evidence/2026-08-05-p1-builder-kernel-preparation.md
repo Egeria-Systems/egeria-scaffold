@@ -8,7 +8,7 @@
 
 ## Decision
 
-Plan P1 as eight separately reviewable local increments:
+The original preparation planned P1 as eight separately reviewable local increments:
 
 1. private runtime schemas and checked JSON Schema artifacts;
 2. the six-capability P1 catalog, `portfolio`/`site` recipes, deterministic resolution, and installed-manifest construction;
@@ -18,6 +18,8 @@ Plan P1 as eight separately reviewable local increments:
 6. deterministic in-memory portfolio/site skeleton rendering;
 7. new-directory-only atomic generation and a thin CLI;
 8. generated-project fixtures, build evidence, canonical documentation, independent review, and the P1 review packet.
+
+**Execution amendment, 2026-08-05:** After Task 1, the user directed that the schema field-purpose and material-code-simplification comparison be preserved without immediate repair and reviewed after all remaining P1 consumers exist. The current implementation plan therefore separates the final review packet into a ninth increment, `Deferred Schema Contract Review and Gate 3 Packet`. Tasks 1 through 8 retain their implementation boundaries; Task 9 owns the deferred review and final packet. See `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`.
 
 P1 executable scope is limited to `standards`, `content-files`, `section-composition`, `deployment-cloudflare`, `observability`, and `site-routing`. Later capabilities remain architecture visibility only. P1 creates no app foundation, persistence, email, jobs, durable submissions, identity, payments, analytics, CMS, provider resources, repository migration, add/remove/upgrade behavior, worktree orchestration, or production deployment.
 

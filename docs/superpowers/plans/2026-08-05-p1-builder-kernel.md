@@ -11,6 +11,7 @@
 ## Global Constraints
 
 - Preparation evidence: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-preparation.md`.
+- Deferred Task 1 schema-review evidence: `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`; do not act on its recorded questions before Task 9 unless a separately approved correctness blocker requires a plan amendment.
 - Frozen starting commit: `303ee9d35e19f9191948d994159f77c82c90a1ed` on clean sequential local `main`; re-freeze before execution if it changes.
 - Run shell commands through `rtk`; use `/Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm` and `CI=true` where pnpm may refresh generated dependencies.
 - Each task follows RED, minimum GREEN, focused verification, one focused commit, and an explicit user stop before the next task.
@@ -935,7 +936,7 @@ git commit -m "Add P1 builder commands"
 
 Stop for explicit user approval before Task 8.
 
-## Task 8: Golden Fixtures, Build Harness, Documentation, and Gate 3 Packet
+## Task 8: Golden Fixtures, Build Harness, Documentation, and Implementation Review
 
 **Files:**
 
@@ -994,7 +995,6 @@ Stop for explicit user approval before Task 8.
 - Create: `tests/generated-fixtures/determinism.test.mjs`
 - Create: `scripts/verify-generated-skeletons.mjs`
 - Create: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-verification.md`
-- Create: `docs/review-packets/2026-08-05-p1-builder-kernel.md`
 - Modify: `package.json`
 - Modify: `eslint.config.mjs`
 - Modify: `tests/constitution/constitution.test.mjs`
@@ -1103,9 +1103,9 @@ Validate every finding against the shared final tree. Classify each as `material
 
 After the last relevant input changes, run `verify:p1`, the affected P0.2 proof if shared inputs changed after its prior run, audit, peers, range diff-check, final status, changed-file list, and commit range. Do not repeat a successful expensive check against an unchanged tested tree.
 
-- [ ] **Step 10: Write verification evidence and the P1 review packet**
+- [ ] **Step 10: Write the settled implementation verification evidence**
 
-The verification record and packet must include:
+The verification record must include:
 
 - frozen base/candidate and branch/ref freshness;
 - changed files and focused commits;
@@ -1120,12 +1120,76 @@ The verification record and packet must include:
 - source/dependency/build-output recovery;
 - explicit statement that no provider, persistent data, publication, deployment, push, or pull request occurred.
 
-If the public-package prerequisite remains open, Tasks 7 and 8 must not begin and no P1 Gate 3 packet may claim a filesystem-generation candidate or stop-gate completion.
+If the public-package prerequisite remains open, Tasks 7 and 8 must not begin and Task 9 must not produce a P1 Gate 3 packet claiming a filesystem-generation candidate or stop-gate completion.
 
-- [ ] **Step 11: Commit Gate 3 artifacts and stop**
+- [ ] **Step 11: Commit Task 8 evidence and stop**
 
 ```bash
-git add docs/implementation-evidence/2026-08-05-p1-builder-kernel-verification.md docs/review-packets/2026-08-05-p1-builder-kernel.md
+git add docs/implementation-evidence/2026-08-05-p1-builder-kernel-verification.md
+git commit -m "Record P1 implementation verification"
+```
+
+Present the exact committed comparison and stop for explicit user approval before Task 9. Do not create the P1 review packet yet.
+
+## Task 9: Deferred Schema Contract Review and Gate 3 Packet
+
+**Files:**
+
+- Modify: `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`
+- Modify: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-verification.md`
+- Create: `docs/review-packets/2026-08-05-p1-builder-kernel.md`
+
+This task revisits the Task 1 schema questions only after Tasks 2 through 8 have supplied their real catalog, resolver, codec, ownership, inference, diagnostics, generation, CLI, and fixture consumers. The dated deferral record preserves the original direct field-purpose audit, the bounded material-code-simplification result, their differences, and the frozen evidence hashes. Those recorded observations are review inputs, not approved findings or pre-authorized edits.
+
+- [ ] **Step 1: Re-freeze and trace every deferred question through final P1 consumers**
+
+Verify the current branch, status, exact Task 1-to-final-P1 comparison, and all direct consumers before judging the recorded questions. Re-evaluate:
+
+1. whether capability `schemaVersion` is a capability release version or a descriptor-format version;
+2. whether constant migration `outcome` carries necessary persisted meaning;
+3. whether constant verification `kind` carries necessary persisted meaning;
+4. whether P1 `capabilitySettings` permits unsupported or secret-bearing states;
+5. whether `threatReviewLevel` has a sufficiently closed vocabulary;
+6. whether surface target/merge validation has one canonical owner and represents only valid combinations;
+7. whether path-only ejection identity can represent every managed surface safely; and
+8. whether checked JSON Schema artifacts must enforce every runtime invariant or explicitly document a narrower static contract.
+
+For each item, identify the canonical owner, actual callers, serialized compatibility boundary, tests, generated artifacts, and counterevidence. Do not assume the original direct recommendation or simplification disposition remains correct.
+
+- [ ] **Step 2: Repeat the two review lenses against the final P1 tree**
+
+Run a fresh field-by-field purpose audit and a bounded behavior-preserving simplification review over the final runtime schemas, direct consumers, contract tests, and generated artifacts. Keep the lenses separate: correctness, schema parity, or product-vocabulary questions must not be relabeled as simplifications, and an accepted contract must not be retained solely because it was accepted before its consumers existed.
+
+Classify every deferred item exactly once as `retain-as-intentional`, `clarify-contract`, `tighten-validation`, `remove-as-redundant`, or `defer-with-owner`. Record evidence, counterevidence, compatibility impact, and confidence in the deferral record.
+
+- [ ] **Step 3: Gate any resulting implementation separately**
+
+If no source/schema/test change is supported, record that result and continue. If any change is supported, write an exact-file amendment under `docs/superpowers/plans/`, identify characterization and migration/compatibility evidence, and stop for explicit plan approval before editing code, schemas, generated artifacts, tests, or state formats. This Task 9 review does not itself authorize those edits.
+
+After any separately approved repair, rerun only affected focused checks during the repair, request the bounded reviewer follow-up needed to close the retained finding, then run the settled final P1 verification once against the final tree.
+
+- [ ] **Step 4: Finalize verification evidence and the P1 review packet**
+
+The verification record and packet must include:
+
+- frozen base/candidate and branch/ref freshness;
+- changed files and focused commits;
+- every RED/GREEN cycle;
+- exact commands, versions, counts, and results;
+- generated portfolio/site file lists and build results;
+- manifest/inference agreement;
+- required reviewer reports and dispositions;
+- the eight deferred schema questions and their final evidence-backed dispositions;
+- security/advisory evidence;
+- exact published-package versions, integrity/provenance evidence, portable lockfile resolutions, and fresh-install proof;
+- risks, fragile assumptions, and deferred P2/P3/later-stage work;
+- source/dependency/build-output recovery; and
+- explicit statement that no provider, persistent data, publication, deployment, push, or pull request occurred.
+
+- [ ] **Step 5: Commit Gate 3 artifacts and stop**
+
+```bash
+git add docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md docs/implementation-evidence/2026-08-05-p1-builder-kernel-verification.md docs/review-packets/2026-08-05-p1-builder-kernel.md
 git commit -m "Record P1 verification and review"
 ```
 
