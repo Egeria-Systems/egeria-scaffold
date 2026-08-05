@@ -11,6 +11,10 @@ importers:
 
   .: {}
 
+  apps/cli: {}
+
+  packages/builder-core: {}
+
   proofs/nextjs-cloudflare:
     dependencies:
       '@opennextjs/cloudflare':
