@@ -40,7 +40,7 @@ function isInsideRepository(path) {
   );
 }
 
-test("the root workspace remains private and pins the P0.2 toolchain", async () => {
+test("the root workspace remains private and pins the compatibility-proof toolchain", async () => {
   const manifest = JSON.parse(await readRepositoryFile("package.json"));
   const nvmVersion = await readRepositoryFile(".nvmrc");
 
@@ -59,9 +59,10 @@ test("the root workspace remains private and pins the P0.2 toolchain", async () 
     "node --test tests/constitution/constitution.test.mjs",
   );
   assert.equal(
-    manifest.scripts["verify:p0.2"],
+    manifest.scripts["verify:compatibility-proof"],
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof verify",
   );
+  assert.equal("verify:p0.2" in manifest.scripts, false);
   assert.equal("dependencies" in manifest, false);
   assert.deepEqual(Object.keys(manifest.devDependencies ?? {}).sort(), [
     "@changesets/cli",
@@ -234,6 +235,12 @@ test("P0.3 documentation exposes approved package ownership and Gate 3 status", 
     assert.match(document, /publication[^\n]+explicit[^\n]+approval/i);
   }
 
+  assert.match(readme, /pnpm run verify:compatibility-proof/);
+  assert.match(readme, /pnpm run verify:builder-packages/);
+  assert.doesNotMatch(readme, /pnpm run verify:p0\.[23]/);
+  assert.match(contributing, /pnpm run verify:builder-packages/);
+  assert.doesNotMatch(contributing, /pnpm run verify:p0\.3/);
+
   assert.match(readme, /P0\.3[^\n]+verified-final-diff approval/i);
   assert.match(
     verification,
@@ -295,6 +302,8 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   assert.match(workflow, /^          cache: true$/m);
   assert.match(workflow, /^          install: false$/m);
   assert.match(workflow, /pnpm install --frozen-lockfile/);
+  assert.match(workflow, /run: pnpm run verify:compatibility-proof/);
+  assert.doesNotMatch(workflow, /pnpm run verify:p0\.2/);
   assert.equal(proofManifest.scripts.deploy, "opennextjs-cloudflare deploy");
   assert.equal(validateCompatibilityDeploymentCredentialBoundary(workflow), "");
 

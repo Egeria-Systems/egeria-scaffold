@@ -41,10 +41,14 @@ test("the builder root owns an exact ESLint 10 lint boundary", async () => {
     },
   );
   assert.equal(
-    rootManifest.scripts?.["lint:p0.3"],
+    rootManifest.scripts?.["lint:builder"],
     "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint",
   );
-  assert.match(rootManifest.scripts?.["verify:p0.3"] ?? "", /lint:p0\.3/);
+  assert.match(
+    rootManifest.scripts?.["verify:builder-packages"] ?? "",
+    /pnpm run lint:builder/,
+  );
+  assert.equal("lint:p0.3" in rootManifest.scripts, false);
 });
 
 test("ESLint 10 applies the builder root config to standards source", async () => {

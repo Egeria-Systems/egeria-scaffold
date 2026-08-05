@@ -142,17 +142,17 @@ test("root release commands use the pinned Changesets boundary", async () => {
   assert.equal(rootManifest.devDependencies?.["@changesets/cli"], "2.31.1");
   assert.deepEqual(
     {
-      build: rootManifest.scripts?.["build:p0.3"],
+      build: rootManifest.scripts?.["build:builder"],
       changeset: rootManifest.scripts?.changeset,
       changesetStatus: rootManifest.scripts?.["changeset:status"],
       builderCoreTests: rootManifest.scripts?.["test:builder-core"],
-      lint: rootManifest.scripts?.["lint:p0.3"],
+      lint: rootManifest.scripts?.["lint:builder"],
       release: rootManifest.scripts?.["release-packages"],
       packageBoundaries: rootManifest.scripts?.["test:package-boundaries"],
       packageTests: rootManifest.scripts?.["test:packages"],
       test: rootManifest.scripts?.test,
-      typecheck: rootManifest.scripts?.["typecheck:p0.3"],
-      verify: rootManifest.scripts?.["verify:p0.3"],
+      typecheck: rootManifest.scripts?.["typecheck:builder"],
+      verify: rootManifest.scripts?.["verify:builder-packages"],
       version: rootManifest.scripts?.["version-packages"],
     },
     {
@@ -173,10 +173,19 @@ test("root release commands use the pinned Changesets boundary", async () => {
       typecheck:
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run typecheck",
       verify:
-        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:p0.3 && pnpm run build:p0.3 && pnpm run test:packages && pnpm run typecheck:p0.3 && pnpm run changeset:status",
+        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:builder && pnpm run build:builder && pnpm run test:packages && pnpm run typecheck:builder && pnpm run changeset:status",
       version: "changeset version",
     },
   );
+
+  for (const oldScriptName of [
+    "build:p0.3",
+    "lint:p0.3",
+    "typecheck:p0.3",
+    "verify:p0.3",
+  ]) {
+    assert.equal(oldScriptName in rootManifest.scripts, false);
+  }
 
   assert.deepEqual(
     Object.entries(rootManifest.scripts)

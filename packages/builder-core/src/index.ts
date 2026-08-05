@@ -1,4 +1,4 @@
-export * from "./catalog/p1-capabilities.js";
+export * from "./catalog/capability-catalog.js";
 export * from "./contracts/capability.js";
 export * from "./contracts/identifiers.js";
 export * from "./contracts/json-schemas.js";
@@ -8,5 +8,5 @@ export * from "./contracts/project.js";
 export * from "./contracts/result.js";
 export * from "./contracts/state.js";
 export * from "./manifest/create-installed-manifest.js";
-export * from "./profiles/p1-profiles.js";
+export * from "./profiles/profile-recipes.js";
 export * from "./resolution/resolve-capabilities.js";

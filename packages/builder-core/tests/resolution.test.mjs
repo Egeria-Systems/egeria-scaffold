@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
@@ -6,6 +7,10 @@ import test from "node:test";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const builtEntry = resolve(packageRoot, "dist/index.js");
 const core = await import(pathToFileURL(builtEntry));
+const builtDeclaration = await readFile(
+  resolve(packageRoot, "dist/index.d.ts"),
+  "utf8",
+);
 
 const packageVersions = {
   standards: "1.2.3",
@@ -23,14 +28,34 @@ function assertIssues(result, expectedIssues) {
 }
 
 function createCatalog() {
-  return assertOk(core.createP1CapabilityCatalog(packageVersions));
+  return assertOk(core.createCapabilityCatalog(packageVersions));
 }
 
-function resolveRequest(request, catalog = createCatalog(), profiles = core.p1ProfileRecipes) {
+function resolveRequest(
+  request,
+  catalog = createCatalog(),
+  profiles = core.profileRecipes,
+) {
   return core.resolveCapabilities(request, catalog, profiles);
 }
 
-test("the P1 catalog declares the exact six executable capability contracts", () => {
+test("the portfolio and site catalog declares the exact six executable capability contracts", async () => {
+  const catalogEntry = builtDeclaration.match(
+    /export \* from "(\.\/catalog\/[^\"]+)\.js";/,
+  )?.[1];
+  assert.ok(catalogEntry);
+  const catalogDeclaration = await readFile(
+    resolve(packageRoot, "dist", `${catalogEntry}.d.ts`),
+    "utf8",
+  );
+
+  assert.equal(typeof core.createCapabilityCatalog, "function");
+  assert.ok(Array.isArray(core.profileRecipes));
+  assert.equal("createP1CapabilityCatalog" in core, false);
+  assert.equal("p1ProfileRecipes" in core, false);
+  assert.match(catalogDeclaration, /\bCapabilityPackageVersions\b/);
+  assert.doesNotMatch(catalogDeclaration, /\bP1PackageVersions\b/);
+
   const catalog = createCatalog();
 
   assert.deepEqual(catalog, [
@@ -435,7 +460,7 @@ test("the P1 catalog declares the exact six executable capability contracts", ()
   ]);
 });
 
-test("P1 package versions must be exact stable releases and issues do not echo inputs", () => {
+test("capability package versions must be exact stable releases and issues do not echo inputs", () => {
   for (const invalidVersion of [
     "workspace:*",
     "file:../standards",
@@ -445,14 +470,14 @@ test("P1 package versions must be exact stable releases and issues do not echo i
     ">=1.2.3",
     "1.2.3-beta.1",
   ]) {
-    const result = core.createP1CapabilityCatalog({
+    const result = core.createCapabilityCatalog({
       standards: invalidVersion,
       observability: "4.5.6",
     });
 
     assertIssues(result, [
       {
-        code: "P1_PACKAGE_VERSION_INVALID",
+        code: "CAPABILITY_PACKAGE_VERSION_INVALID",
         path: ["packageVersions", "standards"],
         context: { packageName: "@egeria-systems/standards" },
       },
@@ -460,7 +485,7 @@ test("P1 package versions must be exact stable releases and issues do not echo i
     assert.doesNotMatch(JSON.stringify(result.issues), new RegExp(invalidVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
 
-  const result = core.createP1CapabilityCatalog({
+  const result = core.createCapabilityCatalog({
     standards: "workspace:*",
     observability: "latest",
   });
@@ -474,7 +499,7 @@ test("P1 package versions must be exact stable releases and issues do not echo i
 });
 
 test("portfolio and site recipes resolve to deterministic dependency-first manifests", () => {
-  assert.deepEqual(core.p1ProfileRecipes, [
+  assert.deepEqual(core.profileRecipes, [
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
@@ -600,7 +625,7 @@ test("resolution traverses dependency identifiers lexically rather than trusting
       : capability,
   );
   const siteOnlyProfile = {
-    ...core.p1ProfileRecipes[1],
+    ...core.profileRecipes[1],
     defaultCapabilities: ["site-routing"],
   };
   const resolved = assertOk(
@@ -695,8 +720,8 @@ test("resolution validates catalogs and profile recipes before traversing them",
   );
   assertIssues(
     resolveRequest({ profile: "portfolio" }, catalog, [
-      { ...core.p1ProfileRecipes[0], schemaVersion: "2.0.0" },
-      core.p1ProfileRecipes[1],
+      { ...core.profileRecipes[0], schemaVersion: "2.0.0" },
+      core.profileRecipes[1],
     ]),
     [
       {
@@ -708,8 +733,8 @@ test("resolution validates catalogs and profile recipes before traversing them",
   );
   assertIssues(
     resolveRequest({ profile: "portfolio" }, catalog, [
-      core.p1ProfileRecipes[0],
-      ...core.p1ProfileRecipes,
+      core.profileRecipes[0],
+      ...core.profileRecipes,
     ]),
     [
       {

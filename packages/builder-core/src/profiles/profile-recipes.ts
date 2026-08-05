@@ -1,6 +1,6 @@
 import type { ProfileRecipe } from "../contracts/profile.js";
 
-export const p1ProfileRecipes: readonly ProfileRecipe[] = [
+export const profileRecipes: readonly ProfileRecipe[] = [
   {
     identifier: "portfolio",
     schemaVersion: "1.0.0",

@@ -152,7 +152,7 @@ function assertRejects(schema, value) {
   assert.equal(schema.safeParse(value).success, false);
 }
 
-test("builder-core exports the executable P1 contract boundary", () => {
+test("builder-core exports the executable contract boundary", () => {
   for (const exportName of [
     "capabilityDeliveryModeSchema",
     "capabilityDescriptorSchema",
@@ -419,6 +419,14 @@ test("contract failures have deterministic paths without echoing invalid values"
 test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts", async () => {
   const generated = contracts.createJsonSchemaArtifacts();
   assert.deepEqual(Object.keys(generated), schemaArtifactNames);
+  assert.equal(
+    generated["profile.schema.json"].title,
+    "Egeria portfolio and site profile recipe",
+  );
+  assert.notEqual(
+    generated["profile.schema.json"].title,
+    "Egeria P1 profile recipe",
+  );
 
   for (const artifactName of schemaArtifactNames) {
     const artifact = JSON.parse(

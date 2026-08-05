@@ -10,7 +10,7 @@ import type {
   ValidationResult,
 } from "../contracts/result.js";
 
-export type P1PackageVersions = Readonly<{
+export type CapabilityPackageVersions = Readonly<{
   standards: string;
   observability: string;
 }>;
@@ -80,7 +80,7 @@ function createPackageProbe(
 }
 
 function createDescriptors(
-  packageVersions: P1PackageVersions,
+  packageVersions: CapabilityPackageVersions,
 ): readonly CapabilityDescriptor[] {
   return [
     {
@@ -351,18 +351,18 @@ function createDescriptors(
 }
 
 function createPackageVersionIssue(
-  field: keyof P1PackageVersions,
+  field: keyof CapabilityPackageVersions,
   packageName: string,
 ): ContractIssue {
   return {
-    code: "P1_PACKAGE_VERSION_INVALID",
+    code: "CAPABILITY_PACKAGE_VERSION_INVALID",
     path: ["packageVersions", field],
     context: { packageName },
   };
 }
 
-export function createP1CapabilityCatalog(
-  packageVersions: P1PackageVersions,
+export function createCapabilityCatalog(
+  packageVersions: CapabilityPackageVersions,
 ): ValidationResult<readonly CapabilityDescriptor[]> {
   const versionIssues: ContractIssue[] = [];
 

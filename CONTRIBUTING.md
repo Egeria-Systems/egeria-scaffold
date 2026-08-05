@@ -14,6 +14,6 @@ Run the current repository contract with:
 pnpm run test:constitution
 ```
 
-Run `pnpm run verify:p0.3` for the current package, lint, build, type, and Changeset gates. A public-package change must include an approved Changeset; use `pnpm changeset:status` to inspect version intent. Changeset metadata, public package manifests, and a successful dry-run pack are safeguards, not release authority. Publication remains an external action requiring explicit human approval.
+Run `pnpm run verify:builder-packages` for the current package, lint, build, type, and Changeset gates. A public-package change must include an approved Changeset; use `pnpm changeset:status` to inspect version intent. Changeset metadata, public package manifests, and a successful dry-run pack are safeguards, not release authority. Publication remains an external action requiring explicit human approval.
 
 Make small, focused, test-driven commits. Preserve user work and the approved increment boundary. Push, pull-request creation, merge, deployment, publication, production action, and external messaging each require their own explicit authority.

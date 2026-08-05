@@ -35,7 +35,7 @@ jobs:
         run: pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec playwright install --with-deps chromium
 
       - name: Verify compatibility proof
-        run: pnpm run verify:p0.2
+        run: pnpm run verify:compatibility-proof
 
       - name: Deploy compatibility Worker
         env:

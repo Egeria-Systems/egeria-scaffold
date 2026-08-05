@@ -27,16 +27,16 @@ Run the constitution contract with:
 pnpm run test:constitution
 ```
 
-Run the complete local P0.2 proof with:
+Run the complete local compatibility proof with:
 
 ```bash
-pnpm run verify:p0.2
+pnpm run verify:compatibility-proof
 ```
 
-Run the current P0.3 package, lint, build, type, and Changeset gates with:
+Run the current builder package, lint, build, type, and Changeset gates with:
 
 ```bash
-pnpm run verify:p0.3
+pnpm run verify:builder-packages
 ```
 
 Node.js `22.23.0` is pinned through `.nvmrc` and `package.json` Volta configuration. pnpm `11.20.0` is pinned through `packageManager` and exact engine policy. The [compatibility record](docs/compatibility/nextjs-cloudflare.md) owns the exact matrix, runtime distinctions, known limitations, and evidence boundary.

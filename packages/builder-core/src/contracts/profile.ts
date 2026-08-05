@@ -23,7 +23,7 @@ export const profileRecipeSchema = z
   .readonly()
   .meta({
     id: "urn:egeria-systems:schema:profile:1.0.0",
-    title: "Egeria P1 profile recipe",
+    title: "Egeria portfolio and site profile recipe",
   });
 
 export type ProfileIdentifier = z.infer<typeof profileIdentifierSchema>;

@@ -205,10 +205,14 @@ test("the CLI remains an empty shell while builder-core owns only approved Task 
     expectedSource,
   );
 
+  const builderCoreSourceFiles = await listFiles(
+    resolve(repositoryRoot, "packages/builder-core/src"),
+  );
+
   assert.deepEqual(
-    await listFiles(resolve(repositoryRoot, "packages/builder-core/src")),
+    builderCoreSourceFiles,
     [
-      "catalog/p1-capabilities.ts",
+      "catalog/capability-catalog.ts",
       "contracts/capability.ts",
       "contracts/identifiers.ts",
       "contracts/json-schemas.ts",
@@ -219,9 +223,17 @@ test("the CLI remains an empty shell while builder-core owns only approved Task 
       "contracts/state.ts",
       "index.ts",
       "manifest/create-installed-manifest.ts",
-      "profiles/p1-profiles.ts",
+      "profiles/profile-recipes.ts",
       "resolution/resolve-capabilities.ts",
     ],
+  );
+  assert.equal(
+    builderCoreSourceFiles.includes("catalog/p1-capabilities.ts"),
+    false,
+  );
+  assert.equal(
+    builderCoreSourceFiles.includes("profiles/p1-profiles.ts"),
+    false,
   );
 });
 
@@ -259,7 +271,7 @@ test("builder-core direct consumers describe the private Task 2 boundary", async
   );
 });
 
-test("P1 keeps schemas private and reserves every later-stage builder surface", async () => {
+test("builder-core keeps schemas private and reserves every later-stage builder surface", async () => {
   for (const requiredDocument of [
     "apps/cli/AGENTS.md",
     "apps/cli/README.md",
