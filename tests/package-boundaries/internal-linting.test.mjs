@@ -42,12 +42,33 @@ test("the builder root owns an exact ESLint 10 lint boundary", async () => {
   );
   assert.equal(
     rootManifest.scripts?.["lint:p0.3"],
-    "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run lint",
+    "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint",
   );
   assert.match(rootManifest.scripts?.["verify:p0.3"] ?? "", /lint:p0\.3/);
 });
 
-test("each immediate builder package delegates zero-warning lint to the root", async () => {
+test("ESLint 10 applies the builder root config to standards source", async () => {
+  const { ESLint } = await import("eslint");
+  const eslint = new ESLint({
+    cwd: repositoryRoot,
+    overrideConfigFile: resolve(repositoryRoot, "eslint.config.mjs"),
+  });
+
+  const [result] = await eslint.lintText("missingBuilderGlobal;\n", {
+    filePath: resolve(
+      repositoryRoot,
+      "packages/standards/eslint/compatibility-boundary.mjs",
+    ),
+  });
+
+  assert.equal(ESLint.version, "10.8.0");
+  assert.deepEqual(
+    result.messages.map(({ ruleId, severity }) => ({ ruleId, severity })),
+    [{ ruleId: "no-undef", severity: 2 }],
+  );
+});
+
+test("each immediate builder application and package delegates zero-warning lint to the root", async () => {
   const expectedScripts = new Map([
     [
       "apps/cli/package.json",
@@ -60,6 +81,10 @@ test("each immediate builder package delegates zero-warning lint to the root", a
     [
       "packages/observability/package.json",
       "pnpm --dir ../.. exec eslint packages/observability/src --max-warnings 0",
+    ],
+    [
+      "packages/standards/package.json",
+      "pnpm --dir ../.. exec eslint packages/standards/eslint --max-warnings 0",
     ],
   ]);
 

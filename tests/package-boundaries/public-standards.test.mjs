@@ -43,8 +43,10 @@ test("standards exposes only its approved public configuration APIs", async () =
       "./package.json": "./package.json",
     },
     scripts: {
+      lint:
+        "pnpm --dir ../.. exec eslint packages/standards/eslint --max-warnings 0",
       test: "node --test tests/*.test.mjs",
-      verify: "pnpm run test",
+      verify: "pnpm run lint && pnpm run test",
       prepublishOnly: "pnpm run verify",
     },
     peerDependencies: {

@@ -7,7 +7,7 @@
     "build:p0.3": "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run build",
     "changeset": "changeset",
     "changeset:status": "changeset status",
-    "lint:p0.3": "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run lint",
+    "lint:p0.3": "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint",
     "release-packages": "changeset publish",
     "test": "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit && pnpm run test:package-boundaries && pnpm run test:packages",
     "test:constitution": "node --test tests/constitution/constitution.test.mjs",

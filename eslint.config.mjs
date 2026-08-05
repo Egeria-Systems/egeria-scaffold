@@ -1,11 +1,12 @@
 import eslint from "@eslint/js";
 import { createTypeScriptStrictConfig } from "@egeria-systems/standards/eslint/typescript-strict";
 
-const builderSourceFiles = [
+const builderTypeScriptFiles = [
   "apps/cli/src/**/*.ts",
   "packages/builder-core/src/**/*.ts",
   "packages/observability/src/**/*.ts",
 ];
+const builderJavaScriptFiles = ["packages/standards/eslint/**/*.mjs"];
 
 export default [
   {
@@ -15,10 +16,10 @@ export default [
   {
     ...eslint.configs.recommended,
     name: "@egeria-systems/scaffold/recommended",
-    files: builderSourceFiles,
+    files: [...builderTypeScriptFiles, ...builderJavaScriptFiles],
   },
   ...createTypeScriptStrictConfig({
-    files: builderSourceFiles,
+    files: builderTypeScriptFiles,
     tsconfigRootDir: import.meta.dirname,
   }),
 ];

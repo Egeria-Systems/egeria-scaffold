@@ -333,6 +333,7 @@ Create:
 
 Modify:
 
+- `docs/architecture/overview.md`
 - `docs/architecture/package-ownership.md`
 - `pnpm-lock.yaml`
 
@@ -663,6 +664,46 @@ rtk git diff --check
 Commit intent: `Document lean monorepo ownership`
 
 Stop for explicit user approval.
+
+## Approved compatibility clarification before Increment 7 — Complete the ESLint split
+
+On 2026-08-05 the user clarified the intended compatibility boundary: the builder repository uses ESLint `10.8.0` for `apps/cli` and builder-owned source under `packages/*`; the accepted proof and future generated Next.js projects retain ESLint `9.39.5` until the selected Next plugin graph supports ESLint 10; and standards supports and tests both majors without implying a proof migration.
+
+### Files
+
+Create:
+
+- `docs/implementation-evidence/2026-08-05-p0-3-eslint-compatibility-boundary.md`
+
+Modify:
+
+- `docs/architecture/overview.md`
+- `docs/architecture/package-ownership.md`
+- `docs/superpowers/plans/2026-08-04-p0-3-lean-builder-monorepo.md`
+- `eslint.config.mjs`
+- `package.json`
+- `packages/standards/package.json`
+- `tests/package-boundaries/internal-linting.test.mjs`
+- `tests/package-boundaries/public-standards.test.mjs`
+- `tests/package-boundaries/release-safeguards.test.mjs`
+
+### RED
+
+Extend the internal-linting contract first. Real ESLint 10 must apply the root recommended configuration to representative standards implementation source, the aggregate root lint script must include standards, and every immediate builder application/package must expose a zero-warning root-delegating lint command. Exact proof-manifest assertions and the real dual-major standards behavior tests remain unchanged.
+
+Run:
+
+```bash
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm exec node --test tests/package-boundaries/internal-linting.test.mjs tests/package-boundaries/public-standards.test.mjs tests/package-boundaries/release-safeguards.test.mjs
+```
+
+Expected RED: standards source has no matching root ESLint configuration and the standards/root lint scripts omit the package.
+
+### GREEN
+
+Add `packages/standards/eslint/**/*.mjs` to the root ESLint 10 recommended file scope without applying the type-aware TypeScript factory to JavaScript. Add the standards lint script, include standards in `lint:p0.3`, and include lint in standards verification. Document that future generated Next.js projects remain on ESLint 9 only while their selected Next plugin graph requires it and must revalidate before changing majors. Do not modify the proof.
+
+Run the focused tests, `pnpm run lint:p0.3`, standards tests under both majors, proof lint, and the full affected P0.3 suite. Commit intent: `Complete ESLint compatibility boundary`.
 
 ## Increment 7 — Final verification, independent review, and Gate 3 packet
 

@@ -19,7 +19,9 @@ This document owns the builder repository's package visibility, current API surf
 
 - The CLI and builder-core depend on standards only for development-time compilation. The CLI may depend on builder-core only after an approved executable builder stage creates a concrete need.
 - Observability depends on standards only for development-time compilation and has no runtime dependencies.
-- The builder root consumes the strict type-aware TypeScript ESLint factory under ESLint 10 for CLI, builder-core, and observability source. The compatibility proof remains an independent ESLint 9 and Next configuration consumer.
+- The builder root uses ESLint `10.8.0` for `apps/cli` and builder-owned source under `packages/*`. The strict type-aware factory applies to TypeScript source; standards configuration source uses the same root's core recommended rules.
+- Standards declares and behaviorally tests both ESLint `9.39.5` and `10.8.0`. Dual-major package support does not imply that the accepted P0.2 proof migrated.
+- The compatibility proof remains an independent ESLint `9.39.5` and Next configuration consumer. Future generated Next.js projects retain ESLint `9.39.5` while their selected Next plugin graph requires it and must revalidate that graph before changing majors.
 - The strict lint factory pins `typescript-eslint` because its strict presets are not semver-stable, enables project-service typed linting, and leaves formatting ownership outside ESLint.
 - Builder-core remains provider-neutral and owns its consuming-boundary ports. It does not depend on the CLI.
 - Public packages remain ordinary replaceable dependencies. Public availability does not transfer ownership of generated application code back to this repository.

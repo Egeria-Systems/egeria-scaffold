@@ -160,7 +160,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
       changeset: "changeset",
       changesetStatus: "changeset status",
       lint:
-        "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run lint",
+        "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint",
       release: "changeset publish",
       packageBoundaries: "node --test tests/package-boundaries/*.test.mjs",
       packageTests:
