@@ -38,6 +38,7 @@ test("standards exposes only its approved public configuration APIs", async () =
     files: ["eslint", "typescript", "README.md"],
     exports: {
       "./eslint/cloudflare-isolation": "./eslint/cloudflare-isolation.mjs",
+      "./eslint/typescript-strict": "./eslint/typescript-strict.mjs",
       "./typescript/strict.json": "./typescript/strict.json",
       "./package.json": "./package.json",
     },
@@ -47,10 +48,15 @@ test("standards exposes only its approved public configuration APIs", async () =
       prepublishOnly: "pnpm run verify",
     },
     peerDependencies: {
-      eslint: ">=9.39.5 <10",
+      eslint: "^9.39.5 || ^10.8.0",
+    },
+    dependencies: {
+      "typescript-eslint": "8.66.0",
     },
     devDependencies: {
       eslint: "9.39.5",
+      "eslint-10": "npm:eslint@10.8.0",
+      typescript: "6.0.3",
     },
     publishConfig: {
       access: "public",
@@ -65,7 +71,8 @@ test("standards exposes only its approved public configuration APIs", async () =
 });
 
 test("each standards API has a concrete workspace consumer", async () => {
-  const [cliManifest, coreManifest, proofManifest] = await Promise.all([
+  const [rootManifest, cliManifest, coreManifest, proofManifest] = await Promise.all([
+    readJson("package.json"),
     readJson("apps/cli/package.json"),
     readJson("packages/builder-core/package.json"),
     readJson("proofs/nextjs-cloudflare/package.json"),
@@ -81,6 +88,10 @@ test("each standards API has a concrete workspace consumer", async () => {
   );
   assert.equal(
     proofManifest.devDependencies?.["@egeria-systems/standards"],
+    "workspace:*",
+  );
+  assert.equal(
+    rootManifest.devDependencies?.["@egeria-systems/standards"],
     "workspace:*",
   );
 });

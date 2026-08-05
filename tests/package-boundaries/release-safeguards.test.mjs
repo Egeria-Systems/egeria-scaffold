@@ -114,6 +114,7 @@ test("public package manifests constrain exports and publication", async () => {
   ]);
   assert.deepEqual(standardsManifest.exports, {
     "./eslint/cloudflare-isolation": "./eslint/cloudflare-isolation.mjs",
+    "./eslint/typescript-strict": "./eslint/typescript-strict.mjs",
     "./typescript/strict.json": "./typescript/strict.json",
     "./package.json": "./package.json",
   });
@@ -144,6 +145,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
       build: rootManifest.scripts?.["build:p0.3"],
       changeset: rootManifest.scripts?.changeset,
       changesetStatus: rootManifest.scripts?.["changeset:status"],
+      lint: rootManifest.scripts?.["lint:p0.3"],
       release: rootManifest.scripts?.["release-packages"],
       packageBoundaries: rootManifest.scripts?.["test:package-boundaries"],
       packageTests: rootManifest.scripts?.["test:packages"],
@@ -157,6 +159,8 @@ test("root release commands use the pinned Changesets boundary", async () => {
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run build",
       changeset: "changeset",
       changesetStatus: "changeset status",
+      lint:
+        "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run lint",
       release: "changeset publish",
       packageBoundaries: "node --test tests/package-boundaries/*.test.mjs",
       packageTests:
@@ -166,7 +170,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
       typecheck:
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run typecheck",
       verify:
-        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run build:p0.3 && pnpm run test:packages && pnpm run typecheck:p0.3 && pnpm run changeset:status",
+        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:p0.3 && pnpm run build:p0.3 && pnpm run test:packages && pnpm run typecheck:p0.3 && pnpm run changeset:status",
       version: "changeset version",
     },
   );
@@ -214,6 +218,12 @@ test("the initial release intent contains only public minor releases", async () 
     .sort();
   assert.deepEqual(changesetFiles, ["lean-builder-monorepo.md"]);
 
+  const changeset = await readFile(
+    resolve(repositoryRoot, ".changeset/lean-builder-monorepo.md"),
+    "utf8",
+  );
+  assert.match(changeset, /strict type-aware ESLint configuration/i);
+
   const temporaryDirectory = await mkdtemp(
     join(tmpdir(), "egeria-changeset-status-"),
   );
@@ -246,6 +256,7 @@ test("public package dry runs contain only approved files", async () => {
   assert.deepEqual(await listPackedFiles("@egeria-systems/standards"), [
     "README.md",
     "eslint/cloudflare-isolation.mjs",
+    "eslint/typescript-strict.mjs",
     "package.json",
     "typescript/strict.json",
   ]);

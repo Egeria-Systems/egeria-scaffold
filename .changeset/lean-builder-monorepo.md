@@ -3,4 +3,4 @@
 "@egeria-systems/observability": minor
 ---
 
-Establish the initial public package APIs and release safeguards.
+Establish the initial public package APIs, including strict type-aware ESLint configuration, and release safeguards.

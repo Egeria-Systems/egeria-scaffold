@@ -124,6 +124,7 @@ test("the private package manifests consume standards without a runtime API", as
     type: "module",
     scripts: {
       build: "tsc -p tsconfig.json",
+      lint: "pnpm --dir ../.. exec eslint apps/cli/src --max-warnings 0",
       typecheck: "tsc -p tsconfig.json --noEmit",
     },
     devDependencies: {
@@ -138,6 +139,8 @@ test("the private package manifests consume standards without a runtime API", as
     type: "module",
     scripts: {
       build: "tsc -p tsconfig.json",
+      lint:
+        "pnpm --dir ../.. exec eslint packages/builder-core/src --max-warnings 0",
       typecheck: "tsc -p tsconfig.json --noEmit",
     },
     devDependencies: {

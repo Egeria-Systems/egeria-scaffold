@@ -64,9 +64,12 @@ test("observability exposes only its approved empty public API", async () => {
     },
     scripts: {
       build: "tsc -p tsconfig.json",
+      lint:
+        "pnpm --dir ../.. exec eslint packages/observability/src --max-warnings 0",
       typecheck: "tsc -p tsconfig.json --noEmit",
       test: "node --test tests/*.test.mjs",
-      verify: "pnpm run build && pnpm run test && pnpm run typecheck",
+      verify:
+        "pnpm run build && pnpm run lint && pnpm run test && pnpm run typecheck",
       prepublishOnly: "pnpm run verify",
     },
     devDependencies: {

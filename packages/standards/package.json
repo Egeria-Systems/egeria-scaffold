@@ -9,6 +9,7 @@
   ],
   "exports": {
     "./eslint/cloudflare-isolation": "./eslint/cloudflare-isolation.mjs",
+    "./eslint/typescript-strict": "./eslint/typescript-strict.mjs",
     "./typescript/strict.json": "./typescript/strict.json",
     "./package.json": "./package.json"
   },
@@ -18,10 +19,15 @@
     "prepublishOnly": "pnpm run verify"
   },
   "peerDependencies": {
-    "eslint": ">=9.39.5 <10"
+    "eslint": "^9.39.5 || ^10.8.0"
+  },
+  "dependencies": {
+    "typescript-eslint": "8.66.0"
   },
   "devDependencies": {
-    "eslint": "9.39.5"
+    "eslint": "9.39.5",
+    "eslint-10": "npm:eslint@10.8.0",
+    "typescript": "6.0.3"
   },
   "publishConfig": {
     "access": "public",

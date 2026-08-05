@@ -529,7 +529,91 @@ Commit intent: `Configure package release safeguards`
 
 Stop for explicit user approval.
 
-## Increment 5 — Update canonical architecture and contributor surfaces
+## Increment 5 — Add the dual-major strict TypeScript lint standard
+
+The user approved this forward-only amendment after Increment 4 and authorized continuing directly into the following documentation increment without a separate review stop.
+
+### Files
+
+Create:
+
+- `docs/implementation-evidence/2026-08-04-p0-3-strict-builder-lint-preparation.md`
+- `eslint.config.mjs`
+- `packages/standards/eslint/typescript-strict.mjs`
+- `packages/standards/tests/typescript-strict.test.mjs`
+- `packages/standards/tests/fixtures/typescript-strict/invalid.ts`
+- `packages/standards/tests/fixtures/typescript-strict/tsconfig.json`
+- `packages/standards/tests/fixtures/typescript-strict/valid.ts`
+- `tests/package-boundaries/internal-linting.test.mjs`
+
+Modify:
+
+- `.changeset/lean-builder-monorepo.md`
+- `apps/cli/package.json`
+- `docs/architecture/package-ownership.md`
+- `docs/superpowers/plans/2026-08-04-p0-3-lean-builder-monorepo.md`
+- `package.json`
+- `packages/builder-core/package.json`
+- `packages/observability/package.json`
+- `packages/standards/AGENTS.md`
+- `packages/standards/README.md`
+- `packages/standards/package.json`
+- `packages/standards/tests/cloudflare-isolation.test.mjs`
+- `pnpm-lock.yaml`
+- `tests/constitution/constitution.test.mjs`
+- `tests/package-boundaries/private-packages.test.mjs`
+- `tests/package-boundaries/public-observability.test.mjs`
+- `tests/package-boundaries/public-standards.test.mjs`
+- `tests/package-boundaries/release-safeguards.test.mjs`
+
+### RED
+
+Write the standards and internal-linting tests and update every exact manifest/API consumer before implementation. The tests must prove:
+
+- the public factory rejects a relative `tsconfigRootDir`, preserves an absolute supplied root, defaults to TypeScript source files, composes only `strictTypeChecked` and `stylisticTypeChecked`, and enables `projectService: true`;
+- real ESLint `9.39.5` and `10.8.0` executions both accept representative valid TypeScript and report a typed floating-promise defect;
+- the valid fixture is intentionally not Prettier-formatted yet receives no ESLint formatting diagnostic, and a rule exclusive to the `all` preset is not enabled;
+- both majors continue to enforce the Cloudflare-isolation config;
+- the builder root and the three immediate package consumers use ESLint `10.8.0`, zero warnings, and the shared public factory;
+- the proof manifest's ESLint 9, Next config, typescript-eslint, and lint command remain exact and unchanged;
+- the standards export, peer range, package allowlist, Changeset summary, and dry-run tarball contract include the new public API.
+
+Run:
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm exec node --test packages/standards/tests/cloudflare-isolation.test.mjs packages/standards/tests/typescript-strict.test.mjs tests/package-boundaries/internal-linting.test.mjs tests/package-boundaries/private-packages.test.mjs tests/package-boundaries/public-observability.test.mjs tests/package-boundaries/public-standards.test.mjs tests/package-boundaries/release-safeguards.test.mjs
+```
+
+Expected RED: missing strict-config API, root config/scripts, exact pins, and consumer manifest updates, not syntax or harness failures.
+
+### GREEN
+
+Add `createTypeScriptStrictConfig({ tsconfigRootDir, files? })`. It requires an absolute root, defaults to TypeScript source extensions, composes exact `typescript-eslint@8.66.0` `strictTypeChecked` and `stylisticTypeChecked`, sets `projectService: true`, returns ordinary flat configs, and adds no formatter, framework, provider, or `all` preset.
+
+The root config supplies matching `@eslint/js@10.0.1`, scopes ESLint `10.8.0` to CLI, builder-core, and observability sources, and excludes `proofs/**`. Package-local lint scripts delegate to that root context with `--max-warnings 0`. Keep the proof manifest and local lint configuration byte-for-byte unchanged.
+
+Run:
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm install --lockfile-only
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm install --frozen-lockfile
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/standards run test
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run lint:p0.3
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/nextjs-cloudflare-proof run lint
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:package-boundaries
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/standards pack --dry-run --json
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm audit --audit-level=moderate
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm peers check
+rtk git diff --check
+```
+
+Expected standards pack contents add only `eslint/typescript-strict.mjs` to the previously approved four files.
+
+Commit intent: `Add strict builder lint standard`
+
+Continue directly to Increment 6 under the user's combined-review authorization.
+
+## Increment 6 — Update canonical architecture and contributor surfaces
 
 ### Files
 
@@ -580,7 +664,7 @@ Commit intent: `Document lean monorepo ownership`
 
 Stop for explicit user approval.
 
-## Increment 6 — Final verification, independent review, and Gate 3 packet
+## Increment 7 — Final verification, independent review, and Gate 3 packet
 
 ### Files
 

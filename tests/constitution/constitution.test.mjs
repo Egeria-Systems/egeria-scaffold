@@ -65,6 +65,9 @@ test("the root workspace remains private and pins the P0.2 toolchain", async () 
   assert.equal("dependencies" in manifest, false);
   assert.deepEqual(Object.keys(manifest.devDependencies ?? {}).sort(), [
     "@changesets/cli",
+    "@egeria-systems/standards",
+    "@eslint/js",
+    "eslint",
   ]);
   assert.equal(manifest.packageManager, "pnpm@11.20.0");
   assert.deepEqual(manifest.engines, {
