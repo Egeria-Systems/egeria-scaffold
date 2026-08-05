@@ -8,5 +8,8 @@ export * from "./contracts/project.js";
 export * from "./contracts/result.js";
 export * from "./contracts/state.js";
 export * from "./manifest/create-installed-manifest.js";
+export * from "./ownership/fingerprint.js";
+export * from "./ownership/materialize-surfaces.js";
 export * from "./profiles/profile-recipes.js";
 export * from "./resolution/resolve-capabilities.js";
+export * from "./state/codecs.js";

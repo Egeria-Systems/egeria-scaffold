@@ -193,7 +193,7 @@ test("the private packages compile through the shared strict contract", async ()
   );
 });
 
-test("the CLI remains an empty shell while builder-core owns only approved Task 2 surfaces", async () => {
+test("the CLI remains an empty shell while builder-core owns only approved Task 3 surfaces", async () => {
   const expectedSource = "export {};\n";
 
   assert.deepEqual(
@@ -223,8 +223,12 @@ test("the CLI remains an empty shell while builder-core owns only approved Task 
       "contracts/state.ts",
       "index.ts",
       "manifest/create-installed-manifest.ts",
+      "ownership/fingerprint.ts",
+      "ownership/materialize-surfaces.ts",
       "profiles/profile-recipes.ts",
       "resolution/resolve-capabilities.ts",
+      "serialization/canonical-json.ts",
+      "state/codecs.ts",
     ],
   );
   assert.equal(
@@ -237,7 +241,7 @@ test("the CLI remains an empty shell while builder-core owns only approved Task 
   );
 });
 
-test("builder-core direct consumers describe the private Task 2 boundary", async () => {
+test("builder-core direct consumers describe the private Task 3 boundary", async () => {
   const builderInstructions = await readFile(
     resolve(repositoryRoot, "packages/builder-core/AGENTS.md"),
     "utf8",
@@ -251,20 +255,20 @@ test("builder-core direct consumers describe the private Task 2 boundary", async
     "utf8",
   );
 
-  assert.match(builderInstructions, /P1 Task 2/);
-  assert.match(builderInstructions, /site-routing/);
-  assert.match(builderInstructions, /does not add `.egeria` codecs or files/);
-  assert.doesNotMatch(builderInstructions, /adds schema contracts only/);
+  assert.match(builderInstructions, /P1 Task 3/);
+  assert.match(builderInstructions, /strict `.egeria` codecs/);
+  assert.match(builderInstructions, /does not create `.egeria` files/);
+  assert.match(builderInstructions, /inference remains deferred to Task 4/);
 
-  assert.match(builderReadme, /P1 Task 2/);
-  assert.match(builderReadme, /six executable capability descriptors/);
-  assert.match(builderReadme, /installed-capability manifest entries/);
+  assert.match(builderReadme, /P1 Task 3/);
+  assert.match(builderReadme, /YAML 1.2/);
+  assert.match(builderReadme, /SHA-256/);
   assert.match(builderReadme, /The CLI remains empty/);
 
-  assert.match(packageOwnership, /through P1 Task 2/);
-  assert.match(packageOwnership, /exact six-capability P1 catalog/);
-  assert.match(packageOwnership, /installed-manifest projection/);
-  assert.match(packageOwnership, /They create no `.egeria` files/);
+  assert.match(packageOwnership, /through P1 Task 3/);
+  assert.match(packageOwnership, /strict `.egeria` codecs/);
+  assert.match(packageOwnership, /hybrid-ownership fingerprints/);
+  assert.match(packageOwnership, /creates no `.egeria` files/);
   assert.doesNotMatch(
     packageOwnership,
     /`packages\/builder-core`[^\n]*Empty ESM ownership shell/,
