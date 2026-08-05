@@ -48,6 +48,12 @@ test("the Cloudflare isolation API preserves the proof boundary", async () => {
               message:
                 "Cloudflare imports belong in the infrastructure adapter.",
             },
+            {
+              regex:
+                "^\\.\\./(?:\\.\\./)*infrastructure/cloudflare(?:/|$)",
+              message:
+                "Cloudflare adapter imports belong in a composition root.",
+            },
           ],
         },
       ],
@@ -70,6 +76,11 @@ for (const [eslintName, eslintPackage] of eslintPackages) {
       'import { env } from "cloudflare:workers";\n',
       [cloudflareIsolation],
       { filename: "src/domain/example.ts" },
+    );
+    const adapterMessages = linter.verify(
+      'import { readCompatibilityRuntime } from "../infrastructure/cloudflare/read-compatibility-runtime.js";\n',
+      [cloudflareIsolation],
+      { filename: "src/application/example.ts" },
     );
 
     assert.deepEqual(
@@ -102,6 +113,21 @@ for (const [eslintName, eslintPackage] of eslintPackages) {
         },
       ],
     );
+    assert.deepEqual(
+      adapterMessages.map(({ message, ruleId, severity }) => ({
+        message,
+        ruleId,
+        severity,
+      })),
+      [
+        {
+          message:
+            "'../infrastructure/cloudflare/read-compatibility-runtime.js' import is restricted from being used by a pattern. Cloudflare adapter imports belong in a composition root.",
+          ruleId: "no-restricted-imports",
+          severity: 2,
+        },
+      ],
+    );
   });
 
   test(`${eslintName} permits provider-neutral imports`, async () => {
@@ -114,6 +140,21 @@ for (const [eslintName, eslintPackage] of eslintPackages) {
         'import { requestContext } from "../ports/request-context.js";\n',
         [cloudflareIsolation],
         { filename: "src/application/example.ts" },
+      ),
+      [],
+    );
+  });
+
+  test(`${eslintName} permits Cloudflare adapter imports in a composition root`, async () => {
+    const cloudflareIsolation = await loadCloudflareIsolation();
+    const { Linter } = await import(eslintPackage);
+    const linter = new Linter({ configType: "flat" });
+
+    assert.deepEqual(
+      linter.verify(
+        'import { readCompatibilityRuntime } from "../../../src/infrastructure/cloudflare/read-compatibility-runtime";\n',
+        [cloudflareIsolation],
+        { filename: "app/api/compatibility/route.ts" },
       ),
       [],
     );

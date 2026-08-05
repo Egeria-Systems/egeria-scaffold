@@ -18,6 +18,11 @@ export const cloudflareIsolation = {
             group: ["cloudflare:*"],
             message: "Cloudflare imports belong in the infrastructure adapter.",
           },
+          {
+            regex: "^\\.\\./(?:\\.\\./)*infrastructure/cloudflare(?:/|$)",
+            message:
+              "Cloudflare adapter imports belong in a composition root.",
+          },
         ],
       },
     ],
