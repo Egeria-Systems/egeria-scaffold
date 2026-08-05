@@ -13,6 +13,7 @@
 - Preparation evidence: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-preparation.md`.
 - Task 2 applicability evidence: `docs/implementation-evidence/2026-08-05-p1-task2-plan-applicability.md`. It re-freezes Task 2 at `5da4dfc8a40a4317730c08e2ef7b5cd139737aa6`, preserves the approved six-capability design, and owns the targeted file-map and validation-interface amendments below.
 - Semantic naming evidence: `docs/implementation-evidence/2026-08-05-semantic-naming-preparation.md`. It inventories every live and planned phase-labelled executable name, preserves historical phase records, and assigns one atomic normalization task immediately before Task 3.
+- Task 2A revalidation evidence: `docs/implementation-evidence/2026-08-05-semantic-naming-plan-revalidation.md`. It confirms the exact consumer map at `18938b0c90c629a1bb55907f922a4c49145edacf` and records that Node.js `22.23.0` is superseded by security release `22.23.2`. Task 2A remains naming-only: local compatibility verification proves command preservation only, while workflow dispatch, deployment, and current-runtime-security claims are blocked pending a separately approved pin update.
 - Task 1 schema-review evidence: `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`. The capability-version name and empty P1 capability-settings contract are assigned to the separately gated Task 1A plan; the other recorded questions remain deferred to Task 9.
 - Frozen starting commit: `303ee9d35e19f9191948d994159f77c82c90a1ed` on clean sequential local `main`; re-freeze before execution if it changes.
 - Run shell commands through `rtk`; use `/Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm` and `CI=true` where pnpm may refresh generated dependencies.
@@ -521,11 +522,27 @@ Task 2A is intentionally placed before state codecs, inference, generation, and 
 
 **Preparation evidence:** `docs/implementation-evidence/2026-08-05-semantic-naming-preparation.md`
 
+**Revalidation evidence:** `docs/implementation-evidence/2026-08-05-semantic-naming-plan-revalidation.md`
+
 **Design:** `docs/superpowers/specs/2026-08-05-semantic-executable-naming-design.md`
 
 **Frozen executable state:** `3d2f0042bb7993a1e745c36b81962677a9a27b43` on clean local `main`. This planning increment changes documentation only. Immediately before RED, require a clean worktree and record the then-current HEAD as Task 2A's exact implementation comparison base.
 
+**Security boundary:** Node.js `22.23.0` is now behind security release `22.23.2`. Do not change the runtime pin inside this naming-only increment. Run the compatibility proof only locally with trusted repository inputs and loopback services, and interpret it only as evidence that the renamed command preserves the accepted proof behavior. Do not dispatch the GitHub workflow, deploy, or claim current runtime security. The pin update requires its own compatibility plan and approval.
+
 **Files:**
+
+Planning gate, committed after approval and before RED:
+
+- Create: `docs/implementation-evidence/2026-08-05-semantic-naming-plan-revalidation.md`
+- Modify: `docs/superpowers/plans/2026-08-05-p1-builder-kernel.md`
+
+Final verification and review gate:
+
+- Create: `docs/implementation-evidence/2026-08-05-semantic-executable-naming-verification.md`
+- Create: `docs/review-packets/2026-08-05-semantic-executable-naming.md`
+
+Implementation:
 
 - Rename: `packages/builder-core/src/catalog/p1-capabilities.ts` to `packages/builder-core/src/catalog/capability-catalog.ts`
 - Rename: `packages/builder-core/src/profiles/p1-profiles.ts` to `packages/builder-core/src/profiles/profile-recipes.ts`
@@ -574,9 +591,31 @@ Normalize these ordinary current-behavior test titles in the same change:
 
 Do not retain compatibility aliases. Historical plans, evidence, review packets, compatibility records, phase status, roadmap headings, and phase-specific invariants retain the labels and exact commands that were true when accepted.
 
+- [ ] **Step 0: Commit the approved planning gate and re-freeze**
+
+After explicit approval, commit only the dated revalidation evidence and this Task 2A plan amendment before implementation:
+
+```bash
+git add docs/implementation-evidence/2026-08-05-semantic-naming-plan-revalidation.md docs/superpowers/plans/2026-08-05-p1-builder-kernel.md
+git commit -m "Revalidate semantic naming plan"
+rtk git status --short --branch
+rtk git rev-parse HEAD
+```
+
+Expected: the local planning commit succeeds, the worktree is clean, and its HEAD becomes Task 2A's exact implementation comparison base. Stop if any unrelated staged, unstaged, or untracked work appears.
+
 - [ ] **Step 1: Write semantic-name and direct-consumer tests**
 
-Update the executable contract tests first. Require the semantic builder-core source paths, exports, schema title, issue code, root script keys, README/contributing commands, and compatibility-workflow command. Assert that the old source paths, exports, issue code, package-script keys, and each exact current test title listed above are absent. Rename ordinary test titles whose subject is current runtime behavior; retain phase labels only in tests whose actual subject is an accepted historical phase record or phase-specific invariant.
+Update the executable contract tests first, before renaming implementation surfaces:
+
+- `packages/builder-core/tests/contracts.test.mjs`: rename the current-runtime export test, assert the generated profile artifact title is exactly `Egeria portfolio and site profile recipe`, and reject the old title.
+- `packages/builder-core/tests/resolution.test.mjs`: call `createCapabilityCatalog`, consume `profileRecipes`, expect `CAPABILITY_PACKAGE_VERSION_INVALID`, assert the three old exports are absent, and rename the two current-runtime test titles listed above without changing their catalog, resolution, or privacy assertions.
+- `tests/package-boundaries/private-packages.test.mjs`: require `catalog/capability-catalog.ts` and `profiles/profile-recipes.ts` in the exact source allowlist, reject both old paths, and apply the semantic current-boundary test title.
+- `tests/package-boundaries/internal-linting.test.mjs`: require `lint:builder`, require `verify:builder-packages` to call it, and assert `lint:p0.3` is absent.
+- `tests/package-boundaries/release-safeguards.test.mjs`: require the exact `build:builder`, `lint:builder`, `typecheck:builder`, and `verify:builder-packages` keys and commands; assert all four old keys are absent.
+- `tests/constitution/constitution.test.mjs`: rename the current workspace test, require `verify:compatibility-proof`, require the compatibility workflow to invoke `pnpm run verify:compatibility-proof`, assert `verify:p0.2` is absent from both live surfaces, and require README/CONTRIBUTING to use only the semantic verification commands.
+
+The RED test edits must not modify catalog metadata, profile content, resolution expectations, accepted historical phase records, or phase-specific invariant tests.
 
 - [ ] **Step 2: Run RED**
 
@@ -595,6 +634,8 @@ Rename the two source files, exported API symbols, stable issue code, schema tit
 
 Do not change resolution logic, capability metadata, recipe content, dependencies, lockfile, provider behavior, generated output, or public package APIs.
 
+After GREEN, run one repository-wide tracked/live-surface search for the old paths, exports, issue code, schema title, and five old script keys. Remaining matches must be phase-subject historical records or the Task 2A negative assertions themselves; any other match is a missed direct consumer.
+
 - [ ] **Step 4: Run GREEN and affected compatibility verification**
 
 ```bash
@@ -609,13 +650,26 @@ rtk git status --short --branch
 
 The compatibility proof is rerun because its GitHub workflow calls the renamed root command. It remains local verification only and performs no deployment or provider mutation.
 
-- [ ] **Step 5: Review, commit, and stop**
+Because the accepted `22.23.0` pin is stale against security release `22.23.2`, this proof establishes only name-preserving behavior for trusted local inputs. It is not evidence of current runtime security, and the GitHub workflow must not be dispatched.
 
-Dispatch the required independent requirements, architecture/anti-overengineering, and test-evidence reviewers. Repair only validated material findings and rerun affected verification. Confirm the final diff contains no old live names or compatibility aliases and does not rewrite historical records.
+- [ ] **Step 5: Commit the verified review candidate**
+
+After the GREEN commands and live-name search pass against the unchanged tree, commit the coherent implementation candidate so every reviewer receives an exact immutable comparison:
 
 ```bash
 git add .github/workflows/compatibility-proof.yml README.md CONTRIBUTING.md package.json packages/builder-core/src packages/builder-core/schemas/profile.schema.json packages/builder-core/tests tests/constitution/constitution.test.mjs tests/package-boundaries
 git commit -m "Normalize executable names"
+```
+
+- [ ] **Step 6: Review, record evidence, and stop**
+
+Dispatch the required independent requirements, architecture/anti-overengineering, and test-evidence reviewers with frozen base/candidate commits, the design, both Task 2A evidence records, this plan section, changed-file list, and exact RED/GREEN output. Prohibit edits, recursive delegation, GitHub comments, workflow dispatch, deployment, and other external action. Repair only validated material findings and rerun affected verification. Confirm the final diff contains no old live names or compatibility aliases, does not rewrite historical records, and does not change the Node pin or make a current-security claim.
+
+Create the dated verification evidence and review packet. The review packet must list the exact comparison, changed files, RED/GREEN and final commands with results, reviewer dispositions, residual risks, deferred work, and rollback/recovery. Commit only these final gate artifacts after they pass documentation and diff checks:
+
+```bash
+git add docs/implementation-evidence/2026-08-05-semantic-executable-naming-verification.md docs/review-packets/2026-08-05-semantic-executable-naming.md
+git commit -m "Record semantic naming verification"
 ```
 
 Stop for explicit user approval before Task 3.
