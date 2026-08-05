@@ -1,0 +1,124 @@
+import { z } from "zod";
+
+import {
+  capabilityDeliveryModeSchema,
+  capabilityRemovalPolicySchema,
+  capabilityStateClassificationsSchema,
+  fingerprintTargetSchema,
+  surfaceOwnerSchema,
+  surfaceOwnershipModeSchema,
+} from "./capability.js";
+import {
+  fingerprintSchema,
+  safeRelativePathSchema,
+  semanticVersionSchema,
+  stableIdentifierSchema,
+} from "./identifiers.js";
+import { profileIdentifierSchema } from "./profile.js";
+
+function requireUniqueIdentifiers(
+  values: readonly { identifier: string }[],
+  context: z.RefinementCtx,
+): void {
+  const identifiers = values.map(({ identifier }) => identifier);
+
+  if (new Set(identifiers).size !== identifiers.length) {
+    context.addIssue({ code: "custom", message: "identifiers must be unique" });
+  }
+}
+
+export const installedCapabilitySchema = z
+  .strictObject({
+    identifier: stableIdentifierSchema,
+    version: semanticVersionSchema,
+    deliveryMode: capabilityDeliveryModeSchema,
+    stateClassifications: capabilityStateClassificationsSchema,
+    removalPolicy: capabilityRemovalPolicySchema,
+  })
+  .readonly();
+
+export const installedSurfaceSchema = z
+  .strictObject({
+    identifier: stableIdentifierSchema,
+    owner: surfaceOwnerSchema,
+    path: safeRelativePathSchema,
+    ownership: surfaceOwnershipModeSchema,
+    fingerprintTarget: fingerprintTargetSchema,
+    mergeStrategy: z.enum(["replace-file", "json-property"]),
+    fingerprint: fingerprintSchema,
+  })
+  .superRefine((surface, context) => {
+    const validPair =
+      (surface.fingerprintTarget.kind === "file" &&
+        surface.mergeStrategy === "replace-file") ||
+      (surface.fingerprintTarget.kind === "json-value" &&
+        surface.mergeStrategy === "json-property");
+
+    if (!validPair) {
+      context.addIssue({
+        code: "custom",
+        message: "merge strategy must match its fingerprint target",
+        path: ["mergeStrategy"],
+      });
+    }
+  })
+  .readonly();
+
+const verificationChecksSchema = z
+  .tuple([
+    z.literal("contracts"),
+    z.literal("pre-state-inference"),
+    z.literal("lockfile"),
+    z.literal("frozen-install"),
+    z.literal("lint"),
+    z.literal("typecheck"),
+    z.literal("next-build"),
+    z.literal("opennext-build"),
+    z.literal("post-state-inference"),
+  ])
+  .readonly();
+
+export const installedStateSchema = z
+  .strictObject({
+    schemaVersion: z.literal("1.0.0"),
+    builderVersion: z.literal("0.0.0"),
+    projectSchemaVersion: z.literal("1.0.0"),
+    origin: z
+      .strictObject({
+        profile: profileIdentifierSchema,
+        recipeVersion: z.literal("0.1.0"),
+      })
+      .readonly(),
+    installedCapabilities: z
+      .array(installedCapabilitySchema)
+      .superRefine(requireUniqueIdentifiers)
+      .readonly(),
+    appliedMigrations: z.array(stableIdentifierSchema).readonly(),
+    managedSurfaces: z
+      .array(installedSurfaceSchema)
+      .superRefine(requireUniqueIdentifiers)
+      .readonly(),
+    ejections: z.array(safeRelativePathSchema).readonly(),
+    compatibility: z
+      .strictObject({
+        node: z.literal("22.23.0"),
+        pnpm: z.literal("11.20.0"),
+        platformAdapter: z.literal("cloudflare-workers"),
+      })
+      .readonly(),
+    lastSuccessfulVerification: z
+      .strictObject({
+        kind: z.literal("generation"),
+        checks: verificationChecksSchema,
+      })
+      .readonly(),
+  })
+  .readonly()
+  .meta({
+    id: "urn:egeria-systems:schema:state:1.0.0",
+    title: "Egeria installed state",
+  });
+
+export type InstalledCapability = z.infer<typeof installedCapabilitySchema>;
+export type InstalledSurface = z.infer<typeof installedSurfaceSchema>;
+export type InstalledState = z.infer<typeof installedStateSchema>;

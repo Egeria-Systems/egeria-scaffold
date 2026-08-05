@@ -143,6 +143,8 @@ Generation adds, rather than templates, these state files:
 - Modify: `packages/builder-core/AGENTS.md`
 - Modify: `packages/builder-core/README.md`
 - Modify: `tests/package-boundaries/private-packages.test.mjs`
+- Modify: `tests/package-boundaries/release-safeguards.test.mjs`
+- Modify: `docs/superpowers/plans/2026-08-05-p1-builder-kernel.md` (execution amendment recording the discovered direct consumer)
 - Modify: `package.json`
 - Modify: `pnpm-lock.yaml`
 
@@ -314,7 +316,7 @@ Expected: all focused contracts pass; no unrelated package API or path exists.
 - [ ] **Step 6: Commit and stop**
 
 ```bash
-git add package.json pnpm-lock.yaml packages/builder-core tests/package-boundaries/private-packages.test.mjs
+git add package.json pnpm-lock.yaml packages/builder-core tests/package-boundaries/private-packages.test.mjs tests/package-boundaries/release-safeguards.test.mjs docs/superpowers/plans/2026-08-05-p1-builder-kernel.md
 git commit -m "Add P1 schema contracts"
 ```
 

@@ -145,6 +145,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
       build: rootManifest.scripts?.["build:p0.3"],
       changeset: rootManifest.scripts?.changeset,
       changesetStatus: rootManifest.scripts?.["changeset:status"],
+      builderCoreTests: rootManifest.scripts?.["test:builder-core"],
       lint: rootManifest.scripts?.["lint:p0.3"],
       release: rootManifest.scripts?.["release-packages"],
       packageBoundaries: rootManifest.scripts?.["test:package-boundaries"],
@@ -159,6 +160,8 @@ test("root release commands use the pinned Changesets boundary", async () => {
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run build",
       changeset: "changeset",
       changesetStatus: "changeset status",
+      builderCoreTests:
+        "pnpm --filter @egeria-systems/builder-core run build && node --test packages/builder-core/tests/*.test.mjs",
       lint:
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint",
       release: "changeset publish",
@@ -166,7 +169,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
       packageTests:
         "pnpm --filter @egeria-systems/standards --filter @egeria-systems/observability run test",
       test:
-        "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit && pnpm run test:package-boundaries && pnpm run test:packages",
+        "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:packages",
       typecheck:
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run typecheck",
       verify:

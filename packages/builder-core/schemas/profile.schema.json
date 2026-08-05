@@ -1,0 +1,46 @@
+{
+  "$defs": {
+    "urn:egeria-systems:schema:stable-identifier:1.0.0": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "defaultCapabilities": {
+      "items": {
+        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+      },
+      "minItems": 1,
+      "readOnly": true,
+      "type": "array"
+    },
+    "identifier": {
+      "enum": [
+        "portfolio",
+        "site"
+      ],
+      "type": "string"
+    },
+    "recipeVersion": {
+      "const": "0.1.0",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "readOnly": true,
+  "required": [
+    "identifier",
+    "schemaVersion",
+    "recipeVersion",
+    "defaultCapabilities"
+  ],
+  "title": "Egeria P1 profile recipe",
+  "type": "object"
+}

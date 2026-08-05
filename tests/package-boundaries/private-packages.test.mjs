@@ -105,7 +105,7 @@ test("the workspace materializes the approved private builder boundaries", async
   ]);
 });
 
-test("the private package manifests consume standards without a runtime API", async () => {
+test("the private package manifests expose only their approved runtime boundaries", async () => {
   assert.equal(await pathExists("apps/cli/package.json"), true);
   assert.equal(await pathExists("packages/builder-core/package.json"), true);
 
@@ -129,21 +129,38 @@ test("the private package manifests consume standards without a runtime API", as
     version: "0.0.0",
     private: true,
     type: "module",
+    exports: {
+      ".": {
+        types: "./dist/index.d.ts",
+        import: "./dist/index.js",
+      },
+      "./package.json": "./package.json",
+    },
     scripts: {
       build: "tsc -p tsconfig.json",
       lint:
         "pnpm --dir ../.. exec eslint packages/builder-core/src --max-warnings 0",
+      "schema:check": "node scripts/generate-json-schemas.mjs --check",
+      "schema:generate": "node scripts/generate-json-schemas.mjs",
+      test: "node --test tests/*.test.mjs",
       typecheck: "tsc -p tsconfig.json --noEmit",
+      verify:
+        "pnpm run build && pnpm run schema:check && pnpm run test && pnpm run typecheck && pnpm run lint",
+    },
+    dependencies: {
+      yaml: "2.9.0",
+      zod: "4.4.3",
     },
     devDependencies: {
       "@egeria-systems/standards": "workspace:*",
+      "@types/node": "22.20.1",
       typescript: "6.0.3",
     },
   });
 });
 
 test("the private packages compile through the shared strict contract", async () => {
-  const expectedConfig = {
+  const expectedCliConfig = {
     extends: "@egeria-systems/standards/typescript/strict.json",
     compilerOptions: {
       declaration: true,
@@ -163,33 +180,48 @@ test("the private packages compile through the shared strict contract", async ()
     true,
     "builder-core must consume the shared strict TypeScript API",
   );
-  assert.deepEqual(await readJson("apps/cli/tsconfig.json"), expectedConfig);
+  assert.deepEqual(await readJson("apps/cli/tsconfig.json"), expectedCliConfig);
   assert.deepEqual(
     await readJson("packages/builder-core/tsconfig.json"),
-    expectedConfig,
+    {
+      ...expectedCliConfig,
+      compilerOptions: {
+        ...expectedCliConfig.compilerOptions,
+        types: ["node"],
+      },
+    },
   );
 });
 
-test("the private package sources remain empty ESM ownership shells", async () => {
+test("the CLI remains an empty shell while builder-core owns only P1 contracts", async () => {
   const expectedSource = "export {};\n";
 
-  for (const sourceDirectory of [
-    "apps/cli/src",
-    "packages/builder-core/src",
-  ]) {
-    assert.equal(await pathExists(sourceDirectory), true);
-    assert.deepEqual(
-      await listFiles(resolve(repositoryRoot, sourceDirectory)),
-      ["index.ts"],
-    );
-    assert.equal(
-      await readFile(resolve(repositoryRoot, sourceDirectory, "index.ts"), "utf8"),
-      expectedSource,
-    );
-  }
+  assert.deepEqual(
+    await listFiles(resolve(repositoryRoot, "apps/cli/src")),
+    ["index.ts"],
+  );
+  assert.equal(
+    await readFile(resolve(repositoryRoot, "apps/cli/src/index.ts"), "utf8"),
+    expectedSource,
+  );
+
+  assert.deepEqual(
+    await listFiles(resolve(repositoryRoot, "packages/builder-core/src")),
+    [
+      "contracts/capability.ts",
+      "contracts/identifiers.ts",
+      "contracts/json-schemas.ts",
+      "contracts/migration.ts",
+      "contracts/profile.ts",
+      "contracts/project.ts",
+      "contracts/result.ts",
+      "contracts/state.ts",
+      "index.ts",
+    ],
+  );
 });
 
-test("the private shells reserve later-stage surfaces without creating them", async () => {
+test("P1 keeps schemas private and reserves every later-stage builder surface", async () => {
   for (const requiredDocument of [
     "apps/cli/AGENTS.md",
     "apps/cli/README.md",
@@ -218,7 +250,6 @@ test("the private shells reserve later-stage surfaces without creating them", as
     "packages/builder-core/generators",
     "packages/builder-core/migrations",
     "packages/builder-core/profiles",
-    "packages/builder-core/schemas",
     "packages/builder-core/state",
     "packages/builder-core/templates",
   ]) {
@@ -228,4 +259,15 @@ test("the private shells reserve later-stage surfaces without creating them", as
       `${forbiddenPath} belongs to a later stage`,
     );
   }
+
+  assert.deepEqual(
+    await listFiles(resolve(repositoryRoot, "packages/builder-core/schemas")),
+    [
+      "capability.schema.json",
+      "migration-record.schema.json",
+      "profile.schema.json",
+      "project.schema.json",
+      "state.schema.json",
+    ],
+  );
 });

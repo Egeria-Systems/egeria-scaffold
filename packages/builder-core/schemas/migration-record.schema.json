@@ -1,0 +1,91 @@
+{
+  "$defs": {
+    "urn:egeria-systems:schema:semantic-version:1.0.0": {
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$",
+      "type": "string"
+    },
+    "urn:egeria-systems:schema:stable-identifier:1.0.0": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capabilities": {
+      "items": {
+        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+      },
+      "readOnly": true,
+      "type": "array"
+    },
+    "completedAt": {
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$",
+      "type": "string"
+    },
+    "fromBuilderVersion": {
+      "$ref": "#/$defs/urn:egeria-systems:schema:semantic-version:1.0.0"
+    },
+    "identifier": {
+      "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+    },
+    "kind": {
+      "enum": [
+        "migration",
+        "reconciliation"
+      ],
+      "type": "string"
+    },
+    "outcome": {
+      "const": "succeeded",
+      "type": "string"
+    },
+    "persistentDataAuthorizations": {
+      "items": {
+        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+      },
+      "readOnly": true,
+      "type": "array"
+    },
+    "remainingKnownDrift": {
+      "items": {
+        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+      },
+      "readOnly": true,
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "toBuilderVersion": {
+      "$ref": "#/$defs/urn:egeria-systems:schema:semantic-version:1.0.0"
+    },
+    "verificationChecks": {
+      "items": {
+        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+      },
+      "readOnly": true,
+      "type": "array"
+    }
+  },
+  "readOnly": true,
+  "required": [
+    "schemaVersion",
+    "identifier",
+    "kind",
+    "outcome",
+    "completedAt",
+    "fromBuilderVersion",
+    "toBuilderVersion",
+    "capabilities",
+    "persistentDataAuthorizations",
+    "remainingKnownDrift",
+    "verificationChecks"
+  ],
+  "title": "Egeria successful migration record",
+  "type": "object"
+}
