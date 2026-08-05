@@ -16,7 +16,7 @@ Create the private root pnpm workspace, substantive root `AGENTS.md`, architectu
 
 Build the smallest Next.js/Cloudflare proof that validates the approved Volta Node.js pin and current compatible pnpm, Next.js App Router, OpenNext Cloudflare adapter, local Next development, production-like workerd preview, generated binding types, strict TypeScript, ESLint flat config, ordinary Vitest, Cloudflare integration testing, Playwright, and axe. Deploy only to an approved non-production environment through GitHub Actions. Record current official documentation, advisories, beta status, known limitations, and runtime distinctions.
 
-**Current status (2026-08-04):** The locked proof passed Node.js development, built-Worker harness, workerd preview, shared Chromium/axe smoke, clean Ubuntu workflow, non-production Cloudflare deployment, and independent deployed-smoke evidence for exact implementation commit `160b8ef`. Required reviews are reconciled. Technical exit evidence is complete; verified-final-diff approval remains required before P0.3. See the [compatibility record](../compatibility/nextjs-cloudflare.md).
+**Completed (2026-08-04):** The locked proof passed Node.js development, built-Worker harness, workerd preview, shared Chromium/axe smoke, clean Ubuntu workflow, non-production Cloudflare deployment, and independent deployed-smoke evidence for exact implementation commit `160b8ef`. Required reviews were reconciled, and the user approved final committed comparison `c90b7c2..818874b`. See the [compatibility record](../compatibility/nextjs-cloudflare.md).
 
 **Exit:** The exact locked combination works locally, under workerd, in tests, and at the non-production URL. Static or local success alone is insufficient.
 
@@ -25,6 +25,8 @@ Build the smallest Next.js/Cloudflare proof that validates the approved Volta No
 ### P0.3 — Lean builder monorepo
 
 Create thin `apps/cli`, the private `packages/builder-core` package and its ownership boundary, public `packages/standards`, the public observability package shell, and approved release tooling with accidental-publication safeguards. Reserve project/state schema ownership for `builder-core`, but defer the executable schemas and builder kernel to P1. Do not create a separate project-schema package.
+
+**Current status (2026-08-04):** Preparation and exact-file planning are authorized. Implementation has not begun and remains plan-gated.
 
 **Exit:** Package APIs and owners are explicit, publication safeguards pass, extraction decisions are justified, and no profile functionality is implemented.
 

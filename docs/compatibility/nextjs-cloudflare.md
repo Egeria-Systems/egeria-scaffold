@@ -4,7 +4,7 @@
 
 **Evidence date:** 2026-08-04
 
-This P0.2 combination has complete technical Gate 3 evidence and awaits verified-final-diff approval. The exact deployed implementation candidate passed local Node.js, Next.js, OpenNext, workerd harness, preview, Ubuntu workflow, non-production Worker, Chromium, and automated accessibility checks. Neither those results nor this document prove a production profile or production readiness.
+This P0.2 combination is accepted after verified-final-diff approval. The exact deployed implementation candidate passed local Node.js, Next.js, OpenNext, workerd harness, preview, Ubuntu workflow, non-production Worker, Chromium, and automated accessibility checks. Neither those results nor this document prove a production profile or production readiness.
 
 The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). Preparation evidence and the approved implementation plan remain separately reviewable in [implementation evidence](../implementation-evidence/2026-08-04-p0-2-compatibility-preparation.md) and the [P0.2 plan](../superpowers/plans/2026-08-04-p0-2-nextjs-cloudflare-compatibility-proof.md).
 

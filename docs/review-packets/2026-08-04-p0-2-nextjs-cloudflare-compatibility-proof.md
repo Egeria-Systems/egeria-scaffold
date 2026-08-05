@@ -2,9 +2,9 @@
 
 **Recorded:** 2026-08-04
 
-**Gate 3 outcome:** READY FOR VERIFIED-FINAL-DIFF APPROVAL — local and Ubuntu verification, non-production Cloudflare deployment, workflow-deployed smoke, an independent deployed smoke rerun, and the three required reviews are complete.
+**Gate 3 outcome:** APPROVED — the user approved exact committed comparison `c90b7c2..818874bd212d3302938074a541e5bc1d0678ca42` after local and Ubuntu verification, non-production Cloudflare deployment, workflow-deployed smoke, an independent deployed smoke rerun, and the three required reviews completed successfully.
 
-This packet requests approval of the verified final committed P0.2 diff. Approval closes P0.2; it does not authorize P0.3.
+This packet records P0.2 closure. P0.3 preparation and planning are authorized; P0.3 implementation remains separately plan-gated.
 
 ## Goal and approved scope
 
@@ -12,7 +12,7 @@ Create the smallest private proof of the exact Node.js, pnpm, Next.js App Router
 
 - Base: `c90b7c2`
 - Deployed implementation candidate: `160b8ef261e69ec783ad93b7bfe69d932ba84541`
-- Approval comparison: `c90b7c2..HEAD`, where `HEAD` is the evidence commit containing this packet and the deployed code is unchanged from `160b8ef`
+- Approved comparison: `c90b7c2..818874bd212d3302938074a541e5bc1d0678ca42`; deployed code is unchanged from `160b8ef`
 - Lockfile SHA-256: `72fab6af3a327404e287094e99438b98f7a43007765a4a9e6255cc357dd637c7`
 - Branch: sequential `main`, pushed to `origin/main`
 - Excluded local state: one preserved user-owned unstaged edit to the approved P0.2 plan is outside this committed comparison
@@ -182,8 +182,8 @@ No material finding. The reviewer accepted the pure tests, authentic built-Worke
 - **Credential recovery:** rotate or revoke the provider token separately from GitHub secret replacement/removal.
 - **Persistent data:** none exists.
 
-## Approval requested
+## Approval disposition
 
-Approve the verified committed comparison from base `c90b7c2` through the evidence commit containing this packet. The deployment and runtime evidence is tied to exact implementation commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`; the subsequent closure edits change documentation and its constitution contract only.
+The user approved exact committed comparison `c90b7c2..818874bd212d3302938074a541e5bc1d0678ca42`. The deployment and runtime evidence is tied to exact implementation commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`; this post-approval status record changes documentation and its constitution contract only.
 
-Until that explicit approval is given, P0.2 remains at Gate 3 and P0.3 is not authorized.
+P0.2 is complete. P0.3 preparation and planning may begin, but its implementation requires approval of a new exact-file plan.

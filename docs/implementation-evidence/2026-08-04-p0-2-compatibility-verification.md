@@ -2,7 +2,7 @@
 
 **Recorded:** 2026-08-04
 
-**Status:** Gate 3 READY FOR VERIFIED-FINAL-DIFF APPROVAL — the exact implementation candidate passed local verification, the manual Ubuntu workflow, non-production Cloudflare deployment, workflow-deployed smoke tests, and an independent deployed smoke rerun. P0.3 remains blocked until the user approves the verified final diff.
+**Status:** Gate 3 APPROVED — the user approved exact committed comparison `c90b7c2..818874bd212d3302938074a541e5bc1d0678ca42` after the implementation candidate passed local verification, the manual Ubuntu workflow, non-production Cloudflare deployment, workflow-deployed smoke tests, and an independent deployed smoke rerun. P0.2 is complete; P0.3 preparation and planning are authorized, while implementation remains separately plan-gated.
 
 ## Scope and candidate
 
@@ -144,6 +144,6 @@ The reviewer reported no material finding. The parser/presentation tests, built-
 
 ## Gate 3 disposition
 
-The P0.2 technical exit evidence is complete for deployed implementation candidate `160b8ef261e69ec783ad93b7bfe69d932ba84541`. The only remaining gate is explicit user approval of the verified final committed diff and review packet. That approval closes P0.2; it does not authorize P0.3.
+The P0.2 technical exit evidence is complete for deployed implementation candidate `160b8ef261e69ec783ad93b7bfe69d932ba84541`. The user approved final committed comparison `c90b7c2..818874bd212d3302938074a541e5bc1d0678ca42`, closing P0.2 and authorizing P0.3 preparation and planning. P0.3 implementation still requires its exact-file plan approval.
 
 Retain the private proof as a dependency, configuration, action, and Cloudflare compatibility regression canary. Retire it only when an equivalent maintained test surface replaces its Node development, built-Worker, workerd preview, deployed Worker, browser, and bounded accessibility evidence, with the canonical compatibility and architecture documents updated in the same approved change.

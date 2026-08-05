@@ -115,7 +115,7 @@ test("the P0.2 compatibility record has its required evidence boundaries", async
 
   assert.match(
     compatibility,
-    /complete technical Gate 3 evidence and awaits verified-final-diff approval/i,
+    /P0\.2 combination is accepted after verified-final-diff approval/i,
   );
   assert.match(compatibility, /non-production Cloudflare Worker/i);
   assert.match(compatibility, /do(?:es)? not establish WCAG conformance/i);
