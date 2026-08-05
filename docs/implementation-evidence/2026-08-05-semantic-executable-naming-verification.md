@@ -2,7 +2,7 @@
 
 **Execution date:** 2026-08-05 (America/Toronto)
 
-**Status:** Task 2A implementation and independent review are complete. Verified-final-diff approval is pending. Task 3 remains blocked.
+**Status:** Task 2A implementation, independent review, and exact verified-final-diff approval are complete.
 
 **Implementation comparison:** `76aefa624bf9fac5110f6dda348cbf2905f34aa5..2f7d20c856d81caa03a53c418d21fafdb44f47fa`
 
@@ -132,7 +132,7 @@ All reviews used frozen comparison `76aefa624bf9fac5110f6dda348cbf2905f34aa5..2f
 ## Security, accessibility, and evidence limits
 
 - The locked npm dependency graph had no known vulnerability in the dated moderate-threshold registry audit recorded in the plan-revalidation evidence. Task 2A does not change that graph.
-- Node.js `22.23.0` remains pinned even though official security release `22.23.2` supersedes it. This is an explicit residual risk and separate compatibility-planning requirement. The local compatibility result proves command-rename preservation for trusted repository inputs only; it is not evidence of current runtime security.
+- Node.js `22.23.0` contains the June 2026 Node 22 security fixes. Official `22.23.1` is a later regression-fix patch. The pin remains unchanged; updating it still requires separate compatibility planning and proof. The local compatibility result proves command-rename preservation for trusted repository inputs only.
 - Static, Node, workerd, and Chromium checks prove only the exercised candidate and environments. They do not establish security completeness, production safety, cross-browser support, visual quality, translation quality, or human usability.
 - Automated axe checks do not establish WCAG conformance. No human accessibility evaluation was performed because this naming-only increment creates no generated UI and no separate gate requires one.
 - No push, pull request, publication, workflow dispatch, deployment, provider mutation, persistent-data mutation, external message, or production action occurred.
@@ -147,4 +147,4 @@ All reviews used frozen comparison `76aefa624bf9fac5110f6dda348cbf2905f34aa5..2f
 
 ## Gate disposition
 
-Task 2A is ready for explicit verified-final-diff approval after this record and the review packet are committed and the exact final comparison is presented. Approval would close Task 2A only. Task 3 implementation, the Node pin update, push, pull request, workflow dispatch, deployment, publication, and provider action remain separately gated.
+The user explicitly approved exact final comparison `76aefa624bf9fac5110f6dda348cbf2905f34aa5..a20dd4444852ff5a355e3010e1f5b038cf27728f` on 2026-08-05. Task 2A is closed. The user's advance instruction pre-authorizes the bounded local Task 3 and Task 4 lifecycle, but not Task 5, a Node pin update, push, pull request, workflow dispatch, deployment, publication, provider action, or external message.

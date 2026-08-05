@@ -57,14 +57,14 @@ No current official source changes the semantic naming design or justifies a com
 
 `CI=true pnpm audit --audit-level moderate` queried the current npm registry advisory endpoint and returned `No known vulnerabilities found` for the locked package graph. This does not audit the Node.js runtime or prove future dependency safety.
 
-The official [Node.js July 2026 security release notice](https://nodejs.org/en/blog/vulnerability/july-2026-security-releases) states that Node.js 22.x received high-, medium-, and low-severity fixes. [Node.js 22.23.2](https://nodejs.org/en/blog/release/v22.23.2/) is the corresponding security release. The repository and compatibility workflow remain pinned to `22.23.0`.
+**2026-08-05 correction after official-source revalidation:** the linked July notice and `22.23.2` release do not exist in the official Node release record. [Node.js 22.23.0](https://nodejs.org/en/blog/release/v22.23.0) is the June 2026 security release; [Node.js 22.23.1](https://nodejs.org/en/blog/release/v22.23.1/) is a later regression-fix patch. The repository and compatibility workflow remain pinned to `22.23.0`.
 
 That stale runtime pin is material but does not belong inside Task 2A:
 
 - Task 2A is an atomic private-source and repository-command rename with no runtime, dependency, lockfile, provider, deployment, or generated-output behavior change.
 - Task 2A verification may run only locally against trusted repository inputs and loopback services. Its compatibility-proof result establishes command-rename preservation only; it cannot establish current runtime security.
 - Do not dispatch the compatibility workflow, deploy, or make a current-security claim under the `22.23.0` pin.
-- Updating Node to `22.23.2` requires a separate exact-file compatibility plan and fresh proof because the accepted matrix, generated-state compatibility literals, action runtime, documentation, tests, and lockfile/install evidence are cross-cutting consumers.
+- Updating Node to `22.23.1` or another later patch requires a separate exact-file compatibility plan and fresh proof because the accepted matrix, generated-state compatibility literals, action runtime, documentation, tests, and lockfile/install evidence are cross-cutting consumers.
 
 ## Consolidated contradiction and uncertainty batch
 

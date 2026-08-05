@@ -13,7 +13,7 @@
 - Preparation evidence: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-preparation.md`.
 - Task 2 applicability evidence: `docs/implementation-evidence/2026-08-05-p1-task2-plan-applicability.md`. It re-freezes Task 2 at `5da4dfc8a40a4317730c08e2ef7b5cd139737aa6`, preserves the approved six-capability design, and owns the targeted file-map and validation-interface amendments below.
 - Semantic naming evidence: `docs/implementation-evidence/2026-08-05-semantic-naming-preparation.md`. It inventories every live and planned phase-labelled executable name, preserves historical phase records, and assigns one atomic normalization task immediately before Task 3.
-- Task 2A revalidation evidence: `docs/implementation-evidence/2026-08-05-semantic-naming-plan-revalidation.md`. It confirms the exact consumer map at `18938b0c90c629a1bb55907f922a4c49145edacf` and records that Node.js `22.23.0` is superseded by security release `22.23.2`. Task 2A remains naming-only: local compatibility verification proves command preservation only, while workflow dispatch, deployment, and current-runtime-security claims are blocked pending a separately approved pin update.
+- Task 2A revalidation evidence: `docs/implementation-evidence/2026-08-05-semantic-naming-plan-revalidation.md`. It confirms the exact consumer map at `18938b0c90c629a1bb55907f922a4c49145edacf`. A 2026-08-05 official-source correction records that Node.js `22.23.0` is the June security release and `22.23.1` is a later regression-fix patch. Task 2A remains naming-only; any pin update still requires a separate compatibility plan and approval.
 - Task 1 schema-review evidence: `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`. The capability-version name and empty P1 capability-settings contract are assigned to the separately gated Task 1A plan; the other recorded questions remain deferred to Task 9.
 - Frozen starting commit: `303ee9d35e19f9191948d994159f77c82c90a1ed` on clean sequential local `main`; re-freeze before execution if it changes.
 - Run shell commands through `rtk`; use `/Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm` and `CI=true` where pnpm may refresh generated dependencies.
@@ -528,7 +528,7 @@ Task 2A is intentionally placed before state codecs, inference, generation, and 
 
 **Frozen executable state:** `3d2f0042bb7993a1e745c36b81962677a9a27b43` on clean local `main`. This planning increment changes documentation only. Immediately before RED, require a clean worktree and record the then-current HEAD as Task 2A's exact implementation comparison base.
 
-**Security boundary:** Node.js `22.23.0` is now behind security release `22.23.2`. Do not change the runtime pin inside this naming-only increment. Run the compatibility proof only locally with trusted repository inputs and loopback services, and interpret it only as evidence that the renamed command preserves the accepted proof behavior. Do not dispatch the GitHub workflow, deploy, or claim current runtime security. The pin update requires its own compatibility plan and approval.
+**Security boundary:** Node.js `22.23.0` is the June 2026 security release; official `22.23.1` is a later regression-fix patch. Do not change the runtime pin inside this naming-only increment. Run the compatibility proof only locally with trusted repository inputs and loopback services, and interpret it only as evidence that the renamed command preserves the accepted proof behavior. Do not dispatch the GitHub workflow or deploy. Any pin update requires its own compatibility plan and approval.
 
 **Files:**
 
@@ -650,7 +650,7 @@ rtk git status --short --branch
 
 The compatibility proof is rerun because its GitHub workflow calls the renamed root command. It remains local verification only and performs no deployment or provider mutation.
 
-Because the accepted `22.23.0` pin is stale against security release `22.23.2`, this proof establishes only name-preserving behavior for trusted local inputs. It is not evidence of current runtime security, and the GitHub workflow must not be dispatched.
+Because the accepted `22.23.0` pin intentionally remains fixed while official `22.23.1` contains a later regression correction, this proof establishes only name-preserving behavior for trusted local inputs. The GitHub workflow must not be dispatched.
 
 - [ ] **Step 5: Commit the verified review candidate**
 
@@ -675,6 +675,8 @@ git commit -m "Record semantic naming verification"
 Stop for explicit user approval before Task 3.
 
 ## Task 3: `.egeria` Codecs and Hybrid Ownership
+
+The exact-file controlling plan for this task is [2026-08-05-egeria-state-ownership.md](2026-08-05-egeria-state-ownership.md). Its narrower decisions supersede this original task sketch where they differ.
 
 **Files:**
 
@@ -742,6 +744,8 @@ git commit -m "Add Egeria state ownership"
 Stop for explicit user approval before Task 4.
 
 ## Task 4: Read-Only Repository Inference
+
+The exact-file controlling plan for this task is [2026-08-05-repository-inference.md](2026-08-05-repository-inference.md). Its narrower decisions supersede this original task sketch where they differ.
 
 **Files:**
 

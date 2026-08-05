@@ -2,7 +2,7 @@
 
 **Recorded:** 2026-08-05
 
-**Task 2A outcome:** PENDING verified-final-diff approval. The implementation and required independent reviews are complete; Task 3 remains blocked.
+**Task 2A outcome:** APPROVED. The implementation, required independent reviews, and verified final comparison are complete.
 
 ## Goal and frozen comparison
 
@@ -103,7 +103,7 @@ No reviewer edited the repository or performed recursive delegation, GitHub comm
 
 ## Risks and deferred work
 
-- Node.js `22.23.0` is behind official security release `22.23.2`. The pin is intentionally unchanged in this naming-only task. A separate compatibility plan, proof, and approval are required; the current local result is not a current-runtime-security claim.
+- Node.js `22.23.0` contains the June 2026 Node 22 security fixes. Official `22.23.1` is a later regression-fix patch. The pin is intentionally unchanged in this naming-only task; a separate compatibility plan, proof, and approval are required before updating it.
 - No dependency or lockfile changed. The dated moderate-threshold npm audit in the plan-revalidation evidence reported no known vulnerabilities for the locked package graph, but cannot establish future safety.
 - The compatibility proof exercised Node, workerd, and Chromium locally. It did not deploy and does not establish production safety, cross-browser support, visual or translation quality, human usability, or WCAG conformance.
 - Task 3 `.egeria` codecs and hybrid ownership, inference/doctor/diff, skeleton generation, fixtures, CLI behavior, and all later capabilities remain deferred.
@@ -118,4 +118,4 @@ No reviewer edited the repository or performed recursive delegation, GitHub comm
 
 ## Approval disposition
 
-Task 2A is ready for explicit verified-final-diff approval once the gate-artifact commit is included in the exact comparison presented to the user. Approval closes only Task 2A and permits no Task 3 implementation or external action by itself.
+The user explicitly approved verified final comparison `76aefa624bf9fac5110f6dda348cbf2905f34aa5..a20dd4444852ff5a355e3010e1f5b038cf27728f` on 2026-08-05. Task 2A is closed. The user separately pre-approved the bounded local preparation, planning, implementation, review, evidence, and focused commits for Tasks 3 and 4; that instruction does not authorize Task 5 or any push, pull request, workflow dispatch, deployment, publication, provider mutation, or external message.
