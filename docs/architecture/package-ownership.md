@@ -25,7 +25,9 @@ This document owns the builder repository's package visibility, current API surf
 
 ## Versioning and release boundary
 
-P0.3 packages begin at `0.0.0`. Standards and observability now have exact public APIs, package-content allowlists, contract tests, and publication defaults. Their Changesets release intent arrives only in its approved P0.3 increment.
+P0.3 packages begin at `0.0.0`. Standards and observability have exact public APIs, package-content allowlists, contract tests, and public publication defaults. Changesets 2.31.1 records their versioning intent; the initial Changeset requests minor releases only for those two packages. The repository-level Changesets default remains restricted, and private-package versioning and tagging are disabled.
+
+Package-boundary tests enumerate the only locally publishable packages and execute dry-run packs to enforce the exact public tarball contents. The root version and release scripts delegate to Changesets, which respects each package's private flag and explicit publication configuration.
 
 Local release configuration never authorizes publication. npm namespace control, licensing, credentials, exact package contents, provenance, and the external publish command require separate current evidence and explicit human approval.
 

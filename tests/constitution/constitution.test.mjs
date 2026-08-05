@@ -47,8 +47,12 @@ test("the root workspace remains private and pins the P0.2 toolchain", async () 
   assert.equal(manifest.name, "@egeria-systems/scaffold");
   assert.equal(manifest.private, true);
   assert.equal(
-    manifest.scripts.test,
-    "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit",
+    manifest.scripts.test
+      .split(" && ")
+      .includes(
+        "pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit",
+      ),
+    true,
   );
   assert.equal(
     manifest.scripts["test:constitution"],
@@ -59,7 +63,9 @@ test("the root workspace remains private and pins the P0.2 toolchain", async () 
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof verify",
   );
   assert.equal("dependencies" in manifest, false);
-  assert.equal("devDependencies" in manifest, false);
+  assert.deepEqual(Object.keys(manifest.devDependencies ?? {}).sort(), [
+    "@changesets/cli",
+  ]);
   assert.equal(manifest.packageManager, "pnpm@11.20.0");
   assert.deepEqual(manifest.engines, {
     node: "22.23.0",

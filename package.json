@@ -4,9 +4,21 @@
   "private": true,
   "description": "Builds versioned materialized Next.js recipes for Egeria Systems projects.",
   "scripts": {
-    "test": "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit",
+    "build:p0.3": "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run build",
+    "changeset": "changeset",
+    "changeset:status": "changeset status",
+    "release-packages": "changeset publish",
+    "test": "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit && pnpm run test:package-boundaries && pnpm run test:packages",
     "test:constitution": "node --test tests/constitution/constitution.test.mjs",
-    "verify:p0.2": "pnpm --filter @egeria-systems/nextjs-cloudflare-proof verify"
+    "test:package-boundaries": "node --test tests/package-boundaries/*.test.mjs",
+    "test:packages": "pnpm --filter @egeria-systems/standards --filter @egeria-systems/observability run test",
+    "typecheck:p0.3": "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run typecheck",
+    "verify:p0.2": "pnpm --filter @egeria-systems/nextjs-cloudflare-proof verify",
+    "verify:p0.3": "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run build:p0.3 && pnpm run test:packages && pnpm run typecheck:p0.3 && pnpm run changeset:status",
+    "version-packages": "changeset version"
+  },
+  "devDependencies": {
+    "@changesets/cli": "2.31.1"
   },
   "packageManager": "pnpm@11.20.0",
   "engines": {
