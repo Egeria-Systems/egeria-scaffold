@@ -1,0 +1,1140 @@
+# P1 Builder Kernel Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Build the private P1 builder kernel: executable schemas, six-capability portfolio/site resolution, installed state, hybrid ownership, read-only inference/doctor/diff, deterministic skeleton generation, a thin CLI, and build-verified fixtures.
+
+**Architecture:** `packages/builder-core` owns all executable decisions and exposes narrow typed functions; `apps/cli` only parses arguments, calls core, and emits stable JSON. Portfolio/site recipes materialize explicit capability sets into the three accepted `.egeria` files, while generated source is rendered deterministically and new-directory creation is atomic. Existing-repository mutation, migration execution, provider work, production behavior, and later capabilities remain outside P1.
+
+**Tech Stack:** Node.js `22.23.0`, pnpm `11.20.0`, TypeScript `6.0.3`, Zod `4.4.3`, `yaml` `2.9.0`, Node test runner, Next.js `16.3.0`, React `19.2.8`, OpenNext Cloudflare `1.20.2`, Wrangler `4.118.0`, ESLint `9.39.5` for generated Next.js and `10.8.0` for builder source.
+
+## Global Constraints
+
+- Preparation evidence: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-preparation.md`.
+- Frozen starting commit: `303ee9d35e19f9191948d994159f77c82c90a1ed` on clean sequential local `main`; re-freeze before execution if it changes.
+- Run shell commands through `rtk`; use `/Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm` and `CI=true` where pnpm may refresh generated dependencies.
+- Each task follows RED, minimum GREEN, focused verification, one focused commit, and an explicit user stop before the next task.
+- Do not change the accepted Node/Next/OpenNext/Cloudflare matrix, the proof package, public package APIs, or Changeset release intent unless a current evidence-backed defect makes the change directly necessary and the plan is amended before editing.
+- Do not create `packages/project-schema`; schemas and checked artifacts remain private inside builder-core.
+- Executable P1 capabilities are exactly `standards`, `content-files`, `section-composition`, `deployment-cloudflare`, `observability`, and `site-routing`.
+- Executable P1 profiles are exactly `portfolio` and `site`. `app`, `app-foundation`, `authenticated-app`, and every later capability remain documentation-only.
+- Installed capabilities become authoritative. `originProfile` and `recipeVersion` are informational provenance; `project.yaml.selectedCapabilities` contains the full materialized set.
+- `.egeria` contains exactly `project.yaml`, `state.json`, `migrations.jsonl`, and an empty `reports/` directory marker only if a report is actually produced. P1 produces no report and therefore no reports directory.
+- `.egeria/state.json` owns the installed capability manifest; do not add `.egeria/manifest.json`.
+- Read-only inference, doctor, and diff perform no writes, Git operations, dependency installation, provider calls, or network access.
+- Creation refuses an existing destination, including an existing empty directory. It never overwrites, stashes, commits, initializes Git, or mutates an existing repository.
+- Creation writes a builder-owned temporary sibling, validates pre-state inference, writes state last, validates post-state inference, and renames once. Existing-repository isolated-worktree transformations remain P3 work.
+- Generated repositories contain only `apps/web`; do not generate `apps/jobs` or local `packages/`.
+- All generated visible/translatable copy comes from `apps/web/content/en-CA/*.json`; presentation receives typed data and callbacks only.
+- No generic `PlatformService` or `ApplicationDatabase` port; no database, queue, email, forms, identity, payments, analytics, CMS, business CRUD, provider resource, or production deployment.
+- Automated accessibility, visual, browser, human-usability, translation-fidelity, conformance, and production-release gates remain P2 scope. P1 must not claim them.
+- Public package versioning/publication is not authorized by this plan. Local packed-tarball substitution cannot satisfy the portable lockfile or state-order contract.
+- Tasks 1 through 6 are within the plan, but plan approval authorizes beginning Task 1 only; every later task still requires the preceding checkpoint approval. Task 7 is additionally a hard stop until standards and observability are separately versioned/published under explicit approval and their exact public versions pass current registry/advisory checks.
+- A portable generated `pnpm-lock.yaml`, fresh public-registry install, and pre-state generated-project verification are mandatory for Tasks 7 and 8. The P1 packet must not mark them passed before they exist.
+- No push, pull request, merge, deployment, npm versioning/publication, permission change, external message, or review-comment response is authorized.
+
+## File and Interface Map
+
+### Builder-core contracts
+
+- `packages/builder-core/src/contracts/result.ts`: `ContractIssue`, `ValidationResult<T>`, deterministic issue sorting.
+- `packages/builder-core/src/contracts/identifiers.ts`: stable identifier, semantic-version, safe-relative-path, and SHA-256 fingerprint schemas.
+- `packages/builder-core/src/contracts/capability.ts`: capability metadata, typed probes, managed-surface descriptors, and inferred TypeScript types.
+- `packages/builder-core/src/contracts/profile.ts`: P1 profile recipe schema.
+- `packages/builder-core/src/contracts/project.ts`: desired project schema.
+- `packages/builder-core/src/contracts/state.ts`: installed manifest, owned-surface, ejection, compatibility, and verification schemas.
+- `packages/builder-core/src/contracts/migration.ts`: append-only successful migration/reconciliation record schema; no executor.
+- `packages/builder-core/src/contracts/json-schemas.ts`: checked Draft 2020-12 artifact generation.
+
+### Resolution and state
+
+- `packages/builder-core/src/catalog/p1-capabilities.ts`: the exact six P1 descriptors.
+- `packages/builder-core/src/profiles/p1-profiles.ts`: exact `portfolio` and `site` recipes.
+- `packages/builder-core/src/resolution/resolve-capabilities.ts`: dependency closure and deterministic ordering.
+- `packages/builder-core/src/manifest/create-installed-manifest.ts`: authoritative installed entries from resolved descriptors.
+- `packages/builder-core/src/state/codecs.ts`: YAML 1.2, JSON, and JSONL parsing/serialization.
+- `packages/builder-core/src/ownership/fingerprint.ts`: exact-file and canonical-JSON SHA-256 fingerprints.
+- `packages/builder-core/src/ownership/materialize-surfaces.ts`: state records for full files and bounded JSON properties.
+
+### Read-only inspection
+
+- `packages/builder-core/src/repository/repository-reader.ts`: narrow read-only port plus filesystem and in-memory adapters.
+- `packages/builder-core/src/inference/evaluate-probe.ts`: typed probe evaluation.
+- `packages/builder-core/src/inference/infer-repository.ts`: qualitative capability evidence and ownership drift.
+- `packages/builder-core/src/diagnostics/doctor.ts`: stable health issues.
+- `packages/builder-core/src/diagnostics/diff-project.ts`: desired/installed/inferred capability and surface differences.
+
+### Generation and CLI
+
+- `packages/builder-core/src/generation/template-catalog.ts`: exact template-to-destination map.
+- `packages/builder-core/src/generation/render-template.ts`: strict token substitution.
+- `packages/builder-core/src/generation/render-skeleton.ts`: in-memory `GeneratedFile[]` plus desired state.
+- `packages/builder-core/src/generation/verify-generated-project.ts`: lockfile preparation and isolated-copy generated-project verification.
+- `packages/builder-core/src/generation/write-generated-project.ts`: safe temp write, inference gates, state-last finalization, and atomic rename.
+- `apps/cli/src/arguments.ts`: Node `parseArgs` command contract.
+- `apps/cli/src/run-cli.ts`: dependency-injected command execution and JSON output.
+- `apps/cli/src/index.ts`: executable entry point only.
+
+### Generated skeleton templates
+
+Common destination set:
+
+```text
+.gitignore
+.nvmrc
+AGENTS.md
+README.md
+package.json
+pnpm-workspace.yaml
+apps/web/AGENTS.md
+apps/web/package.json
+apps/web/tsconfig.json
+apps/web/eslint.config.mjs
+apps/web/next.config.ts
+apps/web/open-next.config.ts
+apps/web/wrangler.jsonc
+apps/web/app/globals.css
+apps/web/app/layout.tsx
+apps/web/app/page.tsx
+apps/web/src/content/content-schema.ts
+apps/web/src/content/read-content.ts
+apps/web/src/presentation/content-page.tsx
+apps/web/src/infrastructure/observability/installed-capability.ts
+apps/web/content/en-CA/site.json
+```
+
+`site` adds:
+
+```text
+apps/web/app/about/page.tsx
+apps/web/content/en-CA/about.json
+```
+
+Generation adds, rather than templates, these state files:
+
+```text
+.egeria/project.yaml
+.egeria/state.json
+.egeria/migrations.jsonl
+```
+
+## Task 1: Private Runtime Schema Contracts
+
+**Files:**
+
+- Create: `packages/builder-core/src/contracts/result.ts`
+- Create: `packages/builder-core/src/contracts/identifiers.ts`
+- Create: `packages/builder-core/src/contracts/capability.ts`
+- Create: `packages/builder-core/src/contracts/profile.ts`
+- Create: `packages/builder-core/src/contracts/project.ts`
+- Create: `packages/builder-core/src/contracts/state.ts`
+- Create: `packages/builder-core/src/contracts/migration.ts`
+- Create: `packages/builder-core/src/contracts/json-schemas.ts`
+- Create: `packages/builder-core/scripts/generate-json-schemas.mjs`
+- Create: `packages/builder-core/schemas/capability.schema.json`
+- Create: `packages/builder-core/schemas/profile.schema.json`
+- Create: `packages/builder-core/schemas/project.schema.json`
+- Create: `packages/builder-core/schemas/state.schema.json`
+- Create: `packages/builder-core/schemas/migration-record.schema.json`
+- Create: `packages/builder-core/tests/contracts.test.mjs`
+- Modify: `packages/builder-core/src/index.ts`
+- Modify: `packages/builder-core/package.json`
+- Modify: `packages/builder-core/tsconfig.json`
+- Modify: `packages/builder-core/AGENTS.md`
+- Modify: `packages/builder-core/README.md`
+- Modify: `tests/package-boundaries/private-packages.test.mjs`
+- Modify: `package.json`
+- Modify: `pnpm-lock.yaml`
+
+**Interfaces:**
+
+```ts
+export type ContractIssue = Readonly<{
+  code: string;
+  path: readonly (string | number)[];
+  context: Readonly<Record<string, string>>;
+}>;
+
+export type ValidationResult<T> =
+  | Readonly<{ ok: true; value: T }>
+  | Readonly<{ ok: false; issues: readonly ContractIssue[] }>;
+
+export type CapabilityDeliveryMode =
+  | "package-backed"
+  | "source-generated"
+  | "hybrid";
+
+export type CapabilityStateClassification =
+  | "stateless"
+  | "repository-stateful"
+  | "external-stateful"
+  | "persistent-data";
+
+export type CapabilityRemovalPolicy =
+  | "automatic"
+  | "reviewed"
+  | "export-and-remove"
+  | "eject-only"
+  | "unsupported";
+
+export type SurfaceOwnershipMode =
+  | "managed"
+  | "merge-managed"
+  | "application-owned"
+  | "ejected";
+
+export type InferenceProbe =
+  | Readonly<{ kind: "file"; path: string }>
+  | Readonly<{
+      kind: "json-value";
+      path: string;
+      pointer: string;
+      expected: string | boolean | number;
+    }>
+  | Readonly<{
+      kind: "package";
+      path: string;
+      section: "dependencies" | "devDependencies";
+      packageName: string;
+      version: string;
+    }>;
+
+export type ManagedSurfaceDescriptor = Readonly<{
+  identifier: string;
+  owner:
+    | Readonly<{ kind: "builder-kernel" }>
+    | Readonly<{ kind: "capability"; identifier: string }>;
+  path: string;
+  ownership: Exclude<SurfaceOwnershipMode, "ejected">;
+  fingerprintTarget:
+    | Readonly<{ kind: "file" }>
+    | Readonly<{ kind: "json-value"; pointer: string }>;
+  mergeStrategy: "replace-file" | "json-property";
+}>;
+```
+
+`CapabilityDescriptor` contains every field in the canonical capability model, replaces documentation-only string probes/surfaces with the typed unions above, rejects unknown keys, requires a non-empty duplicate-free `stateClassifications`, and rejects `stateless` combined with another state classification.
+
+`ProjectConfiguration` uses this exact top-level shape:
+
+```ts
+type ProjectConfiguration = Readonly<{
+  schemaVersion: "1.0.0";
+  builderCompatibility: "0.0.0";
+  project: Readonly<{
+    name: string;
+    displayName: string;
+    defaultLocale: "en-CA";
+  }>;
+  originProfile: "portfolio" | "site";
+  recipeVersion: "0.1.0";
+  platformAdapter: "cloudflare-workers";
+  selectedCapabilities: readonly string[];
+  capabilitySettings: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  ejectedAreas: readonly string[];
+}>;
+```
+
+`InstalledState` uses this exact top-level shape:
+
+```ts
+type InstalledState = Readonly<{
+  schemaVersion: "1.0.0";
+  builderVersion: "0.0.0";
+  projectSchemaVersion: "1.0.0";
+  origin: Readonly<{ profile: "portfolio" | "site"; recipeVersion: "0.1.0" }>;
+  installedCapabilities: readonly InstalledCapability[];
+  appliedMigrations: readonly string[];
+  managedSurfaces: readonly InstalledSurface[];
+  ejections: readonly string[];
+  compatibility: Readonly<{
+    node: "22.23.0";
+    pnpm: "11.20.0";
+    platformAdapter: "cloudflare-workers";
+  }>;
+  lastSuccessfulVerification: Readonly<{
+    kind: "generation";
+    checks: readonly [
+      "contracts",
+      "pre-state-inference",
+      "lockfile",
+      "frozen-install",
+      "lint",
+      "typecheck",
+      "next-build",
+      "opennext-build",
+      "post-state-inference",
+    ];
+  }>;
+}>;
+```
+
+- [ ] **Step 1: Write the schema contract tests**
+
+Test valid and invalid project/state/migration values, all enum boundaries, strict unknown-key rejection, safe relative paths, lowercase kebab identifiers, `sha256:<64 lowercase hex>` fingerprints, duplicate classifications, and `stateless` exclusivity. Read every checked JSON Schema artifact and compare it with `createJsonSchemaArtifacts()`.
+
+- [ ] **Step 2: Run RED**
+
+Run:
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk node --test packages/builder-core/tests/contracts.test.mjs
+```
+
+Expected: the test fails because the contract exports and schema artifacts do not exist; the failure must not be a Node test-loader error.
+
+- [ ] **Step 3: Add exact dependencies and schemas**
+
+Add runtime dependencies `zod: "4.4.3"` and `yaml: "2.9.0"`, dev dependency `@types/node: "22.20.1"`, Node types in builder-core `tsconfig.json`, and root exports to built ESM/declarations. Add builder-core scripts `test: "node --test tests/*.test.mjs"`, `schema:generate: "node scripts/generate-json-schemas.mjs"`, `schema:check: "node scripts/generate-json-schemas.mjs --check"`, and `verify: "pnpm run build && pnpm run schema:check && pnpm run test && pnpm run typecheck && pnpm run lint"`. Add root `test:builder-core` and include it once in the root `test` aggregate. Use `z.strictObject`, `.meta({ id, title })`, and `z.toJSONSchema(schema, { target: "draft-2020-12", unrepresentable: "throw" })`.
+
+The generator script accepts only `--check`; without it, it writes sorted, two-space JSON plus one newline. In check mode it compares bytes and exits non-zero without writing.
+
+- [ ] **Step 4: Update the P0.3 boundary contract**
+
+Replace the private-shell assertions with P1 assertions: builder-core remains private, exports only its root and package manifest, owns schemas internally, has only the two exact runtime dependencies, and still does not expose a separate schema package, provider, migration executor, or existing-repository mutation surface.
+
+- [ ] **Step 5: Generate artifacts and run GREEN**
+
+Run:
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm install --lockfile-only
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm install --frozen-lockfile
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run schema:generate
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run schema:check
+rtk node --test packages/builder-core/tests/contracts.test.mjs
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:package-boundaries
+rtk git diff --check
+```
+
+Expected: all focused contracts pass; no unrelated package API or path exists.
+
+- [ ] **Step 6: Commit and stop**
+
+```bash
+git add package.json pnpm-lock.yaml packages/builder-core tests/package-boundaries/private-packages.test.mjs
+git commit -m "Add P1 schema contracts"
+```
+
+Present the exact changed-file list and focused results. Stop for explicit user approval before Task 2.
+
+## Task 2: P1 Capability Catalog, Profiles, and Resolution
+
+**Files:**
+
+- Create: `packages/builder-core/src/catalog/p1-capabilities.ts`
+- Create: `packages/builder-core/src/profiles/p1-profiles.ts`
+- Create: `packages/builder-core/src/resolution/resolve-capabilities.ts`
+- Create: `packages/builder-core/src/manifest/create-installed-manifest.ts`
+- Create: `packages/builder-core/tests/resolution.test.mjs`
+- Modify: `packages/builder-core/src/index.ts`
+- Modify: `docs/architecture/capability-model.md`
+
+**Interfaces:**
+
+```ts
+export type ResolutionRequest = Readonly<{
+  profile: "portfolio" | "site";
+  requestedCapabilities?: readonly string[];
+}>;
+
+export type P1PackageVersions = Readonly<{
+  standards: string;
+  observability: string;
+}>;
+
+export type ResolvedCapabilities = Readonly<{
+  profile: "portfolio" | "site";
+  recipeVersion: "0.1.0";
+  capabilities: readonly CapabilityDescriptor[];
+}>;
+
+export function resolveCapabilities(
+  request: ResolutionRequest,
+  catalog: readonly CapabilityDescriptor[],
+  profiles: readonly ProfileRecipe[],
+): ValidationResult<ResolvedCapabilities>;
+
+export function createP1CapabilityCatalog(
+  packageVersions: P1PackageVersions,
+): readonly CapabilityDescriptor[];
+
+export function createInstalledManifest(
+  resolved: ResolvedCapabilities,
+): readonly InstalledCapability[];
+```
+
+The exact P1 catalog matrix is:
+
+| Identifier | Version | Delivery | State | Removal | Dependencies | Profiles |
+| --- | --- | --- | --- | --- | --- | --- |
+| `standards` | `0.1.0` | package-backed | repository-stateful | reviewed | none | portfolio, site |
+| `content-files` | `0.1.0` | source-generated | repository-stateful | reviewed | standards | portfolio, site |
+| `section-composition` | `0.1.0` | source-generated | repository-stateful | reviewed | content-files | portfolio, site |
+| `deployment-cloudflare` | `0.1.0` | hybrid | repository-stateful, external-stateful | reviewed | standards | portfolio, site |
+| `observability` | `0.1.0` | hybrid | repository-stateful, external-stateful | reviewed | deployment-cloudflare | portfolio, site |
+| `site-routing` | `0.1.0` | source-generated | repository-stateful | reviewed | content-files, section-composition | site |
+
+Every P1 descriptor declares all metadata arrays. P1 uses no secret, browser storage, persistent data, privileged operation, migration planner, analytics domain, or provider mutation. `deployment-cloudflare` declares Cloudflare Worker/static assets as platform resources and OpenNext/Wrangler verification identifiers. `observability` declares only its ordinary package dependency and source registration marker; Better Stack transport behavior remains P2.
+
+The recipes are exact:
+
+```ts
+portfolio = [
+  "standards",
+  "content-files",
+  "section-composition",
+  "deployment-cloudflare",
+  "observability",
+];
+
+site = [
+  "standards",
+  "content-files",
+  "section-composition",
+  "deployment-cloudflare",
+  "observability",
+  "site-routing",
+];
+```
+
+The required P1 inference probes are exact:
+
+| Capability | Required probes |
+| --- | --- |
+| `standards` | package `apps/web/package.json#/devDependencies/@egeria-systems~1standards = packageVersions.standards`; files `apps/web/tsconfig.json`, `apps/web/eslint.config.mjs` |
+| `content-files` | files `apps/web/content/en-CA/site.json`, `apps/web/src/content/content-schema.ts`, `apps/web/src/content/read-content.ts` |
+| `section-composition` | files `apps/web/app/page.tsx`, `apps/web/src/presentation/content-page.tsx` |
+| `deployment-cloudflare` | package `apps/web/package.json#/dependencies/@opennextjs~1cloudflare = 1.20.2`; files `apps/web/next.config.ts`, `apps/web/open-next.config.ts`, `apps/web/wrangler.jsonc` |
+| `observability` | package `apps/web/package.json#/dependencies/@egeria-systems~1observability = packageVersions.observability`; file `apps/web/src/infrastructure/observability/installed-capability.ts` |
+| `site-routing` | files `apps/web/app/about/page.tsx`, `apps/web/content/en-CA/about.json` |
+
+Capability-managed surfaces use those exact package JSON pointers and files. Baseline workspace files not semantically owned by one capability use `owner: { kind: "builder-kernel" }`. Configuration files are `managed`, package JSON pointers are `merge-managed` with `json-property`, and generated content/presentation/README/AGENTS surfaces are `application-owned` after creation.
+
+- [ ] **Step 1: Write resolution tests**
+
+Cover exact recipes, dependency-before-dependant order, catalog permutation stability, duplicate requested capability collapse, unknown identifiers, unsupported profile selection, synthetic missing dependency, cycle, conflict, released-package version validation, and manifest fields. Reject `workspace:`, `file:`, Git, URL, range, and prerelease package values. Assert `app` and all later capability identifiers are rejected as unknown executable P1 inputs.
+
+- [ ] **Step 2: Run RED**
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk node --test packages/builder-core/tests/resolution.test.mjs
+```
+
+Expected: missing resolver/catalog exports.
+
+- [ ] **Step 3: Implement deterministic resolution**
+
+Validate the catalog before resolution. Walk profile defaults in declared recipe order, sort every descriptor dependency list lexically before depth-first resolution, append each capability once after its dependencies, and report stable `CAPABILITY_UNKNOWN`, `PROFILE_UNKNOWN`, `CAPABILITY_UNSUPPORTED`, `CAPABILITY_DEPENDENCY_MISSING`, `CAPABILITY_CYCLE`, and `CAPABILITY_CONFLICT` issues.
+
+- [ ] **Step 4: Update the canonical capability model**
+
+Replace `managedSurfaces: readonly string[]` and `inferenceProbes: readonly string[]` in the executable contract example with the typed descriptor/probe shapes from Task 1. State clearly that the full table remains program visibility while P1 executes only the six listed identifiers.
+
+- [ ] **Step 5: Run GREEN**
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk node --test packages/builder-core/tests/contracts.test.mjs packages/builder-core/tests/resolution.test.mjs
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:constitution
+rtk git diff --check
+```
+
+- [ ] **Step 6: Commit and stop**
+
+```bash
+git add packages/builder-core/src packages/builder-core/tests/resolution.test.mjs docs/architecture/capability-model.md
+git commit -m "Resolve P1 capabilities"
+```
+
+Stop for explicit user approval before Task 3.
+
+## Task 3: `.egeria` Codecs and Hybrid Ownership
+
+**Files:**
+
+- Create: `packages/builder-core/src/state/codecs.ts`
+- Create: `packages/builder-core/src/ownership/fingerprint.ts`
+- Create: `packages/builder-core/src/ownership/materialize-surfaces.ts`
+- Create: `packages/builder-core/tests/state-ownership.test.mjs`
+- Modify: `packages/builder-core/src/index.ts`
+
+**Interfaces:**
+
+```ts
+export function parseProjectYaml(source: string): ValidationResult<ProjectConfiguration>;
+export function serializeProjectYaml(value: ProjectConfiguration): string;
+export function parseStateJson(source: string): ValidationResult<InstalledState>;
+export function serializeStateJson(value: InstalledState): string;
+export function parseMigrationLog(source: string): ValidationResult<readonly MigrationRecord[]>;
+export function serializeMigrationRecord(value: MigrationRecord): string;
+
+export function fingerprintFileContent(content: Uint8Array): `sha256:${string}`;
+export function fingerprintJsonValue(value: unknown): `sha256:${string}`;
+
+export function materializeInstalledSurfaces(input: Readonly<{
+  files: ReadonlyMap<string, Uint8Array>;
+  surfaces: readonly ManagedSurfaceDescriptor[];
+}>): ValidationResult<readonly InstalledSurface[]>;
+```
+
+YAML parsing uses `parseDocument(source, { version: "1.2", schema: "core", resolveKnownTags: false, strict: true, stringKeys: true, uniqueKeys: true, prettyErrors: true })`, rejects document warnings, and calls `toJS({ maxAliasCount: 0, mapAsMap: false })`. Serialization uses YAML 1.2 with sorted map entries and one terminal newline.
+
+Fingerprints are lowercase SHA-256. File targets hash exact bytes. JSON-property targets resolve an RFC 6901 pointer, recursively sort object keys, preserve array order, serialize with `JSON.stringify`, and hash UTF-8 bytes.
+
+- [ ] **Step 1: Write codec and ownership tests**
+
+Cover YAML 1.2 `No` remaining a string, duplicate keys, aliases, multiple documents, unknown keys, stable sorting/newline, invalid JSON, JSONL line numbers, empty migration logs, full-file hashes, canonical JSON hashes, missing JSON pointers, duplicate surface identifiers, overlapping exact targets, and no self-fingerprint of `.egeria/state.json`.
+
+- [ ] **Step 2: Run RED**
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk node --test packages/builder-core/tests/state-ownership.test.mjs
+```
+
+Expected: missing codec/ownership exports.
+
+- [ ] **Step 3: Implement minimum codecs and ownership**
+
+Map parser/library errors to stable `PROJECT_YAML_INVALID`, `PROJECT_SCHEMA_INVALID`, `STATE_JSON_INVALID`, `STATE_SCHEMA_INVALID`, `MIGRATION_JSON_INVALID`, `MIGRATION_SCHEMA_INVALID`, `SURFACE_SOURCE_MISSING`, `SURFACE_POINTER_MISSING`, and `SURFACE_TARGET_DUPLICATE` issues. Do not include raw file contents in issues.
+
+- [ ] **Step 4: Run GREEN**
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk node --test packages/builder-core/tests/contracts.test.mjs packages/builder-core/tests/state-ownership.test.mjs
+rtk git diff --check
+```
+
+- [ ] **Step 5: Commit and stop**
+
+```bash
+git add packages/builder-core/src packages/builder-core/tests/state-ownership.test.mjs
+git commit -m "Add Egeria state ownership"
+```
+
+Stop for explicit user approval before Task 4.
+
+## Task 4: Read-Only Repository Inference
+
+**Files:**
+
+- Create: `packages/builder-core/src/repository/repository-reader.ts`
+- Create: `packages/builder-core/src/inference/evaluate-probe.ts`
+- Create: `packages/builder-core/src/inference/infer-repository.ts`
+- Create: `packages/builder-core/tests/inference.test.mjs`
+- Modify: `packages/builder-core/src/index.ts`
+
+**Interfaces:**
+
+```ts
+export type RepositoryReadResult =
+  | Readonly<{ kind: "file"; content: string }>
+  | Readonly<{ kind: "missing" }>
+  | Readonly<{ kind: "symlink" }>
+  | Readonly<{ kind: "error"; code: string }>;
+
+export interface RepositoryReader {
+  readText(path: string): Promise<RepositoryReadResult>;
+}
+
+export function createFileSystemRepositoryReader(root: string): RepositoryReader;
+export function createInMemoryRepositoryReader(
+  files: Readonly<Record<string, string>>,
+): RepositoryReader;
+
+export type EvidenceCategory =
+  | "confirmed"
+  | "probable"
+  | "partial"
+  | "contradictory"
+  | "ambiguous";
+
+export async function inferRepository(input: Readonly<{
+  reader: RepositoryReader;
+  catalog: readonly CapabilityDescriptor[];
+}>): Promise<RepositoryInference>;
+```
+
+Category rules are exact:
+
+- `confirmed`: state declares the capability and every required probe is present;
+- `probable`: state does not declare it and every required probe is present;
+- `partial`: at least one but not all required probes is present and state does not declare it;
+- `contradictory`: state declares it while at least one required probe is missing or mismatched;
+- `ambiguous`: a required path is a symlink, unreadable, invalid JSON, or otherwise cannot be classified safely.
+
+`ambiguous` takes precedence whenever required evidence is not safely classifiable. Otherwise, a state-declared deterministic mismatch is `contradictory`. A capability with no state declaration and no present probe is omitted from capability evidence rather than mislabeled `partial`. No numeric confidence, majority threshold, or force option is permitted.
+
+- [ ] **Step 1: Write inference tests**
+
+Use the in-memory adapter for every category, the absent-capability case, and category precedence; use the filesystem adapter for containment, symlink, unreadable-path, and no-write checks. Assert deterministic capability/probe ordering, package version matching, JSON pointer matching, ownership fingerprint drift, and secrets/content absence from issue context.
+
+- [ ] **Step 2: Run RED**
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk node --test packages/builder-core/tests/inference.test.mjs
+```
+
+Expected: missing reader/inference exports.
+
+- [ ] **Step 3: Implement the narrow read boundary**
+
+Resolve every requested path against the fixed root, reject absolute/parent traversal before filesystem access, use `lstat` to surface symlinks without following them, cap each read at 1 MiB, and never enumerate unrelated repository files. Evaluate only catalog-declared probes and state-declared managed surfaces.
+
+- [ ] **Step 4: Run GREEN**
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk node --test packages/builder-core/tests/inference.test.mjs
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run typecheck
+rtk git diff --check
+```
+
+- [ ] **Step 5: Commit and stop**
+
+```bash
+git add packages/builder-core/src packages/builder-core/tests/inference.test.mjs
+git commit -m "Infer repository capabilities"
+```
+
+Stop for explicit user approval before Task 5.
+
+## Task 5: Read-Only Doctor and Diff
+
+**Files:**
+
+- Create: `packages/builder-core/src/diagnostics/doctor.ts`
+- Create: `packages/builder-core/src/diagnostics/diff-project.ts`
+- Create: `packages/builder-core/tests/diagnostics.test.mjs`
+- Modify: `packages/builder-core/src/index.ts`
+
+**Interfaces:**
+
+```ts
+export type DiagnosticSeverity = "error" | "warning" | "info";
+
+export type Diagnostic = Readonly<{
+  code: string;
+  severity: DiagnosticSeverity;
+  capability?: string;
+  path?: string;
+  context: Readonly<Record<string, string>>;
+}>;
+
+export async function doctorRepository(input: Readonly<{
+  reader: RepositoryReader;
+  catalog: readonly CapabilityDescriptor[];
+  profiles: readonly ProfileRecipe[];
+}>): Promise<Readonly<{ healthy: boolean; diagnostics: readonly Diagnostic[] }>>;
+
+export type ProjectDifference = Readonly<{
+  kind:
+    | "desired-only"
+    | "installed-only"
+    | "inferred-only"
+    | "inference-mismatch"
+    | "managed-surface-drift";
+  capability?: string;
+  path?: string;
+}>;
+
+export async function diffProject(input: Readonly<{
+  reader: RepositoryReader;
+  catalog: readonly CapabilityDescriptor[];
+  profiles: readonly ProfileRecipe[];
+}>): Promise<Readonly<{ equal: boolean; differences: readonly ProjectDifference[] }>>;
+```
+
+Doctor codes are exact: `PROJECT_INVALID`, `STATE_INVALID`, `MIGRATION_LOG_INVALID`, `BUILDER_VERSION_INCOMPATIBLE`, `PROJECT_CAPABILITY_UNKNOWN`, `STATE_CAPABILITY_UNKNOWN`, `DESIRED_INSTALLED_MISMATCH`, `INSTALLED_INFERENCE_CONTRADICTION`, `INFERENCE_AMBIGUOUS`, and `MANAGED_SURFACE_DRIFT`.
+
+- [ ] **Step 1: Write diagnostic tests**
+
+Cover a healthy portfolio, each stable code, severity, sorted output, desired/installed/inferred set differences, drifted surfaces, invalid files without exceptions, and identical before/after filesystem snapshots proving no writes.
+
+- [ ] **Step 2: Run RED**
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk node --test packages/builder-core/tests/diagnostics.test.mjs
+```
+
+- [ ] **Step 3: Implement composition only**
+
+Compose the existing parsers, resolver, inference, and fingerprint results. Do not duplicate probe logic or create a second schema owner. Sort diagnostics by severity (`error`, `warning`, `info`), code, capability, then path; sort differences by kind, capability, then path.
+
+- [ ] **Step 4: Run GREEN**
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk node --test packages/builder-core/tests/diagnostics.test.mjs
+rtk git diff --check
+```
+
+- [ ] **Step 5: Commit and stop**
+
+```bash
+git add packages/builder-core/src packages/builder-core/tests/diagnostics.test.mjs
+git commit -m "Add read-only project diagnostics"
+```
+
+Stop for explicit user approval before Task 6.
+
+## Task 6: Deterministic Portfolio and Site Rendering
+
+**Files:**
+
+- Create: `packages/builder-core/src/generation/template-catalog.ts`
+- Create: `packages/builder-core/src/generation/render-template.ts`
+- Create: `packages/builder-core/src/generation/render-skeleton.ts`
+- Create: `packages/builder-core/templates/common/.gitignore.template`
+- Create: `packages/builder-core/templates/common/.nvmrc`
+- Create: `packages/builder-core/templates/common/AGENTS.md.template`
+- Create: `packages/builder-core/templates/common/README.md.template`
+- Create: `packages/builder-core/templates/common/package.json.template`
+- Create: `packages/builder-core/templates/common/pnpm-workspace.yaml`
+- Create: `packages/builder-core/templates/common/apps/web/AGENTS.md.template`
+- Create: `packages/builder-core/templates/common/apps/web/package.json.template`
+- Create: `packages/builder-core/templates/common/apps/web/tsconfig.json`
+- Create: `packages/builder-core/templates/common/apps/web/eslint.config.mjs`
+- Create: `packages/builder-core/templates/common/apps/web/next.config.ts`
+- Create: `packages/builder-core/templates/common/apps/web/open-next.config.ts`
+- Create: `packages/builder-core/templates/common/apps/web/wrangler.jsonc.template`
+- Create: `packages/builder-core/templates/common/apps/web/app/globals.css`
+- Create: `packages/builder-core/templates/common/apps/web/app/layout.tsx`
+- Create: `packages/builder-core/templates/common/apps/web/app/page.tsx`
+- Create: `packages/builder-core/templates/common/apps/web/src/content/content-schema.ts`
+- Create: `packages/builder-core/templates/common/apps/web/src/content/read-content.ts`
+- Create: `packages/builder-core/templates/common/apps/web/src/presentation/content-page.tsx`
+- Create: `packages/builder-core/templates/common/apps/web/src/infrastructure/observability/installed-capability.ts`
+- Create: `packages/builder-core/templates/portfolio/apps/web/content/en-CA/site.json.template`
+- Create: `packages/builder-core/templates/site/apps/web/content/en-CA/site.json.template`
+- Create: `packages/builder-core/templates/site/apps/web/content/en-CA/about.json.template`
+- Create: `packages/builder-core/templates/site/apps/web/app/about/page.tsx`
+- Create: `packages/builder-core/tests/render-skeleton.test.mjs`
+- Modify: `packages/builder-core/src/index.ts`
+
+**Interfaces:**
+
+```ts
+export type GenerationRequest = Readonly<{
+  profile: "portfolio" | "site";
+  projectName: string;
+  displayName: string;
+  packageVersions: P1PackageVersions;
+}>;
+
+export type GeneratedFile = Readonly<{
+  path: string;
+  content: Uint8Array;
+}>;
+
+export type RenderedSkeleton = Readonly<{
+  project: ProjectConfiguration;
+  resolved: ResolvedCapabilities;
+  files: readonly GeneratedFile[];
+  surfaces: readonly ManagedSurfaceDescriptor[];
+}>;
+
+export async function renderSkeleton(
+  request: GenerationRequest,
+): Promise<ValidationResult<RenderedSkeleton>>;
+```
+
+Allowed template tokens are exactly `projectName`, `displayNameJson`, and `workerName`. Unknown, repeated-unresolved, or malformed tokens fail with `TEMPLATE_TOKEN_INVALID`; every destination path is validated and duplicate destinations fail with `TEMPLATE_DESTINATION_DUPLICATE`.
+
+Generated `apps/web/package.json` pins the accepted exact proof versions. It declares standards and observability as ordinary exact stable versions supplied by `P1PackageVersions` and never uses `workspace:`, `file:`, a Git source, URL source, range, or prerelease. Before the separate release prerequisite is complete, render tests use explicit synthetic `0.1.0` values only as in-memory contract data and do not write or claim an installable generated repository.
+
+Generated visible copy exists only in JSON:
+
+- portfolio `site.json`: localized metadata title/description, one home heading, one home summary, and an empty navigation array;
+- site `site.json`: the same home fields plus localized Home/About navigation labels;
+- site `about.json`: localized heading and summary.
+
+Components parse content into typed data. `ContentPage` is pure and accepts `{ heading, summary, navigation }`; route modules perform content loading. No JSX literal is user-facing.
+
+- [ ] **Step 1: Write render tests**
+
+Assert exact sorted file sets for portfolio and site, byte-for-byte repeatability across two renders, no absolute/parent paths, one versus two routes, no `apps/jobs`/`packages`, no later capability/provider strings, no user-visible JSX literals, exact package pins, exact externalized copy files, profile materialization in project YAML, one ownership descriptor for every generated destination/JSON region, and capability-owned descriptors that match the relevant descriptor metadata.
+
+- [ ] **Step 2: Run RED**
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk node --test packages/builder-core/tests/render-skeleton.test.mjs
+```
+
+- [ ] **Step 3: Implement strict template rendering**
+
+Use the checked-in files as data. Resolve the template root with `new URL("../../templates/", import.meta.url)` so both `src/generation` and `dist/generation` find the package-root templates. Do not generate executable TypeScript by assembling fragments. Render tokens only in `.template` inputs, strip that suffix at the destination, normalize line endings to LF, require one final newline for text files, sort output paths, and keep state files out of this renderer.
+
+- [ ] **Step 4: Run GREEN**
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
+rtk node --test packages/builder-core/tests/render-skeleton.test.mjs
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run lint
+rtk git diff --check
+```
+
+- [ ] **Step 5: Commit and stop**
+
+```bash
+git add packages/builder-core/src packages/builder-core/templates packages/builder-core/tests/render-skeleton.test.mjs
+git commit -m "Render P1 skeletons"
+```
+
+Stop for explicit user approval before Task 7.
+
+## Separate Prerequisite Gate Before Task 7
+
+Task 7 must not start under ordinary P1 plan approval. Obtain a separate explicit request that authorizes the exact public-package versioning/publication payload and destination after verifying npm-scope authority, repository licensing, credentials, exact tarballs, provenance support, and rollback/deprecation procedure. The expected initial public versions from the accepted pending minor Changeset are:
+
+```text
+@egeria-systems/standards@0.1.0
+@egeria-systems/observability@0.1.0
+registry: https://registry.npmjs.org/
+access: public
+provenance: enabled through the approved release authority
+```
+
+After separately authorized publication, verify both exact public manifests, tarball contents, integrity, provenance, fresh install, and current audit. Record that evidence in a separately scoped release record, re-freeze the P1 branch/base/lockfile, and amend this plan if either version differs from `0.1.0`. Publication remains an external action and is not included in any command below.
+
+## Task 7: Atomic New-Directory Generation and Thin CLI
+
+**Files:**
+
+- Create: `packages/builder-core/src/catalog/p1-release-catalog.ts`
+- Create: `packages/builder-core/src/generation/verify-generated-project.ts`
+- Create: `packages/builder-core/src/generation/write-generated-project.ts`
+- Create: `packages/builder-core/tests/generate-project.test.mjs`
+- Create: `apps/cli/src/arguments.ts`
+- Create: `apps/cli/src/run-cli.ts`
+- Create: `apps/cli/tests/cli.test.mjs`
+- Modify: `packages/builder-core/src/index.ts`
+- Modify: `apps/cli/src/index.ts`
+- Modify: `apps/cli/package.json`
+- Modify: `apps/cli/tsconfig.json`
+- Modify: `apps/cli/AGENTS.md`
+- Modify: `apps/cli/README.md`
+- Modify: `package.json`
+- Modify: `pnpm-lock.yaml`
+
+**Interfaces:**
+
+```ts
+export type GeneratedProjectVerification = Readonly<{
+  checks: readonly [
+    "lockfile",
+    "frozen-install",
+    "lint",
+    "typecheck",
+    "next-build",
+    "opennext-build",
+  ];
+}>;
+
+export interface GeneratedProjectVerifier {
+  prepareLockfile(root: string): Promise<ValidationResult<void>>;
+  verifyInIsolatedCopy(root: string): Promise<ValidationResult<GeneratedProjectVerification>>;
+}
+
+export function createPnpmGeneratedProjectVerifier(input: Readonly<{
+  pnpmExecutable: string;
+}>): GeneratedProjectVerifier;
+
+export async function generateProject(input: Readonly<{
+  request: GenerationRequest;
+  destination: string;
+  verifier: GeneratedProjectVerifier;
+}>): Promise<ValidationResult<Readonly<{
+  destination: string;
+  state: InstalledState;
+}>>>;
+
+export type CliOutput = Readonly<{
+  write(value: string): void;
+  writeError(value: string): void;
+}>;
+
+export async function runCli(
+  arguments_: readonly string[],
+  output: CliOutput,
+): Promise<0 | 1 | 2>;
+```
+
+Commands are exact:
+
+```text
+egeria create --profile portfolio|site --name <lowercase-kebab> --display-name <text> --directory <new-path>
+egeria infer --directory <project-root>
+egeria doctor --directory <project-root>
+egeria diff --directory <project-root>
+```
+
+All stdout/stderr values are one-line JSON with stable codes and data; the CLI contains no product copy or builder decision. Exit `0` means success/healthy/equal, `1` means diagnosed unhealthy/different or generation failure, and `2` means invalid command/arguments.
+
+Generation order is exact:
+
+1. validate request, require the exact separately verified `0.1.0` public-package catalog, and confirm the destination does not exist;
+2. render all non-state files in memory;
+3. create a random builder-owned sibling temporary directory;
+4. write project YAML and rendered files using exclusive file creation; do not create installed state or the migration log yet;
+5. prepare the normal public-registry `pnpm-lock.yaml` in the temporary source;
+6. infer without state and require every resolved capability to be `probable`;
+7. copy the exact temporary source to a second builder-owned validation directory, run frozen install, lint, typecheck, Next build, and OpenNext build there, then remove only that validation directory;
+8. after successful transformation, verification, and pre-state inference, write the empty migration log, materialize all ownership records including `pnpm-lock.yaml` and the migration log, then write `state.json` last in the source temporary directory;
+9. infer again and require every resolved capability to be `confirmed` with no surface drift;
+10. rename the source temporary directory to the requested destination;
+11. on failure, remove only the exact builder-created source/validation directories and leave the destination absent.
+
+- [ ] **Step 1: Write filesystem and CLI tests**
+
+Cover successful portfolio/site creation, exact verifier order, refusal to write migration/state records after lock/install/lint/type/build failure, state-last agreement, lockfile and empty-migration-log fingerprinting, existing destination refusal, symlink destination refusal, injected write failure cleanup, no Git invocation, exact command parsing, JSON output, exit codes, and read-only command before/after tree equality. Use a fake verifier for failure-order unit tests and the real pnpm verifier for one published-package integration test. Spawn `node apps/cli/dist/index.js` for one end-to-end CLI test after build.
+
+- [ ] **Step 2: Run RED**
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core --filter @egeria-systems/cli run build
+rtk node --test packages/builder-core/tests/generate-project.test.mjs apps/cli/tests/cli.test.mjs
+```
+
+- [ ] **Step 3: Implement atomic generation**
+
+Use `mkdtemp`, `mkdir`, `open` with exclusive creation, `writeFile`, `lstat`, `cp`, `rename`, and exact-path `rm` only for builder-owned temporary directories. The verifier uses `execFile` with argument arrays for the exact pnpm commands; it never invokes a shell, Git, npm publication, provider API, or deployment. Cap `displayName` at 120 Unicode code points and reject control characters. Generated build outputs and `node_modules` exist only in the validation copy and never enter the destination.
+
+- [ ] **Step 4: Implement the CLI adapter**
+
+Add `p1-release-catalog.ts` with exact separately verified standards/observability `0.1.0` versions. Add `bin: { "egeria": "./dist/index.js" }`, runtime dependency `@egeria-systems/builder-core: "workspace:*"`, a Node shebang on the entry point, and package test/build scripts. `arguments.ts` owns only the `parseArgs` configuration; `run-cli.ts` maps inputs/outputs without reimplementing core validation and constructs the pnpm verifier with the approved executable.
+
+- [ ] **Step 5: Run GREEN**
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm install --lockfile-only
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm install --frozen-lockfile
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core --filter @egeria-systems/cli run build
+rtk node --test packages/builder-core/tests/generate-project.test.mjs apps/cli/tests/cli.test.mjs
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core --filter @egeria-systems/cli run lint
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core --filter @egeria-systems/cli run typecheck
+rtk git diff --check
+```
+
+- [ ] **Step 6: Commit and stop**
+
+```bash
+git add package.json pnpm-lock.yaml apps/cli packages/builder-core/src packages/builder-core/tests/generate-project.test.mjs
+git commit -m "Add P1 builder commands"
+```
+
+Stop for explicit user approval before Task 8.
+
+## Task 8: Golden Fixtures, Build Harness, Documentation, and Gate 3 Packet
+
+**Files:**
+
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/.gitignore`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/.nvmrc`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/AGENTS.md`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/README.md`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/package.json`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/pnpm-workspace.yaml`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/pnpm-lock.yaml`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/.egeria/project.yaml`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/.egeria/state.json`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/.egeria/migrations.jsonl`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/AGENTS.md`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/package.json`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/tsconfig.json`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/eslint.config.mjs`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/next.config.ts`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/open-next.config.ts`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/wrangler.jsonc`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/app/globals.css`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/app/layout.tsx`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/app/page.tsx`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/content/en-CA/site.json`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/src/content/content-schema.ts`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/src/content/read-content.ts`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/src/presentation/content-page.tsx`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/src/infrastructure/observability/installed-capability.ts`
+- Create from exact site CLI output: `fixtures/generated/site/.gitignore`
+- Create from exact site CLI output: `fixtures/generated/site/.nvmrc`
+- Create from exact site CLI output: `fixtures/generated/site/AGENTS.md`
+- Create from exact site CLI output: `fixtures/generated/site/README.md`
+- Create from exact site CLI output: `fixtures/generated/site/package.json`
+- Create from exact site CLI output: `fixtures/generated/site/pnpm-workspace.yaml`
+- Create from exact site CLI output: `fixtures/generated/site/pnpm-lock.yaml`
+- Create from exact site CLI output: `fixtures/generated/site/.egeria/project.yaml`
+- Create from exact site CLI output: `fixtures/generated/site/.egeria/state.json`
+- Create from exact site CLI output: `fixtures/generated/site/.egeria/migrations.jsonl`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/AGENTS.md`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/package.json`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/tsconfig.json`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/eslint.config.mjs`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/next.config.ts`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/open-next.config.ts`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/wrangler.jsonc`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/app/globals.css`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/app/layout.tsx`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/app/page.tsx`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/app/about/page.tsx`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/content/en-CA/site.json`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/content/en-CA/about.json`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/src/content/content-schema.ts`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/src/content/read-content.ts`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/src/presentation/content-page.tsx`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/src/infrastructure/observability/installed-capability.ts`
+- Create: `tests/generated-fixtures/determinism.test.mjs`
+- Create: `scripts/verify-generated-skeletons.mjs`
+- Create: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-verification.md`
+- Create: `docs/review-packets/2026-08-05-p1-builder-kernel.md`
+- Modify: `package.json`
+- Modify: `eslint.config.mjs`
+- Modify: `tests/constitution/constitution.test.mjs`
+- Modify: `README.md`
+- Modify: `CONTRIBUTING.md`
+- Modify: `AGENTS.md`
+- Modify: `docs/architecture/overview.md`
+- Modify: `docs/architecture/enforcement-map.md`
+- Modify: `docs/architecture/package-ownership.md`
+- Modify: `docs/roadmaps/program-roadmap.md`
+
+**Interfaces:**
+
+Root scripts become:
+
+```json
+{
+  "test:builder-core": "pnpm --filter @egeria-systems/builder-core run build && node --test packages/builder-core/tests/*.test.mjs",
+  "test:cli": "pnpm --filter @egeria-systems/cli run build && node --test apps/cli/tests/*.test.mjs",
+  "test:generated-fixtures": "node --test tests/generated-fixtures/*.test.mjs",
+  "verify:generated-skeletons": "node scripts/verify-generated-skeletons.mjs",
+  "verify:p1": "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:generated-fixtures && pnpm run lint:p0.3 && pnpm run build:p0.3 && pnpm run typecheck:p0.3 && pnpm run verify:generated-skeletons && pnpm run changeset:status"
+}
+```
+
+The fixture verifier:
+
+1. copies each committed golden fixture to an isolated temporary directory;
+2. verifies the committed lockfile and exact standards/observability public-registry resolutions;
+3. runs frozen install, lint, typecheck, Next build, and OpenNext Cloudflare build;
+4. removes the temporary directory;
+5. verifies that no override, tarball, `node_modules`, build output, or test artifact entered a committed fixture.
+
+This is fresh public-registry and build evidence for the exact published package versions. It does not publish, deploy, mutate a provider, or prove production/runtime/accessibility behavior.
+
+- [ ] **Step 1: Add fixture contract RED**
+
+The determinism test runs the built CLI twice per profile, compares both outputs byte-for-byte, and compares them with committed fixtures. It requires the exact portable `pnpm-lock.yaml` and rejects local overrides, tarballs, `node_modules`, `.next`, `.open-next`, `.wrangler`, `dist`, provider secrets, or later-stage surfaces.
+
+Run:
+
+```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core --filter @egeria-systems/cli run build
+rtk node --test tests/generated-fixtures/determinism.test.mjs
+```
+
+Expected RED: golden fixtures are absent.
+
+- [ ] **Step 2: Generate golden fixtures once**
+
+Use the built CLI into new temporary paths, inspect inference/doctor/diff, then move only the exact generated source/state into `fixtures/generated/portfolio` and `fixtures/generated/site`. Do not hand-edit golden output; repair templates/core and regenerate if the contract is wrong.
+
+- [ ] **Step 3: Add and run the build harness**
+
+Run:
+
+```bash
+rtk node --test tests/generated-fixtures/determinism.test.mjs
+rtk node scripts/verify-generated-skeletons.mjs
+```
+
+Expected: deterministic fixtures pass; both temporary copies pass public-registry frozen install, lint, typecheck, Next build, and OpenNext build. No provider/deployment operation occurs; network access is limited to registry/advisory reads required by install and audit.
+
+- [ ] **Step 4: Update canonical owners and contracts**
+
+Update package ownership from P0.3 shells to the exact P1 APIs/consumers. Mark `INV-PROFILE-MATERIALIZATION` and `INV-CAPABILITY-METADATA` actual for the tested P1 subset. Mark the generated-repository part of `INV-CLOUDFLARE-ISOLATION` actual only for the generated skeleton lint/build fixtures. Leave clean isolated migration/state-update-order at P3 and accessibility automation at P2. Keep roadmap P1 “in review” until Gate 3 approval; do not mark it complete in the implementation candidate.
+
+- [ ] **Step 5: Run the full relevant deterministic suite once**
+
+```bash
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm install --frozen-lockfile
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm audit --audit-level=moderate
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm peers check
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run verify:p1
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run verify:p0.2
+rtk git diff --check 303ee9d35e19f9191948d994159f77c82c90a1ed...HEAD
+rtk git status --short --branch
+```
+
+Record exact versions, counts, exit results, sandbox/runtime distinctions, published-package provenance, and unproved properties. Run the expensive P0.2 proof only once after all shared-tooling/template inputs settle; it does not deploy.
+
+- [ ] **Step 6: Commit the coherent implementation candidate and stop**
+
+```bash
+git add AGENTS.md CONTRIBUTING.md README.md eslint.config.mjs package.json apps packages fixtures scripts tests docs/architecture docs/roadmaps/program-roadmap.md
+git commit -m "Verify P1 builder kernel"
+```
+
+Present the implementation comparison and stop for user approval to begin independent review. Do not create the review packet before reviewer dispositions exist.
+
+- [ ] **Step 7: Dispatch the three required read-only reviewers**
+
+Provide each reviewer the frozen base, candidate HEAD, approved source, preparation evidence, plan, changed-file list, and exact verification output. Prohibit edits, recursive delegation, GitHub comments, and external action.
+
+- Requirements reviewer: approved P1 scope, six-capability/profile limits, exact-file plan, state contracts, CLI behavior, generated skeleton acceptance, non-goals.
+- Architecture/anti-overengineering reviewer: materialized recipes, hybrid ownership, Cloudflare isolation, package boundaries, no generic ports, state-last generation, stage discipline, low-churn design.
+- Test-evidence reviewer: credible RED/GREEN record, schema/refinement coverage, deterministic inference/generation, no-write checks, atomic-failure tests, build harness authenticity, claim limits.
+
+Use no specialist unless the final changed scope raises a material security, platform, accessibility, or supply-chain question the required reviewers cannot responsibly evaluate.
+
+- [ ] **Step 8: Reconcile and repair only material findings**
+
+Validate every finding against the shared final tree. Classify each as `material-kept`, `invalid`, `duplicate`, `deferred-by-scope`, or `low-value-churn`. Repair only current material defects, add a focused regression test, rerun the affected check, and make a focused repair commit. Do not repeat all three reviews against unchanged code; request only the bounded follow-up needed to close a retained finding.
+
+- [ ] **Step 9: Re-run settled final verification**
+
+After the last relevant input changes, run `verify:p1`, the affected P0.2 proof if shared inputs changed after its prior run, audit, peers, range diff-check, final status, changed-file list, and commit range. Do not repeat a successful expensive check against an unchanged tested tree.
+
+- [ ] **Step 10: Write verification evidence and the P1 review packet**
+
+The verification record and packet must include:
+
+- frozen base/candidate and branch/ref freshness;
+- changed files and focused commits;
+- every RED/GREEN cycle;
+- exact commands, versions, counts, and results;
+- generated portfolio/site file lists and build results;
+- manifest/inference agreement;
+- reviewer reports and dispositions;
+- security/advisory evidence;
+- exact published-package versions, integrity/provenance evidence, portable lockfile resolutions, and fresh-install proof;
+- risks, fragile assumptions, and deferred P2/P3/later-stage work;
+- source/dependency/build-output recovery;
+- explicit statement that no provider, persistent data, publication, deployment, push, or pull request occurred.
+
+If the public-package prerequisite remains open, Tasks 7 and 8 must not begin and no P1 Gate 3 packet may claim a filesystem-generation candidate or stop-gate completion.
+
+- [ ] **Step 11: Commit Gate 3 artifacts and stop**
+
+```bash
+git add docs/implementation-evidence/2026-08-05-p1-builder-kernel-verification.md docs/review-packets/2026-08-05-p1-builder-kernel.md
+git commit -m "Record P1 verification and review"
+```
+
+Present the exact committed comparison and stop for verified-final-diff approval. Gate 3 approval does not authorize push, pull request, merge, npm versioning/publication, deployment, provider mutation, persistent-data action, permission change, or external message.
+
+## Recovery
+
+- Preparation-only recovery: remove the two uncommitted P1 planning documents only with explicit authorization.
+- Source recovery after implementation: revert focused P1 commits newest-first; never reset shared `main`.
+- Dependency recovery: the same reverts restore manifests and `pnpm-lock.yaml`; reinstall with the exact pinned pnpm. `node_modules`, `dist`, `.next`, `.open-next`, and `.wrangler` are generated, non-authoritative outputs.
+- Generation failure recovery: core removes only its exact builder-owned temporary sibling and leaves the requested destination absent. Existing destinations are never touched.
+- Generated fixture recovery: regenerate from the approved templates/core; do not hand-reconcile drift.
+- Publication: the separately authorized prerequisite release owns its own deprecation/recovery record and is not represented as source rollback here.
+- Provider/deployment/persistent data: none is authorized or created by this plan, so no external rollback is represented as source recovery.
