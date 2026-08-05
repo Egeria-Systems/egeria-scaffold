@@ -26,7 +26,7 @@ Build the smallest Next.js/Cloudflare proof that validates the approved Volta No
 
 Create thin `apps/cli`, the private `packages/builder-core` package and its ownership boundary, public `packages/standards`, the public observability package shell, and approved release tooling with accidental-publication safeguards. Reserve project/state schema ownership for `builder-core`, but defer the executable schemas and builder kernel to P1. Do not create a separate project-schema package.
 
-**Current status (2026-08-04):** Implementation is review-pending. The lean ownership shells, consumed standards APIs, internal ESLint 10 boundary, dual ESLint-major tests, and local release safeguards are materialized, but P0.3 is not accepted until verified-final-diff approval.
+**Completed (2026-08-05):** The lean ownership shells, consumed standards APIs, internal ESLint 10 boundary, dual ESLint-major tests, and local release safeguards passed the complete P0.3 and affected P0.2 verification. Required reviews were reconciled, and the user approved final committed comparison `40604eb..da74a5b`. P1 preparation and exact-file planning are authorized; P1 implementation remains separately plan-gated.
 
 **Exit:** Package APIs and owners are explicit, publication safeguards pass, extraction decisions are justified, and no profile functionality is implemented.
 

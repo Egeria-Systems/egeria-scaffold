@@ -2,9 +2,9 @@
 
 Egeria Scaffold will build versioned, materialized Next.js recipes for Egeria Systems projects. Generated repositories remain ordinary, understandable client-owned codebases; installed capabilities, not a live profile inheritance chain, become authoritative after generation.
 
-## Current phase: P0.3 — Lean builder monorepo review
+## Current phase: P0.3 complete
 
-P0.1 established the repository constitution, architecture decisions, governance, and enforcement ownership. P0.2's private Next.js and Cloudflare compatibility proof passed its local, workerd, clean Ubuntu workflow, non-production deployment, Chromium, and axe gates and received verified-final-diff approval. The P0.3 package and tooling implementation is review-pending; it is not accepted until its review packet receives verified-final-diff approval. No production profile is implemented.
+P0.1 established the repository constitution, architecture decisions, governance, and enforcement ownership. P0.2's private Next.js and Cloudflare compatibility proof passed its local, workerd, clean Ubuntu workflow, non-production deployment, Chromium, and axe gates and received verified-final-diff approval. P0.3 established the lean package and tooling boundaries and received verified-final-diff approval. P1 preparation and exact-file planning may begin, but P1 implementation remains separately plan-gated. No production profile is implemented.
 
 Canonical project documents:
 

@@ -1,6 +1,6 @@
 # Architecture Overview
 
-**Status:** Controlling architecture summary for the P0.3 review candidate
+**Status:** Controlling architecture summary after P0.3 approval
 
 **Source:** [Approved reconciled program plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md)
 
@@ -65,7 +65,7 @@ In-memory adapters and shared behavioral contract tests are required where ports
 
 `apps/*` contains builder applications. `proofs/*` contains disposable infrastructure evidence and is not a product-application namespace. `packages/*` contains deliberately owned packages created only at an approved package-boundary stage.
 
-P0.1 created none of those paths. P0.2 created only the separately scoped private proof at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). P0.3 has now materialized a private CLI shell, private builder-core shell, public standards package, public observability shell, and local release safeguards. P0.3 is review-pending; [package ownership](package-ownership.md) is the canonical owner of their exact visibility, APIs, consumers, and publication guards.
+P0.1 created none of those paths. P0.2 created only the separately scoped private proof at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). P0.3 has materialized a private CLI shell, private builder-core shell, public standards package, public observability shell, and local release safeguards. P0.3 is complete; [package ownership](package-ownership.md) is the canonical owner of their exact visibility, APIs, consumers, and publication guards.
 
 P1 is the first executable project/state schema stage. It implements the schemas and builder kernel inside the already-private `builder-core` boundary.
 

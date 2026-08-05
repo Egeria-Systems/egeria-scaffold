@@ -1,6 +1,6 @@
 # Package Ownership
 
-**Status:** Controlling package and API ownership for the P0.3 review candidate
+**Status:** Controlling package and API ownership after P0.3 approval
 
 **Sources:** [ADR-0005](../adr/0005-evidence-driven-package-extraction.md), [architecture overview](overview.md), and the [approved P0.3 plan](../superpowers/plans/2026-08-04-p0-3-lean-builder-monorepo.md)
 

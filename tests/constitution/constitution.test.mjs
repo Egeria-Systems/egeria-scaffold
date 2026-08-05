@@ -155,7 +155,7 @@ test("workspace documentation reserves apps for builder code and proofs for evid
   assert.match(overview, /`packages\/\*` contains deliberately owned packages/);
 });
 
-test("P0.3 documentation exposes current package ownership and review status", async () => {
+test("P0.3 documentation exposes approved package ownership and Gate 3 status", async () => {
   const [
     rootInstructions,
     readme,
@@ -163,6 +163,8 @@ test("P0.3 documentation exposes current package ownership and review status", a
     overview,
     enforcementMap,
     roadmap,
+    verification,
+    reviewPacket,
   ] = await Promise.all([
     readRepositoryFile("AGENTS.md"),
     readRepositoryFile("README.md"),
@@ -170,6 +172,12 @@ test("P0.3 documentation exposes current package ownership and review status", a
     readRepositoryFile("docs/architecture/overview.md"),
     readRepositoryFile("docs/architecture/enforcement-map.md"),
     readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+    readRepositoryFile(
+      "docs/implementation-evidence/2026-08-04-p0-3-lean-builder-monorepo-verification.md",
+    ),
+    readRepositoryFile(
+      "docs/review-packets/2026-08-04-p0-3-lean-builder-monorepo.md",
+    ),
   ]);
 
   for (const nestedInstructions of [
@@ -186,7 +194,7 @@ test("P0.3 documentation exposes current package ownership and review status", a
   );
 
   assert.match(overview, /\(package-ownership\.md\)/);
-  assert.match(overview, /P0\.3 is review-pending/i);
+  assert.match(overview, /P0\.3 is complete/i);
   assert.match(overview, /P1 is the first executable project\/state schema stage/i);
 
   assert.match(
@@ -210,8 +218,8 @@ test("P0.3 documentation exposes current package ownership and review status", a
   const p03Section = roadmap
     .split("### P0.3 — Lean builder monorepo", 2)[1]
     .split("## P1 — Builder kernel", 1)[0];
-  assert.match(p03Section, /review-pending/i);
-  assert.doesNotMatch(p03Section, /\*\*(?:Completed|Accepted)/i);
+  assert.match(p03Section, /\*\*Completed \(2026-08-05\):\*\*/);
+  assert.match(p03Section, /40604eb\.\.da74a5b/);
   assert.match(
     roadmap,
     /P1 is the first executable project\/state schema stage/i,
@@ -225,6 +233,16 @@ test("P0.3 documentation exposes current package ownership and review status", a
     assert.match(document, /Changeset/i);
     assert.match(document, /publication[^\n]+explicit[^\n]+approval/i);
   }
+
+  assert.match(readme, /P0\.3[^\n]+verified-final-diff approval/i);
+  assert.match(
+    verification,
+    /Gate 3 APPROVED[^\n]+40604eb5b8a3ade0175c16dd945a1bafee15ae04\.\.da74a5baab12d19fa5a5007008f960f495721b8e/i,
+  );
+  assert.match(
+    reviewPacket,
+    /Gate 3 outcome:\*\* APPROVED[^\n]+40604eb5b8a3ade0175c16dd945a1bafee15ae04\.\.da74a5baab12d19fa5a5007008f960f495721b8e/i,
+  );
 });
 
 function validateCompatibilityDeploymentCredentialBoundary(workflow) {

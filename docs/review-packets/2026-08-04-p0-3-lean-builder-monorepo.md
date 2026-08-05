@@ -2,7 +2,7 @@
 
 **Recorded:** 2026-08-05
 
-**Gate 3 outcome:** PENDING — this packet requests verified-final-diff approval. It does not authorize P1, push, pull request, publication, deployment, or any provider action.
+**Gate 3 outcome:** APPROVED — the user approved exact committed comparison `40604eb5b8a3ade0175c16dd945a1bafee15ae04..da74a5baab12d19fa5a5007008f960f495721b8e` after all verification and reviewer repairs passed. P1 preparation and exact-file planning are authorized; P1 implementation remains separately plan-gated.
 
 ## Goal and frozen comparison
 
@@ -11,8 +11,9 @@ Create the lean builder workspace boundaries without implementing profile or cap
 - Base: `40604eb5b8a3ade0175c16dd945a1bafee15ae04`
 - Committed implementation candidate: `b6472d2bbe3c7149e14947faa4e13b0a22690ab2`
 - Comparison: `40604eb5b8a3ade0175c16dd945a1bafee15ae04..b6472d2bbe3c7149e14947faa4e13b0a22690ab2`
-- Branch: sequential local `main`, eleven commits ahead of the unrefreshed local `origin/main`
-- Review artifacts outside the frozen implementation comparison: this packet and `docs/implementation-evidence/2026-08-04-p0-3-lean-builder-monorepo-verification.md`
+- Approved comparison including Gate 3 artifacts: `40604eb5b8a3ade0175c16dd945a1bafee15ae04..da74a5baab12d19fa5a5007008f960f495721b8e`
+- Branch at approval: sequential local `main`, twelve commits ahead of the unrefreshed local `origin/main`
+- Gate 3 artifacts were committed in `da74a5b` after the frozen implementation candidate and are included in the approved comparison.
 - Lockfile SHA-256: `c33e7c8da6fcf8708ff9f16444157aa85ac0e77f9503bd80ee250f0cc0f96b95`
 
 Remote refs were not refreshed because remote freshness does not affect this local stage gate. No push, pull request, publication, or deployment is authorized.
@@ -183,6 +184,6 @@ No material findings. The specialist marked P0.3 READY for Gate 3 and explicitly
 - **P0.2 proof deployment:** unchanged by P0.3. Any Worker redeploy, version rollback, deletion, custom-domain change, or credential action remains separate and requires explicit approval.
 - **Persistent data and providers:** none were created or mutated by P0.3, so no persistent-data rollback exists.
 
-## Approval requested
+## Approval disposition
 
-Approve the exact committed implementation comparison above together with the two post-candidate Gate 3 artifacts. Approval closes P0.3 and permits P1 preparation and exact-file planning only; P1 implementation remains separately plan-gated.
+The user approved exact committed comparison `40604eb5b8a3ade0175c16dd945a1bafee15ae04..da74a5baab12d19fa5a5007008f960f495721b8e` after confirming that `lint:p0.3` is the intentional stage-scoped builder lint aggregate. P0.3 is complete. P1 preparation and exact-file planning may begin, but P1 implementation, push, pull request, publication, deployment, and provider actions remain separately gated.

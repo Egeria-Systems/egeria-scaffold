@@ -2,6 +2,8 @@
 
 **Execution date:** 2026-08-05 (America/Toronto)
 
+**Status:** Gate 3 APPROVED — the user approved exact committed comparison `40604eb5b8a3ade0175c16dd945a1bafee15ae04..da74a5baab12d19fa5a5007008f960f495721b8e`. P0.3 is complete; P1 preparation and exact-file planning are authorized, while P1 implementation remains separately plan-gated.
+
 **Implementation comparison:** `40604eb5b8a3ade0175c16dd945a1bafee15ae04..b6472d2bbe3c7149e14947faa4e13b0a22690ab2`
 
 **Branch:** `main`; the committed implementation candidate is eleven commits ahead of the unrefreshed local `origin/main`. Remote refs were not refreshed because this is a local review gate and no push, pull request, publication, or deployment is authorized. This verification record and the review packet are post-candidate review artifacts and therefore are outside the frozen implementation comparison.
@@ -150,3 +152,7 @@ b6472d2 Strengthen P0.3 boundary tests
 - Static, Node, workerd, and browser checks prove only the exercised candidate and environments; they do not prove security completeness, production safety, translation quality, visual quality, or future dependency compatibility.
 - Automated accessibility checks are mandatory evidence but do not permit a WCAG conformance claim. No human accessibility evaluation was performed for P0.3 because this increment creates no generated UI and no separate contractual gate requires it.
 - No `.egeria` schema/state, profile, capability implementation, generator, repository mutation, provider, observability transport, analytics behavior, or application runtime was introduced.
+
+## Gate 3 disposition
+
+The user approved exact committed comparison `40604eb5b8a3ade0175c16dd945a1bafee15ae04..da74a5baab12d19fa5a5007008f960f495721b8e` after reviewing the completed packet and confirming that the `lint:p0.3` name is intentional. The command remains stage-scoped so the builder repository's ESLint 10 aggregate does not imply that the package-local ESLint 9 proof migrated. This approval closes P0.3 and permits P1 preparation and exact-file planning only. It does not authorize P1 implementation, push, pull request, npm publication, deployment, or provider action.
