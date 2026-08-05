@@ -28,6 +28,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@egeria-systems/standards": "workspace:*",
     "@axe-core/playwright": "4.12.1",
     "@playwright/test": "1.62.1",
     "@types/node": "22.20.1",

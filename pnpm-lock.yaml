@@ -11,9 +11,29 @@ importers:
 
   .: {}
 
-  apps/cli: {}
+  apps/cli:
+    devDependencies:
+      '@egeria-systems/standards':
+        specifier: workspace:*
+        version: link:../../packages/standards
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
 
-  packages/builder-core: {}
+  packages/builder-core:
+    devDependencies:
+      '@egeria-systems/standards':
+        specifier: workspace:*
+        version: link:../standards
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
+  packages/standards:
+    devDependencies:
+      eslint:
+        specifier: 9.39.5
+        version: 9.39.5(supports-color@10.2.2)
 
   proofs/nextjs-cloudflare:
     dependencies:
@@ -33,6 +53,9 @@ importers:
       '@axe-core/playwright':
         specifier: 4.12.1
         version: 4.12.1(playwright-core@1.62.1)
+      '@egeria-systems/standards':
+        specifier: workspace:*
+        version: link:../../packages/standards
       '@playwright/test':
         specifier: 1.62.1
         version: 1.62.1

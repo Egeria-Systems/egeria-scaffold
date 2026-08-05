@@ -2,5 +2,13 @@
   "name": "@egeria-systems/builder-core",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@egeria-systems/standards": "workspace:*",
+    "typescript": "6.0.3"
+  }
 }

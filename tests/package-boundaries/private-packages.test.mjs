@@ -113,7 +113,7 @@ test("the workspace materializes the approved private builder boundaries", async
   );
 });
 
-test("the private package manifests expose no premature API or dependency", async () => {
+test("the private package manifests consume standards without a runtime API", async () => {
   assert.equal(await pathExists("apps/cli/package.json"), true);
   assert.equal(await pathExists("packages/builder-core/package.json"), true);
 
@@ -122,13 +122,57 @@ test("the private package manifests expose no premature API or dependency", asyn
     version: "0.0.0",
     private: true,
     type: "module",
+    scripts: {
+      build: "tsc -p tsconfig.json",
+      typecheck: "tsc -p tsconfig.json --noEmit",
+    },
+    devDependencies: {
+      "@egeria-systems/standards": "workspace:*",
+      typescript: "6.0.3",
+    },
   });
   assert.deepEqual(await readJson("packages/builder-core/package.json"), {
     name: "@egeria-systems/builder-core",
     version: "0.0.0",
     private: true,
     type: "module",
+    scripts: {
+      build: "tsc -p tsconfig.json",
+      typecheck: "tsc -p tsconfig.json --noEmit",
+    },
+    devDependencies: {
+      "@egeria-systems/standards": "workspace:*",
+      typescript: "6.0.3",
+    },
   });
+});
+
+test("the private packages compile through the shared strict contract", async () => {
+  const expectedConfig = {
+    extends: "@egeria-systems/standards/typescript/strict.json",
+    compilerOptions: {
+      declaration: true,
+      outDir: "dist",
+      rootDir: "src",
+    },
+    include: ["src/**/*.ts"],
+  };
+
+  assert.equal(
+    await pathExists("apps/cli/tsconfig.json"),
+    true,
+    "the CLI must consume the shared strict TypeScript API",
+  );
+  assert.equal(
+    await pathExists("packages/builder-core/tsconfig.json"),
+    true,
+    "builder-core must consume the shared strict TypeScript API",
+  );
+  assert.deepEqual(await readJson("apps/cli/tsconfig.json"), expectedConfig);
+  assert.deepEqual(
+    await readJson("packages/builder-core/tsconfig.json"),
+    expectedConfig,
+  );
 });
 
 test("the private package sources remain empty ESM ownership shells", async () => {

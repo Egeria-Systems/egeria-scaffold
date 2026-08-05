@@ -1,0 +1,11 @@
+{
+  "extends": "@egeria-systems/standards/typescript/strict.json",
+  "compilerOptions": {
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
