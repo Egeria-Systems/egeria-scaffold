@@ -2,6 +2,31 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 test("renders the proof and returns its runtime report", async ({ page }) => {
+  await expect
+    .poll(
+      async () => {
+        const response = await page.request.get("/api/compatibility");
+
+        if (!response.ok()) {
+          return null;
+        }
+
+        try {
+          return JSON.parse(await response.text());
+        } catch {
+          return null;
+        }
+      },
+      {
+        message: "the deployed compatibility runtime report to become ready",
+        timeout: 60_000,
+      },
+    )
+    .toEqual({
+      environment: "compatibility",
+      runtime: "workerd",
+    });
+
   await page.goto("/");
   await expect(
     page.getByRole("heading", {
@@ -9,13 +34,6 @@ test("renders the proof and returns its runtime report", async ({ page }) => {
       name: "Next.js and Cloudflare compatibility proof",
     }),
   ).toBeVisible();
-
-  const response = await page.request.get("/api/compatibility");
-  expect(response.ok()).toBe(true);
-  expect(await response.json()).toEqual({
-    environment: "compatibility",
-    runtime: "workerd",
-  });
 });
 
 test("has no detected axe violations in the selected rule set", async ({
