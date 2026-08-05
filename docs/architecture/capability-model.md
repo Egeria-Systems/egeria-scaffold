@@ -1,8 +1,8 @@
 # Capability Model
 
-**Status:** Controlling P0.1 capability vocabulary
+**Status:** Controlling capability vocabulary through P1 Task 2
 
-**Runtime status:** Documentation only; no capability descriptor is executable in P0.1.
+**Runtime status:** The six `portfolio`/`site` descriptors and two recipes named below are executable in private builder-core. Every other program capability and profile remains documentation-only.
 
 ## Descriptor contract
 
@@ -52,13 +52,42 @@ interface CapabilityDescriptor {
   privilegedOperations: readonly string[];
   threatReviewLevel: string;
   adapterSemanticRequirements: readonly string[];
-  managedSurfaces: readonly string[];
-  inferenceProbes: readonly string[];
+  managedSurfaces: readonly ManagedSurfaceDescriptor[];
+  inferenceProbes: readonly InferenceProbe[];
   migrationPlanners: readonly string[];
   verificationPlan: readonly string[];
   documentationEvidenceRequirements: readonly string[];
   removalAndRecoveryRequirements: readonly string[];
 }
+
+type ManagedSurfaceDescriptor = Readonly<{
+  identifier: string;
+  owner:
+    | Readonly<{ kind: "builder-kernel" }>
+    | Readonly<{ kind: "capability"; identifier: string }>;
+  path: string;
+  ownership: "managed" | "merge-managed" | "application-owned";
+  fingerprintTarget:
+    | Readonly<{ kind: "file" }>
+    | Readonly<{ kind: "json-value"; pointer: string }>;
+  mergeStrategy: "replace-file" | "json-property";
+}>;
+
+type InferenceProbe =
+  | Readonly<{ kind: "file"; path: string }>
+  | Readonly<{
+      kind: "json-value";
+      path: string;
+      pointer: string;
+      expected: string | boolean | number;
+    }>
+  | Readonly<{
+      kind: "package";
+      path: string;
+      section: "dependencies" | "devDependencies";
+      packageName: string;
+      version: string;
+    }>;
 ```
 
 `version` is the capability release version used by catalogs and installed manifests. The descriptor schema-format version is owned by the schema identifier, such as `urn:egeria-systems:schema:capability:1.0.0`, rather than a second descriptor field.
@@ -96,6 +125,8 @@ authenticated-app
 These expressions define generation-time resolution only. The resolved installed capability set becomes authoritative. Recipe inheritance is not stored as a live mutation channel.
 
 ## Initial catalog
+
+Task 2 executes exactly `standards`, `content-files`, `section-composition`, `deployment-cloudflare`, `observability`, and `site-routing` for the `portfolio` and `site` recipes. The other rows remain program visibility only and have no runtime descriptor, resolver availability, generated surface, state, or provider effect yet.
 
 State classifications below describe repository, external-provider, and persistent-data effects managed by the capability. Dependencies may also vary by an explicitly selected mode; those conditional rules are called out rather than hidden.
 
@@ -146,4 +177,4 @@ Package-backed delivery uses an ordinary replaceable dependency. Source-generate
 
 Initial public packages are limited to `@egeria-systems/standards` and `@egeria-systems/observability`, and they are created only in P0.3. P0.3 reserves private `builder-core` ownership of project/state schemas; P1 implements them there. They remain private until a proven independent consumer justifies extraction.
 
-This catalog provides future visibility without implementation. P0.1 creates no capability registry, profile code, package, template, state file, migration, binding, provider integration, or generated application.
+The full catalog preserves future visibility without prematurely implementing later stages. P1 Task 2 adds only the six descriptors and two recipes identified above. It adds no template, `.egeria` file, inference engine, migration executor, binding, provider integration, generated application, or generated profile skeleton.

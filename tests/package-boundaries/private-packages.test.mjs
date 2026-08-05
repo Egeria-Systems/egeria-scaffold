@@ -193,7 +193,7 @@ test("the private packages compile through the shared strict contract", async ()
   );
 });
 
-test("the CLI remains an empty shell while builder-core owns only P1 contracts", async () => {
+test("the CLI remains an empty shell while builder-core owns only approved Task 2 surfaces", async () => {
   const expectedSource = "export {};\n";
 
   assert.deepEqual(
@@ -208,6 +208,7 @@ test("the CLI remains an empty shell while builder-core owns only P1 contracts",
   assert.deepEqual(
     await listFiles(resolve(repositoryRoot, "packages/builder-core/src")),
     [
+      "catalog/p1-capabilities.ts",
       "contracts/capability.ts",
       "contracts/identifiers.ts",
       "contracts/json-schemas.ts",
@@ -217,7 +218,44 @@ test("the CLI remains an empty shell while builder-core owns only P1 contracts",
       "contracts/result.ts",
       "contracts/state.ts",
       "index.ts",
+      "manifest/create-installed-manifest.ts",
+      "profiles/p1-profiles.ts",
+      "resolution/resolve-capabilities.ts",
     ],
+  );
+});
+
+test("builder-core direct consumers describe the private Task 2 boundary", async () => {
+  const builderInstructions = await readFile(
+    resolve(repositoryRoot, "packages/builder-core/AGENTS.md"),
+    "utf8",
+  );
+  const builderReadme = await readFile(
+    resolve(repositoryRoot, "packages/builder-core/README.md"),
+    "utf8",
+  );
+  const packageOwnership = await readFile(
+    resolve(repositoryRoot, "docs/architecture/package-ownership.md"),
+    "utf8",
+  );
+
+  assert.match(builderInstructions, /P1 Task 2/);
+  assert.match(builderInstructions, /site-routing/);
+  assert.match(builderInstructions, /does not add `.egeria` codecs or files/);
+  assert.doesNotMatch(builderInstructions, /adds schema contracts only/);
+
+  assert.match(builderReadme, /P1 Task 2/);
+  assert.match(builderReadme, /six executable capability descriptors/);
+  assert.match(builderReadme, /installed-capability manifest entries/);
+  assert.match(builderReadme, /The CLI remains empty/);
+
+  assert.match(packageOwnership, /through P1 Task 2/);
+  assert.match(packageOwnership, /exact six-capability P1 catalog/);
+  assert.match(packageOwnership, /installed-manifest projection/);
+  assert.match(packageOwnership, /They create no `.egeria` files/);
+  assert.doesNotMatch(
+    packageOwnership,
+    /`packages\/builder-core`[^\n]*Empty ESM ownership shell/,
   );
 });
 
