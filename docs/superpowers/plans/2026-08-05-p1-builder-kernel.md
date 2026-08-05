@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Preparation evidence: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-preparation.md`.
-- Deferred Task 1 schema-review evidence: `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`; do not act on its recorded questions before Task 9 unless a separately approved correctness blocker requires a plan amendment.
+- Task 1 schema-review evidence: `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`. The capability-version name and empty P1 capability-settings contract are assigned to the separately gated Task 1A plan; the other recorded questions remain deferred to Task 9.
 - Frozen starting commit: `303ee9d35e19f9191948d994159f77c82c90a1ed` on clean sequential local `main`; re-freeze before execution if it changes.
 - Run shell commands through `rtk`; use `/Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm` and `CI=true` where pnpm may refresh generated dependencies.
 - Each task follows RED, minimum GREEN, focused verification, one focused commit, and an explicit user stop before the next task.
@@ -321,7 +321,13 @@ git add package.json pnpm-lock.yaml packages/builder-core tests/package-boundari
 git commit -m "Add P1 schema contracts"
 ```
 
-Present the exact changed-file list and focused results. Stop for explicit user approval before Task 2.
+Present the exact changed-file list and focused results. Stop for explicit user approval before Task 1A.
+
+## Task 1A: Pre-Task2 Schema Contract Clarifications
+
+Task 1A resolves only the two contract questions whose ambiguity or permissiveness would otherwise be materialized by later P1 consumers: capability `version` naming and an empty P1 `capabilitySettings` map. Its exact files, RED/GREEN sequence, documentation reconciliation, reviewers, verification, and rollback are owned by `docs/superpowers/plans/2026-08-05-p1-pre-task2-schema-contract-clarifications.md`.
+
+Do not treat the other recorded schema questions as authorized Task 1A work. Stop after its focused commit for explicit user approval before Task 2.
 
 ## Task 2: P1 Capability Catalog, Profiles, and Resolution
 
