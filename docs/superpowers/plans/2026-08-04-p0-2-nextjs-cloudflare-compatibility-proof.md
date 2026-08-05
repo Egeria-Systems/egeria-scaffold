@@ -1492,6 +1492,8 @@ Stop and request explicit authorization for Task 7. Do not push or create/config
 
 **Required user-controlled inputs:** a narrow Cloudflare API token, account ID, and the expected non-production Worker URL. Never request their values in chat if the user can set them directly in GitHub.
 
+**Optional local tooling:** The installed Cloudflare plugin may support current-documentation lookup and, only after explicit authorization, read-only inspection of the named account and Worker. It is not a deployment path or evidence by itself; do not use its skills or API MCP to create, update, deploy, roll back, or delete Cloudflare resources.
+
 - [ ] **Step 1: Obtain exact external-action approval**
 
 Present the proposed actions, destination repository, environment name, Worker name, credential names/scopes, workflow ref, recovery path, and the fact that the private repository currently has no remote default branch. Proceed only after explicit approval.
@@ -1548,6 +1550,8 @@ Stop for user review before Task 8.
 - Create: `docs/implementation-evidence/2026-08-04-p0-2-compatibility-verification.md`
 - Create: `docs/review-packets/2026-08-04-p0-2-nextjs-cloudflare-compatibility-proof.md`
 - Modify only if evidence-backed material findings require it: files in the approved P0.2 map
+
+**Optional-tool evidence:** If the Cloudflare plugin materially contributes to verification, record its exact version, granted OAuth scope names, read-only operations and results, and limitations without recording credentials or unrelated private account data. Plugin availability alone is neither repository evidence nor a repository dependency.
 
 - [ ] **Step 1: Freeze the candidate and run the full relevant suite once**
 
