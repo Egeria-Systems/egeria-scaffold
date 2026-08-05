@@ -2,14 +2,14 @@
 
 **Recorded:** 2026-08-04
 
-**Status:** Gate 3 NOT READY — local evidence and reviews are complete, but the user-controlled GitHub environment inputs are absent. No workflow run, Cloudflare Worker deployment, or deployed smoke result exists.
+**Status:** Gate 3 READY FOR VERIFIED-FINAL-DIFF APPROVAL — the exact implementation candidate passed local verification, the manual Ubuntu workflow, non-production Cloudflare deployment, workflow-deployed smoke tests, and an independent deployed smoke rerun. P0.3 remains blocked until the user approves the verified final diff.
 
 ## Scope and candidate
 
 - Repository: private `Egeria-Systems/egeria-scaffold`
 - Comparison base: `c90b7c2` (completed P0.1 Gate 3)
-- Verified implementation candidate: `236d2bace3b7513873998cbde6aee6c15bf1b2b2`
-- Remote state: local `main`, `origin/main`, and GitHub's default branch all resolve to the candidate
+- Deployed implementation candidate: `160b8ef261e69ec783ad93b7bfe69d932ba84541`
+- Remote state at deployment: local `main`, `origin/main`, and GitHub's default branch resolved to the deployed candidate
 - Lockfile SHA-256: `72fab6af3a327404e287094e99438b98f7a43007765a4a9e6255cc357dd637c7`
 - Source plan SHA-256: `821c175a8ce8c8a46ff4ec75f855e5cc9c867e0dfa9988ee2865dadbf969829d`
 
@@ -22,11 +22,12 @@ Local verification used Node.js `v22.23.0` and pnpm `11.20.0`. The final install
 - runtime: `@opennextjs/cloudflare@1.20.2`, `next@16.3.0`, `react@19.2.8`, `react-dom@19.2.8`;
 - development: `wrangler@4.118.0`, `typescript@6.0.3`, `eslint@9.39.5`, `eslint-config-next@16.3.0`, `typescript-eslint@8.66.0`, `vitest@4.1.10`, `@playwright/test@1.62.1`, `@axe-core/playwright@4.12.1`, `@types/node@22.20.1`, `@types/react@19.2.18`, and `@types/react-dom@19.2.4`.
 
-The workflow pins:
+The final workflow pins:
 
 - `actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803`;
-- `pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa`;
-- `actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444`.
+- `pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c`.
+
+[`pnpm/setup@v2.0.0`](https://github.com/pnpm/setup/releases/tag/v2.0.0) was released on 2026-08-04 while deployment evidence was being gathered. Its upstream documentation makes it the successor for pnpm 11 and newer, installs the exact pnpm and JavaScript runtime versions, verifies the pnpm release checksum, and runs as a Node 24 action. The workflow therefore replaced the deprecated Node 20 `pnpm/action-setup` runtime and separate `actions/setup-node` step without changing the approved Node `22.23.0` or pnpm `11.20.0` matrix.
 
 The [preparation evidence](2026-08-04-p0-2-compatibility-preparation.md) owns the dated official-documentation, registry, action-resolution, exact-version advisory, beta-status, and compatibility-limit revalidation. The final registry audit returned `No known vulnerabilities found`, and `pnpm peers check` returned `No peer dependency issues found`.
 
@@ -43,6 +44,10 @@ One narrow transitive override remains: `miniflare>undici: 7.29.0`. Wrangler's l
 | Canonical docs | Three constitution contracts failed for the absent compatibility record, navigation, and proof boundary | The documentation/link suite passed |
 | Workflow security | Constitution failed because the workflow was absent | Manual/main-only/minimum-permission/action-pin/secret-boundary checks passed |
 | Deploy-only repair | The contract exposed `build && deploy` under Cloudflare credentials | The script deploys only the verified artifact; a mutation test rejects build work in the secret-bearing block |
+| Clean-checkout binding order | Workflow run `30963809028` failed because `wrangler types --check` ran before `.open-next/worker.js` existed; a clean archived snapshot reproduced the mismatch | `668bec5` moved the type drift check after the OpenNext build; the clean snapshot and later Ubuntu workflows passed |
+| Current setup action | Run `30963809028` warned that the old pnpm setup action's Node 20 runtime was deprecated and forced to Node 24; the updated constitution expectation failed against the old workflow | `8f0c38d` migrated to fully pinned `pnpm/setup@v2.0.0`; 12/12 constitution tests and the final workflow passed without the warning |
+| pnpm deploy command collision | Run `30965223422` reached deployment but bare `pnpm --filter … deploy` invoked pnpm's built-in deploy command and failed with `ERR_PNPM_INVALID_DEPLOY_TARGET` | `6323292` invokes the package script explicitly with `run deploy`; the contract and mutation test pass, and later deployments succeeded |
+| Edge propagation readiness | The first independent check immediately after run `30965456416` reached the prior edge version and received `Hello World!` instead of the runtime JSON | `160b8ef` polls the typed runtime-report condition for up to 60 seconds before browser assertions; the final workflow and independent rerun passed 4/4 |
 
 The generated Wrangler declaration was narrowed to binding types with `--include-runtime=false`. The default generator emitted a 14,711-line unrelated runtime declaration containing trailing whitespace; the proof consumes only the generated binding contract. `wrangler types --check` confirms the committed output is current.
 
@@ -56,7 +61,7 @@ The exact pnpm binary was selected explicitly because the surrounding desktop sh
 | `pnpm audit --audit-level=moderate` | `0`; no known vulnerabilities | Current registry audit for the locked graph |
 | `pnpm peers check` | `0`; no peer issues | Direct/peer graph compatibility |
 | `pnpm run test:constitution` | `0`; 12/12 tests | Repository, documentation, workflow, and deploy-only contracts |
-| `pnpm run verify:p0.2` | `0` on repaired implementation candidate `93f3ca7`; the only later change added the constitution mutation test | Complete local proof suite |
+| `pnpm run verify:p0.2` | `0` on deployed candidate `160b8ef`; unit 4/4, harness 1/1, development 4/4, preview 4/4 | Complete local proof suite |
 | `wrangler types ... --check` | `0`; types current | Binding generation drift |
 | `eslint . --max-warnings 0` | `0` | Flat-config lint and Cloudflare import restriction |
 | `tsc --noEmit` | `0` | Strict TypeScript configuration |
@@ -66,9 +71,10 @@ The exact pnpm binary was selected explicitly because the surrounding desktop sh
 | Wrangler `createTestHarness()` | `0`; 1/1 | HTTP execution through the built Worker under workerd |
 | Playwright development config | `0`; 4/4 | Node.js `next dev` browser, endpoint, axe, keyboard, reflow, and motion evidence |
 | Playwright preview config | `0`; 4/4 | OpenNext workerd preview with the same bounded checks |
-| `git diff --check` / final status | `0`; clean tracked tree | Patch hygiene and preserved state |
+| Playwright deployed config | `0`; 4/4 in workflow run `30966212691`, then 4/4 in an independent local rerun | Public Worker response, bounded browser, and automated accessibility evidence |
+| `git diff --check c90b7c2..160b8ef` | `0` | Committed implementation patch hygiene |
 
-`pnpm ignored-builds` exited `0` but reported `Cannot identify as no node_modules found` when invoked at the root, package directory, and filtered package. That output is not counted as proof of an empty ignored-build set. Lifecycle-script control is instead evidenced by the committed exact `allowBuilds` list, frozen install, locked graph review, and runtime checks; a clean Ubuntu workflow run remains required.
+`pnpm ignored-builds` exited `0` but reported `Cannot identify as no node_modules found` when invoked at the root, package directory, and filtered package. That output is not counted as proof of an empty ignored-build set. Lifecycle-script control is instead evidenced by the committed exact `allowBuilds` list, frozen install, locked graph review, and successful clean Ubuntu workflow.
 
 ## Runtime and accessibility evidence boundaries
 
@@ -80,19 +86,20 @@ The exact pnpm binary was selected explicitly because the surrounding desktop sh
 
 ## GitHub and Cloudflare external state
 
-Verified GitHub facts:
+Verified external state after the user corrected the URL classification:
 
 - workflow `Compatibility proof` is active as workflow ID `327419709`;
-- environment `compatibility` exists;
-- its custom deployment branch policy allows only `main`;
-- environment secret list is empty;
-- environment variable list is empty;
-- workflow run list is empty;
-- no Cloudflare Worker or deployed URL has been verified.
+- environment `compatibility` exists and its custom deployment branch policy allows only `main`;
+- its environment secrets are named `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`;
+- its sole environment variable is named `COMPATIBILITY_URL`; it is not retained as a secret;
+- secret and variable values were not read, logged, committed, or copied into this evidence;
+- [workflow run `30966212691`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/30966212691), job `92180621200`, completed successfully for exact commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`;
+- the run passed frozen installation, the complete Ubuntu verification suite, deployment, and the deployed Playwright/axe suite;
+- the deployed non-production URL is `https://egeria-scaffold-nextjs-cloudflare-proof.bmarquiscom.workers.dev`;
+- the resulting Cloudflare Worker version is `fddba63e-c0e9-497e-98c4-4942461fb753`;
+- the workflow-deployed smoke suite passed 4/4, and a separate local rerun against the recorded URL passed 4/4.
 
-Required user-controlled inputs are environment secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, plus environment variable `COMPATIBILITY_URL`. Their values must be set directly in GitHub and must not be sent in chat, committed, logged, or copied into this evidence.
-
-The workflow deliberately has `contents: read`, manual dispatch only, `main` and environment enforcement, SHA-pinned actions, credential-free installation/build/local tests, and a deploy-only secret-bearing step. It must not be dispatched until all three inputs exist.
+The workflow has `contents: read`, manual dispatch only, `main` and environment enforcement, SHA-pinned actions, credential-free installation/build/local tests, and a deploy-only secret-bearing step. `COMPATIBILITY_URL` is exposed only to the post-deployment test step. The repository's current GitHub plan did not expose environment reviewer or prevent-self-review controls; that governance limitation does not weaken the verified branch and credential boundaries and does not establish production safety.
 
 ## Independent review reconciliation
 
@@ -104,7 +111,7 @@ Three material documentation findings were retained and repaired in `93f3ca7`:
 - the approved design still labeled proposed;
 - the preparation table incorrectly implied that Volta could project-pin pnpm.
 
-The reviewer found no implementation requirement defect and confirmed that deployed exit remained blocked.
+The reviewer found no implementation requirement defect. Its then-current deployed-evidence blocker was subsequently resolved by workflow run `30966212691` and the independent deployed smoke rerun.
 
 ### Architecture and anti-overengineering review
 
@@ -114,12 +121,12 @@ No other material architecture finding existed. Cloudflare isolation, pure prese
 
 ### Independent test-evidence review
 
-The reviewer reported no material finding. The parser/presentation tests, built-Worker harness, Node/workerd separation, bounded accessibility checks, action and workflow security, and deploy-only artifact flow were considered meaningful. The reviewer independently identified the missing environment inputs and deployed smoke as the P0.2 exit blocker.
+The reviewer reported no material finding. The parser/presentation tests, built-Worker harness, Node/workerd separation, bounded accessibility checks, action and workflow security, and deploy-only artifact flow were considered meaningful. Its then-current missing-input and deployed-smoke blocker was subsequently resolved by the successful final workflow and independent deployed rerun.
 
 ## Known limitations and non-proofs
 
-- No clean Ubuntu GitHub Actions run exists yet.
-- No credentialed deploy, Worker version, public URL response, or deployed Playwright/axe result exists.
+- The deployed Worker is a non-production compatibility proof. It does not establish a production profile, production readiness, production authorization, or a custom-domain deployment.
+- The deployment log warned that Workers preview URLs defaulted on because `preview_urls` is not explicit in `wrangler.jsonc`; P0.2 did not require or verify a separate preview-URL policy.
 - OpenNext does not support Node.js Middleware for this adapter; the proof adds none.
 - Windows is not guaranteed or tested.
 - Cloudflare Worker size limits still apply.
@@ -135,6 +142,8 @@ The reviewer reported no material finding. The parser/presentation tests, built-
 - **Credentials:** revoke or rotate the Cloudflare token at the provider and replace/remove the GitHub environment secret separately.
 - **Persistent data:** none exists in this stateless proof.
 
-## Blocker and next evidence
+## Gate 3 disposition
 
-P0.2 cannot close Gate 3 until all three GitHub environment inputs are configured, the manual workflow succeeds for the exact final `main` commit, and an independent local deployed Playwright run passes against the recorded URL. After that run, amend this record with the workflow/run IDs, job conclusions, deployed URL approved for disclosure, Worker evidence, deployed 4/4 result, and final commit/hash state.
+The P0.2 technical exit evidence is complete for deployed implementation candidate `160b8ef261e69ec783ad93b7bfe69d932ba84541`. The only remaining gate is explicit user approval of the verified final committed diff and review packet. That approval closes P0.2; it does not authorize P0.3.
+
+Retain the private proof as a dependency, configuration, action, and Cloudflare compatibility regression canary. Retire it only when an equivalent maintained test surface replaces its Node development, built-Worker, workerd preview, deployed Worker, browser, and bounded accessibility evidence, with the canonical compatibility and architecture documents updated in the same approved change.

@@ -65,7 +65,7 @@ The original supplied file remains available at `/Users/CoveMB/Downloads/2026-08
 | pnpm | `10.32.1` | Existing global/default tool; not the P0.2 candidate |
 | Corepack | command not found | The local Volta-managed Node distribution does not expose Corepack; the plan must not assume it exists |
 
-P0.2 pins pnpm `11.20.0` through the standard root `packageManager` field and pnpm 11's `pmOnFail: error` workspace policy. The implementation originally planned `volta.pnpm`, but Volta `2.0.2` rejected `volta pin pnpm@11.20.0` with `Only node and yarn can be pinned in a project`. Current Volta documentation still describes pnpm support as experimental and lists limitations, while current pnpm 11 documentation replaces the removed `packageManagerStrictVersion` setting with `pmOnFail: error`. The corrected local bootstrap uses `volta install pnpm@11.20.0` only to install the approved CLI on this machine; Volta remains the project pin owner only for Node. CI uses the fully SHA-pinned `pnpm/action-setup` action rather than depending on Corepack.
+P0.2 pins pnpm `11.20.0` through the standard root `packageManager` field and pnpm 11's `pmOnFail: error` workspace policy. The implementation originally planned `volta.pnpm`, but Volta `2.0.2` rejected `volta pin pnpm@11.20.0` with `Only node and yarn can be pinned in a project`. Current Volta documentation still describes pnpm support as experimental and lists limitations, while current pnpm 11 documentation replaces the removed `packageManagerStrictVersion` setting with `pmOnFail: error`. The corrected local bootstrap uses `volta install pnpm@11.20.0` only to install the approved CLI on this machine; Volta remains the project pin owner only for Node. The initial CI plan used fully SHA-pinned `pnpm/action-setup` and `actions/setup-node` actions rather than Corepack; final deployment verification records the evidence-backed migration to the current SHA-pinned `pnpm/setup` successor.
 
 ## Live-source freshness method
 
@@ -116,7 +116,7 @@ Consequence: Playwright and axe provide mandatory automated smoke evidence for l
   - `pnpm/action-setup@v4` -> `f40ffcd9367d9f12939873eb1018b921a783ffaa`
   - `actions/setup-node@v5` -> `a0853c24544627f65ddf259abe73b1d18a591444`
 
-The repository does not enforce action SHA pinning, but P0.2 will pin these full SHAs in the workflow. Workflow permissions are limited to `contents: read`. Deployment uses the approved Worker name `egeria-scaffold-nextjs-cloudflare-proof` and environment `compatibility`.
+This table records the preparation-time action selection. The repository does not enforce action SHA pinning, but P0.2 pins full SHAs in the workflow. During deployment verification, the setup actions were superseded by fully pinned `pnpm/setup`; the [verification record](2026-08-04-p0-2-compatibility-verification.md) owns that final action and run evidence. Workflow permissions are limited to `contents: read`. Deployment uses the approved Worker name `egeria-scaffold-nextjs-cloudflare-proof` and environment `compatibility`.
 
 ## Exact package candidates
 

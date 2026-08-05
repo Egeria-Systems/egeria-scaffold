@@ -2,19 +2,20 @@
 
 **Recorded:** 2026-08-04
 
-**Gate 3 outcome:** NOT READY — one external prerequisite group remains. Local implementation, local verification, and the three required reviews are complete, but GitHub environment inputs, the workflow run, Cloudflare deployment, and deployed smoke evidence are absent.
+**Gate 3 outcome:** READY FOR VERIFIED-FINAL-DIFF APPROVAL — local and Ubuntu verification, non-production Cloudflare deployment, workflow-deployed smoke, an independent deployed smoke rerun, and the three required reviews are complete.
 
-This is a durable pre-deployment packet, not a request for verified-final-diff approval and not authorization to begin P0.3.
+This packet requests approval of the verified final committed P0.2 diff. Approval closes P0.2; it does not authorize P0.3.
 
 ## Goal and approved scope
 
 Create the smallest private proof of the exact Node.js, pnpm, Next.js App Router, OpenNext Cloudflare, Wrangler, TypeScript, ESLint, Vitest, Playwright, and axe combination. The proof must distinguish Node development from workerd execution, deploy only to non-production through GitHub Actions, and avoid implementing a builder app, package boundary, profile, capability, or production behavior.
 
 - Base: `c90b7c2`
-- Verified implementation candidate: `236d2bace3b7513873998cbde6aee6c15bf1b2b2`
-- Comparison: `c90b7c2..236d2ba`
+- Deployed implementation candidate: `160b8ef261e69ec783ad93b7bfe69d932ba84541`
+- Approval comparison: `c90b7c2..HEAD`, where `HEAD` is the evidence commit containing this packet and the deployed code is unchanged from `160b8ef`
 - Lockfile SHA-256: `72fab6af3a327404e287094e99438b98f7a43007765a4a9e6255cc357dd637c7`
-- Branch: clean sequential `main`, pushed to `origin/main`
+- Branch: sequential `main`, pushed to `origin/main`
+- Excluded local state: one preserved user-owned unstaged edit to the approved P0.2 plan is outside this committed comparison
 
 ## Changed files by boundary
 
@@ -92,6 +93,11 @@ Create the smallest private proof of the exact Node.js, pnpm, Next.js App Router
 - `ea61c78` — add compatibility proof deployment workflow
 - `93f3ca7` — minimize compatibility deployment credentials and repair canonical status
 - `236d2ba` — protect the deploy-only credential boundary
+- `f074b8d` — record P0.2 pre-deployment evidence
+- `668bec5` — build the proof before checking generated bindings
+- `8f0c38d` — migrate to the current pinned pnpm setup action
+- `6323292` — invoke the compatibility deploy package script explicitly
+- `160b8ef` — wait for the deployed proof's typed readiness condition
 
 ## Verification summary
 
@@ -110,16 +116,32 @@ Create the smallest private proof of the exact Node.js, pnpm, Next.js App Router
 | Wrangler production-Worker harness | 1/1 pass |
 | Next development browser/axe suite | 4/4 pass |
 | Workerd preview browser/axe suite | 4/4 pass |
-| GitHub workflow structure/security | pass |
-| Deployed browser/axe suite | BLOCKED — no environment inputs or deployment |
+| GitHub workflow structure/security | pass; manual, `main`-only, SHA-pinned, deploy-only credentials |
+| Clean Ubuntu workflow | pass for exact candidate `160b8ef` |
+| Non-production Cloudflare deployment | pass; Worker version `fddba63e-c0e9-497e-98c4-4942461fb753` |
+| Workflow-deployed browser/axe suite | 4/4 pass |
+| Independent deployed browser/axe rerun | 4/4 pass |
 
 The full command history, RED/GREEN sequence, exact versions, action SHAs, environment facts, and evidence boundaries are in the [verification record](../implementation-evidence/2026-08-04-p0-2-compatibility-verification.md).
+
+## Deployment evidence
+
+- Workflow: [`Compatibility proof` run `30966212691`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/30966212691), workflow ID `327419709`
+- Job: `verify-and-deploy`, job ID `92180621200`, conclusion `success`
+- Exact deployed commit: `160b8ef261e69ec783ad93b7bfe69d932ba84541`
+- Public non-production URL: `https://egeria-scaffold-nextjs-cloudflare-proof.bmarquiscom.workers.dev`
+- Cloudflare Worker: `egeria-scaffold-nextjs-cloudflare-proof`
+- Worker version: `fddba63e-c0e9-497e-98c4-4942461fb753`
+- Environment boundary: `compatibility`, custom deployment branch policy `main` only
+- Environment input names: secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; variable `COMPATIBILITY_URL`
+
+Input values were not read, logged, committed, or copied into this packet.
 
 ## Review outcomes and dispositions
 
 ### Requirements
 
-Retained documentation findings: stale remote/environment status, ambiguous design approval status, and contradictory Volta/pnpm wording. All were repaired in `93f3ca7`. No implementation requirement defect remained.
+Retained documentation findings: stale remote/environment status, ambiguous design approval status, and contradictory Volta/pnpm wording. All were repaired in `93f3ca7`. No implementation requirement defect remained. The deployed-evidence blocker present at review time is resolved by the final workflow and independent rerun.
 
 ### Architecture and anti-overengineering
 
@@ -127,7 +149,7 @@ Retained high-impact finding: the secret-bearing deployment script rebuilt befor
 
 ### Independent test evidence
 
-No material finding. The reviewer accepted the pure tests, authentic built-Worker harness, Node/workerd/deployed separation, bounded accessibility claims, workflow ordering, action pins, secret isolation, and deploy-only artifact contract. The absent credentialed deployment and deployed smoke remain an explicit blocker.
+No material finding. The reviewer accepted the pure tests, authentic built-Worker harness, Node/workerd/deployed separation, bounded accessibility claims, workflow ordering, action pins, secret isolation, and deploy-only artifact contract. The absent credentialed-deployment evidence at review time is resolved by the final workflow and independent deployed rerun.
 
 ## Security and remaining dependency risk
 
@@ -136,12 +158,13 @@ No material finding. The reviewer accepted the pure tests, authentic built-Worke
 - The `miniflare>undici: 7.29.0` override is intentionally narrow and must be removed when upstream no longer needs it.
 - Lifecycle scripts are restricted to five reviewed package names in `allowBuilds`.
 - The workflow is manual, `main`-only, environment-bound, `contents: read`, and exposes Cloudflare credentials only to deploy-only publication of the verified artifact.
+- `COMPATIBILITY_URL` is an environment variable and is exposed only to the deployed-test step; it is not retained as a secret.
 - GitHub environment reviewers/self-review controls were not configured; the available branch-policy control is active. This is a remaining external governance limitation, not proof of production safety.
 
 ## Risks, limitations, and deferred work
 
-- No clean Ubuntu workflow result exists; local macOS success cannot substitute for it.
-- No Worker, public proof URL, or deployed browser/axe evidence exists.
+- The public Worker is a non-production compatibility proof and does not establish production readiness, production authorization, or a custom-domain deployment.
+- The deployment log warned that Workers preview URLs defaulted on because `preview_urls` is not explicit in `wrangler.jsonc`; no separate preview-URL policy was required or verified in P0.2.
 - Chromium-only smoke does not prove cross-browser support.
 - Automated accessibility evidence does not establish WCAG conformance or human usability.
 - Node.js Middleware is unsupported by the selected OpenNext adapter and is not used.
@@ -153,18 +176,14 @@ No material finding. The reviewer accepted the pure tests, authentic built-Worke
 ## Rollback and recovery
 
 - **Source rollback:** revert the relevant commits; never reset shared `main`.
-- **Deployment rollback:** after deployment exists, redeploy a previously verified commit through the same workflow or use separately authorized Worker version rollback.
+- **Deployment rollback:** redeploy a previously verified commit through the same workflow or use separately authorized Worker version rollback.
 - **Worker deletion/custom-domain removal:** separate Cloudflare action requiring explicit approval.
 - **GitHub cleanup:** environment, branch policy, secret, and variable removal are separate actions.
 - **Credential recovery:** rotate or revoke the provider token separately from GitHub secret replacement/removal.
 - **Persistent data:** none exists.
 
-## Blocking next action
+## Approval requested
 
-Configure these names directly in GitHub environment `compatibility`, without sending values in chat:
+Approve the verified committed comparison from base `c90b7c2` through the evidence commit containing this packet. The deployment and runtime evidence is tied to exact implementation commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`; the subsequent closure edits change documentation and its constitution contract only.
 
-- secret `CLOUDFLARE_API_TOKEN`, narrowly scoped to Workers Scripts edit for the target account;
-- secret `CLOUDFLARE_ACCOUNT_ID`;
-- variable `COMPATIBILITY_URL` for the expected non-production Worker URL.
-
-Then dispatch `.github/workflows/compatibility-proof.yml` from exact `main`, monitor the run, and independently rerun the deployed Playwright suite. Until those checks pass and this packet is amended, P0.2 is not complete and no verified-final-diff approval is requested.
+Until that explicit approval is given, P0.2 remains at Gate 3 and P0.3 is not authorized.

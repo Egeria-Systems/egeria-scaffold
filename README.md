@@ -4,7 +4,7 @@ Egeria Scaffold will build versioned, materialized Next.js recipes for Egeria Sy
 
 ## Current phase: P0.2 — Deployed compatibility proof
 
-P0.1 established the repository constitution, architecture decisions, governance, and enforcement ownership. P0.2 now owns the smallest private Next.js and Cloudflare compatibility proof. The local Node.js, Next.js, OpenNext, workerd, Chromium, and axe gates are implemented; deployed Gate 3 evidence remains required before P0.2 is complete. No production profile is implemented.
+P0.1 established the repository constitution, architecture decisions, governance, and enforcement ownership. P0.2 owns the smallest private Next.js and Cloudflare compatibility proof. Local, workerd, clean Ubuntu workflow, non-production deployment, Chromium, and axe evidence is complete; verified-final-diff approval remains required before P0.3. No production profile is implemented.
 
 Canonical project documents:
 
