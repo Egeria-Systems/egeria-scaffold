@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
-import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, readlink, rm, symlink, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, readlink, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import test from "node:test";
 
+const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const builtEntry = resolve(packageRoot, "dist/index.js");
+const typeScriptCompiler = resolve(packageRoot, "node_modules/typescript/bin/tsc");
 const core = await import(pathToFileURL(builtEntry));
 const encoder = new TextEncoder();
 
@@ -183,6 +187,71 @@ test("builder-core exports the approved read-only inference API", () => {
   }
 });
 
+test("the package root exposes every approved read-only inference type", async () => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "egeria-inference-types-"));
+
+  try {
+    const packageScope = join(temporaryRoot, "node_modules", "@egeria-systems");
+    const consumer = join(temporaryRoot, "consumer.ts");
+    await mkdir(packageScope, { recursive: true });
+    await symlink(packageRoot, join(packageScope, "builder-core"), "dir");
+    await writeFile(
+      consumer,
+      `import type {
+  CapabilityEvidence,
+  EvidenceCategory,
+  ProbeEvidence,
+  ProbeEvidenceStatus,
+  RepositoryInference,
+  RepositoryReader,
+  RepositoryReadErrorCode,
+  RepositoryReadResult,
+  RepositoryStateEvidence,
+  SurfaceEvidence,
+  SurfaceEvidenceStatus,
+} from "@egeria-systems/builder-core";
+
+const errorCode: RepositoryReadErrorCode = "READ_FAILED";
+const readResult: RepositoryReadResult = { kind: "error", code: errorCode };
+const reader: RepositoryReader = { readText: async () => readResult };
+const probeStatus: ProbeEvidenceStatus = "present";
+const probe: ProbeEvidence = { kind: "file", path: "file.txt", status: probeStatus };
+const category: EvidenceCategory = "confirmed";
+const capability: CapabilityEvidence = { identifier: "example", category, probes: [probe] };
+const surfaceStatus: SurfaceEvidenceStatus = "confirmed";
+const surface: SurfaceEvidence = { identifier: "surface", path: "file.txt", status: surfaceStatus };
+const state: RepositoryStateEvidence = { kind: "missing" };
+const inference: RepositoryInference = { state, capabilities: [capability], surfaces: [surface] };
+void [reader, inference];
+`,
+      "utf8",
+    );
+    try {
+      await execFileAsync(
+        process.execPath,
+        [
+          typeScriptCompiler,
+          "--noEmit",
+          "--strict",
+          "--exactOptionalPropertyTypes",
+          "--module",
+          "NodeNext",
+          "--moduleResolution",
+          "NodeNext",
+          "--target",
+          "ES2022",
+          consumer,
+        ],
+        { cwd: temporaryRoot, encoding: "utf8" },
+      );
+    } catch (error) {
+      assert.fail(error?.stdout || error?.stderr || error?.message);
+    }
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
 test("the in-memory reader validates paths before returning content or absence", async () => {
   const reader = core.createInMemoryRepositoryReader({
     "apps/web/file.txt": "safe content",
@@ -294,6 +363,34 @@ test("the filesystem reader rejects symlink ancestors and leaves without followi
         assert.deepEqual(await reader.readText("apps/web/file.txt"), { kind: "symlink" });
       },
     );
+  }
+});
+
+test("the filesystem reader keeps one root identity across reads", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-repository-identity-"));
+
+  try {
+    const root = join(owner, "repository");
+    const priorRoot = join(owner, "prior-repository");
+    await mkdir(root);
+    await writeFile(join(root, "file.txt"), "repository-a", "utf8");
+    const reader = core.createFileSystemRepositoryReader(root);
+
+    assert.deepEqual(await reader.readText("file.txt"), {
+      kind: "file",
+      content: "repository-a",
+    });
+
+    await rename(root, priorRoot);
+    await mkdir(root);
+    await writeFile(join(root, "file.txt"), "repository-b", "utf8");
+
+    assert.deepEqual(await reader.readText("file.txt"), {
+      kind: "error",
+      code: "PATH_INVALID",
+    });
+  } finally {
+    await rm(owner, { recursive: true, force: true });
   }
 });
 
@@ -421,7 +518,10 @@ test("probe failures distinguish missing, mismatch, and ambiguity", async () => 
 
 test("capability inference applies the approved category precedence and omission rule", async () => {
   const confirmed = createDescriptor("confirmed", [{ kind: "file", path: "confirmed.txt" }]);
-  const contradictory = createDescriptor("contradictory", [{ kind: "file", path: "missing.txt" }]);
+  const contradictory = createDescriptor("contradictory", [
+    { kind: "file", path: "contradictory-present.txt" },
+    { kind: "file", path: "missing.txt" },
+  ]);
   const metadataMismatch = createDescriptor("metadata-mismatch", [{ kind: "file", path: "metadata.txt" }]);
   const probable = createDescriptor("probable", [{ kind: "file", path: "probable.txt" }]);
   const partial = createDescriptor("partial", [
@@ -447,6 +547,7 @@ test("capability inference applies the approved category precedence and omission
     catalog: [probable, confirmed, partial, metadataMismatch, absent, contradictory],
     reader: core.createInMemoryRepositoryReader(stateFiles(state, {
       "confirmed.txt": "present",
+      "contradictory-present.txt": "present",
       "metadata.txt": "present",
       "probable.txt": "present",
       "partial-present.txt": "present",
@@ -466,17 +567,77 @@ test("capability inference applies the approved category precedence and omission
   );
 });
 
+test("ambiguous probes take precedence over installed metadata mismatch", async () => {
+  const descriptor = createDescriptor("ambiguous-precedence", [
+    { kind: "json-value", path: "invalid.json", pointer: "/enabled", expected: true },
+  ]);
+  const state = createState({
+    installedCapabilities: [installCapability(descriptor, { version: "0.2.0" })],
+  });
+  const inference = await core.inferRepository({
+    catalog: [descriptor],
+    reader: core.createInMemoryRepositoryReader(stateFiles(state, {
+      "invalid.json": "{ private-token",
+    })),
+  });
+
+  assert.deepEqual(inference.capabilities, [{
+    identifier: "ambiguous-precedence",
+    category: "ambiguous",
+    probes: [{
+      kind: "json-value",
+      path: "invalid.json",
+      status: "ambiguous",
+      code: "JSON_INVALID",
+    }],
+  }]);
+});
+
+test("state classification sets compare independently of declaration order", async () => {
+  const descriptor = {
+    ...createDescriptor("classification-set", [{ kind: "file", path: "present.txt" }]),
+    stateClassifications: ["repository-stateful", "external-stateful"],
+  };
+  const state = createState({
+    installedCapabilities: [
+      installCapability(descriptor, {
+        stateClassifications: ["external-stateful", "repository-stateful"],
+      }),
+    ],
+  });
+  const inference = await core.inferRepository({
+    catalog: [descriptor],
+    reader: core.createInMemoryRepositoryReader(stateFiles(state, {
+      "present.txt": "present",
+    })),
+  });
+
+  assert.equal(inference.capabilities[0]?.category, "confirmed");
+});
+
 test("an unreadable, symlinked, or invalid existing state makes catalog declaration evidence ambiguous", async () => {
   const descriptor = createDescriptor("catalog-capability", [{ kind: "file", path: "present.txt" }]);
   const cases = [
-    core.createInMemoryRepositoryReader({ ".egeria/state.json": "{ private-state-token", "present.txt": "present" }),
-    { readText: async (path) => path === ".egeria/state.json" ? { kind: "symlink" } : { kind: "file", content: "present" } },
-    { readText: async (path) => path === ".egeria/state.json" ? { kind: "error", code: "READ_FAILED" } : { kind: "file", content: "present" } },
+    {
+      reader: core.createInMemoryRepositoryReader({ ".egeria/state.json": "{ private-state-token", "present.txt": "present" }),
+      assertState: (state) => {
+        assert.equal(state.kind, "invalid");
+        assert.equal(state.issues[0]?.code, "STATE_JSON_INVALID");
+      },
+    },
+    {
+      reader: { readText: async (path) => path === ".egeria/state.json" ? { kind: "symlink" } : { kind: "file", content: "present" } },
+      assertState: (state) => assert.deepEqual(state, { kind: "ambiguous", code: "STATE_SYMLINK" }),
+    },
+    {
+      reader: { readText: async (path) => path === ".egeria/state.json" ? { kind: "error", code: "READ_FAILED" } : { kind: "file", content: "present" } },
+      assertState: (state) => assert.deepEqual(state, { kind: "ambiguous", code: "READ_FAILED" }),
+    },
   ];
 
-  for (const reader of cases) {
+  for (const { reader, assertState } of cases) {
     const inference = await core.inferRepository({ reader, catalog: [descriptor] });
-    assert.equal(inference.state.kind === "valid" || inference.state.kind === "missing", false);
+    assertState(inference.state);
     assert.deepEqual(inference.capabilities, [{
       identifier: "catalog-capability",
       category: "ambiguous",
@@ -518,6 +679,14 @@ test("managed and merge-managed surfaces report deterministic drift evidence", a
       mergeStrategy: "json-property",
       fingerprint: core.fingerprintJsonValue(true),
     }),
+    createSurface({
+      identifier: "n-json-drifted",
+      path: "config.json",
+      ownership: "merge-managed",
+      fingerprintTarget: { kind: "json-value", pointer: "/managed" },
+      mergeStrategy: "json-property",
+      fingerprint: core.fingerprintJsonValue({ nested: { a: 1, b: 3 } }),
+    }),
   ];
   const state = createState({ managedSurfaces: surfaces });
   const inference = await core.inferRepository({
@@ -536,6 +705,7 @@ test("managed and merge-managed surfaces report deterministic drift evidence", a
     { identifier: "k-json-missing", path: "config.json", status: "missing", code: "JSON_MEMBER_MISSING" },
     { identifier: "l-json-ambiguous", path: "invalid.json", status: "ambiguous", code: "JSON_INVALID" },
     { identifier: "m-missing", path: "missing.txt", status: "missing" },
+    { identifier: "n-json-drifted", path: "config.json", status: "drifted" },
     { identifier: "z-drifted", path: "drifted.txt", status: "drifted" },
   ]);
   assert.doesNotMatch(JSON.stringify(inference), /different private content|private-token/);

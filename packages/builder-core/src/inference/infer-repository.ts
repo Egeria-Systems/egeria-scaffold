@@ -143,15 +143,18 @@ function installedMetadataMatches(
   installed: InstalledCapability,
   descriptor: CapabilityDescriptor,
 ): boolean {
+  const descriptorStateClassifications = new Set(
+    descriptor.stateClassifications,
+  );
+
   return (
     installed.version === descriptor.version &&
     installed.deliveryMode === descriptor.deliveryMode &&
     installed.removalPolicy === descriptor.removalPolicy &&
     installed.stateClassifications.length ===
       descriptor.stateClassifications.length &&
-    installed.stateClassifications.every(
-      (classification, index) =>
-        classification === descriptor.stateClassifications[index],
+    installed.stateClassifications.every((classification) =>
+      descriptorStateClassifications.has(classification),
     )
   );
 }

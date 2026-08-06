@@ -56,6 +56,10 @@ function sameIdentity(
   return identity.device === stats.dev && identity.inode === stats.ino;
 }
 
+function samePathIdentity(left: PathIdentity, right: PathIdentity): boolean {
+  return left.device === right.device && left.inode === right.inode;
+}
+
 async function validateRoot(root: string): Promise<PathIdentity | undefined> {
   try {
     const stats = await lstat(root, { bigint: true });
@@ -219,6 +223,7 @@ export function createFileSystemRepositoryReader(
 ): RepositoryReader {
   const fixedRoot = resolve(root);
   const absoluteRoot = isAbsolute(root);
+  let fixedRootIdentityPromise: Promise<PathIdentity | undefined> | undefined;
 
   return {
     async readText(path: string): Promise<RepositoryReadResult> {
@@ -226,9 +231,19 @@ export function createFileSystemRepositoryReader(
         return readError("PATH_INVALID");
       }
 
-      const rootIdentity = await validateRoot(fixedRoot);
+      fixedRootIdentityPromise ??= validateRoot(fixedRoot);
+      const rootIdentity = await fixedRootIdentityPromise;
 
       if (rootIdentity === undefined) {
+        return readError("PATH_INVALID");
+      }
+
+      const currentRootIdentity = await validateRoot(fixedRoot);
+
+      if (
+        currentRootIdentity === undefined ||
+        !samePathIdentity(rootIdentity, currentRootIdentity)
+      ) {
         return readError("PATH_INVALID");
       }
 

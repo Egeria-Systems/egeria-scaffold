@@ -7,6 +7,10 @@ export * from "./contracts/profile.js";
 export * from "./contracts/project.js";
 export * from "./contracts/result.js";
 export * from "./contracts/state.js";
+export type {
+  ProbeEvidence,
+  ProbeEvidenceStatus,
+} from "./inference/evaluate-probe.js";
 export * from "./inference/infer-repository.js";
 export * from "./manifest/create-installed-manifest.js";
 export * from "./ownership/fingerprint.js";
