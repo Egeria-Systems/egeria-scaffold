@@ -8,6 +8,8 @@ P1 Task 2 owns the exact six executable capability descriptors for `portfolio` a
 
 P1 Task 3 owns strict YAML 1.2 `project.yaml`, JSON `state.json`, and successful-record JSONL migration codecs. It also owns deterministic SHA-256 fingerprints over exact file bytes or canonical RFC 6901-selected JSON values and pure descriptor-to-installed-surface materialization. These APIs do not create or read repository files.
 
-Repository inference, diagnostics, repository transformation, templates, providers, recovery automation, and every later capability remain outside this increment. The CLI remains empty, and a separate project-schema package is intentionally absent.
+P1 Task 4 owns fixed-root read-only text access and deterministic capability and surface evidence. Filesystem reads reject unsafe paths and requested-path symlinks, require regular files beneath a non-symlink root, cap content at 1 MiB, and require valid UTF-8. Inference reads only `.egeria/state.json`, catalog-declared probes, and valid-state managed surfaces; it returns stable metadata and codes without actual repository values or source content.
+
+Diagnostics, doctor/diff policy, repository transformation, templates, providers, recovery automation, and every later capability remain outside this increment. The CLI remains empty, and a separate project-schema package is intentionally absent.
 
 The canonical API and lifecycle owner is [package ownership](../../docs/architecture/package-ownership.md).

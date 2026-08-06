@@ -193,7 +193,7 @@ test("the private packages compile through the shared strict contract", async ()
   );
 });
 
-test("the CLI remains an empty shell while builder-core owns only approved Task 3 surfaces", async () => {
+test("the CLI remains an empty shell while builder-core owns only approved Task 4 surfaces", async () => {
   const expectedSource = "export {};\n";
 
   assert.deepEqual(
@@ -222,10 +222,13 @@ test("the CLI remains an empty shell while builder-core owns only approved Task 
       "contracts/result.ts",
       "contracts/state.ts",
       "index.ts",
+      "inference/evaluate-probe.ts",
+      "inference/infer-repository.ts",
       "manifest/create-installed-manifest.ts",
       "ownership/fingerprint.ts",
       "ownership/materialize-surfaces.ts",
       "profiles/profile-recipes.ts",
+      "repository/repository-reader.ts",
       "resolution/resolve-capabilities.ts",
       "serialization/canonical-json.ts",
       "state/codecs.ts",
@@ -241,7 +244,7 @@ test("the CLI remains an empty shell while builder-core owns only approved Task 
   );
 });
 
-test("builder-core direct consumers describe the private Task 3 boundary", async () => {
+test("builder-core direct consumers describe the private Task 4 boundary", async () => {
   const builderInstructions = await readFile(
     resolve(repositoryRoot, "packages/builder-core/AGENTS.md"),
     "utf8",
@@ -255,20 +258,20 @@ test("builder-core direct consumers describe the private Task 3 boundary", async
     "utf8",
   );
 
-  assert.match(builderInstructions, /P1 Task 3/);
-  assert.match(builderInstructions, /strict `.egeria` codecs/);
-  assert.match(builderInstructions, /does not create `.egeria` files/);
-  assert.match(builderInstructions, /inference remains deferred to Task 4/);
+  assert.match(builderInstructions, /P1 Task 4/);
+  assert.match(builderInstructions, /fixed-root read-only repository access/);
+  assert.match(builderInstructions, /does not enumerate or write/);
+  assert.match(builderInstructions, /Diagnostics remain deferred to Task 5/);
 
-  assert.match(builderReadme, /P1 Task 3/);
-  assert.match(builderReadme, /YAML 1.2/);
-  assert.match(builderReadme, /SHA-256/);
+  assert.match(builderReadme, /P1 Task 4/);
+  assert.match(builderReadme, /1 MiB/);
+  assert.match(builderReadme, /deterministic capability and surface evidence/);
   assert.match(builderReadme, /The CLI remains empty/);
 
-  assert.match(packageOwnership, /through P1 Task 3/);
+  assert.match(packageOwnership, /through P1 Task 4/);
   assert.match(packageOwnership, /strict `.egeria` codecs/);
-  assert.match(packageOwnership, /hybrid-ownership fingerprints/);
-  assert.match(packageOwnership, /creates no `.egeria` files/);
+  assert.match(packageOwnership, /read-only repository inference/);
+  assert.match(packageOwnership, /creates no `.egeria` files and performs no repository write/);
   assert.doesNotMatch(
     packageOwnership,
     /`packages\/builder-core`[^\n]*Empty ESM ownership shell/,
