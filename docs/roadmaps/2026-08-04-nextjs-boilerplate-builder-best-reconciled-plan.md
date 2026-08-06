@@ -1001,6 +1001,21 @@ The first client launch is not blocked by a mandatory manual review under the de
 - current-major and previous-major upgrade fixtures;
 - package public-API contract tests.
 
+### Builder CLI lifecycle end-to-end boundary
+
+In addition to in-process unit and integration coverage, the builder maintains a bounded end-to-end layer that invokes the compiled CLI as a child process against isolated temporary Git repositories and worktrees. These tests assert the real arguments, working directory, stdout, stderr, stable JSON, exit code, repository diff, post-change inference, state-update ordering, and cleanup boundaries without using a shell.
+
+Required representative scenarios are:
+
+1. a successful capability addition;
+2. refusal of an addition when the repository is dirty, materially drifted, or incompatible;
+3. a successful supported capability upgrade;
+4. refusal of an unsupported version edge without repository or state mutation;
+5. a successful migration whose post-change inference agrees and whose state and migration records update only after transformation verification;
+6. an injected transformation or verification failure that leaves the original repository and authoritative state unchanged and produces recovery evidence.
+
+Unit, property-based, and temporary-repository integration tests remain responsible for exhaustive policy, combination, failure-point, and supported-version-edge coverage. Compiled-CLI end-to-end cases remain risk-based and representative rather than Cartesian. This builder layer performs no deployment, production action, persistent-data or provider mutation, or claim about the generated application's runtime behavior; those require their separately approved application, staging, provider, and recovery evidence.
+
 ### Generated applications
 
 1. Unit tests for domain policies, transformations, content normalization, and state transitions.
@@ -1012,6 +1027,28 @@ The first client launch is not blocked by a mandatory manual review under the de
 7. Deterministic visual regression in a pinned environment.
 8. Measured profile-specific performance baselines and calibrated regression thresholds.
 9. Migration tests in temporary Git repositories.
+
+### Capability certification journeys
+
+Every independently selectable capability receives a certification journey from the smallest supported generated-project baseline. Before P3, a capability delivered during initial scaffolding is exercised from actual generated output. From P3 onward, every capability advertised as addable later must also be exercised as a fresh addition through the compiled CLI. The journey re-infers the repository, verifies the exact diff and `.egeria` state, installs and builds the generated project, runs an OpenNext preview, and executes the affected browser, runtime, integration, migration, removal, and recovery checks.
+
+A capability whose declared state or behavior includes an external provider, persistent data, privileged or security-sensitive operations, or another outcome that local execution cannot establish also requires a separately approved capability-specific deployed certification plan before its phase can close. Each plan must name:
+
+- prerequisites, supported baseline, and the exact initial-scaffolding selection or compiled-CLI operation;
+- configuration and provisioning ownership, protected non-production environment, synthetic identities and data, and secret boundaries;
+- the provider- or system-confirmed success outcome, correlation and idempotency evidence where applicable, and any approved substitute when the provider offers no safe test facility;
+- bounded polling and timeout rules for eventual consistency, plus rate limits, quotas, spend limits, evidence retention, and rerun triggers;
+- cleanup, rollback, recovery, and proof that production and real client data, identities, messages, and money are not used.
+
+Deployed journeys run through GitHub Actions under protected staging environments. They are phase and release certification gates, not a Cartesian matrix or a mandatory live-provider run on every pull request. They rerun when the affected capability, provider contract, deployment boundary, supported upgrade edge, or recovery behavior materially changes.
+
+Certification is introduced in stages:
+
+1. P2 certifies `booking-calendly` selected during initial portfolio scaffolding: deploy the minimal generated portfolio to protected staging, configure a synthetic Calendly event, complete a synthetic booking through the rendered integration, and verify the provider-side event and user-visible success and fallback paths. This is not evidence for later CLI addition or webhook ingestion.
+2. P3 establishes the reusable certification contract and repeats `booking-calendly` as the first fresh-added-capability journey by adding it through the compiled CLI to a minimal existing supported project, re-inferring, deploying, and verifying the same bounded booking outcome.
+3. From P5 onward, every new independently selectable capability completes the base certification journey, and every capability meeting the external, persistent-data, privileged, or security-sensitive criteria completes its own approved deployed certification plan before phase acceptance.
+4. P9 certifies `booking-webhooks` separately on its supported application baseline: create the non-production webhook subscription, make a synthetic booking, verify signature validation, normalized and idempotent receipt, replay and cancellation behavior, and injected failure and recovery. It does not treat the P2 or P3 `booking-calendly` journey as webhook evidence.
+5. P10 reruns selected deployed capability journeys across representative real-fleet repositories and supported upgrade paths, based on observed risk rather than capability-profile Cartesian coverage.
 
 ### Risk-based fixture matrix
 
@@ -1070,6 +1107,7 @@ Pull-request gates include, as relevant:
 - production build and OpenNext preview smoke;
 - Chromium Playwright and axe checks;
 - affected migration fixtures;
+- affected compiled-CLI lifecycle end-to-end fixtures;
 - security checks matched to changed scope.
 
 Release gates include:
@@ -1081,6 +1119,7 @@ Release gates include:
 - supported upgrade matrix;
 - package API and release validation;
 - deployment smoke;
+- applicable capability-specific deployed certification and cleanup/recovery evidence;
 - explicit approval for stateful production and persistent-data migrations.
 
 Preview URLs are protected where necessary. Persistent staging is required for CMS, identity, billing, and other stateful applications.
@@ -1185,6 +1224,7 @@ P10 Fleet hardening, package review, and portability evidence
 - bounded section catalog;
 - responsive accessible UI;
 - Calendly link/inline/popup with lazy enhancement and fallback;
+- protected-staging certification of `booking-calendly` selected during initial scaffolding, including a synthetic booking and provider-confirmed outcome;
 - production observability;
 - CI/deployment, visual, performance, and automated accessibility gates;
 - real client project generated and retained as migration evidence.
@@ -1197,7 +1237,9 @@ P10 Fleet hardening, package review, and portability evidence
 - ownership-aware migrations;
 - drift reconciliation;
 - current/previous-major upgrade matrix;
-- portfolio-to-site transition.
+- portfolio-to-site transition;
+- bounded compiled-CLI end-to-end coverage for representative capability addition, upgrade, migration, refusal, and recovery paths;
+- reusable capability-certification contract and the first fresh-added `booking-calendly` staging journey.
 
 #### P4 — Site and app foundation
 
@@ -1209,6 +1251,8 @@ P10 Fleet hardening, package review, and portability evidence
 #### P5A–P5F — Independent backend and growth capabilities
 
 Implement multilingual, analytics, persistence, Resend email, Cloudflare job delivery, and durable contact submissions as separate capability prompts.
+
+Each capability completes its base fresh-project certification journey. Capabilities with provider, persistent-data, privileged, or security-sensitive behavior also complete a separately approved deployed certification plan before their phase is accepted.
 
 #### P6 — Payload CMS
 
@@ -1241,7 +1285,8 @@ Implement multilingual, analytics, persistence, Resend email, Cloudflare job del
 - idempotent receipts;
 - normalized booking events;
 - optional queue-backed processing;
-- operational replay and failure handling.
+- operational replay and failure handling;
+- a separate protected-staging certification journey covering synthetic booking, webhook receipt, replay, cancellation, injected failure, and recovery.
 
 #### P10 — Fleet hardening
 
@@ -1252,6 +1297,7 @@ After real client evidence:
 - simplify weak abstractions;
 - verify current/previous-major upgrades;
 - run data/provider recovery drills;
+- rerun selected deployed capability journeys across representative real-fleet repositories and supported upgrades;
 - perform a bounded portability spike without claiming another supported production platform.
 
 ## 22. Program acceptance principles
