@@ -1,0 +1,7 @@
+metadata:
+  title: {{displayNameJson}}
+  description: A focused portfolio.
+home:
+  heading: {{displayNameJson}}
+  summary: A concise introduction to selected work.
+navigation: []

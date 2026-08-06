@@ -105,14 +105,14 @@ apps/web/src/content/content-schema.ts
 apps/web/src/content/read-content.ts
 apps/web/src/presentation/content-page.tsx
 apps/web/src/infrastructure/observability/installed-capability.ts
-apps/web/content/en-CA/site.json
+apps/web/content/en-CA/site.yaml
 ```
 
 `site` adds:
 
 ```text
 apps/web/app/about/page.tsx
-apps/web/content/en-CA/about.json
+apps/web/content/en-CA/about.yaml
 ```
 
 Generation adds, rather than templates, these state files:
@@ -407,7 +407,7 @@ Every descriptor uses `threatReviewLevel: "standard"`; `optionalIntegrations`, `
 | Identifier | Required packages | Platform resources | Adapter semantics | Verification plan | Documentation evidence | Removal and recovery |
 | --- | --- | --- | --- | --- | --- | --- |
 | `standards` | `@egeria-systems/standards` | none | none | `package-resolution`, `lint`, `typecheck` | `public-package-version-and-provenance` | `review-package-and-configuration-removal` |
-| `content-files` | none | none | none | `content-contracts`, `typecheck` | `copy-externalization` | `review-content-and-source-removal` |
+| `content-files` | `yaml` | none | none | `content-contracts`, `typecheck` | `copy-externalization` | `review-content-and-source-removal` |
 | `section-composition` | none | none | none | `typecheck`, `next-build` | `bounded-section-composition` | `review-route-and-presentation-removal` |
 | `deployment-cloudflare` | `@opennextjs/cloudflare`, `wrangler` | `cloudflare-worker`, `cloudflare-static-assets` | `node-runtime`, `worker-static-assets` | `next-build`, `opennext-build`, `wrangler-types` | `nextjs-opennext-cloudflare-compatibility` | `review-deployment-source-and-provider-state-separately` |
 | `observability` | `@egeria-systems/observability` | none | none | `package-resolution`, `typecheck`, `next-build` | `public-package-version-and-provenance`, `analytics-separation` | `review-package-and-registration-removal` |
@@ -439,11 +439,11 @@ The required P1 inference probes are exact:
 | Capability | Required probes |
 | --- | --- |
 | `standards` | package `apps/web/package.json#/devDependencies/@egeria-systems~1standards = packageVersions.standards`; files `apps/web/tsconfig.json`, `apps/web/eslint.config.mjs` |
-| `content-files` | files `apps/web/content/en-CA/site.json`, `apps/web/src/content/content-schema.ts`, `apps/web/src/content/read-content.ts` |
+| `content-files` | package `apps/web/package.json#/dependencies/yaml = 2.9.0`; files `apps/web/content/en-CA/site.yaml`, `apps/web/src/content/content-schema.ts`, `apps/web/src/content/read-content.ts` |
 | `section-composition` | files `apps/web/app/page.tsx`, `apps/web/src/presentation/content-page.tsx` |
 | `deployment-cloudflare` | package `apps/web/package.json#/dependencies/@opennextjs~1cloudflare = 1.20.2`; package `apps/web/package.json#/devDependencies/wrangler = 4.118.0`; files `apps/web/next.config.ts`, `apps/web/open-next.config.ts`, `apps/web/wrangler.jsonc` |
 | `observability` | package `apps/web/package.json#/dependencies/@egeria-systems~1observability = packageVersions.observability`; file `apps/web/src/infrastructure/observability/installed-capability.ts` |
-| `site-routing` | files `apps/web/app/about/page.tsx`, `apps/web/content/en-CA/about.json` |
+| `site-routing` | files `apps/web/app/about/page.tsx`, `apps/web/content/en-CA/about.yaml` |
 
 Capability-managed surfaces use those exact package JSON pointers and files. Baseline workspace files not semantically owned by one capability use `owner: { kind: "builder-kernel" }`. Configuration files are `managed`, package JSON pointers are `merge-managed` with `json-property`, and generated content/presentation/README/AGENTS surfaces are `application-owned` after creation.
 
@@ -454,7 +454,8 @@ The exact Task 2 surface identifiers and ownership are:
 | `standards-package` | `standards` | `apps/web/package.json#/devDependencies/@egeria-systems~1standards` | `merge-managed`, `json-property` |
 | `standards-typescript-configuration` | `standards` | `apps/web/tsconfig.json` file | `managed`, `replace-file` |
 | `standards-eslint-configuration` | `standards` | `apps/web/eslint.config.mjs` file | `managed`, `replace-file` |
-| `content-files-site-content` | `content-files` | `apps/web/content/en-CA/site.json` file | `application-owned`, `replace-file` |
+| `content-files-yaml-package` | `content-files` | `apps/web/package.json#/dependencies/yaml` | `merge-managed`, `json-property` |
+| `content-files-site-content` | `content-files` | `apps/web/content/en-CA/site.yaml` file | `application-owned`, `replace-file` |
 | `content-files-schema` | `content-files` | `apps/web/src/content/content-schema.ts` file | `application-owned`, `replace-file` |
 | `content-files-reader` | `content-files` | `apps/web/src/content/read-content.ts` file | `application-owned`, `replace-file` |
 | `section-composition-home-route` | `section-composition` | `apps/web/app/page.tsx` file | `application-owned`, `replace-file` |
@@ -467,7 +468,7 @@ The exact Task 2 surface identifiers and ownership are:
 | `observability-package` | `observability` | `apps/web/package.json#/dependencies/@egeria-systems~1observability` | `merge-managed`, `json-property` |
 | `observability-registration` | `observability` | `apps/web/src/infrastructure/observability/installed-capability.ts` file | `managed`, `replace-file` |
 | `site-routing-about-route` | `site-routing` | `apps/web/app/about/page.tsx` file | `application-owned`, `replace-file` |
-| `site-routing-about-content` | `site-routing` | `apps/web/content/en-CA/about.json` file | `application-owned`, `replace-file` |
+| `site-routing-about-content` | `site-routing` | `apps/web/content/en-CA/about.yaml` file | `application-owned`, `replace-file` |
 
 - [ ] **Step 1: Write resolution and direct-boundary tests**
 
@@ -936,6 +937,8 @@ Stop for explicit user approval before Task 6.
 
 ## Task 6: Deterministic Portfolio and Site Rendering
 
+**Review amendment (2026-08-06):** Accepted ADR-0008 and the controlling source plan require YAML 1.2 structured content. They supersede the JSON paths that appeared in the initial task plan. Task 6 therefore materializes `site.yaml` and `about.yaml`, uses exact ordinary dependency `yaml@2.9.0`, and updates the content capability package/path ownership atomically. No installed state exists, so no migration is required.
+
 **Files:**
 
 - Create: `packages/builder-core/src/generation/template-catalog.ts`
@@ -961,9 +964,9 @@ Stop for explicit user approval before Task 6.
 - Create: `packages/builder-core/templates/common/apps/web/src/content/read-content.ts`
 - Create: `packages/builder-core/templates/common/apps/web/src/presentation/content-page.tsx`
 - Create: `packages/builder-core/templates/common/apps/web/src/infrastructure/observability/installed-capability.ts`
-- Create: `packages/builder-core/templates/portfolio/apps/web/content/en-CA/site.json.template`
-- Create: `packages/builder-core/templates/site/apps/web/content/en-CA/site.json.template`
-- Create: `packages/builder-core/templates/site/apps/web/content/en-CA/about.json.template`
+- Create: `packages/builder-core/templates/portfolio/apps/web/content/en-CA/site.yaml.template`
+- Create: `packages/builder-core/templates/site/apps/web/content/en-CA/site.yaml.template`
+- Create: `packages/builder-core/templates/site/apps/web/content/en-CA/about.yaml.template`
 - Create: `packages/builder-core/templates/site/apps/web/app/about/page.tsx`
 - Create: `packages/builder-core/tests/render-skeleton.test.mjs`
 - Modify: `packages/builder-core/src/index.ts`
@@ -999,11 +1002,11 @@ Allowed template tokens are exactly `projectName`, `displayNameJson`, and `worke
 
 Generated `apps/web/package.json` pins the accepted exact proof versions. It declares standards and observability as ordinary exact stable versions supplied by `CapabilityPackageVersions` and never uses `workspace:`, `file:`, a Git source, URL source, range, or prerelease. Before the separate release prerequisite is complete, render tests use explicit synthetic `0.1.0` values only as in-memory contract data and do not write or claim an installable generated repository.
 
-Generated visible copy exists only in JSON:
+Generated visible copy exists only in YAML 1.2:
 
-- portfolio `site.json`: localized metadata title/description, one home heading, one home summary, and an empty navigation array;
-- site `site.json`: the same home fields plus localized Home/About navigation labels;
-- site `about.json`: localized heading and summary.
+- portfolio `site.yaml`: localized metadata title/description, one home heading, one home summary, and an empty navigation array;
+- site `site.yaml`: the same home fields plus localized Home/About navigation labels;
+- site `about.yaml`: localized heading and summary.
 
 Components parse content into typed data. `ContentPage` is pure and accepts `{ heading, summary, navigation }`; route modules perform content loading. No JSX literal is user-facing.
 
@@ -1208,7 +1211,7 @@ Stop for explicit user approval before Task 8.
 - Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/app/globals.css`
 - Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/app/layout.tsx`
 - Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/app/page.tsx`
-- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/content/en-CA/site.json`
+- Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/content/en-CA/site.yaml`
 - Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/src/content/content-schema.ts`
 - Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/src/content/read-content.ts`
 - Create from exact portfolio CLI output: `fixtures/generated/portfolio/apps/web/src/presentation/content-page.tsx`
@@ -1234,8 +1237,8 @@ Stop for explicit user approval before Task 8.
 - Create from exact site CLI output: `fixtures/generated/site/apps/web/app/layout.tsx`
 - Create from exact site CLI output: `fixtures/generated/site/apps/web/app/page.tsx`
 - Create from exact site CLI output: `fixtures/generated/site/apps/web/app/about/page.tsx`
-- Create from exact site CLI output: `fixtures/generated/site/apps/web/content/en-CA/site.json`
-- Create from exact site CLI output: `fixtures/generated/site/apps/web/content/en-CA/about.json`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/content/en-CA/site.yaml`
+- Create from exact site CLI output: `fixtures/generated/site/apps/web/content/en-CA/about.yaml`
 - Create from exact site CLI output: `fixtures/generated/site/apps/web/src/content/content-schema.ts`
 - Create from exact site CLI output: `fixtures/generated/site/apps/web/src/content/read-content.ts`
 - Create from exact site CLI output: `fixtures/generated/site/apps/web/src/presentation/content-page.tsx`

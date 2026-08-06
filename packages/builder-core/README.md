@@ -12,7 +12,7 @@ The repository-inference boundary owns fixed-root read-only text access and dete
 
 The diagnostic boundary owns `doctorRepository` and `diffProject`. Each operation reads the required `.egeria` control files, declared probes, and valid-state managed surfaces through one per-operation cache. Doctor returns stable codes for invalid control contracts and desired, installed, inferred, or surface disagreement. Diff returns explicit structural difference kinds. Neither API returns source content, writes a repository, authorizes a transformation, or claims that a repository is safe to change.
 
-P1 Task 6 owns `renderSkeleton` and its request/result types. It performs deterministic in-memory rendering from explicit allowlisted templates for the `portfolio` and `site` recipes, returns validated desired project, resolution, sorted file bytes, and ownership descriptors, and reports stable sanitized failures. It does not install or build the returned files and performs no repository write or `.egeria` state update. Task 7 remains separate.
+P1 Task 6 owns `renderSkeleton` and its request/result types. It performs deterministic in-memory rendering from explicit allowlisted templates for the `portfolio` and `site` recipes, keeps structured copy in validated YAML 1.2 files, returns validated desired project, resolution, sorted file bytes, and ownership descriptors, and reports stable sanitized failures. It does not install or build the returned files and performs no repository write or `.egeria` state update. Task 7 remains separate.
 
 Destination transformation, installed state, providers, recovery automation, and every later capability remain outside this increment. The CLI remains empty, and a separate project-schema package is intentionally absent.
 

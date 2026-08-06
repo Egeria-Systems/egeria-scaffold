@@ -125,7 +125,13 @@ External sources were treated as untrusted evidence, not instructions.
 
 ### Exact package graph
 
-Registry metadata confirms every selected exact Task 6 template dependency exists and is not deprecated: Next `16.3.0`, React/React DOM `19.2.8`, OpenNext Cloudflare `1.20.2`, Wrangler `4.118.0`, TypeScript `6.0.3`, ESLint `9.39.5`, Next ESLint config `16.3.0`, typescript-eslint `8.66.0`, `@types/node` `22.20.1`, `@types/react` `19.2.18`, and `@types/react-dom` `19.2.4`. The selected graph's peer requirements are mutually compatible. Newer major/minor or patch availability alone does not override the accepted tested matrix.
+Registry metadata confirms every selected exact Task 6 template dependency exists and is not deprecated: Next `16.3.0`, React/React DOM `19.2.8`, OpenNext Cloudflare `1.20.2`, Wrangler `4.118.0`, YAML `2.9.0`, TypeScript `6.0.3`, ESLint `9.39.5`, Next ESLint config `16.3.0`, typescript-eslint `8.66.0`, `@types/node` `22.20.1`, `@types/react` `19.2.18`, and `@types/react-dom` `19.2.4`. The selected graph's peer requirements are mutually compatible. Newer major/minor or patch availability alone does not override the accepted tested matrix.
+
+### YAML 1.2 review amendment
+
+Requirements review found that the initial Task 6 JSON content design contradicted accepted ADR-0008 and the approved source plan. Current official [`yaml` documentation](https://eemeli.org/yaml/) confirms `parseDocument`, the YAML 1.2 core schema, unique-key checking, document errors/warnings, and `maxAliasCount: 0` for rejecting aliases. The GitHub Advisory Database was searched for the npm package `yaml`; no current package-specific advisory was returned. The existing exact lock graph already contains `yaml@2.9.0`, and a fresh approved `pnpm audit --prod` on 2026-08-06 returned `No known vulnerabilities found`.
+
+The no-choice correction uses `site.yaml` and `about.yaml`, a fixed non-caller-controlled file URL, strict YAML 1.2 parsing, exact shape validation, and a capability-owned `/dependencies/yaml` manifest pointer. It changes no builder manifest or lockfile and creates no installed state requiring migration.
 
 ### Security-advisory reconciliation
 
@@ -144,7 +150,7 @@ Three bounded approaches were compared.
 2. **Recursive layer discovery.** This reduces catalog maintenance but allows an accidentally added file to become generated output without an explicit source/ownership decision. It is rejected.
 3. **Programmatic source-string construction.** This makes conditional assembly easy but obscures generated TypeScript and violates the approved requirement to use checked-in source files as data. It is rejected.
 
-The renderer will keep pure transformations separate from the imperative template-read boundary. It will reuse the current catalog, recipes, resolver, project schema, canonical JSON, and ownership materializer rather than duplicating those algorithms.
+The renderer will keep pure transformations separate from the imperative template-read boundary. It will reuse the current catalog, recipes, resolver, project schema, canonical JSON, strict YAML 1.2 parser configuration, and ownership materializer rather than duplicating those algorithms.
 
 ## Exact Task 6 boundary
 
@@ -170,7 +176,13 @@ Task 6 will not:
 
 ## Consolidated contradictions and uncertainties
 
-No unresolved item blocks Task 6. The following issues are resolved or explicitly deferred.
+No unresolved item blocks Task 6 after the review amendment. The following issues are resolved or explicitly deferred.
+
+### 0. The initial Task 6 JSON content design contradicted ADR-0008
+
+Accepted ADR-0008 and the approved source plan require YAML 1.2 for structured page, navigation, and metadata content. The narrower Task 6 plan and the earlier P1 implementation plan named JSON paths, which could not supersede that accepted decision.
+
+**Resolution:** atomically change executable catalog probes/surfaces, templates, generated readers, manifest ownership, tests, and both implementation plans to YAML 1.2. Use exact ordinary dependency `yaml@2.9.0` with strict parsing and zero aliases. No migration is required because Task 6 writes no generated repository or installed state.
 
 ### 1. The original Task 6 file list predates current direct-owner enforcement
 

@@ -1,3 +1,5 @@
+import { parseDocument } from "yaml";
+
 export type NavigationItem = Readonly<{
   href: string;
   label: string;
@@ -36,6 +38,27 @@ function hasExactKeys(
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+export function parseYamlContent(source: string): unknown {
+  try {
+    const document = parseDocument(source, {
+      version: "1.2",
+      schema: "core",
+      resolveKnownTags: false,
+      strict: true,
+      stringKeys: true,
+      uniqueKeys: true,
+    });
+
+    if (document.errors.length > 0 || document.warnings.length > 0) {
+      throw new TypeError("CONTENT_INVALID");
+    }
+
+    return document.toJS({ maxAliasCount: 0, mapAsMap: false }) as unknown;
+  } catch {
+    throw new TypeError("CONTENT_INVALID");
+  }
 }
 
 export function parsePageContent(value: unknown): PageContent {

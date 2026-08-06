@@ -30,12 +30,12 @@ const commonTemplateSources = [
 ] as const;
 
 const portfolioTemplateSources = [
-  "portfolio/apps/web/content/en-CA/site.json.template",
+  "portfolio/apps/web/content/en-CA/site.yaml.template",
 ] as const;
 
 const siteTemplateSources = [
-  "site/apps/web/content/en-CA/site.json.template",
-  "site/apps/web/content/en-CA/about.json.template",
+  "site/apps/web/content/en-CA/site.yaml.template",
+  "site/apps/web/content/en-CA/about.yaml.template",
   "site/apps/web/app/about/page.tsx",
 ] as const;
 

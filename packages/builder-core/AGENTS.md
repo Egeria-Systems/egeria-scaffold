@@ -9,7 +9,7 @@ Read the repository [`AGENTS.md`](../../AGENTS.md), the canonical [package owner
 - Keep reads fixed to explicitly declared control, probe, and valid-state surface paths. The reader does not enumerate or write, follows no requested-path symlink, caps text reads at 1 MiB, and emits no source content through evidence.
 - Keep inference evidence separate from policy. Read-only diagnostics compose existing codecs, resolution, and inference; they neither authorize nor perform a repository change.
 - Keep generation limited to the exact `src/generation` modules and checked-in `templates/common`, `templates/portfolio`, and `templates/site` allowlists. Catalog entries are explicit; do not enumerate or accept a caller-supplied template root.
-- Permit only the strict `projectName`, `displayNameJson`, and `workerName` template tokens. Preserve deterministic LF-normalized bytes, code-point ordering, externalized runtime copy, pure presentation, and current ownership validation.
+- Permit only the strict `projectName`, `displayNameJson`, and `workerName` template tokens. Preserve deterministic LF-normalized bytes, code-point ordering, YAML 1.2 externalized runtime copy, pure presentation, and current ownership validation.
 - Do not add destination writes, installed state, migration execution, recovery automation, provider integration, CLI behavior, or later-stage capability runtime code.
 - Do not create or move schema ownership into a separate `project-schema` package.
 - Do not expose builder-core as a public package or add generic `PlatformService` or `ApplicationDatabase` ports.

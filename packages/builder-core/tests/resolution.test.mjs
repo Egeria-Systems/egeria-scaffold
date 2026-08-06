@@ -137,7 +137,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
       optionalIntegrations: [],
       conflicts: [],
       supportedProfiles: ["portfolio", "site"],
-      requiredPackages: [],
+      requiredPackages: ["yaml"],
       environmentVariables: [],
       secrets: [],
       platformResources: [],
@@ -151,9 +151,20 @@ test("the portfolio and site catalog declares the exact six executable capabilit
       adapterSemanticRequirements: [],
       managedSurfaces: [
         {
+          identifier: "content-files-yaml-package",
+          owner: { kind: "capability", identifier: "content-files" },
+          path: "apps/web/package.json",
+          ownership: "merge-managed",
+          fingerprintTarget: {
+            kind: "json-value",
+            pointer: "/dependencies/yaml",
+          },
+          mergeStrategy: "json-property",
+        },
+        {
           identifier: "content-files-site-content",
           owner: { kind: "capability", identifier: "content-files" },
-          path: "apps/web/content/en-CA/site.json",
+          path: "apps/web/content/en-CA/site.yaml",
           ownership: "application-owned",
           fingerprintTarget: { kind: "file" },
           mergeStrategy: "replace-file",
@@ -176,7 +187,14 @@ test("the portfolio and site catalog declares the exact six executable capabilit
         },
       ],
       inferenceProbes: [
-        { kind: "file", path: "apps/web/content/en-CA/site.json" },
+        {
+          kind: "package",
+          path: "apps/web/package.json",
+          section: "dependencies",
+          packageName: "yaml",
+          version: "2.9.0",
+        },
+        { kind: "file", path: "apps/web/content/en-CA/site.yaml" },
         { kind: "file", path: "apps/web/src/content/content-schema.ts" },
         { kind: "file", path: "apps/web/src/content/read-content.ts" },
       ],
@@ -439,7 +457,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
         {
           identifier: "site-routing-about-content",
           owner: { kind: "capability", identifier: "site-routing" },
-          path: "apps/web/content/en-CA/about.json",
+          path: "apps/web/content/en-CA/about.yaml",
           ownership: "application-owned",
           fingerprintTarget: { kind: "file" },
           mergeStrategy: "replace-file",
@@ -447,7 +465,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
       ],
       inferenceProbes: [
         { kind: "file", path: "apps/web/app/about/page.tsx" },
-        { kind: "file", path: "apps/web/content/en-CA/about.json" },
+        { kind: "file", path: "apps/web/content/en-CA/about.yaml" },
       ],
       migrationPlanners: [],
       verificationPlan: ["typecheck", "next-build"],

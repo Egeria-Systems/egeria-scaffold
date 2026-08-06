@@ -273,10 +273,10 @@ test("the CLI remains an empty shell while builder-core owns only approved deter
       "common/apps/web/wrangler.jsonc.template",
       "common/package.json.template",
       "common/pnpm-workspace.yaml",
-      "portfolio/apps/web/content/en-CA/site.json.template",
+      "portfolio/apps/web/content/en-CA/site.yaml.template",
       "site/apps/web/app/about/page.tsx",
-      "site/apps/web/content/en-CA/about.json.template",
-      "site/apps/web/content/en-CA/site.json.template",
+      "site/apps/web/content/en-CA/about.yaml.template",
+      "site/apps/web/content/en-CA/site.yaml.template",
     ],
   );
 });
@@ -305,6 +305,7 @@ test("builder-core direct consumers describe the private deterministic rendering
   assert.match(builderInstructions, /neither authorize nor perform a repository change/);
   assert.match(builderInstructions, /deterministic in-memory rendering/);
   assert.match(builderInstructions, /explicit allowlisted templates/);
+  assert.match(builderInstructions, /YAML 1.2/);
   assert.match(builderInstructions, /no repository write or `.egeria` state update/);
 
   assert.match(builderReadme, /1 MiB/);
@@ -313,6 +314,7 @@ test("builder-core direct consumers describe the private deterministic rendering
   assert.match(builderReadme, /renderSkeleton/);
   assert.match(builderReadme, /deterministic in-memory rendering/);
   assert.match(builderReadme, /explicit allowlisted templates/);
+  assert.match(builderReadme, /YAML 1.2/);
   assert.match(builderReadme, /no repository write or `.egeria` state/);
   assert.match(builderReadme, /The CLI remains empty/);
 
@@ -320,6 +322,7 @@ test("builder-core direct consumers describe the private deterministic rendering
   assert.match(packageOwnership, /canonical private owner/i);
   assert.match(packageOwnership, /deterministic in-memory rendering/);
   assert.match(packageOwnership, /explicit allowlisted templates/);
+  assert.match(packageOwnership, /YAML 1.2/);
   assert.match(packageOwnership, /strict `.egeria` codecs/);
   assert.match(packageOwnership, /read-only repository inference/);
   assert.match(packageOwnership, /doctorRepository/);
@@ -331,6 +334,7 @@ test("builder-core direct consumers describe the private deterministic rendering
   assert.match(enforcementMap, /exact source and template allowlists/);
   assert.match(enforcementMap, /render-skeleton\.test\.mjs/);
   assert.match(enforcementMap, /deterministic in-memory rendering/);
+  assert.match(enforcementMap, /YAML 1.2/);
   assert.doesNotMatch(
     packageOwnership,
     /`packages\/builder-core`[^\n]*Empty ESM ownership shell/,

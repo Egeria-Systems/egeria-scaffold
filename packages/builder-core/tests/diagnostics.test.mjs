@@ -379,6 +379,7 @@ test("doctor and diff agree across the canonical portfolio composition", async (
       dependencies: {
         "@egeria-systems/observability": "4.5.6",
         "@opennextjs/cloudflare": "1.20.2",
+        yaml: "2.9.0",
       },
       devDependencies: {
         "@egeria-systems/standards": "1.2.3",
@@ -387,7 +388,7 @@ test("doctor and diff agree across the canonical portfolio composition", async (
     }, null, 2)}\n`,
     "apps/web/tsconfig.json": "{}\n",
     "apps/web/eslint.config.mjs": "export default [];\n",
-    "apps/web/content/en-CA/site.json": "{}\n",
+    "apps/web/content/en-CA/site.yaml": "{}\n",
     "apps/web/src/content/content-schema.ts": "export {};\n",
     "apps/web/src/content/read-content.ts": "export {};\n",
     "apps/web/app/page.tsx": "export default function Page() {}\n",

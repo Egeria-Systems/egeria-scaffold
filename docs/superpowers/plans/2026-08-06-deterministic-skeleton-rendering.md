@@ -6,7 +6,7 @@
 
 **Architecture:** A private explicit catalog selects common templates plus one profile overlay. A pure strict renderer validates source names, destination paths, and the exact three-token grammar. An imperative shell reads the allowlisted templates, composes the existing catalog/profile/resolver/project contracts, inserts the supplied public-package versions structurally into parsed JSON, validates every declared ownership target, and returns sorted bytes without writing a repository or `.egeria` state.
 
-**Tech stack:** Node.js `22.23.0` as the accepted repository pin, pnpm `11.20.0`, TypeScript `6.0.3`, Zod `4.4.3`, Node test runner, Next.js `16.3.0`, React/React DOM `19.2.8`, OpenNext Cloudflare `1.20.2`, Wrangler `4.118.0`, ESLint `9.39.5`.
+**Tech stack:** Node.js `22.23.0` as the accepted repository pin, pnpm `11.20.0`, TypeScript `6.0.3`, Zod `4.4.3`, YAML `2.9.0`, Node test runner, Next.js `16.3.0`, React/React DOM `19.2.8`, OpenNext Cloudflare `1.20.2`, Wrangler `4.118.0`, ESLint `9.39.5`.
 
 **Design authority:** [`2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md`](../../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md), accepted ADRs `0001`–`0011`, and the approved P1 Task 6 design in [`2026-08-05-p1-builder-kernel.md`](2026-08-05-p1-builder-kernel.md). Preparation and current-source evidence is recorded in [`2026-08-06-deterministic-skeleton-rendering-preparation.md`](../../implementation-evidence/2026-08-06-deterministic-skeleton-rendering-preparation.md).
 
@@ -47,9 +47,15 @@ Use the pinned pnpm executable in every repository command:
 /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm
 ```
 
+### Review amendment — YAML 1.2 canonical content
+
+The requirements review after commit `bd9e176` found that this plan's JSON content paths contradicted accepted [ADR-0008](../../adr/0008-copy-externalization.md) and the approved source plan, which require YAML 1.2 for structured content. Accepted ADRs own architecture decisions, so the user-approved no-choice amendment replaces the content files with `site.yaml` and `about.yaml`, uses the already-vetted exact `yaml@2.9.0` ordinary dependency, and updates the executable content capability path/package ownership atomically. No installed state or generated repository exists, so no migration is required.
+
+This amendment additionally modifies `packages/builder-core/src/catalog/capability-catalog.ts`, `packages/builder-core/tests/resolution.test.mjs`, and affected inference/diagnostic fixtures; it updates the prior P1 plan's direct Task 6 references. The content capability remains source-generated, owns the YAML dependency pointer and probe, and returns 40 portfolio or 42 site ownership descriptors. A separate architecture-review repair adds a rendered-source assertion that Cloudflare imports/types remain confined to approved configuration/composition boundaries.
+
 ## Scope and non-goals
 
-Task 6 creates no dependency change. Do not edit any `package.json`, `pnpm-lock.yaml`, root tool configuration, JSON Schema artifact, compatibility record, proof file, CLI file, or `.egeria` file.
+Task 6 creates no builder-workspace dependency change. The generated web manifest includes the capability-owned ordinary `yaml` dependency, but do not edit any existing builder-workspace `package.json`, `pnpm-lock.yaml`, root tool configuration, JSON Schema artifact, compatibility record, proof file, CLI file, or `.egeria` file.
 
 The generated skeleton is data returned by `renderSkeleton`; it is not written, installed, built, previewed, deployed, or represented as release-ready. Tests use synthetic exact `0.1.0` standards and observability versions only as contract inputs. Task 7 remains blocked on the separately authorized publication prerequisite.
 
@@ -96,9 +102,9 @@ packages/builder-core/templates/common/apps/web/src/infrastructure/observability
 Create these profile overlays:
 
 ```text
-packages/builder-core/templates/portfolio/apps/web/content/en-CA/site.json.template
-packages/builder-core/templates/site/apps/web/content/en-CA/site.json.template
-packages/builder-core/templates/site/apps/web/content/en-CA/about.json.template
+packages/builder-core/templates/portfolio/apps/web/content/en-CA/site.yaml.template
+packages/builder-core/templates/site/apps/web/content/en-CA/site.yaml.template
+packages/builder-core/templates/site/apps/web/content/en-CA/about.yaml.template
 packages/builder-core/templates/site/apps/web/app/about/page.tsx
 ```
 
@@ -189,7 +195,7 @@ The only textual tokens are:
 {{workerName}}
 ```
 
-`displayNameJson` is `JSON.stringify(project.displayName)`, including its JSON quotes. The JSON content templates therefore place it as a value without surrounding quotes. `workerName` equals the validated `projectName` in Task 6.
+`displayNameJson` is `JSON.stringify(project.displayName)`, including its JSON quotes. JSON double-quoted strings are valid YAML 1.2 scalars, so the YAML content templates place it as a value without surrounding quotes. `workerName` equals the validated `projectName` in Task 6.
 
 Only source paths ending in `.template` may contain tokens. Rendering performs one substitution pass. Reject source text containing any unknown or malformed `{{...}}` form, and reject replacement values containing `{{` or `}}` so user data cannot trigger recursive substitution. Static templates must contain no token delimiters.
 
@@ -211,7 +217,7 @@ apps/web/AGENTS.md
 apps/web/app/globals.css
 apps/web/app/layout.tsx
 apps/web/app/page.tsx
-apps/web/content/en-CA/site.json
+apps/web/content/en-CA/site.yaml
 apps/web/eslint.config.mjs
 apps/web/next.config.ts
 apps/web/open-next.config.ts
@@ -226,7 +232,7 @@ apps/web/wrangler.jsonc
 site (23 files)
 the 21 portfolio destinations plus:
 apps/web/app/about/page.tsx
-apps/web/content/en-CA/about.json
+apps/web/content/en-CA/about.yaml
 ```
 
 No profile overlay may replace a common destination. Profile-specific differences live only in the listed content/route files.
@@ -302,7 +308,8 @@ The application manifest template contains the accepted fixed graph and no stand
     "@opennextjs/cloudflare": "1.20.2",
     "next": "16.3.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "yaml": "2.9.0"
   },
   "devDependencies": {
     "@types/node": "22.20.1",
@@ -371,55 +378,46 @@ Do not add proof-only variables or deployment scripts.
 
 ## Copy, presentation, and route contract
 
-All generated application runtime UI and metadata copy resides in `apps/web/content/en-CA/*.json`. TypeScript and TSX may contain stable invariant identifiers, HTML element names, import paths, error identifiers, and locale configuration, but no heading, summary, navigation label, title, or description literal. Developer-facing repository instructions and README prose are documentation, not runtime application copy.
+All generated application runtime UI and metadata copy resides in `apps/web/content/en-CA/*.yaml`. TypeScript and TSX may contain stable invariant identifiers, HTML element names, import paths, error identifiers, and locale configuration, but no heading, summary, navigation label, title, or description literal. Developer-facing repository instructions and README prose are documentation, not runtime application copy.
 
 Use this portfolio content shape:
 
-```json
-{
-  "metadata": {
-    "title": {{displayNameJson}},
-    "description": "A focused portfolio."
-  },
-  "home": {
-    "heading": {{displayNameJson}},
-    "summary": "A concise introduction to selected work."
-  },
-  "navigation": []
-}
+```yaml
+metadata:
+  title: {{displayNameJson}}
+  description: A focused portfolio.
+home:
+  heading: {{displayNameJson}}
+  summary: A concise introduction to selected work.
+navigation: []
 ```
 
 Use this site content shape:
 
-```json
-{
-  "metadata": {
-    "title": {{displayNameJson}},
-    "description": "A multi-page public website."
-  },
-  "home": {
-    "heading": {{displayNameJson}},
-    "summary": "A clear starting point for this website."
-  },
-  "navigation": [
-    { "href": "/", "label": "Home" },
-    { "href": "/about", "label": "About" }
-  ]
-}
+```yaml
+metadata:
+  title: {{displayNameJson}}
+  description: A multi-page public website.
+home:
+  heading: {{displayNameJson}}
+  summary: A clear starting point for this website.
+navigation:
+  - href: /
+    label: Home
+  - href: /about
+    label: About
 ```
 
 Use this site-only about content:
 
-```json
-{
-  "heading": "About",
-  "summary": "Background and approach."
-}
+```yaml
+heading: About
+summary: Background and approach.
 ```
 
-`content-schema.ts` exports readonly `NavigationItem`, `PageContent`, and `SiteContent` types plus `parsePageContent` and `parseSiteContent`. Implement a small local unknown-record guard. Require exact keys, non-empty trimmed string values, an array for navigation, unique navigation `href` values, and no unrecognized properties. Throw only stable `CONTENT_INVALID` on invalid imported JSON. Do not add a generated Zod dependency.
+`content-schema.ts` exports readonly `NavigationItem`, `PageContent`, and `SiteContent` types plus `parseYamlContent`, `parsePageContent`, and `parseSiteContent`. Parse with `yaml.parseDocument` under YAML 1.2 core-schema, strict, unique-key, string-key, no-known-tag, no-warning, and zero-alias limits. Implement a small local unknown-record guard. Require exact keys, non-empty trimmed string values, an array for navigation, unique navigation `href` values, and no unrecognized properties. Throw only stable `CONTENT_INVALID` on YAML or shape failure. Do not add a generated Zod dependency.
 
-`read-content.ts` statically imports `site.json`, parses it, and exports `readSiteContent(): SiteContent`. The home route and root layout call that reader. The site-only about route statically imports `about.json`, calls `parsePageContent`, and obtains navigation from `readSiteContent`.
+`read-content.ts` reads the fixed `site.yaml` URL relative to `import.meta.url`, parses it, and exports `readSiteContent(): SiteContent`. The home route and root layout call that reader. The site-only about route reads the fixed `about.yaml` URL, calls the same YAML parser and `parsePageContent`, and obtains navigation from `readSiteContent`. No path is caller-controlled.
 
 `ContentPage` is a pure presentation function with this contract:
 
@@ -439,7 +437,7 @@ export function ContentPage({
 }
 ```
 
-Render navigation only when the array is non-empty. Do not read files, import JSON, access environment state, call Cloudflare APIs, fetch, or mutate values from this component. Routes load typed content and pass it to the component. The root layout derives Next `Metadata` title and description from parsed JSON and keeps `lang="en-CA"` as a locale identifier rather than visible copy.
+Render navigation only when the array is non-empty. Do not read files, import structured content, access environment state, call Cloudflare APIs, fetch, or mutate values from this component. Routes load typed content and pass it to the component. The root layout derives Next `Metadata` title and description from parsed YAML and keeps `lang="en-CA"` as a locale identifier rather than visible copy.
 
 `installed-capability.ts` imports `@egeria-systems/observability` for package registration and exports the stable identifier `observability`. It has no analytics behavior, environment access, telemetry event, or Cloudflare type.
 
@@ -485,16 +483,17 @@ Builder-owned `apps/web/package.json` JSON-property descriptors:
 
 Every row uses owner `{ kind: "builder-kernel" }`, path `apps/web/package.json`, ownership `merge-managed`, `fingerprintTarget: { kind: "json-value", pointer }`, and `mergeStrategy: "json-property"`.
 
-Do not add a full-file descriptor for `apps/web/package.json`; it would overlap the capability package pointers. Capability descriptors remain the canonical owners of standards configuration/content/routes/Cloudflare configuration/observability registration and these four manifest properties:
+Do not add a full-file descriptor for `apps/web/package.json`; it would overlap the capability package pointers. Capability descriptors remain the canonical owners of standards configuration/content/routes/Cloudflare configuration/observability registration and these five manifest properties:
 
 ```text
 /dependencies/@opennextjs~1cloudflare
 /dependencies/@egeria-systems~1observability
+/dependencies/yaml
 /devDependencies/@egeria-systems~1standards
 /devDependencies/wrangler
 ```
 
-Construct a `ReadonlyMap<string, Uint8Array>` from all rendered files and call `materializeInstalledSurfaces({ files, surfaces })`. This call validates existence, JSON pointers, duplicate identifiers, and overlapping targets. Discard its fingerprints because installed state is Task 7. Map any failure to `GENERATED_SURFACE_INVALID` without leaking content. Successful totals are exactly 39 descriptors for `portfolio` and 41 for `site`.
+Construct a `ReadonlyMap<string, Uint8Array>` from all rendered files and call `materializeInstalledSurfaces({ files, surfaces })`. This call validates existence, JSON pointers, duplicate identifiers, and overlapping targets. Discard its fingerprints because installed state is Task 7. Map any failure to `GENERATED_SURFACE_INVALID` without leaking content. Successful totals are exactly 40 descriptors for `portfolio` and 42 for `site`.
 
 ## Task 1: Strict renderer mechanics
 
@@ -571,7 +570,7 @@ Do not commit this partial state. The repository's exact Task 5 source allowlist
 
 - [ ] **Step 2.1 — Extend tests for the public contract**
 
-Import the public function from `../dist/index.js`. Add helpers that decode files, index by path, parse JSON, and compare byte arrays without mutating returned values.
+Import the public function from `../dist/index.js`. Add helpers that decode files, index by path, parse JSON manifests and YAML 1.2 content, and compare byte arrays without mutating returned values.
 
 Test all of the following:
 
@@ -581,12 +580,12 @@ Test all of the following:
 4. `portfolio` has only `/`; `site` adds `/about`; neither output contains `apps/jobs`, generated `packages`, `.egeria`, a lockfile, middleware, or a deploy workflow.
 5. Exact root/application manifests, exact accepted package pins, exact supplied synthetic `0.1.0` public-package pins, and absence of `workspace:`, `file:`, Git/URL sources, ranges, or prereleases.
 6. Desired project configuration agrees with the resolved profile and capabilities.
-7. `displayName` containing quotes, a newline, and non-ASCII text yields valid JSON and cannot alter JSON structure.
+7. `displayName` containing quotes, a newline, and non-ASCII text yields valid YAML 1.2 data and cannot alter content structure.
 8. Invalid profile/name/display-name/package versions return existing catalog/project contract failures without reading or writing outside the template root.
-9. Visible copy strings occur in content JSON and do not occur in TS/TSX; `portfolio` navigation is empty and `site` navigation/about content is exact.
+9. Visible copy strings occur in content YAML and do not occur in TS/TSX; `portfolio` navigation is empty and `site` navigation/about content is exact.
 10. No later-capability/provider markers occur: `app-foundation`, `database`, `d1`, `queue`, `resend`, `better-auth`, `stripe`, `analytics`, `web-analytics`, `cms`, `contact-submission`, `totp`, or `passkey`.
 11. Every capability-owned descriptor equals the corresponding descriptor from the resolved catalog.
-12. Descriptor totals are 39 and 41; all descriptor sources/pointers validate; no generated destination except `apps/web/package.json` lacks one full-file owner; package-manifest pointers cover every top-level/dependency/devDependency region exactly once without overlap.
+12. Descriptor totals are 40 and 42; all descriptor sources/pointers validate; no generated destination except `apps/web/package.json` lacks one full-file owner; package-manifest pointers cover every top-level/dependency/devDependency region exactly once without overlap.
 13. Returned arrays are sorted, returned values do not expose a writable shared buffer, and one caller mutation cannot change a later render.
 14. No filesystem destination is created and no repository file is changed by rendering.
 
@@ -825,8 +824,8 @@ Task 6 is complete only when all of these are true:
 
 - strict renderer tests observed a legitimate RED before implementation and are GREEN;
 - exact catalog and template allowlists match the filesystem;
-- `portfolio` returns exactly 21 sorted files and 39 valid ownership descriptors;
-- `site` returns exactly 23 sorted files and 41 valid ownership descriptors;
+- `portfolio` returns exactly 21 sorted files and 40 valid ownership descriptors;
+- `site` returns exactly 23 sorted files and 42 valid ownership descriptors;
 - repeated rendering produces byte-identical results;
 - manifest/project/resolution/capability ownership agree;
 - generated application runtime UI and metadata copy exists only in localized JSON;

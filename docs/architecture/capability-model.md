@@ -135,7 +135,7 @@ Profile inclusion distinguishes recipe defaults from independent selections. `de
 | Capability | Delivery mode | State classifications | Removal policy | Profile inclusion | Required or conditional dependencies |
 |---|---|---|---|---|---|
 | `standards` | `package-backed` | `repository-stateful` | `reviewed` | default: portfolio, site, app, authenticated-app | None |
-| `content-files` | `source-generated` | `repository-stateful` | `reviewed` | default: portfolio, site | `standards` |
+| `content-files` | `source-generated` | `repository-stateful` | `reviewed` | default: portfolio, site | `standards`; generated YAML 1.2 parsing uses ordinary dependency `yaml` |
 | `section-composition` | `source-generated` | `repository-stateful` | `reviewed` | default: portfolio, site | `content-files` |
 | `deployment-cloudflare` | `hybrid` | `repository-stateful`, `external-stateful` | `reviewed` | default: portfolio, site, app, authenticated-app | `standards` |
 | `observability` | `hybrid` | `repository-stateful`, `external-stateful` | `reviewed` | default: portfolio, site, app, authenticated-app | `deployment-cloudflare` |

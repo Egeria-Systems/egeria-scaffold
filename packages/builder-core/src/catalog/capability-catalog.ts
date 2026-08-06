@@ -140,14 +140,19 @@ function createDescriptors(
       dependencies: ["standards"],
       ...sharedCapabilityMetadata,
       supportedProfiles: ["portfolio", "site"],
-      requiredPackages: [],
+      requiredPackages: ["yaml"],
       platformResources: [],
       adapterSemanticRequirements: [],
       managedSurfaces: [
+        createPackageSurface(
+          "content-files-yaml-package",
+          "content-files",
+          "/dependencies/yaml",
+        ),
         createFileSurface(
           "content-files-site-content",
           "content-files",
-          "apps/web/content/en-CA/site.json",
+          "apps/web/content/en-CA/site.yaml",
           "application-owned",
         ),
         createFileSurface(
@@ -164,7 +169,8 @@ function createDescriptors(
         ),
       ],
       inferenceProbes: [
-        createFileProbe("apps/web/content/en-CA/site.json"),
+        createPackageProbe("dependencies", "yaml", "2.9.0"),
+        createFileProbe("apps/web/content/en-CA/site.yaml"),
         createFileProbe("apps/web/src/content/content-schema.ts"),
         createFileProbe("apps/web/src/content/read-content.ts"),
       ],
@@ -335,13 +341,13 @@ function createDescriptors(
         createFileSurface(
           "site-routing-about-content",
           "site-routing",
-          "apps/web/content/en-CA/about.json",
+          "apps/web/content/en-CA/about.yaml",
           "application-owned",
         ),
       ],
       inferenceProbes: [
         createFileProbe("apps/web/app/about/page.tsx"),
-        createFileProbe("apps/web/content/en-CA/about.json"),
+        createFileProbe("apps/web/content/en-CA/about.yaml"),
       ],
       verificationPlan: ["typecheck", "next-build"],
       documentationEvidenceRequirements: ["multi-page-routing-contract"],

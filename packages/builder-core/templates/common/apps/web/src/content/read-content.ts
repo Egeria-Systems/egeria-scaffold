@@ -1,7 +1,15 @@
-import siteContent from "../../content/en-CA/site.json";
+import { readFileSync } from "node:fs";
 
-import { parseSiteContent, type SiteContent } from "./content-schema";
+import {
+  parseSiteContent,
+  parseYamlContent,
+  type SiteContent,
+} from "./content-schema";
+
+const siteContentUrl = new URL("../../content/en-CA/site.yaml", import.meta.url);
 
 export function readSiteContent(): SiteContent {
-  return parseSiteContent(siteContent);
+  return parseSiteContent(
+    parseYamlContent(readFileSync(siteContentUrl, "utf8")),
+  );
 }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { parseDocument } from "yaml";
 
 import {
   deriveTemplateDestination,
@@ -23,7 +24,7 @@ const portfolioPaths = [
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
-  "apps/web/content/en-CA/site.json",
+  "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
@@ -48,8 +49,8 @@ const sitePaths = [
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
-  "apps/web/content/en-CA/about.json",
-  "apps/web/content/en-CA/site.json",
+  "apps/web/content/en-CA/about.yaml",
+  "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
@@ -95,6 +96,22 @@ function parseGeneratedJson(files, path) {
   const source = indexFiles(files).get(path);
   assert.notEqual(source, undefined);
   return JSON.parse(source);
+}
+
+function parseGeneratedYaml(files, path) {
+  const source = indexFiles(files).get(path);
+  assert.notEqual(source, undefined);
+  const document = parseDocument(source, {
+    version: "1.2",
+    schema: "core",
+    resolveKnownTags: false,
+    strict: true,
+    stringKeys: true,
+    uniqueKeys: true,
+  });
+  assert.deepEqual(document.errors, []);
+  assert.deepEqual(document.warnings, []);
+  return document.toJS({ maxAliasCount: 0, mapAsMap: false });
 }
 
 function snapshotBytes(files) {
@@ -342,6 +359,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       next: "16.3.0",
       react: "19.2.8",
       "react-dom": "19.2.8",
+      yaml: "2.9.0",
     },
     devDependencies: {
       "@egeria-systems/standards": "0.1.0",
@@ -357,7 +375,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
   });
 });
 
-test("display names are inserted as JSON data and runtime copy stays externalized", async () => {
+test("display names are inserted as YAML 1.2 data and runtime copy stays externalized", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const displayName = 'Atelier "Nord"\nMontréal';
   const portfolio = assertSuccess(
@@ -378,7 +396,7 @@ test("display names are inserted as JSON data and runtime copy stays externalize
   );
 
   assert.deepEqual(
-    parseGeneratedJson(portfolio.files, "apps/web/content/en-CA/site.json"),
+    parseGeneratedYaml(portfolio.files, "apps/web/content/en-CA/site.yaml"),
     {
       metadata: { title: displayName, description: "A focused portfolio." },
       home: {
@@ -389,7 +407,7 @@ test("display names are inserted as JSON data and runtime copy stays externalize
     },
   );
   assert.deepEqual(
-    parseGeneratedJson(site.files, "apps/web/content/en-CA/site.json"),
+    parseGeneratedYaml(site.files, "apps/web/content/en-CA/site.yaml"),
     {
       metadata: {
         title: displayName,
@@ -406,7 +424,7 @@ test("display names are inserted as JSON data and runtime copy stays externalize
     },
   );
   assert.deepEqual(
-    parseGeneratedJson(site.files, "apps/web/content/en-CA/about.json"),
+    parseGeneratedYaml(site.files, "apps/web/content/en-CA/about.yaml"),
     { heading: "About", summary: "Background and approach." },
   );
 
@@ -420,12 +438,47 @@ test("display names are inserted as JSON data and runtime copy stays externalize
   ];
   for (const rendered of [portfolio, site]) {
     const files = indexFiles(rendered.files);
+    assert.equal(
+      [...files.keys()].some(
+        (path) => path.startsWith("apps/web/content/") && path.endsWith(".json"),
+      ),
+      false,
+    );
     const executableSource = [...files]
       .filter(([path]) => path.endsWith(".ts") || path.endsWith(".tsx"))
       .map(([, source]) => source)
       .join("\n");
     for (const copy of visibleCopy) {
       assert.equal(executableSource.includes(copy), false);
+    }
+  }
+});
+
+test("Cloudflare imports and types stay in generated configuration boundaries", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "site",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const approvedConfigurationPaths = new Set([
+    "apps/web/next.config.ts",
+    "apps/web/open-next.config.ts",
+  ]);
+
+  for (const [path, source] of indexFiles(rendered.files)) {
+    if (
+      (path.endsWith(".ts") || path.endsWith(".tsx")) &&
+      !approvedConfigurationPaths.has(path)
+    ) {
+      assert.doesNotMatch(
+        source,
+        /(?:@opennextjs\/cloudflare|\bCloudflareEnv\b|cloudflare:)/,
+        path,
+      );
     }
   }
 });
@@ -481,8 +534,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 39],
-    ["site", 41],
+    ["portfolio", 40],
+    ["site", 42],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -545,6 +598,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       "/dependencies/next",
       "/dependencies/react",
       "/dependencies/react-dom",
+      "/dependencies/yaml",
       "/devDependencies/@egeria-systems~1standards",
       "/devDependencies/@types~1node",
       "/devDependencies/@types~1react",
