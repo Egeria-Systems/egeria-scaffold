@@ -833,12 +833,24 @@ Stop for explicit user approval before Task 5.
 
 ## Task 5: Read-Only Doctor and Diff
 
+**Exact execution owner:** [`docs/superpowers/plans/2026-08-05-read-only-project-diagnostics.md`](2026-08-05-read-only-project-diagnostics.md)
+
 **Files:**
 
+- Create: `packages/builder-core/src/repository/cache-reader.ts`
+- Modify: `packages/builder-core/src/inference/infer-repository.ts`
+- Create: `packages/builder-core/src/diagnostics/project-inspection.ts`
 - Create: `packages/builder-core/src/diagnostics/doctor.ts`
 - Create: `packages/builder-core/src/diagnostics/diff-project.ts`
 - Create: `packages/builder-core/tests/diagnostics.test.mjs`
 - Modify: `packages/builder-core/src/index.ts`
+- Modify: `tests/package-boundaries/private-packages.test.mjs`
+- Modify: `packages/builder-core/AGENTS.md`
+- Modify: `packages/builder-core/README.md`
+- Modify: `docs/architecture/package-ownership.md`
+- Modify: `docs/architecture/enforcement-map.md`
+- Create: `docs/implementation-evidence/2026-08-05-read-only-project-diagnostics-verification.md`
+- Create: `docs/review-packets/2026-08-05-read-only-project-diagnostics.md`
 
 **Interfaces:**
 
@@ -846,7 +858,17 @@ Stop for explicit user approval before Task 5.
 export type DiagnosticSeverity = "error" | "warning" | "info";
 
 export type Diagnostic = Readonly<{
-  code: string;
+  code:
+    | "PROJECT_INVALID"
+    | "STATE_INVALID"
+    | "MIGRATION_LOG_INVALID"
+    | "BUILDER_VERSION_INCOMPATIBLE"
+    | "PROJECT_CAPABILITY_UNKNOWN"
+    | "STATE_CAPABILITY_UNKNOWN"
+    | "DESIRED_INSTALLED_MISMATCH"
+    | "INSTALLED_INFERENCE_CONTRADICTION"
+    | "INFERENCE_AMBIGUOUS"
+    | "MANAGED_SURFACE_DRIFT";
   severity: DiagnosticSeverity;
   capability?: string;
   path?: string;
@@ -861,6 +883,7 @@ export async function doctorRepository(input: Readonly<{
 
 export type ProjectDifference = Readonly<{
   kind:
+    | "control-file-invalid"
     | "desired-only"
     | "installed-only"
     | "inferred-only"
