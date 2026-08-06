@@ -394,6 +394,29 @@ test("the filesystem reader keeps one root identity across reads", async () => {
   }
 });
 
+test("the filesystem reader fixes its root identity at construction", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-repository-construction-"));
+
+  try {
+    const root = join(owner, "repository");
+    const priorRoot = join(owner, "prior-repository");
+    await mkdir(root);
+    await writeFile(join(root, "file.txt"), "repository-a", "utf8");
+    const reader = core.createFileSystemRepositoryReader(root);
+
+    await rename(root, priorRoot);
+    await mkdir(root);
+    await writeFile(join(root, "file.txt"), "repository-b", "utf8");
+
+    assert.deepEqual(await reader.readText("file.txt"), {
+      kind: "error",
+      code: "PATH_INVALID",
+    });
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+});
+
 test("the filesystem reader bounds type, size, UTF-8, and read failures without mutation", async () => {
   const scenarios = [
     {
@@ -613,6 +636,26 @@ test("state classification sets compare independently of declaration order", asy
   });
 
   assert.equal(inference.capabilities[0]?.category, "confirmed");
+
+  const differentState = createState({
+    installedCapabilities: [
+      installCapability(descriptor, {
+        stateClassifications: ["repository-stateful", "persistent-data"],
+      }),
+    ],
+  });
+  const differentInference = await core.inferRepository({
+    catalog: [descriptor],
+    reader: core.createInMemoryRepositoryReader(stateFiles(differentState, {
+      "present.txt": "present",
+    })),
+  });
+
+  assert.equal(differentInference.capabilities[0]?.category, "contradictory");
+  assert.equal(
+    differentInference.capabilities[0]?.code,
+    "CAPABILITY_METADATA_MISMATCH",
+  );
 });
 
 test("an unreadable, symlinked, or invalid existing state makes catalog declaration evidence ambiguous", async () => {

@@ -1,4 +1,4 @@
-import { constants } from "node:fs";
+import { constants, lstatSync } from "node:fs";
 import { lstat, open } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 import { TextDecoder } from "node:util";
@@ -63,6 +63,22 @@ function samePathIdentity(left: PathIdentity, right: PathIdentity): boolean {
 async function validateRoot(root: string): Promise<PathIdentity | undefined> {
   try {
     const stats = await lstat(root, { bigint: true });
+
+    if (stats.isSymbolicLink() || !stats.isDirectory()) {
+      return undefined;
+    }
+
+    return { path: root, device: stats.dev, inode: stats.ino };
+  } catch {
+    return undefined;
+  }
+}
+
+function validateRootAtConstruction(
+  root: string,
+): PathIdentity | undefined {
+  try {
+    const stats = lstatSync(root, { bigint: true });
 
     if (stats.isSymbolicLink() || !stats.isDirectory()) {
       return undefined;
@@ -223,16 +239,15 @@ export function createFileSystemRepositoryReader(
 ): RepositoryReader {
   const fixedRoot = resolve(root);
   const absoluteRoot = isAbsolute(root);
-  let fixedRootIdentityPromise: Promise<PathIdentity | undefined> | undefined;
+  const rootIdentity = absoluteRoot
+    ? validateRootAtConstruction(fixedRoot)
+    : undefined;
 
   return {
     async readText(path: string): Promise<RepositoryReadResult> {
       if (!absoluteRoot || !safeRelativePathSchema.safeParse(path).success) {
         return readError("PATH_INVALID");
       }
-
-      fixedRootIdentityPromise ??= validateRoot(fixedRoot);
-      const rootIdentity = await fixedRootIdentityPromise;
 
       if (rootIdentity === undefined) {
         return readError("PATH_INVALID");
