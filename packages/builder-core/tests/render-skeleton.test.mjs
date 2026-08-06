@@ -351,7 +351,9 @@ test("rendered manifests and desired project match the approved resolved recipe"
     portfolio.project.selectedCapabilities,
   );
 
-  assert.deepEqual(parseGeneratedJson(portfolio.files, "package.json"), {
+  const rootManifest = parseGeneratedJson(portfolio.files, "package.json");
+
+  assert.deepEqual(rootManifest, {
     name: "acme-studio",
     version: "0.0.0",
     private: true,
@@ -364,10 +366,14 @@ test("rendered manifests and desired project match the approved resolved recipe"
       verify:
         "pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run build:cloudflare",
     },
-    engines: { node: "22.23.0", pnpm: "11.20.0" },
+    engines: { node: "22.23.2", pnpm: "11.20.0" },
     packageManager: "pnpm@11.20.0",
-    volta: { node: "22.23.0" },
+    volta: { node: "22.23.2" },
   });
+  assert.equal(
+    indexFiles(portfolio.files).get(".nvmrc"),
+    `${rootManifest.volta.node}\n`,
+  );
   assert.deepEqual(parseGeneratedJson(portfolio.files, "apps/web/package.json"), {
     name: "acme-studio-web",
     version: "0.0.0",

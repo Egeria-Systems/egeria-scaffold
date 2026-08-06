@@ -101,7 +101,7 @@ export const installedStateSchema = z
     ejections: z.array(safeRelativePathSchema).readonly(),
     compatibility: z
       .strictObject({
-        node: z.literal("22.23.0"),
+        node: z.literal("22.23.2"),
         pnpm: z.literal("11.20.0"),
         platformAdapter: z.literal("cloudflare-workers"),
       })

@@ -15,6 +15,7 @@
 ### Tests changed first
 
 - Modify `tests/constitution/constitution.test.mjs`
+- Modify `tests/package-boundaries/internal-linting.test.mjs`
 - Modify `packages/builder-core/tests/contracts.test.mjs`
 - Modify `packages/builder-core/tests/state-ownership.test.mjs`
 - Modify `packages/builder-core/tests/inference.test.mjs`
@@ -26,6 +27,7 @@
 - Modify `.nvmrc`
 - Modify `package.json`
 - Modify `.github/workflows/compatibility-proof.yml`
+- Modify `eslint.config.mjs`
 - Modify `README.md`
 - Modify `docs/compatibility/nextjs-cloudflare.md`
 - Modify `proofs/nextjs-cloudflare/content/en-CA.json`
@@ -40,6 +42,8 @@
 - Create `docs/review-packets/2026-08-06-node-22-23-2-compatibility.md`
 
 No lockfile, dependency version, package API, capability, profile, localization structure, or generated application source is otherwise changed.
+
+The full verification RED exposed one prerequisite-integration defect not visible on the pre-rendering base: ESLint 10 traversed the generated-project template tree while resolving broad test globs and executed its package-local Next.js configuration without generated-project dependencies. The user's standing amendment approval covers the bounded correction in `eslint.config.mjs` and its contract in `tests/package-boundaries/internal-linting.test.mjs`. Builder lint excludes only the generated-project template tree; the repository-wide semantic naming scanner continues to inspect authored template paths and content.
 
 ## Step 1: freeze and install the runtime
 

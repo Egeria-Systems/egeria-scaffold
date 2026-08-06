@@ -117,6 +117,24 @@ test("ESLint 10 applies typed strict linting through the builder root config", a
   assert.deepEqual(validResult.messages, []);
 });
 
+test("builder lint does not execute generated-project configuration", async () => {
+  const { ESLint } = await import("eslint");
+  const eslint = new ESLint({
+    cwd: repositoryRoot,
+    overrideConfigFile: resolve(repositoryRoot, "eslint.config.mjs"),
+  });
+
+  assert.equal(
+    await eslint.isPathIgnored(
+      resolve(
+        repositoryRoot,
+        "packages/builder-core/templates/common/apps/web/eslint.config.mjs",
+      ),
+    ),
+    true,
+  );
+});
+
 test("the root semantic naming rule rejects sequencing labels across authored syntax", async () => {
   const prohibitedIdentifier = compactLabel("create", "P", "2", "Catalog");
   const prohibitedPrivateIdentifier = namedLabel("Task", "3", "");

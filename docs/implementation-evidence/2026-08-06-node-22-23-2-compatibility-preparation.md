@@ -10,6 +10,8 @@
 
 Update the repository, compatibility proof, builder state contract, and generated skeleton templates from Node `22.23.0` to `22.23.2`. Preserve pnpm `11.20.0` and every application, package, capability, and generated-project behavior other than the exact Node patch version.
 
+One approved exact-file amendment was added after the full verification RED: the integrated skeleton template introduced a nested ESLint configuration that ESLint 10 tried to execute while traversing broad builder-test globs. The candidate now excludes only `packages/builder-core/templates/**` from builder ESLint and protects that boundary in `tests/package-boundaries/internal-linting.test.mjs`. The separate repository-wide semantic naming check continues to scan template paths and authored content.
+
 This increment does not dispatch GitHub Actions, deploy, publish, change repository visibility, change a provider resource, or update historical evidence that correctly records an earlier runtime.
 
 ## Frozen implementation base

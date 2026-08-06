@@ -46,6 +46,9 @@ function isInsideRepository(path) {
 test("the root workspace remains private and pins the compatibility-proof toolchain", async () => {
   const manifest = JSON.parse(await readRepositoryFile("package.json"));
   const nvmVersion = await readRepositoryFile(".nvmrc");
+  const proofContent = JSON.parse(
+    await readRepositoryFile("proofs/nextjs-cloudflare/content/en-CA.json"),
+  );
 
   assert.equal(manifest.name, "@egeria-systems/scaffold");
   assert.equal(manifest.private, true);
@@ -78,11 +81,16 @@ test("the root workspace remains private and pins the compatibility-proof toolch
   ]);
   assert.equal(manifest.packageManager, "pnpm@11.20.0");
   assert.deepEqual(manifest.engines, {
-    node: "22.23.0",
+    node: "22.23.2",
     pnpm: "11.20.0",
   });
-  assert.deepEqual(manifest.volta, { node: "22.23.0" });
+  assert.deepEqual(manifest.volta, { node: "22.23.2" });
   assert.equal(nvmVersion, `${manifest.volta.node}\n`);
+  assert.equal(
+    proofContent.page.facts.find(({ identifier }) => identifier === "node")
+      ?.value,
+    manifest.volta.node,
+  );
 });
 
 test("the workspace declares the approved proof root and install policy", async () => {
@@ -138,6 +146,11 @@ test("the compatibility record preserves its required evidence boundaries", asyn
     ),
   );
   assert.match(compatibility, /non-production Cloudflare Worker/i);
+  assert.match(compatibility, /Node `22\.23\.2` revalidation is local-only/i);
+  assert.match(
+    compatibility,
+    /deployed evidence remains on Node `22\.23\.0`/i,
+  );
   assert.match(compatibility, /do(?:es)? not establish WCAG conformance/i);
 });
 
@@ -340,7 +353,7 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   );
   assert.doesNotMatch(workflow, /pnpm\/action-setup|actions\/setup-node/);
   assert.match(workflow, /^          version: 11\.20\.0$/m);
-  assert.match(workflow, /^          runtime: node@22\.23\.0$/m);
+  assert.match(workflow, /^          runtime: node@22\.23\.2$/m);
   assert.match(workflow, /^          cache: true$/m);
   assert.match(workflow, /^          install: false$/m);
   assert.match(workflow, /pnpm install --frozen-lockfile/);

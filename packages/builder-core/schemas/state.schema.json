@@ -43,7 +43,7 @@
       "additionalProperties": false,
       "properties": {
         "node": {
-          "const": "22.23.0",
+          "const": "22.23.2",
           "type": "string"
         },
         "platformAdapter": {

@@ -8,7 +8,7 @@
     "heading": "Next.js and Cloudflare compatibility proof",
     "summary": "This non-production page verifies the selected development, workerd preview, and deployment toolchain.",
     "facts": [
-      { "identifier": "node", "label": "Node.js", "value": "22.23.0" },
+      { "identifier": "node", "label": "Node.js", "value": "22.23.2" },
       { "identifier": "package-manager", "label": "Package manager", "value": "pnpm 11.20.0" },
       { "identifier": "framework", "label": "Framework", "value": "Next.js 16.3.0 App Router" },
       { "identifier": "adapter", "label": "Cloudflare adapter", "value": "OpenNext 1.20.2" },

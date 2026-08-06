@@ -80,7 +80,7 @@ function createState(overrides = {}) {
     managedSurfaces: [],
     ejections: [],
     compatibility: {
-      node: "22.23.0",
+      node: "22.23.2",
       pnpm: "11.20.0",
       platformAdapter: "cloudflare-workers",
     },

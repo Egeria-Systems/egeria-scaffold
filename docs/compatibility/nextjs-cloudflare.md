@@ -2,9 +2,11 @@
 
 ## Status and evidence date
 
-**Evidence date:** 2026-08-04
+**Evidence date:** 2026-08-06
 
-This P0.2 combination is accepted after verified-final-diff approval. The exact deployed implementation candidate passed local Node.js, Next.js, OpenNext, workerd harness, preview, Ubuntu workflow, non-production Worker, Chromium, and automated accessibility checks. Neither those results nor this document prove a production profile or production readiness.
+This P0.2 combination is accepted after verified-final-diff approval. The original implementation candidate passed local Node.js, Next.js, OpenNext, workerd harness, preview, Ubuntu workflow, non-production Worker, Chromium, and automated accessibility checks under Node `22.23.0`.
+
+Node `22.23.2` revalidation is local-only. On 2026-08-06, the current candidate passed the frozen install, dependency audit, Next.js and OpenNext builds, workerd integration harness, development and preview browser checks, and the selected automated accessibility checks. The deployed evidence remains on Node `22.23.0`; no workflow was dispatched and no Worker was deployed for this patch update. Neither the local nor deployed results prove a production profile, production readiness, or WCAG conformance.
 
 The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). Preparation evidence and the approved implementation plan remain separately reviewable in [implementation evidence](../implementation-evidence/2026-08-04-p0-2-compatibility-preparation.md) and the [P0.2 plan](../superpowers/plans/2026-08-04-p0-2-nextjs-cloudflare-compatibility-proof.md).
 
@@ -12,7 +14,7 @@ The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](..
 
 | Surface | Exact version or value |
 |---|---|
-| Node.js | `22.23.0` |
+| Node.js | `22.23.2` |
 | pnpm | `11.20.0` |
 | Next.js | `16.3.0` |
 | React / React DOM | `19.2.8` |
@@ -29,8 +31,9 @@ The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](..
 | GitHub environment | `compatibility` |
 | Cloudflare Worker | `egeria-scaffold-nextjs-cloudflare-proof` |
 | GitHub setup action | `pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c` |
+| Deployed Node.js | `22.23.0` |
 | Deployed implementation | `160b8ef261e69ec783ad93b7bfe69d932ba84541` |
-| `pnpm-lock.yaml` SHA-256 | `72fab6af3a327404e287094e99438b98f7a43007765a4a9e6255cc357dd637c7` |
+| Deployed `pnpm-lock.yaml` SHA-256 | `72fab6af3a327404e287094e99438b98f7a43007765a4a9e6255cc357dd637c7` |
 
 All package versions are exact. The workspace uses a one-day package maturity policy, a reviewed lifecycle-script allowlist, and the narrow `miniflare>undici: 7.29.0` security override recorded in the preparation evidence.
 
