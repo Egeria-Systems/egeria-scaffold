@@ -19,6 +19,7 @@ import type { RepositoryReader } from "../repository/repository-reader.js";
 import {
   parseMigrationLog,
   parseProjectYaml,
+  parseStateJson,
 } from "../state/codecs.js";
 
 export const projectConfigurationPath = ".egeria/project.yaml";
@@ -74,15 +75,28 @@ export async function inspectProject(input: Readonly<{
     projectConfigurationPath,
     parseProjectYaml,
   );
+  const state = await readControlFile(
+    reader,
+    statePath,
+    parseStateJson,
+  );
   const migrations = await readControlFile(
     reader,
     migrationLogPath,
     parseMigrationLog,
   );
-  const inference = await inferRepository({ reader, catalog: input.catalog });
+  const controlInference: RepositoryInference = {
+    state,
+    capabilities: [],
+    surfaces: [],
+  };
 
-  if (project.kind !== "valid") {
-    return { project, migrations, inference };
+  if (
+    project.kind !== "valid" ||
+    state.kind !== "valid" ||
+    migrations.kind !== "valid"
+  ) {
+    return { project, migrations, inference: controlInference };
   }
 
   const resolution = resolveCapabilities(
@@ -93,6 +107,17 @@ export async function inspectProject(input: Readonly<{
     input.catalog,
     input.profiles,
   );
+
+  if (!resolution.ok) {
+    return {
+      project,
+      migrations,
+      inference: controlInference,
+      resolution,
+    };
+  }
+
+  const inference = await inferRepository({ reader, catalog: input.catalog });
 
   return { project, migrations, inference, resolution };
 }

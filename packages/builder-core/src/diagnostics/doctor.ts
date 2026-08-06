@@ -349,8 +349,12 @@ export async function doctorRepository(
       ({ code }) => code === "CAPABILITY_UNKNOWN",
     );
     const capability = unknown?.context.identifier;
+    const selectedCapability =
+      capability !== undefined &&
+      inspection.project.kind === "valid" &&
+      inspection.project.value.selectedCapabilities.includes(capability);
     const diagnostics = uniqueSortedDiagnostics([
-      capability === undefined
+      !selectedCapability
         ? diagnostic("PROJECT_INVALID", "error", {
             path: projectConfigurationPath,
             context: { reason: "desired-resolution" },

@@ -248,6 +248,39 @@ test("the package root exposes the exact diagnostics types", async () => {
   ProjectDifference,
 } from "@egeria-systems/builder-core";
 
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends
+  (<Value>() => Value extends Right ? 1 : 2)
+    ? true
+    : false;
+type Expect<Value extends true> = Value;
+type ExpectedDiagnosticCode =
+  | "PROJECT_INVALID"
+  | "STATE_INVALID"
+  | "MIGRATION_LOG_INVALID"
+  | "BUILDER_VERSION_INCOMPATIBLE"
+  | "PROJECT_CAPABILITY_UNKNOWN"
+  | "STATE_CAPABILITY_UNKNOWN"
+  | "DESIRED_INSTALLED_MISMATCH"
+  | "INSTALLED_INFERENCE_CONTRADICTION"
+  | "INFERENCE_AMBIGUOUS"
+  | "MANAGED_SURFACE_DRIFT";
+type ExpectedSeverity = "error" | "warning" | "info";
+type ExpectedDifferenceKind =
+  | "control-file-invalid"
+  | "desired-only"
+  | "installed-only"
+  | "inferred-only"
+  | "inference-mismatch"
+  | "managed-surface-drift";
+type ExactDiagnosticCodes = Expect<
+  Equal<Diagnostic["code"], ExpectedDiagnosticCode>
+>;
+type ExactSeverities = Expect<Equal<DiagnosticSeverity, ExpectedSeverity>>;
+type ExactDifferenceKinds = Expect<
+  Equal<ProjectDifference["kind"], ExpectedDifferenceKind>
+>;
+
 const severities: readonly DiagnosticSeverity[] = ["error", "warning", "info"];
 const codes: readonly Diagnostic["code"][] = [
   "PROJECT_INVALID",
@@ -271,11 +304,16 @@ const differences: readonly ProjectDifference["kind"][] = [
 ];
 const diagnostic: Diagnostic = { code: codes[0]!, severity: severities[0]!, context: {} };
 const difference: ProjectDifference = { kind: differences[0]! };
+const exactTypes: readonly [
+  ExactDiagnosticCodes,
+  ExactSeverities,
+  ExactDifferenceKinds,
+] = [true, true, true];
 // @ts-expect-error invented diagnostic codes are not public API
 const inventedDiagnostic: Diagnostic = { code: "INVENTED", severity: "error", context: {} };
 // @ts-expect-error invented difference kinds are not public API
 const inventedDifference: ProjectDifference = { kind: "invented" };
-void [diagnostic, difference, inventedDiagnostic, inventedDifference];
+void [diagnostic, difference, exactTypes, inventedDiagnostic, inventedDifference];
 `,
       "utf8",
     );
@@ -583,6 +621,47 @@ test("doctor treats other resolution failures as an invalid project contract", a
   ]);
 });
 
+test("doctor does not attribute an unknown profile default to project selection", async () => {
+  const selected = createDescriptor("selected-existing");
+  const fixture = minimalFixture({
+    descriptor: selected,
+    projectValue: project(["selected-existing"]),
+    profiles: [profile(["profile-default-missing"])],
+  });
+  const result = await core.doctorRepository(requestFromFixture(fixture));
+
+  assert.deepEqual(result.diagnostics, [
+    {
+      code: "PROJECT_INVALID",
+      severity: "error",
+      path: ".egeria/project.yaml",
+      context: { reason: "desired-resolution" },
+    },
+  ]);
+});
+
+test("doctor and diff reject a malformed runtime catalog without throwing", async () => {
+  const fixture = minimalFixture({ catalog: [{}] });
+
+  assert.deepEqual(await core.doctorRepository(requestFromFixture(fixture)), {
+    healthy: false,
+    diagnostics: [
+      {
+        code: "PROJECT_INVALID",
+        severity: "error",
+        path: ".egeria/project.yaml",
+        context: { reason: "desired-resolution" },
+      },
+    ],
+  });
+  assert.deepEqual(await core.diffProject(requestFromFixture(fixture)), {
+    equal: false,
+    differences: [
+      { kind: "control-file-invalid", path: ".egeria/project.yaml" },
+    ],
+  });
+});
+
 test("doctor reports desired-only and installed-only capabilities in lexical order independent of input order", async () => {
   const standards = createDescriptor("standards", [
     { kind: "file", path: "standards.txt" },
@@ -752,6 +831,53 @@ test("doctor preserves probable, partial, contradictory, and ambiguous inference
   assert.doesNotMatch(JSON.stringify(ambiguousResult), /private-token/);
 });
 
+test("doctor sorts errors before lexically earlier warnings", async () => {
+  const contradictory = createDescriptor("contradictory", [
+    { kind: "file", path: "missing.txt" },
+  ]);
+  const ambiguous = createDescriptor("ambiguous", [
+    {
+      kind: "json-value",
+      path: "ambiguous.json",
+      pointer: "/enabled",
+      expected: true,
+    },
+  ]);
+  const fixture = minimalFixture({
+    descriptor: contradictory,
+    catalog: [ambiguous, contradictory],
+    projectValue: project(["contradictory", "ambiguous"]),
+    profiles: [profile(["contradictory", "ambiguous"])],
+    stateValue: state([
+      installCapability(ambiguous),
+      installCapability(contradictory),
+    ]),
+    files: {
+      "managed.txt": undefined,
+      "ambiguous.json": "{ private-token",
+    },
+  });
+  delete fixture.files["managed.txt"];
+
+  assert.deepEqual(
+    (await core.doctorRepository(requestFromFixture(fixture))).diagnostics,
+    [
+      {
+        code: "INSTALLED_INFERENCE_CONTRADICTION",
+        severity: "error",
+        capability: "contradictory",
+        context: { category: "contradictory" },
+      },
+      {
+        code: "INFERENCE_AMBIGUOUS",
+        severity: "warning",
+        capability: "ambiguous",
+        context: { category: "ambiguous" },
+      },
+    ],
+  );
+});
+
 test("diagnostics do not return rejected package values or source excerpts", async () => {
   const descriptor = createDescriptor("standards", [
     {
@@ -865,6 +991,32 @@ test("doctor reports managed drift, isolates ambiguous surfaces, and ignores app
   );
 });
 
+test("doctor and diff ignore an isolated ejected surface", async () => {
+  const descriptor = createDescriptor();
+  const fixture = minimalFixture({
+    descriptor,
+    stateValue: state(
+      [installCapability(descriptor)],
+      [
+        createSurface({
+          identifier: "ejected-surface",
+          path: "private/ejected.txt",
+          ownership: "ejected",
+        }),
+      ],
+    ),
+  });
+
+  assert.deepEqual(await core.doctorRepository(requestFromFixture(fixture)), {
+    healthy: true,
+    diagnostics: [],
+  });
+  assert.deepEqual(await core.diffProject(requestFromFixture(fixture)), {
+    equal: true,
+    differences: [],
+  });
+});
+
 test("diff short-circuits invalid control files and resolution failures", async () => {
   const fixture = minimalFixture();
   const delegate = core.createInMemoryRepositoryReader(fixture.files);
@@ -892,6 +1044,37 @@ test("diff short-circuits invalid control files and resolution failures", async 
       { kind: "control-file-invalid", path: ".egeria/project.yaml" },
     ],
   });
+
+  const malformedState = minimalFixture({
+    files: { ".egeria/state.json": "{ private-state-token" },
+  });
+  const malformedStateResult = await core.diffProject(
+    requestFromFixture(malformedState),
+  );
+  assert.deepEqual(malformedStateResult, {
+    equal: false,
+    differences: [
+      { kind: "control-file-invalid", path: ".egeria/state.json" },
+    ],
+  });
+  assert.doesNotMatch(JSON.stringify(malformedStateResult), /private-state-token/);
+
+  const invalidMigrationWithLatentMismatch = minimalFixture({
+    stateValue: state([]),
+    files: {
+      ".egeria/migrations.jsonl": "{ private-migration-token\n",
+    },
+  });
+  const migrationResult = await core.diffProject(
+    requestFromFixture(invalidMigrationWithLatentMismatch),
+  );
+  assert.deepEqual(migrationResult, {
+    equal: false,
+    differences: [
+      { kind: "control-file-invalid", path: ".egeria/migrations.jsonl" },
+    ],
+  });
+  assert.doesNotMatch(JSON.stringify(migrationResult), /private-migration-token/);
 });
 
 test("diff maps desired, installed, inferred, and mismatch evidence without duplicates", async () => {
@@ -932,6 +1115,57 @@ test("diff maps desired, installed, inferred, and mismatch evidence without dupl
       { kind: "installed-only", capability: "installed-only" },
     ],
   });
+});
+
+test("diff independently maps partial and ambiguous capability evidence", async () => {
+  const standards = createDescriptor("standards", [
+    { kind: "file", path: "standards.txt" },
+  ]);
+  const partial = createDescriptor("partial", [
+    { kind: "file", path: "partial-present.txt" },
+    { kind: "file", path: "partial-missing.txt" },
+  ]);
+  const partialFixture = minimalFixture({
+    descriptor: standards,
+    catalog: [partial, standards],
+    files: {
+      "managed.txt": undefined,
+      "standards.txt": "present",
+      "partial-present.txt": "present",
+    },
+  });
+  delete partialFixture.files["managed.txt"];
+  assert.deepEqual(await core.diffProject(requestFromFixture(partialFixture)), {
+    equal: false,
+    differences: [{ kind: "inferred-only", capability: "partial" }],
+  });
+
+  const ambiguous = createDescriptor("ambiguous", [
+    {
+      kind: "json-value",
+      path: "ambiguous.json",
+      pointer: "/enabled",
+      expected: true,
+    },
+  ]);
+  const ambiguousFixture = minimalFixture({
+    descriptor: standards,
+    catalog: [standards, ambiguous],
+    files: {
+      "managed.txt": undefined,
+      "standards.txt": "present",
+      "ambiguous.json": "{ private-token",
+    },
+  });
+  delete ambiguousFixture.files["managed.txt"];
+  const ambiguousResult = await core.diffProject(
+    requestFromFixture(ambiguousFixture),
+  );
+  assert.deepEqual(ambiguousResult, {
+    equal: false,
+    differences: [{ kind: "inference-mismatch", capability: "ambiguous" }],
+  });
+  assert.doesNotMatch(JSON.stringify(ambiguousResult), /private-token/);
 });
 
 test("diff maps missing, drifted, and ambiguous managed surfaces with capability owners", async () => {
@@ -989,9 +1223,15 @@ test("diff maps missing, drifted, and ambiguous managed surfaces with capability
 });
 
 test("doctor and diff use a read-once cache for every repository path per operation", async () => {
-  const fixture = minimalFixture();
+  const descriptor = createDescriptor("standards", [
+    { kind: "file", path: ".egeria/project.yaml" },
+  ]);
+  const fixture = minimalFixture({ descriptor });
 
-  for (const operation of [core.doctorRepository, core.diffProject]) {
+  for (const [operation, expected] of [
+    [core.doctorRepository, { healthy: true, diagnostics: [] }],
+    [core.diffProject, { equal: true, differences: [] }],
+  ]) {
     const delegate = core.createInMemoryRepositoryReader(fixture.files);
     const reads = new Map();
     const reader = {
@@ -1001,11 +1241,10 @@ test("doctor and diff use a read-once cache for every repository path per operat
       },
     };
 
-    await operation(requestFromFixture(fixture, reader));
+    assert.deepEqual(await operation(requestFromFixture(fixture, reader)), expected);
     assert.equal(reads.get(".egeria/state.json"), 1);
     assert.equal(reads.get(".egeria/project.yaml"), 1);
     assert.equal(reads.get(".egeria/migrations.jsonl"), 1);
-    assert.equal(reads.get("managed.txt"), 1);
     assert.equal([...reads.values()].every((count) => count === 1), true);
   }
 });
