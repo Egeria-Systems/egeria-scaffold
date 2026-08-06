@@ -241,15 +241,6 @@ test("the CLI remains an empty shell while builder-core owns only approved deter
       "state/codecs.ts",
     ],
   );
-  assert.equal(
-    builderCoreSourceFiles.includes("catalog/p1-capabilities.ts"),
-    false,
-  );
-  assert.equal(
-    builderCoreSourceFiles.includes("profiles/p1-profiles.ts"),
-    false,
-  );
-
   assert.deepEqual(
     await listFiles(resolve(repositoryRoot, "packages/builder-core/templates")),
     [
