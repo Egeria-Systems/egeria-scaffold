@@ -1,8 +1,8 @@
 # Public Package Release Implementation Plan
 
-> **Status:** Approved for local implementation. Do not take an external action.
+> **Status:** The public `0.1.0` release and separately approved external gates were executed. The post-release evidence increment is approved for local implementation; do not take another external action.
 
-**Goal:** Publish exactly `@egeria-systems/standards@0.1.0` and `@egeria-systems/observability@0.1.0` from the reviewed public `Egeria-Systems/egeria-scaffold` source with Apache-2.0 license files, exact tarballs, npm provenance/signatures, and post-bootstrap trusted publishing.
+**Goal:** Publish exactly `@egeria-systems/standards@0.1.0` and `@egeria-systems/observability@0.1.0` from the reviewed public `Egeria-Systems/egeria-scaffold` source with Apache-2.0 license files, controlled tarballs, npm registry signatures, and post-bootstrap trusted publishing. The approved amendment below records the narrowly bounded provenance exception for only these immutable bootstrap versions.
 
 **Architecture:** Keep a functional validation core and an imperative release shell. Existing Changesets remains the only version/publication owner. A read-only release check validates the approved commit, exact public package set, candidate manifests, and all-or-nothing absent registry state before publication. GitHub Actions supplies the only publication runtime; the workflow is manual, environment-gated, exact-commit-bound, cache-free, and least privilege. External visibility, credentials, publication, and trust settings remain separate human gates.
 
@@ -30,6 +30,18 @@ The controller must stop at each numbered gate:
 8. **Partial-failure gate:** any mixed registry result stops; no rerun, deprecation, unpublish, or corrective publish without a new approved recovery plan.
 9. **Post-release hardening gate:** the user configures both trusted publishers, disallows traditional tokens, deletes the GitHub secret, and revokes the npm token from exact instructions.
 10. **Completion gate:** post-release evidence is committed, reviewed, and approved. Any second push of evidence remains separately authorized.
+
+## Approved public execution and provenance amendment
+
+All external gates above were separately approved and executed. The public source commit is `91a4413f67930f3aa5c85a4d998c450c728942e0`, and both exact `0.1.0` packages were published by the successful manual workflow run recorded in the [verification evidence](../../implementation-evidence/2026-08-06-public-package-release-verification.md).
+
+Changesets selected pnpm `11.20.0`'s native publish path. Its publish options did not consume the package manifests' `publishConfig.provenance`, so both immutable `0.1.0` versions have npm registry signatures but no npm provenance attestations. The user explicitly accepted this exact two-version bootstrap provenance exception. It must never be described as retroactive provenance or generalized to a later version.
+
+Commit `f640c87a709bc4266c59543942fe093824d02eb9` adds `NPM_CONFIG_PROVENANCE: "true"` only to future publish steps. Its focused TDD contract, complete file test, diff check, and independent review were clean. Both npm trusted publishers are configured for OIDC, token-based publishing is disallowed, and the explicit future provenance request remains mandatory. Those future controls are not exercised evidence until a later separately approved version is published.
+
+This amendment changes only the completion criteria for `@egeria-systems/standards@0.1.0` and `@egeria-systems/observability@0.1.0`. It does not authorize another publication, external action, version, tag, GitHub release, or provenance claim.
+
+The remaining procedure is retained as the approved historical execution record. Its private-state and pending-action wording describes the gate where it originally applied; the amendment above and current verification evidence own the post-release status.
 
 ## Exact file inventory
 
@@ -829,12 +841,12 @@ Stop for final completion approval. A push of this evidence commit requires its 
 The increment is complete only when:
 
 - both exact `0.1.0` packages are public and installable;
-- manifests, tarballs, Apache license bytes, APIs, and integrities match the candidate;
-- provenance/signatures resolve to the exact public source/workflow;
+- published inventories, Apache license bytes, APIs, and all non-`package.json` included bytes match the private candidates; npm's normalized published `package.json` output is recorded rather than described as byte-identical;
+- both exact bootstrap versions have npm registry signatures, and their missing provenance attestations are accepted only under the explicit two-version exception above;
 - standards passes both peer-major controls and observability remains empty;
 - no private package or unintended file was published;
 - the repository remains public;
-- both trusted publishers and token-disallow settings are configured;
+- both trusted publishers, token-disallow settings, and the explicit future provenance request are configured, while OIDC publication remains unexercised until a later separately approved version;
 - `NPM_BOOTSTRAP_TOKEN` is deleted and the npm token is revoked;
 - all material review findings are resolved;
 - verification evidence and the review packet are complete; and

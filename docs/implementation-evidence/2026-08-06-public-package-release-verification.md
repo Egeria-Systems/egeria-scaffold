@@ -1,8 +1,8 @@
-# Public Package Release Candidate Verification
+# Public Package Release Verification
 
 **Date:** 2026-08-06 (America/Toronto)
 
-**Status:** Private local implementation verified; human rights/privacy confirmation and every external action remain pending
+**Status:** Public `0.1.0` execution verified; exact bootstrap provenance exception approved; post-release evidence awaiting final completion approval
 
 **Plan:** [Public package release plan](../superpowers/plans/2026-08-06-public-package-release.md)
 
@@ -10,7 +10,117 @@
 
 **Review packet:** [Public package release review](../review-packets/2026-08-06-public-package-release.md)
 
-## Exact comparison
+## Public execution evidence
+
+### Source, workflow, and repository controls
+
+- Public repository source commit: `91a4413f67930f3aa5c85a4d998c450c728942e0`.
+- Manual workflow run: [`31128800393`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/31128800393), successful `workflow_dispatch` on `main`; every job step completed successfully.
+- The repository is public. Protected `main` remained at the exact source SHA. Secret scanning and push protection are enabled.
+- The `npm-release` environment allows only `main`, requires one `User` reviewer, and has prevent-self-review disabled because there is one eligible operator. Administrator bypass remains enabled by explicit operator decision.
+- The accepted Dependabot branch, pull request, and Copilot review surface did not change `main`.
+- No tag or GitHub release was created by us. Changesets-created local tags existed only in the ephemeral runner and were not pushed because checkout credentials were disabled.
+
+### Registry state and immutable artifacts
+
+Exactly these complete public version sets were observed anonymously:
+
+```text
+@egeria-systems/standards: ["0.1.0"]
+@egeria-systems/observability: ["0.1.0"]
+```
+
+For each package, `latest` is `0.1.0`, access is public, the license is Apache-2.0, and the repository is `Egeria-Systems/egeria-scaffold`. The standards directory is `packages/standards`; the observability directory is `packages/observability`. Both versions have npm registry signatures. Neither version has an npm provenance attestation.
+
+Standards registry artifact:
+
+```text
+integrity (SHA-512): sha512-BmDwcX0T6KT271C4N24jCKn6ymKTqDAFpJjsG6LNpmIoTAz0xApIcqpHFl9dHOqlB2xdhdHwKYfSiELUp04E0Q==
+SHA-1: 2fd05fbec0be0cbfb41e929f2b02a51cc9592c72
+SHA-256: ddc7ddce58e16637df45083c0fb6bc5ddd35422b0096044c019cad7c5bf2d2c0
+
+LICENSE
+README.md
+eslint/cloudflare-isolation.mjs
+eslint/typescript-strict.mjs
+package.json
+typescript/strict.json
+```
+
+Observability registry artifact:
+
+```text
+integrity (SHA-512): sha512-eCTt6tNP0q2HA0wNpM1VJpZBFZqFpBDekKbno+UUKfWMG5I+KEg3bpt/fKdVO86JrKohlIM6Zo/7qzGDBpmh8g==
+SHA-1: a659e750c994d6449a0b477721a276f05bfa96d6
+SHA-256: a5a2e7fc764c7663b831e97ec6a049865316f24a108df0c8c3ea71ad51fc6b45
+
+LICENSE
+README.md
+dist/index.d.ts
+dist/index.js
+package.json
+```
+
+Each registry `LICENSE` has SHA-256 `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30`, matching the source and private candidate.
+
+The published archives are not byte-identical to the private `pnpm pack` archives. pnpm normalized the published `package.json` by changing key order, removing `prepublishOnly`, and materializing a workspace development dependency. File inventories, license bytes, and every other included byte match. The different archive hashes are therefore recorded as expected package-manager normalization, not a content mismatch.
+
+The private workspace names `@egeria-systems/scaffold`, `@egeria-systems/cli`, and `@egeria-systems/builder-core` remained 404/absent, and no unintended file was published. The package-level 404 observed briefly after exact-version availability was transient npm registry negative-cache propagation. Because the guard also checked the exact-version URL, it failed closed when that URL became present; the earlier URL concern is retracted.
+
+### Fresh isolated consumer verification
+
+Fresh consumers used Node `22.23.2` and npm `12.0.2`:
+
+- Standards with ESLint `9.39.5`: 109 installed packages; all 3/3 established export and behavioral controls passed.
+- Standards with ESLint `10.8.0`: 88 installed packages; all 3/3 established export and behavioral controls passed.
+- Observability: one installed package; the 1/1 empty-root export control passed.
+- `npm audit signatures` passed in all three consumers.
+- All moderate-level audits reported zero vulnerabilities at the recorded time.
+
+Signature audit proves registry signature verification, not npm provenance, package security, accessibility, production fitness, or behavior beyond the executed controls.
+
+### Provenance exception and future release boundary
+
+Changesets selected pnpm `11.20.0`'s native publish path. Its publish options did not consume manifest `publishConfig.provenance`, so both immutable `0.1.0` bootstrap versions lack npm provenance. The user explicitly accepted this exact two-version bootstrap provenance exception. It is not retroactive provenance and does not relax the requirement for any future version.
+
+Commit `f640c87a709bc4266c59543942fe093824d02eb9` adds `NPM_CONFIG_PROVENANCE: "true"` only to future publish steps. Its TDD record was RED for the sole missing provenance request, then GREEN at 1/1 focused and 15/15 for the full test file; `git diff --check` passed. Independent review reported no material findings.
+
+Operator confirmation records trusted publishing for both packages with organization `Egeria-Systems`, repository `egeria-scaffold`, workflow filename `package-release.yml`, environment `npm-release`, and allowed action `npm publish` only. Publishing access disallows tokens. GitHub's environment-secrets API now returns zero secrets and an empty name set. Revocation of the npm bootstrap token is operator-confirmed; no token value or identifier is recorded.
+
+OIDC trusted publishing and the explicit provenance environment are configured but remain unexercised until a later separately approved version is published. Future provenance remains mandatory.
+
+### Timing gate and refreshed official documentation
+
+Publication time was `2026-08-06T22:10:51Z`. The generated-project `minimumReleaseAge: 1440` means Task 7 live installation must wait until after `2026-08-07T22:10:51Z` (`2026-08-07 18:10:51 America/Toronto`) and then recheck live registry state before relying on the packages.
+
+The following official documentation was refreshed on 2026-08-06:
+
+- [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/)
+- [Viewing package provenance](https://docs.npmjs.com/viewing-package-provenance)
+- [npm publish](https://docs.npmjs.com/cli/publish/)
+- [Manually running a GitHub Actions workflow](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)
+
+npm documents OIDC trusted publishing, provenance evidence, and published-version immutability; GitHub documents manual workflow dispatch. These sources do not change the repository's separate human approval gates.
+
+### Current risks and deferred proof
+
+- The immutable `0.1.0` versions have registry signatures but no cryptographic source/workflow provenance.
+- Trusted-publisher configuration and the explicit future provenance request are unexercised until a later separately approved version.
+- Administrator bypass remains enabled by explicit operator decision.
+- Advisory and registry observations are time-sensitive.
+- Automated tests, audits, signatures, and static checks do not prove security, legal title, privacy, WCAG conformance, human usability, production fitness, or future-release correctness.
+
+## Post-release comparison
+
+```text
+public source: 91a4413f67930f3aa5c85a4d998c450c728942e0
+future provenance fix: f640c87a709bc4266c59543942fe093824d02eb9
+comparison for final completion review: 91a4413f67930f3aa5c85a4d998c450c728942e0..HEAD
+```
+
+The comparison contains the independently reviewed future-workflow fix plus this six-file post-release evidence commit. It does not include a package publication, tag, GitHub release, workflow dispatch, repository setting, credential, or other external mutation.
+
+## Historical private-candidate comparison
 
 ```text
 worktree: /private/tmp/egeria-scaffold-public-package-release
@@ -22,9 +132,9 @@ release comparison: 2e721a2d0358f758d0c5794da7126648b46ad527..e4201e09460568444a
 review comparison: 8382de8f1377300d6bbeca6b67679d2c20ba6111..e4201e09460568444a84b35d8fa05d814a2e0b11
 ```
 
-The broader review comparison includes the separately reviewed deterministic skeleton-rendering and Node `22.23.2` prerequisites. This evidence records the public-package release implementation from the completed Node prerequisite through the reviewed private candidate.
+The broader historical review comparison includes the separately reviewed deterministic skeleton-rendering and Node `22.23.2` prerequisites. It records the release implementation from the completed Node prerequisite through the reviewed private candidate; it no longer describes current repository or registry status.
 
-## Release implementation commits
+## Historical release implementation commits
 
 ```text
 3659fc9 License public package sources
@@ -35,7 +145,7 @@ ee40d36 Repair package release review findings
 e4201e0 Harden package release safeguards
 ```
 
-## Changed files
+## Historical candidate changed files
 
 - Deleted `.changeset/lean-builder-monorepo.md` through the existing Changesets version command.
 - Created `.github/workflows/package-release.yml` and root `LICENSE`.
@@ -50,7 +160,7 @@ e4201e0 Harden package release safeguards
 
 No package API, observability behavior, private-package visibility, capability, generated-project source, `.egeria` state, CLI behavior, provider, deployment, or client repository changed in the release implementation range.
 
-## Materialized release candidate
+## Historical materialized release candidate
 
 - `@egeria-systems/standards@0.1.0` is public-configured, Apache-2.0 licensed, and retains only its approved TypeScript/ESLint configuration exports.
 - `@egeria-systems/observability@0.1.0` is public-configured, Apache-2.0 licensed, and retains its intentionally empty runtime API.
@@ -59,7 +169,7 @@ No package API, observability behavior, private-package visibility, capability, 
 - Changesets remains the sole version/publication owner. The new validator only rejects invalid release context, candidate state, and registry state.
 - The manual workflow checks out full-history `main`, binds both `HEAD` and local `main` to the exact approved input, uses the `npm-release` environment, and exposes no publish-time mapped secret.
 
-## Test-driven record
+## Historical private-candidate test-driven record
 
 ### License and metadata
 
@@ -101,7 +211,7 @@ package ownership: package-name absence contract missing
 
 The minimum repair mutation-protects both Git assertions, separates pure HTTP classification from the request shell, tests both URLs and network failure, and requires both package-level packuments and exact target versions to be absent. Reviewer disposition checks confirmed all findings resolved.
 
-## Final deterministic command evidence
+## Historical private-candidate deterministic command evidence
 
 | Command or gate | Result |
 |---|---|
@@ -122,7 +232,7 @@ The minimum repair mutation-protects both Git assertions, separates pure HTTP cl
 
 The release-branch `changeset status` nonzero changed-package/no-pending-changeset state is expected after version materialization. The workflow checks out `main` with full history and reruns raw Changesets status only after exact commit equality is established.
 
-## Tarball evidence
+## Historical private-candidate tarball evidence
 
 Tarballs were created outside the repository after builds.
 
@@ -155,9 +265,9 @@ package.json
 
 Neither tarball contains a repository changelog because its existing `files` allowlist does not include one.
 
-## Private repository and secret audit
+## Historical private repository and secret audit
 
-The live read-only GitHub audit found:
+Before publicization, the live read-only GitHub audit found:
 
 - repository visibility `private`, default branch `main`, enabled and unarchived;
 - only remote branch `main` at `af299f4aeb602ebf7c3e0fc0c33a2d208cb496fc`, which is an ancestor of this candidate;
@@ -171,7 +281,7 @@ The official Darwin arm64 Gitleaks `8.30.1` archive matched approved SHA-256 `b4
 - Four Actions logs streamed directly through redacted stdin scanning: no leaks found; raw logs were neither printed nor stored.
 - Directory scan: 33 generic-key matches, all confined to ignored `.next`, `.open-next`, and `.wrangler` proof output; none is tracked.
 
-Automated scanning does not prove privacy or rights. Human review of identities, history, files, third-party material, Actions exposure, repository metadata, and publication authority remains pending and blocks every external action.
+Automated scanning did not prove privacy or rights. At that historical checkpoint, human review of identities, history, files, third-party material, Actions exposure, repository metadata, and publication authority remained pending. Those gates were later separately approved and executed; this historical scan is not current public-state evidence.
 
 ## License inventory
 
@@ -179,14 +289,16 @@ The clean-worktree production inventory completed only when allowed to read the 
 
 - The LGPL entry is the platform binary `@img/sharp-libvips-darwin-arm64`; the CC-BY entry is `caniuse-lite`. Both belong to the private compatibility-proof dependency graph and neither public tarball.
 - The standards production/peer tool graph contains permissive identifiers only; observability reports no production licenses.
-- Automated inventory is not legal advice or proof of title. Human confirmation of attribution, incorporated material, Apache-2.0 authority, and any NOTICE requirement remains pending.
+- Automated inventory is not legal advice or proof of title. Human confirmation was still pending at this historical checkpoint and was resolved separately before public execution.
 
-## Current official evidence revalidated
+## Historical pre-release official evidence
 
 - GitHub's official `actions/checkout` documentation confirms `fetch-depth: 0` fetches all branch/tag history, `ref` may name a branch, and `persist-credentials: false` opts out of persisted authentication.
 - GitHub's official workflow-event documentation states `workflow_dispatch` uses the last commit and ref of the selected branch/tag.
-- npm's official trusted-publishing, provenance, package-metadata, access-token, and unpublish guidance remains the external runbook authority; none of those settings or actions was exercised.
+- npm's official trusted-publishing, provenance, package-metadata, and access-token guidance was the external runbook authority; none of those settings or actions had been exercised at this historical checkpoint.
 - Current official Node, pnpm, npm, Changesets, action, and Gitleaks versions/advisories are recorded in the dated [preparation evidence](2026-08-06-public-package-release-preparation.md) and Node verification evidence.
+
+The current npm and GitHub release documentation refreshed after execution is linked in the public execution section above.
 
 ## Reviewer dispositions
 
@@ -196,21 +308,24 @@ The clean-worktree production inventory completed only when allowed to read the 
 | Architecture/anti-overengineering | raw-SHA checkout did not guarantee Changesets' local `main`; same README contradiction | full-history `main` checkout plus exact `HEAD`/local-main checks; resolved; no other material architecture finding |
 | Test evidence | Git assertions lacked mutation protection; HTTP/network adapter untested | independent deletion mutations plus classifier/request-shell tests; resolved; 15/15 focused tests |
 | Supply-chain/privacy | exact-version-only check allowed unwanted earlier package history | package-level and exact-version absence, authenticated human name check, and post-publication complete-version-set check; resolved; 7/7 focused tests |
+| Future provenance fix | sole missing explicit publish-time provenance request | `f640c87a709bc4266c59543942fe093824d02eb9`; focused 1/1 and full file 15/15 GREEN, diff check passed, independent review found no material issue |
 
-## Evidence limits and blockers
+## Historical pre-release blockers (superseded)
 
-- Human privacy, rights, identity, attribution, and authority confirmation is pending. This is a hard blocker, not an automated check.
-- Authenticated npm confirmation that neither package name already exists as public or private is pending.
-- The workflow is statically and mutation tested but has not run on GitHub.
-- No token, environment, secret, trusted publisher, public repository, package publication, provenance statement, signature, registry tarball, or fresh public consumer exists yet.
-- Registry absence and advisory results are time-sensitive and must be refreshed at their named external gates.
-- Two-package publication is not atomic. A mixed result requires a new recovery approval.
-- Automated secret, license, accessibility, and package tests do not prove security, legal title, privacy, WCAG conformance, or production fitness.
+These items blocked external action at the private-candidate checkpoint. They are retained as historical provenance and are not current blockers:
+
+- Human privacy, rights, identity, attribution, and authority confirmation was pending; it was later separately confirmed.
+- Authenticated npm package-name confirmation was pending; execution later established the exact public version sets.
+- The workflow had not run on GitHub; run `31128800393` later completed successfully.
+- The token, environment, trusted publishers, public repository, signatures, registry tarballs, and fresh consumers did not yet exist; their current dispositions are recorded above.
+- Registry absence and advisory results were time-sensitive and were refreshed at the applicable gates.
+- Two-package publication was non-atomic; no mixed result occurred.
+- The automation limits remain current and are restated under current risks above.
 
 ## Recovery domains
 
-- **Source:** revert the six release implementation commits together; do not leave versions, workflow, validator, metadata, tests, and documentation mixed.
-- **Package registry:** no package was published, so no registry rollback exists. Future deprecation/corrective release is separate from source rollback; unpublish is not treated as routine recovery.
-- **Credentials and trust:** no npm token, GitHub secret, environment, or trusted publisher was created or changed.
-- **Repository visibility:** the repository remains private; no visibility recovery is needed. A future return to private would not retract prior public disclosure.
+- **Source:** reverting `f640c87` or this evidence increment would affect only future workflow/docs state; any broader source correction requires its own approved comparison and does not alter published registry versions.
+- **Package registry:** the `0.1.0` versions are immutable. Any registry correction or deprecation is separate from source rollback and requires new explicit approval; no registry action is recommended by this evidence increment.
+- **Credentials and trust:** the bootstrap token and GitHub environment secret are gone. Trusted-publisher or publishing-access changes are separate external actions and require explicit approval.
+- **Repository visibility:** the repository is public. Returning it to private would not retract prior disclosure or published packages and requires separate approval.
 - **State and migrations:** no `.egeria` state, migration, provider resource, deployment, or client repository changed.

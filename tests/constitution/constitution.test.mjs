@@ -303,8 +303,16 @@ test("package ownership documentation records the approved release boundary", as
   assert.match(contributing, /must not publish.*local/i);
   assert.match(contributing, /public API.*approved Changeset/i);
 
-  assert.match(packageOwnership, /`0\.1\.0` release candidates/i);
-  assert.match(packageOwnership, /not.*published.*npm registry/i);
+  for (const document of [readme, packageOwnership]) {
+    assert.match(
+      document,
+      /exactly `@egeria-systems\/standards@0\.1\.0` and `@egeria-systems\/observability@0\.1\.0` are publicly available on npm/i,
+    );
+    assert.match(document, /registry signatures/i);
+    assert.match(document, /approved bootstrap provenance exception/i);
+    assert.match(document, /future releases.*OIDC trusted publishing/i);
+    assert.match(document, /explicit provenance request/i);
+  }
   assert.match(packageOwnership, /Changesets.*versioning and publication/i);
   assert.match(packageOwnership, /does not create.*release resolver/i);
   assert.match(packageOwnership, /`package-release\.yml`/);
