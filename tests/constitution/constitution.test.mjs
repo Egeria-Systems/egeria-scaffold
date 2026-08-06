@@ -78,6 +78,7 @@ test("the root workspace remains private and pins the compatibility-proof toolch
     "@egeria-systems/standards",
     "@eslint/js",
     "eslint",
+    "npm",
   ]);
   assert.equal(manifest.packageManager, "pnpm@11.20.0");
   assert.deepEqual(manifest.engines, {

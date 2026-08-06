@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
@@ -6,6 +9,11 @@ import {
   checkRegistryState,
   checkReleaseContext,
 } from "../../scripts/check-package-release.mjs";
+
+const repositoryRoot = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 
 const releaseCommit = "a".repeat(40);
 
@@ -182,7 +190,7 @@ test("pending release intent is rejected after version materialization", () => {
   );
 });
 
-test("an all-absent registry state is accepted", () => {
+test("release registry state accepts two absent versions", () => {
   assert.deepEqual(
     checkRegistryState({
       packages: packageRecords,
@@ -193,7 +201,7 @@ test("an all-absent registry state is accepted", () => {
   );
 });
 
-test("present, mixed, redirect, rate-limit, authentication, and network states fail closed", () => {
+test("release registry state fails closed for every non-absent result", () => {
   for (const status of [
     "present",
     "redirect",
@@ -246,4 +254,143 @@ test("registry validation rejects incomplete or mixed target results", () => {
     ),
     ["REGISTRY_STATE_INVALID"],
   );
+});
+
+function countMatches(source, pattern) {
+  return [...source.matchAll(pattern)].length;
+}
+
+function releaseWorkflowProblems(workflow) {
+  const registryIndex = workflow.indexOf(
+    "pnpm run check:package-release registry",
+  );
+  const configureIndex = workflow.indexOf(
+    "- name: Configure temporary npm authentication",
+  );
+  const publishIndex = workflow.indexOf("- name: Publish packages");
+  const cleanupIndex = workflow.indexOf(
+    "- name: Remove temporary npm authentication",
+  );
+  const configureBlock = workflow.slice(configureIndex, publishIndex);
+  const publishBlock = workflow.slice(publishIndex, cleanupIndex);
+  const problems = [];
+
+  if (!(registryIndex >= 0 && registryIndex < configureIndex)) {
+    problems.push("registry validation must immediately precede authentication");
+  }
+  if (!(configureIndex >= 0 && configureIndex < publishIndex)) {
+    problems.push("authentication must precede publication");
+  }
+  if (/NPM_BOOTSTRAP_TOKEN|secrets\./.test(publishBlock)) {
+    problems.push("publication must not receive a mapped secret");
+  }
+  if (
+    /verify:package-release-candidate|pnpm peers check|pnpm audit/.test(
+      configureBlock,
+    )
+  ) {
+    problems.push("verification must not run under npm authentication");
+  }
+  if (!/^        if: always\(\)$/m.test(workflow.slice(cleanupIndex))) {
+    problems.push("authentication cleanup must be unconditional");
+  }
+  if (
+    !workflow.includes(
+      "pnpm exec npm config delete --location=user //registry.npmjs.org/:_authToken",
+    )
+  ) {
+    problems.push("authentication cleanup command is missing");
+  }
+
+  return problems;
+}
+
+test("package release workflow is manual, exact-commit-bound, and least privilege", async () => {
+  const workflow = await readFile(
+    resolve(repositoryRoot, ".github/workflows/package-release.yml"),
+    "utf8",
+  );
+
+  assert.match(workflow, /^name: Package release$/m);
+  assert.match(
+    workflow,
+    /^on:\n  workflow_dispatch:\n    inputs:\n      release_commit:\n(?:        .+\n)+/m,
+  );
+  assert.match(workflow, /^        required: true$/m);
+  assert.match(workflow, /^        type: string$/m);
+  assert.doesNotMatch(
+    workflow,
+    /^  (?:push|pull_request|schedule|release|workflow_call):/m,
+  );
+  assert.match(
+    workflow,
+    /^permissions:\n  contents: read\n  id-token: write$/m,
+  );
+  assert.match(
+    workflow,
+    /^concurrency:\n  group: package-release\n  cancel-in-progress: false$/m,
+  );
+  assert.match(workflow, /^    if: github\.ref == 'refs\/heads\/main'$/m);
+  assert.match(workflow, /^    runs-on: ubuntu-24\.04$/m);
+  assert.match(workflow, /^      name: npm-release$/m);
+  assert.match(
+    workflow,
+    /^        uses: actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1$/m,
+  );
+  assert.match(workflow, /^          persist-credentials: false$/m);
+  assert.match(workflow, /^          ref: \$\{\{ inputs\.release_commit \}\}$/m);
+  assert.match(
+    workflow,
+    /^        uses: pnpm\/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c$/m,
+  );
+  assert.match(workflow, /^          version: 11\.20\.0$/m);
+  assert.match(workflow, /^          runtime: node@22\.23\.2$/m);
+  assert.match(workflow, /^          cache: false$/m);
+  assert.match(workflow, /^          install: false$/m);
+  assert.match(workflow, /pnpm install --frozen-lockfile/);
+  assert.match(workflow, /test "\$\(pnpm exec npm --version\)" = "12\.0\.2"/);
+  assert.match(workflow, /pnpm run check:package-release context/);
+  assert.match(workflow, /pnpm run verify:package-release-candidate/);
+  assert.match(workflow, /pnpm run changeset:status/);
+  assert.match(workflow, /pnpm peers check/);
+  assert.match(workflow, /pnpm audit --audit-level=moderate/);
+  assert.equal(
+    countMatches(workflow, /pnpm run check:package-release registry/g),
+    1,
+  );
+  assert.match(
+    workflow,
+    /pnpm exec npm config set --location=user \/\/registry\.npmjs\.org\/:_authToken "\$NPM_BOOTSTRAP_TOKEN"/,
+  );
+  assert.equal(countMatches(workflow, /pnpm run release-packages/g), 1);
+  assert.equal(countMatches(workflow, /secrets\.NPM_BOOTSTRAP_TOKEN/g), 1);
+  assert.doesNotMatch(
+    workflow,
+    /actions\/cache|actions\/setup-node|git push|gh release|wrangler|deploy/i,
+  );
+  assert.deepEqual(releaseWorkflowProblems(workflow), []);
+});
+
+test("package release workflow mutations cannot expose authentication or skip cleanup", async () => {
+  const workflow = await readFile(
+    resolve(repositoryRoot, ".github/workflows/package-release.yml"),
+    "utf8",
+  );
+  const mutations = [
+    workflow.replace(
+      "      - name: Publish packages\n        run: pnpm run release-packages",
+      "      - name: Publish packages\n        env:\n          NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}\n        run: pnpm run release-packages",
+    ),
+    workflow.replace("        if: always()\n", ""),
+    workflow
+      .replace("          pnpm run verify:package-release-candidate\n", "")
+      .replace(
+        "          if [ -n \"$NPM_BOOTSTRAP_TOKEN\" ]; then",
+        "          pnpm run verify:package-release-candidate\n          if [ -n \"$NPM_BOOTSTRAP_TOKEN\" ]; then",
+      ),
+  ];
+
+  for (const mutation of mutations) {
+    assert.notDeepEqual(releaseWorkflowProblems(mutation), []);
+  }
 });

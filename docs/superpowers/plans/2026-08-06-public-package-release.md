@@ -60,6 +60,7 @@ The controller must stop at each numbered gate:
 - Modify `tests/package-boundaries/internal-linting.test.mjs`
 - Modify `tests/package-boundaries/release-safeguards.test.mjs`
 - Create `tests/package-boundaries/package-release.test.mjs`
+- Modify `tests/constitution/constitution.test.mjs`
 - Modify `tests/package-boundaries/private-packages.test.mjs`
 - Modify `tests/package-boundaries/public-observability.test.mjs`
 - Modify `tests/package-boundaries/public-standards.test.mjs`
@@ -257,7 +258,7 @@ Add root scripts:
   "check:package-release": "node scripts/check-package-release.mjs",
   "verify:builder-packages:quality": "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:builder && pnpm run build:builder && pnpm run test:packages && pnpm run typecheck:builder",
   "verify:builder-packages": "pnpm run verify:builder-packages:quality && pnpm run changeset:status",
-  "verify:package-release-candidate": "pnpm run verify:builder-packages:quality && pnpm run check:package-release -- local"
+  "verify:package-release-candidate": "pnpm run verify:builder-packages:quality && pnpm run check:package-release local"
 }
 ```
 
@@ -331,6 +332,9 @@ Stop for explicit increment approval.
 - Modify `scripts/check-package-release.mjs`
 - Modify `tests/package-boundaries/package-release.test.mjs`
 - Modify `tests/package-boundaries/release-safeguards.test.mjs`
+- Modify `tests/constitution/constitution.test.mjs`
+
+The exact root dependency-shape contract in `tests/constitution/constitution.test.mjs` is a direct consumer of the pinned npm development dependency. The user's standing amendment approval adds it to this increment before RED.
 
 ### RED
 
@@ -566,7 +570,7 @@ pnpm exec npm --version
 pnpm audit --audit-level=moderate
 pnpm peers check
 pnpm run verify:package-release-candidate
-pnpm run check:package-release -- registry
+pnpm run check:package-release registry
 pnpm run check:semantic-naming
 git diff --check
 git status --short --branch

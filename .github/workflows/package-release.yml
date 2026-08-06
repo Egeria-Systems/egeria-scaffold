@@ -1,0 +1,74 @@
+name: Package release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_commit:
+        description: Exact approved main commit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: package-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment:
+      name: npm-release
+    steps:
+      - name: Check out approved commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.release_commit }}
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release context
+        env:
+          RELEASE_COMMIT: ${{ inputs.release_commit }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+          test "$(pnpm exec npm --version)" = "12.0.2"
+          pnpm run check:package-release context
+
+      - name: Verify release candidate
+        run: |
+          pnpm run verify:package-release-candidate
+          pnpm run changeset:status
+          pnpm peers check
+          pnpm audit --audit-level=moderate
+
+      - name: Final registry absence check
+        run: pnpm run check:package-release registry
+
+      - name: Configure temporary npm authentication
+        env:
+          NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
+        run: |
+          if [ -n "$NPM_BOOTSTRAP_TOKEN" ]; then
+            pnpm exec npm config set --location=user //registry.npmjs.org/:_authToken "$NPM_BOOTSTRAP_TOKEN"
+          fi
+
+      - name: Publish packages
+        run: pnpm run release-packages
+
+      - name: Remove temporary npm authentication
+        if: always()
+        run: pnpm exec npm config delete --location=user //registry.npmjs.org/:_authToken

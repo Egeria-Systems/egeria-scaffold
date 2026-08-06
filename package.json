@@ -20,14 +20,15 @@
     "verify:compatibility-proof": "pnpm --filter @egeria-systems/nextjs-cloudflare-proof verify",
     "verify:builder-packages:quality": "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:builder && pnpm run build:builder && pnpm run test:packages && pnpm run typecheck:builder",
     "verify:builder-packages": "pnpm run verify:builder-packages:quality && pnpm run changeset:status",
-    "verify:package-release-candidate": "pnpm run verify:builder-packages:quality && pnpm run check:package-release -- local",
+    "verify:package-release-candidate": "pnpm run verify:builder-packages:quality && pnpm run check:package-release local",
     "version-packages": "changeset version"
   },
   "devDependencies": {
     "@changesets/cli": "2.31.1",
     "@egeria-systems/standards": "workspace:*",
     "@eslint/js": "10.0.1",
-    "eslint": "10.8.0"
+    "eslint": "10.8.0",
+    "npm": "12.0.2"
   },
   "packageManager": "pnpm@11.20.0",
   "engines": {

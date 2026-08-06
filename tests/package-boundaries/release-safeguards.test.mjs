@@ -180,6 +180,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
   const rootManifest = await readJson("package.json");
 
   assert.equal(rootManifest.devDependencies?.["@changesets/cli"], "2.31.1");
+  assert.equal(rootManifest.devDependencies?.npm, "12.0.2");
   assert.deepEqual(
     {
       build: rootManifest.scripts?.["build:builder"],
@@ -223,7 +224,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
       verifyQuality:
         "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:builder && pnpm run build:builder && pnpm run test:packages && pnpm run typecheck:builder",
       verifyRelease:
-        "pnpm run verify:builder-packages:quality && pnpm run check:package-release -- local",
+        "pnpm run verify:builder-packages:quality && pnpm run check:package-release local",
       version: "changeset version",
     },
   );
