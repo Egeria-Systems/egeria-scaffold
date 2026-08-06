@@ -100,7 +100,7 @@ The repository has one package-publication workflow with a semantic filename and
 - checks out `main` with full history, then requires both local `main` and `HEAD` to equal the exact approved commit before Changesets runs;
 - runs the full relevant deterministic verification once;
 - confirms package names and versions are exactly the approved pair at `0.1.0`;
-- confirms neither exact version exists before the initial release;
+- confirms neither package name nor exact target version exists before the initial release;
 - rebuilds and inspects the exact dry-run package contents immediately before publication;
 - invokes the existing root `release-packages`/Changesets publication owner rather than adding a competing version resolver;
 - requests provenance and public access through the package manifests;

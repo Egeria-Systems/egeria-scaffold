@@ -8,6 +8,8 @@ import {
   checkLocalCandidate,
   checkRegistryState,
   checkReleaseContext,
+  classifyRegistryResponseStatus,
+  readRegistryPackageState,
 } from "../../scripts/check-package-release.mjs";
 
 const repositoryRoot = resolve(
@@ -60,11 +62,13 @@ const absentRegistryResults = [
   {
     name: "@egeria-systems/observability",
     version: "0.1.0",
+    packageStatus: "absent",
     status: "absent",
   },
   {
     name: "@egeria-systems/standards",
     version: "0.1.0",
+    packageStatus: "absent",
     status: "absent",
   },
 ];
@@ -256,11 +260,95 @@ test("registry validation rejects incomplete or mixed target results", () => {
   );
 });
 
+test("registry validation rejects unexpected package history", () => {
+  const registryResults = absentRegistryResults.map((result, index) =>
+    index === 0 ? { ...result, packageStatus: "present" } : result,
+  );
+
+  assert.deepEqual(
+    problemCodes(
+      checkRegistryState({
+        packages: packageRecords,
+        pendingChangesets: [],
+        registryResults,
+      }),
+    ),
+    ["REGISTRY_STATE_INVALID"],
+  );
+});
+
+test("registry response statuses are classified fail-closed", () => {
+  for (const [statusCode, status] of [
+    [404, "absent"],
+    [200, "present"],
+    [301, "redirect"],
+    [307, "redirect"],
+    [401, "authentication-failed"],
+    [403, "authentication-failed"],
+    [429, "rate-limited"],
+    [500, "unexpected"],
+  ]) {
+    assert.equal(classifyRegistryResponseStatus(statusCode), status);
+  }
+});
+
+test("registry adapter checks package history and exact version", async () => {
+  const requests = [];
+  const result = await readRegistryPackageState({
+    name: "@egeria-systems/standards",
+    version: "0.1.0",
+    request: async (url, options) => {
+      requests.push({ url, redirect: options.redirect });
+      return { status: url.endsWith("/0.1.0") ? 404 : 200 };
+    },
+  });
+
+  assert.deepEqual(result, {
+    name: "@egeria-systems/standards",
+    version: "0.1.0",
+    packageStatus: "present",
+    status: "absent",
+  });
+  assert.deepEqual(
+    requests.sort((left, right) => left.url.localeCompare(right.url)),
+    [
+      {
+        url: "https://registry.npmjs.org/%40egeria-systems%2Fstandards",
+        redirect: "manual",
+      },
+      {
+        url: "https://registry.npmjs.org/%40egeria-systems%2Fstandards/0.1.0",
+        redirect: "manual",
+      },
+    ],
+  );
+});
+
+test("registry adapter maps request failures without exposing details", async () => {
+  const result = await readRegistryPackageState({
+    name: "@egeria-systems/observability",
+    version: "0.1.0",
+    request: async () => {
+      throw new Error("credential-secret network detail");
+    },
+  });
+
+  assert.deepEqual(result, {
+    name: "@egeria-systems/observability",
+    version: "0.1.0",
+    packageStatus: "network-failed",
+    status: "network-failed",
+  });
+  assert.equal(JSON.stringify(result).includes("credential-secret"), false);
+});
+
 function countMatches(source, pattern) {
   return [...source.matchAll(pattern)].length;
 }
 
 function releaseWorkflowProblems(workflow) {
+  const contextIndex = workflow.indexOf("- name: Verify release context");
+  const candidateIndex = workflow.indexOf("- name: Verify release candidate");
   const registryIndex = workflow.indexOf(
     "pnpm run check:package-release registry",
   );
@@ -273,7 +361,17 @@ function releaseWorkflowProblems(workflow) {
   );
   const configureBlock = workflow.slice(configureIndex, publishIndex);
   const publishBlock = workflow.slice(publishIndex, cleanupIndex);
+  const contextBlock = workflow.slice(contextIndex, candidateIndex);
   const problems = [];
+
+  for (const command of [
+    'test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"',
+    'test "$(git rev-parse refs/heads/main)" = "$RELEASE_COMMIT"',
+  ]) {
+    if (!contextBlock.includes(command)) {
+      problems.push("release context must bind HEAD and local main");
+    }
+  }
 
   if (!(registryIndex >= 0 && registryIndex < configureIndex)) {
     problems.push("registry validation must immediately precede authentication");
@@ -342,6 +440,10 @@ test("package release workflow is manual, exact-commit-bound, and least privileg
   assert.match(workflow, /^          ref: main$/m);
   assert.match(
     workflow,
+    /test "\$\(git rev-parse HEAD\)" = "\$RELEASE_COMMIT"/,
+  );
+  assert.match(
+    workflow,
     /test "\$\(git rev-parse refs\/heads\/main\)" = "\$RELEASE_COMMIT"/,
   );
   assert.match(
@@ -382,6 +484,14 @@ test("package release workflow mutations cannot expose authentication or skip cl
     "utf8",
   );
   const mutations = [
+    workflow.replace(
+      '          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"\n',
+      "",
+    ),
+    workflow.replace(
+      '          test "$(git rev-parse refs/heads/main)" = "$RELEASE_COMMIT"\n',
+      "",
+    ),
     workflow.replace(
       "      - name: Publish packages\n        run: pnpm run release-packages",
       "      - name: Publish packages\n        env:\n          NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}\n        run: pnpm run release-packages",

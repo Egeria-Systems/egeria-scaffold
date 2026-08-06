@@ -314,6 +314,10 @@ test("package ownership documentation records the approved release boundary", as
   assert.match(packageOwnership, /OIDC trusted publishing/i);
   assert.match(
     packageOwnership,
+    /both package names and target versions are absent/i,
+  );
+  assert.match(
+    packageOwnership,
     /local configuration.*green workflow.*authorize publication/i,
   );
 

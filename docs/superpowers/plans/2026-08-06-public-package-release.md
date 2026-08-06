@@ -242,9 +242,9 @@ node scripts/check-package-release.mjs registry
 - for this initial candidate both are exactly `0.1.0`;
 - no pending Changeset Markdown file exists except `.changeset/README.md`;
 
-`registry` first applies the same local validation and then queries only the two exact target versions:
+`registry` first applies the same local validation and then queries each package packument plus its exact target version:
 
-- each exact registry URL returns HTTP 404;
+- both package-level and both exact-version registry URLs return HTTP 404;
 - HTTP 200 for either package, a mixed 200/404 state, a redirect, rate limit, authentication response, or network error fails closed;
 - response bodies are never logged; and
 - the command performs no write or publish.
@@ -281,6 +281,8 @@ In `package-release.test.mjs`, test the pure release checks:
 - exact two-package `0.1.0` candidate accepted;
 - missing, extra, renamed, private, zero, or wrong-version records rejected;
 - all-404 registry state accepted;
+- unexpected earlier package history rejected;
+- package-level and exact-version HTTP status classification plus network failure tested at the registry adapter boundary;
 - present, mixed, redirect, rate-limit, and network-failure states rejected without including a response body or credential-like input in the returned error.
 
 Run:
@@ -483,14 +485,16 @@ Stop for explicit increment approval.
 
 ## Approved reviewer-repair amendment
 
-The user's standing amendment approval covers two material findings from the first independent review pair. Modify only:
+The user's standing amendment approval covers the material findings from both independent review pairs. Modify only:
 
 - `.github/workflows/package-release.yml`;
 - `README.md`;
 - `docs/superpowers/specs/2026-08-06-public-package-release-design.md`;
 - this plan;
-- `tests/constitution/constitution.test.mjs`; and
-- `tests/package-boundaries/package-release.test.mjs`.
+- `tests/constitution/constitution.test.mjs`;
+- `tests/package-boundaries/package-release.test.mjs`;
+- `scripts/check-package-release.mjs`; and
+- `docs/architecture/package-ownership.md`.
 
 The release workflow must check out `main` with full history and require both local `main` and `HEAD` to equal the exact approved input before raw Changesets status runs. This preserves Changesets' configured `main` comparison instead of relying on a detached raw-SHA checkout. The README must distinguish implemented read-only/in-memory builder behavior from deferred repository-writing generation, `.egeria` file creation or update, CLI behavior, installation, and generated builds.
 
@@ -498,6 +502,12 @@ Record focused RED for both defects, make the minimum repair, rerun the affected
 
 ```text
 Repair package release review findings
+```
+
+The second independent review pair adds three evidence-backed repairs under the same standing approval: mutation-protect both exact Git assertions; causally test the HTTP registry adapter; and require package-level packument absence as well as exact-version absence so the initial release cannot attach to unexpected history. Record focused RED/GREEN for each repair and commit:
+
+```text
+Harden package release safeguards
 ```
 
 ## Private public-surface and rights audit
@@ -652,7 +662,8 @@ The user confirms, without sharing account identity or evidence secrets in chat:
 - npm account 2FA is enabled;
 - Apache-2.0 publication is authorized;
 - the private public-surface audit is accepted; and
-- the exact two package/version names remain desired.
+- the exact two package/version names remain desired; and
+- an authenticated npm account view confirms neither package name already exists as public or private.
 
 Stop on any negative or uncertain answer.
 
@@ -712,7 +723,7 @@ Stop before publication on any mismatch. Making the repository private again is 
 
 ### Operator action 6: approve and run exact publication
 
-After confirming both registry URLs still return 404, the controller reads the exact public remote-main SHA into `APPROVED_PUBLIC_MAIN_SHA` and renders its actual 40-character value—never a placeholder—in a separate publication approval request naming:
+After confirming both package-level and both exact-version registry URLs still return 404, the controller reads the exact public remote-main SHA into `APPROVED_PUBLIC_MAIN_SHA` and renders its actual 40-character value—never a placeholder—in a separate publication approval request naming:
 
 ```text
 @egeria-systems/standards@0.1.0
@@ -756,7 +767,7 @@ npm unpublish is not routine rollback. A used name/version cannot be reused, and
 
 Before removing the bootstrap credential, verify from fresh temporary npm consumers using exact Node `22.23.2` and npm `12.0.2`:
 
-1. query each public packument and record version, public access, license, repository/directory, dist integrity, signatures, attestations, and tarball URL;
+1. query each public packument, confirm its complete version set is exactly `0.1.0` with no earlier history, and record public access, license, repository/directory, dist integrity, signatures, attestations, and tarball URL;
 2. download each registry tarball and compare exact file inventories and Apache license SHA-256;
 3. install standards with ESLint `9.39.5` in one temp consumer and ESLint `10.8.0` in another; import all declared exports and run the established strict/cloudflare behavioral controls;
 4. install observability in a third temp consumer and assert its root module exports no values;

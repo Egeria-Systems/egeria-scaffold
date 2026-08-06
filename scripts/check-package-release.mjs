@@ -162,11 +162,16 @@ export function checkRegistryState({
     ]);
   }
 
-  if (registryResults.some(({ status }) => status !== "absent")) {
+  if (
+    registryResults.some(
+      ({ packageStatus, status }) =>
+        packageStatus !== "absent" || status !== "absent",
+    )
+  ) {
     return freezeProblems([
       createProblem(
         "REGISTRY_STATE_INVALID",
-        "Both exact public package versions must be absent from the registry.",
+        "Both public package names and exact target versions must be absent from the registry.",
       ),
     ]);
   }
@@ -216,31 +221,46 @@ async function loadPendingChangesets() {
     .sort();
 }
 
-function registryStatus(response) {
-  if (response.status === 404) return "absent";
-  if (response.status === 200) return "present";
-  if (response.status >= 300 && response.status < 400) return "redirect";
-  if (response.status === 429) return "rate-limited";
-  if (response.status === 401 || response.status === 403) {
+export function classifyRegistryResponseStatus(statusCode) {
+  if (statusCode === 404) return "absent";
+  if (statusCode === 200) return "present";
+  if (statusCode >= 300 && statusCode < 400) return "redirect";
+  if (statusCode === 429) return "rate-limited";
+  if (statusCode === 401 || statusCode === 403) {
     return "authentication-failed";
   }
   return "unexpected";
 }
 
+async function requestRegistryStatus(url, request) {
+  try {
+    const response = await request(url, { redirect: "manual" });
+
+    return classifyRegistryResponseStatus(response.status);
+  } catch {
+    return "network-failed";
+  }
+}
+
+export async function readRegistryPackageState({
+  name,
+  version,
+  request = fetch,
+}) {
+  const packageUrl = `https://registry.npmjs.org/${encodeURIComponent(name)}`;
+  const [packageStatus, status] = await Promise.all([
+    requestRegistryStatus(packageUrl, request),
+    requestRegistryStatus(`${packageUrl}/${version}`, request),
+  ]);
+
+  return { name, version, packageStatus, status };
+}
+
 async function loadRegistryResults() {
   return Promise.all(
-    expectedPublicPackages.map(async ({ name, version }) => {
-      try {
-        const response = await fetch(
-          `https://registry.npmjs.org/${encodeURIComponent(name)}/${version}`,
-          { redirect: "manual" },
-        );
-
-        return { name, version, status: registryStatus(response) };
-      } catch {
-        return { name, version, status: "network-failed" };
-      }
-    }),
+    expectedPublicPackages.map(({ name, version }) =>
+      readRegistryPackageState({ name, version }),
+    ),
   );
 }
 
