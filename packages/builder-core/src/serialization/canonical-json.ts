@@ -25,6 +25,30 @@ function isJsonArray(value: JsonValue): value is readonly JsonValue[] {
   return Array.isArray(value);
 }
 
+function assertDenseArray(value: readonly unknown[]): void {
+  const ownKeys = Reflect.ownKeys(value);
+
+  if (ownKeys.length !== value.length + 1) {
+    throw new TypeError("JSON_VALUE_INVALID");
+  }
+
+  for (const key of ownKeys) {
+    if (key === "length") {
+      continue;
+    }
+
+    if (typeof key !== "string" || !/^(?:0|[1-9][0-9]*)$/.test(key)) {
+      throw new TypeError("JSON_VALUE_INVALID");
+    }
+
+    const index = Number(key);
+
+    if (!Number.isSafeInteger(index) || index >= value.length) {
+      throw new TypeError("JSON_VALUE_INVALID");
+    }
+  }
+}
+
 function canonicalize(
   value: unknown,
   ancestors: Set<object>,
@@ -57,6 +81,7 @@ function canonicalize(
 
   try {
     if (isUnknownArray(value)) {
+      assertDenseArray(value);
       return value.map((item) => canonicalize(item, ancestors));
     }
 

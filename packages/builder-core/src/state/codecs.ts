@@ -23,6 +23,64 @@ import {
   stringifyCanonicalJson,
 } from "../serialization/canonical-json.js";
 
+const structuralPathSegments = new Set([
+  "appliedMigrations",
+  "builderCompatibility",
+  "builderVersion",
+  "capabilities",
+  "capabilitySettings",
+  "checks",
+  "compatibility",
+  "completedAt",
+  "defaultLocale",
+  "deliveryMode",
+  "displayName",
+  "ejectedAreas",
+  "ejections",
+  "fingerprint",
+  "fingerprintTarget",
+  "fromBuilderVersion",
+  "identifier",
+  "installedCapabilities",
+  "kind",
+  "lastSuccessfulVerification",
+  "managedSurfaces",
+  "mergeStrategy",
+  "name",
+  "node",
+  "origin",
+  "originProfile",
+  "outcome",
+  "owner",
+  "ownership",
+  "path",
+  "persistentDataAuthorizations",
+  "platformAdapter",
+  "pnpm",
+  "pointer",
+  "project",
+  "projectSchemaVersion",
+  "recipeVersion",
+  "remainingKnownDrift",
+  "removalPolicy",
+  "schemaVersion",
+  "selectedCapabilities",
+  "stateClassifications",
+  "toBuilderVersion",
+  "verificationChecks",
+  "version",
+]);
+
+function sanitizeIssuePath(
+  path: readonly (string | number)[],
+): readonly (string | number)[] {
+  return path.map((segment) =>
+    typeof segment === "string" && !structuralPathSegments.has(segment)
+      ? "<dynamic>"
+      : segment,
+  );
+}
+
 function invalidResult(
   code: string,
   path: readonly (string | number)[],
@@ -51,7 +109,7 @@ function validateWithCode<T>(
     issues: result.issues.map(
       (issue): ContractIssue => ({
         code,
-        path: [...pathPrefix, ...issue.path],
+        path: [...pathPrefix, ...sanitizeIssuePath(issue.path)],
         context: issue.context,
       }),
     ),

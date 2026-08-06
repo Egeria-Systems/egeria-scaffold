@@ -155,11 +155,24 @@ ejectedAreas: []
   assert.equal(parsed.project.displayName, "No");
 
   const serialized = core.serializeProjectYaml(validProject);
-  assert.equal(serialized.endsWith("\n"), true);
-  assert.equal(serialized.endsWith("\n\n"), false);
+  assert.equal(
+    serialized,
+    `builderCompatibility: 0.0.0
+capabilitySettings: {}
+ejectedAreas: []
+originProfile: portfolio
+platformAdapter: cloudflare-workers
+project:
+  defaultLocale: en-CA
+  displayName: Sample Portfolio
+  name: sample-portfolio
+recipeVersion: 0.1.0
+schemaVersion: 1.0.0
+selectedCapabilities:
+  - standards
+`,
+  );
   assert.equal(serialized, core.serializeProjectYaml(validProject));
-  assert.ok(serialized.indexOf("builderCompatibility:") < serialized.indexOf("capabilitySettings:"));
-  assert.ok(serialized.indexOf("capabilitySettings:") < serialized.indexOf("ejectedAreas:"));
   assert.deepEqual(assertOk(core.parseProjectYaml(serialized)), validProject);
 });
 
@@ -194,6 +207,27 @@ unknownKey: secret-schema-value
 `);
   assertIssue(schemaResult, "PROJECT_SCHEMA_INVALID");
   assert.doesNotMatch(JSON.stringify(schemaResult.issues), /secret-schema-value/);
+
+  const dynamicKeyResult = core.parseProjectYaml(`schemaVersion: 1.0.0
+builderCompatibility: 0.0.0
+project:
+  name: sample-portfolio
+  displayName: Sample Portfolio
+  defaultLocale: en-CA
+originProfile: portfolio
+recipeVersion: 0.1.0
+platformAdapter: cloudflare-workers
+selectedCapabilities:
+  - standards
+capabilitySettings:
+  leaked-key: secret-setting
+ejectedAreas: []
+`);
+  assertIssue(dynamicKeyResult, "PROJECT_SCHEMA_INVALID");
+  assert.doesNotMatch(
+    JSON.stringify(dynamicKeyResult.issues),
+    /leaked-key|secret-setting/,
+  );
 });
 
 test("state JSON is strict, canonical, and content-safe", () => {
@@ -219,9 +253,22 @@ test("migration JSONL preserves source line numbers and serializes one canonical
   assert.deepEqual(assertOk(core.parseMigrationLog("\n  \n")), []);
 
   const line = core.serializeMigrationRecord(validMigrationRecord);
-  assert.equal(line.endsWith("\n"), true);
-  assert.equal(line.includes("\n", 0), true);
-  assert.equal(line.slice(0, -1).includes("\n"), false);
+  assert.equal(
+    line,
+    `${JSON.stringify({
+      capabilities: ["standards"],
+      completedAt: "2026-08-05T16:00:00.000Z",
+      fromBuilderVersion: "0.0.0",
+      identifier: "initial-generation-reconciliation",
+      kind: "reconciliation",
+      outcome: "succeeded",
+      persistentDataAuthorizations: [],
+      remainingKnownDrift: [],
+      schemaVersion: "1.0.0",
+      toBuilderVersion: "0.0.0",
+      verificationChecks: ["contracts"],
+    })}\n`,
+  );
   assert.deepEqual(assertOk(core.parseMigrationLog(`\n${line}\n`)), [validMigrationRecord]);
 
   const invalidJson = core.parseMigrationLog(`\n\n{"token":"secret-migration"\n`);
@@ -266,6 +313,24 @@ test("file and canonical JSON fingerprints use exact lowercase SHA-256", () => {
   assert.notEqual(
     core.fingerprintJsonValue([1, 2]),
     core.fingerprintJsonValue([2, 1]),
+  );
+  assert.equal(
+    core.fingerprintJsonValue({ z: { b: 2, a: 1 }, a: [{ d: 4, c: 3 }] }),
+    core.fingerprintJsonValue({ a: [{ c: 3, d: 4 }], z: { a: 1, b: 2 } }),
+  );
+});
+
+test("canonical JSON rejects sparse arrays and non-index array properties", () => {
+  assert.throws(
+    () => core.fingerprintJsonValue(new Array(1)),
+    (error) => error instanceof TypeError && error.message === "JSON_VALUE_INVALID",
+  );
+
+  const arrayWithProperty = [];
+  arrayWithProperty.extra = "secret-array-property";
+  assert.throws(
+    () => core.fingerprintJsonValue(arrayWithProperty),
+    (error) => error instanceof TypeError && error.message === "JSON_VALUE_INVALID",
   );
 });
 
@@ -325,6 +390,24 @@ test("surface materialization returns sanitized missing-source and pointer issue
   }
 });
 
+test("surface materialization validates runtime descriptors before projection", () => {
+  const result = core.materializeInstalledSurfaces({
+    files: new Map([
+      ["apps/web/tsconfig.json", encoder.encode("hello")],
+    ]),
+    surfaces: [
+      {
+        ...createFileSurface("standards-typescript"),
+        ownership: "ejected",
+        secretProperty: "secret-descriptor",
+      },
+    ],
+  });
+
+  assertIssue(result, "SURFACE_TARGET_INVALID", ["surfaces", 0]);
+  assert.doesNotMatch(JSON.stringify(result.issues), /secret-descriptor/);
+});
+
 test("surface materialization rejects duplicate, self, and overlapping ownership targets", () => {
   const cases = [
     [
@@ -335,6 +418,10 @@ test("surface materialization rejects duplicate, self, and overlapping ownership
     [
       createFileSurface("package-file", "apps/web/package.json"),
       createJsonSurface("package-pointer", "/dependencies/example"),
+    ],
+    [
+      createFileSurface("package-file-first", "apps/web/package.json"),
+      createFileSurface("package-file-second", "apps/web/package.json"),
     ],
     [
       createJsonSurface("package-parent", "/dependencies"),

@@ -1,8 +1,12 @@
-import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
+import {
+  managedSurfaceDescriptorSchema,
+  type ManagedSurfaceDescriptor,
+} from "../contracts/capability.js";
 import type {
   ContractIssue,
   ValidationResult,
 } from "../contracts/result.js";
+import { validateContract } from "../contracts/result.js";
 import type { InstalledSurface } from "../contracts/state.js";
 import {
   canonicalizeJsonValue,
@@ -84,6 +88,33 @@ function validateTargets(
   return undefined;
 }
 
+function validateDescriptors(
+  surfaces: readonly ManagedSurfaceDescriptor[],
+): ValidationResult<readonly ManagedSurfaceDescriptor[]> {
+  const validated: ManagedSurfaceDescriptor[] = [];
+
+  for (const [index, surface] of surfaces.entries()) {
+    const result = validateContract(managedSurfaceDescriptorSchema, surface);
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        issues: result.issues.map(
+          (issue): ContractIssue => ({
+            code: "SURFACE_TARGET_INVALID",
+            path: ["surfaces", index, ...issue.path],
+            context: issue.context,
+          }),
+        ),
+      };
+    }
+
+    validated.push(result.value);
+  }
+
+  return { ok: true, value: validated };
+}
+
 function decodeJsonSource(content: Uint8Array): unknown {
   const source = new TextDecoder("utf-8", { fatal: true }).decode(content);
   return JSON.parse(source) as unknown;
@@ -93,7 +124,13 @@ export function materializeInstalledSurfaces(input: Readonly<{
   files: ReadonlyMap<string, Uint8Array>;
   surfaces: readonly ManagedSurfaceDescriptor[];
 }>): ValidationResult<readonly InstalledSurface[]> {
-  const targetIssue = validateTargets(input.surfaces);
+  const descriptorResult = validateDescriptors(input.surfaces);
+
+  if (!descriptorResult.ok) {
+    return descriptorResult;
+  }
+
+  const targetIssue = validateTargets(descriptorResult.value);
 
   if (targetIssue !== undefined) {
     return { ok: false, issues: [targetIssue] };
@@ -101,7 +138,7 @@ export function materializeInstalledSurfaces(input: Readonly<{
 
   const installedSurfaces: InstalledSurface[] = [];
 
-  for (const [index, surface] of input.surfaces.entries()) {
+  for (const [index, surface] of descriptorResult.value.entries()) {
     const content = input.files.get(surface.path);
 
     if (content === undefined) {
