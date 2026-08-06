@@ -3,13 +3,10 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   access,
-  mkdtemp,
   readFile,
   readdir,
-  rm,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
@@ -188,6 +185,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
       build: rootManifest.scripts?.["build:builder"],
       changeset: rootManifest.scripts?.changeset,
       changesetStatus: rootManifest.scripts?.["changeset:status"],
+      releaseCheck: rootManifest.scripts?.["check:package-release"],
       builderCoreTests: rootManifest.scripts?.["test:builder-core"],
       lint: rootManifest.scripts?.["lint:builder"],
       release: rootManifest.scripts?.["release-packages"],
@@ -196,6 +194,10 @@ test("root release commands use the pinned Changesets boundary", async () => {
       test: rootManifest.scripts?.test,
       typecheck: rootManifest.scripts?.["typecheck:builder"],
       verify: rootManifest.scripts?.["verify:builder-packages"],
+      verifyQuality:
+        rootManifest.scripts?.["verify:builder-packages:quality"],
+      verifyRelease:
+        rootManifest.scripts?.["verify:package-release-candidate"],
       version: rootManifest.scripts?.["version-packages"],
     },
     {
@@ -203,6 +205,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run build",
       changeset: "changeset",
       changesetStatus: "changeset status",
+      releaseCheck: "node scripts/check-package-release.mjs",
       builderCoreTests:
         "pnpm --filter @egeria-systems/builder-core run build && node --test packages/builder-core/tests/*.test.mjs",
       lint:
@@ -216,7 +219,11 @@ test("root release commands use the pinned Changesets boundary", async () => {
       typecheck:
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run typecheck",
       verify:
-        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:builder && pnpm run build:builder && pnpm run test:packages && pnpm run typecheck:builder && pnpm run changeset:status",
+        "pnpm run verify:builder-packages:quality && pnpm run changeset:status",
+      verifyQuality:
+        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:builder && pnpm run build:builder && pnpm run test:packages && pnpm run typecheck:builder",
+      verifyRelease:
+        "pnpm run verify:builder-packages:quality && pnpm run check:package-release -- local",
       version: "changeset version",
     },
   );
@@ -252,49 +259,46 @@ test("Changesets keeps a restricted default and excludes private releases", asyn
   });
 });
 
-test("the initial release intent contains only public minor releases", async () => {
-  assert.equal(
-    await pathExists(".changeset/lean-builder-monorepo.md"),
-    true,
-    "the initial public-package Changeset must exist",
-  );
-
+test("the release candidate materializes only the approved public versions", async () => {
   const changesetFiles = (await readdir(resolve(repositoryRoot, ".changeset")))
     .filter((file) => file.endsWith(".md") && file !== "README.md")
     .sort();
-  assert.deepEqual(changesetFiles, ["lean-builder-monorepo.md"]);
+  assert.deepEqual(changesetFiles, []);
 
-  const changeset = await readFile(
-    resolve(repositoryRoot, ".changeset/lean-builder-monorepo.md"),
-    "utf8",
-  );
-  assert.match(changeset, /strict type-aware ESLint configuration/i);
-
-  const temporaryDirectory = await mkdtemp(
-    join(tmpdir(), "egeria-changeset-status-"),
-  );
-  const statusPath = join(temporaryDirectory, "status.json");
-
-  try {
-    await execFileAsync(
-      "pnpm",
-      ["exec", "changeset", "status", "--output", statusPath],
-      { cwd: repositoryRoot, encoding: "utf8" },
+  for (const [manifestPath, changelogPath, packageName] of [
+    [
+      "packages/standards/package.json",
+      "packages/standards/CHANGELOG.md",
+      "@egeria-systems/standards",
+    ],
+    [
+      "packages/observability/package.json",
+      "packages/observability/CHANGELOG.md",
+      "@egeria-systems/observability",
+    ],
+  ]) {
+    const manifest = await readJson(manifestPath);
+    const changelog = await readFile(
+      resolve(repositoryRoot, changelogPath),
+      "utf8",
     );
-    const status = JSON.parse(await readFile(statusPath, "utf8"));
 
-    assert.deepEqual(
-      status.releases
-        .filter((release) => release.type !== "none")
-        .map((release) => ({ name: release.name, type: release.type }))
-        .sort((left, right) => left.name.localeCompare(right.name)),
-      [
-        { name: "@egeria-systems/observability", type: "minor" },
-        { name: "@egeria-systems/standards", type: "minor" },
-      ],
+    assert.equal(manifest.version, "0.1.0", manifestPath);
+    assert.match(changelog, new RegExp(`^# ${packageName}$`, "m"));
+    assert.match(changelog, /^## 0\.1\.0$/m);
+    assert.match(
+      changelog,
+      /Establish the initial public package APIs, including strict type-aware ESLint configuration, and release safeguards\./,
     );
-  } finally {
-    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+
+  for (const manifestPath of [
+    "package.json",
+    "apps/cli/package.json",
+    "packages/builder-core/package.json",
+    "proofs/nextjs-cloudflare/package.json",
+  ]) {
+    assert.equal((await readJson(manifestPath)).version, "0.0.0", manifestPath);
   }
 });
 

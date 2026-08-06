@@ -70,8 +70,12 @@ test("the builder root owns an exact ESLint 10 lint boundary", async () => {
     "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint && pnpm exec eslint eslint.config.mjs scripts 'tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' 'apps/**/tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' 'packages/**/tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' --no-error-on-unmatched-pattern --max-warnings 0",
   );
   assert.match(
-    rootManifest.scripts?.["verify:builder-packages"] ?? "",
+    rootManifest.scripts?.["verify:builder-packages:quality"] ?? "",
     /pnpm run lint:builder/,
+  );
+  assert.match(
+    rootManifest.scripts?.["verify:builder-packages"] ?? "",
+    /pnpm run verify:builder-packages:quality/,
   );
 });
 

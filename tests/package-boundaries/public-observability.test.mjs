@@ -52,8 +52,14 @@ test("observability exposes only its approved empty public API", async () => {
 
   assert.deepEqual(manifest, {
     name: "@egeria-systems/observability",
-    version: "0.0.0",
+    version: "0.1.0",
     type: "module",
+    license: "Apache-2.0",
+    repository: {
+      type: "git",
+      url: "git+https://github.com/Egeria-Systems/egeria-scaffold.git",
+      directory: "packages/observability",
+    },
     files: ["dist", "README.md"],
     exports: {
       ".": {

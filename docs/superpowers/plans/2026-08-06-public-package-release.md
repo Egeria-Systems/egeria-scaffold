@@ -57,8 +57,12 @@ The controller must stop at each numbered gate:
 - Create `packages/observability/LICENSE`
 - Create `packages/observability/CHANGELOG.md` through `changeset version`
 - Create `scripts/check-package-release.mjs`
+- Modify `tests/package-boundaries/internal-linting.test.mjs`
 - Modify `tests/package-boundaries/release-safeguards.test.mjs`
 - Create `tests/package-boundaries/package-release.test.mjs`
+- Modify `tests/package-boundaries/private-packages.test.mjs`
+- Modify `tests/package-boundaries/public-observability.test.mjs`
+- Modify `tests/package-boundaries/public-standards.test.mjs`
 - Modify `tests/constitution/constitution.test.mjs`
 - Modify `docs/architecture/package-ownership.md`
 - Modify `docs/architecture/enforcement-map.md`
@@ -126,6 +130,8 @@ Expected versions at this point: Node `v22.23.2`, pnpm `11.20.0`.
 - Modify `packages/standards/README.md`
 - Modify `packages/observability/README.md`
 - Modify `README.md`
+- Modify `tests/package-boundaries/public-observability.test.mjs`
+- Modify `tests/package-boundaries/public-standards.test.mjs`
 - Modify `tests/package-boundaries/release-safeguards.test.mjs`
 
 ### RED
@@ -203,8 +209,14 @@ Stop for explicit increment approval. Do not begin versioning.
 - Modify `packages/observability/package.json` through the existing command
 - Create `packages/observability/CHANGELOG.md` through the existing command
 - Create `scripts/check-package-release.mjs`
+- Modify `tests/package-boundaries/internal-linting.test.mjs`
 - Modify `tests/package-boundaries/release-safeguards.test.mjs`
 - Create `tests/package-boundaries/package-release.test.mjs`
+- Modify `tests/package-boundaries/private-packages.test.mjs`
+- Modify `tests/package-boundaries/public-observability.test.mjs`
+- Modify `tests/package-boundaries/public-standards.test.mjs`
+
+The complete quality RED identified these direct manifest/script contract consumers after version materialization. The user's standing amendment approval covers their exact expectation updates; no production surface is added by this amendment.
 
 ### Interface contract
 

@@ -5,6 +5,7 @@
   "description": "Builds versioned materialized Next.js recipes for Egeria Systems projects.",
   "scripts": {
     "build:builder": "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run build",
+    "check:package-release": "node scripts/check-package-release.mjs",
     "check:semantic-naming": "node scripts/check-semantic-naming.mjs",
     "changeset": "changeset",
     "changeset:status": "changeset status",
@@ -17,7 +18,9 @@
     "test:packages": "pnpm --filter @egeria-systems/standards --filter @egeria-systems/observability run test",
     "typecheck:builder": "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run typecheck",
     "verify:compatibility-proof": "pnpm --filter @egeria-systems/nextjs-cloudflare-proof verify",
-    "verify:builder-packages": "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:builder && pnpm run build:builder && pnpm run test:packages && pnpm run typecheck:builder && pnpm run changeset:status",
+    "verify:builder-packages:quality": "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:builder && pnpm run build:builder && pnpm run test:packages && pnpm run typecheck:builder",
+    "verify:builder-packages": "pnpm run verify:builder-packages:quality && pnpm run changeset:status",
+    "verify:package-release-candidate": "pnpm run verify:builder-packages:quality && pnpm run check:package-release -- local",
     "version-packages": "changeset version"
   },
   "devDependencies": {
