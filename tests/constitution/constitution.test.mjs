@@ -285,6 +285,14 @@ test("package ownership documentation records the approved release boundary", as
 
   assert.match(readme, /pnpm run verify:compatibility-proof/);
   assert.match(readme, /pnpm run verify:builder-packages/);
+  assert.match(
+    readme,
+    /strict.*codecs.*read-only.*inference.*diagnostics.*in-memory skeleton rendering/i,
+  );
+  assert.match(
+    readme,
+    /repository-writing generation.*egeria.*file creation.*CLI behavior.*generated builds.*remain unimplemented/i,
+  );
   assert.match(contributing, /pnpm run verify:builder-packages/);
 
   assert.match(readme, /packages\/standards/);

@@ -97,6 +97,7 @@ The repository has one package-publication workflow with a semantic filename and
 - disables package-manager caching for the release job;
 - installs exact Node, pnpm, and a release-supported exact npm CLI version selected in the implementation plan;
 - performs a frozen install without changing the committed lockfile;
+- checks out `main` with full history, then requires both local `main` and `HEAD` to equal the exact approved commit before Changesets runs;
 - runs the full relevant deterministic verification once;
 - confirms package names and versions are exactly the approved pair at `0.1.0`;
 - confirms neither exact version exists before the initial release;

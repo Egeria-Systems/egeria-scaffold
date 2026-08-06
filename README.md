@@ -4,7 +4,7 @@ Egeria Scaffold will build versioned, materialized Next.js recipes for Egeria Sy
 
 ## Current phase: P1 in progress
 
-P0.1 established the repository constitution, architecture decisions, governance, and enforcement ownership. P0.2's private Next.js and Cloudflare compatibility proof passed its local, workerd, clean Ubuntu workflow, non-production deployment, Chromium, and axe gates and received verified-final-diff approval. P0.3 established the lean package and tooling boundaries and received verified-final-diff approval. P1 now has executable private project/state contracts plus the exact six-capability `portfolio`/`site` catalog, recipes, resolver, and installed-manifest projection. Generation, `.egeria` codecs and files, inference, diagnostics, CLI behavior, and generated profile skeletons remain unimplemented and separately gated.
+P0.1 established the repository constitution, architecture decisions, governance, and enforcement ownership. P0.2's private Next.js and Cloudflare compatibility proof passed its local, workerd, clean Ubuntu workflow, non-production deployment, Chromium, and axe gates and received verified-final-diff approval. P0.3 established the lean package and tooling boundaries and received verified-final-diff approval. P1 now has executable private project/state contracts, the exact six-capability `portfolio`/`site` catalog, strict in-memory codecs, read-only repository inference and diagnostics, and deterministic in-memory skeleton rendering. Repository-writing generation, `.egeria` file creation or updates, CLI behavior, installation, and generated builds remain unimplemented and separately gated.
 
 Canonical project documents:
 

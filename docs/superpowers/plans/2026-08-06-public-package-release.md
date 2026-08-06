@@ -347,7 +347,7 @@ Extend the workflow/release tests to require:
 - permissions exactly `contents: read` and `id-token: write`;
 - concurrency group `package-release`, cancellation disabled;
 - one job gated to `refs/heads/main`, `ubuntu-24.04`, environment `npm-release`;
-- checkout SHA `3d3c42e5aac5ba805825da76410c181273ba90b1`, `persist-credentials: false`;
+- checkout SHA `3d3c42e5aac5ba805825da76410c181273ba90b1`, `ref: main`, `fetch-depth: 0`, `persist-credentials: false`;
 - pnpm setup SHA `c9883cc79df532ad1a7b81bf9ab944ceb090d65c`, pnpm `11.20.0`, runtime `node@22.23.2`, cache `false`, install `false`;
 - frozen install and exact `pnpm exec npm --version` assertion for `12.0.2`;
 - context validation before verification;
@@ -379,10 +379,10 @@ Create `.github/workflows/package-release.yml` with this semantic flow:
 
 1. manual exact-commit input;
 2. main-only job and `npm-release` environment;
-3. checkout without persisted credentials;
+3. full-history checkout of local `main` without persisted credentials;
 4. exact pnpm/Node setup with cache/install disabled;
 5. frozen install;
-6. exact npm/context assertion;
+6. exact npm/context assertion requiring both `HEAD` and local `main` to equal `release_commit`;
 7. complete release-candidate verification, raw Changesets main-ref status, peer check, and audit;
 8. final all-404 `registry` check exactly once;
 9. conditional temporary npm user authentication when `NPM_BOOTSTRAP_TOKEN` exists;
@@ -480,6 +480,25 @@ Document package release controls
 ```
 
 Stop for explicit increment approval.
+
+## Approved reviewer-repair amendment
+
+The user's standing amendment approval covers two material findings from the first independent review pair. Modify only:
+
+- `.github/workflows/package-release.yml`;
+- `README.md`;
+- `docs/superpowers/specs/2026-08-06-public-package-release-design.md`;
+- this plan;
+- `tests/constitution/constitution.test.mjs`; and
+- `tests/package-boundaries/package-release.test.mjs`.
+
+The release workflow must check out `main` with full history and require both local `main` and `HEAD` to equal the exact approved input before raw Changesets status runs. This preserves Changesets' configured `main` comparison instead of relying on a detached raw-SHA checkout. The README must distinguish implemented read-only/in-memory builder behavior from deferred repository-writing generation, `.egeria` file creation or update, CLI behavior, installation, and generated builds.
+
+Record focused RED for both defects, make the minimum repair, rerun the affected focused tests and complete private release-candidate verification, then commit:
+
+```text
+Repair package release review findings
+```
 
 ## Private public-surface and rights audit
 

@@ -23,10 +23,11 @@ jobs:
     environment:
       name: npm-release
     steps:
-      - name: Check out approved commit
+      - name: Check out main release candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: ${{ inputs.release_commit }}
+          fetch-depth: 0
+          ref: main
           persist-credentials: false
 
       - name: Set up pnpm and Node.js
@@ -45,6 +46,7 @@ jobs:
           RELEASE_COMMIT: ${{ inputs.release_commit }}
         run: |
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+          test "$(git rev-parse refs/heads/main)" = "$RELEASE_COMMIT"
           test "$(pnpm exec npm --version)" = "12.0.2"
           pnpm run check:package-release context
 

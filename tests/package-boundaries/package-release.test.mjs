@@ -338,7 +338,12 @@ test("package release workflow is manual, exact-commit-bound, and least privileg
     /^        uses: actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1$/m,
   );
   assert.match(workflow, /^          persist-credentials: false$/m);
-  assert.match(workflow, /^          ref: \$\{\{ inputs\.release_commit \}\}$/m);
+  assert.match(workflow, /^          fetch-depth: 0$/m);
+  assert.match(workflow, /^          ref: main$/m);
+  assert.match(
+    workflow,
+    /test "\$\(git rev-parse refs\/heads\/main\)" = "\$RELEASE_COMMIT"/,
+  );
   assert.match(
     workflow,
     /^        uses: pnpm\/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c$/m,
