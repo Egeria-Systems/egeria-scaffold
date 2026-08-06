@@ -383,6 +383,13 @@ function releaseWorkflowProblems(workflow) {
     problems.push("publication must not receive a mapped secret");
   }
   if (
+    !publishBlock.includes(
+      '        env:\n          NPM_CONFIG_PROVENANCE: "true"\n',
+    )
+  ) {
+    problems.push("publication must explicitly request npm provenance");
+  }
+  if (
     /verify:package-release-candidate|pnpm peers check|pnpm audit/.test(
       configureBlock,
     )
@@ -478,11 +485,13 @@ test("package release workflow is manual, exact-commit-bound, and least privileg
   assert.deepEqual(releaseWorkflowProblems(workflow), []);
 });
 
-test("package release workflow mutations cannot expose authentication or skip cleanup", async () => {
+test("package release workflow mutations cannot expose authentication, drop provenance, or skip cleanup", async () => {
   const workflow = await readFile(
     resolve(repositoryRoot, ".github/workflows/package-release.yml"),
     "utf8",
   );
+  const provenanceEnvironment =
+    '        env:\n          NPM_CONFIG_PROVENANCE: "true"\n';
   const mutations = [
     workflow.replace(
       '          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"\n',
@@ -493,8 +502,18 @@ test("package release workflow mutations cannot expose authentication or skip cl
       "",
     ),
     workflow.replace(
-      "      - name: Publish packages\n        run: pnpm run release-packages",
-      "      - name: Publish packages\n        env:\n          NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}\n        run: pnpm run release-packages",
+      "      - name: Publish packages\n" +
+        provenanceEnvironment +
+        "        run: pnpm run release-packages",
+      "      - name: Publish packages\n" +
+        provenanceEnvironment +
+        "          NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}\n" +
+        "        run: pnpm run release-packages",
+    ),
+    workflow.replace(provenanceEnvironment, "        env:\n"),
+    workflow.replace(
+      provenanceEnvironment,
+      '        env:\n          NPM_CONFIG_PROVENANCE: "false"\n',
     ),
     workflow.replace("        if: always()\n", ""),
     workflow

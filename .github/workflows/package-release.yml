@@ -69,6 +69,8 @@ jobs:
           fi
 
       - name: Publish packages
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
         run: pnpm run release-packages
 
       - name: Remove temporary npm authentication
