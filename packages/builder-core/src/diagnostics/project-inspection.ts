@@ -91,11 +91,7 @@ export async function inspectProject(input: Readonly<{
     surfaces: [],
   };
 
-  if (
-    project.kind !== "valid" ||
-    state.kind !== "valid" ||
-    migrations.kind !== "valid"
-  ) {
+  if (project.kind !== "valid") {
     return { project, migrations, inference: controlInference };
   }
 
@@ -108,7 +104,11 @@ export async function inspectProject(input: Readonly<{
     input.profiles,
   );
 
-  if (!resolution.ok) {
+  if (
+    state.kind !== "valid" ||
+    migrations.kind !== "valid" ||
+    !resolution.ok
+  ) {
     return {
       project,
       migrations,

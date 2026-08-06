@@ -101,8 +101,6 @@ export async function diffProject(
     ...(inspection.inference.state.kind === "valid" ? [] : [statePath]),
     ...(inspection.migrations.kind === "valid" ? [] : [migrationLogPath]),
     ...(inspection.project.kind === "valid" &&
-    inspection.inference.state.kind === "valid" &&
-    inspection.migrations.kind === "valid" &&
     inspection.resolution?.ok !== true
       ? [projectConfigurationPath]
       : []),

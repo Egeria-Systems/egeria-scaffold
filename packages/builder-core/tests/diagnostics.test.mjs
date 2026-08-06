@@ -1059,6 +1059,21 @@ test("diff short-circuits invalid control files and resolution failures", async 
   });
   assert.doesNotMatch(JSON.stringify(malformedStateResult), /private-state-token/);
 
+  const combinedControlFailure = minimalFixture({
+    projectValue: project(["standards", "unknown-selected"]),
+    files: { ".egeria/state.json": "{ private-state-token" },
+  });
+  assert.deepEqual(
+    await core.diffProject(requestFromFixture(combinedControlFailure)),
+    {
+      equal: false,
+      differences: [
+        { kind: "control-file-invalid", path: ".egeria/project.yaml" },
+        { kind: "control-file-invalid", path: ".egeria/state.json" },
+      ],
+    },
+  );
+
   const invalidMigrationWithLatentMismatch = minimalFixture({
     stateValue: state([]),
     files: {
