@@ -9,10 +9,8 @@ import {
   fingerprintFileContent,
   fingerprintJsonValue,
 } from "../ownership/fingerprint.js";
-import type {
-  RepositoryReader,
-  RepositoryReadResult,
-} from "../repository/repository-reader.js";
+import { createCachingRepositoryReader } from "../repository/cache-reader.js";
+import type { RepositoryReader } from "../repository/repository-reader.js";
 import {
   canonicalizeJsonValue,
   resolveJsonPointer,
@@ -98,24 +96,6 @@ function surfaceEvidence(
     { identifier: surface.identifier, path: surface.path, status },
     code,
   );
-}
-
-function createCachingReader(reader: RepositoryReader): RepositoryReader {
-  const reads = new Map<string, Promise<RepositoryReadResult>>();
-
-  return {
-    readText(path: string): Promise<RepositoryReadResult> {
-      const prior = reads.get(path);
-
-      if (prior !== undefined) {
-        return prior;
-      }
-
-      const current = reader.readText(path);
-      reads.set(path, current);
-      return current;
-    },
-  };
 }
 
 async function inferState(
@@ -348,7 +328,7 @@ async function inferSurfaces(
 export async function inferRepository(
   request: InferRepositoryRequest,
 ): Promise<RepositoryInference> {
-  const reader = createCachingReader(request.reader);
+  const reader = createCachingRepositoryReader(request.reader);
   const state = await inferState(reader);
   const capabilities = await inferCapabilities(reader, request.catalog, state);
   const surfaces = await inferSurfaces(reader, state);

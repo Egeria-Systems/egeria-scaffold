@@ -7,6 +7,10 @@ export * from "./contracts/profile.js";
 export * from "./contracts/project.js";
 export * from "./contracts/result.js";
 export * from "./contracts/state.js";
+export { diffProject } from "./diagnostics/diff-project.js";
+export type { ProjectDifference } from "./diagnostics/diff-project.js";
+export { doctorRepository } from "./diagnostics/doctor.js";
+export type { Diagnostic, DiagnosticSeverity } from "./diagnostics/doctor.js";
 export type {
   ProbeEvidence,
   ProbeEvidenceStatus,

@@ -10,6 +10,8 @@ P1 Task 3 owns strict YAML 1.2 `project.yaml`, JSON `state.json`, and successful
 
 P1 Task 4 owns fixed-root read-only text access and deterministic capability and surface evidence. Filesystem reads reject unsafe paths and requested-path symlinks, require regular files beneath a non-symlink root, cap content at 1 MiB, and require valid UTF-8. Inference reads only `.egeria/state.json`, catalog-declared probes, and valid-state managed surfaces; it returns stable metadata and codes without actual repository values or source content.
 
-Diagnostics, doctor/diff policy, repository transformation, templates, providers, recovery automation, and every later capability remain outside this increment. The CLI remains empty, and a separate project-schema package is intentionally absent.
+P1 Task 5 owns `doctorRepository` and `diffProject`. Each operation reads the required `.egeria` control files, declared probes, and valid-state managed surfaces through one per-operation cache. Doctor returns stable codes for invalid control contracts and desired, installed, inferred, or surface disagreement. Diff returns explicit structural difference kinds. Neither API returns source content, writes a repository, authorizes a transformation, or claims that a repository is safe to change.
+
+Repository transformation, templates, providers, recovery automation, and every later capability remain outside this increment. The CLI remains empty, and a separate project-schema package is intentionally absent.
 
 The canonical API and lifecycle owner is [package ownership](../../docs/architecture/package-ownership.md).
