@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   access,
   mkdtemp,
@@ -136,6 +137,48 @@ test("public package manifests constrain exports and publication", async () => {
   assert.deepEqual(observabilityManifest.publishConfig, expectedPublishConfig);
 });
 
+test("public source and package licenses are exact", async () => {
+  const licensePaths = [
+    "LICENSE",
+    "packages/standards/LICENSE",
+    "packages/observability/LICENSE",
+  ];
+  const licenses = await Promise.all(
+    licensePaths.map((licensePath) =>
+      readFile(resolve(repositoryRoot, licensePath)),
+    ),
+  );
+  const [rootLicense] = licenses;
+  const expectedRepository = (directory) => ({
+    type: "git",
+    url: "git+https://github.com/Egeria-Systems/egeria-scaffold.git",
+    directory,
+  });
+
+  assert.ok(
+    licenses.every((license) => license.equals(rootLicense)),
+    "public license files must be byte-identical",
+  );
+  assert.equal(
+    createHash("sha256").update(rootLicense).digest("hex"),
+    "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+  );
+
+  for (const [manifestPath, directory] of [
+    ["packages/standards/package.json", "packages/standards"],
+    ["packages/observability/package.json", "packages/observability"],
+  ]) {
+    const manifest = await readJson(manifestPath);
+
+    assert.equal(manifest.license, "Apache-2.0", manifestPath);
+    assert.deepEqual(
+      manifest.repository,
+      expectedRepository(directory),
+      manifestPath,
+    );
+  }
+});
+
 test("root release commands use the pinned Changesets boundary", async () => {
   const rootManifest = await readJson("package.json");
 
@@ -257,6 +300,7 @@ test("the initial release intent contains only public minor releases", async () 
 
 test("public package dry runs contain only approved files", async () => {
   assert.deepEqual(await listPackedFiles("@egeria-systems/standards"), [
+    "LICENSE",
     "README.md",
     "eslint/cloudflare-isolation.mjs",
     "eslint/typescript-strict.mjs",
@@ -271,6 +315,7 @@ test("public package dry runs contain only approved files", async () => {
   );
 
   assert.deepEqual(await listPackedFiles("@egeria-systems/observability"), [
+    "LICENSE",
     "README.md",
     "dist/index.d.ts",
     "dist/index.js",

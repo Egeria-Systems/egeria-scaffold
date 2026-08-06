@@ -51,3 +51,7 @@ Node.js `22.23.2` is pinned through `.nvmrc` and `package.json` Volta configurat
 The [package-ownership document](docs/architecture/package-ownership.md) owns the exact APIs, consumers, and publication guards. Project/state schemas remain inside private builder-core; no separate schema package is created initially.
 
 Changesets records version intent for the two public packages. Use `pnpm changeset` for an approved public-package change and `pnpm changeset:status` to inspect the current release plan. Local release configuration does not authorize an external release: publication is a separate action that requires explicit human approval.
+
+## License
+
+Repository-owned source and documentation are licensed under [Apache-2.0](LICENSE). Package publication and repository visibility remain separate approval-gated actions.
