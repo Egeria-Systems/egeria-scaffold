@@ -423,10 +423,6 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
     generated["profile.schema.json"].title,
     "Egeria portfolio and site profile recipe",
   );
-  assert.notEqual(
-    generated["profile.schema.json"].title,
-    "Egeria P1 profile recipe",
-  );
 
   for (const artifactName of schemaArtifactNames) {
     const artifact = JSON.parse(

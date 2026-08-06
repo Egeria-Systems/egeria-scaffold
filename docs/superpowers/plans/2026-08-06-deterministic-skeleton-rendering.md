@@ -674,12 +674,12 @@ Do not stage or commit this partial state. Package-boundary enforcement and dire
 
 Update the package-boundary test first:
 
-- rename the Task 5 source-boundary test to Task 6;
+- rename the source-boundary test to `the CLI remains an empty shell while builder-core owns the approved rendering boundary`;
 - add the three generation modules to the exact source allowlist;
 - add an exact recursive template-file allowlist matching the 24 sources in this plan;
 - remove only `packages/builder-core/templates` from the later-stage forbidden paths;
 - retain `.egeria`, CLI generation/state directories, builder-core `capabilities`, `generators`, `migrations`, and runtime `state` as forbidden;
-- require the four direct-owner documents to say P1 Task 6, deterministic in-memory rendering, explicit allowlisted templates, no repository write/state, and Task 7 remains separate;
+- require the four direct-owner documents to describe the private deterministic-rendering boundary, deterministic in-memory rendering, explicit allowlisted templates, no repository write/state, and the separate future generation boundary;
 - require package ownership to identify private builder-core as canonical owner and enforcement mapping to name the exact source/template allowlists and render tests.
 
 Run only the boundary test. Expected RED is the deliberately stale exact source/template boundary and documentation text, not a malformed assertion:
@@ -702,6 +702,7 @@ Link to canonical owners instead of copying full lifecycle rules.
 - [ ] **Step 3.3 — Verify coherent GREEN, commit, and stop**
 
 ```bash
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run check:semantic-naming
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:package-boundaries
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:constitution
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run verify
@@ -742,6 +743,7 @@ rtk git diff --check 5ed1630..HEAD
 - [ ] **Step 4.2 — Run the full relevant deterministic suite once**
 
 ```bash
+rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run check:semantic-naming
 rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run verify
 rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:package-boundaries
 rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run test:constitution
@@ -830,6 +832,7 @@ Task 6 is complete only when all of these are true:
 - generated application runtime UI and metadata copy exists only in localized JSON;
 - Cloudflare types/bindings remain outside presentation/domain/application code;
 - no write/state/CLI/later-capability surface was added;
+- the permanent semantic-naming scanner reports no path, content, or test-description finding;
 - builder-core verify, package-boundary tests, constitution tests, and diff checks pass on the final coherent tree;
 - all material reviewer findings are dispositioned and accepted ones repaired;
 - dated verification evidence and the Gate 3 review packet are committed;

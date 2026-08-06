@@ -16,7 +16,7 @@ const authoredJavaScriptAndTypeScriptFiles = [
 export default [
   {
     name: "@egeria-systems/scaffold/ignores",
-    ignores: ["**/dist/**", "proofs/**"],
+    ignores: ["**/dist/**", "**/tests/fixtures/**", "proofs/**"],
   },
   {
     ...eslint.configs.recommended,

@@ -36,7 +36,7 @@
 - Tasks 1 through 6 are within the plan, but plan approval authorizes beginning Task 1 only; every later task still requires the preceding checkpoint approval. Task 7 is additionally a hard stop until standards and observability are separately versioned/published under explicit approval and their exact public versions pass current registry/advisory checks.
 - A portable generated `pnpm-lock.yaml`, fresh public-registry install, and pre-state generated-project verification are mandatory for Tasks 7 and 8. The P1 packet must not mark them passed before they exist.
 - No push, pull request, merge, deployment, npm versioning/publication, permission change, external message, or review-comment response is authorized.
-- Roadmap labels remain valid in phase-subject plans, evidence, review packets, status, and gates, but executable paths, APIs, errors, scripts, workflows, schemas, CLI surfaces, generated paths, and ordinary test identifiers use semantic responsibility names. Task 2A normalizes the current exceptions before later P1 consumers are added.
+- Compact phase labels and named implementation-sequencing labels remain valid when phase, task, provenance, historical status, or an approval gate is the actual subject. Authored executable, configuration, workflow, test, fixture, template, and generated content—including comments and ordinary test/suite descriptions—plus paths, identifiers, keys, commands, flags, schemas, and errors must use semantic responsibility names. `scripts/check-semantic-naming.mjs` and its constitution contract are the permanent enforcement owner; the repository-local ESLint adapter is temporary fast feedback only.
 
 ## File and Interface Map
 
@@ -1028,6 +1028,7 @@ Use the checked-in files as data. Resolve the template root with `new URL("../..
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run build
 rtk node --test packages/builder-core/tests/render-skeleton.test.mjs
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core run lint
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run check:semantic-naming
 rtk git diff --check
 ```
 
@@ -1170,6 +1171,7 @@ rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-syst
 rtk node --test packages/builder-core/tests/generate-project.test.mjs apps/cli/tests/cli.test.mjs
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core --filter @egeria-systems/cli run lint
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm --filter @egeria-systems/builder-core --filter @egeria-systems/cli run typecheck
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run check:semantic-naming
 rtk git diff --check
 ```
 
@@ -1240,10 +1242,13 @@ Stop for explicit user approval before Task 8.
 - Create from exact site CLI output: `fixtures/generated/site/apps/web/src/infrastructure/observability/installed-capability.ts`
 - Create: `tests/generated-fixtures/determinism.test.mjs`
 - Create: `scripts/verify-generated-skeletons.mjs`
+- Delete after the equivalence gate: `scripts/eslint/no-sequencing-labels.mjs`
 - Create: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-verification.md`
 - Modify: `package.json`
 - Modify: `eslint.config.mjs`
 - Modify: `tests/constitution/constitution.test.mjs`
+- Modify: `tests/constitution/semantic-naming.test.mjs`
+- Modify: `tests/package-boundaries/internal-linting.test.mjs`
 - Modify: `README.md`
 - Modify: `CONTRIBUTING.md`
 - Modify: `AGENTS.md`
@@ -1308,12 +1313,19 @@ Expected: deterministic fixtures pass; both temporary copies pass public-registr
 
 Update package ownership from P0.3 shells to the exact P1 APIs/consumers. Mark `INV-PROFILE-MATERIALIZATION` and `INV-CAPABILITY-METADATA` actual for the tested P1 subset. Mark the generated-repository part of `INV-CLOUDFLARE-ISOLATION` actual only for the generated skeleton lint/build fixtures. Leave clean isolated migration/state-update-order at P3 and accessibility automation at P2. Keep roadmap P1 “in review” until Gate 3 approval; do not mark it complete in the implementation candidate.
 
+- [ ] **Step 4A: Sunset the temporary semantic-naming lint adapter only after equivalence**
+
+Run the permanent matcher, path/content scanner, and test-description matrix against every identifier, private identifier, string, static template, comment, JSX, test/suite-description, path, and counterexample case covered by the temporary ESLint rule. Require `node scripts/check-semantic-naming.mjs`, `test:constitution`, and the focused internal-linting tests to pass first.
+
+Only after that equivalence gate passes, delete `scripts/eslint/no-sequencing-labels.mjs`, remove its import/plugin/config block from `eslint.config.mjs`, and remove the temporary extra test/script ESLint invocation from `lint:builder`. Update `tests/package-boundaries/internal-linting.test.mjs` to require the permanent scanner and prove the temporary rule/config is absent, then rerun semantic naming, constitution, package-boundary, and builder lint checks. Keep `scripts/check-semantic-naming.mjs`, `tests/constitution/semantic-naming.test.mjs`, `check:semantic-naming`, and `INV-SEMANTIC-NAMING` permanently. If equivalence fails, retain the rule, record the gap, amend this plan, and stop instead of deleting coverage.
+
 - [ ] **Step 5: Run the full relevant deterministic suite once**
 
 ```bash
 rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm install --frozen-lockfile
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm audit --audit-level=moderate
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm peers check
+rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run check:semantic-naming
 rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run verify:builder-kernel
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run verify:compatibility-proof
 rtk git diff --check 303ee9d35e19f9191948d994159f77c82c90a1ed...HEAD

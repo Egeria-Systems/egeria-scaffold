@@ -193,7 +193,7 @@ test("the private packages compile through the shared strict contract", async ()
   );
 });
 
-test("the CLI remains an empty shell while builder-core owns only approved Task 5 surfaces", async () => {
+test("the CLI remains an empty shell while builder-core owns the approved diagnostic boundary", async () => {
   const expectedSource = "export {};\n";
 
   assert.deepEqual(
@@ -238,17 +238,9 @@ test("the CLI remains an empty shell while builder-core owns only approved Task 
       "state/codecs.ts",
     ],
   );
-  assert.equal(
-    builderCoreSourceFiles.includes("catalog/p1-capabilities.ts"),
-    false,
-  );
-  assert.equal(
-    builderCoreSourceFiles.includes("profiles/p1-profiles.ts"),
-    false,
-  );
 });
 
-test("builder-core direct consumers describe the private Task 5 boundary", async () => {
+test("builder-core direct consumers describe the private diagnostic boundary", async () => {
   const builderInstructions = await readFile(
     resolve(repositoryRoot, "packages/builder-core/AGENTS.md"),
     "utf8",
@@ -266,19 +258,16 @@ test("builder-core direct consumers describe the private Task 5 boundary", async
     "utf8",
   );
 
-  assert.match(builderInstructions, /P1 Task 5/);
   assert.match(builderInstructions, /fixed-root read-only repository access/);
   assert.match(builderInstructions, /does not enumerate or write/);
   assert.match(builderInstructions, /content-safe read-only diagnostics/);
   assert.match(builderInstructions, /neither authorize nor perform a repository change/);
 
-  assert.match(builderReadme, /P1 Task 5/);
   assert.match(builderReadme, /1 MiB/);
   assert.match(builderReadme, /doctorRepository/);
   assert.match(builderReadme, /diffProject/);
   assert.match(builderReadme, /The CLI remains empty/);
 
-  assert.match(packageOwnership, /through P1 Task 5/);
   assert.match(packageOwnership, /strict `.egeria` codecs/);
   assert.match(packageOwnership, /read-only repository inference/);
   assert.match(packageOwnership, /doctorRepository/);

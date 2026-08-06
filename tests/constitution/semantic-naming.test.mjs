@@ -12,6 +12,7 @@ import {
 const compactLabel = (...parts) => parts.join("");
 const namedLabel = (prefix, ordinal, separator = " ") =>
   [prefix, separator, ordinal].join("");
+const repositoryRoot = resolve(import.meta.dirname, "../..");
 
 test("the matcher identifies compact sequencing labels at textual and identifier boundaries", () => {
   const cases = [
@@ -315,4 +316,8 @@ test("repository scanning rejects unsafe paths and invalid authored UTF-8 before
     }),
     /SEMANTIC_NAMING_TEXT_INVALID:tests\/invalid\.mjs/,
   );
+});
+
+test("repository paths and authored content use semantic names", async () => {
+  assert.deepEqual(await scanRepository({ root: repositoryRoot }), []);
 });

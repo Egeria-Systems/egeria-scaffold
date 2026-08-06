@@ -23,11 +23,13 @@ Prefer the smallest resilient change. Every changed line must trace to the appro
 
 ## Semantic naming
 
-Roadmap phase labels such as `P0.3` and `P1` describe sequencing and provenance, not software responsibility. They may appear when the phase itself is the subject: roadmap headings, task or approval-gate references, historical status, dated plans, implementation evidence, compatibility records, review packets, and explicitly phase-scoped invariants.
+Roadmap and implementation-sequencing labels describe order and provenance, not software responsibility. This includes compact phase labels such as `P2` or `PX` and named labels such as `Task 3` or `Task X`. They may appear only when sequencing or provenance is the actual subject: roadmap headings, task or approval-gate references, historical status, dated plans, implementation evidence, compatibility records, review packets, and explicitly phase-scoped invariants.
 
-Do not use roadmap phase labels in executable source, configuration, or workflow filenames/directories; package-script or configuration keys; exported or internal API symbols; stable error identifiers; schema identifiers or titles; CLI commands or flags; generated paths; or ordinary test and fixture identifiers. Name these surfaces for the responsibility or domain behavior they provide. A test may retain a phase label only when its actual subject is a historical phase record or phase-specific invariant.
+Do not use these labels in authored executable, configuration, workflow, test, fixture, template, or generated content, including comments and ordinary test or suite descriptions. Do not use them in filenames, directories, package-script or configuration keys, exported or internal identifiers, stable errors, schema identifiers or titles, CLI commands or flags, or generated paths. Name each surface for the responsibility or domain behavior it provides. Historical-document tests may construct a required label from neutral fragments while keeping their own descriptions, identifiers, and fixture names semantic.
 
-Do not add a temporary phase-labelled alias unless an approved compatibility migration names its real external consumer and exact removal gate. Rename a live surface and every direct consumer atomically under an approved plan.
+[`scripts/check-semantic-naming.mjs`](scripts/check-semantic-naming.mjs) is the permanent repository contract for the canonical label grammar, allowed documentary paths, tracked and non-ignored untracked path enumeration, and authored-content scan. The [enforcement map](docs/architecture/enforcement-map.md) owns its gate mapping. Link those owners instead of copying the matcher or its prefix data.
+
+Do not add a temporary sequencing-labelled alias unless an approved compatibility migration names its real external consumer and exact removal gate. Rename a live surface and every direct consumer atomically under an approved plan.
 
 ## Architecture invariants
 

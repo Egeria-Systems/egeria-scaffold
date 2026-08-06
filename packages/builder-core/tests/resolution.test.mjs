@@ -51,10 +51,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
 
   assert.equal(typeof core.createCapabilityCatalog, "function");
   assert.ok(Array.isArray(core.profileRecipes));
-  assert.equal("createP1CapabilityCatalog" in core, false);
-  assert.equal("p1ProfileRecipes" in core, false);
   assert.match(catalogDeclaration, /\bCapabilityPackageVersions\b/);
-  assert.doesNotMatch(catalogDeclaration, /\bP1PackageVersions\b/);
 
   const catalog = createCatalog();
 

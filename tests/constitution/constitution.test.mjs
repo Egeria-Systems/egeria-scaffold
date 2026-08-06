@@ -12,6 +12,9 @@ const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
+const compactLabel = (...parts) => parts.join("");
+const namedLabel = (prefix, ordinal, separator = " ") =>
+  [prefix, separator, ordinal].join("");
 
 async function readRepositoryFile(relativePath) {
   return readFile(resolve(repositoryRoot, relativePath), "utf8");
@@ -56,13 +59,16 @@ test("the root workspace remains private and pins the compatibility-proof toolch
   );
   assert.equal(
     manifest.scripts["test:constitution"],
-    "node --test tests/constitution/constitution.test.mjs",
+    "node --test tests/constitution/*.test.mjs",
+  );
+  assert.equal(
+    manifest.scripts["check:semantic-naming"],
+    "node scripts/check-semantic-naming.mjs",
   );
   assert.equal(
     manifest.scripts["verify:compatibility-proof"],
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof verify",
   );
-  assert.equal("verify:p0.2" in manifest.scripts, false);
   assert.equal("dependencies" in manifest, false);
   assert.deepEqual(Object.keys(manifest.devDependencies ?? {}).sort(), [
     "@changesets/cli",
@@ -105,10 +111,11 @@ test("the compatibility proof has a private non-app workspace boundary", async (
   );
 });
 
-test("the P0.2 compatibility record has its required evidence boundaries", async () => {
+test("the compatibility record preserves its required evidence boundaries", async () => {
   const compatibility = await readRepositoryFile(
     "docs/compatibility/nextjs-cloudflare.md",
   );
+  const compatibilityPhase = compactLabel("P", "0", ".", "2");
 
   for (const heading of [
     "Status and evidence date",
@@ -125,7 +132,10 @@ test("the P0.2 compatibility record has its required evidence boundaries", async
 
   assert.match(
     compatibility,
-    /P0\.2 combination is accepted after verified-final-diff approval/i,
+    new RegExp(
+      `${escapeRegularExpression(compatibilityPhase)} combination is accepted after verified-final-diff approval`,
+      "i",
+    ),
   );
   assert.match(compatibility, /non-production Cloudflare Worker/i);
   assert.match(compatibility, /do(?:es)? not establish WCAG conformance/i);
@@ -156,7 +166,11 @@ test("workspace documentation reserves apps for builder code and proofs for evid
   assert.match(overview, /`packages\/\*` contains deliberately owned packages/);
 });
 
-test("P0.3 documentation exposes approved package ownership and Gate 3 status", async () => {
+test("package ownership documentation records the approved release boundary", async () => {
+  const builderFoundationPhase = compactLabel("P", "0", ".", "3");
+  const builderKernelPhase = compactLabel("P", "1");
+  const approvalGate = namedLabel("Gate", "3");
+  const historicalPathToken = compactLabel("p", "0", "-", "3");
   const [
     rootInstructions,
     readme,
@@ -174,10 +188,10 @@ test("P0.3 documentation exposes approved package ownership and Gate 3 status", 
     readRepositoryFile("docs/architecture/enforcement-map.md"),
     readRepositoryFile("docs/roadmaps/program-roadmap.md"),
     readRepositoryFile(
-      "docs/implementation-evidence/2026-08-04-p0-3-lean-builder-monorepo-verification.md",
+      `docs/implementation-evidence/2026-08-04-${historicalPathToken}-lean-builder-monorepo-verification.md`,
     ),
     readRepositoryFile(
-      "docs/review-packets/2026-08-04-p0-3-lean-builder-monorepo.md",
+      `docs/review-packets/2026-08-04-${historicalPathToken}-lean-builder-monorepo.md`,
     ),
   ]);
 
@@ -195,12 +209,24 @@ test("P0.3 documentation exposes approved package ownership and Gate 3 status", 
   );
 
   assert.match(overview, /\(package-ownership\.md\)/);
-  assert.match(overview, /P0\.3 is complete/i);
-  assert.match(overview, /P1 is the first executable project\/state schema stage/i);
+  assert.match(
+    overview,
+    new RegExp(`${escapeRegularExpression(builderFoundationPhase)} is complete`, "i"),
+  );
+  assert.match(
+    overview,
+    new RegExp(
+      `${escapeRegularExpression(builderKernelPhase)} is the first executable project/state schema stage`,
+      "i",
+    ),
+  );
 
   assert.match(
     enforcementMap,
-    /INV-PACKAGE-EXTRACTION[^\n]+actual for P0\.3/i,
+    new RegExp(
+      `INV-PACKAGE-EXTRACTION[^\\n]+actual for ${escapeRegularExpression(builderFoundationPhase)}`,
+      "i",
+    ),
   );
   assert.match(
     enforcementMap,
@@ -216,14 +242,20 @@ test("P0.3 documentation exposes approved package ownership and Gate 3 status", 
   );
   assert.match(enforcementMap, /generated-repository gate planned/i);
 
-  const p03Section = roadmap
-    .split("### P0.3 — Lean builder monorepo", 2)[1]
-    .split("## P1 — Builder kernel", 1)[0];
-  assert.match(p03Section, /\*\*Completed \(2026-08-05\):\*\*/);
-  assert.match(p03Section, /40604eb\.\.da74a5b/);
+  const completedBuilderFoundationSection = roadmap
+    .split(`### ${builderFoundationPhase} — Lean builder monorepo`, 2)[1]
+    .split(`## ${builderKernelPhase} — Builder kernel`, 1)[0];
+  assert.match(
+    completedBuilderFoundationSection,
+    /\*\*Completed \(2026-08-05\):\*\*/,
+  );
+  assert.match(completedBuilderFoundationSection, /40604eb\.\.da74a5b/);
   assert.match(
     roadmap,
-    /P1 is the first executable project\/state schema stage/i,
+    new RegExp(
+      `${escapeRegularExpression(builderKernelPhase)} is the first executable project/state schema stage`,
+      "i",
+    ),
   );
 
   for (const document of [readme, contributing]) {
@@ -237,18 +269,28 @@ test("P0.3 documentation exposes approved package ownership and Gate 3 status", 
 
   assert.match(readme, /pnpm run verify:compatibility-proof/);
   assert.match(readme, /pnpm run verify:builder-packages/);
-  assert.doesNotMatch(readme, /pnpm run verify:p0\.[23]/);
   assert.match(contributing, /pnpm run verify:builder-packages/);
-  assert.doesNotMatch(contributing, /pnpm run verify:p0\.3/);
 
-  assert.match(readme, /P0\.3[^\n]+verified-final-diff approval/i);
+  assert.match(
+    readme,
+    new RegExp(
+      `${escapeRegularExpression(builderFoundationPhase)}[^\\n]+verified-final-diff approval`,
+      "i",
+    ),
+  );
   assert.match(
     verification,
-    /Gate 3 APPROVED[^\n]+40604eb5b8a3ade0175c16dd945a1bafee15ae04\.\.da74a5baab12d19fa5a5007008f960f495721b8e/i,
+    new RegExp(
+      `${escapeRegularExpression(approvalGate)} APPROVED[^\\n]+40604eb5b8a3ade0175c16dd945a1bafee15ae04\\.\\.da74a5baab12d19fa5a5007008f960f495721b8e`,
+      "i",
+    ),
   );
   assert.match(
     reviewPacket,
-    /Gate 3 outcome:\*\* APPROVED[^\n]+40604eb5b8a3ade0175c16dd945a1bafee15ae04\.\.da74a5baab12d19fa5a5007008f960f495721b8e/i,
+    new RegExp(
+      `${escapeRegularExpression(approvalGate)} outcome:\\*\\* APPROVED[^\\n]+40604eb5b8a3ade0175c16dd945a1bafee15ae04\\.\\.da74a5baab12d19fa5a5007008f960f495721b8e`,
+      "i",
+    ),
   );
 });
 
@@ -303,7 +345,6 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   assert.match(workflow, /^          install: false$/m);
   assert.match(workflow, /pnpm install --frozen-lockfile/);
   assert.match(workflow, /run: pnpm run verify:compatibility-proof/);
-  assert.doesNotMatch(workflow, /pnpm run verify:p0\.2/);
   assert.equal(proofManifest.scripts.deploy, "opennextjs-cloudflare deploy");
   assert.equal(validateCompatibilityDeploymentCredentialBoundary(workflow), "");
 

@@ -163,7 +163,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
       builderCoreTests:
         "pnpm --filter @egeria-systems/builder-core run build && node --test packages/builder-core/tests/*.test.mjs",
       lint:
-        "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint",
+        "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint && pnpm exec eslint eslint.config.mjs scripts 'tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' 'apps/**/tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' 'packages/**/tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' --no-error-on-unmatched-pattern --max-warnings 0",
       release: "changeset publish",
       packageBoundaries: "node --test tests/package-boundaries/*.test.mjs",
       packageTests:
@@ -177,15 +177,6 @@ test("root release commands use the pinned Changesets boundary", async () => {
       version: "changeset version",
     },
   );
-
-  for (const oldScriptName of [
-    "build:p0.3",
-    "lint:p0.3",
-    "typecheck:p0.3",
-    "verify:p0.3",
-  ]) {
-    assert.equal(oldScriptName in rootManifest.scripts, false);
-  }
 
   assert.deepEqual(
     Object.entries(rootManifest.scripts)
