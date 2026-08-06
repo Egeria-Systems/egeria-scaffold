@@ -1,8 +1,8 @@
 # Package Ownership
 
-**Status:** Controlling package and API ownership through deterministic skeleton rendering
+**Status:** Controlling package and API ownership through deterministic skeleton rendering and private release-candidate verification
 
-**Sources:** [ADR-0005](../adr/0005-evidence-driven-package-extraction.md), [architecture overview](overview.md), the [approved P0.3 plan](../superpowers/plans/2026-08-04-p0-3-lean-builder-monorepo.md), and the [approved P1 plan](../superpowers/plans/2026-08-05-p1-builder-kernel.md)
+**Sources:** [ADR-0005](../adr/0005-evidence-driven-package-extraction.md), [architecture overview](overview.md), the [approved P0.3 plan](../superpowers/plans/2026-08-04-p0-3-lean-builder-monorepo.md), the [approved P1 plan](../superpowers/plans/2026-08-05-p1-builder-kernel.md), and the [approved public-package release plan](../superpowers/plans/2026-08-06-public-package-release.md)
 
 This document owns the builder repository's package visibility, current API surface, responsibility, consumers, and publication boundary. The [review and contribution protocol](../governance/review-and-contribution.md) owns implementation and approval gates.
 
@@ -30,11 +30,11 @@ This document owns the builder repository's package visibility, current API surf
 
 ## Versioning and release boundary
 
-P0.3 packages begin at `0.0.0`. Standards and observability have exact public APIs, package-content allowlists, contract tests, and public publication defaults. Changesets 2.31.1 records their versioning intent; the initial Changeset requests minor releases only for those two packages. The repository-level Changesets default remains restricted, and private-package versioning and tagging are disabled.
+The standards and observability manifests are `0.1.0` release candidates. They are not described as published to the npm registry: registry absence is time-sensitive and must be checked immediately before authentication. Their exact public APIs, package-content allowlists, contract tests, and public publication defaults remain unchanged. The repository-level Changesets default remains restricted, and private-package versioning and tagging are disabled.
 
-Package-boundary tests enumerate the only locally publishable packages and execute dry-run packs to enforce the exact public tarball contents. The root version and release scripts delegate to Changesets, which respects each package's private flag and explicit publication configuration.
+Changesets owns package versioning and publication. The manual workflow delegates to Changesets and does not create another release resolver. Package-boundary tests enumerate the only locally publishable packages and execute dry-run packs to enforce exact public tarball contents. Release-context and registry tests fail closed unless the manual [package release workflow](../../.github/workflows/package-release.yml) receives an exact commit on `main` and both target versions are absent.
 
-Local release configuration never authorizes publication. npm namespace control, licensing, credentials, exact package contents, provenance, and the external publish command require separate current evidence and explicit human approval.
+The manual `package-release.yml` job uses the protected `npm-release` environment. A bootstrap token, when required for the first release, is confined to temporary user configuration and removed unconditionally; later releases use npm OIDC trusted publishing after that trust is configured. Local configuration and a green workflow never authorize publication. npm namespace control, licensing, rights, credentials, exact package contents, provenance, and the external publish command require separate current evidence and explicit human approval under the [review and contribution protocol](../governance/review-and-contribution.md).
 
 ## Deferred ownership
 

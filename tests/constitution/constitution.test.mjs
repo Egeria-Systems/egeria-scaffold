@@ -189,6 +189,7 @@ test("package ownership documentation records the approved release boundary", as
     rootInstructions,
     readme,
     contributing,
+    packageOwnership,
     overview,
     enforcementMap,
     roadmap,
@@ -198,6 +199,7 @@ test("package ownership documentation records the approved release boundary", as
     readRepositoryFile("AGENTS.md"),
     readRepositoryFile("README.md"),
     readRepositoryFile("CONTRIBUTING.md"),
+    readRepositoryFile("docs/architecture/package-ownership.md"),
     readRepositoryFile("docs/architecture/overview.md"),
     readRepositoryFile("docs/architecture/enforcement-map.md"),
     readRepositoryFile("docs/roadmaps/program-roadmap.md"),
@@ -284,6 +286,33 @@ test("package ownership documentation records the approved release boundary", as
   assert.match(readme, /pnpm run verify:compatibility-proof/);
   assert.match(readme, /pnpm run verify:builder-packages/);
   assert.match(contributing, /pnpm run verify:builder-packages/);
+
+  assert.match(readme, /packages\/standards/);
+  assert.match(readme, /packages\/observability/);
+  assert.match(readme, /\[Apache-2\.0\]\(LICENSE\)/);
+  assert.match(readme, /manual.*package-release\.yml/i);
+
+  assert.match(contributing, /must not publish.*local/i);
+  assert.match(contributing, /public API.*approved Changeset/i);
+
+  assert.match(packageOwnership, /`0\.1\.0` release candidates/i);
+  assert.match(packageOwnership, /not.*published.*npm registry/i);
+  assert.match(packageOwnership, /Changesets.*versioning and publication/i);
+  assert.match(packageOwnership, /does not create.*release resolver/i);
+  assert.match(packageOwnership, /`package-release\.yml`/);
+  assert.match(packageOwnership, /`npm-release`/);
+  assert.match(packageOwnership, /exact.*commit/i);
+  assert.match(packageOwnership, /bootstrap token.*removed/i);
+  assert.match(packageOwnership, /OIDC trusted publishing/i);
+  assert.match(
+    packageOwnership,
+    /local configuration.*green workflow.*authorize publication/i,
+  );
+
+  assert.match(
+    enforcementMap,
+    /INV-PACKAGE-PUBLICATION.*manifest.*API.*tarball.*release-context.*registry.*package-release\.yml/i,
+  );
 
   assert.match(
     readme,

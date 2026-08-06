@@ -14,6 +14,6 @@ Run the current repository contract with:
 pnpm run test:constitution
 ```
 
-Run `pnpm run verify:builder-packages` for the current package, lint, build, type, and Changeset gates. A public-package change must include an approved Changeset; use `pnpm changeset:status` to inspect version intent. Changeset metadata, public package manifests, and a successful dry-run pack are safeguards, not release authority. Publication remains an external action requiring explicit human approval.
+Run `pnpm run verify:builder-packages` for the current package, lint, build, type, and Changeset gates. Any later public API change requires an approved Changeset; use `pnpm changeset:status` to inspect version intent. Contributors must not publish public packages from a local checkout. Changeset metadata, public package manifests, successful dry-run packs, and a green manual workflow are safeguards, not release authority. Publication through [`.github/workflows/package-release.yml`](.github/workflows/package-release.yml) remains an external action requiring exact-commit validation and explicit human approval.
 
 Make small, focused, test-driven commits. Preserve user work and the approved increment boundary. Push, pull-request creation, merge, deployment, publication, production action, and external messaging each require their own explicit authority.

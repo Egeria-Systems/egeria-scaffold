@@ -39,18 +39,24 @@ Run the current builder package, lint, build, type, and Changeset gates with:
 pnpm run verify:builder-packages
 ```
 
+Run the complete local public-package release-candidate gate with:
+
+```bash
+pnpm run verify:package-release-candidate
+```
+
 Node.js `22.23.2` is pinned through `.nvmrc` and `package.json` Volta configuration. pnpm `11.20.0` is pinned through `packageManager` and exact engine policy. The [compatibility record](docs/compatibility/nextjs-cloudflare.md) owns the exact matrix, runtime distinctions, known limitations, and evidence boundary.
 
 ## Current builder topology
 
 - `apps/cli` is a private, empty command ownership shell with no executable `bin`.
-- `packages/builder-core` is private and owns the P1 runtime contracts, checked schemas, six-capability catalog, two recipes, deterministic resolver, and installed-manifest projection.
-- `packages/standards` is a public, replaceable package containing consumed TypeScript and ESLint configuration APIs.
-- `packages/observability` is a public, replaceable package with an intentionally empty runtime API.
+- `packages/builder-core` is private and owns the P1 runtime contracts, checked schemas, catalog and recipes, deterministic resolution, state inspection, diagnostics, and in-memory skeleton rendering.
+- [`packages/standards`](packages/standards/) is a public, replaceable package containing consumed TypeScript and ESLint configuration APIs.
+- [`packages/observability`](packages/observability/) is a public, replaceable package with an intentionally empty runtime API.
 
 The [package-ownership document](docs/architecture/package-ownership.md) owns the exact APIs, consumers, and publication guards. Project/state schemas remain inside private builder-core; no separate schema package is created initially.
 
-Changesets records version intent for the two public packages. Use `pnpm changeset` for an approved public-package change and `pnpm changeset:status` to inspect the current release plan. Local release configuration does not authorize an external release: publication is a separate action that requires explicit human approval.
+The two public package manifests are `0.1.0` release candidates; this repository does not claim they are live on npm. Changesets owns their version and publication plan. Use `pnpm changeset` for an approved later public-package change and `pnpm changeset:status` to inspect pending version intent. The manual [`.github/workflows/package-release.yml`](.github/workflows/package-release.yml) workflow is the only package-publication path. Local configuration and green checks never authorize publication: the exact release commit and final external action require separate explicit human approval.
 
 ## License
 
