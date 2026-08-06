@@ -11,6 +11,12 @@ export { diffProject } from "./diagnostics/diff-project.js";
 export type { ProjectDifference } from "./diagnostics/diff-project.js";
 export { doctorRepository } from "./diagnostics/doctor.js";
 export type { Diagnostic, DiagnosticSeverity } from "./diagnostics/doctor.js";
+export { renderSkeleton } from "./generation/render-skeleton.js";
+export type {
+  GeneratedFile,
+  GenerationRequest,
+  RenderedSkeleton,
+} from "./generation/render-skeleton.js";
 export type {
   ProbeEvidence,
   ProbeEvidenceStatus,

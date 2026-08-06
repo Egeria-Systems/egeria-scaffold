@@ -193,7 +193,7 @@ test("the private packages compile through the shared strict contract", async ()
   );
 });
 
-test("the CLI remains an empty shell while builder-core owns the approved diagnostic boundary", async () => {
+test("the CLI remains an empty shell while builder-core owns only approved deterministic rendering surfaces", async () => {
   const expectedSource = "export {};\n";
 
   assert.deepEqual(
@@ -224,6 +224,9 @@ test("the CLI remains an empty shell while builder-core owns the approved diagno
       "diagnostics/diff-project.ts",
       "diagnostics/doctor.ts",
       "diagnostics/project-inspection.ts",
+      "generation/render-skeleton.ts",
+      "generation/render-template.ts",
+      "generation/template-catalog.ts",
       "index.ts",
       "inference/evaluate-probe.ts",
       "inference/infer-repository.ts",
@@ -238,9 +241,47 @@ test("the CLI remains an empty shell while builder-core owns the approved diagno
       "state/codecs.ts",
     ],
   );
+  assert.equal(
+    builderCoreSourceFiles.includes("catalog/p1-capabilities.ts"),
+    false,
+  );
+  assert.equal(
+    builderCoreSourceFiles.includes("profiles/p1-profiles.ts"),
+    false,
+  );
+
+  assert.deepEqual(
+    await listFiles(resolve(repositoryRoot, "packages/builder-core/templates")),
+    [
+      "common/.gitignore.template",
+      "common/.nvmrc",
+      "common/AGENTS.md.template",
+      "common/README.md.template",
+      "common/apps/web/AGENTS.md.template",
+      "common/apps/web/app/globals.css",
+      "common/apps/web/app/layout.tsx",
+      "common/apps/web/app/page.tsx",
+      "common/apps/web/eslint.config.mjs",
+      "common/apps/web/next.config.ts",
+      "common/apps/web/open-next.config.ts",
+      "common/apps/web/package.json.template",
+      "common/apps/web/src/content/content-schema.ts",
+      "common/apps/web/src/content/read-content.ts",
+      "common/apps/web/src/infrastructure/observability/installed-capability.ts",
+      "common/apps/web/src/presentation/content-page.tsx",
+      "common/apps/web/tsconfig.json",
+      "common/apps/web/wrangler.jsonc.template",
+      "common/package.json.template",
+      "common/pnpm-workspace.yaml",
+      "portfolio/apps/web/content/en-CA/site.json.template",
+      "site/apps/web/app/about/page.tsx",
+      "site/apps/web/content/en-CA/about.json.template",
+      "site/apps/web/content/en-CA/site.json.template",
+    ],
+  );
 });
 
-test("builder-core direct consumers describe the private diagnostic boundary", async () => {
+test("builder-core direct consumers describe the private deterministic rendering boundary", async () => {
   const builderInstructions = await readFile(
     resolve(repositoryRoot, "packages/builder-core/AGENTS.md"),
     "utf8",
@@ -262,19 +303,34 @@ test("builder-core direct consumers describe the private diagnostic boundary", a
   assert.match(builderInstructions, /does not enumerate or write/);
   assert.match(builderInstructions, /content-safe read-only diagnostics/);
   assert.match(builderInstructions, /neither authorize nor perform a repository change/);
+  assert.match(builderInstructions, /deterministic in-memory rendering/);
+  assert.match(builderInstructions, /explicit allowlisted templates/);
+  assert.match(builderInstructions, /no repository write or `.egeria` state update/);
 
   assert.match(builderReadme, /1 MiB/);
   assert.match(builderReadme, /doctorRepository/);
   assert.match(builderReadme, /diffProject/);
+  assert.match(builderReadme, /renderSkeleton/);
+  assert.match(builderReadme, /deterministic in-memory rendering/);
+  assert.match(builderReadme, /explicit allowlisted templates/);
+  assert.match(builderReadme, /no repository write or `.egeria` state/);
   assert.match(builderReadme, /The CLI remains empty/);
 
+  assert.match(packageOwnership, /through deterministic skeleton rendering/);
+  assert.match(packageOwnership, /canonical private owner/i);
+  assert.match(packageOwnership, /deterministic in-memory rendering/);
+  assert.match(packageOwnership, /explicit allowlisted templates/);
   assert.match(packageOwnership, /strict `.egeria` codecs/);
   assert.match(packageOwnership, /read-only repository inference/);
   assert.match(packageOwnership, /doctorRepository/);
   assert.match(packageOwnership, /diffProject/);
-  assert.match(packageOwnership, /creates no `.egeria` files and performs no repository write/);
+  assert.match(packageOwnership, /no repository write or `.egeria` state/);
+  assert.match(packageOwnership, /repository-changing generation remains separate/);
   assert.match(enforcementMap, /desired, installed, and inferred/);
   assert.match(enforcementMap, /read-only diagnostics/);
+  assert.match(enforcementMap, /exact source and template allowlists/);
+  assert.match(enforcementMap, /render-skeleton\.test\.mjs/);
+  assert.match(enforcementMap, /deterministic in-memory rendering/);
   assert.doesNotMatch(
     packageOwnership,
     /`packages\/builder-core`[^\n]*Empty ESM ownership shell/,
@@ -311,7 +367,6 @@ test("builder-core keeps schemas private and reserves every later-stage builder 
     "packages/builder-core/migrations",
     "packages/builder-core/profiles",
     "packages/builder-core/state",
-    "packages/builder-core/templates",
   ]) {
     assert.equal(
       await pathExists(forbiddenPath),
