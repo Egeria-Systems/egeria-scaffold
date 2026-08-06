@@ -875,9 +875,17 @@ test("rendering returns isolated byte arrays and performs no repository write", 
   assert.deepEqual(snapshotBytes(second.files), original);
   assert.deepEqual(await snapshotDirectory(join(packageRoot, "templates")), before);
 
-  const generationSource = await readFile(
-    new URL("../src/generation/render-skeleton.ts", import.meta.url),
-    "utf8",
+  const generationSource = (
+    await Promise.all(
+      ["render-skeleton.ts", "render-template.ts", "template-catalog.ts"].map(
+        (name) =>
+          readFile(new URL(`../src/generation/${name}`, import.meta.url), "utf8"),
+      ),
+    )
+  ).join("\n");
+  assert.equal(
+    generationSource.match(/from "node:fs\/promises"/g)?.length,
+    1,
   );
   assert.match(
     generationSource,
