@@ -331,7 +331,11 @@ function createDesiredSurfaces(
 export async function renderSkeleton(
   request: GenerationRequest,
 ): Promise<ValidationResult<RenderedSkeleton>> {
-  const catalogResult = createCapabilityCatalog(request.packageVersions);
+  const packageVersions: CapabilityPackageVersions = {
+    standards: request.packageVersions.standards,
+    observability: request.packageVersions.observability,
+  };
+  const catalogResult = createCapabilityCatalog(packageVersions);
   if (!catalogResult.ok) {
     return catalogResult;
   }
@@ -371,7 +375,7 @@ export async function renderSkeleton(
     files.push(result.value);
   }
 
-  const manifestResult = enrichApplicationManifest(files, request.packageVersions);
+  const manifestResult = enrichApplicationManifest(files, packageVersions);
   if (!manifestResult.ok) {
     return manifestResult;
   }

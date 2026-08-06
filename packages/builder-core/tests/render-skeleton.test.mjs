@@ -124,6 +124,37 @@ async function loadRenderSkeleton() {
   return module.renderSkeleton;
 }
 
+async function loadGeneratedContentModule(files) {
+  const source = indexFiles(files).get(
+    "apps/web/src/content/content-schema.ts",
+  );
+  assert.notEqual(source, undefined);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const executable = transpiled.replace(
+    'from "yaml"',
+    `from ${JSON.stringify(import.meta.resolve("yaml"))}`,
+  );
+  assert.notEqual(executable, transpiled);
+
+  return import(
+    `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`
+  );
+}
+
+function assertContentInvalid(operation) {
+  assert.throws(operation, {
+    name: "TypeError",
+    message: "CONTENT_INVALID",
+  });
+}
+
 async function snapshotDirectory(root) {
   const entries = await readdir(root, { withFileTypes: true });
   const snapshot = [];
@@ -375,6 +406,50 @@ test("rendered manifests and desired project match the approved resolved recipe"
   });
 });
 
+test("rendered files satisfy every inference probe in their resolved recipes", async () => {
+  const core = await import("../dist/index.js");
+
+  for (const profile of ["portfolio", "site"]) {
+    const rendered = assertSuccess(
+      await core.renderSkeleton({
+        profile,
+        projectName: "acme-studio",
+        displayName: "Acme Studio",
+        packageVersions,
+      }),
+    );
+    const reader = core.createInMemoryRepositoryReader(
+      Object.fromEntries(
+        rendered.files.map(({ path, content }) => [
+          path,
+          decoder.decode(content),
+        ]),
+      ),
+    );
+    const inference = await core.inferRepository({
+      reader,
+      catalog: rendered.resolved.capabilities,
+    });
+    const expectedIdentifiers = rendered.resolved.capabilities
+      .map(({ identifier }) => identifier)
+      .sort();
+
+    assert.equal(inference.state.kind, "missing");
+    assert.deepEqual(
+      inference.capabilities.map(({ identifier }) => identifier),
+      expectedIdentifiers,
+    );
+    for (const capability of inference.capabilities) {
+      assert.equal(capability.category, "probable", capability.identifier);
+      assert.ok(capability.probes.length > 0, capability.identifier);
+      assert.ok(
+        capability.probes.every(({ status }) => status === "present"),
+        capability.identifier,
+      );
+    }
+  }
+});
+
 test("display names are inserted as YAML 1.2 data and runtime copy stays externalized", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const displayName = 'Atelier "Nord"\nMontréal';
@@ -454,6 +529,68 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
   }
 });
 
+test("the emitted YAML parser rejects unsafe syntax and invalid content shapes", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "site",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const contentModule = await loadGeneratedContentModule(rendered.files);
+  const files = indexFiles(rendered.files);
+  const siteSource = files.get("apps/web/content/en-CA/site.yaml");
+  const aboutSource = files.get("apps/web/content/en-CA/about.yaml");
+  assert.notEqual(siteSource, undefined);
+  assert.notEqual(aboutSource, undefined);
+
+  const siteContent = contentModule.parseSiteContent(
+    contentModule.parseYamlContent(siteSource),
+  );
+  assert.deepEqual(
+    siteContent,
+    parseGeneratedYaml(rendered.files, "apps/web/content/en-CA/site.yaml"),
+  );
+  assert.deepEqual(
+    contentModule.parsePageContent(contentModule.parseYamlContent(aboutSource)),
+    parseGeneratedYaml(rendered.files, "apps/web/content/en-CA/about.yaml"),
+  );
+
+  for (const unsafeYaml of [
+    "value: first\nvalue: second\n",
+    "value: !unapproved tagged\n",
+    "first: &shared value\nsecond: *shared\n",
+    "---\nvalue: first\n---\nvalue: second\n",
+  ]) {
+    assertContentInvalid(() => contentModule.parseYamlContent(unsafeYaml));
+  }
+
+  assertContentInvalid(() =>
+    contentModule.parseSiteContent({ ...siteContent, extra: true }),
+  );
+  assertContentInvalid(() =>
+    contentModule.parseSiteContent({
+      ...siteContent,
+      home: { ...siteContent.home, heading: " " },
+    }),
+  );
+  assertContentInvalid(() =>
+    contentModule.parseSiteContent({
+      ...siteContent,
+      navigation: [...siteContent.navigation, siteContent.navigation[0]],
+    }),
+  );
+  assertContentInvalid(() =>
+    contentModule.parsePageContent({
+      heading: "About",
+      summary: "Background and approach.",
+      extra: true,
+    }),
+  );
+});
+
 test("Cloudflare imports and types stay in generated configuration boundaries", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(
@@ -476,11 +613,34 @@ test("Cloudflare imports and types stay in generated configuration boundaries", 
     ) {
       assert.doesNotMatch(
         source,
-        /(?:@opennextjs\/cloudflare|\bCloudflareEnv\b|cloudflare:)/,
+        /(?:@opennextjs\/cloudflare|@cloudflare\/workers-types|cloudflare:|\b(?:AnalyticsEngineDataset|CloudflareEnv|D1Database|DurableObjectNamespace|Hyperdrive|KVNamespace|Queue|R2Bucket|VectorizeIndex)\b)/,
         path,
       );
     }
   }
+});
+
+test("generated presentation remains a pure typed-data boundary", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "site",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const presentationSource = indexFiles(rendered.files).get(
+    "apps/web/src/presentation/content-page.tsx",
+  );
+  assert.notEqual(presentationSource, undefined);
+  assert.deepEqual(presentationSource.match(/^import .*;$/gm), [
+    'import type { NavigationItem } from "../content/content-schema";',
+  ]);
+  assert.doesNotMatch(
+    presentationSource,
+    /(?:\b(?:fetch|process|readFile|readFileSync|useEffect|useLayoutEffect|useState)\b|node:)/,
+  );
 });
 
 test("profiles remain narrow and exclude later capabilities and surfaces", async () => {
@@ -667,6 +827,36 @@ test("rendering rejects invalid requests with stable existing contract failures"
   }
 });
 
+test("rendering snapshots validated package versions before asynchronous reads", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const mutablePackageVersions = { ...packageVersions };
+  const pendingRender = renderSkeleton({
+    profile: "portfolio",
+    projectName: "acme-studio",
+    displayName: "Acme Studio",
+    packageVersions: mutablePackageVersions,
+  });
+
+  mutablePackageVersions.standards = "file:../../attacker";
+  mutablePackageVersions.observability =
+    "https://attacker.invalid/package.tgz";
+
+  const rendered = assertSuccess(await pendingRender);
+  const applicationManifest = parseGeneratedJson(
+    rendered.files,
+    "apps/web/package.json",
+  );
+
+  assert.equal(
+    applicationManifest.devDependencies["@egeria-systems/standards"],
+    packageVersions.standards,
+  );
+  assert.equal(
+    applicationManifest.dependencies["@egeria-systems/observability"],
+    packageVersions.observability,
+  );
+});
+
 test("rendering returns isolated byte arrays and performs no repository write", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const packageRoot = new URL("..", import.meta.url).pathname;
@@ -684,4 +874,20 @@ test("rendering returns isolated byte arrays and performs no repository write", 
 
   assert.deepEqual(snapshotBytes(second.files), original);
   assert.deepEqual(await snapshotDirectory(join(packageRoot, "templates")), before);
+
+  const generationSource = await readFile(
+    new URL("../src/generation/render-skeleton.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    generationSource,
+    /^import \{ readFile \} from "node:fs\/promises";$/m,
+  );
+  assert.doesNotMatch(
+    generationSource.replace(
+      'import { readFile } from "node:fs/promises";',
+      "",
+    ),
+    /(?:node:(?:child_process|fs)|\b(?:appendFile|copyFile|cp|createWriteStream|mkdir|mkdtemp|open|rename|rm|writeFile)\s*\()/,
+  );
 });

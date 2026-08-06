@@ -53,6 +53,8 @@ The requirements review after commit `bd9e176` found that this plan's JSON conte
 
 This amendment additionally modifies `packages/builder-core/src/catalog/capability-catalog.ts`, `packages/builder-core/tests/resolution.test.mjs`, and affected inference/diagnostic fixtures; it updates the prior P1 plan's direct Task 6 references. The content capability remains source-generated, owns the YAML dependency pointer and probe, and returns 40 portfolio or 42 site ownership descriptors. A separate architecture-review repair adds a rendered-source assertion that Cloudflare imports/types remain confined to approved configuration/composition boundaries.
 
+The template/input-security review then reproduced an in-flight mutation race: `request.packageVersions` was validated before asynchronous template reads but re-read afterward for manifest enrichment. The accepted repair snapshots both version strings before validation or the first `await` and uses only that validated snapshot. Test-evidence review additionally requires direct execution of the emitted YAML parser, rendered-output-to-inference composition, broader Cloudflare and presentation-purity assertions, and source-level protection of the read-only filesystem boundary.
+
 ## Scope and non-goals
 
 Task 6 creates no builder-workspace dependency change. The generated web manifest includes the capability-owned ordinary `yaml` dependency, but do not edit any existing builder-workspace `package.json`, `pnpm-lock.yaml`, root tool configuration, JSON Schema artifact, compatibility record, proof file, CLI file, or `.egeria` file.
@@ -259,7 +261,7 @@ Create and parse this desired project configuration through `projectConfiguratio
 }
 ```
 
-Call `createCapabilityCatalog(request.packageVersions)`, then `resolveCapabilities({ profile: request.profile }, catalog, profileRecipes)`. Do not accept optional capabilities in Task 6. `portfolio` resolves five capabilities; `site` resolves those five plus `site-routing`, in the existing dependency-stable order.
+Snapshot `request.packageVersions.standards` and `request.packageVersions.observability` before validation or the first `await`. Call `createCapabilityCatalog(packageVersions)`, then `resolveCapabilities({ profile: request.profile }, catalog, profileRecipes)`, and reuse only that validated snapshot during manifest enrichment. Do not accept optional capabilities in Task 6. `portfolio` resolves five capabilities; `site` resolves those five plus `site-routing`, in the existing dependency-stable order.
 
 The generated root `package.json` is:
 
@@ -327,10 +329,8 @@ The application manifest template contains the accepted fixed graph and no stand
 After text rendering, parse this manifest, require plain-object `dependencies` and `devDependencies`, insert:
 
 ```ts
-dependencies["@egeria-systems/observability"] =
-  request.packageVersions.observability;
-devDependencies["@egeria-systems/standards"] =
-  request.packageVersions.standards;
+dependencies["@egeria-systems/observability"] = packageVersions.observability;
+devDependencies["@egeria-systems/standards"] = packageVersions.standards;
 ```
 
 Serialize with `stringifyCanonicalJson` plus one LF. This structural insertion preserves the exact three-token grammar. The capability catalog already rejects ranges, prereleases, Git/URL/file sources, and `workspace:` through its stable semantic-version contract.
@@ -588,6 +588,10 @@ Test all of the following:
 12. Descriptor totals are 40 and 42; all descriptor sources/pointers validate; no generated destination except `apps/web/package.json` lacks one full-file owner; package-manifest pointers cover every top-level/dependency/devDependency region exactly once without overlap.
 13. Returned arrays are sorted, returned values do not expose a writable shared buffer, and one caller mutation cannot change a later render.
 14. No filesystem destination is created and no repository file is changed by rendering.
+15. Caller-owned package-version input mutated after rendering starts cannot change the validated versions used for manifest enrichment.
+16. Both rendered profiles satisfy every inference probe for every capability in their resolved recipe.
+17. The emitted YAML parser itself accepts the generated documents and rejects aliases, tags, duplicate keys, multiple documents, extra keys, empty values, and duplicate navigation links with `CONTENT_INVALID`.
+18. Generated presentation imports only its typed content contract and contains no filesystem, environment, fetch, state-hook, or Cloudflare behavior; generation source retains a read-only filesystem boundary.
 
 - [ ] **Step 2.2 — Verify expected RED**
 
@@ -614,7 +618,7 @@ Generated `AGENTS.md` files are concise application-owned guidance. They describ
 
 In `render-skeleton.ts`:
 
-1. Validate package versions by creating the current capability catalog.
+1. Snapshot the two caller-owned package-version strings, then validate that snapshot by creating the current capability catalog.
 2. Resolve the current profile recipe.
 3. Parse desired project configuration.
 4. Obtain the explicit catalog.
@@ -827,8 +831,8 @@ Task 6 is complete only when all of these are true:
 - `portfolio` returns exactly 21 sorted files and 40 valid ownership descriptors;
 - `site` returns exactly 23 sorted files and 42 valid ownership descriptors;
 - repeated rendering produces byte-identical results;
-- manifest/project/resolution/capability ownership agree;
-- generated application runtime UI and metadata copy exists only in localized JSON;
+- manifest/project/resolution/capability ownership and post-render inference probes agree;
+- generated application runtime UI and metadata copy exists only in localized YAML 1.2 content;
 - Cloudflare types/bindings remain outside presentation/domain/application code;
 - no write/state/CLI/later-capability surface was added;
 - the permanent semantic-naming scanner reports no path, content, or test-description finding;
