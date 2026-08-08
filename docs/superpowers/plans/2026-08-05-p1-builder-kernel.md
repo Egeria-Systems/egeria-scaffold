@@ -1191,6 +1191,8 @@ Stop for explicit user approval before Task 8.
 
 ## Task 8: Golden Fixtures, Build Harness, Documentation, and Implementation Review
 
+**Execution amendment (2026-08-08):** The user's current instruction preapproves the bounded Task 8 amendments and authorizes continuous local execution through the implemented-task review. This section remains the canonical exact-file plan; no competing plan is created. The implementation runs in `/private/tmp/egeria-scaffold-p1-task-8` on `p1-task-8-golden-fixtures` from frozen base `bcedd968fcc11c8a836068f939c016c0c030f352`. Task 8 creates its own review packet to satisfy the canonical review protocol, but it does not create the final P1 Gate 3 packet reserved for Task 9.
+
 **Files:**
 
 - Create from exact portfolio CLI output: `fixtures/generated/portfolio/.gitignore`
@@ -1246,9 +1248,13 @@ Stop for explicit user approval before Task 8.
 - Create from exact site CLI output: `fixtures/generated/site/apps/web/src/presentation/content-page.tsx`
 - Create from exact site CLI output: `fixtures/generated/site/apps/web/src/infrastructure/observability/installed-capability.ts`
 - Create: `tests/generated-fixtures/determinism.test.mjs`
+- Create: `tests/generated-fixtures/verification-script.test.mjs`
 - Create: `scripts/verify-generated-skeletons.mjs`
 - Delete after the equivalence gate: `scripts/eslint/no-sequencing-labels.mjs`
-- Create: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-verification.md`
+- Create: `docs/implementation-evidence/2026-08-08-golden-fixture-harness-preparation.md`
+- Create: `docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md`
+- Create: `docs/review-packets/2026-08-08-p1-task-8-golden-fixture-harness.md`
+- Modify: `docs/superpowers/plans/2026-08-05-p1-builder-kernel.md`
 - Modify: `package.json`
 - Modify: `eslint.config.mjs`
 - Modify: `tests/constitution/constitution.test.mjs`
@@ -1269,7 +1275,7 @@ Root scripts become:
 ```json
 {
   "test:builder-core": "pnpm --filter @egeria-systems/builder-core run build && node --test packages/builder-core/tests/*.test.mjs",
-  "test:cli": "pnpm --filter @egeria-systems/cli run build && node --test apps/cli/tests/*.test.mjs",
+  "test:cli": "pnpm --filter @egeria-systems/cli run build && pnpm --filter @egeria-systems/cli run test",
   "test:generated-fixtures": "node --test tests/generated-fixtures/*.test.mjs",
   "verify:generated-skeletons": "node scripts/verify-generated-skeletons.mjs",
   "verify:builder-kernel": "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run build:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run changeset:status"
@@ -1278,17 +1284,43 @@ Root scripts become:
 
 The fixture verifier:
 
-1. copies each committed golden fixture to an isolated temporary directory;
-2. verifies the committed lockfile and exact standards/observability public-registry resolutions;
-3. runs frozen install, lint, typecheck, Next build, and OpenNext Cloudflare build;
-4. removes the temporary directory;
-5. verifies that no override, tarball, `node_modules`, build output, or test artifact entered a committed fixture.
+1. accepts no caller fixture root, command list, registry, package identity, or environment extension; the two committed roots and pnpm `11.20.0` are fixed by the script;
+2. validates each committed tree as regular files/directories only and rejects symlinks, local dependency sources, overrides, tarballs, `node_modules`, `.next`, `.open-next`, `.wrangler`, `dist`, coverage, temporary support paths, credentials, and provider secrets;
+3. verifies the committed lockfile and exact `@egeria-systems/standards@0.1.0` / `@egeria-systems/observability@0.1.0` public-registry resolutions and integrities;
+4. copies each fixture to an identity-recorded isolated temporary directory, creates an empty private home/configuration and separate store, and invokes pnpm through no-shell argument arrays with bounded output/time and an allowlisted environment;
+5. runs exact pnpm version, frozen install, peer check, moderate audit, registry-signature audit, lint, typecheck, Next build, and OpenNext Cloudflare build commands;
+6. removes only identity-verified temporary directories in `finally` and verifies that the committed fixture bytes remain unchanged.
 
-This is fresh public-registry and build evidence for the exact published package versions. It does not publish, deploy, mutate a provider, or prove production/runtime/accessibility behavior.
+`inspectGeneratedFixture(root, profile)` is the exported read-only contract boundary used by the focused test. `verifyGeneratedSkeletons()` is the executable orchestration boundary and accepts only test-injected filesystem/process adapters; production defaults remain fixed. This is fresh public-registry and build evidence for the exact published package versions. It does not publish, preview, deploy, mutate a provider, or prove workerd, production, visual, translation, human-usability, accessibility-conformance, or general-security behavior.
 
-- [ ] **Step 1: Add fixture contract RED**
+- [ ] **Step 1: Add fixture determinism contract RED**
 
-The determinism test runs the built CLI twice per profile, compares both outputs byte-for-byte, and compares them with committed fixtures. It requires the exact portable `pnpm-lock.yaml` and rejects local overrides, tarballs, `node_modules`, `.next`, `.open-next`, `.wrangler`, `dist`, provider secrets, or later-stage surfaces.
+The determinism test uses these exact immutable cases:
+
+```js
+const cases = [
+  {
+    profile: "portfolio",
+    projectName: "acme-portfolio",
+    displayName: "Acme Portfolio",
+    fixture: "fixtures/generated/portfolio",
+    expectedFiles: 25,
+    expectedCapabilities: 5,
+    expectedSurfaces: 43,
+  },
+  {
+    profile: "site",
+    projectName: "acme-site",
+    displayName: "Acme Site",
+    fixture: "fixtures/generated/site",
+    expectedFiles: 27,
+    expectedCapabilities: 6,
+    expectedSurfaces: 45,
+  },
+];
+```
+
+For each case it invokes `node apps/cli/dist/index.js create` twice with the exact long options, asserts one successful content-safe JSON line and empty stderr, runs the compiled `infer`, `doctor`, and `diff` commands against each result, compares both complete regular-file trees byte-for-byte, then compares them with the committed fixture. It asserts exact file/capability/surface counts, a portable `pnpm-lock.yaml`, state/manifest/inference agreement, and absence of local overrides, tarballs, build outputs, credentials, provider secrets, symlinks, `apps/jobs`, later profiles, and later capability surfaces.
 
 Run:
 
@@ -1301,28 +1333,61 @@ Expected RED: golden fixtures are absent.
 
 - [ ] **Step 2: Generate golden fixtures once**
 
-Use the built CLI into new temporary paths, inspect inference/doctor/diff, then move only the exact generated source/state into `fixtures/generated/portfolio` and `fixtures/generated/site`. Do not hand-edit golden output; repair templates/core and regenerate if the contract is wrong.
+Use the built CLI with the exact Step 1 inputs into new `/private/tmp` paths, inspect the successful `infer`, `doctor`, and `diff` JSON, then copy only the exact generated source/state into the still-absent `fixtures/generated/portfolio` and `fixtures/generated/site` leaves. Do not hand-edit golden output; repair templates/core through a new failing builder-core test and regenerate if the contract is wrong. Rerun the determinism test and require GREEN before committing fixtures and their test as `Add generated project fixtures`.
 
-- [ ] **Step 3: Add and run the build harness**
+- [ ] **Step 3: Add the build-harness contract and implementation**
+
+Add `verification-script.test.mjs` first. It imports the absent script and proves:
+
+```js
+await assert.rejects(
+  inspectGeneratedFixture(fixtureWithForbiddenArtifact, "portfolio"),
+  /GENERATED_FIXTURE_FORBIDDEN_ARTIFACT/,
+);
+await assert.rejects(
+  inspectGeneratedFixture(fixtureWithLocalDependency, "portfolio"),
+  /GENERATED_FIXTURE_LOCAL_DEPENDENCY/,
+);
+assert.deepEqual(recordedCommands, [
+  ["--version"],
+  [
+    "install",
+    "--frozen-lockfile",
+    "--store-dir",
+    recordedCommands[1].at(-1),
+  ],
+  ["peers", "check"],
+  ["audit", "--audit-level", "moderate"],
+  ["audit", "signatures"],
+  ["run", "lint"],
+  ["run", "typecheck"],
+  ["run", "build"],
+  ["run", "build:cloudflare"],
+]);
+```
+
+Expected RED: `scripts/verify-generated-skeletons.mjs` or its exports are absent. Implement the minimum fixed-root, no-shell, bounded-output harness described by the interface; use injected adapters only in tests and never expose child output or inherited token-like environment values.
 
 Run:
 
 ```bash
 rtk node --test tests/generated-fixtures/determinism.test.mjs
-rtk node scripts/verify-generated-skeletons.mjs
+rtk node --test tests/generated-fixtures/verification-script.test.mjs
 ```
 
-Expected: deterministic fixtures pass; both temporary copies pass public-registry frozen install, lint, typecheck, Next build, and OpenNext build. No provider/deployment operation occurs; network access is limited to registry/advisory reads required by install and audit.
+Expected GREEN: deterministic fixtures and the dependency-free build-harness contract pass. Commit the harness, tests, and root script wiring as `Verify generated project fixtures`. The expensive live public-registry harness runs once after all relevant Task 8 inputs settle in Step 5.
 
 - [ ] **Step 4: Update canonical owners and contracts**
 
 Update package ownership from P0.3 shells to the exact P1 APIs/consumers. Mark `INV-PROFILE-MATERIALIZATION` and `INV-CAPABILITY-METADATA` actual for the tested P1 subset. Mark the generated-repository part of `INV-CLOUDFLARE-ISOLATION` actual only for the generated skeleton lint/build fixtures. Leave clean isolated migration/state-update-order at P3 and accessibility automation at P2. Keep roadmap P1 “in review” until Gate 3 approval; do not mark it complete in the implementation candidate.
 
+Add dependency-free constitution assertions first for those exact status transitions, the Task 8 root scripts, fixture paths, and roadmap wording; verify RED against the pre-documentation tree, make the minimum canonical-owner edits, and verify GREEN.
+
 - [ ] **Step 4A: Sunset the temporary semantic-naming lint adapter only after equivalence**
 
-Run the permanent matcher, path/content scanner, and test-description matrix against every identifier, private identifier, string, static template, comment, JSX, test/suite-description, path, and counterexample case covered by the temporary ESLint rule. Require `node scripts/check-semantic-naming.mjs`, `test:constitution`, and the focused internal-linting tests to pass first.
+Add the sunset contract RED first: `tests/package-boundaries/internal-linting.test.mjs` must require the permanent scanner/script, assert the temporary rule file/import/plugin/rule are absent, and retain the existing matcher/path/content/test-description/counterexample matrix in `tests/constitution/semantic-naming.test.mjs`. Run the permanent matcher, path/content scanner, and test-description matrix against every identifier, private identifier, string, static template, comment, JSX, test/suite-description, path, and counterexample case covered by the temporary ESLint rule. Require `node scripts/check-semantic-naming.mjs`, `test:constitution`, and focused internal-linting tests to pass before deletion.
 
-Only after that equivalence gate passes, delete `scripts/eslint/no-sequencing-labels.mjs`, remove its import/plugin/config block from `eslint.config.mjs`, and remove the temporary extra test/script ESLint invocation from `lint:builder`. Update `tests/package-boundaries/internal-linting.test.mjs` to require the permanent scanner and prove the temporary rule/config is absent, then rerun semantic naming, constitution, package-boundary, and builder lint checks. Keep `scripts/check-semantic-naming.mjs`, `tests/constitution/semantic-naming.test.mjs`, `check:semantic-naming`, and `INV-SEMANTIC-NAMING` permanently. If equivalence fails, retain the rule, record the gap, amend this plan, and stop instead of deleting coverage.
+Only after that equivalence gate passes, delete `scripts/eslint/no-sequencing-labels.mjs`, remove its import/plugin/config block from `eslint.config.mjs`, and remove the temporary semantic-only test/script ESLint invocation from `lint:builder`. Keep package-owned source lint unchanged. Rerun semantic naming, constitution, package-boundary, and builder lint checks. Keep `scripts/check-semantic-naming.mjs`, `tests/constitution/semantic-naming.test.mjs`, `check:semantic-naming`, and `INV-SEMANTIC-NAMING` permanently. If equivalence fails, retain the rule, record the gap, amend this plan, and stop instead of deleting coverage. Commit canonical documentation and the proven sunset as `Document generated fixture enforcement`.
 
 - [ ] **Step 5: Run the full relevant deterministic suite once**
 
@@ -1333,20 +1398,21 @@ rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm peers check
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run check:semantic-naming
 rtk env CI=true /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run verify:builder-kernel
 rtk /Users/CoveMB/.volta/tools/image/pnpm/11.20.0/bin/pnpm run verify:compatibility-proof
-rtk git diff --check 303ee9d35e19f9191948d994159f77c82c90a1ed...HEAD
+rtk git diff --check bcedd968fcc11c8a836068f939c016c0c030f352...HEAD
 rtk git status --short --branch
 ```
 
-Record exact versions, counts, exit results, sandbox/runtime distinctions, published-package provenance, and unproved properties. Run the expensive P0.2 proof only once after all shared-tooling/template inputs settle; it does not deploy.
+`verify:builder-kernel` is the sole settled live execution of `verify:generated-skeletons`; do not run that expensive harness separately against the unchanged final inputs. Record exact versions, counts, exit results, fixture hashes, sandbox/runtime distinctions, published-package signature/provenance limits, and unproved properties. Run the expensive P0.2 proof only once after all shared-tooling/template inputs settle; it does not deploy.
 
-- [ ] **Step 6: Commit the coherent implementation candidate and stop**
+- [ ] **Step 6: Freeze the coherent implementation candidate**
 
 ```bash
-git add AGENTS.md CONTRIBUTING.md README.md eslint.config.mjs package.json apps packages fixtures scripts tests docs/architecture docs/roadmaps/program-roadmap.md
-git commit -m "Verify P1 builder kernel"
+git status --short --branch
+git diff --check bcedd968fcc11c8a836068f939c016c0c030f352...HEAD
+git diff --name-status bcedd968fcc11c8a836068f939c016c0c030f352...HEAD
 ```
 
-Present the implementation comparison and stop for user approval to begin independent review. Do not create the review packet before reviewer dispositions exist.
+The user's current authorization permits immediate independent review after the coherent focused commits. Do not create either review packet before reviewer dispositions exist.
 
 - [ ] **Step 7: Dispatch the three required read-only reviewers**
 
@@ -1385,21 +1451,23 @@ The verification record must include:
 
 If the public-package prerequisite remains open, Tasks 7 and 8 must not begin and Task 9 must not produce a P1 Gate 3 packet claiming a filesystem-generation candidate or stop-gate completion.
 
-- [ ] **Step 11: Commit Task 8 evidence and stop**
+- [ ] **Step 11: Write the Task 8 review packet, commit gate artifacts, and stop**
+
+Create `docs/review-packets/2026-08-08-p1-task-8-golden-fixture-harness.md` with the exact comparison, changed files, focused commits, requirement-to-evidence map, commands/results, reviewer dispositions, risks, deferred work, and source/dependency/build-output recovery. State explicitly that this is the Task 8 increment packet and not the P1 Gate 3 packet.
 
 ```bash
-git add docs/implementation-evidence/2026-08-05-p1-builder-kernel-verification.md
-git commit -m "Record P1 implementation verification"
+git add docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md docs/review-packets/2026-08-08-p1-task-8-golden-fixture-harness.md
+git commit -m "Record generated fixture verification"
 ```
 
-Present the exact committed comparison and stop for explicit user approval before Task 9. Do not create the P1 review packet yet.
+Present the exact committed comparison and Task 8 packet, then stop for explicit user verified-final-diff approval before Task 9. Do not create the P1 Gate 3 review packet yet.
 
 ## Task 9: Deferred Schema Contract Review and Gate 3 Packet
 
 **Files:**
 
 - Modify: `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`
-- Modify: `docs/implementation-evidence/2026-08-05-p1-builder-kernel-verification.md`
+- Modify: `docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md`
 - Create: `docs/review-packets/2026-08-05-p1-builder-kernel.md`
 
 This task revisits the Task 1 schema questions only after Tasks 2 through 8 have supplied their real catalog, resolver, codec, ownership, inference, diagnostics, generation, CLI, and fixture consumers. The dated deferral record preserves the original direct field-purpose audit, the bounded material-code-simplification result, their differences, and the frozen evidence hashes. Those recorded observations are review inputs, not approved findings or pre-authorized edits.
@@ -1452,7 +1520,7 @@ The verification record and packet must include:
 - [ ] **Step 5: Commit Gate 3 artifacts and stop**
 
 ```bash
-git add docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md docs/implementation-evidence/2026-08-05-p1-builder-kernel-verification.md docs/review-packets/2026-08-05-p1-builder-kernel.md
+git add docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md docs/review-packets/2026-08-05-p1-builder-kernel.md
 git commit -m "Record P1 verification and review"
 ```
 
