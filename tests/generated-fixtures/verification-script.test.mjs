@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import {
   access,
   cp,
@@ -12,6 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import test from "node:test";
 
 import {
@@ -24,6 +26,7 @@ const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
+const execFileAsync = promisify(execFile);
 
 async function pathExists(path) {
   try {
@@ -85,6 +88,24 @@ test("fixture inspection accepts only the exact portable generated trees", async
   }
 });
 
+test("generated fixture checkout bytes are pinned to LF", async () => {
+  const fixturePaths = generatedFixtureContracts.map(
+    ({ relativeRoot }) => `${relativeRoot}/package.json`,
+  );
+  const { stdout } = await execFileAsync(
+    "git",
+    ["check-attr", "text", "eol", "--", ...fixturePaths],
+    { cwd: repositoryRoot, encoding: "utf8" },
+  );
+
+  assert.deepEqual(stdout.trimEnd().split("\n"), [
+    "fixtures/generated/portfolio/package.json: text: set",
+    "fixtures/generated/portfolio/package.json: eol: lf",
+    "fixtures/generated/site/package.json: text: set",
+    "fixtures/generated/site/package.json: eol: lf",
+  ]);
+});
+
 test("fixture inspection rejects artifacts, local sources, altered integrity, and links", async () => {
   const owner = await mkdtemp(join(tmpdir(), "egeria-fixture-policy-"));
 
@@ -134,6 +155,94 @@ test("fixture inspection rejects artifacts, local sources, altered integrity, an
       () =>
         inspectGeneratedFixture(linkedRoot, "portfolio"),
       "FIXTURE_PATH_INVALID",
+    );
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+});
+
+test("fixture inspection rejects unapproved dependency and execution policy", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-fixture-policy-"));
+
+  try {
+    const workspaceOverrideRoot = await copyFixture(
+      owner,
+      "portfolio",
+      "workspace-override",
+    );
+    const workspacePath = join(workspaceOverrideRoot, "pnpm-workspace.yaml");
+    const workspace = await readFile(workspacePath, "utf8");
+    await writeFile(
+      workspacePath,
+      workspace.replace(
+        '  "miniflare>undici": 7.29.0',
+        '  "miniflare>undici": 7.29.0\n  next: 16.3.1',
+      ),
+    );
+    await expectFixtureError(
+      () => inspectGeneratedFixture(workspaceOverrideRoot, "portfolio"),
+      "FIXTURE_WORKSPACE_POLICY_INVALID",
+    );
+
+    const lockfileOverrideRoot = await copyFixture(
+      owner,
+      "portfolio",
+      "lockfile-override",
+    );
+    const lockfilePath = join(lockfileOverrideRoot, "pnpm-lock.yaml");
+    const lockfile = await readFile(lockfilePath, "utf8");
+    await writeFile(
+      lockfilePath,
+      lockfile.replace(
+        "  miniflare>undici: 7.29.0",
+        "  miniflare>undici: 7.29.1",
+      ),
+    );
+    await expectFixtureError(
+      () => inspectGeneratedFixture(lockfileOverrideRoot, "portfolio"),
+      "FIXTURE_LOCKFILE_INVALID",
+    );
+
+    const lifecycleRoot = await copyFixture(owner, "portfolio", "lifecycle");
+    const rootManifestPath = join(lifecycleRoot, "package.json");
+    const rootManifest = JSON.parse(await readFile(rootManifestPath, "utf8"));
+    rootManifest.scripts.preinstall = "node unapproved-install-hook.mjs";
+    await writeFile(
+      rootManifestPath,
+      `${JSON.stringify(rootManifest, null, 2)}\n`,
+    );
+    await expectFixtureError(
+      () => inspectGeneratedFixture(lifecycleRoot, "portfolio"),
+      "FIXTURE_MANIFEST_INVALID",
+    );
+
+    const remoteSourceRoot = await copyFixture(
+      owner,
+      "portfolio",
+      "remote-source",
+    );
+    const webManifestPath = join(remoteSourceRoot, "apps/web/package.json");
+    const webManifest = JSON.parse(await readFile(webManifestPath, "utf8"));
+    webManifest.dependencies.next = "https://example.invalid/next.tgz";
+    await writeFile(webManifestPath, `${JSON.stringify(webManifest, null, 2)}\n`);
+    await expectFixtureError(
+      () => inspectGeneratedFixture(remoteSourceRoot, "portfolio"),
+      "FIXTURE_MANIFEST_INVALID",
+    );
+
+    const tarballRoot = await copyFixture(owner, "portfolio", "tarball");
+    const tarballLockfilePath = join(tarballRoot, "pnpm-lock.yaml");
+    const tarballLockfile = await readFile(tarballLockfilePath, "utf8");
+    await writeFile(
+      tarballLockfilePath,
+      tarballLockfile.replace(
+        "    resolution: {integrity:",
+        "    resolution:\n      tarball: https://example.invalid/package.tgz\n      integrity:",
+      ),
+    );
+    await expectFixtureError(
+      () => inspectGeneratedFixture(tarballRoot, "portfolio"),
+      "FIXTURE_LOCKFILE_INVALID",
     );
   } finally {
     await rm(owner, { recursive: true, force: true });

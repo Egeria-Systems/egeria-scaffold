@@ -1250,6 +1250,7 @@ Stop for explicit user approval before Task 8.
 - Create: `tests/generated-fixtures/determinism.test.mjs`
 - Create: `tests/generated-fixtures/verification-script.test.mjs`
 - Create: `scripts/verify-generated-skeletons.mjs`
+- Create: `.gitattributes`
 - Delete after the equivalence gate: `scripts/eslint/no-sequencing-labels.mjs`
 - Create: `docs/implementation-evidence/2026-08-08-golden-fixture-harness-preparation.md`
 - Create: `docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md`
@@ -1287,7 +1288,7 @@ Root scripts become:
 The fixture verifier:
 
 1. accepts no caller fixture root, command list, registry, package identity, or environment extension; the two committed roots and pnpm `11.20.0` are fixed by the script;
-2. validates each committed tree as regular files/directories only and rejects symlinks, local dependency sources, overrides, tarballs, `node_modules`, `.next`, `.open-next`, `.wrangler`, `dist`, coverage, temporary support paths, credentials, and provider secrets;
+2. validates each committed tree as regular files/directories only; pins `fixtures/generated/**` to LF checkout bytes; validates the exact root/web manifest scripts, engines, package manager, and registry-version dependency maps; validates the exact workspace policy including the sole approved `miniflare>undici: 7.29.0` security override and lifecycle-build allowlist; and rejects symlinks, unapproved dependency sources or overrides, tarballs, lifecycle-script drift, `node_modules`, `.next`, `.open-next`, `.wrangler`, `dist`, coverage, temporary support paths, credentials, and provider secrets before pnpm execution;
 3. verifies the committed lockfile and exact `@egeria-systems/standards@0.1.0` / `@egeria-systems/observability@0.1.0` public-registry resolutions and integrities;
 4. copies each fixture to an identity-recorded isolated temporary directory, creates an empty private home/configuration and separate store, and invokes pnpm through no-shell argument arrays with bounded output/time and an allowlisted environment;
 5. runs exact pnpm version, frozen install, peer check, moderate audit, registry-signature audit, lint, typecheck, Next build, and OpenNext Cloudflare build commands;

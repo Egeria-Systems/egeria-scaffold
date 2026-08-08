@@ -121,6 +121,95 @@ const requiredPublicPackages = [
   },
 ];
 
+const expectedWorkspacePolicy = `packages:
+  - "apps/*"
+
+pmOnFail: error
+
+minimumReleaseAge: 1440
+
+overrides:
+  "miniflare>undici": 7.29.0
+
+allowBuilds:
+  "@parcel/watcher": true
+  "@swc/core": true
+  esbuild: true
+  unrs-resolver: true
+  workerd: true
+`;
+
+const expectedLockfilePreamble = `lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+overrides:
+  miniflare>undici: 7.29.0
+
+importers:
+`;
+
+function expectedRootManifest(projectName) {
+  return {
+    name: projectName,
+    version: "0.0.0",
+    private: true,
+    scripts: {
+      build: "pnpm --dir apps/web run build",
+      "build:cloudflare": "pnpm --dir apps/web run build:cloudflare",
+      dev: "pnpm --dir apps/web run dev",
+      lint: "pnpm --dir apps/web run lint",
+      typecheck: "pnpm --dir apps/web run typecheck",
+      verify:
+        "pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run build:cloudflare",
+    },
+    engines: { node: "22.23.2", pnpm: "11.20.0" },
+    packageManager: "pnpm@11.20.0",
+    volta: { node: "22.23.2" },
+  };
+}
+
+function expectedWebManifest(projectName) {
+  return {
+    dependencies: {
+      "@egeria-systems/observability": "0.1.0",
+      "@opennextjs/cloudflare": "1.20.2",
+      next: "16.3.0",
+      react: "19.2.8",
+      "react-dom": "19.2.8",
+      yaml: "2.9.0",
+    },
+    devDependencies: {
+      "@egeria-systems/standards": "0.1.0",
+      "@types/node": "22.20.1",
+      "@types/react": "19.2.18",
+      "@types/react-dom": "19.2.4",
+      eslint: "9.39.5",
+      "eslint-config-next": "16.3.0",
+      typescript: "6.0.3",
+      "typescript-eslint": "8.66.0",
+      wrangler: "4.118.0",
+    },
+    name: `${projectName}-web`,
+    private: true,
+    scripts: {
+      build: "next build",
+      "build:cloudflare": "opennextjs-cloudflare build",
+      "cf-typegen":
+        "wrangler types --env-interface CloudflareEnv --include-runtime=false cloudflare-env.d.ts",
+      dev: "next dev",
+      lint: "eslint . --max-warnings 0",
+      preview:
+        "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+      typecheck: "next typegen && tsc --noEmit",
+    },
+    type: "module",
+    version: "0.0.0",
+  };
+}
+
 export class GeneratedFixtureVerificationError extends Error {
   constructor(code) {
     super(`Generated fixture verification failed: ${code}`);
@@ -286,6 +375,27 @@ function hasLocalSource(value) {
   );
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) {
+    return value.map(canonicalJson);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => codePointCompare(left, right))
+        .map(([key, entry]) => [key, canonicalJson(entry)]),
+    );
+  }
+  return value;
+}
+
+function jsonMatches(actual, expected) {
+  return (
+    JSON.stringify(canonicalJson(actual)) ===
+    JSON.stringify(canonicalJson(expected))
+  );
+}
+
 async function readJson(path, failureCode) {
   try {
     return JSON.parse(await readFile(path, "utf8"));
@@ -325,6 +435,12 @@ async function inspectFixture(root, contract) {
   if (hasLocalSource(rootManifest) || hasLocalSource(webManifest)) {
     fail("GENERATED_FIXTURE_LOCAL_DEPENDENCY");
   }
+  if (
+    !jsonMatches(rootManifest, expectedRootManifest(contract.projectName)) ||
+    !jsonMatches(webManifest, expectedWebManifest(contract.projectName))
+  ) {
+    fail("FIXTURE_MANIFEST_INVALID");
+  }
   for (const requiredPackage of requiredPublicPackages) {
     if (
       webManifest[requiredPackage.field]?.[requiredPackage.name] !==
@@ -334,6 +450,19 @@ async function inspectFixture(root, contract) {
     }
   }
 
+  let workspacePolicy;
+  try {
+    workspacePolicy = await readFile(
+      join(root, "pnpm-workspace.yaml"),
+      "utf8",
+    );
+  } catch {
+    fail("FIXTURE_WORKSPACE_POLICY_INVALID");
+  }
+  if (workspacePolicy !== expectedWorkspacePolicy) {
+    fail("FIXTURE_WORKSPACE_POLICY_INVALID");
+  }
+
   let lockfile;
   try {
     lockfile = await readFile(join(root, "pnpm-lock.yaml"), "utf8");
@@ -341,8 +470,15 @@ async function inspectFixture(root, contract) {
     fail("FIXTURE_LOCKFILE_INVALID");
   }
   if (
-    /^\s+(?:specifier|version):\s+(?:file|link|workspace):/mu.test(lockfile) ||
-    /^\s+['"]?(?:file|link|workspace):/mu.test(lockfile) ||
+    !lockfile.startsWith(expectedLockfilePreamble) ||
+    (lockfile.match(/^overrides:/gmu) ?? []).length !== 1 ||
+    /^\s+(?:specifier|version):\s+['"]?(?:(?:file|link|workspace|git|github|https?):|git\+)/mu.test(
+      lockfile,
+    ) ||
+    /^\s+['"]?(?:(?:file|link|workspace|git|github|https?):|git\+)/mu.test(
+      lockfile,
+    ) ||
+    /^\s+tarball:/mu.test(lockfile) ||
     /(?:^|[{,]\s*)tarball:/mu.test(lockfile)
   ) {
     fail("FIXTURE_LOCKFILE_INVALID");
