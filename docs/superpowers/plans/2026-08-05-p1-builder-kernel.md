@@ -1060,6 +1060,8 @@ After separately authorized publication, verify both exact public manifests, tar
 
 ## Task 7: Atomic New-Directory Generation and Thin CLI
 
+**Execution amendment (2026-08-08):** The exact-file [atomic project generation plan](2026-08-06-atomic-project-generation.md) controls this task. `ProjectGenerationRequest` excludes caller package versions; generation injects the separately verified immutable public versions. Project display names count Unicode code points, require non-whitespace content, and reject Unicode control characters. Current enforcement adds `verified-package-versions.ts`, `verify-generated-project.ts`, `write-generated-project.ts`, and `generate-project.test.mjs`; the live `generate-project.integration.mjs` gate is explicit and remains outside the ordinary offline `tests/*.test.mjs` glob. Portable Node filesystem rename is the commit boundary but not a hostile-concurrency no-clobber guarantee: a target created after the final absence check may be replaced on platforms whose rename semantics permit it.
+
 **Files:**
 
 - Create: `packages/builder-core/src/catalog/verified-package-versions.ts`
@@ -1102,7 +1104,7 @@ export function createPnpmGeneratedProjectVerifier(input: Readonly<{
 }>): GeneratedProjectVerifier;
 
 export async function generateProject(input: Readonly<{
-  request: GenerationRequest;
+  request: ProjectGenerationRequest;
   destination: string;
   verifier: GeneratedProjectVerifier;
 }>): Promise<ValidationResult<Readonly<{

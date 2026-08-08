@@ -19,6 +19,15 @@ export type {
   RenderedSkeleton,
 } from "./generation/render-skeleton.js";
 export type {
+  GeneratedProjectVerification,
+  GeneratedProjectVerifier,
+} from "./generation/verify-generated-project.js";
+export { generateProject } from "./generation/write-generated-project.js";
+export type {
+  GeneratedProject,
+  ProjectGenerationRequest,
+} from "./generation/write-generated-project.js";
+export type {
   ProbeEvidence,
   ProbeEvidenceStatus,
 } from "./inference/evaluate-probe.js";

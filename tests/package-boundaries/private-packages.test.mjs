@@ -193,7 +193,7 @@ test("the private packages compile through the shared strict contract", async ()
   );
 });
 
-test("the CLI remains an empty shell while builder-core owns only approved deterministic rendering surfaces", async () => {
+test("the CLI remains an empty shell while builder-core owns approved generation surfaces", async () => {
   const expectedSource = "export {};\n";
 
   assert.deepEqual(
@@ -228,6 +228,8 @@ test("the CLI remains an empty shell while builder-core owns only approved deter
       "generation/render-skeleton.ts",
       "generation/render-template.ts",
       "generation/template-catalog.ts",
+      "generation/verify-generated-project.ts",
+      "generation/write-generated-project.ts",
       "index.ts",
       "inference/evaluate-probe.ts",
       "inference/infer-repository.ts",
@@ -273,7 +275,7 @@ test("the CLI remains an empty shell while builder-core owns only approved deter
   );
 });
 
-test("builder-core direct consumers describe the private deterministic rendering boundary", async () => {
+test("builder-core direct consumers describe the private generation boundary", async () => {
   const builderInstructions = await readFile(
     resolve(repositoryRoot, "packages/builder-core/AGENTS.md"),
     "utf8",
@@ -298,7 +300,10 @@ test("builder-core direct consumers describe the private deterministic rendering
   assert.match(builderInstructions, /deterministic in-memory rendering/);
   assert.match(builderInstructions, /explicit allowlisted templates/);
   assert.match(builderInstructions, /YAML 1.2/);
-  assert.match(builderInstructions, /no repository write or `.egeria` state update/);
+  assert.match(builderInstructions, /state-last generation/);
+  assert.match(builderInstructions, /exact verified public package versions/);
+  assert.match(builderInstructions, /identity-recorded sibling temporary directory/);
+  assert.match(builderInstructions, /portable rename/);
 
   assert.match(builderReadme, /1 MiB/);
   assert.match(builderReadme, /doctorRepository/);
@@ -307,10 +312,13 @@ test("builder-core direct consumers describe the private deterministic rendering
   assert.match(builderReadme, /deterministic in-memory rendering/);
   assert.match(builderReadme, /explicit allowlisted templates/);
   assert.match(builderReadme, /YAML 1.2/);
-  assert.match(builderReadme, /no repository write or `.egeria` state/);
+  assert.match(builderReadme, /generateProject/);
+  assert.match(builderReadme, /previously absent destination/);
+  assert.match(builderReadme, /installed state last/);
+  assert.match(builderReadme, /hostile-concurrency no-clobber guarantee/);
   assert.match(builderReadme, /The CLI remains empty/);
 
-  assert.match(packageOwnership, /through deterministic skeleton rendering/);
+  assert.match(packageOwnership, /through verified new-directory generation/);
   assert.match(packageOwnership, /canonical private owner/i);
   assert.match(packageOwnership, /deterministic in-memory rendering/);
   assert.match(packageOwnership, /explicit allowlisted templates/);
@@ -319,14 +327,18 @@ test("builder-core direct consumers describe the private deterministic rendering
   assert.match(packageOwnership, /read-only repository inference/);
   assert.match(packageOwnership, /doctorRepository/);
   assert.match(packageOwnership, /diffProject/);
-  assert.match(packageOwnership, /no repository write or `.egeria` state/);
-  assert.match(packageOwnership, /repository-changing generation remains separate/);
+  assert.match(packageOwnership, /state-last new-directory generation/);
+  assert.match(packageOwnership, /portable-rename race limit/);
+  assert.match(packageOwnership, /existing-repository transformation/);
   assert.match(enforcementMap, /desired, installed, and inferred/);
   assert.match(enforcementMap, /read-only diagnostics/);
   assert.match(enforcementMap, /exact source and template allowlists/);
   assert.match(enforcementMap, /render-skeleton\.test\.mjs/);
   assert.match(enforcementMap, /deterministic in-memory rendering/);
   assert.match(enforcementMap, /YAML 1.2/);
+  assert.match(enforcementMap, /new-directory manifest\/pre-state\/post-state agreement/);
+  assert.match(enforcementMap, /state-last failure-injection/);
+  assert.match(enforcementMap, /do not prove that pnpm/);
   assert.doesNotMatch(
     packageOwnership,
     /`packages\/builder-core`[^\n]*Empty ESM ownership shell/,
