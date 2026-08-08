@@ -114,13 +114,22 @@ test("the private package manifests expose only their approved runtime boundarie
     version: "0.0.0",
     private: true,
     type: "module",
+    bin: {
+      egeria: "./dist/index.js",
+    },
     scripts: {
       build: "tsc -p tsconfig.json",
-      lint: "pnpm --dir ../.. exec eslint apps/cli/src --max-warnings 0",
+      lint:
+        "pnpm --dir ../.. exec eslint apps/cli/src apps/cli/tests --max-warnings 0",
+      test: "node --test tests/*.test.mjs",
       typecheck: "tsc -p tsconfig.json --noEmit",
+    },
+    dependencies: {
+      "@egeria-systems/builder-core": "workspace:*",
     },
     devDependencies: {
       "@egeria-systems/standards": "workspace:*",
+      "@types/node": "22.20.1",
       typescript: "6.0.3",
     },
   });
@@ -168,6 +177,7 @@ test("the private packages compile through the shared strict contract", async ()
       declaration: true,
       outDir: "dist",
       rootDir: "src",
+      types: ["node"],
     },
     include: ["src/**/*.ts"],
   };
@@ -185,26 +195,28 @@ test("the private packages compile through the shared strict contract", async ()
   assert.deepEqual(await readJson("apps/cli/tsconfig.json"), expectedCliConfig);
   assert.deepEqual(
     await readJson("packages/builder-core/tsconfig.json"),
-    {
-      ...expectedCliConfig,
-      compilerOptions: {
-        ...expectedCliConfig.compilerOptions,
-        types: ["node"],
-      },
-    },
+    expectedCliConfig,
   );
 });
 
-test("the CLI remains an empty shell while builder-core owns approved generation surfaces", async () => {
-  const expectedSource = "export {};\n";
+test("the CLI is a thin command adapter while builder-core owns generation", async () => {
+  const expectedEntry = `#!/usr/bin/env node
+
+import { runCli } from "./run-cli.js";
+
+process.exitCode = await runCli(process.argv.slice(2), {
+  write: (value) => process.stdout.write(\`\${value}\\n\`),
+  writeError: (value) => process.stderr.write(\`\${value}\\n\`),
+});
+`;
 
   assert.deepEqual(
     await listFiles(resolve(repositoryRoot, "apps/cli/src")),
-    ["index.ts"],
+    ["arguments.ts", "index.ts", "run-cli.ts"],
   );
   assert.equal(
     await readFile(resolve(repositoryRoot, "apps/cli/src/index.ts"), "utf8"),
-    expectedSource,
+    expectedEntry,
   );
 
   const builderCoreSourceFiles = await listFiles(
@@ -278,6 +290,14 @@ test("the CLI remains an empty shell while builder-core owns approved generation
 });
 
 test("builder-core direct consumers describe the private generation boundary", async () => {
+  const cliInstructions = await readFile(
+    resolve(repositoryRoot, "apps/cli/AGENTS.md"),
+    "utf8",
+  );
+  const cliReadme = await readFile(
+    resolve(repositoryRoot, "apps/cli/README.md"),
+    "utf8",
+  );
   const builderInstructions = await readFile(
     resolve(repositoryRoot, "packages/builder-core/AGENTS.md"),
     "utf8",
@@ -323,7 +343,12 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /createPnpmGeneratedProjectVerifier/);
   assert.match(builderReadme, /Child processes receive only a narrow/);
   assert.match(builderReadme, /child output is never returned/i);
-  assert.match(builderReadme, /The CLI remains empty/);
+  assert.match(cliInstructions, /four commands exact/);
+  assert.match(cliInstructions, /remain read-only/);
+  assert.match(cliInstructions, /does not add overwrite/);
+  assert.match(cliReadme, /four exact commands/);
+  assert.match(cliReadme, /one content-safe JSON line/);
+  assert.match(cliReadme, /no prompt, overwrite mode/);
 
   assert.match(packageOwnership, /through verified new-directory generation/);
   assert.match(packageOwnership, /canonical private owner/i);
@@ -338,6 +363,8 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /portable-rename race limit/);
   assert.match(packageOwnership, /pnpm `11.20.0`/);
   assert.match(packageOwnership, /disabled Next telemetry/);
+  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, and `diff`/);
+  assert.match(packageOwnership, /one-line JSON output/);
   assert.match(packageOwnership, /existing-repository transformation/);
   assert.match(enforcementMap, /desired, installed, and inferred/);
   assert.match(enforcementMap, /read-only diagnostics/);

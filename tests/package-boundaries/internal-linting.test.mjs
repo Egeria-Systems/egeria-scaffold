@@ -75,7 +75,7 @@ test("the builder root owns an exact ESLint 10 lint boundary", async () => {
   );
   assert.match(
     rootManifest.scripts?.["verify:builder-packages"] ?? "",
-    /pnpm run verify:builder-packages:quality/,
+    /pnpm run lint:builder/,
   );
 });
 
@@ -226,7 +226,7 @@ test("each immediate builder application and package delegates zero-warning lint
   const expectedScripts = new Map([
     [
       "apps/cli/package.json",
-      "pnpm --dir ../.. exec eslint apps/cli/src --max-warnings 0",
+      "pnpm --dir ../.. exec eslint apps/cli/src apps/cli/tests --max-warnings 0",
     ],
     [
       "packages/builder-core/package.json",

@@ -2,9 +2,11 @@
 
 Read the repository [`AGENTS.md`](../../AGENTS.md), the canonical [package ownership](../../docs/architecture/package-ownership.md), and the [review and contribution protocol](../../docs/governance/review-and-contribution.md) before editing this surface.
 
-`apps/cli` is a private builder application boundary. In P0.3 it is only an empty ESM ownership shell.
+`apps/cli` is the private executable adapter for the builder kernel.
 
-- Do not add a `bin` entry, command parser, interactive prompt, generated-repository mutation, migration, state write, profile behavior, capability behavior, or user-visible copy in this increment.
-- Keep command input/output thin when a later approved stage makes it executable. Builder decisions and repository transformations belong to `packages/builder-core`.
+- Keep the four commands exact: `create`, `infer`, `doctor`, and `diff`. Parse only command-specific long options and emit one content-safe JSON line.
+- Keep command input/output thin. Builder decisions, repository transformations, schemas, profile recipes, state, inference, and diagnostics belong to `packages/builder-core`.
+- `create` may call only builder-core's approved new-directory generation boundary. It does not add overwrite, interactive prompt, Git, deployment, publication, provider, or existing-repository mutation behavior.
+- `infer`, `doctor`, and `diff` remain read-only and must not install dependencies or change repository bytes.
 - Do not expose this application as a public package.
 - Follow the currently approved increment and stop at its review gate before expanding this boundary.

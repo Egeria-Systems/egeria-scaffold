@@ -188,6 +188,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
       changesetStatus: rootManifest.scripts?.["changeset:status"],
       releaseCheck: rootManifest.scripts?.["check:package-release"],
       builderCoreTests: rootManifest.scripts?.["test:builder-core"],
+      cliTests: rootManifest.scripts?.["test:cli"],
       lint: rootManifest.scripts?.["lint:builder"],
       release: rootManifest.scripts?.["release-packages"],
       packageBoundaries: rootManifest.scripts?.["test:package-boundaries"],
@@ -209,6 +210,8 @@ test("root release commands use the pinned Changesets boundary", async () => {
       releaseCheck: "node scripts/check-package-release.mjs",
       builderCoreTests:
         "pnpm --filter @egeria-systems/builder-core run build && node --test packages/builder-core/tests/*.test.mjs",
+      cliTests:
+        "pnpm --filter @egeria-systems/cli run build && pnpm --filter @egeria-systems/cli run test",
       lint:
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint && pnpm exec eslint eslint.config.mjs scripts 'tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' 'apps/**/tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' 'packages/**/tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' --no-error-on-unmatched-pattern --max-warnings 0",
       release: "changeset publish",
@@ -216,11 +219,11 @@ test("root release commands use the pinned Changesets boundary", async () => {
       packageTests:
         "pnpm --filter @egeria-systems/standards --filter @egeria-systems/observability run test",
       test:
-        "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:packages",
+        "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages",
       typecheck:
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run typecheck",
       verify:
-        "pnpm run verify:builder-packages:quality && pnpm run changeset:status",
+        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:builder && pnpm run build:builder && pnpm run test:cli && pnpm run test:packages && pnpm run typecheck:builder && pnpm run changeset:status",
       verifyQuality:
         "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:builder && pnpm run build:builder && pnpm run test:packages && pnpm run typecheck:builder",
       verifyRelease:

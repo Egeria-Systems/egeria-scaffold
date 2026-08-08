@@ -3,13 +3,21 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "egeria": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "lint": "pnpm --dir ../.. exec eslint apps/cli/src --max-warnings 0",
+    "lint": "pnpm --dir ../.. exec eslint apps/cli/src apps/cli/tests --max-warnings 0",
+    "test": "node --test tests/*.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@egeria-systems/builder-core": "workspace:*"
   },
   "devDependencies": {
     "@egeria-systems/standards": "workspace:*",
+    "@types/node": "22.20.1",
     "typescript": "6.0.3"
   }
 }
