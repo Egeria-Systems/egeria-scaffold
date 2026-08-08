@@ -1,6 +1,6 @@
 # User-Facing Documentation Naming Design
 
-**Status:** Option 1 selected; written specification awaiting user review
+**Status:** Approved 2026-08-08, including the final-part timing clarification
 
 ## Problem
 
@@ -14,7 +14,7 @@ Internal architecture and implementation records still use sequencing labels as 
 
 Adopt staged enforcement.
 
-The current repair will scan user-facing Markdown content and remove existing user-facing leakage. Internal architecture, decision, governance, agent-instruction, and provenance documents remain content-exempt throughout program implementation. Only after the whole program implementation is complete will a final fleet-hardening task clean permanent internal documentation and broaden the scanner without rewriting historical artifacts.
+The current repair will scan user-facing Markdown content and remove existing user-facing leakage. Internal architecture, decision, governance, agent-instruction, and provenance documents remain content-exempt throughout program implementation. Only at the end of the final task in the program's final part will a permanent-documentation hardening pass clean permanent internal documentation and broaden the scanner without rewriting historical artifacts.
 
 The canonical sequencing-label grammar does not change. The repair changes only which Markdown content is scanned.
 
@@ -55,7 +55,7 @@ The repair does not prohibit ordinary non-sequencing uses such as `taskQueue`, `
 
 ## Permanent internal-document cleanup
 
-The program roadmap will add a final fleet-hardening task named for permanent documentation hardening. It is an end-of-program task: no earlier phase-finalization task, including the final P1 review task, will inventory, clean, or expand enforcement over the exempt internal documents. After the whole program implementation is complete, the hardening task will:
+The program roadmap will add permanent documentation hardening to the end of the final task in its final part. No earlier task or part, including the final P1 review task, will inventory, clean, or expand enforcement over the exempt internal documents. At that end-of-program boundary, the hardening pass will:
 
 - inventory sequencing labels in architecture, ADR, governance, and agent-instruction content;
 - replace implementation-routing labels with stable responsibility language or precise links where the labels no longer provide necessary provenance;
@@ -132,5 +132,4 @@ Completion requires the expanded repository scan to pass, current user-facing le
 - Expanding the canonical sequencing-label grammar.
 - Detecting every conceptual synonym for implementation order.
 - Reintroducing the deleted ESLint adapter.
-- Adding an internal-document audit or cleanup checkpoint to the final P1 task.
-- Starting the final fleet-hardening documentation task.
+- Scheduling or starting the permanent internal-document audit and cleanup before the end of the final task in the program's final part.

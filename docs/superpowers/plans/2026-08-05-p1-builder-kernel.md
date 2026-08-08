@@ -1467,6 +1467,124 @@ git commit -m "Record generated fixture verification"
 
 Present the exact committed comparison and Task 8 packet, then stop for explicit user verified-final-diff approval before Task 9. Do not create the P1 Gate 3 review packet yet.
 
+### Approved Task 8 review repair: user-facing documentation semantic naming
+
+**Approval and scope amendment (2026-08-08):** During verified-final-diff review, the user selected the staged user-facing-document enforcement design in `docs/superpowers/specs/2026-08-08-user-facing-documentation-naming-design.md`, approved the written specification, and clarified that permanent internal-document cleanup belongs only at the end of the final task in the program's final part. The user's original Task 8 instruction preapproves this bounded amendment and authorizes continuous local implementation through the repaired Task 8 review. This is a repair within Task 8, not Task 9 or a new implementation increment.
+
+**Files:**
+
+- Modify: `scripts/check-semantic-naming.mjs`
+- Modify: `tests/constitution/semantic-naming.test.mjs`
+- Modify: `README.md`
+- Modify: `CONTRIBUTING.md`
+- Modify: `AGENTS.md`
+- Modify: `docs/architecture/enforcement-map.md`
+- Modify: `docs/roadmaps/program-roadmap.md`
+- Modify: `docs/superpowers/specs/2026-08-08-user-facing-documentation-naming-design.md`
+- Modify: `docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md`
+- Modify: `docs/review-packets/2026-08-08-p1-task-8-golden-fixture-harness.md`
+- Modify: `docs/superpowers/plans/2026-08-05-p1-builder-kernel.md`
+
+**Interfaces:**
+
+- `classifySemanticNamingPath(path: string): { contentPolicy: "scan" | "skip"; pathPolicy: "allow-sequencing-labels" | "require-semantic-name" }` remains the single path/content classification boundary.
+- Existing sequencing-label grammar, finding shape, Git inventory, path validation, deterministic ordering, and content-safe output remain unchanged.
+- Content scanning becomes the default for `.md` files outside explicit internal/provenance categories. Every `AGENTS.md`, ADR, architecture, governance, roadmap, plan, specification, implementation-evidence, review-packet, and compatibility-record content path remains exempt during program implementation. Existing generated-directory, binary, and lockfile exclusions remain unchanged.
+- Path enforcement remains unchanged. Only existing provenance path prefixes may contain sequencing labels in their paths.
+
+- [x] **Step 12A: Record the approved design, timing correction, and preparation evidence**
+
+Record the approved status and the user's final-part/final-task clarification in the design specification. Re-freeze branch, status, base, recent commits, manifests, schemas, canonical sources, and the current Task 8 packet. Record that the same-day Task 8 official Node/pnpm documentation and advisory evidence remains applicable because this repair changes no dependency, version, provider, generated-project input, or executed external command. Record no blocking contradiction if that remains true.
+
+```bash
+git add docs/superpowers/specs/2026-08-08-user-facing-documentation-naming-design.md docs/superpowers/plans/2026-08-05-p1-builder-kernel.md docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md
+git commit -m "Plan user-facing documentation naming"
+```
+
+- [ ] **Step 12B: Write focused classifier and scanner tests and verify RED**
+
+Extend `tests/constitution/semantic-naming.test.mjs` using the existing neutral `compactLabel` and `namedLabel` constructors so the test source does not itself leak a sequencing label. The classification matrix must expect `scan` for root `README.md`, `CONTRIBUTING.md`, `packages/builder-core/README.md`, and `docs/guides/getting-started.md`. It must expect `skip` for `AGENTS.md`, `docs/adr/README.md`, `docs/architecture/overview.md`, `docs/governance/review-and-contribution.md`, and one representative path from every existing provenance category.
+
+Extend the controlled `scanRepository` test with user-facing Markdown containing constructed labels and exempt internal documents containing the same labels. Assert literal finding paths and locations for user-facing Markdown and assert that exempt documents are never read. The realistic production mutation caught by these tests is restoring the broad `docs/**` or ordinary-document basename skip.
+
+```bash
+node --test --test-name-pattern="path classification|repository scanning reports" tests/constitution/semantic-naming.test.mjs
+```
+
+Expected RED: current classification returns `skip` for ordinary README, contribution, and guide Markdown, and the controlled scanner omits their content findings.
+
+- [ ] **Step 12C: Implement the minimum staged Markdown classification and verify focused GREEN**
+
+Replace the broad documentary skip with one explicit internal/provenance content-prefix collection, an exact `AGENTS.md` exemption, and a case-insensitive `.md` check. Reuse `provenancePathPrefixes`; do not add a second scanner, dependency, configuration file, matcher, or policy registry.
+
+```js
+const internalDocumentPathPrefixes = Object.freeze([
+  "docs/adr/",
+  "docs/architecture/",
+  "docs/governance/",
+  ...provenancePathPrefixes,
+]);
+
+const agentInstructionBasenames = new Set(["AGENTS.md"]);
+const isMarkdown = (path) => path.toLowerCase().endsWith(".md");
+```
+
+The classifier must first derive the unchanged path policy; then skip generated directories, binaries, lockfiles, internal/provenance content, and agent instructions; then scan other Markdown; then apply the existing authored-content rules to non-Markdown paths.
+
+```bash
+node --test --test-name-pattern="path classification|repository scanning reports" tests/constitution/semantic-naming.test.mjs
+```
+
+Expected GREEN: the focused controlled classification and scanning tests pass. Then run the full semantic test file before editing user-facing prose:
+
+```bash
+node --test tests/constitution/semantic-naming.test.mjs
+```
+
+Expected repository-level RED: the live scan reports only current user-facing documentation leakage, including root `README.md` and `CONTRIBUTING.md`.
+
+- [ ] **Step 12D: Remove current user-facing leakage and update canonical owners**
+
+Replace the root README's phase-number heading and historical phase summary with `Current implementation status` and stable capability/status prose. Remove the remaining phase label from the builder-core topology bullet. Replace the contribution guide's phase label with stable builder-kernel review language. Do not rewrite unrelated prose or exempt internal records.
+
+Update root instructions to link the scanner as the owner of user-facing Markdown enforcement without copying its prefix list or grammar. Update `INV-SEMANTIC-NAMING` to include user-facing Markdown and its staged exemption boundary. Add the permanent-documentation hardening pass to the end of the final task in `P10 — Fleet hardening`; do not create or begin an earlier audit or cleanup task.
+
+```bash
+node --test tests/constitution/semantic-naming.test.mjs
+node scripts/check-semantic-naming.mjs
+```
+
+Expected GREEN: all focused tests and the live repository scan pass with no findings.
+
+```bash
+git add scripts/check-semantic-naming.mjs tests/constitution/semantic-naming.test.mjs README.md CONTRIBUTING.md AGENTS.md docs/architecture/enforcement-map.md docs/roadmaps/program-roadmap.md
+git commit -m "Enforce semantic names in user documentation"
+```
+
+- [ ] **Step 12E: Run proportional verification and independent review**
+
+Run the settled relevant suite once. The generated-project harness and compatibility proof remain excluded because no executable generator, package, dependency, template, fixture, lockfile, or proof input changes.
+
+```bash
+pnpm run check:semantic-naming
+pnpm run verify:builder-packages:quality
+git diff --check bcedd968fcc11c8a836068f939c016c0c030f352...HEAD
+git status --short --branch
+```
+
+Dispatch independent read-only requirements, architecture/anti-overengineering, and test-evidence reviewers against the exact repaired comparison. Prohibit edits, recursive delegation, GitHub comments, and external action. Validate each finding against the current tree, repair only evidence-backed material defects with a focused RED/GREEN cycle, and rerun only affected checks before the settled verification.
+
+- [ ] **Step 12F: Amend verification evidence and the Task 8 review packet, then stop**
+
+Update the existing Task 8 evidence and packet with the repaired comparison, added files/commits, RED/GREEN receipts, exact verification results, reviewer dispositions, staged exemption boundary, user-facing cleanup, final-program hardening deferral, risks, and recovery. State that static scanning does not establish documentation quality or completeness beyond the canonical grammar and classified paths.
+
+```bash
+git add docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md docs/review-packets/2026-08-08-p1-task-8-golden-fixture-harness.md
+git commit -m "Record documentation naming verification"
+```
+
+Present the repaired committed comparison and amended Task 8 packet, then stop for explicit verified-final-diff approval. Do not begin Task 9.
+
 ## Task 9: Deferred Schema Contract Review and Gate 3 Packet
 
 **Files:**

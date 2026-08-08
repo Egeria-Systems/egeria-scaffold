@@ -24,6 +24,16 @@ Authorization did not include Task 9, push, pull request, merge, deployment, pub
 
 The separate gate-artifact commit adds this record and the review packet without changing implementation behavior. Its exact commit is reported at handoff.
 
+### Approved user-facing documentation naming repair preparation
+
+Verified-final-diff review identified that the permanent semantic-naming scanner still skipped ordinary user-facing Markdown content. The user selected the staged enforcement design in `docs/superpowers/specs/2026-08-08-user-facing-documentation-naming-design.md`, approved it on 2026-08-08, and clarified that permanent internal-document cleanup belongs only at the end of the final task in the program's final part.
+
+The repair was re-frozen at clean worktree commit `2ceefe9c341aad87676a6a24c046923022c18d1a` against the unchanged Task 8 base. Preparation rechecked the branch/status, recent commits, root and relevant package manifests, the five checked builder-core JSON Schemas, root and builder-core instructions, accepted ADR index, architecture overview, capability model, enforcement map, program roadmaps, review protocol, canonical Task 8 plan, current semantic scanner/tests, and this packet.
+
+The same-day official Node `22.23.2` and pnpm `11.20.0` documentation, security-release, registry, and advisory evidence in `2026-08-08-golden-fixture-harness-preparation.md` remains current for this repair. The repair changes no tool or provider configuration, dependency, lockfile, executable generator, template, generated fixture, networked verification command, or provider surface. It therefore requires no new provider documentation, advisory query, installation, registry read, generated-project build, compatibility proof, or external action.
+
+No blocking contradiction remains. The permanent scanner is the canonical owner; the enforcement map owns its gate mapping; the root README and contribution guide are user-facing; internal architecture/provenance content remains temporarily exempt; and the roadmap can defer permanent-document cleanup to the end of the final task in the final program part without changing current executable scope.
+
 ## Current official and package evidence
 
 The dated [preparation record](2026-08-08-golden-fixture-harness-preparation.md) records the official Node, pnpm, Next.js, OpenNext, and Cloudflare documentation; exact registry metadata; direct-version advisory queries; package signatures; integrity values; and claim limits revalidated before implementation.
