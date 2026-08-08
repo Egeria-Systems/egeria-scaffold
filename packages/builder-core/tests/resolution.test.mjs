@@ -513,6 +513,64 @@ test("capability package versions must be exact stable releases and issues do no
   );
 });
 
+test("the verified generation catalog pins exact public package releases", () => {
+  assert.deepEqual(core.verifiedCapabilityPackageVersions, {
+    standards: "0.1.0",
+    observability: "0.1.0",
+  });
+  assert.equal(Object.isFrozen(core.verifiedCapabilityPackageVersions), true);
+  assert.throws(() => {
+    core.verifiedCapabilityPackageVersions.standards = "9.9.9";
+  }, TypeError);
+  assert.equal(core.verifiedCapabilityPackageVersions.standards, "0.1.0");
+
+  const catalog = assertOk(core.createVerifiedCapabilityCatalog());
+  assert.equal(catalog.length, 6);
+  assert.deepEqual(
+    catalog.map(({ identifier }) => identifier),
+    [
+      "standards",
+      "content-files",
+      "section-composition",
+      "deployment-cloudflare",
+      "observability",
+      "site-routing",
+    ],
+  );
+
+  const packageProbes = catalog.flatMap((capability) =>
+    capability.inferenceProbes.filter(({ kind }) => kind === "package"),
+  );
+  assert.deepEqual(
+    packageProbes.filter(({ packageName }) =>
+      packageName.startsWith("@egeria-systems/"),
+    ),
+    [
+      {
+        kind: "package",
+        path: "apps/web/package.json",
+        section: "devDependencies",
+        packageName: "@egeria-systems/standards",
+        version: "0.1.0",
+      },
+      {
+        kind: "package",
+        path: "apps/web/package.json",
+        section: "dependencies",
+        packageName: "@egeria-systems/observability",
+        version: "0.1.0",
+      },
+    ],
+  );
+  for (const { version } of packageProbes) {
+    assert.match(version, /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/);
+    assert.doesNotMatch(
+      version,
+      /workspace:|file:|git(?:\+|:)|https?:|[~^*<>=|]|latest|next|beta|rc/i,
+    );
+  }
+});
+
 test("portfolio and site recipes resolve to deterministic dependency-first manifests", () => {
   assert.deepEqual(core.profileRecipes, [
     {

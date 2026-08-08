@@ -28,6 +28,10 @@ const ejectedAreaListSchema = z
   })
   .readonly();
 
+const displayNameSchema = z
+  .string()
+  .regex(/^(?=.{1,120}$)(?=.*\S)[^\p{Cc}]+$/u);
+
 export const projectConfigurationSchema = z
   .strictObject({
     schemaVersion: z.literal("1.0.0"),
@@ -35,7 +39,7 @@ export const projectConfigurationSchema = z
     project: z
       .strictObject({
         name: stableIdentifierSchema,
-        displayName: z.string().min(1).max(120).regex(/\S/),
+        displayName: displayNameSchema,
         defaultLocale: z.literal("en-CA"),
       })
       .readonly(),

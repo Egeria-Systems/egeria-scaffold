@@ -213,6 +213,7 @@ test("the CLI remains an empty shell while builder-core owns only approved deter
     builderCoreSourceFiles,
     [
       "catalog/capability-catalog.ts",
+      "catalog/verified-package-versions.ts",
       "contracts/capability.ts",
       "contracts/identifiers.ts",
       "contracts/json-schemas.ts",

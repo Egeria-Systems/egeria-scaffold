@@ -56,9 +56,7 @@
           "type": "string"
         },
         "displayName": {
-          "maxLength": 120,
-          "minLength": 1,
-          "pattern": "\\S",
+          "pattern": "^(?=.{1,120}$)(?=.*\\S)[^\\p{Cc}]+$",
           "type": "string"
         },
         "name": {

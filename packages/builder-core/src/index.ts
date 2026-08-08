@@ -1,4 +1,5 @@
 export * from "./catalog/capability-catalog.js";
+export * from "./catalog/verified-package-versions.js";
 export * from "./contracts/capability.js";
 export * from "./contracts/identifiers.js";
 export * from "./contracts/json-schemas.js";

@@ -346,6 +346,54 @@ test("project configuration is strict and materializes safe capability identifie
   });
 });
 
+test("project display names preserve Unicode while rejecting controls and whitespace-only input", () => {
+  const acceptedDisplayNames = [
+    "Sample Portfolio",
+    "Égeria Studio",
+    "👩‍💻 Studio",
+    "😀".repeat(120),
+  ];
+  const rejectedDisplayNames = [
+    "",
+    " ".repeat(4),
+    "😀".repeat(121),
+    "Line one\nLine two",
+    "unsafe\u0000name",
+    "next\u0085line",
+  ];
+
+  for (const displayName of acceptedDisplayNames) {
+    assertAccepts(contracts.projectConfigurationSchema, {
+      ...validProject,
+      project: { ...validProject.project, displayName },
+    });
+  }
+
+  for (const displayName of rejectedDisplayNames) {
+    const result = contracts.validateContract(
+      contracts.projectConfigurationSchema,
+      {
+        ...validProject,
+        project: { ...validProject.project, displayName },
+      },
+    );
+
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.issues.map((issue) => issue.path), [
+      ["project", "displayName"],
+    ]);
+    assert.ok(result.issues.every((issue) => !("input" in issue)));
+    if (displayName.trim().length > 0) {
+      assert.equal(
+        JSON.stringify(result.issues).includes(
+          JSON.stringify(displayName).slice(1, -1),
+        ),
+        false,
+      );
+    }
+  }
+});
+
 test("installed state is strict and records the exact successful generation checks", () => {
   assertAccepts(contracts.installedStateSchema, validState);
   assertRejects(contracts.installedStateSchema, {
@@ -423,6 +471,31 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
     generated["profile.schema.json"].title,
     "Egeria portfolio and site profile recipe",
   );
+  const displayNamePattern = /^(?=.{1,120}$)(?=.*\S)[^\p{Cc}]+$/u;
+  const projectDisplayNamePattern =
+    generated["project.schema.json"].properties.project.properties.displayName
+      .pattern;
+
+  assert.equal(projectDisplayNamePattern, displayNamePattern.source);
+  const schemaDisplayNamePattern = new RegExp(projectDisplayNamePattern, "u");
+  for (const displayName of [
+    "Sample Portfolio",
+    "Égeria Studio",
+    "👩‍💻 Studio",
+    "😀".repeat(120),
+  ]) {
+    assert.match(displayName, schemaDisplayNamePattern);
+  }
+  for (const displayName of [
+    "",
+    " ".repeat(4),
+    "😀".repeat(121),
+    "Line one\nLine two",
+    "unsafe\u0000name",
+    "next\u0085line",
+  ]) {
+    assert.doesNotMatch(displayName, schemaDisplayNamePattern);
+  }
 
   for (const artifactName of schemaArtifactNames) {
     const artifact = JSON.parse(
