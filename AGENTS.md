@@ -21,6 +21,10 @@ Implement only the approved increment. Future capabilities may be documented wit
 
 Prefer the smallest resilient change. Every changed line must trace to the approved increment or a directly required correction. Reuse existing patterns and avoid speculative abstractions, generic frameworks, and unrelated refactors.
 
+## Functional programming discipline
+
+Use a functional core and imperative shell. Keep domain transformations pure and function inputs immutable where practical, and confine side effects to scripts, adapters, composition roots, and other explicit boundaries. Prefer named function composition when it makes a multi-step transformation clearer. Use `map`, `filter`, `flatMap`, and `reduce` only when they express their actual collection semantics; never use `map` for side effects. Point-free style is optional, and explicit lambdas are preferred when they preserve parameter meaning, arity, or error context. `for...of`, local mutation, `Map`, `Set`, and stacks remain appropriate for early exit, ordered or asynchronous effects, graph traversal, cycle detection, and other stateful algorithms when they are clearer and safer than immutable copying or reducer-based encodings. Do not add a functional-programming runtime or lint preset solely to enforce syntax; adopt dependencies and rules only for an evidenced correctness or maintainability benefit.
+
 ## Semantic naming
 
 Roadmap and implementation-sequencing labels describe order and provenance, not software responsibility. This includes compact phase labels such as `P2` or `PX` and named labels such as `Task 3` or `Task X`. They may appear only when sequencing or provenance is the actual subject: roadmap headings, task or approval-gate references, historical status, dated plans, implementation evidence, compatibility records, review packets, and explicitly phase-scoped invariants.
