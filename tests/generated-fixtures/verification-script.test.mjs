@@ -244,6 +244,24 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
       () => inspectGeneratedFixture(tarballRoot, "portfolio"),
       "FIXTURE_LOCKFILE_INVALID",
     );
+
+    const snapshotLocatorRoot = await copyFixture(
+      owner,
+      "portfolio",
+      "snapshot-locator",
+    );
+    const snapshotLockfilePath = join(snapshotLocatorRoot, "pnpm-lock.yaml");
+    const snapshotLockfile = await readFile(snapshotLockfilePath, "utf8");
+    const alteredSnapshotLockfile = snapshotLockfile.replace(
+      "      tslib: 2.8.1",
+      "      tslib: git+https://example.invalid/unapproved.git",
+    );
+    assert.notEqual(alteredSnapshotLockfile, snapshotLockfile);
+    await writeFile(snapshotLockfilePath, alteredSnapshotLockfile);
+    await expectFixtureError(
+      () => inspectGeneratedFixture(snapshotLocatorRoot, "portfolio"),
+      "FIXTURE_LOCKFILE_INVALID",
+    );
   } finally {
     await rm(owner, { recursive: true, force: true });
   }

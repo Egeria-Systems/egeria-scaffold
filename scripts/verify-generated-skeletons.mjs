@@ -472,7 +472,7 @@ async function inspectFixture(root, contract) {
   if (
     !lockfile.startsWith(expectedLockfilePreamble) ||
     (lockfile.match(/^overrides:/gmu) ?? []).length !== 1 ||
-    /^\s+(?:specifier|version):\s+['"]?(?:(?:file|link|workspace|git|github|https?):|git\+)/mu.test(
+    /:\s+['"]?(?:(?:file|link|workspace|git|github|https?):|git\+)/mu.test(
       lockfile,
     ) ||
     /^\s+['"]?(?:(?:file|link|workspace|git|github|https?):|git\+)/mu.test(
