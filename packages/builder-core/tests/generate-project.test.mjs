@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -167,9 +167,92 @@ async function withTestRoot(run) {
   }
 }
 
+async function createFakePnpmExecutable(owner) {
+  const executable = join(owner, "fake-pnpm");
+  const controlPath = join(owner, "fake-pnpm-control.json");
+  const logPath = join(owner, "fake-pnpm-log.jsonl");
+  const source = `#!/usr/bin/env node
+import { appendFileSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+
+const control = JSON.parse(readFileSync(${JSON.stringify(controlPath)}, "utf8"));
+const arguments_ = process.argv.slice(2);
+const operation = arguments_.join(" ");
+appendFileSync(
+  ${JSON.stringify(logPath)},
+  JSON.stringify({ arguments: arguments_, cwd: process.cwd(), environment: process.env }) + "\\n",
+);
+
+if (control.overflowOperation === operation) {
+  process.stdout.write("sensitive-output".repeat(100_000));
+}
+if (
+  control.failureOperation === operation ||
+  (control.failureOperationPrefix !== undefined &&
+    operation.startsWith(control.failureOperationPrefix))
+) {
+  process.stderr.write("sensitive-error");
+  process.exit(23);
+}
+if (operation === "--version") {
+  process.stdout.write((control.version ?? "11.20.0") + "\\n");
+  process.exit(0);
+}
+if (operation.startsWith("install --lockfile-only")) {
+  if (control.lockfileMode === "changed-source") {
+    writeFileSync("package.json", "{}\\n");
+  }
+  if (control.lockfileMode === "extra-source") {
+    writeFileSync("unexpected", "unexpected");
+  }
+  if (control.lockfileMode === "symlink") {
+    symlinkSync("package.json", "pnpm-lock.yaml");
+  } else if (control.lockfileMode !== "missing") {
+    writeFileSync("pnpm-lock.yaml", "lockfileVersion: '9.0'\\n");
+  }
+}
+`;
+
+  await writeFile(executable, source);
+  await chmod(executable, 0o700);
+  await writeFile(controlPath, "{}\n");
+
+  return {
+    executable,
+    async configure(value) {
+      await writeFile(controlPath, `${JSON.stringify(value)}\n`);
+    },
+    async readCalls() {
+      if (!(await exists(logPath))) {
+        return [];
+      }
+      return (await readFile(logPath, "utf8"))
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+    },
+  };
+}
+
+async function createVerifierSource(owner, name = "source") {
+  const root = join(owner, name);
+  await mkdir(root);
+  await writeFile(join(root, "package.json"), '{"private":true}\n');
+  await writeFile(join(root, "marker"), "source-marker\n");
+  return root;
+}
+
+async function snapshotFileBytes(root) {
+  const snapshot = new Map();
+  for (const path of await listFiles(root)) {
+    snapshot.set(path, await readFile(join(root, path), "base64"));
+  }
+  return snapshot;
+}
+
 test("builder-core exports new-directory generation without caller package versions", async () => {
   assert.equal(typeof core.generateProject, "function");
-  assert.equal(typeof core.createPnpmGeneratedProjectVerifier, "undefined");
+  assert.equal(typeof core.createPnpmGeneratedProjectVerifier, "function");
   const declaration = await readFile(
     resolve(packageRoot, "dist/generation/write-generated-project.d.ts"),
     "utf8",
@@ -178,6 +261,204 @@ test("builder-core exports new-directory generation without caller package versi
     declaration,
     /ProjectGenerationRequest = Omit<\s*GenerationRequest,\s*"packageVersions"\s*>/,
   );
+});
+
+test("the pnpm verifier uses exact commands, isolated copies, and an allowlisted environment", async () => {
+  await withTestRoot(async (owner) => {
+    const fakePnpm = await createFakePnpmExecutable(owner);
+    const source = await createVerifierSource(owner);
+    const canonicalSource = await realpath(source);
+    const verifier = core.createPnpmGeneratedProjectVerifier({
+      pnpmExecutable: fakePnpm.executable,
+    });
+
+    assertSuccess(await verifier.prepareLockfile(source));
+    const beforeVerification = await snapshotFileBytes(source);
+    assert.deepEqual(assertSuccess(await verifier.verifyInIsolatedCopy(source)), {
+      checks: generatedChecks,
+    });
+    assert.deepEqual(await snapshotFileBytes(source), beforeVerification);
+
+    const calls = await fakePnpm.readCalls();
+    assert.deepEqual(
+      calls.map(({ arguments: arguments_ }) => arguments_),
+      [
+        ["--version"],
+        [
+          "install",
+          "--lockfile-only",
+          "--ignore-scripts",
+          "--store-dir",
+          calls[1].arguments.at(-1),
+        ],
+        ["--version"],
+        [
+          "install",
+          "--frozen-lockfile",
+          "--store-dir",
+          calls[3].arguments.at(-1),
+        ],
+        ["run", "lint"],
+        ["run", "typecheck"],
+        ["run", "build"],
+        ["run", "build:cloudflare"],
+      ],
+    );
+    assert.equal(calls[0].cwd, canonicalSource);
+    assert.equal(calls[1].cwd, canonicalSource);
+    assert.notEqual(calls[2].cwd, canonicalSource);
+    assert.ok(calls.slice(2).every(({ cwd }) => cwd === calls[2].cwd));
+    assert.notEqual(calls[1].arguments.at(-1), calls[3].arguments.at(-1));
+
+    const forbiddenEnvironmentKeys = [
+      "TOKEN",
+      "SECRET",
+      "PASSWORD",
+      "NPM_TOKEN",
+      "NODE_OPTIONS",
+      "ARBITRARY_INHERITED_VALUE",
+    ];
+    const allowedEnvironmentKeys = new Set([
+      "CI",
+      "HOME",
+      "USERPROFILE",
+      "TMPDIR",
+      "TMP",
+      "TEMP",
+      "NPM_CONFIG_REGISTRY",
+      "NPM_CONFIG_USERCONFIG",
+      "NEXT_TELEMETRY_DISABLED",
+      "PATH",
+      "SystemRoot",
+      "ComSpec",
+      "PATHEXT",
+      "LANG",
+      "__CF_USER_TEXT_ENCODING",
+    ]);
+
+    for (const { arguments: arguments_, environment } of calls) {
+      assert.ok(
+        Object.keys(environment).every((key) => allowedEnvironmentKeys.has(key)),
+        JSON.stringify(Object.keys(environment)),
+      );
+      assert.ok(forbiddenEnvironmentKeys.every((key) => !(key in environment)));
+      assert.equal(environment.CI, "true");
+      assert.equal(environment.NEXT_TELEMETRY_DISABLED, "1");
+      assert.equal(environment.NPM_CONFIG_REGISTRY, "https://registry.npmjs.org/");
+      assert.ok(environment.NPM_CONFIG_USERCONFIG.endsWith("/.npmrc"));
+      assert.equal(await exists(environment.HOME), false);
+      assert.equal(await exists(environment.NPM_CONFIG_USERCONFIG), false);
+      assert.equal(await exists(arguments_.at(-1)), false);
+    }
+
+    const commandText = calls
+      .flatMap(({ arguments: arguments_ }) => arguments_)
+      .join(" ");
+    assert.doesNotMatch(
+      commandText,
+      /preview|deploy|upload|wrangler|git|npm publish|--force|--update-checksums|[;&|`$<>]/i,
+    );
+  });
+});
+
+test("the pnpm verifier rejects lockfile mutations and non-regular lockfiles", async () => {
+  await withTestRoot(async (owner) => {
+    const fakePnpm = await createFakePnpmExecutable(owner);
+
+    for (const lockfileMode of [
+      "missing",
+      "changed-source",
+      "extra-source",
+      "symlink",
+    ]) {
+      await fakePnpm.configure({ lockfileMode });
+      const source = await createVerifierSource(owner, lockfileMode);
+      const verifier = core.createPnpmGeneratedProjectVerifier({
+        pnpmExecutable: fakePnpm.executable,
+      });
+      assertFailure(
+        await verifier.prepareLockfile(source),
+        "LOCKFILE_PREPARATION_FAILED",
+      );
+      assert.equal(await exists(source), true);
+    }
+  });
+});
+
+test("the pnpm verifier maps command failures without child output", async () => {
+  await withTestRoot(async (owner) => {
+    const cases = [
+      ["--version", "PNPM_VERSION_INVALID", "prepare"],
+      [
+        "install --lockfile-only --ignore-scripts --store-dir ignored",
+        "LOCKFILE_PREPARATION_FAILED",
+        "prepare-prefix",
+      ],
+      [
+        "install --frozen-lockfile --store-dir ignored",
+        "FROZEN_INSTALL_FAILED",
+        "verify-prefix",
+      ],
+      ["run lint", "LINT_FAILED", "verify"],
+      ["run typecheck", "TYPECHECK_FAILED", "verify"],
+      ["run build", "NEXT_BUILD_FAILED", "verify"],
+      ["run build:cloudflare", "OPENNEXT_BUILD_FAILED", "verify"],
+    ];
+
+    for (const [operation, code, stage] of cases) {
+      const caseOwner = await mkdtemp(join(owner, "failure-case-"));
+      const fakePnpm = await createFakePnpmExecutable(caseOwner);
+      const source = await createVerifierSource(caseOwner);
+      const verifier = core.createPnpmGeneratedProjectVerifier({
+        pnpmExecutable: fakePnpm.executable,
+      });
+
+      if (stage.startsWith("verify")) {
+        await writeFile(
+          join(source, "pnpm-lock.yaml"),
+          "lockfileVersion: '9.0'\n",
+        );
+      }
+      if (stage.endsWith("prefix")) {
+        await fakePnpm.configure({ failureOperationPrefix: operation.split(" ignored")[0] });
+      } else {
+        await fakePnpm.configure({ failureOperation: operation });
+      }
+
+      const result = stage.startsWith("verify")
+        ? await verifier.verifyInIsolatedCopy(source)
+        : await verifier.prepareLockfile(source);
+      assertFailure(result, code);
+      assert.doesNotMatch(JSON.stringify(result.issues), /sensitive-output|sensitive-error/);
+      assert.equal(await exists(source), true);
+    }
+
+    const overflowOwner = await mkdtemp(join(owner, "overflow-case-"));
+    const overflowPnpm = await createFakePnpmExecutable(overflowOwner);
+    const overflowSource = await createVerifierSource(overflowOwner);
+    await overflowPnpm.configure({ overflowOperation: "--version" });
+    assertFailure(
+      await core
+        .createPnpmGeneratedProjectVerifier({
+          pnpmExecutable: overflowPnpm.executable,
+        })
+        .prepareLockfile(overflowSource),
+      "PNPM_VERSION_INVALID",
+    );
+
+    const versionOwner = await mkdtemp(join(owner, "version-case-"));
+    const versionPnpm = await createFakePnpmExecutable(versionOwner);
+    const versionSource = await createVerifierSource(versionOwner);
+    await versionPnpm.configure({ version: "11.19.0" });
+    assertFailure(
+      await core
+        .createPnpmGeneratedProjectVerifier({
+          pnpmExecutable: versionPnpm.executable,
+        })
+        .prepareLockfile(versionSource),
+      "PNPM_VERSION_INVALID",
+    );
+  });
 });
 
 test("portfolio and site generation writes exact state-last repositories", async () => {

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   parsePageContent,
@@ -7,14 +8,11 @@ import {
 import { readSiteContent } from "../../src/content/read-content";
 import { ContentPage } from "../../src/presentation/content-page";
 
-const aboutContentUrl = new URL(
-  "../../content/en-CA/about.yaml",
-  import.meta.url,
-);
+const aboutContentPath = join(process.cwd(), "content/en-CA/about.yaml");
 
 export default function About() {
   const content = parsePageContent(
-    parseYamlContent(readFileSync(aboutContentUrl, "utf8")),
+    parseYamlContent(readFileSync(aboutContentPath, "utf8")),
   );
   const { navigation } = readSiteContent();
 

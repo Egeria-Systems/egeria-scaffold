@@ -143,6 +143,8 @@ test("the private package manifests expose only their approved runtime boundarie
       "schema:check": "node scripts/generate-json-schemas.mjs --check",
       "schema:generate": "node scripts/generate-json-schemas.mjs",
       test: "node --test tests/*.test.mjs",
+      "test:generated-project":
+        "node --test tests/generate-project.integration.mjs",
       typecheck: "tsc -p tsconfig.json --noEmit",
       verify:
         "pnpm run build && pnpm run schema:check && pnpm run test && pnpm run typecheck && pnpm run lint",
@@ -304,6 +306,8 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /exact verified public package versions/);
   assert.match(builderInstructions, /identity-recorded sibling temporary directory/);
   assert.match(builderInstructions, /portable rename/);
+  assert.match(builderInstructions, /disabled Next telemetry/);
+  assert.match(builderInstructions, /argument-array `execFile`/);
 
   assert.match(builderReadme, /1 MiB/);
   assert.match(builderReadme, /doctorRepository/);
@@ -316,6 +320,9 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /previously absent destination/);
   assert.match(builderReadme, /installed state last/);
   assert.match(builderReadme, /hostile-concurrency no-clobber guarantee/);
+  assert.match(builderReadme, /createPnpmGeneratedProjectVerifier/);
+  assert.match(builderReadme, /Child processes receive only a narrow/);
+  assert.match(builderReadme, /child output is never returned/i);
   assert.match(builderReadme, /The CLI remains empty/);
 
   assert.match(packageOwnership, /through verified new-directory generation/);
@@ -329,6 +336,8 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /diffProject/);
   assert.match(packageOwnership, /state-last new-directory generation/);
   assert.match(packageOwnership, /portable-rename race limit/);
+  assert.match(packageOwnership, /pnpm `11.20.0`/);
+  assert.match(packageOwnership, /disabled Next telemetry/);
   assert.match(packageOwnership, /existing-repository transformation/);
   assert.match(enforcementMap, /desired, installed, and inferred/);
   assert.match(enforcementMap, /read-only diagnostics/);
@@ -338,7 +347,8 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(enforcementMap, /YAML 1.2/);
   assert.match(enforcementMap, /new-directory manifest\/pre-state\/post-state agreement/);
   assert.match(enforcementMap, /state-last failure-injection/);
-  assert.match(enforcementMap, /do not prove that pnpm/);
+  assert.match(enforcementMap, /public installed generated-repository/);
+  assert.match(enforcementMap, /execution-time moderate advisory/);
   assert.doesNotMatch(
     packageOwnership,
     /`packages\/builder-core`[^\n]*Empty ESM ownership shell/,

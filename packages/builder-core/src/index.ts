@@ -22,6 +22,7 @@ export type {
   GeneratedProjectVerification,
   GeneratedProjectVerifier,
 } from "./generation/verify-generated-project.js";
+export { createPnpmGeneratedProjectVerifier } from "./generation/verify-generated-project.js";
 export { generateProject } from "./generation/write-generated-project.js";
 export type {
   GeneratedProject,

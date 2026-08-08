@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   parseSiteContent,
@@ -6,10 +7,10 @@ import {
   type SiteContent,
 } from "./content-schema";
 
-const siteContentUrl = new URL("../../content/en-CA/site.yaml", import.meta.url);
+const siteContentPath = join(process.cwd(), "content/en-CA/site.yaml");
 
 export function readSiteContent(): SiteContent {
   return parseSiteContent(
-    parseYamlContent(readFileSync(siteContentUrl, "utf8")),
+    parseYamlContent(readFileSync(siteContentPath, "utf8")),
   );
 }

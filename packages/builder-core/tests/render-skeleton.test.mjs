@@ -535,6 +535,39 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
   }
 });
 
+test("generated server readers use web-workspace string paths for YAML content", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const portfolio = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const site = assertSuccess(
+    await renderSkeleton({
+      profile: "site",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const portfolioReader = indexFiles(portfolio.files).get(
+    "apps/web/src/content/read-content.ts",
+  );
+  const siteReader = indexFiles(site.files).get(
+    "apps/web/app/about/page.tsx",
+  );
+
+  for (const source of [portfolioReader, siteReader]) {
+    assert.notEqual(source, undefined);
+    assert.match(source, /from "node:path"/);
+    assert.match(source, /join\(process\.cwd\(\), "content\/en-CA\//);
+    assert.doesNotMatch(source, /new URL|import\.meta\.url|fileURLToPath/);
+  }
+});
+
 test("the emitted YAML parser rejects unsafe syntax and invalid content shapes", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(

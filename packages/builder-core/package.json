@@ -16,6 +16,7 @@
     "schema:check": "node scripts/generate-json-schemas.mjs --check",
     "schema:generate": "node scripts/generate-json-schemas.mjs",
     "test": "node --test tests/*.test.mjs",
+    "test:generated-project": "node --test tests/generate-project.integration.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify": "pnpm run build && pnpm run schema:check && pnpm run test && pnpm run typecheck && pnpm run lint"
   },

@@ -429,6 +429,8 @@ Proceed to Task 3 under the user's current Task 7 plan-amendment preapproval.
 
 ### Task 3: Real pnpm verifier and public generated-project integration
 
+**Live-build amendment (2026-08-08):** The first authorized public integration run reached the generated Next build and failed with `NEXT_BUILD_FAILED`. A disposable reproduction established that Next 16.3/Turbopack transforms the module-relative content `URL` into a value rejected by both Node `readFileSync` and `fileURLToPath`. This task therefore also modifies `packages/builder-core/templates/common/apps/web/src/content/read-content.ts`, `packages/builder-core/templates/site/apps/web/app/about/page.tsx`, and `packages/builder-core/tests/render-skeleton.test.mjs` to use and enforce web-workspace string paths. The same live Next and OpenNext gate must pass after this evidence-backed repair.
+
 **Files:**
 
 - Modify: `packages/builder-core/src/generation/verify-generated-project.ts`

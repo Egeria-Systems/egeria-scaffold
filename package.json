@@ -13,6 +13,7 @@
     "release-packages": "changeset publish",
     "test": "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:packages",
     "test:builder-core": "pnpm --filter @egeria-systems/builder-core run build && node --test packages/builder-core/tests/*.test.mjs",
+    "test:generated-project": "pnpm --filter @egeria-systems/builder-core run build && pnpm --filter @egeria-systems/builder-core run test:generated-project",
     "test:constitution": "node --test tests/constitution/*.test.mjs",
     "test:package-boundaries": "node --test tests/package-boundaries/*.test.mjs",
     "test:packages": "pnpm --filter @egeria-systems/standards --filter @egeria-systems/observability run test",
