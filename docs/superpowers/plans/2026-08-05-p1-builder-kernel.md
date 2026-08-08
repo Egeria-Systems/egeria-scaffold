@@ -1475,6 +1475,7 @@ Present the exact committed comparison and Task 8 packet, then stop for explicit
 
 - Modify: `scripts/check-semantic-naming.mjs`
 - Modify: `tests/constitution/semantic-naming.test.mjs`
+- Modify: `tests/constitution/constitution.test.mjs`
 - Modify: `README.md`
 - Modify: `CONTRIBUTING.md`
 - Modify: `AGENTS.md`
@@ -1545,7 +1546,7 @@ Expected repository-level RED: the live scan reports only current user-facing do
 
 - [x] **Step 12D: Remove current user-facing leakage and update canonical owners**
 
-Replace the root README's phase-number heading and historical phase summary with `Current implementation status` and stable capability/status prose. Remove the remaining phase label from the builder-core topology bullet. Replace the contribution guide's phase label with stable builder-kernel review language. Do not rewrite unrelated prose or exempt internal records.
+Replace the root README's phase-number heading and historical phase summary with `Current implementation status` and stable capability/status prose. Remove the remaining phase label from the builder-core topology bullet. Replace the contribution guide's phase label with stable builder-kernel review language. Update the two direct constitution assertions that own those status and generated-fixture documentation contracts; assert the stable builder-kernel review boundary rather than reconstructing the removed public sequencing labels. Do not rewrite unrelated prose or exempt internal records.
 
 Update root instructions to link the scanner as the owner of user-facing Markdown enforcement without copying its prefix list or grammar. Update `INV-SEMANTIC-NAMING` to include user-facing Markdown and its staged exemption boundary. Add the permanent-documentation hardening pass to the end of the final task in `P10 — Fleet hardening`; do not create or begin an earlier audit or cleanup task.
 
@@ -1557,7 +1558,7 @@ node scripts/check-semantic-naming.mjs
 Expected GREEN: all focused tests and the live repository scan pass with no findings.
 
 ```bash
-git add scripts/check-semantic-naming.mjs tests/constitution/semantic-naming.test.mjs README.md CONTRIBUTING.md AGENTS.md docs/architecture/enforcement-map.md docs/roadmaps/program-roadmap.md
+git add scripts/check-semantic-naming.mjs tests/constitution/semantic-naming.test.mjs tests/constitution/constitution.test.mjs README.md CONTRIBUTING.md AGENTS.md docs/architecture/enforcement-map.md docs/roadmaps/program-roadmap.md
 git commit -m "Enforce semantic names in user documentation"
 ```
 

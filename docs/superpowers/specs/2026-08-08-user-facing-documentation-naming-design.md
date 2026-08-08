@@ -109,6 +109,7 @@ Expected implementation files are limited to:
 
 - `scripts/check-semantic-naming.mjs`;
 - `tests/constitution/semantic-naming.test.mjs`;
+- `tests/constitution/constitution.test.mjs`;
 - `README.md`;
 - `CONTRIBUTING.md`;
 - `AGENTS.md`;

@@ -291,10 +291,7 @@ test("package ownership documentation records the approved release boundary", as
   );
   assert.match(
     readme,
-    new RegExp(
-      `${escapeRegularExpression(builderKernelPhase)} remains in review.*schema-contract.*${escapeRegularExpression(approvalGate)}.*verified-final-diff approval`,
-      "i",
-    ),
+    /builder-kernel implementation candidate.*remains in review.*schema-contract review.*final builder-kernel review packet.*verified-final-diff approval/i,
   );
   assert.match(contributing, /pnpm run verify:builder-packages/);
 
@@ -339,10 +336,7 @@ test("package ownership documentation records the approved release boundary", as
 
   assert.match(
     readme,
-    new RegExp(
-      `${escapeRegularExpression(builderFoundationPhase)}[^\\n]+verified-final-diff approval`,
-      "i",
-    ),
+    /lean package and tooling boundaries.*verified-final-diff approval/i,
   );
   assert.match(
     verification,
@@ -832,7 +826,11 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
 
   assert.match(
     readme,
-    new RegExp(`## Current phase: ${builderStage} in review`),
+    /## Current implementation status/,
+  );
+  assert.match(
+    readme,
+    /builder-kernel implementation candidate.*committed golden fixtures.*remains in review/i,
   );
   assert.match(
     roadmap,
