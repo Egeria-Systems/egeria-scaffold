@@ -1562,7 +1562,7 @@ git add scripts/check-semantic-naming.mjs tests/constitution/semantic-naming.tes
 git commit -m "Enforce semantic names in user documentation"
 ```
 
-- [ ] **Step 12E: Run proportional verification and independent review**
+- [x] **Step 12E: Run proportional verification and independent review**
 
 Run the settled relevant suite once. The generated-project harness and compatibility proof remain excluded because no executable generator, package, dependency, template, fixture, lockfile, or proof input changes.
 
@@ -1575,12 +1575,12 @@ git status --short --branch
 
 Dispatch independent read-only requirements, architecture/anti-overengineering, and test-evidence reviewers against the exact repaired comparison. Prohibit edits, recursive delegation, GitHub comments, and external action. Validate each finding against the current tree, repair only evidence-backed material defects with a focused RED/GREEN cycle, and rerun only affected checks before the settled verification.
 
-- [ ] **Step 12F: Amend verification evidence and the Task 8 review packet, then stop**
+- [x] **Step 12F: Amend verification evidence and the Task 8 review packet, then stop**
 
 Update the existing Task 8 evidence and packet with the repaired comparison, added files/commits, RED/GREEN receipts, exact verification results, reviewer dispositions, staged exemption boundary, user-facing cleanup, final-program hardening deferral, risks, and recovery. State that static scanning does not establish documentation quality or completeness beyond the canonical grammar and classified paths.
 
 ```bash
-git add docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md docs/review-packets/2026-08-08-p1-task-8-golden-fixture-harness.md
+git add docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md docs/review-packets/2026-08-08-p1-task-8-golden-fixture-harness.md docs/superpowers/plans/2026-08-05-p1-builder-kernel.md
 git commit -m "Record documentation naming verification"
 ```
 

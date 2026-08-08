@@ -12,8 +12,8 @@ External documentation, registry responses, package metadata, advisory results, 
 worktree: /private/tmp/egeria-scaffold-p1-task-8
 branch: p1-task-8-golden-fixtures
 base: bcedd968fcc11c8a836068f939c016c0c030f352
-reviewed implementation candidate: 08bca41ada747bb11b72aae9f544e0392796569e
-comparison: bcedd968fcc11c8a836068f939c016c0c030f352..08bca41ada747bb11b72aae9f544e0392796569e
+reviewed implementation candidate: c61b5ab1acd42f2bc77ab3c5354076b6626eae4a
+comparison: bcedd968fcc11c8a836068f939c016c0c030f352..c61b5ab1acd42f2bc77ab3c5354076b6626eae4a
 Node: v22.23.2
 pnpm: 11.20.0
 ```
@@ -99,9 +99,9 @@ For each profile it runs exact pnpm version, frozen install, peer check, moderat
 
 ### Canonical enforcement
 
-Root scripts expose `test:generated-fixtures`, `verify:generated-skeletons`, and the aggregate `verify:builder-kernel`. Canonical architecture, package ownership, roadmap, root guidance, contributor guidance, and README surfaces describe the implemented subset and its limits. The permanent semantic-naming scanner now remains the single owner after a proved-equivalent temporary ESLint adapter was removed; a regression also excludes unstaged tracked deletions from its live-path scan.
+Root scripts expose `test:generated-fixtures`, `verify:generated-skeletons`, and the aggregate `verify:builder-kernel`. Canonical architecture, package ownership, roadmap, root guidance, contributor guidance, and README surfaces describe the implemented subset and its limits. The permanent semantic-naming scanner remains the single owner after a proved-equivalent temporary ESLint adapter was removed. It enumerates live tracked and non-ignored untracked paths, excludes unstaged tracked deletions, scans user-facing Markdown by default, and retains the approved internal/provenance content exemptions during implementation.
 
-The roadmap records P1 as in review, not complete. Task 9 retains the schema-contract review and final P1 Gate 3 packet.
+The root README and contribution guide now use stable implementation-status language rather than roadmap coordinates. The roadmap records P1 as in review, not complete; Task 9 retains the schema-contract review and final P1 Gate 3 packet. Permanent internal-document hardening is scheduled only at the end of the final task in the program's final part.
 
 ## Test-driven development evidence
 
@@ -114,6 +114,10 @@ Focused failing tests preceded implementation and reviewer repairs:
 | Canonical wiring | Documentation and root-script assertions described the earlier state | Add aggregate scripts and update direct canonical consumers without claiming Task 9 completion |
 | Semantic adapter sunset | Package-boundary assertion still required the temporary adapter | Prove permanent-scanner equivalence, remove the duplicate adapter, and retain one canonical semantic owner |
 | Scanner deleted-path regression | An unstaged tracked deletion could be enumerated then fail during read | Subtract `git ls-files --deleted` from live tracked paths with focused constitution coverage |
+| User-facing Markdown classification | Root and nested README, contribution, and guide paths returned `skip`, and the controlled scanner never read them | Scan `.md` content by default after exact internal/provenance, agent-instruction, generated-directory, binary, and lockfile exclusions |
+| Case-insensitive Markdown extension | `docs/guides/REFERENCE.MD` returned `skip` against the first case-sensitive implementation | Normalize only the extension check to lowercase before matching `.md` |
+| User-facing leakage cleanup | After classifier GREEN, the live scan reported nine exact findings across root `README.md` and `CONTRIBUTING.md` | Replace roadmap coordinates with stable implementation, capability, and approval language; keep unrelated user-facing prose unchanged |
+| Direct documentation contracts | The first aggregate passed 19/21 constitution tests and exposed two stale README sequencing assertions; the first focused repair then exposed the remaining historical package-boundary assertion | Replace all three public sequencing-text assertions with stable builder-kernel status and approved package-boundary behavior while retaining constructed labels for exempt historical records |
 | Review: LF portability | `git check-attr` returned `text`/`eol` unspecified for generated fixture bytes | Add scoped `.gitattributes` rule and exact `check-attr` regression |
 | Review: override/execution policy | Added workspace override, changed lock override, lifecycle hook, remote manifest source, and block tarball were accepted | Validate exact manifests/workspace/lock policy before installation and document the sole approved override |
 | Review closure: snapshot locator | `tslib: git+https://...` in a lockfile mapping value passed inspection | Reject forbidden source schemes in every lockfile mapping value and retain the exact mutation regression |
@@ -163,11 +167,23 @@ Additional settled-input checks:
 | `git diff --check bcedd968fcc11c8a836068f939c016c0c030f352...08bca41ada747bb11b72aae9f544e0392796569e` | PASS |
 | `pnpm run verify:compatibility-proof` | PASS on the earlier frozen candidate; lint/typecheck, unit 4/4, Next/OpenNext builds, Cloudflare type generation, workerd integration 1/1, development Playwright 4/4, preview Playwright 4/4 |
 
-The later reviewer repairs changed only the Task 8 fixture verifier, its tests, LF attributes, and canonical documentation. They did not change any compatibility-proof input, so the expensive proof was not repeated against an unchanged proof tree.
+User-facing naming repair verification against `c61b5ab1acd42f2bc77ab3c5354076b6626eae4a`:
+
+| Command | Result |
+| --- | --- |
+| `node --test tests/constitution/semantic-naming.test.mjs` | PASS; 7/7 including classification, exemptions, deterministic findings, invalid input, and live scan |
+| `pnpm run check:semantic-naming` | PASS; no findings |
+| `pnpm run verify:builder-packages:quality` | PASS; constitution 21/21, package boundaries 39/39, standards 14/14, observability 1/1, zero-warning builder lint, builds, and typechecks |
+| `git diff --check bcedd968fcc11c8a836068f939c016c0c030f352...c61b5ab1acd42f2bc77ab3c5354076b6626eae4a` | PASS |
+| `git status --short --branch` | PASS; clean `p1-task-8-golden-fixtures` |
+
+The generated-project harness and compatibility proof were not repeated for the naming repair because it changed no executable generator, package, dependency, template, fixture, lockfile, or proof input. Their previously settled results remain the applicable evidence for those unchanged surfaces.
 
 ### Command-environment corrections
 
 The first post-repair aggregate attempt selected the desktop fallback Node `v24.14.0` and pnpm `11.16.0`; the manifest rejected them with `ERR_PNPM_UNSUPPORTED_ENGINE` before tests. The corrected run used the exact Node `22.23.2` Corepack entry and downloaded pinned pnpm `11.20.0` into a task-scoped temporary cache.
+
+The user-facing naming repair's first aggregate invocation again exposed the desktop fallback through pnpm's dependency-status subprocess despite an exact outer binary. `volta run --node 22.23.2 --pnpm 11.20.0` corrected subprocess resolution; its first noninteractive run then stopped before tests with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`. The settled command added the already-required `CI=true` and passed with exact Node `22.23.2` and pnpm `11.20.0`. These stopped attempts changed no repository file.
 
 One sandboxed generated-fixture attempt could not resolve `registry.npmjs.org`; lockfile preparation consequently returned the stable `LOCKFILE_PREPARATION_FAILED` / `source-changed` result because the permitted lockfile was never created. A disposable reproduction confirmed that no other source changed. The identical network-authorized exact-toolchain command then passed 7/7. These environment corrections do not replace the final settled-tree aggregate evidence above.
 
@@ -182,6 +198,14 @@ Three independent read-only lanes reviewed the same frozen candidate. All materi
 | Architecture and anti-overengineering | Pre-install validation overstated source-policy enforcement and then missed a Git locator in a snapshot mapping value | Accepted; exact manifests/workspace policy plus source/tarball checks added in `4ec29b8`, mapping-value bypass repaired in `08bca41`; closure: CLOSED |
 | Test evidence | Override-policy regression coverage was missing | Accepted as the same requirements defect; added/retargeted override regressions in `4ec29b8`; closure: CLOSED |
 
+The approved user-facing naming repair was then reviewed independently against frozen candidate `c61b5ab1acd42f2bc77ab3c5354076b6626eae4a`:
+
+| Lane | Result | Disposition |
+| --- | --- | --- |
+| Requirements | No material improvement recommended; approved scope, every exemption category, stable public status language, and final-program timing agree | CLOSED |
+| Architecture and anti-overengineering | No material improvement recommended; staged classifier, canonical owners, and later-stage boundary agree without duplicate machinery | CLOSED |
+| Test evidence | No material finding; RED/GREEN causality, controlled scanning, live scan, direct consumers, and proportional commands are credible | CLOSED |
+
 No material finding remains. Reviewers were read-only and performed no repository or external mutation.
 
 ## Claim limits, risks, and deferred work
@@ -189,13 +213,14 @@ No material finding remains. Reviewers were read-only and performed no repositor
 - Repeated generation proves byte determinism for the selected profiles and current exact toolchain, not independent cross-platform implementation equivalence.
 - Public registry metadata, audit, peer, signature, integrity, install, and build results are point-in-time evidence. Signatures do not prove source provenance; the two bootstrap packages still have no attestations.
 - Generated Next and OpenNext builds passed. The compatibility proof separately passed local workerd checks, but the generated fixtures were not previewed under workerd or deployed.
+- Semantic scanning proves only the canonical grammar over classified paths. It does not prove documentation quality, completeness, conceptual-synonym coverage, or cleanliness of the intentionally exempt internal/provenance documents.
 - No production, visual, translation, human-usability, accessibility-conformance, penetration, or general-security claim is made.
 - Only the P1 `portfolio` and `site` fixtures are implemented. Existing-repository mutation, applied migrations, later profiles/capabilities, persistence, email, jobs, identity, payments, analytics, CMS, forms, and `apps/jobs` remain deferred.
 - Remote refs were not refreshed. The scope uses the explicitly frozen local base and independently refreshed external facts.
 
 ## Recovery
 
-All Task 8 effects are local source commits. Recovery is a focused revert of `08bca41`, `4ec29b8`, `db8ff9d`, `79735f2`, `8238e0e`, and `b044709` in the listed order, followed by `verify:builder-kernel`. Revert the final gate-artifact commit separately if this record and packet must be withdrawn.
+All Task 8 effects are local source commits. Full recovery is a focused newest-first revert of `c61b5ab`, `19ca160`, `57cd737`, `2ceefe9`, `3391e6e`, `f81cd7a`, `08bca41`, `4ec29b8`, `db8ff9d`, `79735f2`, `8238e0e`, and `b044709`, followed by `verify:builder-kernel`. Revert the final gate-artifact commit separately if this record and packet must be withdrawn. To withdraw only the user-facing naming repair, revert `c61b5ab`, `19ca160`, `57cd737`, `2ceefe9`, and `3391e6e` newest-first, then rerun semantic naming and the builder-package quality gate.
 
 The harness writes only to identity-recorded temporary directories and verified no source-byte mutation. No persistent data, provider resource, deployment, publication, Git remote, or production state was created or changed, so no external recovery is required.
 
