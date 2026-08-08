@@ -107,31 +107,67 @@ test("the matcher identifies every named sequencing prefix without treating doma
   }
 });
 
-test("path classification preserves provenance while scanning product Markdown and authored text", () => {
+test("path classification scans user-facing Markdown and preserves internal provenance exemptions", () => {
   const documentedPhasePath = [
     "docs/roadmaps/",
     compactLabel("p", "1"),
     "-builder.md",
   ].join("");
 
-  assert.deepEqual(classifySemanticNamingPath(documentedPhasePath), {
-    contentPolicy: "skip",
-    pathPolicy: "allow-sequencing-labels",
-  });
-  assert.deepEqual(
-    classifySemanticNamingPath("docs/architecture/overview.md"),
-    {
-      contentPolicy: "skip",
-      pathPolicy: "require-semantic-name",
-    },
-  );
-  assert.deepEqual(
-    classifySemanticNamingPath("packages/builder-core/README.md"),
-    {
-      contentPolicy: "skip",
-      pathPolicy: "require-semantic-name",
-    },
-  );
+  const cases = [
+    ["README.md", "scan", "require-semantic-name"],
+    ["CONTRIBUTING.md", "scan", "require-semantic-name"],
+    ["packages/builder-core/README.md", "scan", "require-semantic-name"],
+    ["docs/guides/getting-started.md", "scan", "require-semantic-name"],
+    ["docs/guides/REFERENCE.MD", "scan", "require-semantic-name"],
+    ["AGENTS.md", "skip", "require-semantic-name"],
+    ["docs/adr/README.md", "skip", "require-semantic-name"],
+    [
+      "docs/architecture/overview.md",
+      "skip",
+      "require-semantic-name",
+    ],
+    [
+      "docs/governance/review-and-contribution.md",
+      "skip",
+      "require-semantic-name",
+    ],
+    ["docs/roadmaps/program-roadmap.md", "skip", "allow-sequencing-labels"],
+    [
+      "docs/superpowers/plans/builder-kernel.md",
+      "skip",
+      "allow-sequencing-labels",
+    ],
+    [
+      "docs/superpowers/specs/naming-design.md",
+      "skip",
+      "allow-sequencing-labels",
+    ],
+    [
+      "docs/implementation-evidence/naming.md",
+      "skip",
+      "allow-sequencing-labels",
+    ],
+    [
+      "docs/review-packets/naming.md",
+      "skip",
+      "allow-sequencing-labels",
+    ],
+    [
+      "docs/compatibility/runtime.md",
+      "skip",
+      "allow-sequencing-labels",
+    ],
+    [documentedPhasePath, "skip", "allow-sequencing-labels"],
+  ];
+
+  for (const [path, contentPolicy, pathPolicy] of cases) {
+    assert.deepEqual(classifySemanticNamingPath(path), {
+      contentPolicy,
+      pathPolicy,
+    });
+  }
+
   assert.deepEqual(
     classifySemanticNamingPath(
       "packages/builder-core/templates/common/README.md.template",
@@ -214,20 +250,46 @@ test("repository scanning reports deterministic path and content locations witho
   const testDescription = namedLabel("Task", "3");
   const fixtureDescription = namedLabel("Story", "4");
   const templateDescription = namedLabel("Milestone", "2");
+  const readmeDescription = namedLabel("Task", "5");
+  const contributingDescription = compactLabel("P", "3");
+  const packageReadmeDescription = namedLabel("Stage", "4");
+  const guideDescription = namedLabel("Part", "2");
   const paths = [
+    "README.md",
+    "CONTRIBUTING.md",
+    "packages/builder-core/README.md",
+    "docs/guides/getting-started.md",
+    "AGENTS.md",
+    "docs/adr/README.md",
+    "docs/architecture/overview.md",
+    "docs/governance/review-and-contribution.md",
+    "docs/superpowers/specs/naming-design.md",
+    "docs/implementation-evidence/naming.md",
+    "docs/review-packets/naming.md",
+    "docs/compatibility/runtime.md",
     "tests/naming.test.mjs",
     phasePath,
     documentedPhasePath,
-    "docs/architecture/overview.md",
     "packages/builder-core/templates/common/README.md.template",
     "fixtures/generated/site/README.md",
     "pnpm-lock.yaml",
   ];
   const contents = new Map([
+    ["README.md", `${readmeDescription}\n`],
+    ["CONTRIBUTING.md", `${contributingDescription}\n`],
+    ["packages/builder-core/README.md", `${packageReadmeDescription}\n`],
+    ["docs/guides/getting-started.md", `${guideDescription}\n`],
+    ["AGENTS.md", testDescription],
+    ["docs/adr/README.md", testDescription],
+    ["docs/architecture/overview.md", testDescription],
+    ["docs/governance/review-and-contribution.md", testDescription],
+    ["docs/superpowers/specs/naming-design.md", testDescription],
+    ["docs/implementation-evidence/naming.md", testDescription],
+    ["docs/review-packets/naming.md", testDescription],
+    ["docs/compatibility/runtime.md", testDescription],
     ["tests/naming.test.mjs", `const stable = true;\nconst message = "${testDescription}";\n`],
     [phasePath, "export {};\n"],
     [documentedPhasePath, testDescription],
-    ["docs/architecture/overview.md", testDescription],
     [
       "packages/builder-core/templates/common/README.md.template",
       `${templateDescription}\n`,
@@ -248,12 +310,40 @@ test("repository scanning reports deterministic path and content locations witho
   });
 
   assert.deepEqual(readPaths.sort(), [
+    "CONTRIBUTING.md",
+    "README.md",
+    "docs/guides/getting-started.md",
     "fixtures/generated/site/README.md",
     phasePath,
+    "packages/builder-core/README.md",
     "packages/builder-core/templates/common/README.md.template",
     "tests/naming.test.mjs",
   ].sort());
   assert.deepEqual(findings, [
+    {
+      column: 1,
+      family: "compact-phase",
+      kind: "content",
+      line: 1,
+      path: "CONTRIBUTING.md",
+      value: contributingDescription,
+    },
+    {
+      column: 1,
+      family: "named-sequence",
+      kind: "content",
+      line: 1,
+      path: "README.md",
+      value: readmeDescription,
+    },
+    {
+      column: 1,
+      family: "named-sequence",
+      kind: "content",
+      line: 1,
+      path: "docs/guides/getting-started.md",
+      value: guideDescription,
+    },
     {
       column: 1,
       family: "named-sequence",
@@ -261,6 +351,14 @@ test("repository scanning reports deterministic path and content locations witho
       line: 1,
       path: "fixtures/generated/site/README.md",
       value: fixtureDescription,
+    },
+    {
+      column: 1,
+      family: "named-sequence",
+      kind: "content",
+      line: 1,
+      path: "packages/builder-core/README.md",
+      value: packageReadmeDescription,
     },
     {
       column: 1,

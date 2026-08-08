@@ -1501,7 +1501,7 @@ git add docs/superpowers/specs/2026-08-08-user-facing-documentation-naming-desig
 git commit -m "Plan user-facing documentation naming"
 ```
 
-- [ ] **Step 12B: Write focused classifier and scanner tests and verify RED**
+- [x] **Step 12B: Write focused classifier and scanner tests and verify RED**
 
 Extend `tests/constitution/semantic-naming.test.mjs` using the existing neutral `compactLabel` and `namedLabel` constructors so the test source does not itself leak a sequencing label. The classification matrix must expect `scan` for root `README.md`, `CONTRIBUTING.md`, `packages/builder-core/README.md`, and `docs/guides/getting-started.md`. It must expect `skip` for `AGENTS.md`, `docs/adr/README.md`, `docs/architecture/overview.md`, `docs/governance/review-and-contribution.md`, and one representative path from every existing provenance category.
 
@@ -1513,7 +1513,7 @@ node --test --test-name-pattern="path classification|repository scanning reports
 
 Expected RED: current classification returns `skip` for ordinary README, contribution, and guide Markdown, and the controlled scanner omits their content findings.
 
-- [ ] **Step 12C: Implement the minimum staged Markdown classification and verify focused GREEN**
+- [x] **Step 12C: Implement the minimum staged Markdown classification and verify focused GREEN**
 
 Replace the broad documentary skip with one explicit internal/provenance content-prefix collection, an exact `AGENTS.md` exemption, and a case-insensitive `.md` check. Reuse `provenancePathPrefixes`; do not add a second scanner, dependency, configuration file, matcher, or policy registry.
 
@@ -1543,7 +1543,7 @@ node --test tests/constitution/semantic-naming.test.mjs
 
 Expected repository-level RED: the live scan reports only current user-facing documentation leakage, including root `README.md` and `CONTRIBUTING.md`.
 
-- [ ] **Step 12D: Remove current user-facing leakage and update canonical owners**
+- [x] **Step 12D: Remove current user-facing leakage and update canonical owners**
 
 Replace the root README's phase-number heading and historical phase summary with `Current implementation status` and stable capability/status prose. Remove the remaining phase label from the builder-core topology bullet. Replace the contribution guide's phase label with stable builder-kernel review language. Do not rewrite unrelated prose or exempt internal records.
 

@@ -33,6 +33,13 @@ const provenancePathPrefixes = Object.freeze([
   "docs/compatibility/",
 ]);
 
+const internalDocumentPathPrefixes = Object.freeze([
+  "docs/adr/",
+  "docs/architecture/",
+  "docs/governance/",
+  ...provenancePathPrefixes,
+]);
+
 const authoredPathPrefixes = Object.freeze([
   ".github/",
   "apps/",
@@ -68,11 +75,7 @@ const binaryExtensions = Object.freeze([
   ".zip",
 ]);
 
-const documentaryBasenames = new Set([
-  "AGENTS.md",
-  "CONTRIBUTING.md",
-  "README.md",
-]);
+const agentInstructionBasenames = new Set(["AGENTS.md"]);
 
 const lockfileBasenames = new Set([
   "npm-shrinkwrap.json",
@@ -186,8 +189,7 @@ const hasGeneratedPathSegment = (path) => {
   return segments.some((segment) => generatedPathSegments.includes(segment));
 };
 
-const isProductMarkdown = (path) =>
-  path.startsWith("fixtures/") || path.includes("/templates/");
+const isMarkdown = (path) => path.toLowerCase().endsWith(".md");
 
 const hasBinaryExtension = (path) => {
   const normalized = path.toLowerCase();
@@ -202,7 +204,6 @@ export function classifySemanticNamingPath(path) {
     : "require-semantic-name";
 
   if (
-    path.startsWith("docs/") ||
     hasGeneratedPathSegment(path) ||
     hasBinaryExtension(path) ||
     lockfileBasenames.has(basename(path))
@@ -210,8 +211,15 @@ export function classifySemanticNamingPath(path) {
     return { contentPolicy: "skip", pathPolicy };
   }
 
-  if (documentaryBasenames.has(basename(path)) && !isProductMarkdown(path)) {
+  if (
+    agentInstructionBasenames.has(basename(path)) ||
+    internalDocumentPathPrefixes.some((prefix) => isWithinPath(path, prefix))
+  ) {
     return { contentPolicy: "skip", pathPolicy };
+  }
+
+  if (isMarkdown(path)) {
+    return { contentPolicy: "scan", pathPolicy };
   }
 
   const contentPolicy =

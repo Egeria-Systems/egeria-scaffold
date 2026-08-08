@@ -103,4 +103,6 @@ Implement verified/idempotent Calendly events, normalized booking events, option
 
 After real client evidence, reassess package boundaries, measure inference and migration failures, simplify weak abstractions, verify supported upgrades, run data/provider recovery drills, and perform a bounded portability spike without claiming a second supported production platform.
 
+At the end of the final fleet-hardening task, run permanent documentation hardening: inventory architecture, ADR, governance, and agent-instruction sequencing labels; replace implementation-routing references where provenance is no longer necessary; and narrow the scanner exemptions while preserving historical records and content whose subject is genuinely sequencing.
+
 **Stop gate:** Present fleet evidence, residual risks, and explicit approval for any continuing support or extraction decision.
