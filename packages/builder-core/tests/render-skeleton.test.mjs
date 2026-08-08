@@ -458,7 +458,7 @@ test("rendered files satisfy every inference probe in their resolved recipes", a
 
 test("display names are inserted as YAML 1.2 data and runtime copy stays externalized", async () => {
   const renderSkeleton = await loadRenderSkeleton();
-  const displayName = 'Atelier "Nord"\nMontréal';
+  const displayName = 'Atelier "Nord" — Montréal 👩‍💻';
   const portfolio = assertSuccess(
     await renderSkeleton({
       profile: "portfolio",
