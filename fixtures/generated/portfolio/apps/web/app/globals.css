@@ -1,0 +1,40 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  min-block-size: 100vh;
+  padding: clamp(1rem, 5vw, 4rem);
+}
+
+article {
+  max-inline-size: 48rem;
+  margin-inline: auto;
+}
+
+nav ul {
+  display: flex;
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+h1,
+p {
+  max-inline-size: 65ch;
+}
+
+a:focus-visible {
+  outline: 0.2rem solid currentColor;
+  outline-offset: 0.2rem;
+}

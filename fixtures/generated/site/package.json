@@ -1,0 +1,21 @@
+{
+  "name": "acme-site",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --dir apps/web run build",
+    "build:cloudflare": "pnpm --dir apps/web run build:cloudflare",
+    "dev": "pnpm --dir apps/web run dev",
+    "lint": "pnpm --dir apps/web run lint",
+    "typecheck": "pnpm --dir apps/web run typecheck",
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run build:cloudflare"
+  },
+  "engines": {
+    "node": "22.23.2",
+    "pnpm": "11.20.0"
+  },
+  "packageManager": "pnpm@11.20.0",
+  "volta": {
+    "node": "22.23.2"
+  }
+}

@@ -1,0 +1,7 @@
+metadata:
+  title: "Acme Portfolio"
+  description: A focused portfolio.
+home:
+  heading: "Acme Portfolio"
+  summary: A concise introduction to selected work.
+navigation: []

@@ -1,0 +1,16 @@
+packages:
+  - "apps/*"
+
+pmOnFail: error
+
+minimumReleaseAge: 1440
+
+overrides:
+  "miniflare>undici": 7.29.0
+
+allowBuilds:
+  "@parcel/watcher": true
+  "@swc/core": true
+  esbuild: true
+  unrs-resolver: true
+  workerd: true

@@ -1,0 +1,17 @@
+builderCompatibility: 0.0.0
+capabilitySettings: {}
+ejectedAreas: []
+originProfile: portfolio
+platformAdapter: cloudflare-workers
+project:
+  defaultLocale: en-CA
+  displayName: Acme Portfolio
+  name: acme-portfolio
+recipeVersion: 0.1.0
+schemaVersion: 1.0.0
+selectedCapabilities:
+  - standards
+  - content-files
+  - section-composition
+  - deployment-cloudflare
+  - observability
