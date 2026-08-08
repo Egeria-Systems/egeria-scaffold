@@ -26,7 +26,7 @@
 - `.egeria` contains exactly `project.yaml`, `state.json`, `migrations.jsonl`, and an empty `reports/` directory marker only if a report is actually produced. P1 produces no report and therefore no reports directory.
 - `.egeria/state.json` owns the installed capability manifest; do not add `.egeria/manifest.json`.
 - Read-only inference, doctor, and diff perform no writes, Git operations, dependency installation, provider calls, or network access.
-- Creation refuses an existing destination, including an existing empty directory. It never overwrites, stashes, commits, initializes Git, or mutates an existing repository.
+- Creation refuses any destination observed by its checks, including an existing empty directory. It exposes no overwrite behavior; the final rename retains the documented cooperative-filesystem portable-rename race. It never stashes, commits, initializes Git, or mutates an existing repository.
 - Creation writes a builder-owned temporary sibling, validates pre-state inference, writes state last, validates post-state inference, and renames once. Existing-repository isolated-worktree transformations remain P3 work.
 - Generated repositories contain only `apps/web`; do not generate `apps/jobs` or local `packages/`.
 - All generated visible/translatable copy comes from `apps/web/content/en-CA/*.json`; presentation receives typed data and callbacks only.

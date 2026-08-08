@@ -20,6 +20,6 @@ The diagnostic boundary owns `doctorRepository` and `diffProject`. Each operatio
 
 Portable filesystem rename does not provide a hostile-concurrency no-clobber guarantee on every supported platform. Generation checks destination absence immediately before rename and preserves destinations observed before that check; a target created after the check may still be replaced where the platform's rename semantics permit it.
 
-Existing-repository transformation, clean-Git enforcement, migration execution, persistent-data or provider rollback, recovery automation, providers, and every later capability remain outside this increment. The CLI remains empty, and a separate project-schema package is intentionally absent.
+Existing-repository transformation, clean-Git enforcement, migration execution, persistent-data or provider rollback, recovery automation, providers, and every later capability remain outside this increment. The private CLI is the current thin consumer of generation, inference, and diagnostics; it owns no builder decisions. A separate project-schema package is intentionally absent.
 
 The canonical API and lifecycle owner is [package ownership](../../docs/architecture/package-ownership.md).

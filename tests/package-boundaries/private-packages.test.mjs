@@ -306,6 +306,13 @@ test("builder-core direct consumers describe the private generation boundary", a
     resolve(repositoryRoot, "packages/builder-core/README.md"),
     "utf8",
   );
+  const builderPlan = await readFile(
+    resolve(
+      repositoryRoot,
+      "docs/superpowers/plans/2026-08-05-p1-builder-kernel.md",
+    ),
+    "utf8",
+  );
   const packageOwnership = await readFile(
     resolve(repositoryRoot, "docs/architecture/package-ownership.md"),
     "utf8",
@@ -343,6 +350,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /createPnpmGeneratedProjectVerifier/);
   assert.match(builderReadme, /Child processes receive only a narrow/);
   assert.match(builderReadme, /child output is never returned/i);
+  assert.doesNotMatch(builderReadme, /The CLI remains empty/);
   assert.match(cliInstructions, /four commands exact/);
   assert.match(cliInstructions, /remain read-only/);
   assert.match(cliInstructions, /does not add overwrite/);
@@ -365,7 +373,13 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /disabled Next telemetry/);
   assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, and `diff`/);
   assert.match(packageOwnership, /one-line JSON output/);
+  assert.doesNotMatch(packageOwnership, /future CLI consumer/);
   assert.match(packageOwnership, /existing-repository transformation/);
+  assert.doesNotMatch(
+    builderPlan,
+    /Creation refuses an existing destination[^\n]*It never overwrites/,
+  );
+  assert.match(builderPlan, /portable-rename race/);
   assert.match(enforcementMap, /desired, installed, and inferred/);
   assert.match(enforcementMap, /read-only diagnostics/);
   assert.match(enforcementMap, /exact source and template allowlists/);
