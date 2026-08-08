@@ -26,6 +26,16 @@ Development of this repository may proceed directly on `main` only when the appr
 
 A dedicated branch and isolated worktree are required when implementation becomes parallel or when isolation is materially useful for risk containment, experimentation, conflicting changes, or preservation of another active tree. Before either mode, verify the branch, status, comparison, and approval scope. Development workflow permission never authorizes push, pull-request creation, merge, deployment, publication, or another external action.
 
+## Accepted-baseline reconciliation
+
+When an approved push or local integration advances accepted `main` history from another branch or worktree, reconcile the primary local `main` before starting the next increment.
+
+1. Refresh the relevant remote refs, record the source commit, local `main`, and `origin/main`, and prove their ancestry.
+2. If the primary checkout is clean and the history is linear, fast-forward local `main` to the accepted commit without creating a merge commit.
+3. If user-owned work prevents that fast-forward, preserve it without loss and record a blocking handoff with the exact paths and recovery reference. Do not begin the next increment until the user approves reconciliation.
+4. Verify the reconciled checkout, record its clean status and exact HEAD, and disclose any intentional local/remote divergence.
+5. A push from another worktree is not complete merely because `origin/main` advanced. The integration receipt must name the commit that owns the next implementation baseline.
+
 ## Generated-client transformation boundary
 
 Repository-changing builder commands always require:
