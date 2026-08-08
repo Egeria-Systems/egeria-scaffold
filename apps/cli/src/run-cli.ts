@@ -36,6 +36,22 @@ function writeJson(
   write(JSON.stringify(value));
 }
 
+function createCliRepositoryReader(root: string): RepositoryReader {
+  const reader = createFileSystemRepositoryReader(root);
+
+  return {
+    async readText(path) {
+      const result = await reader.readText(path);
+
+      if (result.kind === "error" && result.code === "PATH_INVALID") {
+        throw new TypeError("repository-open-failed");
+      }
+
+      return result;
+    },
+  };
+}
+
 async function runCreate(
   command: Extract<CliCommand, Readonly<{ kind: "create" }>>,
   output: CliOutput,
@@ -82,7 +98,7 @@ async function runReadOnly(
 ): Promise<0 | 1> {
   try {
     const reader = (dependencies.createReader ??
-      createFileSystemRepositoryReader)(resolve(command.directory));
+      createCliRepositoryReader)(resolve(command.directory));
     if (command.kind === "infer") {
       const result = await inferRepository({ reader, catalog: catalog.value });
       writeJson(output.write, { ok: true, command: "infer", result });

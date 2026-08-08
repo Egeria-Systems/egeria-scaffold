@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import {
   lstat,
+  mkdir,
   mkdtemp,
   readFile,
   readdir,
   realpath,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -365,6 +367,35 @@ test("repository open failures emit one content-free JSON error", async () => {
     JSON.stringify({ ok: false, code: "REPOSITORY_OPEN_FAILED" }),
   ]);
   assert.doesNotMatch(captured.error[0], /private-project|private directory detail/);
+});
+
+test("real invalid repository roots emit the sanitized open failure", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-cli-roots-"));
+  const missingRoot = join(owner, "missing");
+  const fileRoot = join(owner, "file");
+  const directoryRoot = join(owner, "directory");
+  const symlinkRoot = join(owner, "symlink");
+
+  try {
+    await writeFile(fileRoot, "not a repository\n");
+    await mkdir(directoryRoot);
+    await symlink(directoryRoot, symlinkRoot, "dir");
+
+    for (const root of [missingRoot, fileRoot, symlinkRoot]) {
+      const captured = captureOutput();
+      assert.equal(
+        await cli.runCli(["infer", "--directory", root], captured.output),
+        1,
+      );
+      assert.deepEqual(captured.standard, []);
+      assert.deepEqual(captured.error, [
+        JSON.stringify({ ok: false, code: "REPOSITORY_OPEN_FAILED" }),
+      ]);
+      assert.equal(captured.error[0].includes(root), false);
+    }
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
 });
 
 test("infer, doctor, and diff preserve every fixture path and byte", async () => {
