@@ -7,6 +7,8 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+import { generatedFixtureContracts } from "../../scripts/verify-generated-skeletons.mjs";
+
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -17,72 +19,6 @@ const maximumOutputBytes = 1024 * 1024;
 const commandTimeoutMilliseconds = 45 * 60 * 1000;
 const codePointCompare = (left, right) =>
   left < right ? -1 : left > right ? 1 : 0;
-
-const portfolioFiles = [
-  ".egeria/migrations.jsonl",
-  ".egeria/project.yaml",
-  ".egeria/state.json",
-  ".gitignore",
-  ".nvmrc",
-  "AGENTS.md",
-  "README.md",
-  "apps/web/AGENTS.md",
-  "apps/web/app/globals.css",
-  "apps/web/app/layout.tsx",
-  "apps/web/app/page.tsx",
-  "apps/web/content/en-CA/site.yaml",
-  "apps/web/eslint.config.mjs",
-  "apps/web/next.config.ts",
-  "apps/web/open-next.config.ts",
-  "apps/web/package.json",
-  "apps/web/src/content/content-schema.ts",
-  "apps/web/src/content/read-content.ts",
-  "apps/web/src/infrastructure/observability/installed-capability.ts",
-  "apps/web/src/presentation/content-page.tsx",
-  "apps/web/tsconfig.json",
-  "apps/web/wrangler.jsonc",
-  "package.json",
-  "pnpm-lock.yaml",
-  "pnpm-workspace.yaml",
-].sort(codePointCompare);
-
-const cases = [
-  {
-    profile: "portfolio",
-    projectName: "acme-portfolio",
-    displayName: "Acme Portfolio",
-    fixture: "fixtures/generated/portfolio",
-    expectedFiles: portfolioFiles,
-    expectedCapabilities: [
-      "standards",
-      "content-files",
-      "section-composition",
-      "deployment-cloudflare",
-      "observability",
-    ],
-    expectedSurfaces: 43,
-  },
-  {
-    profile: "site",
-    projectName: "acme-site",
-    displayName: "Acme Site",
-    fixture: "fixtures/generated/site",
-    expectedFiles: [
-      ...portfolioFiles,
-      "apps/web/app/about/page.tsx",
-      "apps/web/content/en-CA/about.yaml",
-    ].sort(codePointCompare),
-    expectedCapabilities: [
-      "standards",
-      "content-files",
-      "section-composition",
-      "deployment-cloudflare",
-      "observability",
-      "site-routing",
-    ],
-    expectedSurfaces: 45,
-  },
-];
 
 const childEnvironment = Object.fromEntries(
   ["PATH", "LANG", "SystemRoot", "ComSpec", "PATHEXT"]
@@ -196,18 +132,18 @@ function assertPortablePublicLockfile(lockfile) {
 }
 
 test("compiled project generation matches committed portfolio and site fixtures", async (context) => {
-  for (const fixtureCase of cases) {
+  for (const fixtureCase of generatedFixtureContracts) {
     assert.equal(
-      await pathExists(resolve(repositoryRoot, fixtureCase.fixture)),
+      await pathExists(resolve(repositoryRoot, fixtureCase.relativeRoot)),
       true,
-      `committed fixture is absent: ${fixtureCase.fixture}`,
+      `committed fixture is absent: ${fixtureCase.relativeRoot}`,
     );
   }
 
   const owner = await mkdtemp(join(tmpdir(), "egeria-fixture-determinism-"));
 
   try {
-    for (const fixtureCase of cases) {
+    for (const fixtureCase of generatedFixtureContracts) {
       const generatedRoots = [
         join(owner, `${fixtureCase.profile}-first`),
         join(owner, `${fixtureCase.profile}-second`),
@@ -275,7 +211,7 @@ test("compiled project generation matches committed portfolio and site fixtures"
 
       assert.deepEqual(generatedSnapshots[1], generatedSnapshots[0]);
       const committedSnapshot = await snapshotTree(
-        resolve(repositoryRoot, fixtureCase.fixture),
+        resolve(repositoryRoot, fixtureCase.relativeRoot),
       );
       assert.deepEqual(committedSnapshot, generatedSnapshots[0]);
       context.diagnostic(
