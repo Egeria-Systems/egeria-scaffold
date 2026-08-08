@@ -36,6 +36,8 @@ Create thin `apps/cli`, the private `packages/builder-core` package and its owne
 
 P1 is the first executable project/state schema stage. Implement private builder-core schemas, capability resolution, installed manifests, `.egeria` state contracts, read-only inference/doctor/diff, deterministic portfolio/site skeleton generation, hybrid ownership, and fixture infrastructure.
 
+**In review (2026-08-08):** The implementation candidate includes the bounded six-capability catalog, portfolio/site materialized recipes, state and ownership contracts, read-only inspection, state-last new-directory generation, thin CLI commands, committed deterministic fixtures, and isolated fresh-install/build verification. The final schema-contract review and P1 Gate 3 packet remain pending; P1 is not complete.
+
 **Stop gate:** Generated skeletons build, manifest and inference agree, and the P1 review packet is approved.
 
 ## P2 — Client-ready portfolio

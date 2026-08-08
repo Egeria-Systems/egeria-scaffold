@@ -2,9 +2,9 @@
 
 Egeria Scaffold will build versioned, materialized Next.js recipes for Egeria Systems projects. Generated repositories remain ordinary, understandable client-owned codebases; installed capabilities, not a live profile inheritance chain, become authoritative after generation.
 
-## Current phase: P1 in progress
+## Current phase: P1 in review
 
-P0.1 established the repository constitution, architecture decisions, governance, and enforcement ownership. P0.2's private Next.js and Cloudflare compatibility proof passed its local, workerd, clean Ubuntu workflow, non-production deployment, Chromium, and axe gates and received verified-final-diff approval. P0.3 established the lean package and tooling boundaries and received verified-final-diff approval. P1 now has executable private project/state contracts, the exact six-capability `portfolio`/`site` catalog, strict in-memory codecs, read-only repository inference and diagnostics, and deterministic in-memory skeleton rendering. Repository-writing generation, `.egeria` file creation or updates, CLI behavior, installation, and generated builds remain unimplemented and separately gated.
+P0.1 established the repository constitution, architecture decisions, governance, and enforcement ownership. P0.2's private Next.js and Cloudflare compatibility proof passed its local, workerd, clean Ubuntu workflow, non-production deployment, Chromium, and axe gates and received verified-final-diff approval. P0.3 established the lean package and tooling boundaries and received verified-final-diff approval. The P1 implementation candidate now includes executable private project/state contracts, the exact six-capability `portfolio`/`site` catalog, strict codecs, hybrid ownership, read-only inference/doctor/diff, state-last new-directory generation, the private CLI, and committed golden fixtures with isolated build verification. P1 remains in review until the final schema-contract task, Gate 3 packet, and verified-final-diff approval are complete.
 
 Canonical project documents:
 
@@ -33,7 +33,13 @@ Run the complete local compatibility proof with:
 pnpm run verify:compatibility-proof
 ```
 
-Run the current builder package, lint, build, type, and Changeset gates with:
+Run the complete builder-kernel candidate gate, including deterministic fixture regeneration and isolated fixture builds, with:
+
+```bash
+pnpm run verify:builder-kernel
+```
+
+Run the narrower package, lint, build, type, and Changeset gates with:
 
 ```bash
 pnpm run verify:builder-packages
@@ -49,8 +55,9 @@ Node.js `22.23.2` is pinned through `.nvmrc` and `package.json` Volta configurat
 
 ## Current builder topology
 
-- `apps/cli` is a private, empty command ownership shell with no executable `bin`.
-- `packages/builder-core` is private and owns the P1 runtime contracts, checked schemas, catalog and recipes, deterministic resolution, state inspection, diagnostics, and in-memory skeleton rendering.
+- `apps/cli` is a private executable adapter for exact `create`, `infer`, `doctor`, and `diff` commands.
+- `packages/builder-core` is private and owns the P1 runtime contracts, checked schemas, catalog and recipes, deterministic resolution, state inspection, diagnostics, template rendering, and state-last new-directory generation.
+- `fixtures/generated/portfolio` and `fixtures/generated/site` are committed golden outputs. `verify:generated-skeletons` validates and builds identity-bounded copies; it never builds in the committed source trees.
 - [`packages/standards`](packages/standards/) is a public, replaceable package containing consumed TypeScript and ESLint configuration APIs.
 - [`packages/observability`](packages/observability/) is a public, replaceable package with an intentionally empty runtime API.
 

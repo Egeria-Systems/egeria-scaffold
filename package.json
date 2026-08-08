@@ -9,7 +9,7 @@
     "check:semantic-naming": "node scripts/check-semantic-naming.mjs",
     "changeset": "changeset",
     "changeset:status": "changeset status",
-    "lint:builder": "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint && pnpm exec eslint eslint.config.mjs scripts 'tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' 'apps/**/tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' 'packages/**/tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' --no-error-on-unmatched-pattern --max-warnings 0",
+    "lint:builder": "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint",
     "release-packages": "changeset publish",
     "test": "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages",
     "test:builder-core": "pnpm --filter @egeria-systems/builder-core run build && node --test packages/builder-core/tests/*.test.mjs",

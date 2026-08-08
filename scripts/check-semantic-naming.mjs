@@ -243,7 +243,7 @@ const decodeUtf8 = (value, errorCode) => {
 };
 
 export async function listRepositoryPaths({ root, runGit = defaultRunGit }) {
-  const call = {
+  const inventoryCall = {
     args: [
       "ls-files",
       "-z",
@@ -254,12 +254,24 @@ export async function listRepositoryPaths({ root, runGit = defaultRunGit }) {
     command: "git",
     cwd: root,
   };
-  const result = await runGit(call);
-  const output = result?.stdout ?? result;
+  const deletedCall = {
+    args: ["ls-files", "-z", "--deleted"],
+    command: "git",
+    cwd: root,
+  };
+  const inventoryResult = await runGit(inventoryCall);
+  const deletedResult = await runGit(deletedCall);
+  const output = inventoryResult?.stdout ?? inventoryResult;
+  const deletedOutput = deletedResult?.stdout ?? deletedResult;
   const decoded = decodeUtf8(output, "SEMANTIC_NAMING_GIT_OUTPUT_INVALID");
+  const deleted = new Set(
+    decodeUtf8(deletedOutput, "SEMANTIC_NAMING_GIT_OUTPUT_INVALID")
+      .split("\0")
+      .filter((path) => path.length > 0),
+  );
   return decoded
     .split("\0")
-    .filter((path) => path.length > 0)
+    .filter((path) => path.length > 0 && !deleted.has(path))
     .sort(codePointCompare);
 }
 

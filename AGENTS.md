@@ -65,6 +65,7 @@ Operational observability and selectable analytics are separate. Cloudflare Web 
 
 - Use test-driven development: add a focused failing test, verify the expected RED state, implement the minimum change, and verify GREEN.
 - Run the smallest deterministic check during each cycle and the full relevant suite once after a coherent change batch. Do not repeat a successful expensive check against an unchanged tree.
+- Use `pnpm run verify:builder-kernel` for the complete current builder-kernel candidate. Its committed portfolio/site fixtures are immutable inputs; the fixed-root verifier installs and builds only identity-bounded temporary copies.
 - Do not claim that static checks prove runtime, workerd, deployment, visual, translation, accessibility-conformance, production-safety, or security properties they do not exercise.
 - Before an increment is complete, dispatch independent read-only requirements, architecture and anti-overengineering, and test-evidence reviewers. Add a specialist only when the changed scope materially requires it.
 - Validate every finding against the current tree. Repair only evidence-backed material defects, rerun affected verification, and record all dispositions.

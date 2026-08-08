@@ -165,12 +165,15 @@ test("path classification preserves provenance while scanning product Markdown a
   );
 });
 
-test("Git enumeration includes tracked and non-ignored untracked paths with NUL-safe parsing", async () => {
+test("Git enumeration includes live tracked and untracked paths with NUL-safe parsing", async () => {
   const calls = [];
   const paths = await listRepositoryPaths({
     root: "/repository",
     runGit: async (call) => {
       calls.push(call);
+      if (call.args.includes("--deleted")) {
+        return Buffer.from("z-last.mjs\0", "utf8");
+      }
       return Buffer.from("z-last.mjs\0a-first.mjs\0line\nbreak.mjs\0", "utf8");
     },
   });
@@ -187,8 +190,13 @@ test("Git enumeration includes tracked and non-ignored untracked paths with NUL-
       command: "git",
       cwd: "/repository",
     },
+    {
+      args: ["ls-files", "-z", "--deleted"],
+      command: "git",
+      cwd: "/repository",
+    },
   ]);
-  assert.deepEqual(paths, ["a-first.mjs", "line\nbreak.mjs", "z-last.mjs"]);
+  assert.deepEqual(paths, ["a-first.mjs", "line\nbreak.mjs"]);
 });
 
 test("repository scanning reports deterministic path and content locations without source excerpts", async () => {

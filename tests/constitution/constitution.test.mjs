@@ -287,11 +287,14 @@ test("package ownership documentation records the approved release boundary", as
   assert.match(readme, /pnpm run verify:builder-packages/);
   assert.match(
     readme,
-    /strict.*codecs.*read-only.*inference.*diagnostics.*in-memory skeleton rendering/i,
+    /strict.*codecs.*read-only.*inference.*state-last.*generation.*committed golden fixtures/i,
   );
   assert.match(
     readme,
-    /repository-writing generation.*egeria.*file creation.*CLI behavior.*generated builds.*remain unimplemented/i,
+    new RegExp(
+      `${escapeRegularExpression(builderKernelPhase)} remains in review.*schema-contract.*${escapeRegularExpression(approvalGate)}.*verified-final-diff approval`,
+      "i",
+    ),
   );
   assert.match(contributing, /pnpm run verify:builder-packages/);
 
@@ -780,5 +783,73 @@ test("accepted ADRs use the repository decision contract", async () => {
       (position, index) => index === 0 || position > rowPositions[index - 1],
     ),
     "accepted ADR index rows are out of order",
+  );
+});
+
+test("generated fixture enforcement is wired through its canonical owners", async () => {
+  const manifest = JSON.parse(await readRepositoryFile("package.json"));
+  const [
+    rootInstructions,
+    readme,
+    contributing,
+    overview,
+    enforcementMap,
+    packageOwnership,
+    roadmap,
+    eslintConfiguration,
+  ] = await Promise.all(
+    [
+      "AGENTS.md",
+      "README.md",
+      "CONTRIBUTING.md",
+      "docs/architecture/overview.md",
+      "docs/architecture/enforcement-map.md",
+      "docs/architecture/package-ownership.md",
+      "docs/roadmaps/program-roadmap.md",
+      "eslint.config.mjs",
+    ].map(readRepositoryFile),
+  );
+  const builderStage = compactLabel("P", "1");
+
+  assert.deepEqual(
+    {
+      fixtures: manifest.scripts["test:generated-fixtures"],
+      kernel: manifest.scripts["verify:builder-kernel"],
+      skeletons: manifest.scripts["verify:generated-skeletons"],
+    },
+    {
+      fixtures: "node --test tests/generated-fixtures/*.test.mjs",
+      kernel:
+        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run build:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run changeset:status",
+      skeletons: "node scripts/verify-generated-skeletons.mjs",
+    },
+  );
+  await Promise.all(
+    ["fixtures/generated/portfolio", "fixtures/generated/site"].map((path) =>
+      access(resolve(repositoryRoot, path)),
+    ),
+  );
+
+  assert.match(
+    readme,
+    new RegExp(`## Current phase: ${builderStage} in review`),
+  );
+  assert.match(
+    roadmap,
+    new RegExp(`## ${builderStage} — Builder kernel[\\s\\S]+\\*\\*In review \\(2026-08-08\\):\\*\\*`),
+  );
+  for (const document of [rootInstructions, readme, contributing]) {
+    assert.match(document, /verify:builder-kernel/u);
+  }
+  assert.match(overview, /committed portfolio and site fixtures/iu);
+  assert.match(enforcementMap, /verify:generated-skeletons/u);
+  assert.match(packageOwnership, /committed golden fixtures/u);
+  assert.doesNotMatch(enforcementMap, /temporary repository-local ESLint adapter/u);
+  assert.doesNotMatch(packageOwnership, /temporary root ESLint adapter/u);
+  assert.doesNotMatch(eslintConfiguration, /noSequencingLabels|semantic-naming/u);
+  await assert.rejects(
+    access(
+      resolve(repositoryRoot, "scripts/eslint/no-sequencing-labels.mjs"),
+    ),
   );
 });

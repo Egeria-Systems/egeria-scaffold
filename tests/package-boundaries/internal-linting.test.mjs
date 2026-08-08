@@ -24,33 +24,12 @@ async function readJson(relativePath) {
   );
 }
 
-const compactLabel = (...parts) => parts.join("");
-const namedLabel = (prefix, ordinal, separator = " ") =>
-  [prefix, separator, ordinal].join("");
-
-const semanticRuleId =
-  "@egeria-systems/scaffold/no-sequencing-labels";
-const semanticRuleMessage =
-  "Roadmap and implementation sequencing labels must not be used as software names.";
-
-async function lintSemanticFixture({ extension = "mjs", source }) {
-  const { ESLint } = await import("eslint");
-  const eslint = new ESLint({
-    cwd: repositoryRoot,
-    overrideConfigFile: resolve(repositoryRoot, "eslint.config.mjs"),
-  });
-  const [result] = await eslint.lintText(source, {
-    filePath: resolve(
-      repositoryRoot,
-      `packages/standards/eslint/semantic-naming-fixture.${extension}`,
-    ),
-  });
-
-  return result.messages.filter(({ ruleId }) => ruleId === semanticRuleId);
-}
-
 test("the builder root owns an exact ESLint 10 lint boundary", async () => {
   const rootManifest = await readJson("package.json");
+  const rootConfiguration = await readFile(
+    resolve(repositoryRoot, "eslint.config.mjs"),
+    "utf8",
+  );
 
   assert.equal(await pathExists("eslint.config.mjs"), true);
   assert.deepEqual(
@@ -67,8 +46,18 @@ test("the builder root owns an exact ESLint 10 lint boundary", async () => {
   );
   assert.equal(
     rootManifest.scripts?.["lint:builder"],
-    "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint && pnpm exec eslint eslint.config.mjs scripts 'tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' 'apps/**/tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' 'packages/**/tests/**/*.{js,mjs,cjs,jsx,ts,tsx,mts,cts}' --no-error-on-unmatched-pattern --max-warnings 0",
+    "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint",
   );
+  assert.equal(
+    rootManifest.scripts?.["check:semantic-naming"],
+    "node scripts/check-semantic-naming.mjs",
+  );
+  assert.equal(await pathExists("scripts/check-semantic-naming.mjs"), true);
+  assert.equal(
+    await pathExists("scripts/eslint/no-sequencing-labels.mjs"),
+    false,
+  );
+  assert.doesNotMatch(rootConfiguration, /noSequencingLabels|semantic-naming/u);
   assert.match(
     rootManifest.scripts?.["verify:builder-packages:quality"] ?? "",
     /pnpm run lint:builder/,
@@ -136,89 +125,6 @@ test("builder lint does not execute generated-project configuration", async () =
       ),
     ),
     true,
-  );
-});
-
-test("the root semantic naming rule rejects sequencing labels across authored syntax", async () => {
-  const prohibitedIdentifier = compactLabel("create", "P", "2", "Catalog");
-  const prohibitedPrivateIdentifier = namedLabel("Task", "3", "");
-  const prohibitedText = namedLabel("Gate", "X");
-  const prohibitedJsxIdentifier = namedLabel("Milestone", "4", "");
-  const cases = [
-    {
-      source: `const ${prohibitedIdentifier} = true;\n`,
-    },
-    {
-      source: `class Example { #${prohibitedPrivateIdentifier} = true; }\n`,
-    },
-    {
-      source: `const value = "${prohibitedText}";\n`,
-    },
-    {
-      source: `const value = \`${prohibitedText}\`;\n`,
-    },
-    {
-      source: `// ${prohibitedText}\nconst value = true;\n`,
-    },
-    {
-      expectedMessages: 2,
-      source: `test("${prohibitedText}", () => {});\ndescribe("${prohibitedText}", () => {});\n`,
-    },
-    {
-      expectedMessages: 2,
-      extension: "jsx",
-      source: `const views = [<${prohibitedJsxIdentifier} />, <div>${prohibitedText}</div>];\n`,
-    },
-  ];
-
-  for (const {
-    expectedMessages = 1,
-    extension,
-    source,
-  } of cases) {
-    const messages = await lintSemanticFixture({ extension, source });
-
-    assert.equal(messages.length, expectedMessages, source);
-    assert.ok(
-      messages.every(
-        ({ message, messageId, severity }) =>
-          messageId === "sequencingLabel" &&
-          message === semanticRuleMessage &&
-          severity === 2,
-      ),
-      source,
-    );
-  }
-});
-
-test("the root semantic naming rule preserves domain counterexamples and stays repository-local", async () => {
-  const counterexamples = [
-    "p2pConnection",
-    "taskQueue",
-    "stepCount",
-    "stageName",
-    "incrementValue",
-  ];
-  const source = [
-    ...counterexamples.map((identifier) => `const ${identifier} = true;`),
-    `const labels = ${JSON.stringify(counterexamples)};`,
-    `// ${counterexamples.join(" ")}`,
-  ].join("\n");
-  const standardsManifest = await readJson("packages/standards/package.json");
-
-  assert.deepEqual(await lintSemanticFixture({ source }), []);
-  assert.equal(
-    standardsManifest.exports?.["./eslint/no-sequencing-labels"],
-    undefined,
-  );
-  assert.deepEqual(standardsManifest.files, [
-    "eslint",
-    "typescript",
-    "README.md",
-  ]);
-  assert.equal(
-    await pathExists("packages/standards/eslint/no-sequencing-labels.mjs"),
-    false,
   );
 });
 

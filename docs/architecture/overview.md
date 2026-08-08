@@ -1,6 +1,6 @@
 # Architecture Overview
 
-**Status:** Controlling architecture summary after P0.3 approval
+**Status:** Controlling architecture summary for the in-review P1 builder-kernel candidate
 
 **Source:** [Approved reconciled program plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md)
 
@@ -67,7 +67,7 @@ In-memory adapters and shared behavioral contract tests are required where ports
 
 P0.1 created none of those paths. P0.2 created only the separately scoped private proof at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). P0.3 has materialized a private CLI shell, private builder-core shell, public standards package, public observability shell, and local release safeguards. P0.3 is complete; [package ownership](package-ownership.md) is the canonical owner of their exact visibility, APIs, consumers, and publication guards.
 
-P1 is the first executable project/state schema stage. It implements the schemas and builder kernel inside the already-private `builder-core` boundary.
+P1 is the first executable project/state schema stage. Its implementation candidate places schemas, resolution, codecs, ownership, inference, diagnostics, rendering, and state-last new-directory generation inside the already-private `builder-core` boundary. The private CLI remains a thin adapter over those policies. Committed portfolio and site fixtures provide exact generated-output evidence without becoming runtime packages.
 
 `builder-core` is justified by cohesive private responsibilities: capability resolution, manifest/state schemas, inference, ownership, planning, migrations, repository transformation, and verification. Reserving that ownership in P0.3 does not implement the schemas early. A separate `project-schema` package is not justified until a second consumer requires an independently versioned contract.
 
@@ -85,10 +85,10 @@ All user-visible or translatable copy originates from validated content or local
 
 ## State and lifecycle
 
-Desired state will live in human-reviewable `.egeria/project.yaml`; installed resolved state in generator-owned `.egeria/state.json`; successful migration and reconciliation history in append-only `.egeria/migrations.jsonl`. None is created before P1.
+Desired state lives in human-reviewable `.egeria/project.yaml`; installed resolved state in generator-owned `.egeria/state.json`; successful migration and reconciliation history in append-only `.egeria/migrations.jsonl`. New-directory generation writes all three only inside an identity-recorded temporary source, verifies the copy, confirms post-state inference, and commits the destination with one rename. Existing-repository mutation and migration history remain deferred.
 
 Repository-changing builder operations require clean state, inference, capability resolution, an isolated worktree, an approval-ready dry-run plan, one execution, verification, and post-change inference. State and migration records update only after those checks succeed; state/inference verification then runs again. The resulting exact diff and review packet require verified-final-diff approval before commit. Source, dependencies, deployment, persistent data, and provider state have separate rollback procedures.
 
 ## Current stage boundary
 
-P0.1 created the constitution and architecture surfaces. P0.2 added only private, non-production infrastructure evidence and its exact toolchain. P0.3 adds builder package ownership shells, consumed standards configurations, local versioning safeguards, and no production profile, generated client repository, state schema, or product capability. Future behavior in these documents remains architecture visibility until its roadmap stage is approved and verified.
+P0.1 created the constitution and architecture surfaces. P0.2 added private, non-production infrastructure evidence and its exact toolchain. P0.3 established the builder package and release boundaries. P1 is in review with executable schemas, six capability descriptors, portfolio/site recipes, read-only inspection, new-directory generation, committed golden fixtures, and a fixed-root isolated verification harness. Existing-repository changes, transactional migrations, later profiles/capabilities, provider actions, deployment, production readiness, and accessibility-conformance claims remain outside this candidate.

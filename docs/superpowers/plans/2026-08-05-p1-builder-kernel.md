@@ -1257,9 +1257,11 @@ Stop for explicit user approval before Task 8.
 - Modify: `docs/superpowers/plans/2026-08-05-p1-builder-kernel.md`
 - Modify: `package.json`
 - Modify: `eslint.config.mjs`
+- Modify: `scripts/check-semantic-naming.mjs`
 - Modify: `tests/constitution/constitution.test.mjs`
 - Modify: `tests/constitution/semantic-naming.test.mjs`
 - Modify: `tests/package-boundaries/internal-linting.test.mjs`
+- Modify: `tests/package-boundaries/release-safeguards.test.mjs`
 - Modify: `README.md`
 - Modify: `CONTRIBUTING.md`
 - Modify: `AGENTS.md`
@@ -1386,6 +1388,8 @@ Add dependency-free constitution assertions first for those exact status transit
 - [ ] **Step 4A: Sunset the temporary semantic-naming lint adapter only after equivalence**
 
 Add the sunset contract RED first: `tests/package-boundaries/internal-linting.test.mjs` must require the permanent scanner/script, assert the temporary rule file/import/plugin/rule are absent, and retain the existing matcher/path/content/test-description/counterexample matrix in `tests/constitution/semantic-naming.test.mjs`. Run the permanent matcher, path/content scanner, and test-description matrix against every identifier, private identifier, string, static template, comment, JSX, test/suite-description, path, and counterexample case covered by the temporary ESLint rule. Require `node scripts/check-semantic-naming.mjs`, `test:constitution`, and focused internal-linting tests to pass before deletion.
+
+**Execution finding (2026-08-08):** The adapter deletion exposed that the permanent scanner's cached Git inventory still included an unstaged deleted tracked path. Add a focused RED/GREEN regression so `listRepositoryPaths` subtracts the NUL-safe `git ls-files --deleted` set and scans only live tracked plus non-ignored untracked paths. Update `tests/package-boundaries/release-safeguards.test.mjs` atomically because it is a direct exact-string consumer of `lint:builder`; do not weaken its release-boundary coverage.
 
 Only after that equivalence gate passes, delete `scripts/eslint/no-sequencing-labels.mjs`, remove its import/plugin/config block from `eslint.config.mjs`, and remove the temporary semantic-only test/script ESLint invocation from `lint:builder`. Keep package-owned source lint unchanged. Rerun semantic naming, constitution, package-boundary, and builder lint checks. Keep `scripts/check-semantic-naming.mjs`, `tests/constitution/semantic-naming.test.mjs`, `check:semantic-naming`, and `INV-SEMANTIC-NAMING` permanently. If equivalence fails, retain the rule, record the gap, amend this plan, and stop instead of deleting coverage. Commit canonical documentation and the proven sunset as `Document generated fixture enforcement`.
 
