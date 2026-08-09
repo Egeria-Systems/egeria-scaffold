@@ -251,3 +251,9 @@ The fixture contract exported by `scripts/verify-generated-skeletons.mjs` is con
 ## Requirements-review repair — decoded control characters
 
 Requirements review reproduced escaped YAML NUL and DEL values that pass the raw Markdown source check and decode into front-matter strings. The repair adds RED regressions for encoded forbidden controls, applies the existing disallowed-control predicate to decoded non-empty content strings, regenerates the affected parser fixtures and installed-state fingerprints, and reruns the content parser plus fixture/build gates. It does not add a renderer, sanitizer, dependency, content shape, or new failure identifier.
+
+## Post-approval integration and next baseline
+
+On 2026-08-09, the user approved the P1 final comparison `303ee9d35e19f9191948d994159f77c82c90a1ed..5580da10eded51ceefa53a068c7ddaaddf2a2d50`, approved this increment's exact final comparison `5580da10eded51ceefa53a068c7ddaaddf2a2d50..e0886fb776f5cd80c34a6ab5c28e355cc1abd7b9`, and authorized local integration. Clean local `main` was fast-forwarded to `e0886fb776f5cd80c34a6ab5c28e355cc1abd7b9` without a merge commit.
+
+The isolated execution boundary above remains the factual record for this completed increment. Task 2 is the separately reviewed standards-owned copy-enforcement increment. Its preparation and exact-file plan use clean local `main` when preflight confirms one sequential builder-repository stream under the [review and contribution protocol](../../governance/review-and-contribution.md). This development-mode decision does not authorize npm publication, push, pull request, deployment, provider mutation, or a builder transformation of a generated client repository.

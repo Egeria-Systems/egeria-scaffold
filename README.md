@@ -4,7 +4,7 @@ Egeria Scaffold will build versioned, materialized Next.js recipes for Egeria Sy
 
 ## Current implementation status
 
-The repository constitution, architecture decisions, governance, and enforcement ownership are established. The lean package and tooling boundaries have received verified-final-diff approval. The private Next.js and Cloudflare compatibility proof passed its local, workerd, clean Ubuntu workflow, non-production deployment, Chromium, and axe checks and received verified-final-diff approval. The builder-kernel implementation candidate now includes executable private project/state contracts, the exact six-capability `portfolio`/`site` catalog, strict codecs, hybrid ownership, read-only inference/doctor/diff, state-last new-directory generation, the private CLI, and committed golden fixtures with isolated build verification. It remains in review until the deferred schema-contract review, final builder-kernel review packet, and verified-final-diff approval are complete.
+The repository constitution, architecture decisions, governance, and enforcement ownership are established. The lean package and tooling boundaries have received verified-final-diff approval. The private Next.js and Cloudflare compatibility proof passed its local, workerd, clean Ubuntu workflow, non-production deployment, Chromium, and axe checks and received verified-final-diff approval. The builder kernel has received verified-final-diff approval with executable private project/state contracts, the exact six-capability `portfolio`/`site` catalog, strict codecs, hybrid ownership, read-only inference/doctor/diff, state-last new-directory generation, the private CLI, and committed golden fixtures with isolated build verification. The client-ready portfolio stage is in progress: the builder now generates versioned validated YAML/Markdown content, while standards-owned copy enforcement and the remaining portfolio outcomes remain separately gated.
 
 Canonical project documents:
 
@@ -33,7 +33,7 @@ Run the complete local compatibility proof with:
 pnpm run verify:compatibility-proof
 ```
 
-Run the complete builder-kernel candidate gate, including deterministic fixture regeneration and isolated fixture builds, with:
+Run the complete approved builder-kernel gate, including deterministic fixture regeneration and isolated fixture builds, with:
 
 ```bash
 pnpm run verify:builder-kernel

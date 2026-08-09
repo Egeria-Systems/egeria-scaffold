@@ -1,6 +1,6 @@
 # Package Ownership
 
-**Status:** Controlling package and API ownership through verified new-directory generation, committed golden fixtures, the in-review builder-kernel candidate, and the public `0.1.0` package release
+**Status:** Controlling package and API ownership through the approved builder kernel, generated validated content, committed golden fixtures, and the public `0.1.0` package release
 
 **Sources:** [ADR-0005](../adr/0005-evidence-driven-package-extraction.md), [architecture overview](overview.md), the [approved P0.3 plan](../superpowers/plans/2026-08-04-p0-3-lean-builder-monorepo.md), the [approved P1 plan](../superpowers/plans/2026-08-05-p1-builder-kernel.md), the [approved atomic project-generation plan](../superpowers/plans/2026-08-06-atomic-project-generation.md), and the [approved public-package release plan](../superpowers/plans/2026-08-06-public-package-release.md)
 

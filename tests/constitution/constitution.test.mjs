@@ -291,7 +291,7 @@ test("package ownership documentation records the approved release boundary", as
   );
   assert.match(
     readme,
-    /builder-kernel implementation candidate.*remains in review.*schema-contract review.*final builder-kernel review packet.*verified-final-diff approval/i,
+    /builder kernel has received verified-final-diff approval.*client-ready portfolio stage is in progress/iu,
   );
   assert.match(contributing, /pnpm run verify:builder-packages/);
 
@@ -804,6 +804,8 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     ].map(readRepositoryFile),
   );
   const builderStage = compactLabel("P", "1");
+  const portfolioStage = compactLabel("P", "2");
+  const copyEnforcementTask = namedLabel("Task", "2");
 
   assert.deepEqual(
     {
@@ -830,11 +832,31 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     readme,
-    /builder-kernel implementation candidate.*committed golden fixtures.*remains in review/i,
+    /builder kernel has received verified-final-diff approval.*committed golden fixtures.*client-ready portfolio stage is in progress/iu,
   );
   assert.match(
     roadmap,
-    new RegExp(`## ${builderStage} — Builder kernel[\\s\\S]+\\*\\*In review \\(2026-08-08\\):\\*\\*`),
+    new RegExp(
+      `## ${builderStage} — Builder kernel[\\s\\S]+\\*\\*Completed \\(2026-08-09\\):\\*\\*[\\s\\S]+303ee9d35e19f9191948d994159f77c82c90a1ed\\.\\.5580da10eded51ceefa53a068c7ddaaddf2a2d50`,
+    ),
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      "## " +
+        escapeRegularExpression(portfolioStage) +
+        " — Client-ready portfolio[\\s\\S]+" +
+        escapeRegularExpression(copyEnforcementTask) +
+        " is the separately reviewed, standards-owned copy-enforcement increment[\\s\\S]+develops directly on clean local `main`",
+    ),
+  );
+  assert.match(
+    contributing,
+    /The approved builder kernel.*standards-owned copy enforcement remains the next separately reviewed increment/iu,
+  );
+  assert.match(
+    packageOwnership,
+    /Controlling package and API ownership through the approved builder kernel, generated validated content/iu,
   );
   for (const document of [rootInstructions, readme, contributing]) {
     assert.match(document, /verify:builder-kernel/u);

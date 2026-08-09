@@ -1,6 +1,6 @@
 # Architecture Overview
 
-**Status:** Controlling architecture summary for the in-review P1 builder-kernel candidate
+**Status:** Controlling architecture summary for the approved P1 builder kernel and in-progress P2 portfolio
 
 **Source:** [Approved reconciled program plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md)
 
@@ -67,7 +67,7 @@ In-memory adapters and shared behavioral contract tests are required where ports
 
 P0.1 created none of those paths. P0.2 created only the separately scoped private proof at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). P0.3 has materialized a private CLI shell, private builder-core shell, public standards package, public observability shell, and local release safeguards. P0.3 is complete; [package ownership](package-ownership.md) is the canonical owner of their exact visibility, APIs, consumers, and publication guards.
 
-P1 is the first executable project/state schema stage. Its implementation candidate places schemas, resolution, codecs, ownership, inference, diagnostics, rendering, and state-last new-directory generation inside the already-private `builder-core` boundary. The private CLI remains a thin adapter over those policies. Committed portfolio and site fixtures provide exact generated-output evidence without becoming runtime packages.
+P1 is the first executable project/state schema stage. Its approved implementation places schemas, resolution, codecs, ownership, inference, diagnostics, rendering, and state-last new-directory generation inside the already-private `builder-core` boundary. The private CLI remains a thin adapter over those policies. Committed portfolio and site fixtures provide exact generated-output evidence without becoming runtime packages.
 
 `builder-core` is justified by cohesive private responsibilities: capability resolution, manifest/state schemas, inference, ownership, planning, migrations, repository transformation, and verification. Reserving that ownership in P0.3 does not implement the schemas early. A separate `project-schema` package is not justified until a second consumer requires an independently versioned contract.
 
@@ -91,4 +91,4 @@ Repository-changing builder operations require clean state, inference, capabilit
 
 ## Current stage boundary
 
-P0.1 created the constitution and architecture surfaces. P0.2 added private, non-production infrastructure evidence and its exact toolchain. P0.3 established the builder package and release boundaries. P1 is in review with executable schemas, six capability descriptors, portfolio/site recipes, read-only inspection, new-directory generation, committed golden fixtures, and a fixed-root isolated verification harness. Existing-repository changes, transactional migrations, later profiles/capabilities, provider actions, deployment, production readiness, and accessibility-conformance claims remain outside this candidate.
+P0.1 created the constitution and architecture surfaces. P0.2 added private, non-production infrastructure evidence and its exact toolchain. P0.3 established the builder package and release boundaries. P1 is approved with executable schemas, six capability descriptors, portfolio/site recipes, read-only inspection, new-directory generation, committed golden fixtures, and a fixed-root isolated verification harness. P2 is in progress: the actual builder now emits versioned validated YAML/Markdown content for portfolio and site, while standards-owned copy enforcement and the remaining client-ready portfolio outcomes remain separately gated. Existing-repository changes, transactional migrations, later profiles/capabilities, provider actions, deployment, production readiness, and accessibility-conformance claims remain outside the accepted baseline.
