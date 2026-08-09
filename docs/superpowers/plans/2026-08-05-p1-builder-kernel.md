@@ -1588,11 +1588,34 @@ Present the repaired committed comparison and amended Task 8 packet, then stop f
 
 ## Task 9: Deferred Schema Contract Review and Gate 3 Packet
 
+**Execution amendment (2026-08-08):** The user approved continuous local execution through the implemented-task review and required Task 9 to build on the Task 8 worktree rather than `main`. The implementation therefore remains in `/private/tmp/egeria-scaffold-p1-task-8` on `p1-task-8-golden-fixtures`, with Task 9 frozen at clean commit `8a503f5e6dceec59330412084c8b014ca287e43b`. The formal material-simplification controller separately bound the exact source/test plan before mutation: corrected scope `a6406a7affe4bbe3f11a2eb426c1db1479ee246365424895761a3a0f08085b59`, Gate A receipt `9b06a0c97362a807977d9a4d4e5cd0a166b7e482c415750410ecb2f0d7af412b`, approved plan `3b44a1b85cf50a8ef39cf734d99e5bd62966c269ecf19b7c31b507824dc215cd`, and Gate B receipt `d8e8659f2fdce2af98f229e44ebb30322653cf24b7c559049b6c18a6aa6a29f8`. This section is the canonical surgical amendment; no competing repository plan is created.
+
 **Files:**
 
+- Modify: `docs/superpowers/plans/2026-08-05-p1-builder-kernel.md`
+- Modify: `packages/builder-core/README.md`
+- Modify: `packages/builder-core/src/generation/verify-generated-project.ts`
+- Modify: `packages/builder-core/src/generation/write-generated-project.ts`
+- Modify: `packages/builder-core/tests/generate-project.test.mjs`
+- Create: `packages/builder-core/src/contracts/surface-target.ts`
+- Modify: `packages/builder-core/src/contracts/capability.ts`
+- Modify: `packages/builder-core/src/contracts/state.ts`
+- Modify: `packages/builder-core/tests/contracts.test.mjs`
+- Modify: `tests/package-boundaries/private-packages.test.mjs`
 - Modify: `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`
 - Modify: `docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md`
 - Create: `docs/review-packets/2026-08-05-p1-builder-kernel.md`
+
+No package manifest, lockfile, checked JSON Schema, generated fixture, root export, migration format, or persisted state format is authorized to change.
+
+**Approved bounded transformations:**
+
+1. Consolidate the exact generated-project nine-check receipt into the existing verifier module as one runtime-frozen internal value. Derive the public receipt type from that tuple, reuse it in the writer's independently invoked unknown-value guard and persisted-state composition, keep the explicit nine-check installed-state schema and independent test literals, and do not add a package-root export.
+2. Consolidate the duplicated surface target/merge pairing rule into one non-root-exported private callback. Keep the descriptor and installed-state Zod schemas independently defined and refined, preserve both valid pairs and both mismatch directions with exact issue semantics, and add only the new private module to the exact builder-core source inventory.
+
+Characterization must prove the receipt is runtime-frozen; malformed, missing, additional, and reordered receipts retain `GENERATED_VERIFICATION_INVALID`; both surface mismatch directions retain the custom Zod code, exact message, descriptor-local path, and installed-state-prefixed path. The source-owner audits must move from three receipt representations to one and from two surface-rule implementations to one. Checked schema and fixture bytes must remain unchanged.
+
+The settled source transformations use small focused commits. Task 9 documentation and the Gate 3 packet follow only after the formal simplification verifier passes. Final review must include independent requirements, architecture/anti-overengineering, test-evidence, and full material-code-review passes over the exact final comparison. Only evidence-backed material findings may be repaired, and affected verification must be rerun before the packet is sealed.
 
 This task revisits the Task 1 schema questions only after Tasks 2 through 8 have supplied their real catalog, resolver, codec, ownership, inference, diagnostics, generation, CLI, and fixture consumers. The dated deferral record preserves the original direct field-purpose audit, the bounded material-code-simplification result, their differences, and the frozen evidence hashes. Those recorded observations are review inputs, not approved findings or pre-authorized edits.
 
