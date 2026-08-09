@@ -77,10 +77,10 @@ The factory returns one flat config object with:
   files,
   languageOptions: {
     parser: typescriptEslint.parser,
+    ecmaVersion: "latest",
+    sourceType: "module",
     parserOptions: {
       ecmaFeatures: { jsx: true },
-      ecmaVersion: "latest",
-      sourceType: "module",
     },
   },
   plugins: {
