@@ -24,6 +24,8 @@ const portfolioPaths = [
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
+  "apps/web/content/content.config.yaml",
+  "apps/web/content/en-CA/long-form/introduction.md",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/next.config.ts",
@@ -49,7 +51,9 @@ const sitePaths = [
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
+  "apps/web/content/content.config.yaml",
   "apps/web/content/en-CA/about.yaml",
+  "apps/web/content/en-CA/long-form/introduction.md",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/next.config.ts",
@@ -334,7 +338,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.1.0",
+    recipeVersion: "0.2.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -477,6 +481,17 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
   );
 
   assert.deepEqual(
+    parseGeneratedYaml(
+      portfolio.files,
+      "apps/web/content/content.config.yaml",
+    ),
+    {
+      schemaVersion: "1.0.0",
+      defaultLocale: "en-CA",
+      locales: ["en-CA"],
+    },
+  );
+  assert.deepEqual(
     parseGeneratedYaml(portfolio.files, "apps/web/content/en-CA/site.yaml"),
     {
       metadata: { title: displayName, description: "A focused portfolio." },
@@ -485,6 +500,23 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
         summary: "A concise introduction to selected work.",
       },
       navigation: [],
+    },
+  );
+  const portfolioContentModule = await loadGeneratedContentModule(
+    portfolio.files,
+  );
+  assert.deepEqual(
+    portfolioContentModule.parseMarkdownContent(
+      indexFiles(portfolio.files).get(
+        "apps/web/content/en-CA/long-form/introduction.md",
+      ),
+    ),
+    {
+      frontMatter: {
+        title: displayName,
+        summary: "A focused introduction.",
+      },
+      body: "A concise overview of selected work and the approach behind it.",
     },
   );
   assert.deepEqual(
@@ -516,6 +548,10 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
     "A multi-page public website.",
     "A clear starting point for this website.",
     "Background and approach.",
+    "A focused introduction.",
+    "A concise overview of selected work and the approach behind it.",
+    "A website introduction.",
+    "An introduction to this website and the work it presents.",
   ];
   for (const rendered of [portfolio, site]) {
     const files = indexFiles(rendered.files);
@@ -566,6 +602,15 @@ test("generated server readers use web-workspace string paths for YAML content",
     assert.match(source, /join\(process\.cwd\(\), "content\/en-CA\//);
     assert.doesNotMatch(source, /new URL|import\.meta\.url|fileURLToPath/);
   }
+  assert.match(
+    portfolioReader,
+    /join\(\s*process\.cwd\(\),\s*"content\/content\.config\.yaml",?\s*\)/,
+  );
+  assert.match(
+    portfolioReader,
+    /join\(\s*process\.cwd\(\),\s*"content\/en-CA\/long-form\/introduction\.md",?\s*\)/,
+  );
+  assert.doesNotMatch(portfolioReader, /function read\w+\([^)]*(?:path|file)/i);
 });
 
 test("the emitted YAML parser rejects unsafe syntax and invalid content shapes", async () => {
@@ -580,10 +625,43 @@ test("the emitted YAML parser rejects unsafe syntax and invalid content shapes",
   );
   const contentModule = await loadGeneratedContentModule(rendered.files);
   const files = indexFiles(rendered.files);
+  const configurationSource = files.get("apps/web/content/content.config.yaml");
+  const introductionSource = files.get(
+    "apps/web/content/en-CA/long-form/introduction.md",
+  );
   const siteSource = files.get("apps/web/content/en-CA/site.yaml");
   const aboutSource = files.get("apps/web/content/en-CA/about.yaml");
+  assert.notEqual(configurationSource, undefined);
+  assert.notEqual(introductionSource, undefined);
   assert.notEqual(siteSource, undefined);
   assert.notEqual(aboutSource, undefined);
+
+  assert.deepEqual(
+    contentModule.parseContentConfiguration(
+      contentModule.parseYamlContent(configurationSource),
+    ),
+    {
+      schemaVersion: "1.0.0",
+      defaultLocale: "en-CA",
+      locales: ["en-CA"],
+    },
+  );
+  assert.deepEqual(contentModule.parseMarkdownContent(introductionSource), {
+    frontMatter: {
+      title: "Acme Studio",
+      summary: "A website introduction.",
+    },
+    body: "An introduction to this website and the work it presents.",
+  });
+  assert.deepEqual(
+    contentModule.parseMarkdownContent(
+      "---\r\ntitle: Example\r\nsummary: Summary\r\n---\r\nBody\r\n",
+    ),
+    {
+      frontMatter: { title: "Example", summary: "Summary" },
+      body: "Body",
+    },
+  );
 
   const siteContent = contentModule.parseSiteContent(
     contentModule.parseYamlContent(siteSource),
@@ -628,6 +706,27 @@ test("the emitted YAML parser rejects unsafe syntax and invalid content shapes",
       extra: true,
     }),
   );
+  assertContentInvalid(() =>
+    contentModule.parseContentConfiguration({
+      schemaVersion: "1.0.0",
+      defaultLocale: "en-CA",
+      locales: ["en-CA"],
+      extra: true,
+    }),
+  );
+  for (const invalidMarkdown of [
+    "title: Missing delimiters\n",
+    "---\ntitle: Missing summary\n---\nBody\n",
+    "---\ntitle: Example\nsummary: Summary\nextra: true\n---\nBody\n",
+    "---\ntitle: Example\nsummary: Summary\n---\n \n",
+    "---\ntitle: Example\nsummary: Summary\n---\nUnsafe\u0000body\n",
+    "---\ntitle: &title Example\nsummary: *title\n---\nBody\n",
+    "---\ntitle: First\ntitle: Second\nsummary: Summary\n---\nBody\n",
+  ]) {
+    assertContentInvalid(() =>
+      contentModule.parseMarkdownContent(invalidMarkdown),
+    );
+  }
 });
 
 test("Cloudflare imports and types stay in generated configuration boundaries", async () => {
@@ -733,8 +832,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 40],
-    ["site", 42],
+    ["portfolio", 42],
+    ["site", 44],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({

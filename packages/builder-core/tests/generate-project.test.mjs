@@ -36,6 +36,8 @@ const portfolioRenderedPaths = [
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
+  "apps/web/content/content.config.yaml",
+  "apps/web/content/en-CA/long-form/introduction.md",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/next.config.ts",
@@ -516,9 +518,16 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
+      assert.equal(generated.state.origin.recipeVersion, "0.2.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 43 : 45,
+        profile === "portfolio" ? 45 : 47,
+      );
+      assert.equal(
+        generated.state.installedCapabilities.find(
+          ({ identifier }) => identifier === "content-files",
+        )?.version,
+        "0.2.0",
       );
 
       const catalog = assertSuccess(core.createVerifiedCapabilityCatalog());

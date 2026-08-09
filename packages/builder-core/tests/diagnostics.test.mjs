@@ -388,6 +388,8 @@ test("doctor and diff agree across the canonical portfolio composition", async (
     }, null, 2)}\n`,
     "apps/web/tsconfig.json": "{}\n",
     "apps/web/eslint.config.mjs": "export default [];\n",
+    "apps/web/content/content.config.yaml": "{}\n",
+    "apps/web/content/en-CA/long-form/introduction.md": "# Introduction\n",
     "apps/web/content/en-CA/site.yaml": "{}\n",
     "apps/web/src/content/content-schema.ts": "export {};\n",
     "apps/web/src/content/read-content.ts": "export {};\n",

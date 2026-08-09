@@ -23,6 +23,7 @@ const commonTemplateSources = [
   "common/apps/web/app/globals.css",
   "common/apps/web/app/layout.tsx",
   "common/apps/web/app/page.tsx",
+  "common/apps/web/content/content.config.yaml",
   "common/apps/web/src/content/content-schema.ts",
   "common/apps/web/src/content/read-content.ts",
   "common/apps/web/src/presentation/content-page.tsx",
@@ -30,12 +31,14 @@ const commonTemplateSources = [
 ] as const;
 
 const portfolioTemplateSources = [
+  "portfolio/apps/web/content/en-CA/long-form/introduction.md.template",
   "portfolio/apps/web/content/en-CA/site.yaml.template",
 ] as const;
 
 const siteTemplateSources = [
   "site/apps/web/content/en-CA/site.yaml.template",
   "site/apps/web/content/en-CA/about.yaml.template",
+  "site/apps/web/content/en-CA/long-form/introduction.md.template",
   "site/apps/web/app/about/page.tsx",
 ] as const;
 

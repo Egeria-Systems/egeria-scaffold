@@ -270,6 +270,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/app/globals.css",
       "common/apps/web/app/layout.tsx",
       "common/apps/web/app/page.tsx",
+      "common/apps/web/content/content.config.yaml",
       "common/apps/web/eslint.config.mjs",
       "common/apps/web/next.config.ts",
       "common/apps/web/open-next.config.ts",
@@ -282,9 +283,11 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/wrangler.jsonc.template",
       "common/package.json.template",
       "common/pnpm-workspace.yaml",
+      "portfolio/apps/web/content/en-CA/long-form/introduction.md.template",
       "portfolio/apps/web/content/en-CA/site.yaml.template",
       "site/apps/web/app/about/page.tsx",
       "site/apps/web/content/en-CA/about.yaml.template",
+      "site/apps/web/content/en-CA/long-form/introduction.md.template",
       "site/apps/web/content/en-CA/site.yaml.template",
     ],
   );
@@ -333,6 +336,8 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /deterministic in-memory rendering/);
   assert.match(builderInstructions, /explicit allowlisted templates/);
   assert.match(builderInstructions, /YAML 1.2/);
+  assert.match(builderInstructions, /Markdown with validated YAML front matter/);
+  assert.match(builderInstructions, /recipe `0.2.0`/);
   assert.match(builderInstructions, /state-last generation/);
   assert.match(builderInstructions, /exact verified public package versions/);
   assert.match(builderInstructions, /identity-recorded sibling temporary directory/);
@@ -347,6 +352,8 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /deterministic in-memory rendering/);
   assert.match(builderReadme, /explicit allowlisted templates/);
   assert.match(builderReadme, /YAML 1.2/);
+  assert.match(builderReadme, /Markdown with validated YAML front matter/);
+  assert.match(builderReadme, /recipe `0.2.0`/);
   assert.match(builderReadme, /generateProject/);
   assert.match(builderReadme, /previously absent destination/);
   assert.match(builderReadme, /installed state last/);
@@ -367,6 +374,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /deterministic in-memory rendering/);
   assert.match(packageOwnership, /explicit allowlisted templates/);
   assert.match(packageOwnership, /YAML 1.2/);
+  assert.match(packageOwnership, /Markdown with validated YAML front matter/);
   assert.match(packageOwnership, /strict `.egeria` codecs/);
   assert.match(packageOwnership, /read-only repository inference/);
   assert.match(packageOwnership, /doctorRepository/);

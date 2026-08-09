@@ -133,7 +133,7 @@ function createDescriptors(
     },
     {
       identifier: "content-files",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -148,6 +148,18 @@ function createDescriptors(
           "content-files-yaml-package",
           "content-files",
           "/dependencies/yaml",
+        ),
+        createFileSurface(
+          "content-files-configuration",
+          "content-files",
+          "apps/web/content/content.config.yaml",
+          "application-owned",
+        ),
+        createFileSurface(
+          "content-files-long-form-introduction",
+          "content-files",
+          "apps/web/content/en-CA/long-form/introduction.md",
+          "application-owned",
         ),
         createFileSurface(
           "content-files-site-content",
@@ -170,6 +182,10 @@ function createDescriptors(
       ],
       inferenceProbes: [
         createPackageProbe("dependencies", "yaml", "2.9.0"),
+        createFileProbe("apps/web/content/content.config.yaml"),
+        createFileProbe(
+          "apps/web/content/en-CA/long-form/introduction.md",
+        ),
         createFileProbe("apps/web/content/en-CA/site.yaml"),
         createFileProbe("apps/web/src/content/content-schema.ts"),
         createFileProbe("apps/web/src/content/read-content.ts"),

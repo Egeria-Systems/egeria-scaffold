@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import { readSiteContent } from "../src/content/read-content";
+import {
+  readContentConfiguration,
+  readSiteContent,
+} from "../src/content/read-content";
 import "./globals.css";
 
 const { metadata: contentMetadata } = readSiteContent();
+const { defaultLocale } = readContentConfiguration();
 
 export const metadata: Metadata = {
   title: contentMetadata.title,
@@ -15,7 +19,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en-CA">
+    <html lang={defaultLocale}>
       <body>{children}</body>
     </html>
   );

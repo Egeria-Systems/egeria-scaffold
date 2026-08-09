@@ -14,7 +14,10 @@ import {
   semanticVersionSchema,
   stableIdentifierSchema,
 } from "./identifiers.js";
-import { profileIdentifierSchema } from "./profile.js";
+import {
+  profileIdentifierSchema,
+  profileRecipeVersionSchema,
+} from "./profile.js";
 import { addMergeTargetIssue } from "./surface-target.js";
 
 function requireUniqueIdentifiers(
@@ -73,7 +76,7 @@ export const installedStateSchema = z
     origin: z
       .strictObject({
         profile: profileIdentifierSchema,
-        recipeVersion: z.literal("0.1.0"),
+        recipeVersion: profileRecipeVersionSchema,
       })
       .readonly(),
     installedCapabilities: z

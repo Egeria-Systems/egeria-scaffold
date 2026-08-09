@@ -18,7 +18,7 @@ export type ResolutionRequest = Readonly<{
 
 export type ResolvedCapabilities = Readonly<{
   profile: "portfolio" | "site";
-  recipeVersion: "0.1.0";
+  recipeVersion: ProfileRecipe["recipeVersion"];
   capabilities: readonly CapabilityDescriptor[];
 }>;
 

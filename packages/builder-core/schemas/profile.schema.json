@@ -26,7 +26,10 @@
       "type": "string"
     },
     "recipeVersion": {
-      "const": "0.1.0",
+      "enum": [
+        "0.1.0",
+        "0.2.0"
+      ],
       "type": "string"
     },
     "schemaVersion": {

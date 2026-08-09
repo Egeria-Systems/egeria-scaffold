@@ -3,12 +3,13 @@ import { z } from "zod";
 import { stableIdentifierSchema } from "./identifiers.js";
 
 export const profileIdentifierSchema = z.enum(["portfolio", "site"]);
+export const profileRecipeVersionSchema = z.enum(["0.1.0", "0.2.0"]);
 
 export const profileRecipeSchema = z
   .strictObject({
     identifier: profileIdentifierSchema,
     schemaVersion: z.literal("1.0.0"),
-    recipeVersion: z.literal("0.1.0"),
+    recipeVersion: profileRecipeVersionSchema,
     defaultCapabilities: z.array(stableIdentifierSchema).min(1).readonly(),
   })
   .superRefine((profile, context) => {

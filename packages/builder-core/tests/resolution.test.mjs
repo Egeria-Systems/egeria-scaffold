@@ -129,7 +129,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
     },
     {
       identifier: "content-files",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -160,6 +160,22 @@ test("the portfolio and site catalog declares the exact six executable capabilit
             pointer: "/dependencies/yaml",
           },
           mergeStrategy: "json-property",
+        },
+        {
+          identifier: "content-files-configuration",
+          owner: { kind: "capability", identifier: "content-files" },
+          path: "apps/web/content/content.config.yaml",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "content-files-long-form-introduction",
+          owner: { kind: "capability", identifier: "content-files" },
+          path: "apps/web/content/en-CA/long-form/introduction.md",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
         },
         {
           identifier: "content-files-site-content",
@@ -193,6 +209,11 @@ test("the portfolio and site catalog declares the exact six executable capabilit
           section: "dependencies",
           packageName: "yaml",
           version: "2.9.0",
+        },
+        { kind: "file", path: "apps/web/content/content.config.yaml" },
+        {
+          kind: "file",
+          path: "apps/web/content/en-CA/long-form/introduction.md",
         },
         { kind: "file", path: "apps/web/content/en-CA/site.yaml" },
         { kind: "file", path: "apps/web/src/content/content-schema.ts" },
@@ -576,7 +597,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.1.0",
+      recipeVersion: "0.2.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -588,7 +609,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.1.0",
+      recipeVersion: "0.2.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -619,7 +640,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.1.0");
+  assert.equal(portfolio.recipeVersion, "0.2.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -652,7 +673,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "content-files",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",

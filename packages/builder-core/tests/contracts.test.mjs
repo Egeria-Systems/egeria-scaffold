@@ -350,6 +350,14 @@ test("probe and managed-surface unions reject mismatched or unsafe structures", 
 test("project configuration is strict and materializes safe capability identifiers", () => {
   assertAccepts(contracts.projectConfigurationSchema, validProject);
   assertAccepts(contracts.profileRecipeSchema, validProfile);
+  assertAccepts(contracts.projectConfigurationSchema, {
+    ...validProject,
+    recipeVersion: "0.2.0",
+  });
+  assertAccepts(contracts.profileRecipeSchema, {
+    ...validProfile,
+    recipeVersion: "0.2.0",
+  });
 
   assertRejects(contracts.projectConfigurationSchema, {
     ...validProject,
@@ -370,6 +378,14 @@ test("project configuration is strict and materializes safe capability identifie
   assertRejects(contracts.profileRecipeSchema, {
     ...validProfile,
     identifier: "app",
+  });
+  assertRejects(contracts.projectConfigurationSchema, {
+    ...validProject,
+    recipeVersion: "0.3.0",
+  });
+  assertRejects(contracts.profileRecipeSchema, {
+    ...validProfile,
+    recipeVersion: "0.3.0",
   });
 });
 
@@ -423,6 +439,10 @@ test("project display names preserve Unicode while rejecting controls and whites
 
 test("installed state is strict and records the exact successful generation checks", () => {
   assertAccepts(contracts.installedStateSchema, validState);
+  assertAccepts(contracts.installedStateSchema, {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.2.0" },
+  });
   for (const surface of [
     { ...validInstalledSurface, mergeStrategy: "json-property" },
     {
@@ -463,6 +483,10 @@ test("installed state is strict and records the exact successful generation chec
   assertRejects(contracts.installedStateSchema, {
     ...validState,
     credentials: { token: "must-not-exist" },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.3.0" },
   });
 });
 

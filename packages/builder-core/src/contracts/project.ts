@@ -4,7 +4,10 @@ import {
   safeRelativePathSchema,
   stableIdentifierSchema,
 } from "./identifiers.js";
-import { profileIdentifierSchema } from "./profile.js";
+import {
+  profileIdentifierSchema,
+  profileRecipeVersionSchema,
+} from "./profile.js";
 
 const capabilityIdentifierListSchema = z
   .array(stableIdentifierSchema)
@@ -44,7 +47,7 @@ export const projectConfigurationSchema = z
       })
       .readonly(),
     originProfile: profileIdentifierSchema,
-    recipeVersion: z.literal("0.1.0"),
+    recipeVersion: profileRecipeVersionSchema,
     platformAdapter: z.literal("cloudflare-workers"),
     selectedCapabilities: capabilityIdentifierListSchema,
     capabilitySettings: z

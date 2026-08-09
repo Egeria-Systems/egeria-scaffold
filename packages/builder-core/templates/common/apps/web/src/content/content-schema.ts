@@ -5,6 +5,20 @@ export type NavigationItem = Readonly<{
   label: string;
 }>;
 
+export type ContentConfiguration = Readonly<{
+  schemaVersion: "1.0.0";
+  defaultLocale: "en-CA";
+  locales: readonly ["en-CA"];
+}>;
+
+export type LongFormDocument = Readonly<{
+  frontMatter: Readonly<{
+    title: string;
+    summary: string;
+  }>;
+  body: string;
+}>;
+
 export type PageContent = Readonly<{
   heading: string;
   summary: string;
@@ -40,6 +54,24 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function hasDisallowedControlCharacter(value: string): boolean {
+  for (const character of value) {
+    const codeUnit = character.charCodeAt(0);
+
+    if (
+      codeUnit <= 0x08 ||
+      codeUnit === 0x0b ||
+      codeUnit === 0x0c ||
+      (codeUnit >= 0x0e && codeUnit <= 0x1f) ||
+      codeUnit === 0x7f
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function parseYamlContent(source: string): unknown {
   try {
     const document = parseDocument(source, {
@@ -59,6 +91,68 @@ export function parseYamlContent(source: string): unknown {
   } catch {
     throw new TypeError("CONTENT_INVALID");
   }
+}
+
+export function parseContentConfiguration(
+  value: unknown,
+): ContentConfiguration {
+  if (
+    !isUnknownRecord(value) ||
+    !hasExactKeys(value, ["schemaVersion", "defaultLocale", "locales"]) ||
+    value.schemaVersion !== "1.0.0" ||
+    value.defaultLocale !== "en-CA" ||
+    !Array.isArray(value.locales) ||
+    value.locales.length !== 1 ||
+    value.locales[0] !== "en-CA"
+  ) {
+    throw new TypeError("CONTENT_INVALID");
+  }
+
+  return {
+    schemaVersion: "1.0.0",
+    defaultLocale: "en-CA",
+    locales: ["en-CA"],
+  };
+}
+
+export function parseMarkdownContent(source: string): LongFormDocument {
+  const normalizedSource = source
+    .replaceAll("\r\n", "\n")
+    .replaceAll("\r", "\n");
+
+  if (hasDisallowedControlCharacter(normalizedSource)) {
+    throw new TypeError("CONTENT_INVALID");
+  }
+
+  const lines = normalizedSource.split("\n");
+  const closingDelimiterIndex = lines.indexOf("---", 1);
+
+  if (lines[0] !== "---" || closingDelimiterIndex < 2) {
+    throw new TypeError("CONTENT_INVALID");
+  }
+
+  const frontMatterValue = parseYamlContent(
+    `${lines.slice(1, closingDelimiterIndex).join("\n")}\n`,
+  );
+  const body = lines.slice(closingDelimiterIndex + 1).join("\n").trim();
+
+  if (
+    !isUnknownRecord(frontMatterValue) ||
+    !hasExactKeys(frontMatterValue, ["title", "summary"]) ||
+    !isNonEmptyString(frontMatterValue.title) ||
+    !isNonEmptyString(frontMatterValue.summary) ||
+    body.length === 0
+  ) {
+    throw new TypeError("CONTENT_INVALID");
+  }
+
+  return {
+    frontMatter: {
+      title: frontMatterValue.title,
+      summary: frontMatterValue.summary,
+    },
+    body,
+  };
 }
 
 export function parsePageContent(value: unknown): PageContent {
