@@ -227,3 +227,68 @@ The harness writes only to identity-recorded temporary directories and verified 
 ## Gate
 
 The implementation, current live evidence, deterministic checks, and independent review closures satisfy the P1 Task 8 review checkpoint for the exact comparison. Approval is requested only for the verified final Task 8 diff reported at handoff. Task 9 must not begin until that approval is explicit.
+
+## Task 9 Gate 3 extension
+
+The preceding Task 8 gate is retained as historical evidence. After its explicit approval, Task 9 used the same isolated worktree and reviewed the exact local comparison `8a503f5e6dceec59330412084c8b014ca287e43b..fea12f9c874d938bd029d31bc0f0fb7809359ee5`. Remote refs were not refreshed because the user froze the local Task 8 worktree/base and remote state did not affect this comparison. Current official schema, Node, pnpm, registry, and advisory evidence is recorded in [the final schema-contract review](2026-08-05-p1-schema-contract-review-deferral.md).
+
+### Settled Task 9 behavior
+
+Task 9 re-evaluated all eight deferred schema questions against the final catalog, resolution, codec, ownership, inference, diagnostics, generation, CLI, and fixture consumers. It retained the settled serialized shapes, assigned unresolved security vocabulary and ejection identity to explicit later owners, and documented runtime Zod as the complete-validation authority.
+
+Two behavior-preserving consolidations removed duplicated internal policy without changing public or serialized contracts: the generated-project verifier now owns one frozen six-check receipt, and one private callback owns the two valid surface target/merge pairings while both Zod trust boundaries remain independent. A final reviewer then reproduced sparse-array false attestation in the exact receipt guard; the repaired comparison drives validation from the dense expected sequence so a hole reads as `undefined` and fails with the existing stable issue and cleanup behavior.
+
+The first settled aggregate exposed time-dependent public-registry transitive drift rather than a same-run nondeterminism. The generated workspace now uses pnpm `resolutionMode: time-based`, the fixed-root verifier requires that exact policy, and both fixtures were regenerated only through the production CLI. The final lockfiles are byte-identical with SHA-256:
+
+```text
+028d52c01ccdc8f76b3beb1e764aa5ccb420981efbe45df28478bf680ce2bb11
+```
+
+Final diagnostic tree hashes are:
+
+```text
+portfolio 25 c604de54d60aefe4b3bea30530ea681891f39732ceee9f23b73e23438fa7a742
+site      27 0280a733e5f38eb43363fc517e9e164b78a6c054b6e5ee8bf271341dea4b3ec0
+```
+
+Portfolio retains five installed capabilities and 43 managed surfaces; site retains six and 45. Both persist the distinct nine-value installed-state verification sequence. Manifest, state, confirmed inference, healthy doctor, and equal diff agree for both profiles.
+
+### Final verification receipts
+
+The full `verify:builder-kernel` aggregate ran once on the final executable, template, fixture, and dependency inputs at `eff2d595b59ae845cc3ea68c37e126703f960013` using exact Node `22.23.2`, pnpm `11.20.0`, and `CI=true`.
+
+| Gate | Result |
+| --- | --- |
+| Constitution and repository-local links | PASS; 21/21 |
+| Package boundaries | PASS; 39/39 |
+| Private builder-core | PASS; build plus 104/104 tests |
+| CLI production entry | PASS; build plus 9/9 tests |
+| Generated fixtures | PASS; 7/7; two fresh generations per profile; portfolio 25 and site 27 byte-stable files |
+| Builder lint | PASS; zero warnings |
+| Builder build and typecheck | PASS |
+| Live fixed-root fixture harness | PASS for both profiles and all nine checks |
+| Changesets status | PASS; no package bump |
+
+The harness emitted:
+
+```json
+{"ok":true,"profiles":["portfolio","site"],"checks":["pnpm-version","frozen-install","peer-dependencies","dependency-audit","registry-signatures","lint","typecheck","next-build","opennext-build"]}
+```
+
+The first sandboxed aggregate could not resolve `registry.npmjs.org`; lockfile preparation sanitized that environment failure as `LOCKFILE_PREPARATION_FAILED` / `source-changed`. A disposable before/after snapshot proved the source trees byte-identical. The identical network-permitted exact-toolchain aggregate then passed. This correction is environment evidence, not a replacement implementation.
+
+Commit `fea12f9c874d938bd029d31bc0f0fb7809359ee5` changed documentation only after that aggregate. The generated-project harness, dependency checks, builds, and compatibility proof were not repeated because none of their source, template, fixture, manifest, lockfile, schema, dependency, or proof inputs changed. Proportional final checks passed the two material-review documentary contracts, the focused runtime surface-pairing contract, constitution 21/21, semantic naming, exact three-path repair scope, and `git diff --check`.
+
+### Final independent review
+
+The exact repaired implementation received separate read-only requirements, architecture/anti-overengineering, and test-evidence review. Requirements and architecture reported “No material improvements recommended.” Test-evidence review found the sparse-receipt defect; after its focused RED/GREEN repair, the final test-evidence conclusion was also “No material improvements recommended.”
+
+The full material-code-review workflow used 22 assignment-matched reviewer artifacts, eight candidates, independent validation, adjudication, separate Gate A and Gate B receipts, checkpointed repairs, final-state test refreshes, and independent post-fix verification. It resolved the bounded Gate 2 disposition record and the reversed static/runtime acceptance wording, found no repair-caused regression, and completed with verdict `pass`, repair round zero, and verification hash `5ff6b265db724dcd04c0369e5a3bb1bb26f85de2f8c6e59480beed44be4b754c`.
+
+### Gate 3 claim limits and recovery
+
+This evidence establishes the final P1 builder-kernel contracts and exact local generated-fixture verification. It does not prove deployment, future registry safety, package provenance, workerd behavior for generated fixtures, visual or translation quality, human usability, accessibility conformance, penetration resistance, or general production security. No WCAG conformance claim is made.
+
+Task 9 created no provider resource, persistent data, deployment, publication, Git remote change, permission change, or production action. Source recovery is a focused newest-first revert of Task 9 commits; the separate final gate-artifact commit can be reverted independently. Generated outputs can be rebuilt from the approved templates and production CLI. Dependency/build artifacts remain non-authoritative and can be reinstalled or rebuilt with the exact pinned toolchain. Provider and persistent-data rollback are not applicable.
+
+The resulting [P1 review packet](../review-packets/2026-08-05-p1-builder-kernel.md) requests verified-final-diff approval only. Until that approval is explicit, P1 remains in review.

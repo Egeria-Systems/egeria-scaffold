@@ -1674,7 +1674,7 @@ The settled source transformations use small focused commits. Task 9 documentati
 
 This task revisits the Task 1 schema questions only after Tasks 2 through 8 have supplied their real catalog, resolver, codec, ownership, inference, diagnostics, generation, CLI, and fixture consumers. The dated deferral record preserves the original direct field-purpose audit, the bounded material-code-simplification result, their differences, and the frozen evidence hashes. Those recorded observations are review inputs, not approved findings or pre-authorized edits.
 
-- [ ] **Step 1: Re-freeze and trace every deferred question through final P1 consumers**
+- [x] **Step 1: Re-freeze and trace every deferred question through final P1 consumers**
 
 Verify the current branch, status, exact Task 1-to-final-P1 comparison, and all direct consumers before judging the recorded questions. Re-evaluate:
 
@@ -1689,19 +1689,19 @@ Verify the current branch, status, exact Task 1-to-final-P1 comparison, and all 
 
 For each item, identify the canonical owner, actual callers, serialized compatibility boundary, tests, generated artifacts, and counterevidence. Do not assume the original direct recommendation or simplification disposition remains correct.
 
-- [ ] **Step 2: Repeat the two review lenses against the final P1 tree**
+- [x] **Step 2: Repeat the two review lenses against the final P1 tree**
 
 Run a fresh field-by-field purpose audit and a bounded behavior-preserving simplification review over the final runtime schemas, direct consumers, contract tests, and generated artifacts. Keep the lenses separate: correctness, schema parity, or product-vocabulary questions must not be relabeled as simplifications, and an accepted contract must not be retained solely because it was accepted before its consumers existed.
 
 Classify every deferred item exactly once as `retain-as-intentional`, `clarify-contract`, `tighten-validation`, `remove-as-redundant`, or `defer-with-owner`. Record evidence, counterevidence, compatibility impact, and confidence in the deferral record.
 
-- [ ] **Step 3: Gate any resulting implementation separately**
+- [x] **Step 3: Gate any resulting implementation separately**
 
 If no source/schema/test change is supported, record that result and continue. If any change is supported, write an exact-file amendment under `docs/superpowers/plans/`, identify characterization and migration/compatibility evidence, and stop for explicit plan approval before editing code, schemas, generated artifacts, tests, or state formats. This Task 9 review does not itself authorize those edits.
 
 After any separately approved repair, rerun only affected focused checks during the repair, request the bounded reviewer follow-up needed to close the retained finding, then run the settled final P1 verification once against the final tree.
 
-- [ ] **Step 4: Finalize verification evidence and the P1 review packet**
+- [x] **Step 4: Finalize verification evidence and the P1 review packet**
 
 The verification record and packet must include:
 
@@ -1719,10 +1719,10 @@ The verification record and packet must include:
 - source/dependency/build-output recovery; and
 - explicit statement that no provider, persistent data, publication, deployment, push, or pull request occurred.
 
-- [ ] **Step 5: Commit Gate 3 artifacts and stop**
+- [x] **Step 5: Commit Gate 3 artifacts and stop**
 
 ```bash
-git add docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md docs/review-packets/2026-08-05-p1-builder-kernel.md
+git add docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md docs/review-packets/2026-08-05-p1-builder-kernel.md docs/superpowers/plans/2026-08-05-p1-builder-kernel.md
 git commit -m "Record P1 verification and review"
 ```
 

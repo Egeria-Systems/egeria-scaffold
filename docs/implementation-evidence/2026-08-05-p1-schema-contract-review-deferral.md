@@ -124,8 +124,9 @@ No schema, runtime source, generated artifact, test, package manifest, or lockfi
 worktree: /private/tmp/egeria-scaffold-p1-task-8
 branch: p1-task-8-golden-fixtures
 Task 9 base: 8a503f5e6dceec59330412084c8b014ca287e43b
-source candidate: e8ba4a9c5ebbfa596bed9709392e86dd4d1ed60f
-source comparison: 8a503f5e6dceec59330412084c8b014ca287e43b..e8ba4a9c5ebbfa596bed9709392e86dd4d1ed60f
+initial schema-transformation candidate: e8ba4a9c5ebbfa596bed9709392e86dd4d1ed60f
+settled pre-packet implementation candidate: fea12f9c874d938bd029d31bc0f0fb7809359ee5
+Task 9 comparison: 8a503f5e6dceec59330412084c8b014ca287e43b..fea12f9c874d938bd029d31bc0f0fb7809359ee5
 overall P1 base: 303ee9d35e19f9191948d994159f77c82c90a1ed
 Node: 22.23.2
 pnpm: 11.20.0
@@ -180,6 +181,36 @@ Two findings were accepted and resolved:
 The source-owner RED controls observed three receipt representations and two surface-rule implementations before the repairs. GREEN observed one owner for each policy. Focused and global receipts passed: generated-project contract 16/16, contract boundaries 12/12, private-source inventory 6/6, builder-core 104/104, package boundaries 39/39, CLI 9/9, generated-fixture determinism 7/7, typecheck, lint, semantic naming, and both-profile generated-skeleton verification. The post-fix independent verifier found both root causes resolved, no regression, and no record-only observation.
 
 One controller incident is preserved rather than hidden. Two F001 `run-test` calls were mistakenly issued concurrently, and their evidence writes collided even though the repository checks were green. Repository files were restored, the controller's pinned-runtime rollback completed, stale temporary checkpoint directories were moved intact to `/private/tmp/egeria-task9-simplification-20260808/quarantined-after-rollback/`, and the same approved transformation was replayed sequentially. Attempt 2 and the full post-fix verification passed. The incident changed no user-owned file and does not replace the final settled-tree verification.
+
+### Formal material review
+
+The final full material review covered the repaired implementation comparison through `eff2d595b59ae845cc3ea68c37e126703f960013`. Its initial immutable range and repair-aligned branch scopes produced the same review patch SHA-256, `883ed5b85d7e75050578aa1443a1fcbe8a9e4ac20b43be1c78cea4dbfd66c3bb`. The controller correctly refused to mutate from the range run, so all 22 reviewer artifacts were rebound to a mutable branch-scope run. After removing only the three run-binding hashes, every candidate artifact was semantically identical; assignment, obligation, frozen-quote, and controller validation passed 22/22 with eight candidates and zero ingestion rejection.
+
+```text
+run ID: 20260809-202521-6daa73b1
+scope hash: ea0f8630a381fe3bb089a4fb3a293dc78552e2b90644a01f221bf0f96d9ca201
+coverage plan hash: d07942c12b8ce89eea04ad22a4f7bd46c451320920a3163fa69888c31a552b30
+coverage context hash: 371aa921dc01fc2e77b6f13aca3a8bb03ccd02909aee49cb44ebdcbd4c03c34e
+candidate bundle hash: ba8353a0242866fab25d6bf4e10e3eea90db58c32c3138f1d1f71cc420d7e75f
+ledger hash: 6b45eed71503cc14d413da81042f0a4da0509e4b05c9506a91ffd859d37226a3
+Gate A receipt: f8e1e1bae1a27db77ed68bbbd36d22e18c6d34a6be3a479f5357ef8946e5f0d8
+approved plan hash: ca007d477c8c69d1695f979ce4f4a04f24d97428c225a5826cce5624e7f2355f
+Gate B receipt: aa7cbb09459702dbfc73fd76c00109fc721f1832c2759c7903a35b4b9aa566b0
+fix summary hash: 26043a12cae136fbf97584788742295ceed7d96bef265d369024b992e7ca1984
+post-fix verification hash: 5ff6b265db724dcd04c0369e5a3bb1bb26f85de2f8c6e59480beed44be4b754c
+controller state: COMPLETE
+verdict: pass
+repair rounds: 0
+```
+
+The mutable Gate A receipt records the exact user statement `approve and preaprove all gates until full resolution`; the exact Gate B statement was `approve`. These receipts authorize only the hash-bound repair. They do not convert the historical Gate 2 deviation into compliance, waive policy, approve the pending Gate 3 final diff, or authorize external action.
+
+Two findings were approved and resolved:
+
+- F001 retained the candid chronology and recorded the user's bounded acceptance of the non-curable Gate 2 deviation for the pending Gate 3 decision only. The canonical Gate 2 rule, Git history, sealed artifacts, and absence of compliance, waiver, exception, or precedent remain explicit.
+- F002 corrected the introduced acceptance-direction wording in the builder-core README and this evidence record. When conversion omits a runtime refinement, checked-schema acceptance can be broader or less restrictive than authoritative runtime Zod; complete validation still requires the runtime schemas, and no full semantic-parity claim was added.
+
+The three discarded groups were a pre-existing static/runtime acceptance difference already accounted for by F002 and two non-fragile additional-test suggestions. The approved repair changed only this evidence record, the canonical plan, and the builder-core README. Causal pre-edit assertions failed on the absent disposition and reversed direction; Volta reported those intentional assertion exits as `126`. Retained GREEN checks, final-state refreshes, exact three-path scope, constitution 21/21, semantic naming, focused runtime surface-pairing behavior, and `git diff --check` all passed. The independent post-fix verifier hash-checked all retained logs, resolved both findings, found no fix-caused regression or record-only observation, and returned `pass`.
 
 ### Current official evidence
 
