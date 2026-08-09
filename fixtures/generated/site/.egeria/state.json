@@ -489,7 +489,7 @@
       "path": "apps/web/src/content/read-content.ts"
     },
     {
-      "fingerprint": "sha256:a028d57dc02548f876520648e2847cefebeadbbb4357278de58babf70cb05d58",
+      "fingerprint": "sha256:828703cb9f90d1cf074107c5998a601756eb336c12acf25bdf138ff02f7547f5",
       "fingerprintTarget": {
         "kind": "file"
       },

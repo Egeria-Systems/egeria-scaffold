@@ -51,7 +51,11 @@ function hasExactKeys(
 }
 
 function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
+  return (
+    typeof value === "string" &&
+    value.trim().length > 0 &&
+    !hasDisallowedControlCharacter(value)
+  );
 }
 
 function hasDisallowedControlCharacter(value: string): boolean {

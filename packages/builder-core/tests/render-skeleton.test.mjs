@@ -720,6 +720,8 @@ test("the emitted YAML parser rejects unsafe syntax and invalid content shapes",
     "---\ntitle: Example\nsummary: Summary\nextra: true\n---\nBody\n",
     "---\ntitle: Example\nsummary: Summary\n---\n \n",
     "---\ntitle: Example\nsummary: Summary\n---\nUnsafe\u0000body\n",
+    '---\ntitle: "\\0"\nsummary: Summary\n---\nBody\n',
+    '---\ntitle: Example\nsummary: "\\u007f"\n---\nBody\n',
     "---\ntitle: &title Example\nsummary: *title\n---\nBody\n",
     "---\ntitle: First\ntitle: Second\nsummary: Summary\n---\nBody\n",
   ]) {
