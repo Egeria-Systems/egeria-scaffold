@@ -159,9 +159,9 @@ The generated project desired and installed state records recipe `0.2.0`; instal
 - Create: `docs/implementation-evidence/2026-08-09-portfolio-content-contract-preparation.md`
 - Create: `docs/superpowers/plans/2026-08-09-portfolio-content-contract.md`
 
-- [ ] Verify both documents contain no unresolved placeholders, broken local links, or trailing whitespace.
-- [ ] Run constitution and semantic-naming checks plus `git diff --check`.
-- [ ] Commit exactly the two planning artifacts with message `Plan portfolio content validation`.
+- [x] Verify both documents contain no unresolved placeholders, broken local links, or trailing whitespace.
+- [x] Run constitution and semantic-naming checks plus `git diff --check`.
+- [x] Commit exactly the two planning artifacts with message `Plan portfolio content validation`.
 
 ## Task 2: RED — specify recipe evolution and generated content behavior
 
@@ -172,12 +172,12 @@ The generated project desired and installed state records recipe `0.2.0`; instal
 - Modify: `packages/builder-core/tests/render-skeleton.test.mjs`
 - Modify: `tests/package-boundaries/private-packages.test.mjs`
 
-- [ ] Add contract assertions that retained `0.1.0` and current `0.2.0` recipe provenance are accepted while `0.3.0` is rejected.
-- [ ] Update current catalog/recipe expectations to `content-files@0.2.0` and recipes `0.2.0`.
-- [ ] Add exact common/profile template inventory and rendered-path expectations.
-- [ ] Add executable parser tests for valid content configuration and Markdown, CRLF normalization, exact front-matter keys, required delimiters/body, unsafe controls, unsafe YAML features, and stable content-free failure.
-- [ ] Add externalized-copy, fixed-reader-path, deterministic-byte, profile-output, and 42/44 ownership assertions.
-- [ ] Build builder-core and run the focused named tests. Record the expected failures caused only by missing new behavior and changed versions.
+- [x] Add contract assertions that retained `0.1.0` and current `0.2.0` recipe provenance are accepted while `0.3.0` is rejected.
+- [x] Update current catalog/recipe expectations to `content-files@0.2.0` and recipes `0.2.0`.
+- [x] Add exact common/profile template inventory and rendered-path expectations.
+- [x] Add executable parser tests for valid content configuration and Markdown, CRLF normalization, exact front-matter keys, required delimiters/body, unsafe controls, unsafe YAML features, and stable content-free failure.
+- [x] Add externalized-copy, fixed-reader-path, deterministic-byte, profile-output, and 42/44 ownership assertions.
+- [x] Build builder-core and run the focused named tests. Record the expected failures caused only by missing new behavior and changed versions.
 
 ## Task 3: GREEN — implement the minimum content contract
 
@@ -186,15 +186,15 @@ The generated project desired and installed state records recipe `0.2.0`; instal
 - Modify the exact runtime, catalog, template, schema, and direct-owner files listed above.
 - Create the three exact template files listed above.
 
-- [ ] Accept exact retained/current recipe versions and derive the resolved recipe type from the profile schema.
-- [ ] Advance current recipes and `content-files` versions without changing other capabilities or dependencies.
-- [ ] Add explicit managed surfaces, probes, and allowlisted templates for the configuration and Markdown document.
-- [ ] Implement only the strict pure parser functions and fixed-path reader functions specified above.
-- [ ] Source layout locale from validated configuration and keep Markdown opaque.
-- [ ] Update generated guidance and direct owner documentation without duplicating canonical architecture rules.
-- [ ] Regenerate checked schemas with the repository schema generator.
-- [ ] Rerun the focused tests until GREEN, then run the full builder-core and package-boundary checks once for this coherent batch.
-- [ ] Commit the exact source/test/schema/doc batch with message `Add validated portfolio content contracts`.
+- [x] Accept exact retained/current recipe versions and derive the resolved recipe type from the profile schema.
+- [x] Advance current recipes and `content-files` versions without changing other capabilities or dependencies.
+- [x] Add explicit managed surfaces, probes, and allowlisted templates for the configuration and Markdown document.
+- [x] Implement only the strict pure parser functions and fixed-path reader functions specified above.
+- [x] Source layout locale from validated configuration and keep Markdown opaque.
+- [x] Update generated guidance and direct owner documentation without duplicating canonical architecture rules.
+- [x] Regenerate checked schemas with the repository schema generator.
+- [x] Rerun the focused tests until GREEN, then run the full builder-core and package-boundary checks once for this coherent batch.
+- [x] Commit the exact source/test/schema/doc batch with message `Add validated portfolio content contracts`.
 
 ## Task 4: RED/GREEN — update production fixture contracts
 
@@ -205,22 +205,22 @@ The generated project desired and installed state records recipe `0.2.0`; instal
 - Regenerate: `fixtures/generated/portfolio/**`
 - Regenerate: `fixtures/generated/site/**`
 
-- [ ] First update expected rendered paths, delivered paths, recipe/capability versions, and 45/47 surface counts.
-- [ ] Run focused generation and fixture checks against the old fixtures and record the expected inventory/state mismatch.
-- [ ] Build the production CLI, generate each profile twice in fresh temporary roots, and require byte-identical output before changing committed fixtures.
-- [ ] Inspect the exact generated inventory and copy only the identity-matched generated roots into their corresponding fixture directories. No path removal is expected.
-- [ ] Confirm the root and fixture lockfile dependency graphs did not change unexpectedly.
-- [ ] Run focused generation tests, fixture determinism, read-only inference agreement, and fixed-root generated project verification until GREEN.
-- [ ] Commit exact fixture/test/harness changes with message `Refresh generated content fixtures`.
+- [x] First update expected rendered paths, delivered paths, recipe/capability versions, and 45/47 surface counts.
+- [x] Run focused generation and fixture checks against the old fixtures and record the expected inventory/state mismatch.
+- [x] Build the production CLI, generate each profile twice in fresh temporary roots, and require byte-identical output before changing committed fixtures.
+- [x] Inspect the exact generated inventory and copy only the identity-matched generated roots into their corresponding fixture directories. No path removal is expected.
+- [x] Confirm the root and fixture lockfile dependency graphs did not change unexpectedly.
+- [x] Run focused generation tests, fixture determinism, read-only inference agreement, and fixed-root generated project verification until GREEN.
+- [x] Commit exact fixture/test/harness changes with message `Refresh generated content fixtures`.
 
 ## Task 5: Independent reviews and evidence-backed repair
 
-- [ ] Freeze the exact base/head comparison and changed-file list.
-- [ ] Dispatch one read-only requirements reviewer, one read-only architecture/anti-overengineering reviewer, and one read-only test-evidence reviewer. Give each the exact comparison and prohibit edits, recursive fan-out, external mutation, and scope expansion.
-- [ ] Validate every reported finding against the current tree.
-- [ ] For each material defect, add a focused failing test where applicable, make the minimum repair, rerun affected checks, and record the disposition. Do not implement preferences or speculative improvements.
-- [ ] Ask the relevant reviewer to verify any material repair. Do not repeat unchanged reviews.
-- [ ] Commit evidence-backed repairs in focused commits named for the actual change.
+- [x] Freeze the exact base/head comparison and changed-file list.
+- [x] Dispatch one read-only requirements reviewer, one read-only architecture/anti-overengineering reviewer, and one read-only test-evidence reviewer. Give each the exact comparison and prohibit edits, recursive fan-out, external mutation, and scope expansion.
+- [x] Validate every reported finding against the current tree.
+- [x] For each material defect, add a focused failing test where applicable, make the minimum repair, rerun affected checks, and record the disposition. Do not implement preferences or speculative improvements.
+- [x] Ask the relevant reviewer to verify any material repair. Do not repeat unchanged reviews.
+- [x] Commit evidence-backed repairs in focused commits named for the actual change.
 
 ## Task 6: Final verification, evidence, and review packet
 
@@ -229,12 +229,12 @@ The generated project desired and installed state records recipe `0.2.0`; instal
 - Create: `docs/implementation-evidence/2026-08-09-portfolio-content-contract-verification.md`
 - Create: `docs/review-packets/2026-08-09-portfolio-content-contract.md`
 
-- [ ] Run `CI=true volta run --node 22.23.2 --pnpm 11.20.0 pnpm run verify:builder-kernel` once against the final executable/template/fixture tree.
-- [ ] Run fresh `pnpm audit --audit-level moderate`, `pnpm audit signatures`, constitution, semantic naming, and `git diff --check` as proportionate final checks.
-- [ ] Record exact commits, comparison, changed files, TDD RED/GREEN evidence, commands/results, reviewer dispositions, version behavior, fixture counts, hashes where useful, risks, deferrals, claim limits, and rollback/recovery.
-- [ ] Confirm no unauthorized Changeset, package bump/publication, push, pull request, merge, deployment, provider mutation, persistent-data action, permission change, external message, or review-comment response occurred.
-- [ ] Commit the two final artifacts and any direct documentary cross-link corrections with message `Record portfolio content verification`.
-- [ ] Stop for explicit verified-final-diff review. Do not integrate the branch or begin the next P2 increment.
+- [x] Run `CI=true volta run --node 22.23.2 --pnpm 11.20.0 pnpm run verify:builder-kernel` once against the final executable/template/fixture tree.
+- [x] Run fresh `pnpm audit --audit-level moderate`, `pnpm audit signatures`, constitution, semantic naming, and `git diff --check` as proportionate final checks.
+- [x] Record exact commits, comparison, changed files, TDD RED/GREEN evidence, commands/results, reviewer dispositions, version behavior, fixture counts, hashes where useful, risks, deferrals, claim limits, and rollback/recovery.
+- [x] Confirm no unauthorized Changeset, package bump/publication, push, pull request, merge, deployment, provider mutation, persistent-data action, permission change, external message, or review-comment response occurred.
+- [x] Commit the two final artifacts and any direct documentary cross-link corrections with message `Record portfolio content verification`.
+- [x] Stop for explicit verified-final-diff review. Do not integrate the branch or begin the next P2 increment.
 
 ## Rollback and recovery
 
