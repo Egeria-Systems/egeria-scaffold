@@ -61,6 +61,7 @@ Modify tests, verification contracts, and checked schemas:
 
 ```text
 packages/builder-core/tests/contracts.test.mjs
+packages/builder-core/tests/diagnostics.test.mjs
 packages/builder-core/tests/resolution.test.mjs
 packages/builder-core/tests/render-skeleton.test.mjs
 packages/builder-core/tests/generate-project.test.mjs
@@ -239,3 +240,7 @@ The generated project desired and installed state records recipe `0.2.0`; instal
 Use focused newest-first `git revert` commits rather than reset or history rewriting. Reverting the fixture commit restores the prior generated project evidence; reverting the content-contract commit restores recipe/capability `0.1.0`, templates, parser behavior, and checked schemas; reverting the planning commit withdraws only the plan/evidence record. After a source revert, regenerate fixtures from the restored production CLI and rerun `verify:builder-kernel`.
 
 This increment has no persistent-data or provider rollback. Temporary install, build, and generated-project directories are non-authoritative and can be recreated with the exact pinned toolchain.
+
+## Execution amendment — canonical diagnostic repository
+
+The first full builder-core GREEN attempt exposed one direct current-catalog consumer in `packages/builder-core/tests/diagnostics.test.mjs`. Its canonical in-memory portfolio materializes every current capability surface and therefore became incomplete when the two content-files probes/surfaces were added. The preapproved exact-file plan amendment adds that test file to the coherent source batch and adds only the two new source entries to its existing canonical file map. It does not change diagnostic policy, production code, stable output, or synthetic retained-`0.1.0` provenance. The original failure and repaired result must be recorded in verification evidence.
