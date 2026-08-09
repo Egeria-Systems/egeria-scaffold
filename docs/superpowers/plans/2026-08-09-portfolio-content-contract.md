@@ -65,6 +65,7 @@ packages/builder-core/tests/diagnostics.test.mjs
 packages/builder-core/tests/resolution.test.mjs
 packages/builder-core/tests/render-skeleton.test.mjs
 packages/builder-core/tests/generate-project.test.mjs
+tests/generated-fixtures/determinism.test.mjs
 tests/package-boundaries/private-packages.test.mjs
 scripts/verify-generated-skeletons.mjs
 packages/builder-core/schemas/profile.schema.json
@@ -244,3 +245,9 @@ This increment has no persistent-data or provider rollback. Temporary install, b
 ## Execution amendment — canonical diagnostic repository
 
 The first full builder-core GREEN attempt exposed one direct current-catalog consumer in `packages/builder-core/tests/diagnostics.test.mjs`. Its canonical in-memory portfolio materializes every current capability surface and therefore became incomplete when the two content-files probes/surfaces were added. The preapproved exact-file plan amendment adds that test file to the coherent source batch and adds only the two new source entries to its existing canonical file map. It does not change diagnostic policy, production code, stable output, or synthetic retained-`0.1.0` provenance. The original failure and repaired result must be recorded in verification evidence.
+
+The fixture contract exported by `scripts/verify-generated-skeletons.mjs` is consumed directly by `tests/generated-fixtures/determinism.test.mjs`. Advancing recipe/capability versions and surface counts therefore requires that test to assert the new contract. The exact-file plan now records this direct consumer; the omission did not authorize a broader fixture or test change.
+
+## Requirements-review repair — decoded control characters
+
+Requirements review reproduced escaped YAML NUL and DEL values that pass the raw Markdown source check and decode into front-matter strings. The repair adds RED regressions for encoded forbidden controls, applies the existing disallowed-control predicate to decoded non-empty content strings, regenerates the affected parser fixtures and installed-state fingerprints, and reruns the content parser plus fixture/build gates. It does not add a renderer, sanitizer, dependency, content shape, or new failure identifier.
