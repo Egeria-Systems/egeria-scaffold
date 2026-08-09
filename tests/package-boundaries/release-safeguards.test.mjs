@@ -185,6 +185,8 @@ test("root release commands use the pinned Changesets boundary", async () => {
   assert.deepEqual(
     {
       build: rootManifest.scripts?.["build:builder"],
+      copyExternalization:
+        rootManifest.scripts?.["check:copy-externalization"],
       changeset: rootManifest.scripts?.changeset,
       changesetStatus: rootManifest.scripts?.["changeset:status"],
       releaseCheck: rootManifest.scripts?.["check:package-release"],
@@ -206,6 +208,8 @@ test("root release commands use the pinned Changesets boundary", async () => {
     {
       build:
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run build",
+      copyExternalization:
+        'eslint "packages/builder-core/templates/**/app/**/*.tsx" "packages/builder-core/templates/**/src/presentation/**/*.tsx" --config eslint.config.mjs --max-warnings 0',
       changeset: "changeset",
       changesetStatus: "changeset status",
       releaseCheck: "node scripts/check-package-release.mjs",
@@ -214,7 +218,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
       cliTests:
         "pnpm --filter @egeria-systems/cli run build && pnpm --filter @egeria-systems/cli run test",
       lint:
-        "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint",
+        "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint && pnpm run check:copy-externalization",
       release: "changeset publish",
       packageBoundaries: "node --test tests/package-boundaries/*.test.mjs",
       packageTests:

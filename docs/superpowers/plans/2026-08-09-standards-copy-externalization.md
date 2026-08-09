@@ -326,8 +326,10 @@ Expected: exact eight-file public API/test/release commit with no version materi
 Require root script:
 
 ```json
-"check:copy-externalization": "eslint \"packages/builder-core/templates/**/app/**/*.tsx\" \"packages/builder-core/templates/**/src/presentation/**/*.tsx\" --max-warnings 0"
+"check:copy-externalization": "eslint \"packages/builder-core/templates/**/app/**/*.tsx\" \"packages/builder-core/templates/**/src/presentation/**/*.tsx\" --config eslint.config.mjs --max-warnings 0"
 ```
+
+The explicit root config prevents ESLint CLI discovery from importing the generated project's nested configuration before the repository-owned ignore and files boundary can apply.
 
 Require `lint:builder` to run the existing four-package lint followed by `pnpm run check:copy-externalization`. Instantiate ESLint with the root config and assert:
 

@@ -1,4 +1,5 @@
 import eslint from "@eslint/js";
+import { createCopyExternalizationConfig } from "@egeria-systems/standards/eslint/copy-externalization";
 import { createTypeScriptStrictConfig } from "@egeria-systems/standards/eslint/typescript-strict";
 
 const builderTypeScriptFiles = [
@@ -13,7 +14,7 @@ export default [
     ignores: [
       "**/dist/**",
       "**/tests/fixtures/**",
-      "packages/builder-core/templates/**",
+      "packages/builder-core/templates/**/eslint.config.mjs",
       "proofs/**",
     ],
   },
@@ -25,5 +26,11 @@ export default [
   ...createTypeScriptStrictConfig({
     files: builderTypeScriptFiles,
     tsconfigRootDir: import.meta.dirname,
+  }),
+  createCopyExternalizationConfig({
+    files: [
+      "packages/builder-core/templates/**/app/**/*.tsx",
+      "packages/builder-core/templates/**/src/presentation/**/*.tsx",
+    ],
   }),
 ];

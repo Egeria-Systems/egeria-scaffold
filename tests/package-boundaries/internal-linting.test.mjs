@@ -46,7 +46,11 @@ test("the builder root owns an exact ESLint 10 lint boundary", async () => {
   );
   assert.equal(
     rootManifest.scripts?.["lint:builder"],
-    "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint",
+    "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/standards --filter @egeria-systems/observability run lint && pnpm run check:copy-externalization",
+  );
+  assert.equal(
+    rootManifest.scripts?.["check:copy-externalization"],
+    'eslint "packages/builder-core/templates/**/app/**/*.tsx" "packages/builder-core/templates/**/src/presentation/**/*.tsx" --config eslint.config.mjs --max-warnings 0',
   );
   assert.equal(
     rootManifest.scripts?.["check:semantic-naming"],
@@ -65,6 +69,72 @@ test("the builder root owns an exact ESLint 10 lint boundary", async () => {
   assert.match(
     rootManifest.scripts?.["verify:builder-packages"] ?? "",
     /pnpm run lint:builder/,
+  );
+});
+
+test("copy externalization covers canonical builder TSX templates", async () => {
+  const { ESLint } = await import("eslint");
+  const eslint = new ESLint({
+    cwd: repositoryRoot,
+    overrideConfigFile: resolve(repositoryRoot, "eslint.config.mjs"),
+  });
+  const results = await eslint.lintFiles([
+    "packages/builder-core/templates/**/app/**/*.tsx",
+    "packages/builder-core/templates/**/src/presentation/**/*.tsx",
+  ]);
+
+  assert.deepEqual(
+    results.map(({ filePath, messages }) => ({
+      filePath: filePath.slice(repositoryRoot.length + 1),
+      messages,
+    })),
+    [
+      {
+        filePath:
+          "packages/builder-core/templates/common/apps/web/app/layout.tsx",
+        messages: [],
+      },
+      {
+        filePath: "packages/builder-core/templates/common/apps/web/app/page.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/common/apps/web/src/presentation/content-page.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/site/apps/web/app/about/page.tsx",
+        messages: [],
+      },
+    ],
+  );
+
+  const [invalidResult] = await eslint.lintText(
+    "export default function Page() { return <main>Literal</main>; }\n",
+    {
+      filePath: resolve(
+        repositoryRoot,
+        "packages/builder-core/templates/common/apps/web/app/page.tsx",
+      ),
+    },
+  );
+
+  assert.deepEqual(
+    invalidResult.messages.map(({ ruleId, severity, message }) => ({
+      ruleId,
+      severity,
+      message,
+    })),
+    [
+      {
+        ruleId: "@egeria-systems/copy/externalize-visible-copy",
+        severity: 2,
+        message:
+          "Move user-visible JSX text to validated content or localization.",
+      },
+    ],
   );
 });
 

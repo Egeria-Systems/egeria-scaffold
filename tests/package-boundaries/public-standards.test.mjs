@@ -80,8 +80,15 @@ test("standards exposes only its approved public configuration APIs", async () =
 });
 
 test("each standards API has a concrete workspace consumer", async () => {
-  const [rootManifest, cliManifest, coreManifest, proofManifest] = await Promise.all([
+  const [
+    rootManifest,
+    rootConfiguration,
+    cliManifest,
+    coreManifest,
+    proofManifest,
+  ] = await Promise.all([
     readJson("package.json"),
+    readFile(resolve(repositoryRoot, "eslint.config.mjs"), "utf8"),
     readJson("apps/cli/package.json"),
     readJson("packages/builder-core/package.json"),
     readJson("proofs/nextjs-cloudflare/package.json"),
@@ -102,5 +109,13 @@ test("each standards API has a concrete workspace consumer", async () => {
   assert.equal(
     rootManifest.devDependencies?.["@egeria-systems/standards"],
     "workspace:*",
+  );
+  assert.equal(
+    rootManifest.scripts?.["check:copy-externalization"],
+    'eslint "packages/builder-core/templates/**/app/**/*.tsx" "packages/builder-core/templates/**/src/presentation/**/*.tsx" --config eslint.config.mjs --max-warnings 0',
+  );
+  assert.match(
+    rootConfiguration,
+    /createCopyExternalizationConfig/u,
   );
 });
