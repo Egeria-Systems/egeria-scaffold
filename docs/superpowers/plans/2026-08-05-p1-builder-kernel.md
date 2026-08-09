@@ -1651,6 +1651,25 @@ The user preapproved bounded plan amendments and continuous local implementation
 
 The disposable pre-plan experiment is evidence only: two independent `time-based` lockfile resolutions were byte-identical, frozen install passed, `pnpm audit --audit-level high` found no known vulnerability, and lint/typecheck/Next/OpenNext builds passed. Repository implementation still follows the RED, minimum source change, regeneration, and GREEN sequence above.
 
+### Sparse verification-receipt repair amendment (2026-08-09)
+
+The independent final test-evidence review reproduced a medium, certain defect in the exact six-check generated-project receipt guard. `Array.prototype.every` skips unassigned indexes, so an injected verifier can return a sparse array with length six, have the receipt accepted, and cause the generator to persist a nine-check successful-verification record even though none of the six generated-project checks was supplied. This violates the approved exact-receipt contract and makes the durable verification attestation false.
+
+The user's preapproval of bounded plan amendments and continuous local implementation through implemented-task review authorizes this narrow repair. It changes no public API, schema, serialized shape, issue code/path/context, verifier command, fixture, dependency, or capability behavior.
+
+**Additional exact files:**
+
+- Modify: `packages/builder-core/tests/generate-project.test.mjs`
+- Modify: `packages/builder-core/src/generation/write-generated-project.ts`
+- Modify: `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`
+
+**TDD and verification sequence:**
+
+1. Add a sparse six-slot receipt to the existing exact-ordered-checks negative table while retaining the exact `GENERATED_VERIFICATION_INVALID` issue and source/destination cleanup assertions. Run only that focused test and require RED because the current guard incorrectly succeeds.
+2. Replace the sparse-skipping comparison with an expected-sequence-driven indexed comparison. A hole then reads as `undefined` and fails without changing dense-array behavior.
+3. Rerun the focused test and builder-core suite, then rerun the full `verify:builder-kernel` aggregate once after all repaired inputs settle.
+4. Restart requirements, architecture/anti-overengineering, test-evidence, and full material-code-review scopes at the repaired candidate. Do not reuse superseded-scope conclusions as final evidence.
+
 The settled source transformations use small focused commits. Task 9 documentation and the Gate 3 packet follow only after the formal simplification verifier passes. Final review must include independent requirements, architecture/anti-overengineering, test-evidence, and full material-code-review passes over the exact final comparison. Only evidence-backed material findings may be repaired, and affected verification must be rerun before the packet is sealed.
 
 This task revisits the Task 1 schema questions only after Tasks 2 through 8 have supplied their real catalog, resolver, codec, ownership, inference, diagnostics, generation, CLI, and fixture consumers. The dated deferral record preserves the original direct field-purpose audit, the bounded material-code-simplification result, their differences, and the frozen evidence hashes. Those recorded observations are review inputs, not approved findings or pre-authorized edits.

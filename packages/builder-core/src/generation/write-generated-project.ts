@@ -438,10 +438,12 @@ function verificationIsExact(value: unknown): value is GeneratedProjectVerificat
     return false;
   }
 
+  const checks = value.checks;
+
   return (
-    value.checks.length === verificationChecks.length &&
-    value.checks.every(
-      (check, index) => check === verificationChecks[index],
+    checks.length === verificationChecks.length &&
+    verificationChecks.every(
+      (expectedCheck, index) => checks[index] === expectedCheck,
     )
   );
 }

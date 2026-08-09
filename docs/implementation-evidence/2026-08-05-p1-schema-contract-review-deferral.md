@@ -211,6 +211,16 @@ A disposable, non-repository experiment added only `resolutionMode: time-based` 
 
 Alternatives were rejected provisionally: merely refreshing fixtures would fail again when another compatible transitive version appears; one override per drifting transitive dependency would copy package-manager resolution into builder policy; and a bundled lockfile template would add a large independently maintained artifact and bypass ordinary first-resolution behavior. The exact-file amendment in the canonical P1 plan authorizes the time-based policy, fixed-root verifier update, production-CLI regeneration of the two workspace policies, lockfiles, and derived state fingerprints, affected verification, and renewed final review. No repository source/configuration/fixture repair preceded that amendment.
 
+### Sparse verification-receipt repair preparation
+
+**Date:** 2026-08-09 (America/Toronto)
+
+The independent final test-evidence reviewer reproduced a false-attestation path at candidate `088dd7a87eddb2a7500926b5bee67bffdf5fe9ee`. The generated-project writer required a six-element receipt and used `value.checks.every(...)` to compare it with the canonical tuple. JavaScript array iteration skips holes, so an injected verifier returning `{ checks: new Array(6) }` passed the guard and caused generation to succeed with all nine durable verification identifiers even though the verifier supplied none of the six generated-project checks. The existing negative table covered a malformed receipt, absent `checks`, an additional item, and reversed order, but no sparse array.
+
+This is a current, causal material finding because Task 9 consolidated and declared the receipt guard exact and relies on it when creating durable state. The canonical plan amendment limits the repair to one negative test and one internal comparison. The expected failure is `GENERATED_VERIFICATION_INVALID` with root path `[]` and `checks-mismatch`, followed by source and destination cleanup. The minimum implementation compares from the dense expected tuple by index so a missing receipt slot evaluates to `undefined`. No public type, schema, receipt shape, persisted format, verifier command, generated fixture, dependency, or capability changes.
+
+The focused test was run against the built pre-repair source and produced the expected RED result: the sparse case reached `assertFailure` with `true !== false`. After the writer compared each dense expected check with the corresponding receipt index, the identical focused command passed 1/1 and the complete builder-core suite passed 104/104. The repaired test also asserts that neither the destination nor the identity-recorded source temporary directory remains after every invalid receipt.
+
 ### Claim limits
 
 This review establishes the purpose and local behavior of the final P1 contracts, not a general schema-equivalence theorem. Static checks do not prove deployment, workerd behavior, visual quality, translation quality, human usability, accessibility conformance, production safety, or general security. Human accessibility evaluation was not a release gate for this increment, and no WCAG conformance claim is made.

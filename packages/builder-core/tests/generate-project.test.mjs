@@ -805,15 +805,20 @@ test("verification receipts must contain the exact ordered checks", async () => 
         receipt: { checks: [...generatedChecks, "extra"] },
       },
       { name: "reordered", receipt: { checks: [...generatedChecks].reverse() } },
+      {
+        name: "sparse",
+        receipt: { checks: new Array(generatedChecks.length) },
+      },
     ];
 
     for (const scenario of cases) {
+      const destination = join(owner, scenario.name);
       const fake = createFakeVerifier({
         verify: async () => ({ ok: true, value: scenario.receipt }),
       });
       const result = await core.generateProject({
         request: request(),
-        destination: join(owner, scenario.name),
+        destination,
         verifier: fake.verifier,
       });
 
@@ -825,6 +830,7 @@ test("verification receipts must contain the exact ordered checks", async () => 
           context: { reason: "checks-mismatch" },
         },
       ]);
+      assert.equal(await exists(destination), false);
       assert.equal(await exists(fake.roots[0]), false);
     }
   });
