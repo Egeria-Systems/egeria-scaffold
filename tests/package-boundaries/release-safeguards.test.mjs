@@ -112,6 +112,7 @@ test("public package manifests constrain exports and publication", async () => {
   ]);
   assert.deepEqual(standardsManifest.exports, {
     "./eslint/cloudflare-isolation": "./eslint/cloudflare-isolation.mjs",
+    "./eslint/copy-externalization": "./eslint/copy-externalization.mjs",
     "./eslint/typescript-strict": "./eslint/typescript-strict.mjs",
     "./typescript/strict.json": "./typescript/strict.json",
     "./package.json": "./package.json",
@@ -267,7 +268,19 @@ test("the release candidate materializes only the approved public versions", asy
   const changesetFiles = (await readdir(resolve(repositoryRoot, ".changeset")))
     .filter((file) => file.endsWith(".md") && file !== "README.md")
     .sort();
-  assert.deepEqual(changesetFiles, []);
+  assert.deepEqual(changesetFiles, ["externalize-visible-copy.md"]);
+  assert.equal(
+    await readFile(
+      resolve(repositoryRoot, ".changeset/externalize-visible-copy.md"),
+      "utf8",
+    ),
+    `---
+"@egeria-systems/standards": minor
+---
+
+Add a flat ESLint config that rejects static user-visible JSX, relevant attribute, and Next.js metadata copy outside validated content or localization sources.
+`,
+  );
 
   for (const [manifestPath, changelogPath, packageName] of [
     [
@@ -311,6 +324,7 @@ test("public package dry runs contain only approved files", async () => {
     "LICENSE",
     "README.md",
     "eslint/cloudflare-isolation.mjs",
+    "eslint/copy-externalization.mjs",
     "eslint/typescript-strict.mjs",
     "package.json",
     "typescript/strict.json",

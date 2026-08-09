@@ -44,6 +44,7 @@ test("standards exposes only its approved public configuration APIs", async () =
     files: ["eslint", "typescript", "README.md"],
     exports: {
       "./eslint/cloudflare-isolation": "./eslint/cloudflare-isolation.mjs",
+      "./eslint/copy-externalization": "./eslint/copy-externalization.mjs",
       "./eslint/typescript-strict": "./eslint/typescript-strict.mjs",
       "./typescript/strict.json": "./typescript/strict.json",
       "./package.json": "./package.json",
