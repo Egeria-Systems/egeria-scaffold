@@ -15,6 +15,7 @@ import {
   stableIdentifierSchema,
 } from "./identifiers.js";
 import { profileIdentifierSchema } from "./profile.js";
+import { addMergeTargetIssue } from "./surface-target.js";
 
 function requireUniqueIdentifiers(
   values: readonly { identifier: string }[],
@@ -47,21 +48,7 @@ export const installedSurfaceSchema = z
     mergeStrategy: z.enum(["replace-file", "json-property"]),
     fingerprint: fingerprintSchema,
   })
-  .superRefine((surface, context) => {
-    const validPair =
-      (surface.fingerprintTarget.kind === "file" &&
-        surface.mergeStrategy === "replace-file") ||
-      (surface.fingerprintTarget.kind === "json-value" &&
-        surface.mergeStrategy === "json-property");
-
-    if (!validPair) {
-      context.addIssue({
-        code: "custom",
-        message: "merge strategy must match its fingerprint target",
-        path: ["mergeStrategy"],
-      });
-    }
-  })
+  .superRefine(addMergeTargetIssue)
   .readonly();
 
 const verificationChecksSchema = z

@@ -236,6 +236,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "contracts/project.ts",
       "contracts/result.ts",
       "contracts/state.ts",
+      "contracts/surface-target.ts",
       "diagnostics/diff-project.ts",
       "diagnostics/doctor.ts",
       "diagnostics/project-inspection.ts",

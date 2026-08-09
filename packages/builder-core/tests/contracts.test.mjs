@@ -152,6 +152,18 @@ function assertRejects(schema, value) {
   assert.equal(schema.safeParse(value).success, false);
 }
 
+function assertMergeTargetIssue(schema, value, path) {
+  const result = schema.safeParse(value);
+  assert.equal(result.success, false);
+  assert.deepEqual(result.error.issues, [
+    {
+      code: "custom",
+      message: "merge strategy must match its fingerprint target",
+      path,
+    },
+  ]);
+}
+
 test("builder-core exports the executable contract boundary", () => {
   for (const exportName of [
     "capabilityDeliveryModeSchema",
@@ -309,11 +321,26 @@ test("probe and managed-surface unions reject mismatched or unsafe structures", 
     packageName: "example",
     version: "1.0.0",
   });
-  assertRejects(contracts.managedSurfaceDescriptorSchema, {
-    ...validCapability.managedSurfaces[0],
-    fingerprintTarget: { kind: "json-value", pointer: "/dependencies/example" },
-    mergeStrategy: "replace-file",
-  });
+  for (const surface of [
+    {
+      ...validCapability.managedSurfaces[0],
+      mergeStrategy: "json-property",
+    },
+    {
+      ...validCapability.managedSurfaces[0],
+      fingerprintTarget: {
+        kind: "json-value",
+        pointer: "/dependencies/example",
+      },
+      mergeStrategy: "replace-file",
+    },
+  ]) {
+    assertMergeTargetIssue(
+      contracts.managedSurfaceDescriptorSchema,
+      surface,
+      ["mergeStrategy"],
+    );
+  }
   assertRejects(contracts.managedSurfaceDescriptorSchema, {
     ...validCapability.managedSurfaces[0],
     ownership: "ejected",
@@ -396,6 +423,23 @@ test("project display names preserve Unicode while rejecting controls and whites
 
 test("installed state is strict and records the exact successful generation checks", () => {
   assertAccepts(contracts.installedStateSchema, validState);
+  for (const surface of [
+    { ...validInstalledSurface, mergeStrategy: "json-property" },
+    {
+      ...validInstalledSurface,
+      fingerprintTarget: {
+        kind: "json-value",
+        pointer: "/dependencies/example",
+      },
+      mergeStrategy: "replace-file",
+    },
+  ]) {
+    assertMergeTargetIssue(
+      contracts.installedStateSchema,
+      { ...validState, managedSurfaces: [surface] },
+      ["managedSurfaces", 0, "mergeStrategy"],
+    );
+  }
   assertRejects(contracts.installedStateSchema, {
     ...validState,
     builderVersion: "0.0.1",

@@ -6,6 +6,7 @@ import {
   semanticVersionSchema,
   stableIdentifierSchema,
 } from "./identifiers.js";
+import { addMergeTargetIssue } from "./surface-target.js";
 
 const nonEmptyTextSchema = z.string().min(1).max(512).regex(/\S/);
 const metadataListSchema = z.array(nonEmptyTextSchema).readonly();
@@ -107,28 +108,6 @@ export const fingerprintTargetSchema = z
     }),
   ])
   .readonly();
-
-function addMergeTargetIssue(
-  descriptor: {
-    fingerprintTarget: { kind: "file" } | { kind: "json-value"; pointer: string };
-    mergeStrategy: "replace-file" | "json-property";
-  },
-  context: z.RefinementCtx,
-): void {
-  const validPair =
-    (descriptor.fingerprintTarget.kind === "file" &&
-      descriptor.mergeStrategy === "replace-file") ||
-    (descriptor.fingerprintTarget.kind === "json-value" &&
-      descriptor.mergeStrategy === "json-property");
-
-  if (!validPair) {
-    context.addIssue({
-      code: "custom",
-      message: "merge strategy must match its fingerprint target",
-      path: ["mergeStrategy"],
-    });
-  }
-}
 
 export const managedSurfaceDescriptorSchema = z
   .strictObject({
