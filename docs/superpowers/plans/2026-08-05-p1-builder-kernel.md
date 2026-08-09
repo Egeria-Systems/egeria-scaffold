@@ -1610,7 +1610,7 @@ One detail in the sealed external plan remains historical evidence of an interna
 - Modify: `docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md`
 - Create: `docs/review-packets/2026-08-05-p1-builder-kernel.md`
 
-No package manifest, lockfile, checked JSON Schema, generated fixture, root export, migration format, or persisted state format is authorized to change.
+The two schema-review transformations below authorize no package manifest, lockfile, checked JSON Schema, generated fixture, root export, migration format, or persisted state format change. The later generated-fixture reproducibility repair is governed only by its explicit 2026-08-09 amendment below.
 
 **Approved bounded transformations:**
 
@@ -1618,6 +1618,38 @@ No package manifest, lockfile, checked JSON Schema, generated fixture, root expo
 2. Consolidate the duplicated surface target/merge pairing rule into one non-root-exported private callback. Keep the descriptor and installed-state Zod schemas independently defined and refined, preserve both valid pairs and both mismatch directions with exact issue semantics, and add only the new private module to the exact builder-core source inventory.
 
 Characterization must prove the receipt is runtime-frozen; malformed, missing, additional, and reordered receipts retain `GENERATED_VERIFICATION_INVALID`; both surface mismatch directions retain the custom Zod code, exact message, descriptor-local path, and installed-state-prefixed path. The source-owner audits must move from three receipt representations to one and from two surface-rule implementations to one. Checked schema and fixture bytes must remain unchanged.
+
+### Generated-fixture reproducibility repair amendment (2026-08-09)
+
+The settled Task 9 aggregate exposed a new stop-gate failure after the reviewed schema transformations: the existing generated-fixture determinism test produced two identical fresh trees but both differed from the committed fixtures in `pnpm-lock.yaml` and the derived `.egeria/state.json` lockfile fingerprint. No Task 9 source transformation changed a manifest, package version, lockfile command, workspace policy, template dependency, or generated fixture. Fresh default pnpm resolution had advanced `browserslist` and `baseline-browser-mapping` by one patch release, proving that exact direct versions plus `minimumReleaseAge` did not make a lockfile first-created from the public registry stable across dates.
+
+The user preapproved bounded plan amendments and continuous local implementation through implemented-task review. This amendment therefore authorizes the smallest evidence-backed repair without adding a new plan file, changing direct dependency versions, bundling a lockfile template, adding transitive overrides, or broadening Task 9 product behavior.
+
+**Additional exact files:**
+
+- Modify: `packages/builder-core/templates/common/pnpm-workspace.yaml`
+- Modify: `scripts/verify-generated-skeletons.mjs`
+- Regenerate from the production CLI: `fixtures/generated/portfolio/pnpm-workspace.yaml`
+- Regenerate from the production CLI: `fixtures/generated/portfolio/pnpm-lock.yaml`
+- Regenerate from the production CLI: `fixtures/generated/portfolio/.egeria/state.json`
+- Regenerate from the production CLI: `fixtures/generated/site/pnpm-workspace.yaml`
+- Regenerate from the production CLI: `fixtures/generated/site/pnpm-lock.yaml`
+- Regenerate from the production CLI: `fixtures/generated/site/.egeria/state.json`
+- Modify: `docs/implementation-evidence/2026-08-05-p1-schema-contract-review-deferral.md`
+- Modify: `docs/implementation-evidence/2026-08-08-golden-fixture-harness-verification.md`
+- Create: `docs/review-packets/2026-08-05-p1-builder-kernel.md`
+
+**TDD and implementation sequence:**
+
+1. Treat the already-observed failure of `tests/generated-fixtures/determinism.test.mjs` as RED: both same-run generations agree, but their lockfile and persisted fingerprint differ from the committed fixture because fresh default transitive resolution changed.
+2. Add only `resolutionMode: time-based` to the generated workspace template. Official pnpm 11/12 documentation defines this mode as resolving exact/lowest direct dependencies first and limiting subdependencies to versions published before the latest direct dependency, so subdependencies change when direct dependencies change rather than merely because a newer compatible transitive version appears.
+3. Update the fixed-root generated-fixture verifier's exact workspace-policy value so the pre-install trust boundary requires the new resolution policy. Do not change its command list, registry, environment, direct-package versions, override, lifecycle allowlist, or lockfile-source checks.
+4. Build builder-core and CLI, generate both fixtures into new isolated temporary destinations through the production CLI, verify each generated project with `infer`, `doctor`, and `diff`, and copy only the six listed generated files from those exact outputs. Do not hand-edit lockfiles or state fingerprints.
+5. Rerun the focused generated-fixture determinism and verifier tests. Require two fresh generations per profile to agree byte-for-byte with each other and the regenerated committed fixture.
+6. Rerun the full `verify:builder-kernel` aggregate once on the settled inputs; its `verify:generated-skeletons` step is the sole fixed-root frozen-install/audit/signature/lint/typecheck/Next/OpenNext execution for this tree.
+7. Extend final requirements, architecture/anti-overengineering, test-evidence, and material-code-review scopes to this amendment. Repair only evidence-backed material findings, rerun affected verification, and record the final disposition and recovery boundary before sealing the Gate 3 packet.
+
+The disposable pre-plan experiment is evidence only: two independent `time-based` lockfile resolutions were byte-identical, frozen install passed, `pnpm audit --audit-level high` found no known vulnerability, and lint/typecheck/Next/OpenNext builds passed. Repository implementation still follows the RED, minimum source change, regeneration, and GREEN sequence above.
 
 The settled source transformations use small focused commits. Task 9 documentation and the Gate 3 packet follow only after the formal simplification verifier passes. Final review must include independent requirements, architecture/anti-overengineering, test-evidence, and full material-code-review passes over the exact final comparison. Only evidence-backed material findings may be repaired, and affected verification must be rerun before the packet is sealed.
 

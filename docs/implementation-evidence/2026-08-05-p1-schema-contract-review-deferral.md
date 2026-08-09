@@ -190,7 +190,26 @@ On 2026-08-08, the implementation revalidated the current primary sources for ev
 - [Node.js June 2026 security releases](https://nodejs.org/en/blog/vulnerability/june-2026-security-releases) identify `22.23.0` as the patched Node 22 release; the repository remains pinned to the later `22.23.2` line already verified in the compatibility record.
 - [pnpm audit](https://pnpm.io/cli/audit) documents advisory and registry-signature checks, while [pnpm install](https://pnpm.io/cli/install) documents frozen-lockfile and script-control behavior used by the final harness.
 
-No provider API, Cloudflare binding, generated application behavior, dependency version, manifest, or lockfile changed in Task 9. Point-in-time audits and signature checks are recorded in the final P1 verification evidence; they do not prove future dependency safety or source provenance.
+The schema-review transformations through `e6263e26c29823932276ec5ac40eb63c83cc1b48` changed no provider API, Cloudflare binding, generated application behavior, dependency version, manifest, or lockfile. The later reproducibility repair below is a separately planned stop-gate correction. Point-in-time audits and signature checks are recorded in the final P1 verification evidence; they do not prove future dependency safety or source provenance.
+
+### Generated-fixture reproducibility repair preparation
+
+**Date:** 2026-08-09 (America/Toronto)
+
+The first settled Task 9 aggregate at clean candidate `e6263e26c29823932276ec5ac40eb63c83cc1b48` passed constitution 21/21, package boundaries 39/39, builder-core 104/104, and CLI 9/9 before the generated-fixture suite stopped at 6/7. Its determinism test generated two identical fresh outputs per profile, but the fresh output differed from the committed fixture in `pnpm-lock.yaml` and the lockfile fingerprint stored in `.egeria/state.json`.
+
+The failure was reproducible outside the test owner. The committed lockfile SHA-256 was `f8299e645d89fc42865b7b70fdec368c7ce0dc67d4a32ad40100645dd7fe47a2`; default fresh resolution produced `385107c190289a6028aefa56074e306f482ba58eb3415551b97dcf5a3a4dc00d`. The default fresh graph selected `browserslist@4.28.8` / `baseline-browser-mapping@2.11.13`, while the committed graph retained `browserslist@4.28.7` / `baseline-browser-mapping@2.11.12`. No Task 9 commit changed a generated manifest, direct package version, workspace policy, lockfile-preparation command, template dependency, or fixture, so the cause was public-registry transitive-version drift rather than the receipt or managed-surface transformations.
+
+Current official pnpm documentation was revalidated before selecting a repair:
+
+- [Settings](https://pnpm.io/settings) confirms that project configuration belongs in `pnpm-workspace.yaml`.
+- [Other settings: `resolutionMode`](https://pnpm.io/settings/other#resolutionmode) documents `time-based`: direct dependencies resolve to their lowest matching versions and subdependencies are limited to versions published before the latest direct dependency, so subdependencies update when direct dependencies update. It also documents the full-metadata performance tradeoff.
+- [`pnpm install`](https://pnpm.io/cli/install) documents that `--lockfile-only` updates the lockfile without writing `node_modules`, while `--frozen-lockfile` leaves the lockfile unchanged and fails when it needs an update.
+- [`pnpm audit`](https://pnpm.io/cli/audit) documents advisory queries and severity filtering used in the disposable verification.
+
+A disposable, non-repository experiment added only `resolutionMode: time-based` to one generated workspace and resolved its lockfile twice from absent state with exact Node `22.23.2` and pnpm `11.20.0`. Both runs produced byte-identical SHA-256 `028d52c01ccdc8f76b3beb1e764aa5ccb420981efbe45df28478bf680ce2bb11`. Compared with the prior committed graph, the policy selected three older compatible transitive versions and added pnpm's `time` metadata. Frozen install passed, `pnpm audit --audit-level high` reported no known vulnerability, and the generated project passed zero-warning lint, typecheck, Next `16.3.0` build, and OpenNext Cloudflare `1.20.2` build. The first sandboxed verification attempt failed only because `next typegen` could not open a loopback helper port (`listen EPERM 127.0.0.1`); the identical permission-corrected command passed.
+
+Alternatives were rejected provisionally: merely refreshing fixtures would fail again when another compatible transitive version appears; one override per drifting transitive dependency would copy package-manager resolution into builder policy; and a bundled lockfile template would add a large independently maintained artifact and bypass ordinary first-resolution behavior. The exact-file amendment in the canonical P1 plan authorizes the time-based policy, fixed-root verifier update, production-CLI regeneration of the two workspace policies, lockfiles, and derived state fingerprints, affected verification, and renewed final review. No repository source/configuration/fixture repair preceded that amendment.
 
 ### Claim limits
 

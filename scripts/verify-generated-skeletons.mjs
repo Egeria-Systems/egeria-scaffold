@@ -128,6 +128,8 @@ pmOnFail: error
 
 minimumReleaseAge: 1440
 
+resolutionMode: time-based
+
 overrides:
   "miniflare>undici": 7.29.0
 

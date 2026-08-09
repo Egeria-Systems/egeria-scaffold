@@ -72,7 +72,7 @@
   },
   "managedSurfaces": [
     {
-      "fingerprint": "sha256:f8299e645d89fc42865b7b70fdec368c7ce0dc67d4a32ad40100645dd7fe47a2",
+      "fingerprint": "sha256:028d52c01ccdc8f76b3beb1e764aa5ccb420981efbe45df28478bf680ce2bb11",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -425,7 +425,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:b8a845c20d04992fd356ed1a738e18e11db27b361718c3eea96b616cb121f2cc",
+      "fingerprint": "sha256:06d27b3aa870a2ec0de1d8ddc3a60c4c72291b714f1dcafa8b05a414d5680533",
       "fingerprintTarget": {
         "kind": "file"
       },
