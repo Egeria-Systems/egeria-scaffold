@@ -2,13 +2,13 @@
 
 **Date:** 2026-08-05 (America/Toronto)
 
-**Status:** two Task 1A dispositions implemented, verified, and independently reviewed; six questions remain deferred
+**Status:** all eight recorded questions re-evaluated against the final P1 consumers; dispositions settled for Gate 3 review
 
 **Source state:** clean local `main` at `d6892c0e02b9f2138c484311eed2aa6530552869` before this evidence record and plan amendment
 
 ## Purpose
 
-Preserve the Task 1 schema field-purpose review and the subsequent bounded material-code-simplification comparison without acting on either result before the remaining P1 consumers exist. Task 9 of the approved P1 plan must re-evaluate every item against the final P1 tree before the Gate 3 packet is written.
+Preserve the Task 1 schema field-purpose review and the subsequent bounded material-code-simplification comparison, then record the final Task 9 re-evaluation after the remaining P1 consumers exist. The historical sections below remain unchanged evidence; the final review is appended rather than rewriting the original observations.
 
 These observations are review inputs. They are not approved defects, simplifications, schema migrations, or implementation instructions.
 
@@ -115,3 +115,81 @@ Task 9 must:
 6. include final dispositions in the P1 verification evidence and Gate 3 review packet.
 
 No schema, runtime source, generated artifact, test, package manifest, or lockfile changed as part of this deferral record.
+
+## Final Task 9 review
+
+### Frozen source and authorization
+
+```text
+worktree: /private/tmp/egeria-scaffold-p1-task-8
+branch: p1-task-8-golden-fixtures
+Task 9 base: 8a503f5e6dceec59330412084c8b014ca287e43b
+source candidate: e8ba4a9c5ebbfa596bed9709392e86dd4d1ed60f
+source comparison: 8a503f5e6dceec59330412084c8b014ca287e43b..e8ba4a9c5ebbfa596bed9709392e86dd4d1ed60f
+overall P1 base: 303ee9d35e19f9191948d994159f77c82c90a1ed
+Node: 22.23.2
+pnpm: 11.20.0
+```
+
+The user required Task 9 to build on the Task 8 worktree and approved continuous local execution through implemented-task review, including the corrected simplification Gate A and replacement Gate B plan. Remote refs were not refreshed because the approved local worktree/base was frozen and remote freshness did not affect this local comparison. No push, pull request, merge, deployment, publication, provider mutation, persistent-data action, permission change, external message, or review-comment response was authorized or performed.
+
+The formal controller plan was exact and user-approved before source mutation. Its repository-local canonical amendment was committed afterwards because the controller had frozen the allowed source/test paths and prohibited an additional documentation edit during transformation. That sequencing met the separate plan-approval gate but did not meet the plan's preferred repository-location timing; commit `cf8c48e` records the deviation and the canonical exact-file amendment without creating a competing plan.
+
+### Final field-purpose dispositions
+
+The final audit traced each item through its runtime schema, catalog or codec caller, generated `.egeria` boundary, tests, checked schema artifact, and final portfolio/site fixtures. Correctness and product-vocabulary questions remained separate from behavior-preserving simplification.
+
+| Item | Final disposition | Evidence and counterevidence | Compatibility impact | Confidence |
+| --- | --- | --- | --- | --- |
+| Capability release `version` | `retain-as-intentional` | The capability model and `capabilityDescriptorSchema` own a semantic release version. The six catalog descriptors supply `0.1.0`; resolution preserves it; `createInstalledManifest` projects it into installed state; inference requires installed and catalog versions to agree. The earlier `schemaVersion` name is gone, while schema-format versions retain their separate `1.0.0` fields. | Removing or renaming it would change descriptors, installed state, fixtures, manifest projection, and inference. No benefit outweighs that persisted/API migration. | High |
+| Migration `outcome` | `retain-as-intentional` | ADR 0006 and `migrationRecordSchema` own successful-history semantics. Strict serializers and JSONL tests admit only `succeeded`; the literal makes each raw append-only record self-describing and fail-closed if a non-success record is presented. P1 writes an empty log and no executor emits migration records, so broader states would be invented. | Removal would change the checked schema and successful-record JSONL contract before any evidenced consumer benefit. | High |
+| Verification `kind` | `retain-as-intentional` | ADR 0006 and `installedStateSchema` own the last-successful-verification receipt. Generation binds `kind: generation`; codecs, state-last tests, and both generated fixtures preserve it. It identifies which operation produced the durable receipt even though P1 has one writer and no current reader branches on it. | Removal would rewrite committed `.egeria/state.json` fixtures and the checked state schema for negligible simplification. | High |
+| Empty `capabilitySettings` | `retain-as-intentional` | ADR 0006 and `projectConfigurationSchema` own desired state. The schema requires a record whose values are `never`; rendering emits `{}`; strict YAML parsing, state ownership, generation, and fixtures preserve it. No P1 capability reads settings, so populated data would be unsupported and could become a secret-bearing ambiguity. | Relaxation would create unsupported desired states; removal would change project YAML and future compatibility. The explicit empty extension point remains safest. | High |
+| `threatReviewLevel` | `defer-with-owner` | ADR 0002, the capability model, and `capabilityDescriptorSchema` own security metadata. The schema requires non-empty text and all six executable descriptors currently use `standard`; catalog and resolution tests preserve it, but no P1 policy or generation code reads it and no accepted document defines other levels. | Closing the vocabulary now would create an unevidenced security contract. The capability-model/security-review owner must define values and migration before the first differentiated executable capability. | High on deferral; vocabulary unresolved |
+| Surface target and merge strategy | `retain-as-intentional` | ADR 0003 owns the evidence-selection and merge-policy distinction. Materialization and inference use `fingerprintTarget`; `mergeStrategy` is validated and persisted for its separate lifecycle role. Only `file`/`replace-file` and `json-value`/`json-property` are valid. One private `addMergeTargetIssue` callback owns that pairing, while descriptor and installed-state schemas independently invoke it with exact trust-boundary paths. | The consolidation changes no serialized shape, checked schema bytes, fixture bytes, root export, or dependency. Collapsing the fields would discard the accepted distinction and add migration churn. | High |
+| Ejection identity | `defer-with-owner` | ADRs 0003 and 0006 own ejection and state semantics; P3 owns executable existing-repository mutation. Project and installed-state schemas currently store path-only arrays, generation emits only empty arrays, and P1 has no ejection executor. Multiple managed JSON properties can share one path, demonstrating insufficiency without establishing the later representation. | P3 must define bounded same-path identity, collision semantics, migration, and recovery before any non-empty record is accepted. Redesign in P1 would be speculative. | High |
+| Runtime/static schema parity | `clarify-contract` | Runtime Zod schemas are authoritative; `createJsonSchemaArtifacts` owns deterministic Draft 2020-12 derivation. Runtime codecs and catalog validation use Zod, while only generation/check tests consume the static artifacts. `schema:check` proves byte currency, not equivalence to omitted custom refinements. | Manually duplicating runtime policy in JSON Schema would create a second owner and drift risk. The package README now states the narrower static-contract boundary; consumers needing complete validation must use the runtime schemas. | High |
+
+The first, second, third, fourth, and sixth dispositions retain existing contracts; the sixth also received one behavior-preserving internal consolidation. The fifth and seventh have explicit later owners rather than invented P1 behavior. The eighth required documentation only. No deferred item supported a schema migration, field removal, new accepted value, new capability, or generated-fixture rewrite.
+
+### Formal material simplification
+
+The fresh bounded run reviewed the Task 9 source/test scope separately from the field-purpose audit:
+
+```text
+run ID: 20260808-230642-838704fd
+scope hash: a6406a7affe4bbe3f11a2eb426c1db1479ee246365424895761a3a0f08085b59
+candidate bundle hash: a32fc9a393faa2ce64e4e2f2583c69346d965c33468b15fa3e91cb329e0cb2f2
+ledger hash: 19e60c3ec11d74b11ff08b4bd52e66a3ec9166e44db7bc896b39d7e2e4594742
+Gate A receipt: 9b06a0c97362a807977d9a4d4e5cd0a166b7e482c415750410ecb2f0d7af412b
+approved plan hash: 3b44a1b85cf50a8ef39cf734d99e5bd62966c269ecf19b7c31b507824dc215cd
+Gate B receipt: d8e8659f2fdce2af98f229e44ebb30322653cf24b7c559049b6c18a6aa6a29f8
+fix summary hash: b82606b8187cced8a25fd8e625970d42423d29e80557a6d14651fc5f770d5926
+post-fix verification hash: 5bba6e9a476980560f994d8855e75d24d2c9ee9ef22a97f524f03f7b9b3b94d2
+controller state: COMPLETE
+verdict: pass
+```
+
+Two findings were accepted and resolved:
+
+- F001 consolidated the exact nine-value generated-project verifier receipt into one internal runtime-frozen owner, retained independent unknown-value validation and the separate installed-state verification tuple, and added malformed/missing/additional/reordered receipt coverage. The controller narrative called this a six-check receipt in two prose fields; the hashed source, tests, approved value list, and canonical plan establish nine values. The prose count is an artifact-label defect, not a behavior difference.
+- F002 consolidated the valid surface target/merge matrix and exact custom issue into one private callback while keeping both Zod trust boundaries independently invoked and their serialized shapes unchanged.
+
+The source-owner RED controls observed three receipt representations and two surface-rule implementations before the repairs. GREEN observed one owner for each policy. Focused and global receipts passed: generated-project contract 16/16, contract boundaries 12/12, private-source inventory 6/6, builder-core 104/104, package boundaries 39/39, CLI 9/9, generated-fixture determinism 7/7, typecheck, lint, semantic naming, and both-profile generated-skeleton verification. The post-fix independent verifier found both root causes resolved, no regression, and no record-only observation.
+
+One controller incident is preserved rather than hidden. Two F001 `run-test` calls were mistakenly issued concurrently, and their evidence writes collided even though the repository checks were green. Repository files were restored, the controller's pinned-runtime rollback completed, stale temporary checkpoint directories were moved intact to `/private/tmp/egeria-task9-simplification-20260808/quarantined-after-rollback/`, and the same approved transformation was replayed sequentially. Attempt 2 and the full post-fix verification passed. The incident changed no user-owned file and does not replace the final settled-tree verification.
+
+### Current official evidence
+
+On 2026-08-08, the implementation revalidated the current primary sources for every runtime/tool boundary materially touched by this review:
+
+- [Zod JSON Schema conversion](https://zod.dev/json-schema) documents `z.toJSONSchema`, Draft 2020-12 output, conversion limits, unrepresentable schemas, and override behavior. The repository uses `target: draft-2020-12` and `unrepresentable: throw`; this does not make custom refinement parity automatic.
+- [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12) and its [validation specification](https://json-schema.org/draft/2020-12/json-schema-validation) remain the normative static-schema sources.
+- [Node.js June 2026 security releases](https://nodejs.org/en/blog/vulnerability/june-2026-security-releases) identify `22.23.0` as the patched Node 22 release; the repository remains pinned to the later `22.23.2` line already verified in the compatibility record.
+- [pnpm audit](https://pnpm.io/cli/audit) documents advisory and registry-signature checks, while [pnpm install](https://pnpm.io/cli/install) documents frozen-lockfile and script-control behavior used by the final harness.
+
+No provider API, Cloudflare binding, generated application behavior, dependency version, manifest, or lockfile changed in Task 9. Point-in-time audits and signature checks are recorded in the final P1 verification evidence; they do not prove future dependency safety or source provenance.
+
+### Claim limits
+
+This review establishes the purpose and local behavior of the final P1 contracts, not a general schema-equivalence theorem. Static checks do not prove deployment, workerd behavior, visual quality, translation quality, human usability, accessibility conformance, production safety, or general security. Human accessibility evaluation was not a release gate for this increment, and no WCAG conformance claim is made.
