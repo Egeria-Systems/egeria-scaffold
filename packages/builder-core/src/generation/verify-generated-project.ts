@@ -17,14 +17,7 @@ import { fingerprintFileContent } from "../ownership/fingerprint.js";
 import type { ValidationResult } from "../contracts/result.js";
 
 export type GeneratedProjectVerification = Readonly<{
-  checks: readonly [
-    "lockfile",
-    "frozen-install",
-    "lint",
-    "typecheck",
-    "next-build",
-    "opennext-build",
-  ];
+  checks: typeof verificationChecks;
 }>;
 
 export interface GeneratedProjectVerifier {
@@ -58,14 +51,14 @@ const versionTimeoutMilliseconds = 30 * 1000;
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const requiredPnpmVersion = "11.20.0";
 const publicRegistry = "https://registry.npmjs.org/";
-const verificationChecks = [
+export const verificationChecks = Object.freeze([
   "lockfile",
   "frozen-install",
   "lint",
   "typecheck",
   "next-build",
   "opennext-build",
-] as const;
+] as const);
 
 function issue<T>(code: string, reason: string): ValidationResult<T> {
   return {

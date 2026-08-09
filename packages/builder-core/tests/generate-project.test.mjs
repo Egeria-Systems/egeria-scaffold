@@ -7,6 +7,11 @@ import test from "node:test";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
+const verifierModule = await import(
+  pathToFileURL(
+    resolve(packageRoot, "dist/generation/verify-generated-project.js"),
+  ),
+);
 
 const generatedChecks = [
   "lockfile",
@@ -261,6 +266,11 @@ test("builder-core exports new-directory generation without caller package versi
     declaration,
     /ProjectGenerationRequest = Omit<\s*GenerationRequest,\s*"packageVersions"\s*>/,
   );
+});
+
+test("the internal generated-project verification receipt is frozen", () => {
+  assert.deepEqual(verifierModule.verificationChecks, generatedChecks);
+  assert.equal(Object.isFrozen(verifierModule.verificationChecks), true);
 });
 
 test("the pnpm verifier uses exact commands, isolated copies, and an allowlisted environment", async () => {
@@ -787,20 +797,36 @@ test("lockfile preparation may add only one regular lockfile without mutations",
 
 test("verification receipts must contain the exact ordered checks", async () => {
   await withTestRoot(async (owner) => {
-    const fake = createFakeVerifier({
-      verify: async () => ({
-        ok: true,
-        value: { checks: [...generatedChecks].reverse() },
-      }),
-    });
-    const result = await core.generateProject({
-      request: request(),
-      destination: join(owner, "wrong-receipt"),
-      verifier: fake.verifier,
-    });
+    const cases = [
+      { name: "malformed", receipt: undefined },
+      { name: "missing-checks", receipt: {} },
+      {
+        name: "additional-check",
+        receipt: { checks: [...generatedChecks, "extra"] },
+      },
+      { name: "reordered", receipt: { checks: [...generatedChecks].reverse() } },
+    ];
 
-    assertFailure(result, "GENERATED_VERIFICATION_INVALID");
-    assert.equal(await exists(fake.roots[0]), false);
+    for (const scenario of cases) {
+      const fake = createFakeVerifier({
+        verify: async () => ({ ok: true, value: scenario.receipt }),
+      });
+      const result = await core.generateProject({
+        request: request(),
+        destination: join(owner, scenario.name),
+        verifier: fake.verifier,
+      });
+
+      assertFailure(result, "GENERATED_VERIFICATION_INVALID");
+      assert.deepEqual(result.issues, [
+        {
+          code: "GENERATED_VERIFICATION_INVALID",
+          path: [],
+          context: { reason: "checks-mismatch" },
+        },
+      ]);
+      assert.equal(await exists(fake.roots[0]), false);
+    }
   });
 });
 

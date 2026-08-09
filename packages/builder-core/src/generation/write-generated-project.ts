@@ -41,9 +41,10 @@ import {
   type GenerationRequest,
   type RenderedSkeleton,
 } from "./render-skeleton.js";
-import type {
-  GeneratedProjectVerification,
-  GeneratedProjectVerifier,
+import {
+  verificationChecks,
+  type GeneratedProjectVerification,
+  type GeneratedProjectVerifier,
 } from "./verify-generated-project.js";
 
 export type ProjectGenerationRequest = Omit<
@@ -77,15 +78,6 @@ const exactRequestKeys = [
   "profile",
   "projectName",
 ] as const;
-const exactVerificationChecks = [
-  "lockfile",
-  "frozen-install",
-  "lint",
-  "typecheck",
-  "next-build",
-  "opennext-build",
-] as const;
-
 function issue(
   code: string,
   path: readonly (string | number)[] = [],
@@ -447,9 +439,9 @@ function verificationIsExact(value: unknown): value is GeneratedProjectVerificat
   }
 
   return (
-    value.checks.length === exactVerificationChecks.length &&
+    value.checks.length === verificationChecks.length &&
     value.checks.every(
-      (check, index) => check === exactVerificationChecks[index],
+      (check, index) => check === verificationChecks[index],
     )
   );
 }
@@ -545,7 +537,7 @@ async function createInstalledState(input: Readonly<{
       checks: [
         "contracts",
         "pre-state-inference",
-        ...exactVerificationChecks,
+        ...verificationChecks,
         "post-state-inference",
       ],
     },
