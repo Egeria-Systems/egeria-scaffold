@@ -38,6 +38,8 @@ const portfolioFiles = Object.freeze([
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
+  "apps/web/content/content.config.yaml",
+  "apps/web/content/en-CA/long-form/introduction.md",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/next.config.ts",
@@ -68,7 +70,9 @@ export const generatedFixtureContracts = Object.freeze([
       "deployment-cloudflare",
       "observability",
     ]),
-    expectedSurfaces: 43,
+    expectedRecipeVersion: "0.2.0",
+    expectedContentFilesVersion: "0.2.0",
+    expectedSurfaces: 45,
   }),
   Object.freeze({
     profile: "site",
@@ -88,7 +92,9 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "site-routing",
     ]),
-    expectedSurfaces: 45,
+    expectedRecipeVersion: "0.2.0",
+    expectedContentFilesVersion: "0.2.0",
+    expectedSurfaces: 47,
   }),
 ]);
 

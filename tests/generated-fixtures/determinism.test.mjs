@@ -185,6 +185,16 @@ test("compiled project generation matches committed portfolio and site fixtures"
           fixtureCase.expectedCapabilities,
         );
         assert.equal(
+          state.origin.recipeVersion,
+          fixtureCase.expectedRecipeVersion,
+        );
+        assert.equal(
+          state.installedCapabilities.find(
+            ({ identifier }) => identifier === "content-files",
+          )?.version,
+          fixtureCase.expectedContentFilesVersion,
+        );
+        assert.equal(
           state.managedSurfaces.length,
           fixtureCase.expectedSurfaces,
         );

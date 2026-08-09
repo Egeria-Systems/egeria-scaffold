@@ -24,7 +24,7 @@
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
       "deliveryMode": "source-generated",
@@ -137,7 +137,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:0ef4485667b30e8cff3e415fa48c9d061a9d70e1e3cbf433779445880cc8c337",
+      "fingerprint": "sha256:bf3f2af1bde2f9e6a0ada1d13919bfc436c093e25af90bfedff9b2cffa04da14",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -163,7 +163,7 @@
       "path": "README.md"
     },
     {
-      "fingerprint": "sha256:b51748933139e2b3f180ebf570ac4a0045620b0fd5a78f9093e5d052d2e92287",
+      "fingerprint": "sha256:00a90f66dd956955a452c3fea9b96b1962666497d62dd4755c7731e9aea709d9",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -176,7 +176,7 @@
       "path": "AGENTS.md"
     },
     {
-      "fingerprint": "sha256:ba4f710db9998a1577f986cca386e1ff571392a467053e4cefa85b94e1e2b3c2",
+      "fingerprint": "sha256:12bbf6b0ec96756dcab6c326e9d0980be78ef43cd1ae5727685b1b6c16ad8154",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -202,7 +202,7 @@
       "path": "package.json"
     },
     {
-      "fingerprint": "sha256:e1f608aa5294e7abc454b5e3c727aeaecfc86d4fcca726a823f36083f993c3dd",
+      "fingerprint": "sha256:2702fb20bcb4835c576b229b09eac728ea79387b497a99e3b9c3b972f2d31848",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -438,7 +438,35 @@
       "path": "pnpm-workspace.yaml"
     },
     {
-      "fingerprint": "sha256:5a4227ec22a9b44209396d4ba986dfac6aa9e390ec95a7ffe66ae804cc3540c8",
+      "fingerprint": "sha256:4f827edda6b1bde315c4e0add09dae1df69aeb6c2e4593fa6ba23eae430ebc55",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "content-files-configuration",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "content-files",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/content/content.config.yaml"
+    },
+    {
+      "fingerprint": "sha256:c0a8834a821e7f34d79fdff81a5e3f26dc76f41fca0e2903f9a6745578411aa9",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "content-files-long-form-introduction",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "content-files",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/content/en-CA/long-form/introduction.md"
+    },
+    {
+      "fingerprint": "sha256:438cdb99b4fa896370a3f06e2b5d0d52207f9e1fc9bc85de9b9781970006571b",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -452,7 +480,7 @@
       "path": "apps/web/src/content/read-content.ts"
     },
     {
-      "fingerprint": "sha256:59797f7539df318b9159825c509000bee9ce6786d4cbccdc2b4e77f48b590acb",
+      "fingerprint": "sha256:a028d57dc02548f876520648e2847cefebeadbbb4357278de58babf70cb05d58",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -669,7 +697,7 @@
   ],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.1.0"
+    "recipeVersion": "0.2.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"
