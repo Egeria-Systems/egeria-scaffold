@@ -55,8 +55,7 @@ function normalizeVisibleText(value) {
 }
 
 function createTextCandidate(node, value) {
-  const text = normalizeVisibleText(value);
-  return text.length === 0 ? [] : [{ node, text }];
+  return normalizeVisibleText(value).length === 0 ? [] : [{ node, text: value }];
 }
 
 function collectStaticTextCandidates(node) {
@@ -83,18 +82,28 @@ function collectStaticTextCandidates(node) {
     ];
   }
 
-  if (
-    expression.type === "LogicalExpression" ||
-    expression.type === "BinaryExpression"
-  ) {
+  if (expression.type === "LogicalExpression") {
+    if (expression.operator === "&&") {
+      return collectStaticTextCandidates(expression.right);
+    }
+
     return [
       ...collectStaticTextCandidates(expression.left),
       ...collectStaticTextCandidates(expression.right),
     ];
   }
 
+  if (expression.type === "BinaryExpression") {
+    return expression.operator === "+"
+      ? [
+          ...collectStaticTextCandidates(expression.left),
+          ...collectStaticTextCandidates(expression.right),
+        ]
+      : [];
+  }
+
   if (expression.type === "SequenceExpression") {
-    return expression.expressions.flatMap(collectStaticTextCandidates);
+    return collectStaticTextCandidates(expression.expressions.at(-1));
   }
 
   if (expression.type === "ArrayExpression") {
@@ -108,10 +117,9 @@ function collectStaticTextCandidates(node) {
 
 function collectAllStaticTextCandidates(node) {
   const expression = unwrapExpression(node);
-  const directCandidates = collectStaticTextCandidates(expression);
 
-  if (directCandidates.length > 0 || !expression) {
-    return directCandidates;
+  if (!expression) {
+    return [];
   }
 
   if (expression.type === "ObjectExpression") {
@@ -128,7 +136,29 @@ function collectAllStaticTextCandidates(node) {
     );
   }
 
-  return [];
+  if (expression.type === "ConditionalExpression") {
+    return [
+      ...collectAllStaticTextCandidates(expression.consequent),
+      ...collectAllStaticTextCandidates(expression.alternate),
+    ];
+  }
+
+  if (expression.type === "LogicalExpression") {
+    if (expression.operator === "&&") {
+      return collectAllStaticTextCandidates(expression.right);
+    }
+
+    return [
+      ...collectAllStaticTextCandidates(expression.left),
+      ...collectAllStaticTextCandidates(expression.right),
+    ];
+  }
+
+  if (expression.type === "SequenceExpression") {
+    return collectAllStaticTextCandidates(expression.expressions.at(-1));
+  }
+
+  return collectStaticTextCandidates(expression);
 }
 
 function readPropertyName(property) {
@@ -147,12 +177,75 @@ function readPropertyName(property) {
   return undefined;
 }
 
-function isNamedExportedVariable(node, name) {
+function readName(node) {
+  if (node?.type === "Identifier") {
+    return node.name;
+  }
+
+  if (node?.type === "Literal" && typeof node.value === "string") {
+    return node.value;
+  }
+
+  return undefined;
+}
+
+function collectExportedLocalNames(program) {
+  const localNamesByExport = new Map([
+    ["generateMetadata", new Set()],
+    ["metadata", new Set()],
+  ]);
+
+  for (const statement of program.body) {
+    if (statement.type !== "ExportNamedDeclaration" || statement.source) {
+      continue;
+    }
+
+    const declaration = statement.declaration;
+
+    if (declaration?.type === "VariableDeclaration") {
+      for (const declarator of declaration.declarations) {
+        const localName = readName(declarator.id);
+        localNamesByExport.get(localName)?.add(localName);
+      }
+    } else if (declaration?.type === "FunctionDeclaration") {
+      const localName = readName(declaration.id);
+      localNamesByExport.get(localName)?.add(localName);
+    }
+
+    for (const specifier of statement.specifiers) {
+      if (specifier.type !== "ExportSpecifier") {
+        continue;
+      }
+
+      const exportedName = readName(specifier.exported);
+      const localName = readName(specifier.local);
+
+      if (localName) {
+        localNamesByExport.get(exportedName)?.add(localName);
+      }
+    }
+  }
+
+  return localNamesByExport;
+}
+
+function isTopLevelVariable(node) {
+  const declaration = node.parent;
+  const declarationParent = declaration?.parent;
+
+  return (
+    declaration?.type === "VariableDeclaration" &&
+    (declarationParent?.type === "Program" ||
+      (declarationParent?.type === "ExportNamedDeclaration" &&
+        declarationParent.parent?.type === "Program"))
+  );
+}
+
+function isNamedExportedVariable(node, localNames) {
   return (
     node.id.type === "Identifier" &&
-    node.id.name === name &&
-    node.parent?.type === "VariableDeclaration" &&
-    node.parent.parent?.type === "ExportNamedDeclaration"
+    localNames.has(node.id.name) &&
+    isTopLevelVariable(node)
   );
 }
 
@@ -174,21 +267,21 @@ function findNearestFunction(node) {
   return undefined;
 }
 
-function isExportedGenerateMetadataFunction(node) {
+function isExportedGenerateMetadataFunction(node, localNames) {
   if (node.type === "FunctionDeclaration") {
     return (
-      node.id?.name === "generateMetadata" &&
-      node.parent?.type === "ExportNamedDeclaration"
+      node.id &&
+      localNames.has(node.id.name) &&
+      (node.parent?.type === "Program" ||
+        (node.parent?.type === "ExportNamedDeclaration" &&
+          node.parent.parent?.type === "Program"))
     );
   }
 
   const declarator = node.parent;
   return (
     declarator?.type === "VariableDeclarator" &&
-    declarator.id.type === "Identifier" &&
-    declarator.id.name === "generateMetadata" &&
-    declarator.parent?.type === "VariableDeclaration" &&
-    declarator.parent.parent?.type === "ExportNamedDeclaration"
+    isNamedExportedVariable(declarator, localNames)
   );
 }
 
@@ -196,6 +289,25 @@ function inspectMetadataNode(node, reportCandidates) {
   const expression = unwrapExpression(node);
 
   if (!expression) {
+    return;
+  }
+
+  if (expression.type === "ConditionalExpression") {
+    inspectMetadataNode(expression.consequent, reportCandidates);
+    inspectMetadataNode(expression.alternate, reportCandidates);
+    return;
+  }
+
+  if (expression.type === "LogicalExpression") {
+    if (expression.operator !== "&&") {
+      inspectMetadataNode(expression.left, reportCandidates);
+    }
+    inspectMetadataNode(expression.right, reportCandidates);
+    return;
+  }
+
+  if (expression.type === "SequenceExpression") {
+    inspectMetadataNode(expression.expressions.at(-1), reportCandidates);
     return;
   }
 
@@ -260,6 +372,7 @@ const externalizeVisibleCopyRule = {
       context.options[0]?.invariantLiterals ?? [],
     );
     const reportedNodes = new WeakSet();
+    let exportedLocalNames = new Map();
 
     function reportCandidates(candidates, messageId) {
       for (const candidate of candidates) {
@@ -276,6 +389,9 @@ const externalizeVisibleCopyRule = {
     }
 
     return {
+      Program(node) {
+        exportedLocalNames = collectExportedLocalNames(node);
+      },
       JSXAttribute(node) {
         const attributeName =
           node.name.type === "JSXIdentifier" ? node.name.name : undefined;
@@ -311,7 +427,10 @@ const externalizeVisibleCopyRule = {
 
         if (
           containingFunction &&
-          isExportedGenerateMetadataFunction(containingFunction)
+          isExportedGenerateMetadataFunction(
+            containingFunction,
+            exportedLocalNames.get("generateMetadata") ?? new Set(),
+          )
         ) {
           inspectMetadataNode(node.argument, (candidates) =>
             reportCandidates(candidates, "metadata"),
@@ -319,14 +438,22 @@ const externalizeVisibleCopyRule = {
         }
       },
       VariableDeclarator(node) {
-        if (isNamedExportedVariable(node, "metadata")) {
+        if (
+          isNamedExportedVariable(
+            node,
+            exportedLocalNames.get("metadata") ?? new Set(),
+          )
+        ) {
           inspectMetadataNode(node.init, (candidates) =>
             reportCandidates(candidates, "metadata"),
           );
         }
 
         if (
-          isNamedExportedVariable(node, "generateMetadata") &&
+          isNamedExportedVariable(
+            node,
+            exportedLocalNames.get("generateMetadata") ?? new Set(),
+          ) &&
           node.init?.type === "ArrowFunctionExpression" &&
           node.init.expression
         ) {

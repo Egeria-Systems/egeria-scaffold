@@ -220,6 +220,101 @@ export function generateMetadata() {
     );
   });
 
+  test(`${eslintName} rejects metadata through result branches and named exports`, async () => {
+    const messages = await lintSource(
+      eslintPackage,
+      `const pageMetadata = {
+  title: condition
+    ? { default: "Literal default", template: "%s | Literal template" }
+    : { absolute: "Literal absolute" },
+};
+
+const buildMetadata = () =>
+  condition
+    ? { description: "Literal description" }
+    : { title: { absolute: "Literal generated title" } };
+
+export {
+  pageMetadata as metadata,
+  buildMetadata as generateMetadata,
+};
+`,
+    );
+
+    assert.deepEqual(
+      selectDiagnostics(messages),
+      Array.from({ length: 5 }, () => ({
+        message:
+          "Move this user-visible metadata value to validated content or localization.",
+        ruleId,
+        severity: 2,
+      })),
+    );
+
+    const functionMessages = await lintSource(
+      eslintPackage,
+      `function createMetadata() {
+  return { publisher: "Literal publisher" };
+}
+
+export { createMetadata as generateMetadata };
+`,
+    );
+
+    assert.deepEqual(selectDiagnostics(functionMessages), [
+      {
+        message:
+          "Move this user-visible metadata value to validated content or localization.",
+        ruleId,
+        severity: 2,
+      },
+    ]);
+  });
+
+  test(`${eslintName} ignores non-rendered JSX control literals`, async () => {
+    assert.deepEqual(
+      await lintSource(
+        eslintPackage,
+        `export function Example({ label, status }: { label: string; status: string }) {
+  return (
+    <main>
+      {status === "ready" && label}
+      {("debug", label)}
+    </main>
+  );
+}
+`,
+      ),
+      [],
+    );
+  });
+
+  test(`${eslintName} rejects literals in result-producing JSX branches`, async () => {
+    const messages = await lintSource(
+      eslintPackage,
+      `export function Example({ label, status }: { label: string; status: string }) {
+  return (
+    <main>
+      {status ? label : "Literal alternate"}
+      {label || "Literal fallback"}
+      {label + " literal suffix"}
+    </main>
+  );
+}
+`,
+    );
+
+    assert.deepEqual(
+      selectDiagnostics(messages),
+      Array.from({ length: 3 }, () => ({
+        message:
+          "Move user-visible JSX text to validated content or localization.",
+        ruleId,
+        severity: 2,
+      })),
+    );
+  });
+
   test(`${eslintName} accepts only exact configured invariant literals`, async () => {
     assert.deepEqual(
       await lintSource(eslintPackage, "export const value = <span>·</span>;", {
@@ -235,6 +330,21 @@ export function generateMetadata() {
     );
 
     assert.deepEqual(selectDiagnostics(messages), [
+      {
+        message:
+          "Move user-visible JSX text to validated content or localization.",
+        ruleId,
+        severity: 2,
+      },
+    ]);
+
+    const whitespaceNearMatch = await lintSource(
+      eslintPackage,
+      "export const value = <span>A  B</span>;",
+      { invariantLiterals: ["A B"] },
+    );
+
+    assert.deepEqual(selectDiagnostics(whitespaceNearMatch), [
       {
         message:
           "Move user-visible JSX text to validated content or localization.",
