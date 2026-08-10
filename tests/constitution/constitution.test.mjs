@@ -702,6 +702,10 @@ test("provider execution remains truthful and Free-compatible for a sole develop
       document,
       /authorized (?:creation or designation|creating or designating)/iu,
     );
+    assert.doesNotMatch(
+      document,
+      /event-type (?:creation|change|disabling|deletion)[^.]+separate(?:ly)? (?:authorized|approval)/iu,
+    );
   }
 
   assert.match(
@@ -721,6 +725,10 @@ test("provider execution remains truthful and Free-compatible for a sole develop
   assert.match(receipt, /pre-existing designated/iu);
   assert.match(receipt, /event-?type[^.]+preserved/iu);
   assert.doesNotMatch(receipt, /certification-created|disabled or deleted/iu);
+  assert.doesNotMatch(
+    receipt,
+    /event-type (?:creation|change|disabling|deletion)[^.]+separate(?:ly)? (?:authorized|approval)/iu,
+  );
 });
 
 test("repository documentation has no broken local Markdown links", async () => {
