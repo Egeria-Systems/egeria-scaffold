@@ -67,7 +67,7 @@ The [package-ownership document](docs/architecture/package-ownership.md) owns th
 
 ## Calendly scaffold boundary
 
-Calendly is an explicit optional selection for initial `portfolio` or `site` creation; it is not a recipe default and is not addable later yet. The paired CLI options accept `link`, `inline`, or `popup` plus a bounded HTTPS destination on `calendly.com` or `www.calendly.com`. Selection and strict settings are recorded together in `.egeria/project.yaml`; the installed capability and managed-surface fingerprints are recorded in `.egeria/state.json` and checked by read-only inference.
+Calendly is an explicit optional selection for initial `portfolio` or `site` creation; it is not a recipe default and is not addable later yet. The paired CLI options accept `link`, `inline`, or `popup` plus a bounded HTTPS destination on `calendly.com` or `www.calendly.com` with no query string. Selection and strict settings are recorded together in `.egeria/project.yaml`; the installed capability and managed-surface fingerprints are recorded in `.egeria/state.json` and checked by read-only inference.
 
 Generated link mode uses an ordinary anchor. Inline mode activates a direct cross-origin iframe near the viewport, and popup mode enhances the ordinary anchor with a native dialog and a user-activated iframe. The generated application loads no Calendly host-page script or API. Calendly account configuration, event types, provider data, cookies, retention, and provider cleanup are unmanaged. Source removal is therefore separate from provider cleanup.
 

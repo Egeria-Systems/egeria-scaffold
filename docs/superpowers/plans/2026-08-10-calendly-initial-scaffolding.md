@@ -14,7 +14,7 @@
 - Keep executable profiles limited to `portfolio` and `site`; add only `booking-calendly@0.1.0` as the seventh executable capability.
 - Keep portfolio/site recipe `0.5.0` defaults unchanged. Calendly is selected explicitly and becomes authoritative only when materialized.
 - Accept only paired `--calendly-url` and `--calendly-mode` initial-scaffolding arguments. Do not add prompts, a generic capability-settings CLI, later-add commands, or existing-repository mutation.
-- Accept only `link`, `inline`, and `popup`, and only validated bounded HTTPS Calendly destinations. Never echo rejected destinations in issues or CLI errors.
+- Accept only `link`, `inline`, and `popup`, and only validated bounded HTTPS Calendly destinations without query strings. Never echo rejected destinations in issues or CLI errors.
 - Keep all visible/translatable booking copy in validated YAML. Keep presentation pure except for the bounded booking client component's intersection, modal, and frame lifecycle.
 - Load no Calendly host-page script. Do not add a package dependency, public package, provider adapter, provider API, webhook, event listener, analytics hook, cookie/consent system, generic integration abstraction, generic platform port, or generic database port.
 - Keep Cloudflare types and bindings out of domain, content, and presentation source.
@@ -173,7 +173,7 @@ Do not touch any other existing `fixtures/generated/portfolio` or `fixtures/gene
 
 **RED files:** contract/resolution/generation/CLI tests listed above.
 
-- [x] Add focused failing tests for the seventh descriptor; dependency-first optional resolution; unchanged default recipes; strict settings/capability parity; all three modes; URL hostname/protocol/path/credentials/fragment/whitespace/length rejection; sanitized failures; paired CLI arguments; exact generated request keys; and no-selection compatibility.
+- [x] Add focused failing tests for the seventh descriptor; dependency-first optional resolution; unchanged default recipes; strict settings/capability parity; all three modes; URL hostname/protocol/path/credentials/query/fragment/whitespace/length rejection; sanitized failures; paired CLI arguments; exact generated request keys; and no-selection compatibility.
 - [x] Run the smallest targeted tests and record the expected assertion failures before production edits.
 - [x] Implement `CalendlyBookingSettings`, the strict optional project settings object, `booking-calendly@0.1.0`, optional request resolution, CLI parsing/forwarding, and generated JSON Schema.
 - [x] Keep project schema version and profile recipe version at `1.0.0` and `0.5.0`; add no package version.

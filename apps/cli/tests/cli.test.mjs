@@ -357,23 +357,26 @@ test("the runner forwards paired Calendly selection without exposing its URL", a
         ],
         captured.output,
       ),
-      1,
+      0,
     );
-    assert.deepEqual(captured.standard, []);
-    assert.deepEqual(captured.error, [
+    assert.deepEqual(captured.error, []);
+    assert.deepEqual(captured.standard, [
       JSON.stringify({
-        ok: false,
+        ok: true,
         command: "create",
-        issues: [
-          {
-            code: "PRE_STATE_INFERENCE_FAILED",
-            path: [],
-            context: { reason: "evidence-mismatch" },
-          },
+        destination: await realpath(destination),
+        profile: "portfolio",
+        capabilities: [
+          "standards",
+          "content-files",
+          "section-composition",
+          "deployment-cloudflare",
+          "observability",
+          "booking-calendly",
         ],
       }),
     ]);
-    assert.doesNotMatch(captured.error[0], /private-intro|calendly\.com/u);
+    assert.doesNotMatch(captured.standard[0], /private-intro|calendly\.com/u);
   } finally {
     await rm(owner, { recursive: true, force: true });
   }

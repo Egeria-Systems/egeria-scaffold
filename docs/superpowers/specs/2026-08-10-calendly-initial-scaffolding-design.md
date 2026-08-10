@@ -29,14 +29,14 @@ capabilitySettings:
 
 The project contract allows no other settings key. `booking-calendly` settings must be present exactly when that capability is selected. Current projects with `capabilitySettings: {}` remain valid.
 
-The URL contract accepts only HTTPS `calendly.com` or `www.calendly.com`, a non-root path, no user information, no fragment, no URL-normalization whitespace, and a maximum of 2,048 characters. Stable failures never include the rejected value.
+The URL contract accepts only HTTPS `calendly.com` or `www.calendly.com`, a non-root path, no user information, no query string, no fragment, no URL-normalization whitespace, and a maximum of 2,048 characters. Stable failures never include the rejected value.
 
 ## Capability contract
 
 `booking-calendly@0.1.0` is source-generated, repository-stateful, automatically removable, and supported by `portfolio` and `site`. It depends on `section-composition`, installs no package, requests no secret or environment variable, creates no provider resource, and declares:
 
-- external domain `calendly.com`;
-- CSP contribution `frame-src https://calendly.com`;
+- external domains `calendly.com` and `www.calendly.com`;
+- CSP contribution `frame-src https://calendly.com https://www.calendly.com`;
 - browser storage and scheduling data as provider-controlled inside the cross-origin frame;
 - elevated threat review because a third-party scheduling surface handles personal data; and
 - explicit documentation and removal/recovery requirements that exclude the Calendly account and provider data.

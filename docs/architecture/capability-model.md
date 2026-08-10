@@ -175,7 +175,7 @@ Profile inclusion distinguishes recipe defaults from independent selections. `de
 
 ### Executable Calendly boundary
 
-Initial selection is one atomic request containing `destination` and `mode`. `destination` accepts at most 2,048 characters and must be HTTPS on `calendly.com` or `www.calendly.com`, use a non-root path, and contain no credentials, fragment, normalization whitespace, or non-default port. `mode` is exactly `link`, `inline`, or `popup`. Stable validation issues do not contain rejected destinations.
+Initial selection is one atomic request containing `destination` and `mode`. `destination` accepts at most 2,048 characters and must be HTTPS on `calendly.com` or `www.calendly.com`, use a non-root path, and contain no credentials, query string, fragment, normalization whitespace, or non-default port. `mode` is exactly `link`, `inline`, or `popup`. Stable validation issues do not contain rejected destinations.
 
 `.egeria/project.yaml` permits one strict optional `capabilitySettings.booking-calendly` object and requires settings presence to agree exactly with the selected capability. `.egeria/state.json` records `booking-calendly@0.1.0`, its source-generated delivery, repository-stateful classification, automatic source-removal policy, and surface fingerprints. Existing projects with `capabilitySettings: {}` remain valid.
 

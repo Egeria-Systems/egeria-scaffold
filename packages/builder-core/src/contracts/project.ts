@@ -35,7 +35,7 @@ const displayNameSchema = z
   .string()
   .regex(/^(?=.{1,120}$)(?=.*\S)[^\p{Cc}]+$/u);
 const calendlyDestinationPattern =
-  /^https:\/\/(?:www\.)?calendly\.com(?::443)?\/[^\s/?#][^\s?#]*(?:\?[^\s#]*)?$/u;
+  /^https:\/\/(?:www\.)?calendly\.com(?::443)?\/[^\s/?#][^\s?#]*$/u;
 
 function isCalendlyDestination(value: string): boolean {
   if (value.length > 2_048 || /\s/u.test(value) || value.includes("#")) {
@@ -53,6 +53,7 @@ function isCalendlyDestination(value: string): boolean {
       destination.pathname !== "/" &&
       destination.username === "" &&
       destination.password === "" &&
+      destination.search === "" &&
       destination.hash === ""
     );
   } catch {

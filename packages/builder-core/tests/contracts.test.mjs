@@ -423,7 +423,7 @@ test("Calendly settings enforce paired capability state and sanitized destinatio
   const maximumDestination = "https://calendly.com/".padEnd(2_048, "a");
 
   assertAccepts(contracts.calendlyBookingSettingsSchema, {
-    destination: "https://www.calendly.com/acme/intro?month=2026-08",
+    destination: "https://www.calendly.com/acme/intro",
     mode: "link",
   });
 
@@ -476,6 +476,8 @@ test("Calendly settings enforce paired capability state and sanitized destinatio
     "https://calendly.com/",
     "https://user:password@calendly.com/acme/intro",
     "https://calendly.com/acme/intro#booking",
+    "https://www.calendly.com/acme/intro?month=2026-08",
+    "https://calendly.com/acme/intro?email=person%40example.com&token=private-token",
     " https://calendly.com/acme/intro",
     "https://calendly.com/acme/intro ",
     "https://calendly.com/acme /intro",
@@ -499,10 +501,20 @@ test("Calendly settings enforce paired capability state and sanitized destinatio
       },
     );
     assert.equal(result.ok, false);
-    assert.doesNotMatch(JSON.stringify(result.issues), new RegExp(
+    const serializedIssues = JSON.stringify(result.issues);
+    assert.doesNotMatch(serializedIssues, new RegExp(
       destination.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"),
       "u",
     ));
+    for (const sensitiveFragment of [
+      "month=2026-08",
+      "person%40example.com",
+      "private-token",
+    ]) {
+      if (destination.includes(sensitiveFragment)) {
+        assert.equal(serializedIssues.includes(sensitiveFragment), false);
+      }
+    }
   }
 });
 
@@ -709,7 +721,7 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
   for (const destination of [
     "https://calendly.com/acme/intro",
     "https://calendly.com:443/acme/intro",
-    "https://www.calendly.com/acme/intro?month=2026-08",
+    "https://www.calendly.com/acme/intro",
   ]) {
     assert.match(destination, calendlyDestinationPattern);
   }
@@ -719,6 +731,8 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
     "https://calendly.com/",
     "https://calendly.com:444/acme/intro",
     "https://user@calendly.com/acme/intro",
+    "https://www.calendly.com/acme/intro?month=2026-08",
+    "https://calendly.com/acme/intro?email=person%40example.com&token=private-token",
     "https://calendly.com/acme/intro#booking",
     " https://calendly.com/acme/intro",
   ]) {

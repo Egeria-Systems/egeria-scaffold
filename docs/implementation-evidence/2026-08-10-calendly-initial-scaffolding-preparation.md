@@ -88,7 +88,7 @@ No contradiction blocks local implementation.
 
 - Add source-generated `booking-calendly@0.1.0` as an optional `portfolio`/`site` capability with automatic source removal, no package dependency, no environment variable, no secret, no generated provider resource, and no provider cleanup claim.
 - Accept either the existing exact four `create` options or those four plus `--calendly-url` and `--calendly-mode`; require the two Calendly options together.
-- Accept modes `link`, `inline`, and `popup`. Accept only an HTTPS `calendly.com` or `www.calendly.com` URL with a non-root path, no credentials, no fragment, no whitespace, and at most 2,048 characters. Reject inputs without echoing them in issues.
+- Accept modes `link`, `inline`, and `popup`. Accept only an HTTPS `calendly.com` or `www.calendly.com` URL with a non-root path, no credentials, no query string, no fragment, no whitespace, and at most 2,048 characters. Reject inputs without echoing them in issues.
 - Store the exact validated selection in `.egeria/project.yaml` as `capabilitySettings.booking-calendly`, and require settings/capability presence to agree.
 - Generate validated externalized `en-CA` booking copy, a typed source reader, generated settings, a client presentation component, a booking-aware home composition root, and a capability-owned browser specification only when selected.
 - Use an ordinary anchor for link mode; an intersection-activated direct iframe plus anchor fallback for inline mode; and an anchor enhanced to a native modal dialog containing a user-activated direct iframe for popup mode.

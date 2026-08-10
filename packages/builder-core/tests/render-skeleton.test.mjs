@@ -980,9 +980,10 @@ test("generated Calendly presentation preserves link, lazy inline, and native di
   assert.doesNotMatch(component, /<script|Calendly\.init|fetch\(/u);
 
   for (const contract of [
+    /const configuredProviderUrl = new URL\(\s*bookingCalendlySettings\.destination,\s*\)\.href/u,
     /new URL\(bookingCalendlySettings\.destination\)\.origin/u,
     /target\.route\(\s*\(url\) => url\.origin === providerOrigin/u,
-    /requestUrl === bookingCalendlySettings\.destination/u,
+    /requestUrl === configuredProviderUrl/u,
     /unexpectedRequestUrls\.push\(requestUrl\)/u,
     /route\.abort\("blockedbyclient"\)/u,
     /route\.fulfill/u,
@@ -1012,6 +1013,85 @@ test("generated Calendly presentation preserves link, lazy inline, and native di
   }
   assert.doesNotMatch(browserSpecification, /not\.toHaveAttribute\("src"\)/u);
   assert.doesNotMatch(browserSpecification, /page\.goto\(bookingCalendlySettings\.destination/u);
+});
+
+test("rendered explicit HTTPS port remains raw while browser requests use its canonical URL", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const destination = "https://calendly.com:443/acme/intro";
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      bookingCalendly: { destination, mode: "popup" },
+      packageVersions,
+    }),
+  );
+  const files = indexFiles(rendered.files);
+  const settings = files.get(
+    "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+  );
+  const component = files.get(
+    "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+  );
+  const browserSpecification = files.get(
+    "apps/web/tests/e2e/calendly-booking.spec.ts",
+  );
+
+  assert.equal(
+    rendered.project.capabilitySettings["booking-calendly"]?.destination,
+    destination,
+  );
+  assert.match(settings, /destination: "https:\/\/calendly\.com:443\/acme\/intro"/u);
+  assert.match(component, /href=\{settings\.destination\}/u);
+  assert.match(component, /src=\{settings\.destination\}/u);
+  assert.match(
+    browserSpecification,
+    /const configuredProviderUrl = new URL\(\s*bookingCalendlySettings\.destination,\s*\)\.href/u,
+  );
+  assert.match(browserSpecification, /requestUrl === configuredProviderUrl/u);
+  assert.equal(
+    browserSpecification.match(/page\.waitForURL\(configuredProviderUrl\)/gu)
+      ?.length,
+    2,
+  );
+  assert.match(
+    browserSpecification,
+    /toHaveAttribute\(\s*"href",\s*bookingCalendlySettings\.destination/u,
+  );
+  assert.match(
+    browserSpecification,
+    /toHaveAttribute\(\s*"src",\s*bookingCalendlySettings\.destination/u,
+  );
+});
+
+test("rendering rejects Calendly query data before desired state or settings are materialized", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+
+  for (const destination of [
+    "https://calendly.com/acme/intro?month=2026-08",
+    "https://calendly.com/acme/intro?email=person%40example.com&token=private-token",
+  ]) {
+    const result = await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      bookingCalendly: { destination, mode: "popup" },
+      packageVersions,
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(Object.hasOwn(result, "value"), false);
+    assert.ok(
+      result.issues.every(
+        ({ code }) => code === "CONTRACT_VALIDATION_FAILED",
+      ),
+    );
+    assert.doesNotMatch(
+      JSON.stringify(result.issues),
+      /month=2026-08|person%40example\.com|private-token/u,
+    );
+  }
 });
 
 test("generated Calendly browser behavior covers unavailable platform APIs", async () => {

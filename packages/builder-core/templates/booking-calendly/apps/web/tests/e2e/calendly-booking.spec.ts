@@ -21,6 +21,9 @@ function readBookingMode(
 }
 
 const bookingMode = readBookingMode(bookingCalendlySettings);
+const configuredProviderUrl = new URL(
+  bookingCalendlySettings.destination,
+).href;
 const providerOrigin = new URL(bookingCalendlySettings.destination).origin;
 const schedulingDocument =
   '<!doctype html><html><head><link rel="icon" href="data:,"></head><body></body></html>';
@@ -43,7 +46,7 @@ async function stubSchedulingDocument(
       const request = route.request();
       const requestUrl = request.url();
 
-      if (requestUrl === bookingCalendlySettings.destination) {
+      if (requestUrl === configuredProviderUrl) {
         configuredRequests.push(request);
         await route.fulfill({
           status: 200,
@@ -148,7 +151,7 @@ test("preserves ordinary anchor navigation without JavaScript", async ({
     await expect(page.getByTestId("booking-frame")).toHaveCount(0);
 
     await Promise.all([
-      page.waitForURL(bookingCalendlySettings.destination),
+      page.waitForURL(configuredProviderUrl),
       bookingLink.click(),
     ]);
     expect(providerAudit.requestCount()).toBe(1);
@@ -234,7 +237,7 @@ test("preserves popup navigation when native modal support is unavailable", asyn
   expect(fallbackState).toEqual({ dialogOpen: false, frameCount: 0 });
 
   await Promise.all([
-    page.waitForURL(bookingCalendlySettings.destination),
+    page.waitForURL(configuredProviderUrl),
     bookingLink.click(),
   ]);
   expect(
