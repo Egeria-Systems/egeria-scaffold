@@ -9,13 +9,13 @@
   "ejections": [],
   "installedCapabilities": [
     {
-      "deliveryMode": "package-backed",
+      "deliveryMode": "hybrid",
       "identifier": "standards",
       "removalPolicy": "reviewed",
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
       "deliveryMode": "source-generated",
@@ -24,7 +24,7 @@
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.3.0"
+      "version": "0.4.0"
     },
     {
       "deliveryMode": "source-generated",
@@ -43,7 +43,7 @@
         "repository-stateful",
         "external-stateful"
       ],
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
       "deliveryMode": "hybrid",
@@ -62,7 +62,7 @@
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.2.0"
+      "version": "0.3.0"
     }
   ],
   "lastSuccessfulVerification": {
@@ -81,7 +81,7 @@
   },
   "managedSurfaces": [
     {
-      "fingerprint": "sha256:3cd0e958acb59ee5d5a80672c4722c9be73167144d03c4329a2c559b12547d3c",
+      "fingerprint": "sha256:bd843e0cab3dd775ae9cee9e60476dfdef122682c15a6c4e1706d6a0562f6b12",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -94,7 +94,7 @@
       "path": "pnpm-lock.yaml"
     },
     {
-      "fingerprint": "sha256:fde0b2b64e3fd7a4086db5ed91299a6e41a892fef9227a566ba55e20912db465",
+      "fingerprint": "sha256:ea9ae5806fbefcbfbc1f39b2dc4bacb4226408ca8355caaa6401d591d46675bb",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -133,7 +133,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:4462525cefed18adeefd26694c757da59c5c225286aaa4a909bce00febee0209",
+      "fingerprint": "sha256:992bcf566cddc0b8e4ea3c6e3a309705b620577250d139c43d24faeb3d774b08",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -146,7 +146,7 @@
       "path": ".egeria/project.yaml"
     },
     {
-      "fingerprint": "sha256:d03600ce5c8bc9784937b00a55c3e7789450fd50b2c027672933d4ca40dc78ad",
+      "fingerprint": "sha256:59a2375af298e196b5a9700c9500cf3699998cacece4cf1a35394d9640356a72",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -198,7 +198,63 @@
       "path": "package.json"
     },
     {
-      "fingerprint": "sha256:68948824e1f0a0d2a671fccdaec1f6ca1d3390f07800f0cb1401f7d2a8aa15f3",
+      "fingerprint": "sha256:71969d21b7129941ed33eb40fa5747153633fa2e9a2b4447b0a25e4b6f15c77b",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/build"
+      },
+      "identifier": "builder-web-build-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "kind": "builder-kernel"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:8c523427bfc39ac7aad8675c0e2b7c0b86dba7ffe20bf8a485523a3038c28827",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/build:cloudflare"
+      },
+      "identifier": "builder-web-cloudflare-build-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "kind": "builder-kernel"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:6b8d38da193b295a86e581b03d211134f89d851b0ebfc871057f136f90a804fe",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/cf-typegen"
+      },
+      "identifier": "builder-web-cloudflare-type-generation-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "kind": "builder-kernel"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:349da1dedba850fc330991e0a85f3fe4db6022703870443b9b86f96ef529b2fe",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/dev"
+      },
+      "identifier": "builder-web-development-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "kind": "builder-kernel"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:60a926fb36199b30629349c155f4fcd65d31d21a032f58fb4b8dd94ecfe0c73f",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -209,6 +265,20 @@
       },
       "ownership": "application-owned",
       "path": "apps/web/AGENTS.md"
+    },
+    {
+      "fingerprint": "sha256:6eefc9a9608c332e6b3f0c8d0e6366241a189f0c8b732982da29abec3be8cb20",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/lint"
+      },
+      "identifier": "builder-web-lint-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "kind": "builder-kernel"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
     },
     {
       "fingerprint": "sha256:d53b05b125b368cca2922e1cdb25b29e06326ac70c968b879c5a9a13102ddc31",
@@ -301,20 +371,6 @@
         "pointer": "/dependencies/react-dom"
       },
       "identifier": "builder-web-package-react-dom",
-      "mergeStrategy": "json-property",
-      "owner": {
-        "kind": "builder-kernel"
-      },
-      "ownership": "merge-managed",
-      "path": "apps/web/package.json"
-    },
-    {
-      "fingerprint": "sha256:b8a70760317e71425ed664b5379a0a1f58b1772e79c9a83a82fe15487ec9a0a8",
-      "fingerprintTarget": {
-        "kind": "json-value",
-        "pointer": "/scripts"
-      },
-      "identifier": "builder-web-package-scripts",
       "mergeStrategy": "json-property",
       "owner": {
         "kind": "builder-kernel"
@@ -421,6 +477,34 @@
       "path": "apps/web/package.json"
     },
     {
+      "fingerprint": "sha256:d82dcb84764c339391ed650d0a718dd1c262d78802b3141d386f1f7824bae102",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/preview"
+      },
+      "identifier": "builder-web-preview-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "kind": "builder-kernel"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:c1850885b2eaf24bf28769efab035e68cd60206d1cde61228959b3049fe20cac",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/typecheck"
+      },
+      "identifier": "builder-web-typecheck-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "kind": "builder-kernel"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
       "fingerprint": "sha256:06d27b3aa870a2ec0de1d8ddc3a60c4c72291b714f1dcafa8b05a414d5680533",
       "fingerprintTarget": {
         "kind": "file"
@@ -462,7 +546,22 @@
       "path": "apps/web/content/en-CA/long-form/introduction.md"
     },
     {
-      "fingerprint": "sha256:438cdb99b4fa896370a3f06e2b5d0d52207f9e1fc9bc85de9b9781970006571b",
+      "fingerprint": "sha256:24822994d0f46fb84da71490a87020e2a9409e578e084d5e5ac2992b9d9ffb64",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/raw-loader"
+      },
+      "identifier": "content-files-raw-loader-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "content-files",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:448b65e8814d30c3e00338248216618954aec031bcb1ab0caca3cda2f7a037b0",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -504,6 +603,20 @@
       "path": "apps/web/content/en-CA/site.yaml"
     },
     {
+      "fingerprint": "sha256:a7e45b479a8b43ff63ddd7ce893cdfb91488faef53e762648908d98092b12dbb",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "content-files-source-declarations",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "content-files",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/content/content-source.d.ts"
+    },
+    {
       "fingerprint": "sha256:ffff7c6d8151c7c43be2fb894756deb6abcc84d003a569fce989dd5aa111bd7a",
       "fingerprintTarget": {
         "kind": "json-value",
@@ -519,7 +632,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:96b950f57ded8980df3c4d3e6867ff5afe7185d15d7cdc5c34f29cfe7e15f619",
+      "fingerprint": "sha256:68ef8ef5525ea171ba75791fd11d0af5a431f21e3dd6f646c2066366cde0090d",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -749,7 +862,7 @@
       "path": "apps/web/content/en-CA/about.yaml"
     },
     {
-      "fingerprint": "sha256:0ab201cb1ee36b0949282e04c45c3356a6ef69361e2e4fa7921d9eee8eed50d6",
+      "fingerprint": "sha256:42b9a5777cd82f9ddedab4f5e82ea23cc2ae3dcce22d05e5e8deb1ce05d7ce7c",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -761,6 +874,95 @@
       },
       "ownership": "application-owned",
       "path": "apps/web/app/about/page.tsx"
+    },
+    {
+      "fingerprint": "sha256:a34b8455789ad192f62d9d3e732553d26494caf9d900efc45a6976345799b6b3",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/@axe-core~1playwright"
+      },
+      "identifier": "standards-axe-playwright-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:7ee503f27fb5497b1aeacf815a4e415d2c69d2c9be8d3f42033ff7fc5a36d76b",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/browser:install:ci"
+      },
+      "identifier": "standards-browser-install-ci-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:54c8e5675ec91fd6ebceff6fd0ef4f6db641ddb2d132071b1bfe1e8bce59ed7d",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/browser:install"
+      },
+      "identifier": "standards-browser-install-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:e47a5db9b0f5bd6220d6931c872485029078398f71328529bda3432d78cfaff3",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-browser-quality-specification",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/e2e/site-quality.spec.ts"
+    },
+    {
+      "fingerprint": "sha256:7c9757ae5f5a432943330ecf8d33be53b42ddf3ae4fb0e0c65ea074373699f4c",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/test:e2e:deployed"
+      },
+      "identifier": "standards-deployed-browser-test-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:7171b2b1152579c5b0452f278ac13708e819768423363ec8ff73116430e9b273",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/test:e2e:dev"
+      },
+      "identifier": "standards-development-browser-test-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
     },
     {
       "fingerprint": "sha256:d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
@@ -792,7 +994,107 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:94a95a4bb9c4cdebce5f35a1710b7fb8fcdc6a7ff190efd0d24b97f7252137a9",
+      "fingerprint": "sha256:ab4e2615a4520365221cb44322410c678f19b6b3f6c68c73d69b014da9757dc9",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-playwright-deployed-configuration",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/playwright.deployed.config.ts"
+    },
+    {
+      "fingerprint": "sha256:a2a11cb72cb9009fff32b2e00240fa804943995f2ddee7fe8963a039d712f379",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-playwright-development-configuration",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/playwright.dev.config.ts"
+    },
+    {
+      "fingerprint": "sha256:634c3863a42508fe6e1e77fadb84f74555d5a0677bb941035f2613b4dc39162a",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/@playwright~1test"
+      },
+      "identifier": "standards-playwright-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:4420710ab5b1c93549ec7668ee57f77de473f52d2e55f75cc00ab9ceb9ea1c78",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-playwright-preview-configuration",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/playwright.preview.config.ts"
+    },
+    {
+      "fingerprint": "sha256:89c07b78bb0442f65664afb83e56ec37d1b0d7d3ca1698901a2abad9433ffd1a",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-playwright-shared-configuration",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/playwright.config.shared.ts"
+    },
+    {
+      "fingerprint": "sha256:be381fd0767cc44566010e2f4c8936e50eeb0470eaa5a69082d52100dce4b3e8",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/test:e2e:preview"
+      },
+      "identifier": "standards-preview-browser-test-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:1a5e22595628876691491ae833d5411028ba0e6f7af1820f49598f2ef970c294",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-quality-workflow",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": ".github/workflows/quality.yml"
+    },
+    {
+      "fingerprint": "sha256:aeb79e3ce87f0e322a20f66896324c2dcb3ede4425c97b615c749911618350ee",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -808,7 +1110,7 @@
   ],
   "origin": {
     "profile": "site",
-    "recipeVersion": "0.4.0"
+    "recipeVersion": "0.5.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

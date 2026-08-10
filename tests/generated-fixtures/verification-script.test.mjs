@@ -78,13 +78,19 @@ test("fixture inspection accepts only the exact portable generated trees", async
   for (const contract of generatedFixtureContracts) {
     assert.equal(
       contract.expectedFiles.length,
-      contract.profile === "portfolio" ? 35 : 37,
+      contract.profile === "portfolio" ? 36 : 38,
     );
     assert.equal(contract.expectedRecipeVersion, "0.5.0");
     assert.equal(contract.expectedStandardsVersion, "0.2.0");
+    assert.equal(contract.expectedContentFilesVersion, "0.4.0");
+    assert.equal(contract.expectedDeploymentCloudflareVersion, "0.2.0");
+    assert.equal(
+      contract.expectedSiteRoutingVersion,
+      contract.profile === "portfolio" ? null : "0.3.0",
+    );
     assert.equal(
       contract.expectedSurfaces,
-      contract.profile === "portfolio" ? 69 : 71,
+      contract.profile === "portfolio" ? 71 : 73,
     );
     const snapshot = await inspectGeneratedFixture(
       resolve(repositoryRoot, contract.relativeRoot),

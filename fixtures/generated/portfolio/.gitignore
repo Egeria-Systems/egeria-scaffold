@@ -7,6 +7,8 @@ cloudflare-env.d.ts
 .env*
 !.env.example
 coverage/
+playwright-report/
+test-results/
 .DS_Store
 .idea/
 .vscode/

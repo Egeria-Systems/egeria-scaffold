@@ -14,6 +14,8 @@ Evolve the existing `standards` capability from package-backed delivery to hybri
 
 The capability version advances to `0.2.0`. Both profile recipes advance to `0.5.0`. No capability is added, and no public browser-testing package is extracted. The proof remains a non-product reference and is never imported, copied at runtime, or added as a dependency.
 
+Runtime certification found one directly blocking compatibility defect in the approved preceding content implementation: generated server modules read externalized YAML/Markdown through `node:fs`, but those project files are not present in the OpenNext workerd bundle. The bounded correction keeps the files as validated non-executable sources and imports them as text through Next's supported Turbopack loader contract. `raw-loader@4.0.2` is an exact generated development dependency, and `apps/web/src/content/content-source.d.ts` provides the corresponding string module types. This advances `content-files` to `0.4.0`, `deployment-cloudflare` to `0.2.0`, and the changed `site-routing` source to `0.3.0`; it adds no capability, provider resource, runtime service, public package, or ordinary-generation browser step.
+
 ## Alternatives considered
 
 ### Selected: hybrid `standards`
@@ -42,10 +44,11 @@ apps/web/playwright.config.shared.ts
 apps/web/playwright.dev.config.ts
 apps/web/playwright.preview.config.ts
 apps/web/playwright.deployed.config.ts
+apps/web/src/content/content-source.d.ts
 apps/web/tests/e2e/site-quality.spec.ts
 ```
 
-`apps/web/package.json` gains exact development dependencies `@playwright/test@1.62.1` and `@axe-core/playwright@4.12.1`, plus semantic scripts for:
+`apps/web/package.json` gains exact development dependencies `@playwright/test@1.62.1`, `@axe-core/playwright@4.12.1`, and the build-time text-module loader `raw-loader@4.0.2`, plus semantic scripts for:
 
 - installing Chromium explicitly for local use;
 - installing Chromium plus operating-system dependencies in CI;
@@ -54,6 +57,8 @@ apps/web/tests/e2e/site-quality.spec.ts
 - running deployed-mode tests.
 
 The root manifest remains builder-owned and unchanged. Generated documentation invokes the web-workspace scripts with `pnpm --dir apps/web`, avoiding duplicate command ownership. Existing builder ownership of `/scripts` in the web manifest is decomposed into exact builder-owned script properties so the standards capability can own only the new quality script properties without overlapping JSON Pointer targets.
+
+`next.config.ts` applies `raw-loader` only to `.md`, `.yaml`, and `.yml` imports. Content readers import the source strings and retain the existing strict parsing and validation functions; they no longer call runtime filesystem APIs. The declaration file and loader property belong to `content-files`, while the Next configuration remains owned by `deployment-cloudflare`. The site about route remains owned by `site-routing`. Each changed owner advances its version and retains matching fingerprints and inference.
 
 `.gitignore` gains `playwright-report/` and `test-results/`. Those lines remain part of the builder-owned generated ignore file; capability ownership does not need to fragment a text file merely to claim every line.
 

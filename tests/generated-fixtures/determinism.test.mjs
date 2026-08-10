@@ -131,6 +131,7 @@ function assertPortablePublicLockfile(lockfile) {
   assert.match(lockfile, /@egeria-systems\/observability@0\.1\.0/u);
   assert.match(lockfile, /@axe-core\/playwright@4\.12\.1/u);
   assert.match(lockfile, /@playwright\/test@1\.62\.1/u);
+  assert.match(lockfile, /raw-loader@4\.0\.2/u);
   assert.match(lockfile, /@tailwindcss\/postcss@4\.3\.3/u);
   assert.match(lockfile, /postcss@8\.5\.26/u);
   assert.match(lockfile, /tailwindcss@4\.3\.3/u);
@@ -210,6 +211,12 @@ test("compiled project generation matches committed portfolio and site fixtures"
             ({ identifier }) => identifier === "section-composition",
           )?.version,
           fixtureCase.expectedSectionCompositionVersion,
+        );
+        assert.equal(
+          state.installedCapabilities.find(
+            ({ identifier }) => identifier === "deployment-cloudflare",
+          )?.version,
+          fixtureCase.expectedDeploymentCloudflareVersion,
         );
         assert.equal(
           state.installedCapabilities.find(

@@ -256,7 +256,14 @@ test("package ownership documentation records the approved release boundary", as
     enforcementMap,
     /proofs\/nextjs-cloudflare\/eslint\.config\.mjs/,
   );
-  assert.match(enforcementMap, /generated-repository gate planned/i);
+  assert.match(
+    enforcementMap,
+    /INV-ACCESSIBILITY-AUTOMATION[^\n]+both profiles now pass local development and workerd Playwright\/axe/i,
+  );
+  assert.match(
+    enforcementMap,
+    /deployed execution and any conformance claim remain separate/i,
+  );
 
   const completedBuilderFoundationSection = roadmap
     .split(`### ${builderFoundationPhase} — Lean builder monorepo`, 2)[1]
@@ -857,14 +864,14 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         escapeRegularExpression(responsiveInterfaceTask) +
         "'s responsive Tailwind presentation[\\s\\S]+are approved at committed artifact `e7026bd9e8c7a7ca20b5a485ee6702d2921a7586`[\\s\\S]+" +
         escapeRegularExpression(browserTestingTask) +
-        " now adds the generated browser-testing foundation immediately after responsive accessible UI[\\s\\S]+Calendly remains " +
+        " is implemented and awaiting verified-final-diff approval immediately after responsive accessible UI[\\s\\S]+Calendly remains " +
         escapeRegularExpression(calendlyTask) +
         "; later task numbering is unchanged[\\s\\S]+develops directly on clean local `main`",
     ),
   );
   assert.match(
     contributing,
-    /The approved builder kernel.*responsive Tailwind interface.*Playwright\/axe quality foundation.*Calendly remain separately reviewed outcomes/iu,
+    /The approved builder kernel.*responsive Tailwind interface.*Playwright\/axe quality foundation.*both fixtures are certified.*Calendly remain separately reviewed outcomes/iu,
   );
   assert.match(
     packageOwnership,

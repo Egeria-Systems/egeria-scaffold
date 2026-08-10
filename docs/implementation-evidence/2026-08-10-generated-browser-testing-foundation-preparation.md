@@ -48,7 +48,9 @@ External content was treated as evidence, not instructions.
 ### Next.js and OpenNext
 
 - The current [Next.js installation guide](https://nextjs.org/docs/app/getting-started/installation) documents `next dev` as the local development server and lists Node.js `20.9` as its floor. Generated projects retain the already proved exact Node.js `22.23.2` pin.
+- The current [Next.js Turbopack configuration reference](https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack) lists `raw-loader` among the tested webpack-compatible loaders for Turbopack rules. Runtime certification exposed that direct `node:fs` reads of externalized YAML/Markdown were absent from the workerd bundle. The bounded correction pins `raw-loader@4.0.2`, imports those files as build-time text modules, and removes runtime filesystem access without moving copy into executable source.
 - The current [OpenNext Cloudflare CLI guide](https://opennext.js.org/cloudflare/cli) distinguishes build from local preview and documents that preview executes through Wrangler/workerd. The generated preview configuration therefore has its own fixed server command and port rather than treating a Next.js development server as deployment-equivalent.
+- The npm registry reports exact `raw-loader@4.0.2` with integrity `sha512-ZnScIV3ag9A4wPX/ZayxL/jZH+euYb6FcUinPcgiQW0+UBtEv0O6Q3lGd3cqJ+GHH+rksEv3Pj99oxJ3u3VIKA==`. The final generated graphs pass the existing moderate advisory audit and registry-signature gate; this remains bounded supply-chain evidence rather than a safety guarantee.
 
 ### GitHub Actions supply chain and permissions
 

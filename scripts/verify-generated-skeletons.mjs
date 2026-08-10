@@ -30,6 +30,7 @@ const portfolioFiles = Object.freeze([
   ".egeria/migrations.jsonl",
   ".egeria/project.yaml",
   ".egeria/state.json",
+  ".github/workflows/quality.yml",
   ".gitignore",
   ".nvmrc",
   "AGENTS.md",
@@ -45,12 +46,18 @@ const portfolioFiles = Object.freeze([
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
+  "apps/web/playwright.config.shared.ts",
+  "apps/web/playwright.deployed.config.ts",
+  "apps/web/playwright.dev.config.ts",
+  "apps/web/playwright.preview.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
+  "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/sections/section-registry.tsx",
+  "apps/web/tests/e2e/site-quality.spec.ts",
   "apps/web/tsconfig.json",
   "apps/web/wrangler.jsonc",
   "package.json",
@@ -72,11 +79,13 @@ export const generatedFixtureContracts = Object.freeze([
       "deployment-cloudflare",
       "observability",
     ]),
-    expectedRecipeVersion: "0.4.0",
-    expectedContentFilesVersion: "0.3.0",
+    expectedRecipeVersion: "0.5.0",
+    expectedStandardsVersion: "0.2.0",
+    expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.2.0",
     expectedSiteRoutingVersion: null,
-    expectedSurfaces: 50,
+    expectedSurfaces: 71,
   }),
   Object.freeze({
     profile: "site",
@@ -96,11 +105,13 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "site-routing",
     ]),
-    expectedRecipeVersion: "0.4.0",
-    expectedContentFilesVersion: "0.3.0",
+    expectedRecipeVersion: "0.5.0",
+    expectedStandardsVersion: "0.2.0",
+    expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedSiteRoutingVersion: "0.2.0",
-    expectedSurfaces: 52,
+    expectedDeploymentCloudflareVersion: "0.2.0",
+    expectedSiteRoutingVersion: "0.3.0",
+    expectedSurfaces: 73,
   }),
 ]);
 
@@ -114,6 +125,9 @@ const verificationChecks = [
   "typecheck",
   "next-build",
   "opennext-build",
+  "browser-install",
+  "browser-development",
+  "browser-preview",
 ];
 
 const requiredPublicPackages = [
@@ -196,7 +210,9 @@ function expectedWebManifest(projectName) {
       yaml: "2.9.0",
     },
     devDependencies: {
+      "@axe-core/playwright": "4.12.1",
       "@egeria-systems/standards": "0.1.0",
+      "@playwright/test": "1.62.1",
       "@tailwindcss/postcss": "4.3.3",
       "@types/node": "22.20.1",
       "@types/react": "19.2.18",
@@ -204,6 +220,7 @@ function expectedWebManifest(projectName) {
       eslint: "9.39.5",
       "eslint-config-next": "16.3.0",
       postcss: "8.5.26",
+      "raw-loader": "4.0.2",
       tailwindcss: "4.3.3",
       typescript: "6.0.3",
       "typescript-eslint": "8.66.0",
@@ -212,6 +229,8 @@ function expectedWebManifest(projectName) {
     name: `${projectName}-web`,
     private: true,
     scripts: {
+      "browser:install": "playwright install chromium",
+      "browser:install:ci": "playwright install --with-deps chromium",
       build: "next build",
       "build:cloudflare": "opennextjs-cloudflare build",
       "cf-typegen":
@@ -220,6 +239,11 @@ function expectedWebManifest(projectName) {
       lint: "eslint . --max-warnings 0",
       preview:
         "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+      "test:e2e:deployed":
+        "playwright test --config playwright.deployed.config.ts",
+      "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
+      "test:e2e:preview":
+        "playwright test --config playwright.preview.config.ts",
       typecheck: "next typegen && tsc --noEmit",
     },
     type: "module",
@@ -275,6 +299,8 @@ function createChildEnvironment(support) {
     TEMP: support.temporary,
     NPM_CONFIG_REGISTRY: publicRegistry,
     NPM_CONFIG_USERCONFIG: support.userConfiguration,
+    PLAYWRIGHT_BROWSERS_PATH: support.browsers,
+    XDG_CACHE_HOME: support.cache,
   };
 }
 
@@ -318,16 +344,20 @@ async function cleanupOwnedDirectory(identity) {
 
 async function createSupportPaths(root) {
   const home = join(root, "home");
+  const browsers = join(root, "playwright-browsers");
+  const cache = join(root, "cache");
   const temporary = join(root, "temporary");
   const store = join(root, "store");
   const userConfiguration = join(root, ".npmrc");
 
   await mkdir(home, { mode: 0o700 });
+  await mkdir(browsers, { mode: 0o700 });
+  await mkdir(cache, { mode: 0o700 });
   await mkdir(temporary, { mode: 0o700 });
   await mkdir(store, { mode: 0o700 });
   await writeFile(userConfiguration, "", { flag: "wx", mode: 0o600 });
 
-  return { home, temporary, store, userConfiguration };
+  return { browsers, cache, home, temporary, store, userConfiguration };
 }
 
 async function snapshotTree(root) {
@@ -640,6 +670,18 @@ async function verifyWithAdapters(adapters) {
         {
           arguments: ["run", "build:cloudflare"],
           failureCode: "OPENNEXT_BUILD_FAILED",
+        },
+        {
+          arguments: ["--dir", "apps/web", "run", "browser:install"],
+          failureCode: "BROWSER_INSTALL_FAILED",
+        },
+        {
+          arguments: ["--dir", "apps/web", "run", "test:e2e:dev"],
+          failureCode: "BROWSER_DEVELOPMENT_FAILED",
+        },
+        {
+          arguments: ["--dir", "apps/web", "run", "test:e2e:preview"],
+          failureCode: "BROWSER_PREVIEW_FAILED",
         },
       ];
 
