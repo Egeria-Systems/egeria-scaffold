@@ -27,11 +27,14 @@ Use this template only after the separately authorized protected-staging and pro
 - Repository revision: [40-character Git commit]
 - Workflow run URL: [GitHub Actions run URL]
 - Protected environment: `compatibility`
-- Human deployment approver: [public GitHub identity]
+- Deployment risk owner: [public GitHub identity]
+- Independent human deployment reviewer: `none — sole-developer exception`
+- GitHub environment required-reviewer status: `none configured`
+- Administrator bypass: [enabled and accepted for this non-production risk exception / unexpected state requiring stop]
 - Local receipt artifact digest: [GitHub-reported artifact SHA-256]
 - Staging origin: [dedicated non-production origin; omit private query data]
 - Worker-name preflight for `acme-portfolio-calendly`: [absent before deployment / approved dedicated certification resource]
-- Action owners and roles: [GitHub repository administrator; workflow dispatcher; required deployment reviewer; Cloudflare account administrator; Calendly certification operator; implemented-task reviewer]
+- Action owners and roles: [GitHub repository administrator; workflow dispatcher; deployment risk owner; Cloudflare account administrator; Calendly certification operator; implemented-task reviewer; identify the sole operator in every role]
 - Credential disposition: [task token revoked / exposed or over-scoped token rotated / shared compatibility token unchanged under named rotation plan]
 
 ## Synthetic-data declaration
@@ -39,7 +42,9 @@ Use this template only after the separately authorized protected-staging and pro
 - Synthetic host and invitee labels declared before execution: [labels without email addresses]
 - Test-controlled calendar/inbox confirmed: [yes / no]
 - Real client data, identities, messages, calendars, and production resources excluded: [yes / no]
-- Calendly service tier and event-type slot confirmed: [tier and bounded slot statement]
+- Calendly service-tier basis: `Free-compatible during and after trial`
+- Free-baseline check: [one one-on-one event type; one connected calendar; bounded availability; supported video conferencing; ordinary scheduling; no trial-only or paid dependency]
+- Event-type lifecycle: [pre-existing designated event / certification-created event]
 - Quota and spend result: [one event slot and one booking; existing GitHub/Cloudflare quota; no paid upgrade or incremental spend]
 
 ## Deployed application evidence
@@ -62,7 +67,7 @@ Use this template only after the separately authorized protected-staging and pro
 ## Cancellation and cleanup evidence
 
 - Synthetic meeting cancellation status and timestamp: [status]
-- Synthetic event type disabled or deleted: [status]
+- Event-type cleanup: [pre-existing designated event preserved / certification-created event disabled or deleted under separate approval]
 - Test calendar/inbox cleanup: [status]
 - Certification Worker rolled back or removed: [status]
 - Staging origin no longer serves the certification Worker: [verification]

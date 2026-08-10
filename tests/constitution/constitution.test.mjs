@@ -676,6 +676,37 @@ test("provider preparation defines the external safety envelope", async () => {
   assert.match(receipt, /rerun trigger/iu);
 });
 
+test("provider execution remains truthful and Free-compatible for a sole developer", async () => {
+  const [preparation, plan, receipt] = await Promise.all([
+    readRepositoryFile(
+      "docs/implementation-evidence/2026-08-10-booking-calendly-certification-preparation.md",
+    ),
+    readRepositoryFile(
+      "docs/superpowers/plans/2026-08-10-booking-calendly-certification.md",
+    ),
+    readRepositoryFile(
+      "docs/implementation-evidence/booking-calendly-provider-receipt-template.md",
+    ),
+  ]);
+
+  for (const document of [preparation, plan]) {
+    assert.match(document, /sole developer/iu);
+    assert.match(document, /no independent human deployment (?:approval|review)/iu);
+    assert.match(document, /administrator bypass[^.]+accepted limitation/iu);
+    assert.match(document, /remain usable after the trial expires without payment/iu);
+    assert.match(document, /trial-only or paid/iu);
+    assert.match(document, /pre-existing designated event/iu);
+    assert.match(document, /preserve[s]? the event type/iu);
+  }
+
+  assert.match(receipt, /independent human deployment reviewer/iu);
+  assert.match(receipt, /required-reviewer status/iu);
+  assert.match(receipt, /administrator bypass/iu);
+  assert.match(receipt, /Free-compatible during and after trial/iu);
+  assert.match(receipt, /pre-existing designated/iu);
+  assert.match(receipt, /event-?type[^.]+preserved/iu);
+});
+
 test("repository documentation has no broken local Markdown links", async () => {
   const markdownFiles = await listRepositoryMarkdownFiles();
   const brokenLinks = [];
