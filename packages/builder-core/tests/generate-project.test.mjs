@@ -537,6 +537,12 @@ test("portfolio and site generation writes exact state-last repositories", async
         )?.version,
         "0.3.0",
       );
+      assert.equal(
+        generated.state.installedCapabilities.find(
+          ({ identifier }) => identifier === "site-routing",
+        )?.version,
+        profile === "site" ? "0.2.0" : undefined,
+      );
 
       const catalog = assertSuccess(core.createVerifiedCapabilityCatalog());
       const resolved = assertSuccess(

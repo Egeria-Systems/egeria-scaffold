@@ -12,7 +12,7 @@ Make the actual builder generate a polished responsive interface for the current
 
 Evolve the existing `section-composition` capability rather than introducing another capability. This capability already owns generated routes, the pure content-page presentation boundary, and the four presentation components. It will also own the Tailwind/PostCSS package properties, PostCSS configuration, global design-token stylesheet, and responsive component classes. Its version advances to `0.3.0`.
 
-The `content-files` capability advances to `0.3.0` because the exact top-level site content contract gains one `accessibility.skipToContent` string. That externalized string is required only when navigation is present and supplies the visible label for the generated skip link. The current profile recipes advance to `0.4.0`. Retained recipe provenance remains readable.
+The `content-files` capability advances to `0.3.0` because the exact top-level site content contract gains one `accessibility.skipToContent` string. That externalized string is required only when navigation is present and supplies the visible label for the generated skip link. `site-routing` advances to `0.2.0` because its owned about route now consumes that required accessibility input through the evolved shared presentation contract. The current profile recipes advance to `0.4.0`. Retained recipe provenance remains readable.
 
 No public package, new capability, runtime provider, browser client component, image model, font dependency, or generic design-system abstraction is added.
 

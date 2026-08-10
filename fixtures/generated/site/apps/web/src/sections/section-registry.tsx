@@ -83,7 +83,7 @@ function ProjectListSection({
               <h3>
                 <a
                   href={project.href}
-                  className="inline-flex min-h-11 items-center text-xl font-semibold text-accent underline decoration-2 underline-offset-4 hover:text-accent-hover"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-xl font-semibold text-accent underline decoration-2 underline-offset-4 hover:text-accent-hover"
                 >
                   {project.title}
                 </a>
@@ -117,7 +117,7 @@ function CallToActionSection({
       <p className="max-w-2xl text-lg leading-8">{section.content.summary}</p>
       <a
         href={section.content.href}
-        className="inline-flex min-h-12 w-fit items-center rounded-md bg-accent-contrast py-3 pe-5 ps-5 font-semibold text-accent underline decoration-2 underline-offset-4 hover:bg-surface hover:text-accent-hover"
+        className="inline-flex min-h-12 min-w-11 w-fit items-center justify-center rounded-md bg-accent-contrast py-3 pe-5 ps-5 font-semibold text-accent underline decoration-2 underline-offset-4 hover:bg-surface hover:text-accent-hover"
       >
         {section.content.label}
       </a>

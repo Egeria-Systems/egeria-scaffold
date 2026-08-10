@@ -530,7 +530,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
     },
     {
       identifier: "site-routing",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -785,7 +785,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "site-routing",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",

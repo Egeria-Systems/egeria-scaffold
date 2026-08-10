@@ -467,7 +467,7 @@
       "path": "apps/web/src/content/read-content.ts"
     },
     {
-      "fingerprint": "sha256:8ec550dcd2a3ed9399cea89608e0d95bb52795f4fb3dd2359f86187997951c06",
+      "fingerprint": "sha256:9b02544938fd567cd7cfa0ba670a34cdc26ed1d67dff12eafa3570c8230e5b8c",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -668,7 +668,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:134ea9d55e817228fbfc552fe1be6fc21618fc3d4c34ad8d51dd3c7ca490ea35",
+      "fingerprint": "sha256:06dd9acadc4ad2e9c5b8abf93ba8158b14b49824c4c375e122ac2fb69c34db35",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -682,7 +682,7 @@
       "path": "apps/web/src/presentation/content-page.tsx"
     },
     {
-      "fingerprint": "sha256:0eb1209b42f7b905dc7ca9189a17885746225b4f7ec3f214109e8d0e969e0d4f",
+      "fingerprint": "sha256:f69d5ae9ce4eb7da4b6b76a209c699f8586d886ccdac196dc1299ea6f29720d6",
       "fingerprintTarget": {
         "kind": "file"
       },

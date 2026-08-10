@@ -204,6 +204,12 @@ test("compiled project generation matches committed portfolio and site fixtures"
           fixtureCase.expectedSectionCompositionVersion,
         );
         assert.equal(
+          state.installedCapabilities.find(
+            ({ identifier }) => identifier === "site-routing",
+          )?.version ?? null,
+          fixtureCase.expectedSiteRoutingVersion,
+        );
+        assert.equal(
           state.managedSurfaces.length,
           fixtureCase.expectedSurfaces,
         );

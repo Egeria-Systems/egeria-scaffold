@@ -75,6 +75,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedRecipeVersion: "0.4.0",
     expectedContentFilesVersion: "0.3.0",
     expectedSectionCompositionVersion: "0.3.0",
+    expectedSiteRoutingVersion: null,
     expectedSurfaces: 50,
   }),
   Object.freeze({
@@ -98,6 +99,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedRecipeVersion: "0.4.0",
     expectedContentFilesVersion: "0.3.0",
     expectedSectionCompositionVersion: "0.3.0",
+    expectedSiteRoutingVersion: "0.2.0",
     expectedSurfaces: 52,
   }),
 ]);

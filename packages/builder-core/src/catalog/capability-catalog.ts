@@ -380,7 +380,7 @@ function createDescriptors(
     },
     {
       identifier: "site-routing",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",

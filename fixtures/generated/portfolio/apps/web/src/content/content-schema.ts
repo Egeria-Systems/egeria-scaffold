@@ -128,7 +128,7 @@ function hasDisallowedControlCharacter(value: string): boolean {
       codeUnit === 0x0b ||
       codeUnit === 0x0c ||
       (codeUnit >= 0x0e && codeUnit <= 0x1f) ||
-      codeUnit === 0x7f
+      (codeUnit >= 0x7f && codeUnit <= 0x9f)
     ) {
       return true;
     }

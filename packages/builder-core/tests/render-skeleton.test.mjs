@@ -1010,6 +1010,7 @@ test("the emitted YAML parser rejects unsafe syntax and invalid content shapes",
     { skipToContent: " " },
     { skipToContent: 42 },
     { skipToContent: "Skip\u007fcontent" },
+    { skipToContent: "Skip\u0085content" },
     { skipToContent: "Skip", extra: true },
   ]) {
     assertContentInvalid(() =>
@@ -1598,16 +1599,18 @@ test("generated presentation composes skip navigation and responsive section lay
   );
   const pageTree = presentationModule.ContentPage({
     sections: content.home.sections,
-    navigation: content.navigation,
-    skipToContent: "Skip to sentinel content",
+    navigation: [{ href: "/", label: "N" }],
+    skipToContent: "S",
   });
 
   assert.equal(pageTree.type, Symbol.for("react.fragment"));
   const [skipLink, main] = pageTree.props.children;
   assert.equal(skipLink.type, "a");
   assert.equal(skipLink.props.href, "#main-content");
-  assert.equal(skipLink.props.children, "Skip to sentinel content");
+  assert.equal(skipLink.props.children, "S");
   assert.match(skipLink.props.className, /focus:translate-y-0/u);
+  assert.match(skipLink.props.className, /min-h-11/u);
+  assert.match(skipLink.props.className, /min-w-11/u);
   assert.equal(main.type, "main");
   assert.equal(main.props.id, "main-content");
   assert.equal(main.props.tabIndex, -1);
@@ -1618,6 +1621,8 @@ test("generated presentation composes skip navigation and responsive section lay
   const navigationLink = navigationList.props.children[0].props.children;
   assert.match(navigationList.props.className, /flex-wrap/u);
   assert.match(navigationLink.props.className, /min-h-11/u);
+  assert.match(navigationLink.props.className, /min-w-11/u);
+  assert.equal(navigationLink.props.children, "N");
   assert.equal(typeof sectionComposition.type, "function");
   assert.equal(sectionComposition.type(sectionComposition.props).type, "section-composition");
 
@@ -1638,7 +1643,7 @@ test("generated presentation composes skip navigation and responsive section lay
         heading: "Selected work",
         projects: [
           {
-            title: "Project",
+            title: "P",
             summary: "Project summary",
             href: "https://example.com/project",
           },
@@ -1653,6 +1658,11 @@ test("generated presentation composes skip navigation and responsive section lay
       .children.props.className,
     /min-h-11/u,
   );
+  assert.match(
+    projectListElement.props.children[0].props.children.props.children[0].props
+      .children.props.className,
+    /min-w-11/u,
+  );
 
   const callToAction = sectionModule.sectionRegistry["call-to-action"].Component({
     section: {
@@ -1663,12 +1673,13 @@ test("generated presentation composes skip navigation and responsive section lay
       content: {
         heading: "Contact",
         summary: "Start a conversation",
-        label: "Send an email",
+        label: "C",
         href: "mailto:hello@example.com",
       },
     },
   });
   assert.match(callToAction.props.children[2].props.className, /min-h-12/u);
+  assert.match(callToAction.props.children[2].props.className, /min-w-11/u);
 
   assert.match(
     files.get("apps/web/app/page.tsx"),

@@ -17,7 +17,7 @@ export function ContentPage({
       {navigation.length > 0 ? (
         <a
           href="#main-content"
-          className="fixed left-4 top-4 z-50 -translate-y-24 rounded-md bg-accent py-3 pe-4 ps-4 font-semibold text-accent-contrast shadow-lg transition-transform focus:translate-y-0 motion-reduce:transition-none"
+          className="fixed left-4 top-4 z-50 inline-flex min-h-11 min-w-11 -translate-y-24 items-center justify-center rounded-md bg-accent py-3 pe-4 ps-4 font-semibold text-accent-contrast shadow-lg transition-transform focus:translate-y-0 motion-reduce:transition-none"
         >
           {skipToContent}
         </a>
@@ -35,7 +35,7 @@ export function ContentPage({
                   <li key={item.href}>
                     <a
                       href={item.href}
-                      className="inline-flex min-h-11 items-center rounded-md py-2 pe-3 ps-3 font-semibold text-accent underline decoration-2 underline-offset-4 hover:text-accent-hover"
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md py-2 pe-3 ps-3 font-semibold text-accent underline decoration-2 underline-offset-4 hover:text-accent-hover"
                     >
                       {item.label}
                     </a>
