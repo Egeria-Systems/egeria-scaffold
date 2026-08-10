@@ -18,18 +18,13 @@ export type CalendlyBookingProperties = Readonly<{
 type BookingFrameProperties = Readonly<{
   settings: CalendlyBookingSettings;
   copy: BookingContent;
-  frameActive: boolean;
 }>;
 
-function BookingFrame({
-  settings,
-  copy,
-  frameActive,
-}: BookingFrameProperties) {
+function BookingFrame({ settings, copy }: BookingFrameProperties) {
   return (
     <iframe
       data-testid="booking-frame"
-      src={frameActive ? settings.destination : undefined}
+      src={settings.destination}
       title={copy.frameTitle}
       loading="lazy"
       referrerPolicy="strict-origin-when-cross-origin"
@@ -128,11 +123,9 @@ export function CalendlyBooking({
           data-testid="booking-inline-region"
           className="mt-8 flex w-full justify-center overflow-hidden"
         >
-          <BookingFrame
-            settings={settings}
-            copy={copy}
-            frameActive={frameActive}
-          />
+          {frameActive ? (
+            <BookingFrame settings={settings} copy={copy} />
+          ) : null}
         </div>
       ) : (
         <dialog
@@ -157,11 +150,9 @@ export function CalendlyBooking({
               {copy.closeLabel}
             </button>
           </div>
-          <BookingFrame
-            settings={settings}
-            copy={copy}
-            frameActive={frameActive}
-          />
+          {frameActive ? (
+            <BookingFrame settings={settings} copy={copy} />
+          ) : null}
         </dialog>
       )}
     </section>

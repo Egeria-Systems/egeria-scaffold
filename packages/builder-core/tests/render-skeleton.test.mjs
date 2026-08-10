@@ -889,7 +889,7 @@ test("generated Calendly presentation preserves link, lazy inline, and native di
     /event\.preventDefault\(\)/u,
     /onClose/u,
     /setFrameActive\(false\)/u,
-    /src=\{frameActive \? settings\.destination : undefined\}/u,
+    /src=\{settings\.destination\}/u,
     /loading="lazy"/u,
     /title=\{copy\.frameTitle\}/u,
     /referrerPolicy="strict-origin-when-cross-origin"/u,
@@ -899,6 +899,13 @@ test("generated Calendly presentation preserves link, lazy inline, and native di
   ]) {
     assert.match(component, contract);
   }
+  assert.equal(
+    component.match(
+      /\{frameActive \? \(\s*<BookingFrame settings=\{settings\} copy=\{copy\} \/>\s*\) : null\}/gu,
+    )?.length,
+    2,
+  );
+  assert.doesNotMatch(component, /src=\{frameActive/u);
   assert.doesNotMatch(component, /calendly\.com/u);
   assert.doesNotMatch(component, /<script|Calendly\.init|fetch\(/u);
 
@@ -909,7 +916,7 @@ test("generated Calendly presentation preserves link, lazy inline, and native di
     /bookingCalendlySettings\.mode/u,
     /toHaveAttribute\(\s*"href",\s*bookingCalendlySettings\.destination/u,
     /toHaveAttribute\(\s*"src",\s*bookingCalendlySettings\.destination/u,
-    /not\.toHaveAttribute\("src"\)/u,
+    /toHaveCount\(0\)[\s\S]+toHaveCount\(1\)/u,
     /keyboard\.press\("Escape"\)/u,
     /document\.activeElement/u,
     /width: 320/u,
@@ -919,7 +926,41 @@ test("generated Calendly presentation preserves link, lazy inline, and native di
   ]) {
     assert.match(browserSpecification, contract);
   }
+  assert.doesNotMatch(browserSpecification, /not\.toHaveAttribute\("src"\)/u);
   assert.doesNotMatch(browserSpecification, /page\.goto\(bookingCalendlySettings\.destination/u);
+});
+
+test("generated Calendly browser behavior covers unavailable platform APIs", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      bookingCalendly: {
+        destination: "https://calendly.com/acme/intro",
+        mode: "popup",
+      },
+      packageVersions,
+    }),
+  );
+  const browserSpecification = indexFiles(rendered.files).get(
+    "apps/web/tests/e2e/calendly-booking.spec.ts",
+  );
+  assert.notEqual(browserSpecification, undefined);
+
+  for (const contract of [
+    /test\("activates inline fallback when IntersectionObserver is unavailable"/u,
+    /page\.addInitScript/u,
+    /Object\.defineProperty\(window, "IntersectionObserver"/u,
+    /test\("preserves popup navigation when native modal support is unavailable"/u,
+    /Object\.defineProperty\(\s*HTMLDialogElement\.prototype,\s*"showModal"/u,
+    /dialogOpen: dialog instanceof HTMLDialogElement && dialog\.open/u,
+    /frameCount: document\.querySelectorAll/u,
+    /request\.frame\(\) === page\.mainFrame\(\)/u,
+  ]) {
+    assert.match(browserSpecification, contract);
+  }
 });
 
 test("generated browser quality is environment-specific and content-agnostic", async () => {
