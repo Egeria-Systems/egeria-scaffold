@@ -88,11 +88,18 @@ function readMetadata(document: string, label: string): string | undefined {
     : undefined;
 }
 
+function includesUnresolvedPrompt(document: string): boolean {
+  return document
+    .split("\n")
+    .some((line) => /:\s*\[[^\]\n]+\]\s*$/u.test(line));
+}
+
 function validateEvidenceArtifact(input: Readonly<{
   artifacts: CertificationArtifacts;
   identifier: string;
   record: CapabilityCertificationRecord;
   evidenceIndex: number;
+  validRevisions: ReadonlySet<string>;
 }>): readonly ContractIssue[] {
   const evidence = input.record.evidence[input.evidenceIndex];
   if (evidence === undefined) {
@@ -117,6 +124,12 @@ function validateEvidenceArtifact(input: Readonly<{
   }
 
   const outcomes = readMetadata(document, "Passed certification outcomes")
+    ?.split(", ")
+    .filter((value) => value.length > 0);
+  const reviewedOutcomes = readMetadata(
+    document,
+    "Reviewed certification outcomes",
+  )
     ?.split(", ")
     .filter((value) => value.length > 0);
   const checks: readonly Readonly<{
@@ -171,6 +184,56 @@ function validateEvidenceArtifact(input: Readonly<{
       ),
     );
   }
+  if (reviewedOutcomes?.includes(evidence.kind) !== true) {
+    issues.push(
+      issue(
+        "CERTIFICATION_EVIDENCE_REVIEW_OUTCOME_MISMATCH",
+        [...basePath, "kind"],
+        "not-accepted-by-review",
+      ),
+    );
+  }
+  if (readMetadata(document, "Certification receipt status") !== "complete") {
+    issues.push(
+      issue(
+        "CERTIFICATION_EVIDENCE_RECEIPT_INCOMPLETE",
+        [...basePath, "path"],
+        "not-complete",
+      ),
+    );
+  }
+  if (
+    readMetadata(document, "Certification reviewer decision") !== "accepted"
+  ) {
+    issues.push(
+      issue(
+        "CERTIFICATION_EVIDENCE_REVIEW_REJECTED",
+        [...basePath, "path"],
+        "not-accepted",
+      ),
+    );
+  }
+  if (
+    readMetadata(document, "Certification unresolved prompts") !== "none" ||
+    includesUnresolvedPrompt(document)
+  ) {
+    issues.push(
+      issue(
+        "CERTIFICATION_EVIDENCE_PROMPTS_UNRESOLVED",
+        [...basePath, "path"],
+        "unresolved",
+      ),
+    );
+  }
+  if (!input.validRevisions.has(evidence.revision)) {
+    issues.push(
+      issue(
+        "CERTIFICATION_EVIDENCE_REVISION_UNKNOWN",
+        [...basePath, "revision"],
+        "not-in-checked-history",
+      ),
+    );
+  }
 
   return issues;
 }
@@ -178,7 +241,9 @@ function validateEvidenceArtifact(input: Readonly<{
 export function validateCertificationArtifacts(input: Readonly<{
   registry: CertificationRegistry;
   artifacts: CertificationArtifacts;
+  validRevisions: readonly string[];
 }>): ValidationResult<void> {
+  const validRevisions = new Set(input.validRevisions);
   const issues = Object.entries(input.registry.records)
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
     .flatMap(([identifier, record]) => {
@@ -202,6 +267,7 @@ export function validateCertificationArtifacts(input: Readonly<{
             identifier,
             record,
             evidenceIndex: index,
+            validRevisions,
           }),
         );
       }

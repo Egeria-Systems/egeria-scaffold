@@ -310,6 +310,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
         [planPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
       },
+      validRevisions: [evidenceRevision],
     }),
     { ok: true, value: undefined },
   );
@@ -320,6 +321,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
       artifacts: {
         [evidencePath]: evidenceDocumentSource,
       },
+      validRevisions: [evidenceRevision],
     }).issues,
     [
       {
@@ -342,12 +344,152 @@ test("repository artifacts bind successful evidence to capability, subject, revi
         [planPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
       },
+      validRevisions: [evidenceRevision],
     }).issues,
     [
       {
         code: "CERTIFICATION_EVIDENCE_OUTCOME_MISMATCH",
         path: ["records", "booking-calendly", "evidence", 0, "kind"],
         context: { reason: "not-passed-by-artifact" },
+      },
+      {
+        code: "CERTIFICATION_EVIDENCE_REVIEW_OUTCOME_MISMATCH",
+        path: ["records", "booking-calendly", "evidence", 0, "kind"],
+        context: { reason: "not-accepted-by-review" },
+      },
+    ],
+  );
+});
+
+test("repository artifacts reject revisions outside the checked Git history", () => {
+  const recorded = cloneRegistry();
+  const booking = recorded.records["booking-calendly"];
+  const nonexistentRevision = "0".repeat(40);
+  booking.evidence = evidenceFor(booking, ["fresh-scaffold"]).map(
+    (evidence) => ({ ...evidence, revision: nonexistentRevision }),
+  );
+
+  const nonexistentRevisionDocument = evidenceDocumentSource.replace(
+    evidenceRevision,
+    nonexistentRevision,
+  );
+
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: recorded,
+      artifacts: {
+        [planPath]: "# approved plan",
+        [evidencePath]: nonexistentRevisionDocument,
+      },
+      validRevisions: [evidenceRevision],
+    }).issues,
+    [
+      {
+        code: "CERTIFICATION_EVIDENCE_REVISION_UNKNOWN",
+        path: ["records", "booking-calendly", "evidence", 0, "revision"],
+        context: { reason: "not-in-checked-history" },
+      },
+    ],
+  );
+});
+
+test("repository artifacts reject incomplete or unresolved reviewer receipts", () => {
+  const recorded = cloneRegistry();
+  const booking = recorded.records["booking-calendly"];
+  booking.evidence = evidenceFor(booking, ["fresh-scaffold"]);
+  const incompleteReceipt = [
+    "# Incomplete receipt",
+    "",
+    "**Certification capability:** `booking-calendly`",
+    "",
+    "**Certification descriptor version:** `0.1.0`",
+    "",
+    `**Certification behavior-contract digest:** \`${descriptorDigests["booking-calendly"]}\``,
+    "",
+    `**Certification evidence revision:** \`${evidenceRevision}\``,
+    "",
+    "**Passed certification outcomes:** `fresh-scaffold`",
+    "",
+    "**Reviewed certification outcomes:** `fresh-scaffold`",
+    "",
+    "**Certification receipt status:** `incomplete`",
+    "",
+    "**Certification reviewer decision:** `rejected`",
+    "",
+    "**Certification unresolved prompts:** `present`",
+    "",
+    "- Remaining evidence: [replace before review]",
+  ].join("\n");
+
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: recorded,
+      artifacts: {
+        [planPath]: "# approved plan",
+        [evidencePath]: incompleteReceipt,
+      },
+      validRevisions: [evidenceRevision],
+    }).issues,
+    [
+      {
+        code: "CERTIFICATION_EVIDENCE_RECEIPT_INCOMPLETE",
+        path: ["records", "booking-calendly", "evidence", 0, "path"],
+        context: { reason: "not-complete" },
+      },
+      {
+        code: "CERTIFICATION_EVIDENCE_REVIEW_REJECTED",
+        path: ["records", "booking-calendly", "evidence", 0, "path"],
+        context: { reason: "not-accepted" },
+      },
+      {
+        code: "CERTIFICATION_EVIDENCE_PROMPTS_UNRESOLVED",
+        path: ["records", "booking-calendly", "evidence", 0, "path"],
+        context: { reason: "unresolved" },
+      },
+    ],
+  );
+});
+
+test("repository artifacts require affirmative review of every claimed outcome", () => {
+  const recorded = cloneRegistry();
+  const booking = recorded.records["booking-calendly"];
+  booking.evidence = evidenceFor(booking, ["fresh-scaffold"]);
+  const mismatchedReview = [
+    "# Mismatched review",
+    "",
+    "**Certification capability:** `booking-calendly`",
+    "",
+    "**Certification descriptor version:** `0.1.0`",
+    "",
+    `**Certification behavior-contract digest:** \`${descriptorDigests["booking-calendly"]}\``,
+    "",
+    `**Certification evidence revision:** \`${evidenceRevision}\``,
+    "",
+    "**Passed certification outcomes:** `fresh-scaffold`",
+    "",
+    "**Reviewed certification outcomes:** `deployed-application`",
+    "",
+    "**Certification receipt status:** `complete`",
+    "",
+    "**Certification reviewer decision:** `accepted`",
+    "",
+    "**Certification unresolved prompts:** `none`",
+  ].join("\n");
+
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: recorded,
+      artifacts: {
+        [planPath]: "# approved plan",
+        [evidencePath]: mismatchedReview,
+      },
+      validRevisions: [evidenceRevision],
+    }).issues,
+    [
+      {
+        code: "CERTIFICATION_EVIDENCE_REVIEW_OUTCOME_MISMATCH",
+        path: ["records", "booking-calendly", "evidence", 0, "kind"],
+        context: { reason: "not-accepted-by-review" },
       },
     ],
   );

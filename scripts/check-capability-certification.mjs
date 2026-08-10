@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import {
   certificationRegistrySchema,
@@ -16,6 +18,7 @@ const registryPath = resolve(
   repositoryRoot,
   "certifications/capabilities.json",
 );
+const executeFile = promisify(execFile);
 
 function parseArguments(arguments_) {
   if (arguments_.length === 0) {
@@ -54,6 +57,31 @@ async function readArtifact(path) {
     return await readFile(resolve(repositoryRoot, path), "utf8");
   } catch {
     return undefined;
+  }
+}
+
+async function revisionIsInCheckedHistory(revision) {
+  const options = {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: {
+      HOME: process.env.HOME,
+      PATH: process.env.PATH,
+      TMPDIR: process.env.TMPDIR,
+    },
+    windowsHide: true,
+  };
+
+  try {
+    await executeFile("git", ["cat-file", "-e", `${revision}^{commit}`], options);
+    await executeFile(
+      "git",
+      ["merge-base", "--is-ancestor", revision, "HEAD"],
+      options,
+    );
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -100,9 +128,27 @@ async function runMain() {
         .map(async (path) => [path, await readArtifact(path)]),
     ),
   );
+  const evidenceRevisions = [
+    ...new Set(
+      Object.values(registry.value.records).flatMap((record) =>
+        record.evidence.map((evidence) => evidence.revision),
+      ),
+    ),
+  ].sort();
+  const validRevisions = (
+    await Promise.all(
+      evidenceRevisions.map(async (revision) => ({
+        revision,
+        valid: await revisionIsInCheckedHistory(revision),
+      })),
+    )
+  )
+    .filter(({ valid }) => valid)
+    .map(({ revision }) => revision);
   const artifactValidation = validateCertificationArtifacts({
     registry: registry.value,
     artifacts,
+    validRevisions,
   });
   if (!artifactValidation.ok) {
     writeStandard({

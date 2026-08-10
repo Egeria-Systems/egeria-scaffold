@@ -4,7 +4,11 @@ Use this template only after the separately authorized protected-staging and pro
 
 **Execution date:** [date and timezone]
 
-**Receipt status:** [complete / incomplete]
+**Certification receipt status:** [replace with `complete` only after every section is resolved]
+
+**Certification reviewer decision:** [replace with `accepted` only after affirmative implemented-task review]
+
+**Certification unresolved prompts:** [replace with `none` only after every bracketed prompt is resolved]
 
 **Certification capability:** `booking-calendly`
 
@@ -15,6 +19,8 @@ Use this template only after the separately authorized protected-staging and pro
 **Certification evidence revision:** [40-character deployed Git revision]
 
 **Passed certification outcomes:** `cleanup-recovery, deployed-application, provider-confirmed`
+
+**Reviewed certification outcomes:** `cleanup-recovery, deployed-application, provider-confirmed`
 
 ## Workflow and revision identity
 

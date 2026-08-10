@@ -16,6 +16,14 @@
 
 **Passed certification outcomes:** `fresh-scaffold`
 
+**Reviewed certification outcomes:** `fresh-scaffold`
+
+**Certification receipt status:** `complete`
+
+**Certification reviewer decision:** `accepted`
+
+**Certification unresolved prompts:** `none`
+
 ## Registry and gate evidence
 
 The repository-owned certification registry contains one key for each of the seven executable capability descriptors. Every subject is bound to the descriptor version and the lowercase SHA-256 digest of canonical `{ descriptor, requiredEvidence }` data.
@@ -26,7 +34,7 @@ Current status is intentionally non-closing:
 - the six accepted pre-foundation subjects: `backfill-pending`, restricted by executable exact identifier/version/digest tuples; and
 - no record: `certified`.
 
-Admission also loads each referenced task/evidence artifact and requires evidence metadata to match its capability, descriptor subject, evidence-producing revision, and explicit passed outcomes. The local receipt declares only `fresh-scaffold`; relabeling it as deployed, provider, cleanup, or recovery evidence rejects.
+Admission also loads each referenced task/evidence artifact and requires evidence metadata to match its capability, descriptor subject, evidence-producing revision, and explicit passed and reviewed outcomes. It verifies that each evidence revision is an ancestor commit of the checked repository revision and rejects incomplete receipts, non-affirmative review decisions, and unresolved prompt fields. The local receipt declares only `fresh-scaffold`; relabeling it as deployed, provider, cleanup, or recovery evidence rejects.
 
 The admission command passed:
 

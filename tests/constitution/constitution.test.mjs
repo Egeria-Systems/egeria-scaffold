@@ -543,6 +543,7 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
   );
   assert.deepEqual(stepsByName["Check out repository"].with, {
+    "fetch-depth": 0,
     ref: "${{ github.sha }}",
     "persist-credentials": false,
   });
