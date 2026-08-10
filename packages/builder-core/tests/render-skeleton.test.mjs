@@ -203,6 +203,23 @@ function assertContentInvalid(operation) {
   });
 }
 
+function describeTestElement(element) {
+  if (typeof element === "string") {
+    return element;
+  }
+
+  const { children, ...attributes } = element.props;
+  const normalizedChildren =
+    children === undefined ? [] : Array.isArray(children) ? children : [children];
+
+  return {
+    type: element.type,
+    key: element.key,
+    attributes,
+    children: normalizedChildren.map(describeTestElement),
+  };
+}
+
 async function snapshotDirectory(root) {
   const entries = await readdir(root, { withFileTypes: true });
   const snapshot = [];
@@ -946,6 +963,23 @@ test("generated section parsing is bounded, ordered, and link-safe", async () =>
       { id: "contact", enabled: true },
     ],
   );
+  const withDisabledLeadingText = contentModule.parsePageContent({
+    sections: [
+      { ...textSection, enabled: false },
+      hero,
+      projectList,
+      callToAction,
+    ],
+  });
+  assert.deepEqual(
+    withDisabledLeadingText.sections.map(({ id, enabled }) => ({ id, enabled })),
+    [
+      { id: "approach", enabled: false },
+      { id: "introduction", enabled: true },
+      { id: "selected-work", enabled: true },
+      { id: "contact", enabled: true },
+    ],
+  );
 
   const safeDestinations = [
     "/work",
@@ -974,6 +1008,7 @@ test("generated section parsing is bounded, ordered, and link-safe", async () =>
     { sections: [{ ...hero, content: { ...hero.content, extra: true } }] },
     { sections: [{ ...hero, enabled: false }] },
     { sections: [hero, { ...hero, id: "second-introduction" }] },
+    { sections: [textSection, hero] },
     {
       sections: [
         hero,
@@ -1172,42 +1207,181 @@ test("the source-owned registry declares and renders every approved section", as
     ],
   );
 
-  const renderedSections = content.home.sections.map((section) =>
+  const sentinelSections = contentModule.parsePageContent({
+    sections: [
+      {
+        ...content.home.sections[0],
+        content: {
+          heading: "Hero heading sentinel",
+          summary: "Hero summary sentinel",
+        },
+      },
+      {
+        ...content.home.sections[1],
+        content: {
+          heading: "Text heading sentinel",
+          body: "Text body sentinel",
+        },
+      },
+      {
+        ...content.home.sections[2],
+        content: {
+          heading: "Projects heading sentinel",
+          projects: [
+            {
+              title: "Project title sentinel",
+              summary: "Project summary sentinel",
+              href: "https://example.com/project-sentinel",
+            },
+          ],
+        },
+      },
+      {
+        ...content.home.sections[3],
+        content: {
+          heading: "Action heading sentinel",
+          summary: "Action summary sentinel",
+          label: "Action label sentinel",
+          href: "mailto:action-sentinel@example.com",
+        },
+      },
+    ],
+  }).sections;
+  const renderedSections = sentinelSections.map((section) =>
     sectionModule.sectionRegistry[section.type].Component({ section }),
   );
   assert.deepEqual(
-    renderedSections.map(({ type, props }) => ({
-      type,
-      id: props.id,
-      labelledBy: props["aria-labelledby"] ?? null,
-      childTypes: Array.isArray(props.children)
-        ? props.children.map((child) => child.type)
-        : [props.children.type],
-    })),
+    renderedSections.map(describeTestElement),
     [
       {
         type: "header",
-        id: "introduction",
-        labelledBy: "introduction--heading",
-        childTypes: ["h1", "p"],
+        key: null,
+        attributes: {
+          id: "introduction",
+          "aria-labelledby": "introduction--heading",
+        },
+        children: [
+          {
+            type: "h1",
+            key: null,
+            attributes: { id: "introduction--heading" },
+            children: ["Hero heading sentinel"],
+          },
+          {
+            type: "p",
+            key: null,
+            attributes: {},
+            children: ["Hero summary sentinel"],
+          },
+        ],
       },
       {
         type: "section",
-        id: "approach",
-        labelledBy: "approach--heading",
-        childTypes: ["h2", "p"],
+        key: null,
+        attributes: {
+          id: "approach",
+          "aria-labelledby": "approach--heading",
+        },
+        children: [
+          {
+            type: "h2",
+            key: null,
+            attributes: { id: "approach--heading" },
+            children: ["Text heading sentinel"],
+          },
+          {
+            type: "p",
+            key: null,
+            attributes: {},
+            children: ["Text body sentinel"],
+          },
+        ],
       },
       {
         type: "section",
-        id: "selected-work",
-        labelledBy: "selected-work--heading",
-        childTypes: ["h2", "ul"],
+        key: null,
+        attributes: {
+          id: "selected-work",
+          "aria-labelledby": "selected-work--heading",
+        },
+        children: [
+          {
+            type: "h2",
+            key: null,
+            attributes: { id: "selected-work--heading" },
+            children: ["Projects heading sentinel"],
+          },
+          {
+            type: "ul",
+            key: null,
+            attributes: {},
+            children: [
+              {
+                type: "li",
+                key: "https://example.com/project-sentinel",
+                attributes: {},
+                children: [
+                  {
+                    type: "article",
+                    key: null,
+                    attributes: {},
+                    children: [
+                      {
+                        type: "h3",
+                        key: null,
+                        attributes: {},
+                        children: [
+                          {
+                            type: "a",
+                            key: null,
+                            attributes: {
+                              href: "https://example.com/project-sentinel",
+                            },
+                            children: ["Project title sentinel"],
+                          },
+                        ],
+                      },
+                      {
+                        type: "p",
+                        key: null,
+                        attributes: {},
+                        children: ["Project summary sentinel"],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
       },
       {
         type: "section",
-        id: "contact",
-        labelledBy: "contact--heading",
-        childTypes: ["h2", "p", "a"],
+        key: null,
+        attributes: {
+          id: "contact",
+          "aria-labelledby": "contact--heading",
+        },
+        children: [
+          {
+            type: "h2",
+            key: null,
+            attributes: { id: "contact--heading" },
+            children: ["Action heading sentinel"],
+          },
+          {
+            type: "p",
+            key: null,
+            attributes: {},
+            children: ["Action summary sentinel"],
+          },
+          {
+            type: "a",
+            key: null,
+            attributes: { href: "mailto:action-sentinel@example.com" },
+            children: ["Action label sentinel"],
+          },
+        ],
       },
     ],
   );

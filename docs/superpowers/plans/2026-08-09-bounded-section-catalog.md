@@ -105,7 +105,7 @@ Expected generated inventory changes are exactly one added file per profile plus
 - exact variant `default`;
 - a boolean `enabled` flag;
 - exact type-specific content, including non-empty project lists; and
-- exactly one enabled hero.
+- exactly one enabled hero, first among enabled sections.
 
 All raw and decoded strings reject the existing forbidden control set. Navigation, project, and call-to-action `href` values accept only root-relative, non-empty hash, credential-free HTTPS, and non-empty mailto destinations. Invalid content always throws `TypeError("CONTENT_INVALID")` without source values.
 
@@ -206,3 +206,5 @@ The first focused GREEN run proved that the root command glob alone is not the c
 ## Execution amendment — review repairs
 
 Independent review identified two material boundary defects. WHATWG URL parsing removes tab, line-feed, and carriage-return characters before interpreting a destination, so a root-relative prefix check alone could admit a credential-bearing network destination after normalization. Generated link validation therefore rejects URL-normalization ASCII whitespace before classifying navigation, project, or call-to-action destinations. Review also identified that `${section.id}-heading` could collide with another valid section ID. Generated heading IDs therefore use `${section.id}--heading`; the identifier grammar prohibits consecutive hyphens, reserving that namespace without changing source section IDs. Focused regressions cover all three link consumers, exact rendered references, and global ID uniqueness.
+
+Accessibility and test-evidence review then identified that the one-enabled-hero rule still allowed an enabled section heading to render before the page heading, and that the deterministic JSX test inspected only immediate child tags. The parser and generated web guidance therefore require the hero to be first among enabled sections while continuing to allow disabled sections before it. The registry test now recursively asserts exact heading targets, project list/article/heading/link structure, content-backed text and destinations, and call-to-action semantics using unique sentinel values. This adds the design, web-guidance template, and its generated fixture/state consumers to the repair batch without adding styling, browser tooling, or a conformance claim.

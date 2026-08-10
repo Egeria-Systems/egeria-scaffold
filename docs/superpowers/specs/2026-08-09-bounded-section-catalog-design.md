@@ -58,7 +58,7 @@ export type PageContent = Readonly<{
 
 The actual implementation uses explicit named content and section types where that improves compiler errors. `parsePageContent` accepts exactly one `sections` key and an ordered non-empty array. Each entry has exactly `id`, `type`, `variant`, `enabled`, and `content`. Type-specific content parsers require exact keys and non-empty control-safe strings. Project lists require at least one entry. Instance identifiers use the existing semantic kebab-case grammar and must be unique across enabled and disabled entries.
 
-Exactly one enabled `hero` is required per page. This is the smallest structural invariant that gives every generated page one page-level heading. Other section types may occur zero or more times, and all section instances may be reordered, added, disabled, or removed while the page retains one enabled hero.
+Exactly one enabled `hero` is required per page, and it must be the first enabled section. Disabled sections may precede it because they are omitted from rendering. This is the smallest structural invariant that gives every generated page a page-level heading before its section-level headings. Other section types may occur zero or more times and may be reordered, added, disabled, or removed after that enabled-structure invariant is preserved.
 
 The parser exposes a frozen `sectionContentSchemas` association so each registry entry points to the parser for its own content type. Every invalid input throws the existing source-free `TypeError("CONTENT_INVALID")`.
 
@@ -136,7 +136,8 @@ TDD starts with contract, parser, registry, rendering, copy, ownership, and fixt
 
 GREEN includes:
 
-- pure parser tests for valid and invalid section shapes, ordering, disabling, unique IDs, one enabled hero, and link schemes;
+- pure parser tests for valid and invalid section shapes, ordering, disabling, unique IDs, one first-enabled hero, and link schemes;
+- recursive deterministic JSX assertions for heading references, nested list/article/link semantics, and content-backed text and destinations;
 - executable registry tests using transpiled generated TypeScript/TSX and a deterministic test JSX runtime;
 - exact template/capability/recipe/schema/ownership tests;
 - copy-literal enforcement over `src/sections/**/*.tsx`;

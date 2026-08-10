@@ -418,7 +418,8 @@ export function parsePageContent(value: unknown): PageContent {
     sections.push(section);
   }
 
-  if (enabledHeroCount !== 1) {
+  const firstEnabledSection = sections.find(({ enabled }) => enabled);
+  if (enabledHeroCount !== 1 || firstEnabledSection?.type !== "hero") {
     throw new TypeError("CONTENT_INVALID");
   }
 
