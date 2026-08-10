@@ -250,7 +250,9 @@ process.exitCode = await runCli(process.argv.slice(2), {
     [
       "catalog/capability-catalog.ts",
       "catalog/verified-package-versions.ts",
+      "certification/capability-certification.ts",
       "contracts/capability.ts",
+      "contracts/certification.ts",
       "contracts/identifiers.ts",
       "contracts/json-schemas.ts",
       "contracts/migration.ts",
@@ -493,6 +495,7 @@ test("builder-core keeps schemas private and reserves every later-stage builder 
     await listFiles(resolve(repositoryRoot, "packages/builder-core/schemas")),
     [
       "capability.schema.json",
+      "certification-registry.schema.json",
       "migration-record.schema.json",
       "profile.schema.json",
       "project.schema.json",

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { capabilityDescriptorSchema } from "./capability.js";
+import { certificationRegistrySchema } from "./certification.js";
 import { migrationRecordSchema } from "./migration.js";
 import { profileRecipeSchema } from "./profile.js";
 import { projectConfigurationSchema } from "./project.js";
@@ -8,6 +9,7 @@ import { installedStateSchema } from "./state.js";
 
 const schemaEntries = [
   ["capability.schema.json", capabilityDescriptorSchema],
+  ["certification-registry.schema.json", certificationRegistrySchema],
   ["migration-record.schema.json", migrationRecordSchema],
   ["profile.schema.json", profileRecipeSchema],
   ["project.schema.json", projectConfigurationSchema],

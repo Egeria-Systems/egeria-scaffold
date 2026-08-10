@@ -1059,7 +1059,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     {
       fixtures: "node --test tests/generated-fixtures/*.test.mjs",
       kernel:
-        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run build:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run changeset:status",
+        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:capability-certification && pnpm run check:capability-certification && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run build:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run changeset:status",
       skeletons: "node scripts/verify-generated-skeletons.mjs",
     },
   );

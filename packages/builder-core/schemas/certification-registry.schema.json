@@ -1,0 +1,124 @@
+{
+  "$defs": {
+    "urn:egeria-systems:schema:safe-relative-path:1.0.0": {
+      "maxLength": 1024,
+      "minLength": 1,
+      "pattern": "^(?!\\/)(?![A-Za-z]:\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*\\/\\/)[^/]+(?:\\/[^/]+)*$",
+      "type": "string"
+    },
+    "urn:egeria-systems:schema:semantic-version:1.0.0": {
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$",
+      "type": "string"
+    },
+    "urn:egeria-systems:schema:sha256-fingerprint:1.0.0": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "urn:egeria-systems:schema:stable-identifier:1.0.0": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "records": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+                },
+                "path": {
+                  "$ref": "#/$defs/urn:egeria-systems:schema:safe-relative-path:1.0.0"
+                }
+              },
+              "readOnly": true,
+              "required": [
+                "kind",
+                "path"
+              ],
+              "type": "object"
+            },
+            "readOnly": true,
+            "type": "array"
+          },
+          "requiredEvidence": {
+            "items": {
+              "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+            },
+            "minItems": 1,
+            "readOnly": true,
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "backfill-pending",
+              "pending",
+              "certified"
+            ],
+            "type": "string"
+          },
+          "subject": {
+            "additionalProperties": false,
+            "properties": {
+              "behaviorContractDigest": {
+                "$ref": "#/$defs/urn:egeria-systems:schema:sha256-fingerprint:1.0.0"
+              },
+              "descriptorVersion": {
+                "$ref": "#/$defs/urn:egeria-systems:schema:semantic-version:1.0.0"
+              }
+            },
+            "readOnly": true,
+            "required": [
+              "descriptorVersion",
+              "behaviorContractDigest"
+            ],
+            "type": "object"
+          },
+          "taskPlan": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/urn:egeria-systems:schema:safe-relative-path:1.0.0"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "readOnly": true,
+        "required": [
+          "subject",
+          "requiredEvidence",
+          "status",
+          "taskPlan",
+          "evidence"
+        ],
+        "type": "object"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+      },
+      "readOnly": true,
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "readOnly": true,
+  "required": [
+    "schemaVersion",
+    "records"
+  ],
+  "title": "Egeria capability certification coverage registry",
+  "type": "object"
+}

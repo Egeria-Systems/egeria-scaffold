@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "1.0.0",
+  "records": {
+    "booking-calendly": {
+      "subject": {
+        "descriptorVersion": "0.1.0",
+        "behaviorContractDigest": "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab"
+      },
+      "requiredEvidence": [
+        "cleanup-recovery",
+        "deployed-application",
+        "fresh-scaffold",
+        "provider-confirmed"
+      ],
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-08-10-booking-calendly-certification.md",
+      "evidence": []
+    },
+    "content-files": {
+      "subject": {
+        "descriptorVersion": "0.4.0",
+        "behaviorContractDigest": "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05"
+      },
+      "requiredEvidence": ["fresh-scaffold"],
+      "status": "backfill-pending",
+      "taskPlan": null,
+      "evidence": []
+    },
+    "deployment-cloudflare": {
+      "subject": {
+        "descriptorVersion": "0.2.0",
+        "behaviorContractDigest": "sha256:846ae45d15ba9d8f256a9b7a1d8a4f3cda1b871a3b3f79f7656fd621050e8273"
+      },
+      "requiredEvidence": [
+        "cleanup-recovery",
+        "deployed-application",
+        "fresh-scaffold"
+      ],
+      "status": "backfill-pending",
+      "taskPlan": null,
+      "evidence": []
+    },
+    "observability": {
+      "subject": {
+        "descriptorVersion": "0.1.0",
+        "behaviorContractDigest": "sha256:1f070bdb531d8bcec8a7ebf5b081cde8466dcd0d72d5f16b5a5a3ac2bd65af93"
+      },
+      "requiredEvidence": ["deployed-application", "fresh-scaffold"],
+      "status": "backfill-pending",
+      "taskPlan": null,
+      "evidence": []
+    },
+    "section-composition": {
+      "subject": {
+        "descriptorVersion": "0.3.0",
+        "behaviorContractDigest": "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696"
+      },
+      "requiredEvidence": ["fresh-scaffold"],
+      "status": "backfill-pending",
+      "taskPlan": null,
+      "evidence": []
+    },
+    "site-routing": {
+      "subject": {
+        "descriptorVersion": "0.3.0",
+        "behaviorContractDigest": "sha256:d716a1c93f8f40db33e54612c85d521fbd6ba13cd142d35ab0c39fa9c4b9647e"
+      },
+      "requiredEvidence": ["fresh-scaffold"],
+      "status": "backfill-pending",
+      "taskPlan": null,
+      "evidence": []
+    },
+    "standards": {
+      "subject": {
+        "descriptorVersion": "0.2.0",
+        "behaviorContractDigest": "sha256:a3a020b778c1ccfa24e0bfc951fcdf5eb74b50728f69e960124c6bae6a757311"
+      },
+      "requiredEvidence": ["fresh-scaffold"],
+      "status": "backfill-pending",
+      "taskPlan": null,
+      "evidence": []
+    }
+  }
+}

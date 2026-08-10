@@ -13,6 +13,7 @@ const contracts = await import(pathToFileURL(builtEntry));
 
 const schemaArtifactNames = [
   "capability.schema.json",
+  "certification-registry.schema.json",
   "migration-record.schema.json",
   "profile.schema.json",
   "project.schema.json",
@@ -176,6 +177,7 @@ test("builder-core exports the executable contract boundary", () => {
     "capabilityRemovalPolicySchema",
     "capabilityStateClassificationSchema",
     "calendlyBookingSettingsSchema",
+    "certificationRegistrySchema",
     "createJsonSchemaArtifacts",
     "fingerprintSchema",
     "inferenceProbeSchema",
@@ -690,6 +692,10 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
   assert.equal(
     generated["profile.schema.json"].title,
     "Egeria portfolio and site profile recipe",
+  );
+  assert.equal(
+    generated["certification-registry.schema.json"].title,
+    "Egeria capability certification coverage registry",
   );
   const displayNamePattern = /^(?=.{1,120}$)(?=.*\S)[^\p{Cc}]+$/u;
   const projectDisplayNamePattern =
