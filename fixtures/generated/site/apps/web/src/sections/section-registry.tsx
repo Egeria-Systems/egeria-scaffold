@@ -12,7 +12,7 @@ type SectionProperties<Section extends PageSection> = Readonly<{
 }>;
 
 function headingIdentifier(section: PageSection): string {
-  return `${section.id}-heading`;
+  return `${section.id}--heading`;
 }
 
 function HeroSection({ section }: SectionProperties<HeroSection>) {

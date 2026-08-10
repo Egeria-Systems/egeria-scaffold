@@ -134,8 +134,12 @@ function hasDisallowedControlCharacter(value: string): boolean {
   return false;
 }
 
+function hasUrlNormalizationWhitespace(value: string): boolean {
+  return /[\u0009-\u000d\u0020]/u.test(value);
+}
+
 function isSafeHref(value: unknown): value is string {
-  if (!isNonEmptyString(value)) {
+  if (!isNonEmptyString(value) || hasUrlNormalizationWhitespace(value)) {
     return false;
   }
 
