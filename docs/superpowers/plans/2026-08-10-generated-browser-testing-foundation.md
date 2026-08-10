@@ -164,28 +164,28 @@ Expected rendered template counts are 32/34, ownership descriptor counts are 68/
 - [x] Update committed fixture roots mechanically from validated outputs, including generated lockfiles and `.egeria` fingerprints/state.
 - [x] Run deterministic fixture tests, read-only infer/doctor/diff, and fixed-root certification for both profiles.
 - [x] Confirm both development and OpenNext/workerd preview suites pass for both profiles with Chromium.
-- [ ] Commit derived fixtures and certification with message `Certify generated browser quality`.
+- [x] Commit derived fixtures and certification with message `Certify generated browser quality`.
 
 ## Task 5: Independent review and bounded repair
 
 **Comparison:** planning base `e7026bd9e8c7a7ca20b5a485ee6702d2921a7586..HEAD` plus any current uncommitted final evidence.
 
-- [ ] Dispatch one read-only requirements reviewer for exact user acceptance criteria, exclusions, roadmap ordering, ownership/state agreement, and claim language.
-- [ ] Dispatch one read-only architecture/anti-overengineering reviewer for capability cohesion, proof isolation, package non-extraction, security boundaries, and ordinary-generation separation.
-- [ ] Dispatch one read-only test-evidence reviewer for causal RED/GREEN coverage, workflow static contracts, fixture isolation, and whether local evidence supports each claim.
-- [ ] Give reviewers exact scope/non-goals, prohibit edits and recursive fan-out, wait for every result, and validate every finding against the current tree.
-- [ ] For each material validated defect, add a focused failing regression test, implement the minimum repair, rerun affected checks, and record disposition. Do not change code for unsupported or preference-only findings.
-- [ ] Commit evidence-backed repairs, if any, with a message naming the actual correction.
+- [x] Dispatch one read-only requirements reviewer for exact user acceptance criteria, exclusions, roadmap ordering, ownership/state agreement, and claim language.
+- [x] Dispatch one read-only architecture/anti-overengineering reviewer for capability cohesion, proof isolation, package non-extraction, security boundaries, and ordinary-generation separation.
+- [x] Dispatch one read-only test-evidence reviewer for causal RED/GREEN coverage, workflow static contracts, fixture isolation, and whether local evidence supports each claim.
+- [x] Give reviewers exact scope/non-goals, prohibit edits and recursive fan-out, wait for every result, and validate every finding against the current tree.
+- [x] For each material validated defect, add a focused failing regression test, implement the minimum repair, rerun affected checks, and record disposition. Do not change code for unsupported or preference-only findings.
+- [x] Commit evidence-backed repairs, if any, with a message naming the actual correction.
 
 ## Task 6: Final verification, packet, and stop gate
 
 **Files:** verification evidence and review packet listed above; plan checkbox updates if useful.
 
-- [ ] Run `git diff --check`, semantic naming, constitution, package boundaries, builder-core, CLI, generated fixture tests, builder lint/build/typecheck, fixed-root full certification, and changeset status on the settled tree.
-- [ ] Do not repeat unchanged successful expensive checks. Record exact command, exit, relevant count, and bounded claim for each result.
-- [ ] Verify clean branch scope, comparison, changed-file inventory, ignored/untracked artifacts, and no changes in separate worktrees.
-- [ ] Record dependency versions, audit/signature result, exact browser modes/profile matrix, workflow/deployed static validation, reviewer dispositions, risks, deferred work, and recovery.
-- [ ] Create the review packet for exact committed comparison `e7026bd9e8c7a7ca20b5a485ee6702d2921a7586..HEAD`.
-- [ ] Commit final evidence with message `Record generated browser quality verification`.
-- [ ] Re-run only final-tree identity/status and documentation/semantic checks affected by the evidence commit.
-- [ ] Stop and request explicit verified-final-diff approval. Do not begin Calendly or any later outcome.
+- [x] Run `git diff --check`, semantic naming, constitution, package boundaries, builder-core, CLI, generated fixture tests, builder lint/build/typecheck, fixed-root full certification, and changeset status on the settled tree.
+- [x] Do not repeat unchanged successful expensive checks. Record exact command, exit, relevant count, and bounded claim for each result.
+- [x] Verify clean branch scope, comparison, changed-file inventory, ignored/untracked artifacts, and no changes in separate worktrees.
+- [x] Record dependency versions, audit/signature result, exact browser modes/profile matrix, workflow/deployed static validation, reviewer dispositions, risks, deferred work, and recovery.
+- [x] Create the review packet for exact committed comparison `e7026bd9e8c7a7ca20b5a485ee6702d2921a7586..HEAD`.
+- [x] Commit final evidence with message `Record generated browser quality verification`.
+- [x] Re-run only final-tree identity/status and documentation/semantic checks affected by the evidence commit.
+- [x] Stop and request explicit verified-final-diff approval. Do not begin Calendly or any later outcome.
