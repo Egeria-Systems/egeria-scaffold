@@ -382,11 +382,23 @@ test("doctor and diff agree across the canonical portfolio composition", async (
         yaml: "2.9.0",
       },
       devDependencies: {
+        "@axe-core/playwright": "4.12.1",
         "@egeria-systems/standards": "1.2.3",
+        "@playwright/test": "1.62.1",
         "@tailwindcss/postcss": "4.3.3",
         postcss: "8.5.26",
+        "raw-loader": "4.0.2",
         tailwindcss: "4.3.3",
         wrangler: "4.118.0",
+      },
+      scripts: {
+        "browser:install": "playwright install chromium",
+        "browser:install:ci": "playwright install --with-deps chromium",
+        "test:e2e:deployed":
+          "playwright test --config playwright.deployed.config.ts",
+        "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
+        "test:e2e:preview":
+          "playwright test --config playwright.preview.config.ts",
       },
     }, null, 2)}\n`,
     "apps/web/tsconfig.json": "{}\n",
@@ -395,6 +407,7 @@ test("doctor and diff agree across the canonical portfolio composition", async (
     "apps/web/content/en-CA/long-form/introduction.md": "# Introduction\n",
     "apps/web/content/en-CA/site.yaml": "{}\n",
     "apps/web/src/content/content-schema.ts": "export {};\n",
+    "apps/web/src/content/content-source.d.ts": "export {};\n",
     "apps/web/src/content/read-content.ts": "export {};\n",
     "apps/web/app/globals.css": "@import \"tailwindcss\";\n",
     "apps/web/app/page.tsx": "export default function Page() {}\n",
@@ -406,6 +419,12 @@ test("doctor and diff agree across the canonical portfolio composition", async (
     "apps/web/wrangler.jsonc": "{}\n",
     "apps/web/src/infrastructure/observability/installed-capability.ts":
       "export {};\n",
+    ".github/workflows/quality.yml": "name: Quality\n",
+    "apps/web/playwright.config.shared.ts": "export {};\n",
+    "apps/web/playwright.deployed.config.ts": "export {};\n",
+    "apps/web/playwright.dev.config.ts": "export {};\n",
+    "apps/web/playwright.preview.config.ts": "export {};\n",
+    "apps/web/tests/e2e/site-quality.spec.ts": "export {};\n",
   };
   const surfaceResult = core.materializeInstalledSurfaces({
     files: new Map(

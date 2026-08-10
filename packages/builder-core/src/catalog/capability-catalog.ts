@@ -277,17 +277,22 @@ function createDescriptors(
     },
     {
       identifier: "content-files",
-      version: "0.3.0",
+      version: "0.4.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
       dependencies: ["standards"],
       ...sharedCapabilityMetadata,
       supportedProfiles: ["portfolio", "site"],
-      requiredPackages: ["yaml"],
+      requiredPackages: ["raw-loader", "yaml"],
       platformResources: [],
       adapterSemanticRequirements: [],
       managedSurfaces: [
+        createPackageSurface(
+          "content-files-raw-loader-package",
+          "content-files",
+          "/devDependencies/raw-loader",
+        ),
         createPackageSurface(
           "content-files-yaml-package",
           "content-files",
@@ -318,6 +323,12 @@ function createDescriptors(
           "application-owned",
         ),
         createFileSurface(
+          "content-files-source-declarations",
+          "content-files",
+          "apps/web/src/content/content-source.d.ts",
+          "application-owned",
+        ),
+        createFileSurface(
           "content-files-reader",
           "content-files",
           "apps/web/src/content/read-content.ts",
@@ -325,6 +336,7 @@ function createDescriptors(
         ),
       ],
       inferenceProbes: [
+        createPackageProbe("devDependencies", "raw-loader", "4.0.2"),
         createPackageProbe("dependencies", "yaml", "2.9.0"),
         createFileProbe("apps/web/content/content.config.yaml"),
         createFileProbe(
@@ -332,6 +344,7 @@ function createDescriptors(
         ),
         createFileProbe("apps/web/content/en-CA/site.yaml"),
         createFileProbe("apps/web/src/content/content-schema.ts"),
+        createFileProbe("apps/web/src/content/content-source.d.ts"),
         createFileProbe("apps/web/src/content/read-content.ts"),
       ],
       verificationPlan: ["content-contracts", "typecheck"],
@@ -419,7 +432,7 @@ function createDescriptors(
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -524,7 +537,7 @@ function createDescriptors(
     },
     {
       identifier: "site-routing",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",

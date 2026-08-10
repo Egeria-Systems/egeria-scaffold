@@ -394,7 +394,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
     },
     {
       identifier: "content-files",
-      version: "0.3.0",
+      version: "0.4.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -402,7 +402,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
       optionalIntegrations: [],
       conflicts: [],
       supportedProfiles: ["portfolio", "site"],
-      requiredPackages: ["yaml"],
+      requiredPackages: ["raw-loader", "yaml"],
       environmentVariables: [],
       secrets: [],
       platformResources: [],
@@ -415,6 +415,17 @@ test("the portfolio and site catalog declares the exact six executable capabilit
       threatReviewLevel: "standard",
       adapterSemanticRequirements: [],
       managedSurfaces: [
+        {
+          identifier: "content-files-raw-loader-package",
+          owner: { kind: "capability", identifier: "content-files" },
+          path: "apps/web/package.json",
+          ownership: "merge-managed",
+          fingerprintTarget: {
+            kind: "json-value",
+            pointer: "/devDependencies/raw-loader",
+          },
+          mergeStrategy: "json-property",
+        },
         {
           identifier: "content-files-yaml-package",
           owner: { kind: "capability", identifier: "content-files" },
@@ -459,6 +470,14 @@ test("the portfolio and site catalog declares the exact six executable capabilit
           mergeStrategy: "replace-file",
         },
         {
+          identifier: "content-files-source-declarations",
+          owner: { kind: "capability", identifier: "content-files" },
+          path: "apps/web/src/content/content-source.d.ts",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
           identifier: "content-files-reader",
           owner: { kind: "capability", identifier: "content-files" },
           path: "apps/web/src/content/read-content.ts",
@@ -468,6 +487,13 @@ test("the portfolio and site catalog declares the exact six executable capabilit
         },
       ],
       inferenceProbes: [
+        {
+          kind: "package",
+          path: "apps/web/package.json",
+          section: "devDependencies",
+          packageName: "raw-loader",
+          version: "4.0.2",
+        },
         {
           kind: "package",
           path: "apps/web/package.json",
@@ -482,6 +508,10 @@ test("the portfolio and site catalog declares the exact six executable capabilit
         },
         { kind: "file", path: "apps/web/content/en-CA/site.yaml" },
         { kind: "file", path: "apps/web/src/content/content-schema.ts" },
+        {
+          kind: "file",
+          path: "apps/web/src/content/content-source.d.ts",
+        },
         { kind: "file", path: "apps/web/src/content/read-content.ts" },
       ],
       migrationPlanners: [],
@@ -629,7 +659,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -795,7 +825,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
     },
     {
       identifier: "site-routing",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -1022,7 +1052,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "content-files",
-      version: "0.3.0",
+      version: "0.4.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -1036,7 +1066,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -1050,7 +1080,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "site-routing",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",

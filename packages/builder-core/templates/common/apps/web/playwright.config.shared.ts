@@ -19,7 +19,7 @@ export function createBrowserQualityConfig({
     fullyParallel: false,
     forbidOnly: Boolean(process.env.CI),
     retries: process.env.CI ? 1 : 0,
-    workers: process.env.CI ? 1 : undefined,
+    ...(process.env.CI ? { workers: 1 } : {}),
     reporter: [
       ["list"],
       ["html", { open: "never", outputFolder: "playwright-report" }],

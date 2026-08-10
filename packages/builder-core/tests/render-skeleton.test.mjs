@@ -38,6 +38,7 @@ const portfolioPaths = [
   "apps/web/playwright.preview.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
+  "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/presentation/content-page.tsx",
@@ -74,6 +75,7 @@ const sitePaths = [
   "apps/web/playwright.preview.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
+  "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/presentation/content-page.tsx",
@@ -583,6 +585,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       eslint: "9.39.5",
       "eslint-config-next": "16.3.0",
       postcss: "8.5.26",
+      "raw-loader": "4.0.2",
       tailwindcss: "4.3.3",
       typescript: "6.0.3",
       "typescript-eslint": "8.66.0",
@@ -608,22 +611,26 @@ test("generated browser quality is environment-specific and content-agnostic", a
   const deployed = files.get("apps/web/playwright.deployed.config.ts");
   const specification = files.get("apps/web/tests/e2e/site-quality.spec.ts");
   const workflow = files.get(".github/workflows/quality.yml");
+  const workflowConfiguration = parseGeneratedYaml(
+    rendered.files,
+    ".github/workflows/quality.yml",
+  );
   const ignore = files.get(".gitignore");
   const readme = files.get("README.md");
 
   assert.match(shared, /fullyParallel: false/u);
   assert.match(shared, /forbidOnly: Boolean\(process\.env\.CI\)/u);
-  assert.match(shared, /workers: process\.env\.CI \? 1 : undefined/u);
+  assert.match(shared, /process\.env\.CI \? \{ workers: 1 \} : \{\}/u);
   assert.match(shared, /name: "chromium"/u);
   assert.match(shared, /trace: "retain-on-failure"/u);
   assert.match(shared, /screenshot: "only-on-failure"/u);
   assert.match(shared, /video: "retain-on-failure"/u);
 
   assert.match(development, /http:\/\/127\.0\.0\.1:3100/u);
-  assert.match(development, /pnpm run dev -- --hostname 127\.0\.0\.1 --port 3100/u);
+  assert.match(development, /pnpm run dev --hostname 127\.0\.0\.1 --port 3100/u);
   assert.match(development, /reuseExistingServer: false/u);
   assert.match(preview, /http:\/\/127\.0\.0\.1:3101/u);
-  assert.match(preview, /pnpm run preview -- --ip 127\.0\.0\.1 --port 3101/u);
+  assert.match(preview, /pnpm run preview --ip 127\.0\.0\.1 --port 3101/u);
   assert.match(preview, /reuseExistingServer: false/u);
 
   assert.match(deployed, /PLAYWRIGHT_DEPLOYED_URL/u);
@@ -692,6 +699,13 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.match(workflow, /if: failure\(\)/u);
   assert.match(workflow, /retention-days: 7/u);
   assert.doesNotMatch(workflow, /secrets\.|deploy|release|PLAYWRIGHT_DEPLOYED_URL/iu);
+  assert.deepEqual(workflowConfiguration.permissions, { contents: "read" });
+  assert.deepEqual(workflowConfiguration.concurrency, {
+    group: "${{ github.workflow }}-${{ github.ref }}",
+    "cancel-in-progress": true,
+  });
+  assert.equal(workflowConfiguration.jobs.verify["runs-on"], "ubuntu-24.04");
+  assert.equal(workflowConfiguration.jobs.verify["timeout-minutes"], 30);
 
   assert.match(ignore, /^playwright-report\/$/mu);
   assert.match(ignore, /^test-results\/$/mu);
@@ -1060,7 +1074,7 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
   }
 });
 
-test("generated server readers use web-workspace string paths for YAML content", async () => {
+test("generated content is bundled as text without runtime filesystem access", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const portfolio = assertSuccess(
     await renderSkeleton({
@@ -1084,22 +1098,33 @@ test("generated server readers use web-workspace string paths for YAML content",
   const siteReader = indexFiles(site.files).get(
     "apps/web/app/about/page.tsx",
   );
+  const contentDeclarations = indexFiles(portfolio.files).get(
+    "apps/web/src/content/content-source.d.ts",
+  );
+  const nextConfiguration = indexFiles(portfolio.files).get(
+    "apps/web/next.config.ts",
+  );
 
   for (const source of [portfolioReader, siteReader]) {
     assert.notEqual(source, undefined);
-    assert.match(source, /from "node:path"/);
-    assert.match(source, /join\(process\.cwd\(\), "content\/en-CA\//);
-    assert.doesNotMatch(source, /new URL|import\.meta\.url|fileURLToPath/);
+    assert.match(source, /import \w+Source from ".+\.yaml"/u);
+    assert.doesNotMatch(source, /node:fs|node:path|readFile|process\.cwd/u);
   }
+  assert.notEqual(contentDeclarations, undefined);
+  assert.match(contentDeclarations, /declare module "\*\.md"/u);
+  assert.match(contentDeclarations, /declare module "\*\.yaml"/u);
+  assert.notEqual(nextConfiguration, undefined);
+  assert.match(nextConfiguration, /"\*\.\{md,yaml,yml\}"/u);
+  assert.match(nextConfiguration, /loaders: \["raw-loader"\]/u);
+  assert.match(nextConfiguration, /as: "\*\.js"/u);
   assert.match(
     portfolioReader,
-    /join\(\s*process\.cwd\(\),\s*"content\/content\.config\.yaml",?\s*\)/,
+    /from "\.\.\/\.\.\/content\/content\.config\.yaml"/u,
   );
   assert.match(
     portfolioReader,
-    /join\(\s*process\.cwd\(\),\s*"content\/en-CA\/long-form\/introduction\.md",?\s*\)/,
+    /from "\.\.\/\.\.\/content\/en-CA\/long-form\/introduction\.md"/u,
   );
-  assert.doesNotMatch(portfolioReader, /function read\w+\([^)]*(?:path|file)/i);
 });
 
 test("the emitted YAML parser rejects unsafe syntax and invalid content shapes", async () => {
@@ -1993,8 +2018,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 66],
-    ["site", 68],
+    ["portfolio", 68],
+    ["site", 70],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -2074,6 +2099,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       "/devDependencies/eslint",
       "/devDependencies/eslint-config-next",
       "/devDependencies/postcss",
+      "/devDependencies/raw-loader",
       "/devDependencies/tailwindcss",
       "/devDependencies/typescript",
       "/devDependencies/typescript-eslint",

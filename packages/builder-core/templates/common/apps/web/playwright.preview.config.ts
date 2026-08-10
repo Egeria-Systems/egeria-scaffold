@@ -5,7 +5,7 @@ const baseURL = "http://127.0.0.1:3101";
 export default createBrowserQualityConfig({
   baseURL,
   webServer: {
-    command: "pnpm run preview -- --ip 127.0.0.1 --port 3101",
+    command: "pnpm run preview --ip 127.0.0.1 --port 3101",
     url: baseURL,
     reuseExistingServer: false,
     timeout: 180_000,

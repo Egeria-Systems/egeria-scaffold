@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import contentConfigurationSource from "../../content/content.config.yaml";
+import introductionContentSource from "../../content/en-CA/long-form/introduction.md";
+import siteContentSource from "../../content/en-CA/site.yaml";
 
 import {
   parseContentConfiguration,
@@ -11,26 +12,16 @@ import {
   type SiteContent,
 } from "./content-schema";
 
-const contentConfigurationPath = join(
-  process.cwd(), "content/content.config.yaml",
-);
-const introductionContentPath = join(
-  process.cwd(), "content/en-CA/long-form/introduction.md",
-);
-const siteContentPath = join(process.cwd(), "content/en-CA/site.yaml");
-
 export function readContentConfiguration(): ContentConfiguration {
   return parseContentConfiguration(
-    parseYamlContent(readFileSync(contentConfigurationPath, "utf8")),
+    parseYamlContent(contentConfigurationSource),
   );
 }
 
 export function readIntroductionContent(): LongFormDocument {
-  return parseMarkdownContent(readFileSync(introductionContentPath, "utf8"));
+  return parseMarkdownContent(introductionContentSource);
 }
 
 export function readSiteContent(): SiteContent {
-  return parseSiteContent(
-    parseYamlContent(readFileSync(siteContentPath, "utf8")),
-  );
+  return parseSiteContent(parseYamlContent(siteContentSource));
 }

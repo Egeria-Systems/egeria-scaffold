@@ -50,6 +50,7 @@ const portfolioRenderedPaths = [
   "apps/web/playwright.preview.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
+  "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/presentation/content-page.tsx",
@@ -535,7 +536,7 @@ test("portfolio and site generation writes exact state-last repositories", async
       assert.equal(generated.state.origin.recipeVersion, "0.5.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 69 : 71,
+        profile === "portfolio" ? 71 : 73,
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -547,7 +548,7 @@ test("portfolio and site generation writes exact state-last repositories", async
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "content-files",
         )?.version,
-        "0.3.0",
+        "0.4.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -559,7 +560,7 @@ test("portfolio and site generation writes exact state-last repositories", async
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "site-routing",
         )?.version,
-        profile === "site" ? "0.2.0" : undefined,
+        profile === "site" ? "0.3.0" : undefined,
       );
 
       const catalog = assertSuccess(core.createVerifiedCapabilityCatalog());
