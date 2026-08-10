@@ -173,11 +173,11 @@ All raw and decoded strings reject the existing forbidden control set. Navigatio
 
 ## Task 5: Independent reviews and evidence-backed repair
 
-- [ ] Freeze the exact base/head comparison and changed-file list.
-- [ ] Dispatch independent read-only requirements, architecture/anti-overengineering, and test-evidence reviewers. Dispatch a read-only accessibility specialist because the registry declares and renders semantic requirements. Give every reviewer the exact comparison and prohibit edits, recursive fan-out, external mutation, review-comment responses, and scope expansion.
-- [ ] Wait for every reviewer, reconcile conflicts, and validate each finding against current source and fresh commands.
-- [ ] For each material defect, add a focused RED regression where applicable, make the minimum repair, rerun affected checks, record the disposition, and commit with a message naming the actual repair.
-- [ ] Ask at most one relevant bounded reviewer to recheck material repairs. Do not repeat unchanged reviews or implement preferences/speculation.
+- [x] Freeze the exact base/head comparison and changed-file list.
+- [x] Dispatch independent read-only requirements, architecture/anti-overengineering, and test-evidence reviewers. Dispatch a read-only accessibility specialist because the registry declares and renders semantic requirements. Give every reviewer the exact comparison and prohibit edits, recursive fan-out, external mutation, review-comment responses, and scope expansion.
+- [x] Wait for every reviewer, reconcile conflicts, and validate each finding against current source and fresh commands.
+- [x] For each material defect, add a focused RED regression where applicable, make the minimum repair, rerun affected checks, record the disposition, and commit with a message naming the actual repair.
+- [x] Ask at most one relevant bounded reviewer to recheck material repairs. Do not repeat unchanged reviews or implement preferences/speculation.
 
 ## Task 6: Final verification, evidence, and review packet
 
@@ -186,12 +186,12 @@ All raw and decoded strings reject the existing forbidden control set. Navigatio
 - Create: `docs/implementation-evidence/2026-08-09-bounded-section-catalog-verification.md`
 - Create: `docs/review-packets/2026-08-09-bounded-section-catalog.md`
 
-- [ ] Run `pnpm run verify:builder-kernel` once against the final executable/template/fixture tree with the exact toolchain and required public-registry access.
-- [ ] Run fresh constitution, semantic-naming, copy-externalization, lockfile advisory, and `git diff --check` checks proportionately; do not rerun unchanged expensive checks.
-- [ ] Record exact commits, comparison, changed files, RED/GREEN evidence, commands/results, reviewer dispositions, generated inventories/counts/hashes where useful, security/advisory evidence, risks, deferrals, claim limits, and recovery.
-- [ ] Confirm no unauthorized dependency, package version/publication, push, pull request, merge, deployment, workflow/provider/production mutation, permission change, external message, or review-comment response occurred.
-- [ ] Commit final evidence and review packet with message `Record bounded section verification`.
-- [ ] Stop for explicit implemented-task and verified-final-diff review. Do not begin responsive accessible UI.
+- [x] Run `pnpm run verify:builder-kernel` once against the final executable/template/fixture tree with the exact toolchain and required public-registry access.
+- [x] Run fresh constitution, semantic-naming, copy-externalization, lockfile advisory, and `git diff --check` checks proportionately; do not rerun unchanged expensive checks.
+- [x] Record exact commits, comparison, changed files, RED/GREEN evidence, commands/results, reviewer dispositions, generated inventories/counts/hashes where useful, security/advisory evidence, risks, deferrals, claim limits, and recovery.
+- [x] Confirm no unauthorized dependency, package version/publication, push, pull request, merge, deployment, workflow/provider/production mutation, permission change, external message, or review-comment response occurred.
+- [x] Commit final evidence and review packet with message `Record bounded section verification`.
+- [x] Stop for explicit implemented-task and verified-final-diff review. Do not begin responsive accessible UI.
 
 ## Rollback and recovery
 
