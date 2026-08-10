@@ -787,6 +787,208 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
 });
 
+test("capability delivery requires a separately planned certification task", async () => {
+  const [
+    sourcePlan,
+    programRoadmap,
+    reviewProtocol,
+    enforcementMap,
+    design,
+  ] =
+    await Promise.all([
+      readRepositoryFile(
+        "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+      ),
+      readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+      readRepositoryFile("docs/governance/review-and-contribution.md"),
+      readRepositoryFile("docs/architecture/enforcement-map.md"),
+      readRepositoryFile(
+        "docs/superpowers/specs/2026-08-10-capability-certification-task-pair-design.md",
+      ),
+    ]);
+  const clientReadyPhase = compactLabel("P", "2");
+  const lifecyclePhase = compactLabel("P", "3");
+  const siteAndAppPhase = compactLabel("P", "4");
+  const initialCertificationTask = namedLabel("Task", "5B");
+  const preparationGate = namedLabel("Gate", "1");
+
+  assert.match(
+    sourcePlan,
+    /^### Capability implementation and certification task pair$/m,
+  );
+  const sourceTaskPair = sourcePlan
+    .split("### Capability implementation and certification task pair\n", 2)[1]
+    .split("Certification is introduced in stages:", 1)[0];
+  assert.ok(sourceTaskPair, "source-plan task-pair contract is missing");
+  assert.match(
+    sourceTaskPair,
+    /every new or materially changed executable capability[\s\S]+separate capability-certification task/i,
+  );
+  assert.match(
+    sourceTaskPair,
+    /implementation approval does not imply certification[\s\S]+cannot close[\s\S]+advertised as certified/i,
+  );
+  assert.match(
+    sourceTaskPair,
+    /repository-owned certification coverage registry[\s\S]+executable capability identifier[\s\S]+planned/i,
+  );
+  assert.match(
+    sourceTaskPair,
+    /descriptor-admission gate[\s\S]+pending certification record[\s\S]+linked to[\s\S]+separate certification task/i,
+  );
+  assert.match(
+    sourceTaskPair,
+    /certification subject[\s\S]+descriptor version[\s\S]+behavior-contract digest/i,
+  );
+  assert.match(
+    sourceTaskPair,
+    /material change[\s\S]+replaces[\s\S]+certified record[\s\S]+new task-linked pending record/i,
+  );
+  assert.match(
+    sourceTaskPair,
+    /phase and release closure gate[\s\S]+rejects[\s\S]+not certified/i,
+  );
+  assert.match(
+    sourceTaskPair,
+    new RegExp(
+      `backfill-pending[^.]+${escapeRegularExpression(lifecyclePhase)}`,
+      "i",
+    ),
+  );
+  assert.match(
+    sourceTaskPair,
+    new RegExp(
+      `backfill-pending[\\s\\S]+exempt from ${escapeRegularExpression(clientReadyPhase)} closure[\\s\\S]+${escapeRegularExpression(lifecyclePhase)} closure[\\s\\S]+rejects`,
+      "i",
+    ),
+  );
+
+  const clientReadySection = programRoadmap
+    .split(`## ${clientReadyPhase} — Client-ready portfolio\n`, 2)[1]
+    .split(`## ${lifecyclePhase} — Transactional lifecycle`, 1)[0];
+  assert.ok(clientReadySection, "client-ready roadmap section is missing");
+  assert.match(
+    clientReadySection,
+    new RegExp(
+      `${escapeRegularExpression(initialCertificationTask)}[^#]+booking-calendly`,
+      "i",
+    ),
+  );
+  const lifecycleSection = programRoadmap
+    .split(`## ${lifecyclePhase} — Transactional lifecycle\n`, 2)[1]
+    .split("## Capability delivery task pair", 1)[0];
+  assert.ok(lifecycleSection, "lifecycle roadmap section is missing");
+  assert.match(
+    lifecycleSection,
+    /coverage backfill[^#]+existing executable capabilities/i,
+  );
+  assert.match(
+    lifecycleSection,
+    /unchanged valid evidence[\s\S]+without repeating expensive checks/i,
+  );
+  assert.match(
+    lifecycleSection,
+    /closure rejects[\s\S]+backfill-pending/i,
+  );
+  const programTaskPair = programRoadmap
+    .split("## Capability delivery task pair\n", 2)[1]
+    .split(`## ${siteAndAppPhase} — Site and app foundation`, 1)[0];
+  assert.ok(programTaskPair, "program task-pair contract is missing");
+  assert.match(
+    programTaskPair,
+    /every new or materially changed executable capability[\s\S]+implementation task[\s\S]+certification task/i,
+  );
+  assert.match(
+    programTaskPair,
+    /local runtime evidence remains separate from protected-staging and provider outcomes[\s\S]+external action requires separate authorization/i,
+  );
+  assert.match(
+    programTaskPair,
+    /descriptor version or behavior-contract digest[\s\S]+material change[\s\S]+new task-linked pending record/i,
+  );
+
+  assert.match(reviewProtocol, /^## Capability-certification planning$/m);
+  const planningSection = reviewProtocol
+    .split("## Capability-certification planning\n", 2)[1]
+    .split("## Builder-repository development boundary", 1)[0];
+  assert.ok(planningSection, "certification-planning protocol is missing");
+  assert.match(
+    planningSection,
+    new RegExp(
+      `${escapeRegularExpression(preparationGate)}[^\n]+step-by-step human-prerequisite runbook`,
+      "i",
+    ),
+  );
+  assert.match(
+    planningSection,
+    /account owner[\s\S]+account type[\s\S]+subscription tier[\s\S]+sandbox or test environment/i,
+  );
+  assert.match(
+    planningSection,
+    /resource[\s\S]+least-privilege permissions or roles/i,
+  );
+  assert.match(
+    planningSection,
+    /credential names[\s\S]+scopes[\s\S]+lifetime[\s\S]+rotation[\s\S]+storage location[\s\S]+without recording values/i,
+  );
+  assert.match(
+    planningSection,
+    /callback[\s\S]+webhook[\s\S]+redirect[\s\S]+domain[\s\S]+allowlist/i,
+  );
+  assert.match(
+    planningSection,
+    /synthetic identities and data[\s\S]+readiness preflight[\s\S]+bounded polling[\s\S]+rate limits[\s\S]+quotas[\s\S]+possible spend[\s\S]+retention/i,
+  );
+  assert.match(
+    planningSection,
+    /step-by-step cleanup[\s\S]+resource deletion[\s\S]+credential revocation or rotation[\s\S]+rollback[\s\S]+recovery/i,
+  );
+  assert.match(
+    planningSection,
+    /owner of every action[\s\S]+automation boundary[\s\S]+explicit approval checkpoint/i,
+  );
+  assert.match(
+    planningSection,
+    /local controlled-dependency tests[\s\S]+protected-staging or provider journey/i,
+  );
+  assert.match(
+    planningSection,
+    /no human setup is required[\s\S]+external action remains separately authorized/i,
+  );
+
+  assert.match(
+    enforcementMap,
+    /INV-CAPABILITY-CERTIFICATION[^\n]+planned[^\n]+certification coverage registry/i,
+  );
+  assert.match(
+    enforcementMap,
+    /documentation contract[^\n]+does not prove[^\n]+runtime or provider result/i,
+  );
+  assert.match(
+    enforcementMap,
+    /descriptor admission[^\n]+pending[^\n]+closure[^\n]+backfill-pending/i,
+  );
+  assert.match(
+    enforcementMap,
+    /descriptor version or behavior-contract digest[^\n]+material change[^\n]+new task-linked pending record/i,
+  );
+  assert.match(
+    enforcementMap,
+    new RegExp(
+      `backfill-pending[^\\n]+${escapeRegularExpression(clientReadyPhase)} closure[^\\n]+${escapeRegularExpression(lifecyclePhase)} closure[^\\n]+reject`,
+      "i",
+    ),
+  );
+  assert.match(
+    design,
+    /introduces no new provider-specific outcome scenario[\s\S]+existing canonical outcome boundaries remain controlling/i,
+  );
+  assert.match(
+    design,
+    /descriptor version or behavior-contract digest[\s\S]+material change[\s\S]+new task-linked pending record/i,
+  );
+});
+
 test("accepted ADRs use the repository decision contract", async () => {
   const index = await readRepositoryFile("docs/adr/README.md");
   const rowPositions = [];

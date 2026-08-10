@@ -1042,11 +1042,21 @@ A capability whose declared state or behavior includes an external provider, per
 
 Deployed journeys run through GitHub Actions under protected staging environments. They are phase and release certification gates, not a Cartesian matrix or a mandatory live-provider run on every pull request. They rerun when the affected capability, provider contract, deployment boundary, supported upgrade edge, or recovery behavior materially changes.
 
+### Capability implementation and certification task pair
+
+Every new or materially changed executable capability is delivered through two independently reviewable tasks: its capability implementation task followed by a separate capability-certification task. The certification task is not a checklist hidden inside implementation and does not inherit the implementation task's approval, comparison, evidence, or external-action authority.
+
+Implementation approval does not imply certification. The capability and its owning phase cannot close, and the capability must not be advertised as certified, until the separate task has established the required local fresh-project evidence and any conditionally required lifecycle, protected-staging, provider, persistent-data, security, cleanup, and recovery evidence. A dependent capability may begin only after the preceding certification gate unless the approved roadmap explicitly establishes that the work is independent.
+
+Each capability-certification task begins with Gate 1 preparation and an exact-file Gate 2 plan under the [review and contribution protocol](../governance/review-and-contribution.md). That planning derives current provider setup and exact executable scenarios within existing canonical outcome boundaries and gives the user step-by-step human prerequisites, or explicitly demonstrates that none are required. The roadmap records the durable planning contract rather than freezing account, credential, provider, cost, or setup instructions that may drift before the task begins.
+
+The first concrete certification task establishes the smallest reusable foundation justified by its capability. A repository-owned certification coverage registry keyed by executable capability identifier and two distinct rejecting gates are planned outputs of that foundation, not current runtime evidence. Each record's certification subject is bound to the descriptor version and a behavior-contract digest covering the material capability definition and required evidence. The descriptor-admission gate requires a pending certification record linked to the exact separate certification task, allowing implementation and certification to remain sequential. A material change replaces the active certified record with a new task-linked pending record while retaining historical evidence. The phase and release closure gate rejects any capability record that is not certified, subject only to the bounded transition for accepted pre-foundation descriptors: their explicit `backfill-pending` records are exempt from P2 closure without being treated or advertised as certified, and P3 closure rejects every record that remains `backfill-pending`. A shared generated scenario may cover more than one capability only when it records causal capability-specific assertions; registry presence alone is not certification.
+
 Certification is introduced in stages:
 
-1. P2 certifies `booking-calendly` selected during initial portfolio scaffolding: deploy the minimal generated portfolio to protected staging, configure a synthetic Calendly event, complete a synthetic booking through the rendered integration, and verify the provider-side event and user-visible success and fallback paths. This is not evidence for later CLI addition or webhook ingestion.
-2. P3 establishes the reusable certification contract and repeats `booking-calendly` as the first fresh-added-capability journey by adding it through the compiled CLI to a minimal existing supported project, re-inferring, deploying, and verifying the same bounded booking outcome.
-3. From P5 onward, every new independently selectable capability completes the base certification journey, and every capability meeting the external, persistent-data, privileged, or security-sensitive criteria completes its own approved deployed certification plan before phase acceptance.
+1. P2 Task 5B follows the implemented Calendly task as a separate `booking-calendly` capability-certification task. Its planning freezes the current local and protected-staging evidence boundary and any human prerequisites before it establishes the reusable fresh-scaffold foundation, deploys the minimal generated portfolio to protected staging, configures a synthetic Calendly event, completes a synthetic booking through the rendered integration, and verifies the provider-side event and user-visible success and fallback paths. This is not evidence for later CLI addition or webhook ingestion, and listing the outcome here does not authorize provider or deployment action.
+2. P3 extends the reusable contract to existing-repository lifecycle journeys, repeats `booking-calendly` as the first fresh-added-capability journey through the compiled CLI, and performs a one-time coverage backfill for already accepted executable capabilities. Existing valid evidence may be mapped without repeating an unchanged expensive check; any missing causal evidence becomes its own capability-certification task.
+3. From P4 onward, every new or materially changed executable capability receives its separate certification sibling task. Every independently selectable capability completes the base certification journey, and every capability meeting the external, persistent-data, privileged, or security-sensitive criteria completes its own approved deployed certification plan before phase acceptance.
 4. P9 certifies `booking-webhooks` separately on its supported application baseline: create the non-production webhook subscription, make a synthetic booking, verify signature validation, normalized and idempotent receipt, replay and cancellation behavior, and injected failure and recovery. It does not treat the P2 or P3 `booking-calendly` journey as webhook evidence.
 5. P10 reruns selected deployed capability journeys across representative real-fleet repositories and supported upgrade paths, based on observed risk rather than capability-profile Cartesian coverage.
 
@@ -1224,6 +1234,7 @@ P10 Fleet hardening, package review, and portability evidence
 - bounded section catalog;
 - responsive accessible UI;
 - Calendly link/inline/popup with lazy enhancement and fallback;
+- separate Task 5B capability certification after the implemented Calendly task, including current human-prerequisite planning and the first reusable fresh-scaffold certification foundation;
 - protected-staging certification of `booking-calendly` selected during initial scaffolding, including a synthetic booking and provider-confirmed outcome;
 - production observability;
 - CI/deployment, visual, performance, and automated accessibility gates;
@@ -1239,7 +1250,9 @@ P10 Fleet hardening, package review, and portability evidence
 - current/previous-major upgrade matrix;
 - portfolio-to-site transition;
 - bounded compiled-CLI end-to-end coverage for representative capability addition, upgrade, migration, refusal, and recovery paths;
-- reusable capability-certification contract and the first fresh-added `booking-calendly` staging journey.
+- extension of the capability-certification foundation to add, upgrade, migration, removal, refusal, and recovery journeys;
+- a one-time coverage backfill for existing executable capabilities, reusing unchanged valid evidence and creating separate certification tasks for gaps;
+- the first fresh-added `booking-calendly` staging journey.
 
 #### P4 — Site and app foundation
 
@@ -1252,7 +1265,7 @@ P10 Fleet hardening, package review, and portability evidence
 
 Implement multilingual, analytics, persistence, Resend email, Cloudflare job delivery, and durable contact submissions as separate capability prompts.
 
-Each capability completes its base fresh-project certification journey. Capabilities with provider, persistent-data, privileged, or security-sensitive behavior also complete a separately approved deployed certification plan before their phase is accepted.
+Each capability implementation is followed by its separately planned and approved capability-certification task. Each capability completes its base fresh-project certification journey. Capabilities with provider, persistent-data, privileged, or security-sensitive behavior also complete a separately approved deployed certification plan before their phase is accepted.
 
 #### P6 — Payload CMS
 

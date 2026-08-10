@@ -20,6 +20,26 @@ Write an exact-file, test-driven plan under `docs/superpowers/plans/`. It must d
 
 Stop for explicit approval. Plan approval authorizes only the bounded local implementation and commits described by the approved plan. It does not authorize a different increment, push, pull request, merge, deployment, publication, provider mutation, production action, permission change, or external message.
 
+## Capability-certification planning
+
+Gate 1 for a capability-certification task must produce a step-by-step human-prerequisite runbook before Gate 2 planning or execution. The runbook derives current instructions from dated official provider and platform sources rather than copying a scenario from the program roadmap.
+
+The runbook must state either that no human setup is required and why, or identify:
+
+1. the required account owner, account type, subscription tier, sandbox or test environment, and any eligibility or waiting period;
+2. every resource the user must create and the exact least-privilege permissions or roles it needs;
+3. credential names, scopes, lifetime, rotation expectations, and approved storage location without recording values in source, plans, evidence, logs, prompts, or messages;
+4. callback, webhook, redirect, domain, origin, or allowlist configuration;
+5. synthetic identities and data, readiness preflight, bounded polling, rate limits, quotas, possible spend, and retention;
+6. step-by-step cleanup, resource deletion, credential revocation or rotation, rollback, and recovery; and
+7. the owner of every action, the automation boundary, and each explicit approval checkpoint.
+
+Gate 2 then binds the current prerequisites to the smallest supported generated-project baseline, exact compiled-CLI operation, local controlled-dependency tests, any conditionally required protected-staging or provider journey, success and failure evidence, cleanup, evidence retention, and rerun triggers. Prefer short-lived or federated credentials when the provider supports them; otherwise use the narrowest scoped non-production credential in its approved secret store.
+
+If the runbook concludes that no human setup is required, the plan records the evidence supporting that conclusion and proceeds only with the approved local scope. Account creation, service-tier changes, provider-resource configuration, credential creation or use, deployment, spending, messages, and external or persistent-state mutation remain separate external actions: implementation or plan approval never supplies that authority, and each external action remains separately authorized.
+
+The [approved source plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md) owns which capability deliveries require a separate certification task. This protocol owns how each task prepares, plans, obtains approval, and separates local proof from external outcomes.
+
 ## Builder-repository development boundary
 
 Development of this repository may proceed directly on `main` only when the approved work is one clean, sequential implementation stream, no user-owned work is at risk, repository protections permit it, and isolation has no material safety or coordination benefit.

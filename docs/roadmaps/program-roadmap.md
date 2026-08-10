@@ -52,13 +52,21 @@ Calendly account/event configuration, provider scheduling data, cookies, retenti
 
 **Development stream:** The next approved sequential builder-repository increment develops directly on clean local `main` under the [review and contribution protocol](../governance/review-and-contribution.md). Each increment must revalidate that the stream remains clean and sequential; parallel work or material isolation needs retain the protocol's branch/worktree boundary. This does not alter the isolated-worktree requirement for builder commands that transform generated client repositories.
 
+**Next capability-certification task:** P2 Task 5B follows acceptance of the implemented Calendly task as a separate `booking-calendly` certification increment. Its Gate 1 and Gate 2 planning must use current official sources to give the user any required account, service-tier, credential, protected-staging, synthetic-data, cost, cleanup, and recovery steps before local or external execution. The task owns the first concrete fresh-scaffold certification foundation; this roadmap entry introduces no new provider outcome scenario, preserves the full source plan's existing outcome boundary, does not freeze provider setup instructions, and does not authorize deployment, provider configuration, credentials, spending, or another external action.
+
 **Stop gate:** Retain the real generated client project as migration evidence and obtain launch-scope approval. No automation-only conformance claim is permitted.
 
 ## P3 — Transactional lifecycle
 
-Implement clean-state enforcement, isolated migration worktrees, plan/final-diff approval, ownership-aware transformations, drift reconciliation, failure recovery, current/previous-major upgrades, and portfolio-to-site migration.
+Implement clean-state enforcement, isolated migration worktrees, plan/final-diff approval, ownership-aware transformations, drift reconciliation, failure recovery, current/previous-major upgrades, and portfolio-to-site migration. Extend the certification foundation to compiled-CLI add, upgrade, migration, removal, refusal, and recovery journeys. Perform a one-time coverage backfill for existing executable capabilities: map unchanged valid evidence without repeating expensive checks, and create a separate capability-certification task for every material gap. P3 closure rejects every record that remains `backfill-pending`.
 
 **Stop gate:** Transactional failure and recovery fixtures pass and the P3 packet is approved.
+
+## Capability delivery task pair
+
+Every new or materially changed executable capability is delivered through a capability implementation task followed by a separate capability certification task. Implementation approval does not imply certification; the capability and owning phase cannot close, and the capability cannot be advertised as certified, until its certification task passes. The planned admission gate requires a pending record linked to that certification task and binds coverage to the descriptor version or behavior-contract digest; a material change replaces stale active coverage with a new task-linked pending record. The planned phase/release gate rejects records that remain pending. Accepted pre-foundation capabilities remain explicitly `backfill-pending`, are exempt from P2 closure without being certified, and must be reconciled because P3 closure rejects any remaining `backfill-pending` record. Every capability entry from P4 onward expands into this implementation-task then certification-task sequence before dependent work begins, subject only to an explicitly approved independent-work exception.
+
+Each certification task begins with current planning under the [review and contribution protocol](../governance/review-and-contribution.md). The plan supplies step-by-step human prerequisites or explicitly states that none exist, then defines the fresh-scaffold, lifecycle, local runtime, protected-staging, provider, cleanup, and recovery evidence required for that capability. Local runtime evidence remains separate from protected-staging and provider outcomes, and every external action requires separate authorization. No implementation plan or certification task inherits authority to create an account, configure a provider, use a credential, spend money, deploy, or mutate external or persistent state.
 
 ## P4 — Site and app foundation
 
@@ -77,7 +85,7 @@ Complete the production `site` profile, internal `app-foundation`, and public `a
 
 P5A through P5E may be developed independently after P4 when they do not alter shared contracts concurrently, but merge sequentially with fixtures rerun after each merge. P5F requires P5C; its email and queue integrations require P5D and P5E respectively.
 
-**Stop gate:** Each capability has its own evidence, add/upgrade/removal or ejection behavior, recovery plan, review packet, and approval.
+**Stop gate:** Each capability has its own implementation task followed by a separate certification task, evidence, add/upgrade/removal or ejection behavior, recovery plan, review packet, and approval.
 
 ## P6 — Payload CMS
 
@@ -99,7 +107,7 @@ After P5C and P5D, run a deployed Better Auth/Next.js/OpenNext/D1/Drizzle compat
 
 These tracks may proceed separately after their prerequisites stabilize. One-time payments may resolve app-foundation, persistence, and jobs; subscription validation uses a stable `BillingSubjectProvider` supplied initially by authenticated-app.
 
-**Stop gate:** Each selected track passes cross-capability, security, persistent-data/provider, reconciliation, and recovery review.
+**Stop gate:** Each selected track completes its implementation task and separate certification task, then passes cross-capability, security, persistent-data/provider, reconciliation, and recovery review.
 
 ## P9 — Booking webhooks
 
