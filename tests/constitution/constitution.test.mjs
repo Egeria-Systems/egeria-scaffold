@@ -484,9 +484,24 @@ test("the deployment credential contract rejects build work in the secret-bearin
 });
 
 test("Calendly certification deployment is manual, revision-bound, and secret-minimal", async () => {
-  const source = await readRepositoryFile(
-    ".github/workflows/booking-calendly-certification.yml",
-  );
+  const [source, runbook, receipt, wranglerTemplate, renderingSource] =
+    await Promise.all([
+      readRepositoryFile(
+        ".github/workflows/booking-calendly-certification.yml",
+      ),
+      readRepositoryFile(
+        "docs/implementation-evidence/2026-08-10-booking-calendly-certification-preparation.md",
+      ),
+      readRepositoryFile(
+        "docs/implementation-evidence/booking-calendly-provider-receipt-template.md",
+      ),
+      readRepositoryFile(
+        "packages/builder-core/templates/common/apps/web/wrangler.jsonc.template",
+      ),
+      readRepositoryFile(
+        "packages/builder-core/src/generation/render-skeleton.ts",
+      ),
+    ]);
   const workflow = parse(source);
 
   assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
@@ -586,6 +601,21 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   );
   assert.doesNotMatch(source, /^  (?:pull_request|push|schedule):/mu);
   assert.doesNotMatch(source, /wrangler delete|calendly\.com\/api|provider token/iu);
+
+  const projectName =
+    stepsByName["Create deployment candidate"].run.match(
+      /--name ([a-z][a-z0-9-]+)/u,
+    )?.[1];
+  assert.equal(projectName, "acme-portfolio-calendly");
+  assert.match(wranglerTemplate, /"name": "\{\{workerName\}\}"/u);
+  assert.match(
+    renderingSource,
+    /workerName: projectResult\.value\.project\.name/u,
+  );
+  assert.match(runbook, new RegExp("Worker name `" + projectName + "`"));
+  assert.match(receipt, new RegExp("preflight for `" + projectName + "`"));
+  assert.doesNotMatch(runbook, /acme-portfolio-calendly-web/u);
+  assert.doesNotMatch(receipt, /acme-portfolio-calendly-web/u);
 });
 
 test("the provider receipt template separates application, provider, and cleanup evidence", async () => {
@@ -606,10 +636,43 @@ test("the provider receipt template separates application, provider, and cleanup
   }
   assert.match(template, /synthetic host and invitee/iu);
   assert.match(template, /meeting status/iu);
-  assert.match(template, /acme-portfolio-calendly-web/u);
+  assert.match(template, /acme-portfolio-calendly/u);
   assert.match(template, /Worker.*removed|removed.*Worker/iu);
   assert.match(template, /must not contain.*email address/iu);
   assert.match(template, /does not establish WCAG conformance/iu);
+});
+
+test("provider preparation defines the external safety envelope", async () => {
+  const [preparation, plan, receipt] = await Promise.all([
+    readRepositoryFile(
+      "docs/implementation-evidence/2026-08-10-booking-calendly-certification-preparation.md",
+    ),
+    readRepositoryFile(
+      "docs/superpowers/plans/2026-08-10-booking-calendly-certification.md",
+    ),
+    readRepositoryFile(
+      "docs/implementation-evidence/booking-calendly-provider-receipt-template.md",
+    ),
+  ]);
+
+  for (const document of [preparation, plan]) {
+    assert.match(document, /GitHub repository administrator/iu);
+    assert.match(document, /workflow dispatcher/iu);
+    assert.match(document, /Calendly certification operator/iu);
+    assert.match(document, /Cloudflare account administrator/iu);
+    assert.match(document, /Workers Scripts Write/u);
+    assert.match(document, /every 30 seconds[^.]+5 minutes/iu);
+    assert.match(document, /exactly one synthetic booking/iu);
+    assert.match(document, /no paid upgrade/iu);
+    assert.match(document, /seven days/iu);
+    assert.match(document, /credential[^.]+revoke[^.]+rotate/iu);
+    assert.match(document, /rerun trigger/iu);
+  }
+  assert.match(receipt, /action owners and roles/iu);
+  assert.match(receipt, /polling result/iu);
+  assert.match(receipt, /quota and spend/iu);
+  assert.match(receipt, /credential disposition/iu);
+  assert.match(receipt, /rerun trigger/iu);
 });
 
 test("repository documentation has no broken local Markdown links", async () => {

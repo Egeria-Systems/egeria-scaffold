@@ -6,6 +6,16 @@ Use this template only after the separately authorized protected-staging and pro
 
 **Receipt status:** [complete / incomplete]
 
+**Certification capability:** `booking-calendly`
+
+**Certification descriptor version:** `0.1.0`
+
+**Certification behavior-contract digest:** `sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab`
+
+**Certification evidence revision:** [40-character deployed Git revision]
+
+**Passed certification outcomes:** `cleanup-recovery, deployed-application, provider-confirmed`
+
 ## Workflow and revision identity
 
 - Repository revision: [40-character Git commit]
@@ -14,7 +24,9 @@ Use this template only after the separately authorized protected-staging and pro
 - Human deployment approver: [public GitHub identity]
 - Local receipt artifact digest: [GitHub-reported artifact SHA-256]
 - Staging origin: [dedicated non-production origin; omit private query data]
-- Worker-name preflight for `acme-portfolio-calendly-web`: [absent before deployment / approved dedicated certification resource]
+- Worker-name preflight for `acme-portfolio-calendly`: [absent before deployment / approved dedicated certification resource]
+- Action owners and roles: [GitHub repository administrator; workflow dispatcher; required deployment reviewer; Cloudflare account administrator; Calendly certification operator; implemented-task reviewer]
+- Credential disposition: [task token revoked / exposed or over-scoped token rotated / shared compatibility token unchanged under named rotation plan]
 
 ## Synthetic-data declaration
 
@@ -22,6 +34,7 @@ Use this template only after the separately authorized protected-staging and pro
 - Test-controlled calendar/inbox confirmed: [yes / no]
 - Real client data, identities, messages, calendars, and production resources excluded: [yes / no]
 - Calendly service tier and event-type slot confirmed: [tier and bounded slot statement]
+- Quota and spend result: [one event slot and one booking; existing GitHub/Cloudflare quota; no paid upgrade or incremental spend]
 
 ## Deployed application evidence
 
@@ -35,6 +48,7 @@ Use this template only after the separately authorized protected-staging and pro
 
 - Synthetic booking completed through the rendered integration: [yes / no]
 - Provider meeting status in Calendly Meetings: [scheduled / cancelled / other]
+- Polling result: [30-second checks for no more than 5 minutes / not needed]
 - Booking and provider-record timestamps: [bounded timestamps and timezone]
 - Causal match between synthetic labels, time slot, and provider record: [content-safe explanation]
 - Provider reviewer: [identity]
@@ -63,3 +77,4 @@ This receipt records one bounded synthetic provider journey. It does not establi
 - Cleanup/recovery evidence accepted: [yes / no and reason]
 - Registry may change from `pending` to `certified`: [yes / no]
 - Review revision: [40-character Git commit]
+- Rerun trigger evaluation: [none / exact trigger requiring a newly authorized rerun]
