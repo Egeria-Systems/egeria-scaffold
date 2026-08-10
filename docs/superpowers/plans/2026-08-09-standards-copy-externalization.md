@@ -153,7 +153,7 @@ Expected: one documentation-only commit containing exactly the two files.
 
 **Produces:** Failing behavioral contracts for `createCopyExternalizationConfig`, rule identifier `@egeria-systems/copy/externalize-visible-copy`, the new public export, the packaged source file, and one pending standards minor Changeset.
 
-- [ ] **Step 1: Write factory validation and valid-source tests**
+- [x] **Step 1: Write factory validation and valid-source tests**
 
 Add tests that import the new public file and prove:
 
@@ -174,7 +174,7 @@ assert.throws(
 
 For both ESLint `9.39.5` and `10.8.0`, verify zero messages for dynamic JSX text, dynamic relevant attributes, content-backed static metadata, logs, internal errors, stable identifiers, URL fields, and ordinary TypeScript syntax.
 
-- [ ] **Step 2: Write literal-source rejection tests**
+- [x] **Step 2: Write literal-source rejection tests**
 
 For both ESLint majors, use real `Linter.verify` calls and literal expected diagnostics to cover:
 
@@ -196,7 +196,7 @@ export function Example({ label }: { label: string }) {
 
 Add a named `generateMetadata` return-object case, all four relevant JSX attributes, whitespace-only JSX, a static title template object, exact invariant acceptance, and a near-match invariant rejection. Assert stable rule ID, severity, message, and no source excerpt in diagnostic messages.
 
-- [ ] **Step 3: Specify public manifest, tarball, and pending Changeset contracts**
+- [x] **Step 3: Specify public manifest, tarball, and pending Changeset contracts**
 
 Require this exact export:
 
@@ -206,7 +206,7 @@ Require this exact export:
 
 Require `eslint/copy-externalization.mjs` in the standards dry-run tarball. Replace the historical no-pending-changeset assertion with exactly one pending file named `.changeset/externalize-visible-copy.md` whose front matter schedules only `@egeria-systems/standards` for a minor bump and whose body describes the copy-externalization config. Keep both materialized manifests and changelogs at published `0.1.0`.
 
-- [ ] **Step 4: Run RED and confirm causality**
+- [x] **Step 4: Run RED and confirm causality**
 
 Run:
 
@@ -233,7 +233,7 @@ Expected: failures are caused by the missing public file/export/package bytes/Ch
 
 **Produces:** `createCopyExternalizationConfig` and an unpublished minor release record. No package version or dependency changes.
 
-- [ ] **Step 1: Implement validated factory input**
+- [x] **Step 1: Implement validated factory input**
 
 Implement pure helpers that accept only:
 
@@ -245,7 +245,7 @@ files.every((file) => typeof file === "string" && file.length > 0)
 
 and unique non-empty strings for `invariantLiterals`. Copy accepted arrays before placing them in the returned config so caller mutation cannot change the config.
 
-- [ ] **Step 2: Implement static-text extraction and AST boundaries**
+- [x] **Step 2: Implement static-text extraction and AST boundaries**
 
 Implement small focused helpers for:
 
@@ -258,7 +258,7 @@ Implement small focused helpers for:
 
 Report each offending visible source node once. Ignore whitespace-only strings and exact `invariantLiterals`.
 
-- [ ] **Step 3: Export the config and document the boundary**
+- [x] **Step 3: Export the config and document the boundary**
 
 Add the exact manifest export, update the package README with the factory signature, checked contexts, exact invariant option, non-fixing behavior, and unpublished-source limitation, and update nested instructions to include the new current source API while retaining publication and later-key-validation boundaries.
 
@@ -272,7 +272,7 @@ Create this Changeset:
 Add a flat ESLint config that rejects static user-visible JSX, relevant attribute, and Next.js metadata copy outside validated content or localization sources.
 ```
 
-- [ ] **Step 4: Run focused GREEN and package checks**
+- [x] **Step 4: Run focused GREEN and package checks**
 
 Run:
 
@@ -289,7 +289,7 @@ git diff --check
 
 Expected: all focused/package tests pass; standards lint has zero warnings; Changesets reports only a future minor standards bump; manifests remain `0.1.0`; no lockfile change.
 
-- [ ] **Step 5: Commit the public source increment**
+- [x] **Step 5: Commit the public source increment**
 
 ```bash
 git add \
@@ -321,7 +321,7 @@ Expected: exact eight-file public API/test/release commit with no version materi
 
 **Produces:** Root `check:copy-externalization`, canonical template coverage, aggregate lint integration, and accurate canonical ownership/status.
 
-- [ ] **Step 1: Write the failing root-consumer tests**
+- [x] **Step 1: Write the failing root-consumer tests**
 
 Require root script:
 
@@ -338,7 +338,7 @@ Require `lint:builder` to run the existing four-package lint followed by `pnpm r
 
 Update the public-API consumer contract to identify the root config/script as the concrete current consumer.
 
-- [ ] **Step 2: Run the consumer RED**
+- [x] **Step 2: Run the consumer RED**
 
 Run:
 
@@ -351,7 +351,7 @@ node --test --test-name-pattern='copy externalization|builder root owns an exact
 
 Expected: failures identify the absent root import/config/script and unchanged lint aggregate.
 
-- [ ] **Step 3: Compose the root config and aggregate**
+- [x] **Step 3: Compose the root config and aggregate**
 
 Import `createCopyExternalizationConfig` in `eslint.config.mjs`. Remove only the blanket template global ignore and add one config instance for:
 
@@ -364,7 +364,7 @@ Import `createCopyExternalizationConfig` in `eslint.config.mjs`. Remove only the
 
 Use no invariant literals initially. Add the exact root script and append it once to `lint:builder`. Do not change any template byte.
 
-- [ ] **Step 4: Update canonical ownership without overstating adoption**
+- [x] **Step 4: Update canonical ownership without overstating adoption**
 
 Update package ownership to distinguish:
 
@@ -374,7 +374,7 @@ Update package ownership to distinguish:
 
 Update the enforcement map so `INV-COPY-EXTERNALIZATION` is actual for canonical builder TSX template literal-source checks under both supported ESLint majors while generated repository adoption, locale-key validation, parity, runtime copy resolution, and semantic quality remain planned.
 
-- [ ] **Step 5: Run consumer GREEN and affected suites**
+- [x] **Step 5: Run consumer GREEN and affected suites**
 
 Run:
 
@@ -392,7 +392,7 @@ git diff --check
 
 Expected: canonical templates pass with zero warnings; mutation input produces the exact rule error in its test; all affected suites pass; no template, fixture, manifest version, dependency, or lockfile changes.
 
-- [ ] **Step 6: Commit the consumer increment**
+- [x] **Step 6: Commit the consumer increment**
 
 ```bash
 git add \
@@ -411,11 +411,11 @@ Expected: exact consumer/canonical-owner commit; if public-standard or release t
 
 ## Task 5: Independent Reviews and Evidence-Backed Repair
 
-- [ ] **Step 1: Freeze the exact review comparison**
+- [x] **Step 1: Freeze the exact review comparison**
 
 Record the planning commit's parent as base, current `HEAD`, `git diff --name-status`, and `git diff --check`. Confirm every changed path appears in the exact file structure above.
 
-- [ ] **Step 2: Dispatch three non-overlapping read-only reviewers**
+- [x] **Step 2: Dispatch three non-overlapping read-only reviewers**
 
 Dispatch:
 
@@ -425,7 +425,7 @@ Dispatch:
 
 Each packet must include exact base/head SHAs and prohibit edits, recursive delegation, GitHub comments, external actions, and scope expansion.
 
-- [ ] **Step 3: Validate and repair only material findings**
+- [x] **Step 3: Validate and repair only material findings**
 
 For each material current defect, add a focused causal test before changing production code, run RED, make the minimum repair, run affected GREEN, and request only the relevant review closure. Classify invalid, duplicate, deferred-by-scope, and low-value churn findings explicitly. Commit each coherent repair with a short semantic message.
 
@@ -437,7 +437,7 @@ For each material current defect, add a focused causal test before changing prod
 - Create: `docs/review-packets/2026-08-09-standards-copy-externalization.md`
 - Modify: `docs/superpowers/plans/2026-08-09-standards-copy-externalization.md`
 
-- [ ] **Step 1: Run the full relevant deterministic suite once on settled inputs**
+- [x] **Step 1: Run the full relevant deterministic suite once on settled inputs**
 
 Run with exact toolchain:
 
@@ -452,25 +452,25 @@ git diff --check
 
 Do not repeat the fixed-root generated-project verifier if review repairs do not change a generator, template, generated fixture, dependency, lockfile, manifest version, or verifier input; record the accepted unchanged-input evidence instead. If any such input changes unexpectedly, stop and amend the plan before running networked generation.
 
-- [ ] **Step 2: Inspect exact final state**
+- [x] **Step 2: Inspect exact final state**
 
 Run:
 
 ```bash
 git status --short --branch
-git diff --name-status <base>..HEAD
-git diff --stat <base>..HEAD
-git diff --check <base>..HEAD
-git log --oneline --decorate <base>..HEAD
+git diff --name-status b082a4302bfa2fc8e2f8ad220bb4d551d9d49283..HEAD
+git diff --stat b082a4302bfa2fc8e2f8ad220bb4d551d9d49283..HEAD
+git diff --check b082a4302bfa2fc8e2f8ad220bb4d551d9d49283..HEAD
+git log --oneline --decorate b082a4302bfa2fc8e2f8ad220bb4d551d9d49283..HEAD
 ```
 
 Also prove unchanged `pnpm-lock.yaml`, standards/observability manifest versions, generated templates/fixtures, `.egeria` state, workflows, and proof bytes.
 
-- [ ] **Step 3: Write evidence and review packet**
+- [x] **Step 3: Write evidence and review packet**
 
 Record exact comparison, changed files, commits, TDD observations, final commands/results, public-versus-published API distinction, Changeset status, official-source evidence, audit limitation, reviewer dispositions, risks, deferred work, claim limits, and focused revert/recovery order.
 
-- [ ] **Step 4: Validate and commit final artifacts**
+- [x] **Step 4: Validate and commit final artifacts**
 
 Run constitution, semantic naming, placeholder scan, local-link validation through the constitution suite, and diff checks. Mark every completed plan checkbox. Commit exactly the plan/evidence/packet files with:
 
@@ -478,6 +478,6 @@ Run constitution, semantic naming, placeholder scan, local-link validation throu
 Record copy externalization verification
 ```
 
-- [ ] **Step 5: Stop for verified-final-diff approval**
+- [x] **Step 5: Stop for verified-final-diff approval**
 
 Present the exact final comparison and review packet. Do not push, create a pull request, run `changeset version`, publish, modify remote state, adopt an unpublished version in generated projects, or begin the next P2 increment.
