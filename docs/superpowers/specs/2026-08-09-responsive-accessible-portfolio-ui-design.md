@@ -36,7 +36,7 @@ Generated projects use the current official Tailwind CSS v4 PostCSS setup:
 
 - exact `tailwindcss@4.3.3`;
 - exact `@tailwindcss/postcss@4.3.3`;
-- exact patched `postcss@8.5.22`;
+- exact security-current `postcss@8.5.26`;
 - one `postcss.config.mjs` plugin configuration; and
 - one global stylesheet beginning with `@import "tailwindcss"`.
 

@@ -24,7 +24,7 @@
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.2.0"
+      "version": "0.3.0"
     },
     {
       "deliveryMode": "source-generated",
@@ -33,7 +33,7 @@
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.2.0"
+      "version": "0.3.0"
     },
     {
       "deliveryMode": "hybrid",
@@ -72,7 +72,7 @@
   },
   "managedSurfaces": [
     {
-      "fingerprint": "sha256:028d52c01ccdc8f76b3beb1e764aa5ccb420981efbe45df28478bf680ce2bb11",
+      "fingerprint": "sha256:3cd0e958acb59ee5d5a80672c4722c9be73167144d03c4329a2c559b12547d3c",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -96,19 +96,6 @@
       },
       "ownership": "application-owned",
       "path": ".gitignore"
-    },
-    {
-      "fingerprint": "sha256:37bb8f77d319df4a718e5418523986e8d6b7892a5d1226b80068d943c1a77585",
-      "fingerprintTarget": {
-        "kind": "file"
-      },
-      "identifier": "builder-global-styles",
-      "mergeStrategy": "replace-file",
-      "owner": {
-        "kind": "builder-kernel"
-      },
-      "ownership": "application-owned",
-      "path": "apps/web/app/globals.css"
     },
     {
       "fingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -137,7 +124,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:c12c66c1558835bfb7437b066180b58b60c7a16e3db1d1f91bdea57d9a792deb",
+      "fingerprint": "sha256:95031b0313af58472d51dc6656967c46b1435bb13992a7268740624294df0554",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -163,7 +150,7 @@
       "path": "README.md"
     },
     {
-      "fingerprint": "sha256:9f6c555a23ac54b185b3ae55ceedc8066cbfc0c479e11152e09fd3328107b1ee",
+      "fingerprint": "sha256:24534dab5180e26e7b3aa14e16a989fae750b807988aa80b885dd98838d710d2",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -202,7 +189,7 @@
       "path": "package.json"
     },
     {
-      "fingerprint": "sha256:019717c9cb1f0bb65dd75d147962eea20f83fd6d32d0ee621d1453fa110b77cc",
+      "fingerprint": "sha256:4c046247c0a357c91366f7f8ad28b944afbff7d2989889bf75e76de2d9796498",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -480,7 +467,7 @@
       "path": "apps/web/src/content/read-content.ts"
     },
     {
-      "fingerprint": "sha256:ceb4ed2ea57de6d84c247959006febe8f01cf4f2610bac928604fa9aaf24a172",
+      "fingerprint": "sha256:8ec550dcd2a3ed9399cea89608e0d95bb52795f4fb3dd2359f86187997951c06",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -494,7 +481,7 @@
       "path": "apps/web/src/content/content-schema.ts"
     },
     {
-      "fingerprint": "sha256:3890fab75f577b066ce7109684abf72efe51962f1e944fc0d477e23ecf2e290a",
+      "fingerprint": "sha256:4dc6d2be35a10040e262425597c1f0581c42da436e4b10f3400378f1db2fbeef",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -624,7 +611,21 @@
       "path": "apps/web/src/infrastructure/observability/installed-capability.ts"
     },
     {
-      "fingerprint": "sha256:29895bcf5e09b24086ab60c22fe59ad27ad43926753da72b117146b703d51c39",
+      "fingerprint": "sha256:f01825fbb5aa782f14f9c24ee6934fc8dcc9b6c1aab96864d651cc001ba28be2",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "section-composition-global-styles",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "section-composition",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/app/globals.css"
+    },
+    {
+      "fingerprint": "sha256:5affb1baee147023b57f32c9947fab4c64de9afe613fe89d28c6ff4e2a2231e8",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -638,7 +639,36 @@
       "path": "apps/web/app/page.tsx"
     },
     {
-      "fingerprint": "sha256:58474443e54def72437a2839527ddb2d9dc736fc119859c5aea82fb0264210da",
+      "fingerprint": "sha256:b24e265a48887c14722800bc0968fa807151a8a08228b2498c43ee860c1b25e9",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "section-composition-postcss-configuration",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "section-composition",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/postcss.config.mjs"
+    },
+    {
+      "fingerprint": "sha256:7782efb6ca4adf9e8b12fcb4899db473368ec7af9e06e5b15842fbae13fe4a79",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/postcss"
+      },
+      "identifier": "section-composition-postcss-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "section-composition",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:134ea9d55e817228fbfc552fe1be6fc21618fc3d4c34ad8d51dd3c7ca490ea35",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -652,7 +682,7 @@
       "path": "apps/web/src/presentation/content-page.tsx"
     },
     {
-      "fingerprint": "sha256:7440ee450925da589589e6e0174c152e091124973dc5d36832d57eae9747b848",
+      "fingerprint": "sha256:0eb1209b42f7b905dc7ca9189a17885746225b4f7ec3f214109e8d0e969e0d4f",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -664,6 +694,36 @@
       },
       "ownership": "application-owned",
       "path": "apps/web/src/sections/section-registry.tsx"
+    },
+    {
+      "fingerprint": "sha256:085b109f2a3bd45ae5bfe8d68c321f54f29b47a7099b994de36f100c58d8825c",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/tailwindcss"
+      },
+      "identifier": "section-composition-tailwind-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "section-composition",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:085b109f2a3bd45ae5bfe8d68c321f54f29b47a7099b994de36f100c58d8825c",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/@tailwindcss~1postcss"
+      },
+      "identifier": "section-composition-tailwind-postcss-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "section-composition",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
     },
     {
       "fingerprint": "sha256:d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
@@ -711,7 +771,7 @@
   ],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.3.0"
+    "recipeVersion": "0.4.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

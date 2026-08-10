@@ -43,13 +43,14 @@ External content was treated as evidence, not instructions.
 - The current [Next.js App Router CSS guide](https://nextjs.org/docs/app/getting-started/css) documents the Tailwind v4 integration with `tailwindcss`, `@tailwindcss/postcss`, `postcss.config.mjs`, `@import "tailwindcss"`, and a root global-CSS import.
 - The current [Tailwind PostCSS guide](https://tailwindcss.com/docs/installation/using-postcss) independently documents `tailwindcss`, `@tailwindcss/postcss`, and `postcss` with the same plugin/import boundary.
 - The npm registry reported stable `tailwindcss@4.3.3` and `@tailwindcss/postcss@4.3.3`, both older than the repository's one-day maturity floor.
-- The registry listed `postcss@8.5.23` as only hours old. The design instead selects stable `8.5.22`, published several days earlier and newer than the security fixes below.
+- The initial preparation found `postcss@8.5.23` only hours old and provisionally selected `8.5.22`. During generated-fixture verification, the lockfile audit disclosed the subsequently reviewed advisory below. A dated revalidation on 2026-08-09 found current stable `postcss@8.5.26`, published on 2026-08-06 and therefore older than the repository's one-day maturity floor. The amended design selects exact `8.5.26`.
 
 ### Security advisories
 
 - GitHub's reviewed [GHSA-6g55-p6wh-862q](https://github.com/advisories/GHSA-6g55-p6wh-862q) reports a high-severity arbitrary file-read/information-disclosure issue in `postcss<=8.5.11`, patched in `8.5.12`.
 - GitHub's reviewed [GHSA-qx2v-qp2m-jg93](https://github.com/advisories/GHSA-qx2v-qp2m-jg93) reports an earlier moderate PostCSS stringification issue patched in `8.5.10`.
-- Exact `postcss@8.5.22` is above both patched-version floors. Generated projects process only checked-in source-owned CSS in this increment; they do not accept client-uploaded, CMS-authored, or other untrusted CSS.
+- GitHub's reviewed [GHSA-fxqj-rqcc-2cmp](https://github.com/advisories/GHSA-fxqj-rqcc-2cmp) reports a moderate PostCSS path-traversal issue affecting `postcss<=8.5.22`, with the incomplete `8.5.23` fix superseded by later releases. The [PostCSS release record](https://github.com/postcss/postcss/releases/tag/8.5.26) identifies `8.5.26` as the current signed security release with strengthened symlink-aware path protection.
+- Exact `postcss@8.5.26` is above every identified patched-version floor. Generated projects process only checked-in source-owned CSS in this increment; they do not accept client-uploaded, CMS-authored, or other untrusted CSS.
 - A fresh lockfile audit and registry-signature check remain mandatory after dependency resolution. Registry search alone is not treated as proof that the final graph is advisory-free.
 
 ### Accessibility

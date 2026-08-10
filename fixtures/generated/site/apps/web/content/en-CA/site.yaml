@@ -1,6 +1,8 @@
 metadata:
   title: "Acme Site"
   description: A multi-page public website.
+accessibility:
+  skipToContent: Skip to content
 home:
   sections:
     - id: introduction

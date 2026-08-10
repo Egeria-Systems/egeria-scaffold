@@ -7,7 +7,7 @@ project:
   defaultLocale: en-CA
   displayName: Acme Site
   name: acme-site
-recipeVersion: 0.3.0
+recipeVersion: 0.4.0
 schemaVersion: 1.0.0
 selectedCapabilities:
   - standards

@@ -6,7 +6,7 @@
 
 **Architecture:** Evolve the existing `section-composition` source-generated capability to own Tailwind/PostCSS package properties, PostCSS configuration, global design tokens, and responsive pure Server Components. Evolve `content-files` only for the exact externalized skip-link string, advance materialized recipes, and regenerate immutable production fixtures without adding a capability, public package, browser runtime, provider, or later automation outcome.
 
-**Tech Stack:** Node.js `22.23.2`, pnpm `11.20.0`, TypeScript `6.0.3`, YAML `2.9.0`, React/React DOM `19.2.8`, Next.js `16.3.0`, Tailwind CSS `4.3.3`, `@tailwindcss/postcss` `4.3.3`, PostCSS `8.5.22`, OpenNext Cloudflare `1.20.2`, Wrangler `4.118.0`, ESLint `9.39.5` in generated projects and `10.8.0` at the builder root, Node test runner.
+**Tech Stack:** Node.js `22.23.2`, pnpm `11.20.0`, TypeScript `6.0.3`, YAML `2.9.0`, React/React DOM `19.2.8`, Next.js `16.3.0`, Tailwind CSS `4.3.3`, `@tailwindcss/postcss` `4.3.3`, PostCSS `8.5.26`, OpenNext Cloudflare `1.20.2`, Wrangler `4.118.0`, ESLint `9.39.5` in generated projects and `10.8.0` at the builder root, Node test runner.
 
 ## Global Constraints
 
@@ -14,7 +14,7 @@
 - Preserve exactly six executable capabilities and the two current `portfolio`/`site` profiles.
 - Keep every visible or accessibility string in validated `en-CA` YAML; TSX contains no visible fallback copy.
 - Keep presentation pure and server-rendered; add no client component, state, effect, browser API, provider, or Cloudflare type.
-- Use exact `tailwindcss@4.3.3`, `@tailwindcss/postcss@4.3.3`, and patched `postcss@8.5.22`; do not change the root lockfile or public Egeria package versions.
+- Use exact `tailwindcss@4.3.3`, `@tailwindcss/postcss@4.3.3`, and security-current `postcss@8.5.26`; do not change the root lockfile or public Egeria package versions.
 - Preserve native semantic elements, the existing ordered heading contract, safe-link parsing, 320-CSS-pixel-oriented fluid reflow, visible focus, minimum 44-CSS-pixel primary/navigation targets, and reduced-motion protection.
 - Do not add Playwright, axe, visual regression, performance thresholds, CI/deployment, Calendly, observability behavior, a human checklist, a conformance claim, images, Markdown rendering, migrations, providers, or a real client repository.
 - Before every commit, confirm branch/status, stage only exact intended files, inspect the cached diff, and run `git diff --cached --check`.
@@ -247,7 +247,7 @@ Require `postcss.config.mjs` in the exact template allowlist and rendered invent
 ```json
 {
   "@tailwindcss/postcss": "4.3.3",
-  "postcss": "8.5.22",
+  "postcss": "8.5.26",
   "tailwindcss": "4.3.3"
 }
 ```
@@ -494,3 +494,8 @@ Stop for explicit implemented-task and verified-final-diff approval. Do not begi
 Use focused newest-first `git revert` commits, never reset or history rewriting. Revert final evidence, fixture evidence, implementation, plan, and design/preparation in reverse order as needed. After any implementation revert, regenerate both fixtures from the restored production CLI and rerun `verify:builder-kernel`; never leave template, lockfile, state fingerprint, and committed fixture bytes out of agreement.
 
 Dependency rollback removes exact Tailwind/PostCSS manifest entries and regenerated lock resolutions with the source revert. There is no deployment, provider, persistent-data, analytics, booking, publication, or external-system recovery. Temporary generation, store, install, build, and test directories are non-authoritative and identity-bounded.
+
+## Approved plan amendments
+
+- 2026-08-09: The generated ESLint 9 contract rejects an anonymous default object export through `import/no-anonymous-default-export`. Name the immutable PostCSS configuration before its default export. This preserves the official plugin configuration and exact generated behavior while satisfying the existing zero-warning lint gate. The user preapproved plan amendments through the implemented-task review gate.
+- 2026-08-09: Generated-project audit identified reviewed advisory `GHSA-fxqj-rqcc-2cmp` in the provisional `postcss@8.5.22` dependency. Advance the exact PostCSS contract to security-current `8.5.26`, update its inference and deterministic fixture contracts, regenerate both production fixtures, and rerun audit/signature/build verification. This is a required security correction within the user's preapproved plan-amendment authority.

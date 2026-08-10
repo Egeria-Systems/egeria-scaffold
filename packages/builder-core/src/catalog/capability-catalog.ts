@@ -259,7 +259,7 @@ function createDescriptors(
           "@tailwindcss/postcss",
           "4.3.3",
         ),
-        createPackageProbe("devDependencies", "postcss", "8.5.22"),
+        createPackageProbe("devDependencies", "postcss", "8.5.26"),
         createPackageProbe("devDependencies", "tailwindcss", "4.3.3"),
         createFileProbe("apps/web/app/globals.css"),
         createFileProbe("apps/web/app/page.tsx"),

@@ -334,7 +334,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
           path: "apps/web/package.json",
           section: "devDependencies",
           packageName: "postcss",
-          version: "8.5.22",
+          version: "8.5.26",
         },
         {
           kind: "package",

@@ -530,7 +530,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       "@types/react-dom": "19.2.4",
       eslint: "9.39.5",
       "eslint-config-next": "16.3.0",
-      postcss: "8.5.22",
+      postcss: "8.5.26",
       tailwindcss: "4.3.3",
       typescript: "6.0.3",
       "typescript-eslint": "8.66.0",
@@ -627,7 +627,10 @@ test("generated global styles expose the approved responsive accessibility token
       line: "#c5cfca",
     },
   );
+  assert.match(postcss, /const postcssConfiguration = \{/u);
   assert.match(postcss, /"@tailwindcss\/postcss": \{\}/u);
+  assert.match(postcss, /export default postcssConfiguration;/u);
+  assert.doesNotMatch(postcss, /export default \{/u);
 
   const palette = {
     canvas: "#f6f5ef",

@@ -129,6 +129,9 @@ function assertPortablePublicLockfile(lockfile) {
   assert.doesNotMatch(lockfile, /(?:^|[{,]\s*)tarball:/mu);
   assert.match(lockfile, /@egeria-systems\/standards@0\.1\.0/u);
   assert.match(lockfile, /@egeria-systems\/observability@0\.1\.0/u);
+  assert.match(lockfile, /@tailwindcss\/postcss@4\.3\.3/u);
+  assert.match(lockfile, /postcss@8\.5\.26/u);
+  assert.match(lockfile, /tailwindcss@4\.3\.3/u);
 }
 
 test("compiled project generation matches committed portfolio and site fixtures", async (context) => {

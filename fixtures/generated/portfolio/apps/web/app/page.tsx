@@ -8,6 +8,7 @@ export default function Home() {
     <ContentPage
       sections={content.home.sections}
       navigation={content.navigation}
+      skipToContent={content.accessibility.skipToContent}
     />
   );
 }

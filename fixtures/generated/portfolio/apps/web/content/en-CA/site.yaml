@@ -1,6 +1,8 @@
 metadata:
   title: "Acme Portfolio"
   description: A focused portfolio.
+accessibility:
+  skipToContent: Skip to content
 home:
   sections:
     - id: introduction

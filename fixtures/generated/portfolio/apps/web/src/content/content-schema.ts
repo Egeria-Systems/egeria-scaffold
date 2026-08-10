@@ -79,6 +79,9 @@ export type SiteContent = Readonly<{
     title: string;
     description: string;
   }>;
+  accessibility: Readonly<{
+    skipToContent: string;
+  }>;
   home: PageContent;
   navigation: readonly NavigationItem[];
 }>;
@@ -455,11 +458,14 @@ function parseNavigation(value: unknown): readonly NavigationItem[] {
 export function parseSiteContent(value: unknown): SiteContent {
   if (
     !isUnknownRecord(value) ||
-    !hasExactKeys(value, ["metadata", "home", "navigation"]) ||
+    !hasExactKeys(value, ["metadata", "accessibility", "home", "navigation"]) ||
     !isUnknownRecord(value.metadata) ||
     !hasExactKeys(value.metadata, ["title", "description"]) ||
     !isNonEmptyString(value.metadata.title) ||
-    !isNonEmptyString(value.metadata.description)
+    !isNonEmptyString(value.metadata.description) ||
+    !isUnknownRecord(value.accessibility) ||
+    !hasExactKeys(value.accessibility, ["skipToContent"]) ||
+    !isNonEmptyString(value.accessibility.skipToContent)
   ) {
     throw new TypeError("CONTENT_INVALID");
   }
@@ -468,6 +474,9 @@ export function parseSiteContent(value: unknown): SiteContent {
     metadata: {
       title: value.metadata.title,
       description: value.metadata.description,
+    },
+    accessibility: {
+      skipToContent: value.accessibility.skipToContent,
     },
     home: parsePageContent(value.home),
     navigation: parseNavigation(value.navigation),

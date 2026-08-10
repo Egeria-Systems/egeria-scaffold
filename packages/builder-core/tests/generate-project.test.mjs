@@ -615,7 +615,7 @@ test("portfolio and site generation writes exact state-last repositories", async
         webManifest.devDependencies["@tailwindcss/postcss"],
         "4.3.3",
       );
-      assert.equal(webManifest.devDependencies.postcss, "8.5.22");
+      assert.equal(webManifest.devDependencies.postcss, "8.5.26");
       assert.equal(webManifest.devDependencies.tailwindcss, "4.3.3");
       assert.equal(
         webManifest.dependencies["@egeria-systems/observability"],

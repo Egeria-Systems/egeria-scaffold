@@ -384,7 +384,7 @@ test("doctor and diff agree across the canonical portfolio composition", async (
       devDependencies: {
         "@egeria-systems/standards": "1.2.3",
         "@tailwindcss/postcss": "4.3.3",
-        postcss: "8.5.22",
+        postcss: "8.5.26",
         tailwindcss: "4.3.3",
         wrangler: "4.118.0",
       },
