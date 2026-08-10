@@ -195,38 +195,38 @@ Do not touch any other existing `fixtures/generated/portfolio` or `fixtures/gene
 
 ## Task 4: Retain and certify the representative generated project
 
-- [ ] Add the `portfolio-calendly` fixture contract with the exact paired CLI arguments, capabilities, settings, files, versions, ownership count, and unique verification roots/artifact state.
-- [ ] Add RED tests proving the three-fixture harness stays deterministic, identity-bounded, source-immutable, and content-safe, and that verifier output distinguishes unique fixture identifiers while retaining unique profile reporting.
-- [ ] Generate the fixture twice through the compiled CLI in absent temporary destinations, require byte identity, inspect the exact diff, and replace only the declared committed fixture root.
-- [ ] In the capability-owned Playwright spec, intercept Calendly, prove no eager request, prove popup activation/close and 320-pixel containment, prove the anchor fallback with JavaScript disabled, and run the selected axe rules with the dialog open.
-- [ ] Run deterministic fixtures, read-only infer/doctor/diff, frozen install, audits/signatures, lint, typecheck, Next/OpenNext builds, and development/preview Chromium suites for all three fixture contracts.
-- [ ] Commit with message `Certify generated Calendly booking`.
+- [x] Add the `portfolio-calendly` fixture contract with the exact paired CLI arguments, capabilities, settings, files, versions, ownership count, and unique verification roots/artifact state.
+- [x] Add RED tests proving the three-fixture harness stays deterministic, identity-bounded, source-immutable, and content-safe, and that verifier output distinguishes unique fixture identifiers while retaining unique profile reporting.
+- [x] Generate the fixture twice through the compiled CLI in absent temporary destinations, require byte identity, inspect the exact diff, and replace only the declared committed fixture root.
+- [x] In the capability-owned Playwright spec, intercept Calendly, prove no eager request, prove popup activation/close and 320-pixel containment, prove the anchor fallback with JavaScript disabled, and run the selected axe rules with the dialog open.
+- [x] Run deterministic fixtures, read-only infer/doctor/diff, frozen install, audits/signatures, lint, typecheck, Next/OpenNext builds, and development/preview Chromium suites for all three fixture contracts.
+- [x] Commit with message `Certify generated Calendly booking`.
 
 ## Task 5: Reconcile canonical documentation
 
-- [ ] Update the executable count, capability/settings behavior, ownership, inference, verification, security/privacy boundary, iframe/dialog design, fixture role, claim limits, rollback separation, and current P2 status in every listed canonical/current document.
-- [ ] State explicitly that provider configuration/data are not managed and protected-staging/provider-confirmed certification remains unexecuted and separately authorized.
-- [ ] Run documentation links/contracts, semantic naming, and targeted package-boundary assertions GREEN.
-- [ ] Commit with message `Document Calendly scaffold boundaries`.
+- [x] Update the executable count, capability/settings behavior, ownership, inference, verification, security/privacy boundary, iframe/dialog design, fixture role, claim limits, rollback separation, and current P2 status in every listed canonical/current document.
+- [x] State explicitly that provider configuration/data are not managed and protected-staging/provider-confirmed certification remains unexecuted and separately authorized.
+- [x] Run documentation links/contracts, semantic naming, and targeted package-boundary assertions GREEN.
+- [x] Commit with message `Document Calendly scaffold boundaries`.
 
 ## Task 6: Independent review and bounded repair
 
 **Comparison:** planning base `02ec5eb12741c1622beec02529c38965e7501d68..HEAD` plus current uncommitted final evidence.
 
-- [ ] Dispatch one read-only requirements reviewer for exact acceptance criteria, initial-scaffolding scope, fallback/lazy modes, state/settings agreement, certification boundary, exclusions, and claim language.
-- [ ] Dispatch one read-only architecture/anti-overengineering reviewer for capability cohesion, managed/application ownership, URL/token safety, provider/privacy isolation, home composition, package non-extraction, and later-stage exclusion.
-- [ ] Dispatch one read-only test-evidence reviewer for causal RED/GREEN evidence, all-mode contract coverage, representative browser behavior, third-party stubbing, fixed-root isolation, deterministic fixture/state evidence, and claim support.
-- [ ] Give each reviewer an exact non-overlapping role and scope, prohibit edits and recursive fan-out, wait for every result, and validate every finding against the current tree.
-- [ ] For each material validated defect, add a focused failing regression test, implement the minimum repair, rerun affected checks, and record disposition. Do not change code for unsupported or preference-only findings.
-- [ ] Commit evidence-backed repairs, if any, with a message naming the actual correction.
+- [x] Dispatch one read-only requirements reviewer for exact acceptance criteria, initial-scaffolding scope, fallback/lazy modes, state/settings agreement, certification boundary, exclusions, and claim language.
+- [x] Dispatch one read-only architecture/anti-overengineering reviewer for capability cohesion, managed/application ownership, URL/token safety, provider/privacy isolation, home composition, package non-extraction, and later-stage exclusion.
+- [x] Dispatch one read-only test-evidence reviewer for causal RED/GREEN evidence, all-mode contract coverage, representative browser behavior, third-party stubbing, fixed-root isolation, deterministic fixture/state evidence, and claim support.
+- [x] Give each reviewer an exact non-overlapping role and scope, prohibit edits and recursive fan-out, wait for every result, and validate every finding against the current tree.
+- [x] For each material validated defect, add a focused failing regression test, implement the minimum repair, rerun affected checks, and record disposition. Do not change code for unsupported or preference-only findings.
+- [x] Commit evidence-backed repairs, if any, with a message naming the actual correction.
 
 ## Task 7: Final verification, packet, and stop gate
 
-- [ ] Run `git diff --check`, semantic naming, constitution, package boundaries, builder-core, CLI, generated-fixture tests, builder lint/build/typecheck, root audit/signatures, fixed-root full certification, and changeset status on the settled tree.
-- [ ] Do not repeat an unchanged successful expensive check. Record exact command, exit, relevant count, and bounded claim for each result.
-- [ ] Verify branch/status, exact comparison, changed-file inventory, ignored/untracked artifacts, and no changes in separate worktrees.
-- [ ] Record exact capability/settings/fixture evidence, dependency/advisory results, reviewer dispositions, risks, deferred protected-staging/provider proof, source rollback, and separate provider cleanup.
-- [ ] Create the review packet for exact committed comparison `02ec5eb12741c1622beec02529c38965e7501d68..HEAD`.
-- [ ] Commit final evidence with message `Record Calendly scaffold verification`.
+- [x] Run `git diff --check`, semantic naming, constitution, package boundaries, builder-core, CLI, generated-fixture tests, builder lint/build/typecheck, root audit/signatures, fixed-root full certification, and changeset status on the settled tree.
+- [x] Do not repeat an unchanged successful expensive check. Record exact command, exit, relevant count, and bounded claim for each result.
+- [x] Verify branch/status, exact comparison, changed-file inventory, ignored/untracked artifacts, and no changes in separate worktrees.
+- [x] Record exact capability/settings/fixture evidence, dependency/advisory results, reviewer dispositions, risks, deferred protected-staging/provider proof, source rollback, and separate provider cleanup.
+- [x] Create the review packet for exact committed comparison `02ec5eb12741c1622beec02529c38965e7501d68..HEAD`.
+- [x] Commit final evidence with message `Record Calendly scaffold verification`.
 - [ ] Re-run only final-tree identity/status and documentation/semantic checks affected by the evidence commit.
 - [ ] Stop and request explicit verified-final-diff approval. Do not begin a later P2 outcome.
