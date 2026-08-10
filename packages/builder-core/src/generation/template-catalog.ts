@@ -51,6 +51,17 @@ const siteTemplateSources = [
   "site/apps/web/app/about/page.tsx",
 ] as const;
 
+const bookingCalendlyTemplateSources = [
+  "booking-calendly/apps/web/app/page.tsx",
+  "booking-calendly/apps/web/content/en-CA/booking-calendly.yaml",
+  "booking-calendly/apps/web/src/integrations/booking-calendly/booking-content.ts",
+  "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template",
+  "booking-calendly/apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+  "booking-calendly/apps/web/tests/e2e/calendly-booking.spec.ts",
+] as const;
+
+const commonHomeRouteSource = "common/apps/web/app/page.tsx";
+
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
@@ -67,12 +78,16 @@ function remapSourceIssue(
 
 export function createTemplateCatalog(
   profile: "portfolio" | "site",
+  includeBookingCalendly = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   const sources = [
-    ...commonTemplateSources,
+    ...commonTemplateSources.filter(
+      (source) => !includeBookingCalendly || source !== commonHomeRouteSource,
+    ),
     ...(profile === "portfolio"
       ? portfolioTemplateSources
       : siteTemplateSources),
+    ...(includeBookingCalendly ? bookingCalendlyTemplateSources : []),
   ];
   const destinations = new Set<string>();
   const entries: TemplateCatalogEntry[] = [];

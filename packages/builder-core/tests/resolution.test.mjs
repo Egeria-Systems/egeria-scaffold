@@ -563,14 +563,6 @@ test("the portfolio and site catalog declares the exact seven executable capabil
           mergeStrategy: "replace-file",
         },
         {
-          identifier: "section-composition-home-route",
-          owner: { kind: "capability", identifier: "section-composition" },
-          path: "apps/web/app/page.tsx",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
           identifier: "section-composition-postcss-package",
           owner: { kind: "capability", identifier: "section-composition" },
           path: "apps/web/package.json",
@@ -651,7 +643,6 @@ test("the portfolio and site catalog declares the exact seven executable capabil
           version: "4.3.3",
         },
         { kind: "file", path: "apps/web/app/globals.css" },
-        { kind: "file", path: "apps/web/app/page.tsx" },
         { kind: "file", path: "apps/web/postcss.config.mjs" },
         {
           kind: "file",
@@ -908,8 +899,76 @@ test("the portfolio and site catalog declares the exact seven executable capabil
       privilegedOperations: [],
       threatReviewLevel: "elevated",
       adapterSemanticRequirements: [],
-      managedSurfaces: [],
-      inferenceProbes: [],
+      managedSurfaces: [
+        {
+          identifier: "booking-calendly-browser-specification",
+          owner: { kind: "capability", identifier: "booking-calendly" },
+          path: "apps/web/tests/e2e/calendly-booking.spec.ts",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "booking-calendly-client-component",
+          owner: { kind: "capability", identifier: "booking-calendly" },
+          path:
+            "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "booking-calendly-content",
+          owner: { kind: "capability", identifier: "booking-calendly" },
+          path: "apps/web/content/en-CA/booking-calendly.yaml",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "booking-calendly-content-reader",
+          owner: { kind: "capability", identifier: "booking-calendly" },
+          path:
+            "apps/web/src/integrations/booking-calendly/booking-content.ts",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "booking-calendly-settings",
+          owner: { kind: "capability", identifier: "booking-calendly" },
+          path:
+            "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+          ownership: "managed",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+      ],
+      inferenceProbes: [
+        {
+          kind: "file",
+          path: "apps/web/tests/e2e/calendly-booking.spec.ts",
+        },
+        {
+          kind: "file",
+          path:
+            "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+        },
+        {
+          kind: "file",
+          path: "apps/web/content/en-CA/booking-calendly.yaml",
+        },
+        {
+          kind: "file",
+          path:
+            "apps/web/src/integrations/booking-calendly/booking-content.ts",
+        },
+        {
+          kind: "file",
+          path:
+            "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+        },
+      ],
       migrationPlanners: [],
       verificationPlan: [
         "typecheck",

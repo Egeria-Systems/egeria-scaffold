@@ -1,0 +1,9 @@
+export type CalendlyBookingSettings = Readonly<{
+  destination: string;
+  mode: "link" | "inline" | "popup";
+}>;
+
+export const bookingCalendlySettings = {
+  destination: {{calendlyDestinationJson}},
+  mode: {{calendlyModeJson}},
+} as const satisfies CalendlyBookingSettings;

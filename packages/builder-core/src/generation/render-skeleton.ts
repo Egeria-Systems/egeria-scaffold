@@ -277,6 +277,11 @@ function createBuilderSurfaces(): readonly ManagedSurfaceDescriptor[] {
       "apps/web/app/layout.tsx",
       "application-owned",
     ),
+    createFileSurface(
+      "builder-home-route",
+      "apps/web/app/page.tsx",
+      "application-owned",
+    ),
     createPackageSurface("builder-web-package-name", "/name"),
     createPackageSurface("builder-web-package-version", "/version"),
     createPackageSurface("builder-web-package-private", "/private"),
@@ -374,7 +379,10 @@ export async function renderSkeleton(
     return projectResult;
   }
 
-  const templateCatalogResult = createTemplateCatalog(request.profile);
+  const templateCatalogResult = createTemplateCatalog(
+    request.profile,
+    request.bookingCalendly !== undefined,
+  );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;
   }
@@ -383,6 +391,14 @@ export async function renderSkeleton(
     projectName: projectResult.value.project.name,
     displayNameJson: JSON.stringify(projectResult.value.project.displayName),
     workerName: projectResult.value.project.name,
+    ...(request.bookingCalendly === undefined
+      ? {}
+      : {
+          calendlyDestinationJson: JSON.stringify(
+            request.bookingCalendly.destination,
+          ),
+          calendlyModeJson: JSON.stringify(request.bookingCalendly.mode),
+        }),
   };
   const templateRoot = new URL("../../templates/", import.meta.url);
   const files: GeneratedFile[] = [];

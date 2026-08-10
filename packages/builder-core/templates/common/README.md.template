@@ -30,3 +30,7 @@ PLAYWRIGHT_DEPLOYED_URL=https://example.com pnpm --dir apps/web run test:e2e:dep
 Deployed mode rejects missing, malformed, non-HTTPS, credential-bearing, query-bearing, and fragment-bearing URLs. It starts no server and is not run by the generated workflow.
 
 Playwright reports and test results are ignored locally and uploaded for seven days when generated CI browser checks fail. Axe and browser checks provide bounded evidence for selected automated and interaction behaviors. Passing them does not establish WCAG conformance, assistive-technology compatibility, or human usability.
+
+## Calendly booking
+
+When Calendly booking is selected, the generated integration keeps an ordinary link fallback and loads the direct cross-origin scheduling frame only near the viewport or after popup activation. It does not load Calendly host-page JavaScript. Calendly controls provider-side behavior, browser storage, and provider-controlled scheduling data; local checks do not prove provider availability or a completed booking.

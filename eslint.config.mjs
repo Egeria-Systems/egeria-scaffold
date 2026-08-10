@@ -30,6 +30,7 @@ export default [
   createCopyExternalizationConfig({
     files: [
       "packages/builder-core/templates/**/app/**/*.tsx",
+      "packages/builder-core/templates/**/src/integrations/**/*.tsx",
       "packages/builder-core/templates/**/src/presentation/**/*.tsx",
       "packages/builder-core/templates/**/src/sections/**/*.tsx",
     ],

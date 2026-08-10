@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { NavigationItem, PageSection } from "../content/content-schema";
 import { SectionComposition } from "../sections/section-registry";
 
@@ -5,12 +7,14 @@ export type ContentPageProperties = Readonly<{
   sections: readonly PageSection[];
   navigation: readonly NavigationItem[];
   skipToContent: string;
+  children?: ReactNode;
 }>;
 
 export function ContentPage({
   sections,
   navigation,
   skipToContent,
+  children,
 }: ContentPageProperties) {
   return (
     <>
@@ -45,6 +49,7 @@ export function ContentPage({
       >
         <article className="mx-auto flex w-full max-w-5xl flex-col gap-16 sm:gap-20">
           <SectionComposition sections={sections} />
+          {children}
         </article>
       </main>
     </>

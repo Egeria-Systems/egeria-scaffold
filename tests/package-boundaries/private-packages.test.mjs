@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { access, readFile, readdir } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
@@ -199,6 +199,28 @@ test("the private packages compile through the shared strict contract", async ()
   );
 });
 
+test("the root copy lint covers integration presentation templates", async () => {
+  const rootManifest = await readJson("package.json");
+  assert.match(
+    rootManifest.scripts["check:copy-externalization"],
+    /templates\/\*\*\/src\/integrations\/\*\*\/\*\.tsx/u,
+  );
+
+  const rootEslintConfiguration = await import(
+    pathToFileURL(resolve(repositoryRoot, "eslint.config.mjs"))
+  );
+  const copyConfiguration = rootEslintConfiguration.default.find(
+    ({ name }) =>
+      name === "@egeria-systems/standards/copy-externalization",
+  );
+  assert.notEqual(copyConfiguration, undefined);
+  assert.ok(
+    copyConfiguration.files.includes(
+      "packages/builder-core/templates/**/src/integrations/**/*.tsx",
+    ),
+  );
+});
+
 test("the CLI is a thin command adapter while builder-core owns generation", async () => {
   const expectedEntry = `#!/usr/bin/env node
 
@@ -262,6 +284,12 @@ process.exitCode = await runCli(process.argv.slice(2), {
   assert.deepEqual(
     await listFiles(resolve(repositoryRoot, "packages/builder-core/templates")),
     [
+      "booking-calendly/apps/web/app/page.tsx",
+      "booking-calendly/apps/web/content/en-CA/booking-calendly.yaml",
+      "booking-calendly/apps/web/src/integrations/booking-calendly/booking-content.ts",
+      "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template",
+      "booking-calendly/apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+      "booking-calendly/apps/web/tests/e2e/calendly-booking.spec.ts",
       "common/.github/workflows/quality.yml.template",
       "common/.gitignore.template",
       "common/.nvmrc",

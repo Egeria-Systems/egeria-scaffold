@@ -4,17 +4,30 @@ import type {
   ValidationResult,
 } from "../contracts/result.js";
 
-const templateLayers = new Set(["common", "portfolio", "site"]);
+const templateLayers = new Set([
+  "booking-calendly",
+  "common",
+  "portfolio",
+  "site",
+]);
 const templateTokenNames = new Set([
   "projectName",
   "displayNameJson",
   "workerName",
   "githubWorkflowExpression",
   "githubRefExpression",
+  "calendlyDestinationJson",
+  "calendlyModeJson",
 ]);
 const templateTokenPattern =
-  /{{(projectName|displayNameJson|workerName|githubWorkflowExpression|githubRefExpression)}}/g;
+  /{{(projectName|displayNameJson|workerName|githubWorkflowExpression|githubRefExpression|calendlyDestinationJson|calendlyModeJson)}}/g;
 const completeTokenPattern = /{{([^{}]*)}}/g;
+const bookingCalendlySettingsSource =
+  "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template";
+const bookingCalendlyTokenNames = new Set([
+  "calendlyDestinationJson",
+  "calendlyModeJson",
+]);
 const fixedTemplateTokens = {
   githubWorkflowExpression: "${{ github.workflow }}",
   githubRefExpression: "${{ github.ref }}",
@@ -24,6 +37,8 @@ export type TemplateTokens = Readonly<{
   projectName: string;
   displayNameJson: string;
   workerName: string;
+  calendlyDestinationJson?: string;
+  calendlyModeJson?: string;
 }>;
 
 type TemplateTokenName = keyof TemplateTokens | keyof typeof fixedTemplateTokens;
@@ -32,9 +47,16 @@ function resolveTemplateToken(
   token: TemplateTokenName,
   tokens: TemplateTokens,
 ): string {
-  return token in fixedTemplateTokens
-    ? fixedTemplateTokens[token as keyof typeof fixedTemplateTokens]
-    : tokens[token as keyof TemplateTokens];
+  if (token in fixedTemplateTokens) {
+    return fixedTemplateTokens[token as keyof typeof fixedTemplateTokens];
+  }
+
+  const value = tokens[token as keyof TemplateTokens];
+  if (value === undefined) {
+    throw new TypeError("TEMPLATE_TOKEN_UNAVAILABLE");
+  }
+
+  return value;
 }
 
 function templateIssue(code: string, reason: string): ContractIssue {
@@ -67,18 +89,40 @@ function containsTemplateSyntax(text: string): boolean {
   return text.includes("{{") || text.includes("}}");
 }
 
-function validateTemplateSyntax(text: string): ValidationResult<undefined> {
-  let reason: "unknown-token" | "malformed-token" | undefined;
+function validateTemplateSyntax(
+  source: string,
+  text: string,
+  tokens: TemplateTokens,
+): ValidationResult<undefined> {
+  let reason:
+    | "unknown-token"
+    | "malformed-token"
+    | "unavailable-token"
+    | undefined;
   const unmatched = text.replace(
     completeTokenPattern,
     (_match, token: string): string => {
-      if (templateTokenNames.has(token)) {
+      if (
+        templateTokenNames.has(token) &&
+        (!bookingCalendlyTokenNames.has(token) ||
+          source === bookingCalendlySettingsSource)
+      ) {
+        if (
+          !(token in fixedTemplateTokens) &&
+          tokens[token as keyof TemplateTokens] === undefined
+        ) {
+          reason = "unavailable-token";
+        }
         return "";
       }
 
-      reason = /^[A-Za-z][A-Za-z0-9]*$/.test(token)
-        ? "unknown-token"
-        : "malformed-token";
+      reason =
+        bookingCalendlyTokenNames.has(token) &&
+        source !== bookingCalendlySettingsSource
+          ? "unavailable-token"
+          : /^[A-Za-z][A-Za-z0-9]*$/.test(token)
+            ? "unknown-token"
+            : "malformed-token";
       return "";
     },
   );
@@ -134,7 +178,11 @@ export function renderTemplateSource(input: Readonly<{
       : { ok: true, value: normalizeText(input.text) };
   }
 
-  const syntaxResult = validateTemplateSyntax(input.text);
+  const syntaxResult = validateTemplateSyntax(
+    input.source,
+    input.text,
+    input.tokens,
+  );
   if (!syntaxResult.ok) {
     return syntaxResult;
   }

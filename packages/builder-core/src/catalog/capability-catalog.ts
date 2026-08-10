@@ -370,12 +370,6 @@ function createDescriptors(
           "apps/web/app/globals.css",
           "application-owned",
         ),
-        createFileSurface(
-          "section-composition-home-route",
-          "section-composition",
-          "apps/web/app/page.tsx",
-          "application-owned",
-        ),
         createPackageSurface(
           "section-composition-postcss-package",
           "section-composition",
@@ -419,7 +413,6 @@ function createDescriptors(
         createPackageProbe("devDependencies", "postcss", "8.5.26"),
         createPackageProbe("devDependencies", "tailwindcss", "4.3.3"),
         createFileProbe("apps/web/app/globals.css"),
-        createFileProbe("apps/web/app/page.tsx"),
         createFileProbe("apps/web/postcss.config.mjs"),
         createFileProbe("apps/web/src/presentation/content-page.tsx"),
         createFileProbe("apps/web/src/sections/section-registry.tsx"),
@@ -589,8 +582,51 @@ function createDescriptors(
       threatReviewLevel: "elevated",
       platformResources: [],
       adapterSemanticRequirements: [],
-      managedSurfaces: [],
-      inferenceProbes: [],
+      managedSurfaces: [
+        createFileSurface(
+          "booking-calendly-browser-specification",
+          "booking-calendly",
+          "apps/web/tests/e2e/calendly-booking.spec.ts",
+          "application-owned",
+        ),
+        createFileSurface(
+          "booking-calendly-client-component",
+          "booking-calendly",
+          "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+          "application-owned",
+        ),
+        createFileSurface(
+          "booking-calendly-content",
+          "booking-calendly",
+          "apps/web/content/en-CA/booking-calendly.yaml",
+          "application-owned",
+        ),
+        createFileSurface(
+          "booking-calendly-content-reader",
+          "booking-calendly",
+          "apps/web/src/integrations/booking-calendly/booking-content.ts",
+          "application-owned",
+        ),
+        createFileSurface(
+          "booking-calendly-settings",
+          "booking-calendly",
+          "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+          "managed",
+        ),
+      ],
+      inferenceProbes: [
+        createFileProbe("apps/web/tests/e2e/calendly-booking.spec.ts"),
+        createFileProbe(
+          "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+        ),
+        createFileProbe("apps/web/content/en-CA/booking-calendly.yaml"),
+        createFileProbe(
+          "apps/web/src/integrations/booking-calendly/booking-content.ts",
+        ),
+        createFileProbe(
+          "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+        ),
+      ],
       verificationPlan: [
         "typecheck",
         "next-build",

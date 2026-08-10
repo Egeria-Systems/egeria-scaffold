@@ -66,6 +66,13 @@ const siteRenderedPaths = [
   "apps/web/app/about/page.tsx",
   "apps/web/content/en-CA/about.yaml",
 ].sort();
+const bookingCalendlyRenderedPaths = [
+  "apps/web/content/en-CA/booking-calendly.yaml",
+  "apps/web/src/integrations/booking-calendly/booking-content.ts",
+  "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+  "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+  "apps/web/tests/e2e/calendly-booking.spec.ts",
+];
 const controlPaths = [
   ".egeria/migrations.jsonl",
   ".egeria/project.yaml",
@@ -715,15 +722,114 @@ test("generation accepts only the exact optional Calendly request key", async ()
     };
     const acceptedDestination = join(owner, "accepted-selection");
     const acceptedVerifier = createFakeVerifier();
-    const accepted = await core.generateProject({
-      request: { ...request(), bookingCalendly },
-      destination: acceptedDestination,
-      verifier: acceptedVerifier.verifier,
-    });
+    const accepted = assertSuccess(
+      await core.generateProject({
+        request: { ...request(), bookingCalendly },
+        destination: acceptedDestination,
+        verifier: acceptedVerifier.verifier,
+      }),
+    );
 
-    assertFailure(accepted, "PRE_STATE_INFERENCE_FAILED");
-    assert.deepEqual(acceptedVerifier.calls, ["prepare-lockfile"]);
-    assert.equal(await exists(acceptedDestination), false);
+    assert.deepEqual(acceptedVerifier.calls, [
+      "prepare-lockfile",
+      "verify-isolated-copy",
+    ]);
+    assert.equal(await exists(acceptedDestination), true);
+    assert.deepEqual(
+      await listFiles(acceptedDestination),
+      [
+        ...portfolioRenderedPaths,
+        ...bookingCalendlyRenderedPaths,
+        ...controlPaths,
+      ].sort(),
+    );
+
+    const project = assertSuccess(
+      core.parseProjectYaml(
+        await readFile(
+          join(acceptedDestination, ".egeria/project.yaml"),
+          "utf8",
+        ),
+      ),
+    );
+    assert.deepEqual(project.capabilitySettings, {
+      "booking-calendly": bookingCalendly,
+    });
+    assert.equal(project.selectedCapabilities.at(-1), "booking-calendly");
+
+    const catalog = assertSuccess(core.createVerifiedCapabilityCatalog());
+    const resolved = assertSuccess(
+      core.resolveCapabilities(
+        {
+          profile: "portfolio",
+          requestedCapabilities: ["booking-calendly"],
+        },
+        catalog,
+        core.profileRecipes,
+      ),
+    );
+    assert.deepEqual(project.selectedCapabilities, [
+      "standards",
+      "content-files",
+      "section-composition",
+      "deployment-cloudflare",
+      "observability",
+      "booking-calendly",
+    ]);
+    assert.deepEqual(
+      accepted.state.installedCapabilities,
+      core.createInstalledManifest(resolved),
+    );
+    assert.equal(accepted.state.managedSurfaces.length, 76);
+    assert.equal(
+      accepted.state.managedSurfaces.filter(
+        ({ owner }) =>
+          owner.kind === "capability" &&
+          owner.identifier === "booking-calendly",
+      ).length,
+      5,
+    );
+    assert.deepEqual(
+      accepted.state.managedSurfaces.find(
+        ({ identifier }) => identifier === "builder-home-route",
+      )?.owner,
+      { kind: "builder-kernel" },
+    );
+
+    const preStateInference = acceptedVerifier.preStateInferences[0];
+    assert.deepEqual(preStateInference.state, { kind: "missing" });
+    assert.deepEqual(
+      preStateInference.capabilities.map(({ identifier, category }) => ({
+        identifier,
+        category,
+      })),
+      resolved.capabilities
+        .map(({ identifier }) => ({
+          identifier,
+          category: "probable",
+        }))
+        .sort((left, right) => left.identifier.localeCompare(right.identifier)),
+    );
+
+    const postStateInference = await infer(acceptedDestination);
+    assert.equal(postStateInference.state.kind, "valid");
+    assert.deepEqual(
+      postStateInference.capabilities.map(({ identifier, category }) => ({
+        identifier,
+        category,
+      })),
+      resolved.capabilities
+        .map(({ identifier }) => ({
+          identifier,
+          category: "confirmed",
+        }))
+        .sort((left, right) => left.identifier.localeCompare(right.identifier)),
+    );
+    assert.ok(
+      postStateInference.surfaces.every(({ status }) =>
+        ["confirmed", "application-owned"].includes(status),
+      ),
+    );
 
     for (const [index, invalidRequest] of [
       { ...request(), bookingCalendly: undefined },

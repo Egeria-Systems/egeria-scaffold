@@ -87,6 +87,23 @@ const sitePaths = [
   "pnpm-workspace.yaml",
 ];
 
+const bookingCalendlyPaths = [
+  "apps/web/content/en-CA/booking-calendly.yaml",
+  "apps/web/src/integrations/booking-calendly/booking-content.ts",
+  "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+  "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+  "apps/web/tests/e2e/calendly-booking.spec.ts",
+];
+
+const bookingCalendlyCopy = {
+  heading: "Book a conversation",
+  summary: "Choose a time that works for you.",
+  linkLabel: "Schedule with Calendly",
+  frameTitle: "Calendly scheduling page",
+  popupHeading: "Choose a time",
+  closeLabel: "Close scheduling",
+};
+
 const packageVersions = {
   standards: "0.1.0",
   observability: "0.1.0",
@@ -188,6 +205,41 @@ async function compileGeneratedContentModule(files) {
 
 async function loadGeneratedContentModule(files) {
   return (await compileGeneratedContentModule(files)).module;
+}
+
+async function loadGeneratedBookingContentModule(files) {
+  const indexedFiles = indexFiles(files);
+  const source = indexedFiles.get(
+    "apps/web/src/integrations/booking-calendly/booking-content.ts",
+  );
+  const bookingContentSource = indexedFiles.get(
+    "apps/web/content/en-CA/booking-calendly.yaml",
+  );
+  assert.notEqual(source, undefined);
+  assert.notEqual(bookingContentSource, undefined);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const contentModule = await compileGeneratedContentModule(files);
+  const withSource = transpiled.replace(
+    'import bookingContentSource from "../../../content/en-CA/booking-calendly.yaml";',
+    `const bookingContentSource = ${JSON.stringify(bookingContentSource)};`,
+  );
+  const executable = withSource.replace(
+    'from "../../content/content-schema"',
+    `from ${JSON.stringify(contentModule.moduleUrl)}`,
+  );
+  assert.notEqual(withSource, transpiled);
+  assert.notEqual(executable, withSource);
+
+  return import(
+    `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`
+  );
 }
 
 async function loadGeneratedSectionModule(files) {
@@ -380,6 +432,53 @@ test("template rendering replaces only the approved dynamic and workflow tokens"
     worker: "acme-studio-web",
     group: "${{ github.workflow }}-${{ github.ref }}",
   });
+});
+
+test("Calendly settings tokens are JSON data scoped to the managed settings template", () => {
+  const settingsTokens = {
+    ...tokens,
+    calendlyDestinationJson: JSON.stringify(
+      'https://calendly.com/acme/intro?theme="contrast',
+    ),
+    calendlyModeJson: JSON.stringify("popup"),
+  };
+  const settingsSource =
+    "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template";
+  const rendered = assertSuccess(
+    renderTemplateSource({
+      source: settingsSource,
+      text: [
+        "export const settings = {",
+        "  destination: {{calendlyDestinationJson}},",
+        "  mode: {{calendlyModeJson}},",
+        "};",
+      ].join("\n"),
+      tokens: settingsTokens,
+    }),
+  );
+
+  assert.equal(
+    rendered,
+    'export const settings = {\n  destination: "https://calendly.com/acme/intro?theme=\\"contrast",\n  mode: "popup",\n};\n',
+  );
+  const unavailable = renderTemplateSource({
+    source: "common/README.md.template",
+    text: "{{calendlyDestinationJson}}",
+    tokens: settingsTokens,
+  });
+  assertFailure(unavailable, "TEMPLATE_TOKEN_INVALID", "calendlyDestinationJson");
+  assertFailureReason(unavailable, "unavailable-token");
+
+  const recursive = renderTemplateSource({
+    source: settingsSource,
+    text: "{{calendlyDestinationJson}}",
+    tokens: {
+      ...settingsTokens,
+      calendlyDestinationJson: '"{{projectName}}"',
+    },
+  });
+  assertFailure(recursive, "TEMPLATE_TOKEN_INVALID", "projectName");
+  assertFailureReason(recursive, "recursive-token");
 });
 
 test("rendering normalizes newlines and leaves static sources otherwise unchanged", () => {
@@ -608,7 +707,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
   });
 });
 
-test("rendering materializes each explicit Calendly mode without changing defaults", async () => {
+test("rendering conditionally overlays the home route and materializes each Calendly mode", async () => {
   const renderSkeleton = await loadRenderSkeleton();
 
   for (const mode of ["link", "inline", "popup"]) {
@@ -639,7 +738,188 @@ test("rendering materializes each explicit Calendly mode without changing defaul
       rendered.resolved.capabilities.map(({ identifier }) => identifier),
       rendered.project.selectedCapabilities,
     );
+    assert.deepEqual(
+      rendered.files.map(({ path }) => path),
+      [...portfolioPaths, ...bookingCalendlyPaths].toSorted(),
+    );
+    const files = indexFiles(rendered.files);
+    assert.equal(
+      files.get(
+        "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+      ),
+      [
+        "export type CalendlyBookingSettings = Readonly<{",
+        "  destination: string;",
+        '  mode: "link" | "inline" | "popup";',
+        "}>;",
+        "",
+        "export const bookingCalendlySettings = {",
+        '  destination: "https://calendly.com/acme/intro",',
+        `  mode: ${JSON.stringify(mode)},`,
+        "} as const satisfies CalendlyBookingSettings;",
+        "",
+      ].join("\n"),
+    );
+    assert.match(
+      files.get("apps/web/app/page.tsx"),
+      /<CalendlyBooking settings=\{bookingCalendlySettings\} copy=\{bookingContent\} \/>/u,
+    );
+    assert.doesNotMatch(
+      files.get("apps/web/app/page.tsx"),
+      /from "\.\.\/src\/presentation\/content-page";[\s\S]+from "\.\.\/src\/presentation\/content-page";/u,
+    );
   }
+
+  const selectedSite = assertSuccess(
+    await renderSkeleton({
+      profile: "site",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      bookingCalendly: {
+        destination: "https://www.calendly.com/acme/intro",
+        mode: "popup",
+      },
+      packageVersions,
+    }),
+  );
+  assert.deepEqual(
+    selectedSite.files.map(({ path }) => path),
+    [...sitePaths, ...bookingCalendlyPaths].toSorted(),
+  );
+});
+
+test("generated Calendly copy is strict externalized YAML", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      bookingCalendly: {
+        destination: "https://calendly.com/acme/intro",
+        mode: "inline",
+      },
+      packageVersions,
+    }),
+  );
+  const files = indexFiles(rendered.files);
+  assert.deepEqual(
+    parseGeneratedYaml(
+      rendered.files,
+      "apps/web/content/en-CA/booking-calendly.yaml",
+    ),
+    bookingCalendlyCopy,
+  );
+  const bookingContentModule = await loadGeneratedBookingContentModule(
+    rendered.files,
+  );
+  assert.deepEqual(bookingContentModule.readBookingContent(), bookingCalendlyCopy);
+  assert.deepEqual(
+    bookingContentModule.parseBookingContent(bookingCalendlyCopy),
+    bookingCalendlyCopy,
+  );
+
+  for (const invalidContent of [
+    { ...bookingCalendlyCopy, extra: true },
+    { ...bookingCalendlyCopy, heading: "" },
+    { ...bookingCalendlyCopy, summary: " " },
+    { ...bookingCalendlyCopy, linkLabel: 42 },
+    { ...bookingCalendlyCopy, frameTitle: "Unsafe\u007fcopy" },
+    { ...bookingCalendlyCopy, popupHeading: undefined },
+    { ...bookingCalendlyCopy, closeLabel: "Unsafe\u0085copy" },
+  ]) {
+    assertContentInvalid(() =>
+      bookingContentModule.parseBookingContent(invalidContent),
+    );
+  }
+
+  for (const value of Object.values(bookingCalendlyCopy)) {
+    assert.equal(
+      [...files]
+        .filter(([path]) => path.endsWith(".ts") || path.endsWith(".tsx"))
+        .some(([, source]) => source.includes(value)),
+      false,
+      value,
+    );
+  }
+});
+
+test("generated Calendly presentation preserves link, lazy inline, and native dialog contracts", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      bookingCalendly: {
+        destination: "https://calendly.com/acme/intro",
+        mode: "popup",
+      },
+      packageVersions,
+    }),
+  );
+  const files = indexFiles(rendered.files);
+  const component = files.get(
+    "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+  );
+  const browserSpecification = files.get(
+    "apps/web/tests/e2e/calendly-booking.spec.ts",
+  );
+  const generatedInstructions = files.get("apps/web/AGENTS.md");
+  const generatedReadme = files.get("README.md");
+  assert.notEqual(component, undefined);
+  assert.notEqual(browserSpecification, undefined);
+  assert.match(generatedInstructions, /direct cross-origin iframe/u);
+  assert.match(generatedInstructions, /normal-link fallback/u);
+  assert.match(generatedInstructions, /native dialog lifecycle/u);
+  assert.match(generatedReadme, /Calendly booking/u);
+  assert.match(generatedReadme, /provider-controlled scheduling data/u);
+  assert.match(generatedReadme, /does not load Calendly host-page JavaScript/u);
+
+  for (const contract of [
+    /^"use client";$/mu,
+    /href=\{settings\.destination\}/u,
+    /settings\.mode === "link"/u,
+    /settings\.mode === "inline"/u,
+    /settings\.mode === "popup"/u,
+    /IntersectionObserver/u,
+    /rootMargin/u,
+    /requestAnimationFrame/u,
+    /showModal/u,
+    /event\.preventDefault\(\)/u,
+    /onClose/u,
+    /setFrameActive\(false\)/u,
+    /src=\{frameActive \? settings\.destination : undefined\}/u,
+    /loading="lazy"/u,
+    /title=\{copy\.frameTitle\}/u,
+    /referrerPolicy="strict-origin-when-cross-origin"/u,
+    /<dialog/u,
+    /max-w-4xl/u,
+    /max-h-\[calc\(100dvh-2rem\)\]/u,
+  ]) {
+    assert.match(component, contract);
+  }
+  assert.doesNotMatch(component, /calendly\.com/u);
+  assert.doesNotMatch(component, /<script|Calendly\.init|fetch\(/u);
+
+  for (const contract of [
+    /page\.route\(bookingCalendlySettings\.destination/u,
+    /route\.fulfill/u,
+    /javaScriptEnabled: false/u,
+    /bookingCalendlySettings\.mode/u,
+    /toHaveAttribute\(\s*"href",\s*bookingCalendlySettings\.destination/u,
+    /toHaveAttribute\(\s*"src",\s*bookingCalendlySettings\.destination/u,
+    /not\.toHaveAttribute\("src"\)/u,
+    /keyboard\.press\("Escape"\)/u,
+    /document\.activeElement/u,
+    /width: 320/u,
+    /scrollWidth/u,
+    /AxeBuilder/u,
+    /wcag22aa/u,
+  ]) {
+    assert.match(browserSpecification, contract);
+  }
+  assert.doesNotMatch(browserSpecification, /page\.goto\(bookingCalendlySettings\.destination/u);
 });
 
 test("generated browser quality is environment-specific and content-agnostic", async () => {
@@ -897,6 +1177,37 @@ test("rendered files satisfy every inference probe in their resolved recipes", a
       );
     }
   }
+
+  const selected = assertSuccess(
+    await core.renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      bookingCalendly: {
+        destination: "https://calendly.com/acme/intro",
+        mode: "popup",
+      },
+      packageVersions,
+    }),
+  );
+  const reader = core.createInMemoryRepositoryReader(
+    Object.fromEntries(
+      selected.files.map(({ path, content }) => [path, decoder.decode(content)]),
+    ),
+  );
+  const inference = await core.inferRepository({
+    reader,
+    catalog: selected.resolved.capabilities,
+  });
+  const bookingCalendly = inference.capabilities.find(
+    ({ identifier }) => identifier === "booking-calendly",
+  );
+  assert.notEqual(bookingCalendly, undefined);
+  assert.equal(bookingCalendly.category, "probable");
+  assert.equal(bookingCalendly.probes.length, 5);
+  assert.ok(
+    bookingCalendly.probes.every(({ status }) => status === "present"),
+  );
 });
 
 test("generated global styles expose the approved responsive accessibility tokens", async () => {
@@ -1944,10 +2255,12 @@ test("generated presentation composes skip navigation and responsive section lay
       files.get("apps/web/content/en-CA/site.yaml"),
     ),
   );
+  const bookingChild = { type: "booking", props: {}, key: null };
   const pageTree = presentationModule.ContentPage({
     sections: content.home.sections,
     navigation: [{ href: "/", label: "N" }],
     skipToContent: "S",
+    children: bookingChild,
   });
 
   assert.equal(pageTree.type, Symbol.for("react.fragment"));
@@ -1964,7 +2277,7 @@ test("generated presentation composes skip navigation and responsive section lay
   assert.equal(main.props.id, "main-content");
   assert.equal(main.props.tabIndex, -1);
   const article = main.props.children;
-  const sectionComposition = article.props.children;
+  const [sectionComposition, renderedBookingChild] = article.props.children;
   const navigationList = navigation.props.children;
   const navigationLink = navigationList.props.children[0].props.children;
   assert.match(navigationList.props.className, /flex-wrap/u);
@@ -1974,6 +2287,7 @@ test("generated presentation composes skip navigation and responsive section lay
   assert.equal(navigationLink.props.children, "N");
   assert.equal(typeof sectionComposition.type, "function");
   assert.equal(sectionComposition.type(sectionComposition.props).type, "section-composition");
+  assert.equal(renderedBookingChild, bookingChild);
 
   const pageWithoutNavigation = presentationModule.ContentPage({
     sections: content.home.sections,
@@ -2054,6 +2368,10 @@ test("Cloudflare imports and types stay in generated configuration boundaries", 
       profile: "site",
       projectName: "acme-studio",
       displayName: "Acme Studio",
+      bookingCalendly: {
+        destination: "https://calendly.com/acme/intro",
+        mode: "popup",
+      },
       packageVersions,
     }),
   );
@@ -2091,6 +2409,7 @@ test("generated presentation remains a pure typed-data boundary", async () => {
   );
   assert.notEqual(presentationSource, undefined);
   assert.deepEqual(presentationSource.match(/^import .*;$/gm), [
+    'import type { ReactNode } from "react";',
     'import type { NavigationItem, PageSection } from "../content/content-schema";',
     'import { SectionComposition } from "../sections/section-registry";',
   ]);
@@ -2198,6 +2517,19 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       ),
       false,
     );
+    assert.deepEqual(
+      rendered.surfaces.find(
+        ({ identifier }) => identifier === "builder-home-route",
+      ),
+      {
+        identifier: "builder-home-route",
+        owner: { kind: "builder-kernel" },
+        path: "apps/web/app/page.tsx",
+        ownership: "application-owned",
+        fingerprintTarget: { kind: "file" },
+        mergeStrategy: "replace-file",
+      },
+    );
 
     const fullFileOwners = new Map();
     for (const surface of rendered.surfaces) {
@@ -2264,6 +2596,36 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       "/version",
     ]);
   }
+
+  const selected = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      bookingCalendly: {
+        destination: "https://calendly.com/acme/intro",
+        mode: "popup",
+      },
+      packageVersions,
+    }),
+  );
+  assert.equal(selected.surfaces.length, 73);
+  assert.deepEqual(
+    selected.surfaces
+      .filter(
+        ({ owner }) =>
+          owner.kind === "capability" &&
+          owner.identifier === "booking-calendly",
+      )
+      .map(({ identifier }) => identifier),
+    [
+      "booking-calendly-browser-specification",
+      "booking-calendly-client-component",
+      "booking-calendly-content",
+      "booking-calendly-content-reader",
+      "booking-calendly-settings",
+    ],
+  );
 });
 
 test("rendering rejects invalid requests with stable existing contract failures", async () => {
