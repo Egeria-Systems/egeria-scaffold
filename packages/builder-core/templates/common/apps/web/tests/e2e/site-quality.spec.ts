@@ -6,6 +6,13 @@ type InternalLink = Readonly<{
   target: string;
 }>;
 
+const LANDING_PATH = "./";
+
+function documentTarget(value: string): string {
+  const url = new URL(value);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 async function openWithoutRuntimeErrors(
   page: Page,
   target: string,
@@ -44,7 +51,11 @@ async function discoverInternalLinks(page: Page): Promise<InternalLink[]> {
 
     for (const [index, element] of elements.entries()) {
       const href = element.getAttribute("href");
-      if (href === null || href.startsWith("#")) {
+      if (
+        href === null ||
+        href.startsWith("#") ||
+        element.hasAttribute("download")
+      ) {
         continue;
       }
 
@@ -76,15 +87,17 @@ async function discoverInternalLinks(page: Page): Promise<InternalLink[]> {
 }
 
 async function discoverContentPaths(page: Page): Promise<string[]> {
-  await openWithoutRuntimeErrors(page, "/");
+  await openWithoutRuntimeErrors(page, LANDING_PATH);
+  const landingTarget = documentTarget(page.url());
   const links = await discoverInternalLinks(page);
 
   return [
-    "/",
+    LANDING_PATH,
     ...links
       .map(({ target }) => target)
-      .filter((target) => target !== "/"),
-  ].sort();
+      .filter((target) => target !== landingTarget)
+      .sort(),
+  ];
 }
 
 test("renders structured content without page or console errors", async ({
@@ -111,13 +124,14 @@ test("renders structured content without page or console errors", async ({
 });
 
 test("follows internal navigation when it is present", async ({ page }) => {
-  await openWithoutRuntimeErrors(page, "/");
+  await openWithoutRuntimeErrors(page, LANDING_PATH);
+  const landingTarget = documentTarget(page.url());
   const links = (await discoverInternalLinks(page)).filter(
-    ({ target }) => target !== "/",
+    ({ target }) => target !== landingTarget,
   );
 
   for (const { index, target } of links) {
-    await openWithoutRuntimeErrors(page, "/");
+    await openWithoutRuntimeErrors(page, LANDING_PATH);
     await page.locator("a[href]").nth(index).click();
     await expect(page).toHaveURL(
       (url) => `${url.pathname}${url.search}${url.hash}` === target,
@@ -144,21 +158,82 @@ test("has no detected axe violations in the selected rule set", async ({
 test("provides keyboard focus with a computed visible indicator", async ({
   page,
 }) => {
-  await openWithoutRuntimeErrors(page, "/");
-  await page.keyboard.press("Tab");
+  const paths = await discoverContentPaths(page);
 
-  const focused = page.locator(":focus");
-  await expect(focused).toBeVisible();
-  const hasVisibleFocus = await focused.evaluate((element) => {
-    const style = getComputedStyle(element);
-    const hasOutline =
-      style.outlineStyle !== "none" && Number.parseFloat(style.outlineWidth) > 0;
-    const hasBoxShadow = style.boxShadow !== "none";
+  for (const path of paths) {
+    await openWithoutRuntimeErrors(page, path);
+    await page.keyboard.press("Tab");
 
-    return hasOutline || hasBoxShadow;
-  });
+    const focused = page.locator(":focus");
+    await expect(focused).toBeVisible();
+    const focusEvidence = await focused.evaluate((element) => {
+      type FocusIndicatorStyle = Readonly<{
+        outlineColor: string;
+        outlineStyle: string;
+        outlineWidth: string;
+        boxShadow: string;
+      }>;
 
-  expect(hasVisibleFocus).toBe(true);
+      const isPerceptibleColor = (value: string): boolean => {
+        const color = value.trim().toLowerCase();
+        if (color === "transparent") {
+          return false;
+        }
+
+        const slashAlpha = color.match(/\/\s*(\d*\.?\d+)(%)?\s*\)$/u);
+        const commaAlpha = /^(?:rgba|hsla)\(/u.test(color)
+          ? color.match(/,\s*(\d*\.?\d+)(%)?\s*\)$/u)
+          : null;
+        const alpha = slashAlpha ?? commaAlpha;
+
+        if (alpha === null) {
+          return true;
+        }
+
+        return Number.parseFloat(alpha[1] ?? "0") > 0;
+      };
+      const hasPerceptibleShadow = (value: string): boolean => {
+        if (value === "none") {
+          return false;
+        }
+
+        const colors =
+          value.match(/(?:rgba?|hsla?)\([^)]*\)|\btransparent\b/gu) ?? [];
+        const hasVisibleColor =
+          colors.length === 0 || colors.some(isPerceptibleColor);
+        const hasVisibleGeometry =
+          value
+            .match(/-?(?:\d*\.)?\d+px/gu)
+            ?.some((length) => Number.parseFloat(length) !== 0) ?? false;
+
+        return hasVisibleColor && hasVisibleGeometry;
+      };
+      const hasPerceptibleFocusIndicator = (
+        style: FocusIndicatorStyle,
+      ): boolean => {
+        const hasOutline =
+          style.outlineStyle !== "none" &&
+          Number.parseFloat(style.outlineWidth) > 0 &&
+          isPerceptibleColor(style.outlineColor);
+
+        return hasOutline || hasPerceptibleShadow(style.boxShadow);
+      };
+      const style = getComputedStyle(element);
+
+      return {
+        hasVisibleFocus: hasPerceptibleFocusIndicator(style),
+        rejectsTransparentIndicator: !hasPerceptibleFocusIndicator({
+          outlineColor: "rgba(0, 0, 0, 0)",
+          outlineStyle: "solid",
+          outlineWidth: "2px",
+          boxShadow: "rgba(0, 0, 0, 0) 0px 0px 0px 3px",
+        }),
+      };
+    });
+
+    expect(focusEvidence.rejectsTransparentIndicator).toBe(true);
+    expect(focusEvidence.hasVisibleFocus).toBe(true);
+  }
 });
 
 test("reflows without document overflow at 320 CSS pixels", async ({ page }) => {
@@ -181,40 +256,48 @@ test("honours reduced motion without material animation or transition", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await openWithoutRuntimeErrors(page, "/");
-  expect(
-    await page.evaluate(() =>
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    ),
-  ).toBe(true);
+  const paths = await discoverContentPaths(page);
 
-  const movingElements = await page.locator("main, main *").evaluateAll(
-    (elements) => {
-      const durationToMilliseconds = (duration: string): number =>
-        duration
-          .split(",")
-          .map((value) => value.trim())
-          .map((value) =>
-            value.endsWith("ms")
-              ? Number.parseFloat(value)
-              : Number.parseFloat(value) * 1_000,
-          )
-          .reduce((maximum, value) => Math.max(maximum, value), 0);
+  for (const path of paths) {
+    await openWithoutRuntimeErrors(page, path);
+    expect(
+      await page.evaluate(() =>
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      ),
+    ).toBe(true);
 
-      return elements
-        .map((element) => {
-          const style = getComputedStyle(element);
-          return {
-            animationDuration: durationToMilliseconds(style.animationDuration),
-            transitionDuration: durationToMilliseconds(style.transitionDuration),
-          };
-        })
-        .filter(
-          ({ animationDuration, transitionDuration }) =>
-            animationDuration > 1 || transitionDuration > 1,
-        );
-    },
-  );
+    const movingElements = await page.locator("main, main *").evaluateAll(
+      (elements) => {
+        const durationToMilliseconds = (duration: string): number =>
+          duration
+            .split(",")
+            .map((value) => value.trim())
+            .map((value) =>
+              value.endsWith("ms")
+                ? Number.parseFloat(value)
+                : Number.parseFloat(value) * 1_000,
+            )
+            .reduce((maximum, value) => Math.max(maximum, value), 0);
 
-  expect(movingElements).toEqual([]);
+        return elements
+          .map((element) => {
+            const style = getComputedStyle(element);
+            return {
+              animationDuration: durationToMilliseconds(
+                style.animationDuration,
+              ),
+              transitionDuration: durationToMilliseconds(
+                style.transitionDuration,
+              ),
+            };
+          })
+          .filter(
+            ({ animationDuration, transitionDuration }) =>
+              animationDuration > 1 || transitionDuration > 1,
+          );
+      },
+    );
+
+    expect(movingElements).toEqual([]);
+  }
 });

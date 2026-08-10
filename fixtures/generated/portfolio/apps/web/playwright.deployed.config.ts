@@ -21,7 +21,11 @@ export function parseDeployedBaseURL(value: string | undefined): string {
     throw new Error("DEPLOYED_URL_INVALID");
   }
 
-  return url.href.replace(/\/$/u, "");
+  if (!url.pathname.endsWith("/")) {
+    url.pathname = `${url.pathname}/`;
+  }
+
+  return url.href;
 }
 
 const baseURL = parseDeployedBaseURL(process.env.PLAYWRIGHT_DEPLOYED_URL);

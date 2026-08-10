@@ -646,7 +646,14 @@ test("generated browser quality is environment-specific and content-agnostic", a
   );
   assert.equal(
     deployedModule.parseDeployedBaseURL("https://example.com/quality/"),
-    "https://example.com/quality",
+    "https://example.com/quality/",
+  );
+  assert.equal(
+    new URL(
+      "./",
+      deployedModule.parseDeployedBaseURL("https://example.com/quality/"),
+    ).href,
+    "https://example.com/quality/",
   );
   for (const [value, message] of [
     [undefined, "DEPLOYED_URL_REQUIRED"],
@@ -670,6 +677,11 @@ test("generated browser quality is environment-specific and content-agnostic", a
     /pageerror/u,
     /wcag22aa/u,
     /keyboard\.press\("Tab"\)/u,
+    /element\.hasAttribute\("download"\)/u,
+    /const paths = await discoverContentPaths\(page\);/u,
+    /for \(const path of paths\)/u,
+    /outlineColor/u,
+    /isPerceptibleColor/u,
     /outlineStyle/u,
     /boxShadow/u,
     /width: 320/u,
@@ -680,6 +692,21 @@ test("generated browser quality is environment-specific and content-agnostic", a
   ]) {
     assert.match(specification, contract);
   }
+  const focusContract = specification.slice(
+    specification.indexOf('test("provides keyboard focus'),
+    specification.indexOf('test("reflows without document overflow'),
+  );
+  const reducedMotionContract = specification.slice(
+    specification.indexOf('test("honours reduced motion'),
+  );
+  assert.match(
+    focusContract,
+    /const paths = await discoverContentPaths\(page\);[\s\S]+for \(const path of paths\)/u,
+  );
+  assert.match(
+    reducedMotionContract,
+    /const paths = await discoverContentPaths\(page\);[\s\S]+for \(const path of paths\)/u,
+  );
   assert.doesNotMatch(specification, /Acme|Portfolio|About|Contact/u);
 
   assert.match(workflow, /^permissions:\n  contents: read$/mu);
