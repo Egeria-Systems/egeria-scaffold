@@ -807,6 +807,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   const portfolioStage = compactLabel("P", "2");
   const copyEnforcementTask = namedLabel("Task", "2");
   const sectionCatalogTask = namedLabel("Task", "3");
+  const responsiveInterfaceTask = namedLabel("Task", "4");
 
   assert.deepEqual(
     {
@@ -850,16 +851,18 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         escapeRegularExpression(copyEnforcementTask) +
         " added standards-owned static visible-copy enforcement for canonical templates[\\s\\S]+" +
         escapeRegularExpression(sectionCatalogTask) +
-        " materializes the source-owned typed section catalog and remains at its implemented-task review gate[\\s\\S]+develops directly on clean local `main`",
+        " materialized the source-owned typed section catalog[\\s\\S]+" +
+        escapeRegularExpression(responsiveInterfaceTask) +
+        " now has an implementation candidate for responsive Tailwind presentation[\\s\\S]+Calendly is the next separately gated outcome after approval[\\s\\S]+develops directly on clean local `main`",
     ),
   );
   assert.match(
     contributing,
-    /The approved builder kernel.*standards-owned copy enforcement remains the next separately reviewed increment/iu,
+    /The approved builder kernel.*responsive Tailwind interface.*Calendly remain separately reviewed increments/iu,
   );
   assert.match(
     packageOwnership,
-    /Controlling package and API ownership through the approved builder kernel, generated validated content/iu,
+    /Controlling package and API ownership through the approved builder kernel, generated validated content, responsive portfolio presentation/iu,
   );
   for (const document of [rootInstructions, readme, contributing]) {
     assert.match(document, /verify:builder-kernel/u);

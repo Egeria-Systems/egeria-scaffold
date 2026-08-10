@@ -126,7 +126,7 @@ These expressions define generation-time resolution only. The resolved installed
 
 ## Initial catalog
 
-Task 2 executes exactly `standards`, `content-files`, `section-composition`, `deployment-cloudflare`, `observability`, and `site-routing` for the `portfolio` and `site` recipes. The other rows remain program visibility only and have no runtime descriptor, resolver availability, generated surface, state, or provider effect yet.
+The current executable catalog contains exactly `standards`, `content-files`, `section-composition`, `deployment-cloudflare`, `observability`, and `site-routing` for the `portfolio` and `site` recipes. The other rows remain program visibility only and have no runtime descriptor, resolver availability, generated surface, state, or provider effect yet.
 
 State classifications below describe repository, external-provider, and persistent-data effects managed by the capability. Dependencies may also vary by an explicitly selected mode; those conditional rules are called out rather than hidden.
 
@@ -135,8 +135,8 @@ Profile inclusion distinguishes recipe defaults from independent selections. `de
 | Capability | Delivery mode | State classifications | Removal policy | Profile inclusion | Required or conditional dependencies |
 |---|---|---|---|---|---|
 | `standards` | `package-backed` | `repository-stateful` | `reviewed` | default: portfolio, site, app, authenticated-app | None |
-| `content-files` | `source-generated` | `repository-stateful` | `reviewed` | default: portfolio, site | `standards`; generated YAML 1.2 parsing uses ordinary dependency `yaml` |
-| `section-composition` | `source-generated` | `repository-stateful` | `reviewed` | default: portfolio, site | `content-files` |
+| `content-files` | `source-generated` | `repository-stateful` | `reviewed` | default: portfolio, site | `standards`; generated YAML 1.2 parsing uses ordinary dependency `yaml`; owns validated externalized accessibility copy |
+| `section-composition` | `source-generated` | `repository-stateful` | `reviewed` | default: portfolio, site | `content-files`; owns Tailwind CSS and PostCSS package/configuration surfaces, global semantic design tokens, and responsive pure presentation |
 | `deployment-cloudflare` | `hybrid` | `repository-stateful`, `external-stateful` | `reviewed` | default: portfolio, site, app, authenticated-app | `standards` |
 | `observability` | `hybrid` | `repository-stateful`, `external-stateful` | `reviewed` | default: portfolio, site, app, authenticated-app | `deployment-cloudflare` |
 | `booking-calendly` | `source-generated` | `repository-stateful` | `automatic` | optional: portfolio, site, app, authenticated-app | Public profile plus an existing Calendly destination |

@@ -268,11 +268,6 @@ function createBuilderSurfaces(): readonly ManagedSurfaceDescriptor[] {
       "application-owned",
     ),
     createFileSurface(
-      "builder-global-styles",
-      "apps/web/app/globals.css",
-      "application-owned",
-    ),
-    createFileSurface(
       "builder-root-layout",
       "apps/web/app/layout.tsx",
       "application-owned",

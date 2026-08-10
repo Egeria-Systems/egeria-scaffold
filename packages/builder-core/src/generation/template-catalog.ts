@@ -15,6 +15,7 @@ const commonTemplateSources = [
   "common/pnpm-workspace.yaml",
   "common/apps/web/AGENTS.md.template",
   "common/apps/web/package.json.template",
+  "common/apps/web/postcss.config.mjs",
   "common/apps/web/tsconfig.json",
   "common/apps/web/eslint.config.mjs",
   "common/apps/web/next.config.ts",

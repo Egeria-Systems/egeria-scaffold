@@ -43,6 +43,7 @@ const portfolioRenderedPaths = [
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
+  "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
@@ -519,22 +520,22 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
-      assert.equal(generated.state.origin.recipeVersion, "0.3.0");
+      assert.equal(generated.state.origin.recipeVersion, "0.4.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 46 : 48,
+        profile === "portfolio" ? 50 : 52,
       );
       assert.equal(
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "content-files",
         )?.version,
-        "0.2.0",
+        "0.3.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "section-composition",
         )?.version,
-        "0.2.0",
+        "0.3.0",
       );
 
       const catalog = assertSuccess(core.createVerifiedCapabilityCatalog());
@@ -610,6 +611,12 @@ test("portfolio and site generation writes exact state-last repositories", async
         webManifest.devDependencies["@egeria-systems/standards"],
         "0.1.0",
       );
+      assert.equal(
+        webManifest.devDependencies["@tailwindcss/postcss"],
+        "4.3.3",
+      );
+      assert.equal(webManifest.devDependencies.postcss, "8.5.22");
+      assert.equal(webManifest.devDependencies.tailwindcss, "4.3.3");
       assert.equal(
         webManifest.dependencies["@egeria-systems/observability"],
         "0.1.0",

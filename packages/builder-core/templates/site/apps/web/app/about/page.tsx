@@ -14,12 +14,13 @@ export default function About() {
   const content = parsePageContent(
     parseYamlContent(readFileSync(aboutContentPath, "utf8")),
   );
-  const { navigation } = readSiteContent();
+  const { accessibility, navigation } = readSiteContent();
 
   return (
     <ContentPage
       sections={content.sections}
       navigation={navigation}
+      skipToContent={accessibility.skipToContent}
     />
   );
 }

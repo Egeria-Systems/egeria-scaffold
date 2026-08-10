@@ -129,7 +129,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
     },
     {
       identifier: "content-files",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -226,7 +226,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
     },
     {
       identifier: "section-composition",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -234,7 +234,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
       optionalIntegrations: [],
       conflicts: [],
       supportedProfiles: ["portfolio", "site"],
-      requiredPackages: [],
+      requiredPackages: ["@tailwindcss/postcss", "postcss", "tailwindcss"],
       environmentVariables: [],
       secrets: [],
       platformResources: [],
@@ -248,9 +248,58 @@ test("the portfolio and site catalog declares the exact six executable capabilit
       adapterSemanticRequirements: [],
       managedSurfaces: [
         {
+          identifier: "section-composition-global-styles",
+          owner: { kind: "capability", identifier: "section-composition" },
+          path: "apps/web/app/globals.css",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
           identifier: "section-composition-home-route",
           owner: { kind: "capability", identifier: "section-composition" },
           path: "apps/web/app/page.tsx",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "section-composition-postcss-package",
+          owner: { kind: "capability", identifier: "section-composition" },
+          path: "apps/web/package.json",
+          ownership: "merge-managed",
+          fingerprintTarget: {
+            kind: "json-value",
+            pointer: "/devDependencies/postcss",
+          },
+          mergeStrategy: "json-property",
+        },
+        {
+          identifier: "section-composition-tailwind-package",
+          owner: { kind: "capability", identifier: "section-composition" },
+          path: "apps/web/package.json",
+          ownership: "merge-managed",
+          fingerprintTarget: {
+            kind: "json-value",
+            pointer: "/devDependencies/tailwindcss",
+          },
+          mergeStrategy: "json-property",
+        },
+        {
+          identifier: "section-composition-tailwind-postcss-package",
+          owner: { kind: "capability", identifier: "section-composition" },
+          path: "apps/web/package.json",
+          ownership: "merge-managed",
+          fingerprintTarget: {
+            kind: "json-value",
+            pointer: "/devDependencies/@tailwindcss~1postcss",
+          },
+          mergeStrategy: "json-property",
+        },
+        {
+          identifier: "section-composition-postcss-configuration",
+          owner: { kind: "capability", identifier: "section-composition" },
+          path: "apps/web/postcss.config.mjs",
           ownership: "application-owned",
           fingerprintTarget: { kind: "file" },
           mergeStrategy: "replace-file",
@@ -273,7 +322,30 @@ test("the portfolio and site catalog declares the exact six executable capabilit
         },
       ],
       inferenceProbes: [
+        {
+          kind: "package",
+          path: "apps/web/package.json",
+          section: "devDependencies",
+          packageName: "@tailwindcss/postcss",
+          version: "4.3.3",
+        },
+        {
+          kind: "package",
+          path: "apps/web/package.json",
+          section: "devDependencies",
+          packageName: "postcss",
+          version: "8.5.22",
+        },
+        {
+          kind: "package",
+          path: "apps/web/package.json",
+          section: "devDependencies",
+          packageName: "tailwindcss",
+          version: "4.3.3",
+        },
+        { kind: "file", path: "apps/web/app/globals.css" },
         { kind: "file", path: "apps/web/app/page.tsx" },
+        { kind: "file", path: "apps/web/postcss.config.mjs" },
         {
           kind: "file",
           path: "apps/web/src/presentation/content-page.tsx",
@@ -609,7 +681,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.3.0",
+      recipeVersion: "0.4.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -621,7 +693,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.3.0",
+      recipeVersion: "0.4.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -652,7 +724,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.3.0");
+  assert.equal(portfolio.recipeVersion, "0.4.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -685,14 +757,14 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "content-files",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
     },
     {
       identifier: "section-composition",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",

@@ -31,6 +31,7 @@ const portfolioPaths = [
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
+  "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
@@ -60,6 +61,7 @@ const sitePaths = [
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
+  "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
@@ -124,6 +126,22 @@ function snapshotBytes(files) {
   return files.map(({ path, content }) => ({ path, content: [...content] }));
 }
 
+function contrastRatio(foreground, background) {
+  const relativeLuminance = (hex) => {
+    const channels = hex.match(/[0-9a-f]{2}/giu).map((value) =>
+      Number.parseInt(value, 16) / 255,
+    );
+    const [red, green, blue] = channels.map((value) =>
+      value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4,
+    );
+
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  };
+  const values = [relativeLuminance(foreground), relativeLuminance(background)];
+
+  return (Math.max(...values) + 0.05) / (Math.min(...values) + 0.05);
+}
+
 async function loadRenderSkeleton() {
   const module = await import("../dist/index.js");
   assert.equal(typeof module.renderSkeleton, "function");
@@ -175,7 +193,7 @@ async function loadGeneratedSectionModule(files) {
   const contentModule = await compileGeneratedContentModule(files);
   const jsxRuntimeUrl = `data:text/javascript;base64,${Buffer.from(
     [
-      "export const Fragment = Symbol.for('test.fragment');",
+      "export const Fragment = Symbol.for('react.fragment');",
       "export function jsx(type, props, key) { return { type, props: props ?? {}, key: key ?? null }; }",
       "export const jsxs = jsx;",
     ].join("\n"),
@@ -196,6 +214,46 @@ async function loadGeneratedSectionModule(files) {
   );
 }
 
+async function loadGeneratedPresentationModule(files) {
+  const source = indexFiles(files).get(
+    "apps/web/src/presentation/content-page.tsx",
+  );
+  assert.notEqual(source, undefined);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      jsx: typescript.JsxEmit.ReactJSX,
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const sectionModuleUrl = `data:text/javascript;base64,${Buffer.from(
+    "export function SectionComposition(props) { return { type: 'section-composition', props, key: null }; }",
+  ).toString("base64")}`;
+  const jsxRuntimeUrl = `data:text/javascript;base64,${Buffer.from(
+    [
+      "export const Fragment = Symbol.for('react.fragment');",
+      "export function jsx(type, props, key) { return { type, props: props ?? {}, key: key ?? null }; }",
+      "export const jsxs = jsx;",
+    ].join("\n"),
+  ).toString("base64")}`;
+  const withSectionImport = transpiled.replace(
+    'from "../sections/section-registry"',
+    `from ${JSON.stringify(sectionModuleUrl)}`,
+  );
+  const executable = withSectionImport.replace(
+    'from "react/jsx-runtime"',
+    `from ${JSON.stringify(jsxRuntimeUrl)}`,
+  );
+  assert.notEqual(withSectionImport, transpiled);
+  assert.notEqual(executable, withSectionImport);
+
+  return import(
+    `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`
+  );
+}
+
 function assertContentInvalid(operation) {
   assert.throws(operation, {
     name: "TypeError",
@@ -209,6 +267,7 @@ function describeTestElement(element) {
   }
 
   const { children, ...attributes } = element.props;
+  delete attributes.className;
   const normalizedChildren =
     children === undefined ? [] : Array.isArray(children) ? children : [children];
 
@@ -399,7 +458,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.3.0",
+    recipeVersion: "0.4.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -465,11 +524,14 @@ test("rendered manifests and desired project match the approved resolved recipe"
     },
     devDependencies: {
       "@egeria-systems/standards": "0.1.0",
+      "@tailwindcss/postcss": "4.3.3",
       "@types/node": "22.20.1",
       "@types/react": "19.2.18",
       "@types/react-dom": "19.2.4",
       eslint: "9.39.5",
       "eslint-config-next": "16.3.0",
+      postcss: "8.5.22",
+      tailwindcss: "4.3.3",
       typescript: "6.0.3",
       "typescript-eslint": "8.66.0",
       wrangler: "4.118.0",
@@ -521,6 +583,74 @@ test("rendered files satisfy every inference probe in their resolved recipes", a
   }
 });
 
+test("generated global styles expose the approved responsive accessibility tokens", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const files = indexFiles(rendered.files);
+  const styles = files.get("apps/web/app/globals.css");
+  const postcss = files.get("apps/web/postcss.config.mjs");
+  assert.notEqual(styles, undefined);
+  assert.notEqual(postcss, undefined);
+
+  assert.match(styles, /^@import "tailwindcss";/u);
+  assert.match(styles, /@theme inline/u);
+  assert.match(styles, /overflow-wrap:\s*anywhere/u);
+  assert.match(styles, /:focus-visible/u);
+  assert.match(
+    styles,
+    /box-shadow:\s*0 0 0 0\.2rem var\(--design-color-canvas\)/u,
+  );
+  assert.match(styles, /@media \(forced-colors:\s*active\)/u);
+  assert.match(styles, /@media \(prefers-reduced-motion:\s*reduce\)/u);
+  assert.deepEqual(
+    Object.fromEntries(
+      [...styles.matchAll(/--design-color-([a-z-]+):\s*(#[0-9a-f]{6});/giu)].map(
+        ([, name, value]) => [name, value.toLowerCase()],
+      ),
+    ),
+    {
+      canvas: "#f6f5ef",
+      surface: "#ffffff",
+      ink: "#17211f",
+      muted: "#52605c",
+      accent: "#0b6959",
+      "accent-hover": "#075346",
+      "accent-contrast": "#ffffff",
+      focus: "#b45309",
+      line: "#c5cfca",
+    },
+  );
+  assert.match(postcss, /"@tailwindcss\/postcss": \{\}/u);
+
+  const palette = {
+    canvas: "#f6f5ef",
+    surface: "#ffffff",
+    ink: "#17211f",
+    muted: "#52605c",
+    accent: "#0b6959",
+    accentContrast: "#ffffff",
+    focus: "#b45309",
+  };
+  for (const [foreground, background] of [
+    [palette.ink, palette.canvas],
+    [palette.muted, palette.canvas],
+    [palette.accent, palette.canvas],
+    [palette.accentContrast, palette.accent],
+    [palette.focus, palette.canvas],
+    [palette.ink, palette.surface],
+    [palette.muted, palette.surface],
+  ]) {
+    assert.ok(contrastRatio(foreground, background) >= 4.5);
+  }
+});
+
 test("display names are inserted as YAML 1.2 data and runtime copy stays externalized", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const displayName = 'Atelier "Nord" — Montréal 👩‍💻';
@@ -556,6 +686,7 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
     parseGeneratedYaml(portfolio.files, "apps/web/content/en-CA/site.yaml"),
     {
       metadata: { title: displayName, description: "A focused portfolio." },
+      accessibility: { skipToContent: "Skip to content" },
       home: {
         sections: [
           {
@@ -637,6 +768,7 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
         title: displayName,
         description: "A multi-page public website.",
       },
+      accessibility: { skipToContent: "Skip to content" },
       home: {
         sections: [
           {
@@ -725,6 +857,7 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
     "A concise overview of selected work and the approach behind it.",
     "A website introduction.",
     "An introduction to this website and the work it presents.",
+    "Skip to content",
   ];
   for (const rendered of [portfolio, site]) {
     const files = indexFiles(rendered.files);
@@ -863,6 +996,23 @@ test("the emitted YAML parser rejects unsafe syntax and invalid content shapes",
   assertContentInvalid(() =>
     contentModule.parseSiteContent({ ...siteContent, extra: true }),
   );
+  const siteContentWithoutAccessibility = { ...siteContent };
+  delete siteContentWithoutAccessibility.accessibility;
+  assertContentInvalid(() =>
+    contentModule.parseSiteContent(siteContentWithoutAccessibility),
+  );
+  for (const accessibility of [
+    {},
+    { skipToContent: "" },
+    { skipToContent: " " },
+    { skipToContent: 42 },
+    { skipToContent: "Skip\u007fcontent" },
+    { skipToContent: "Skip", extra: true },
+  ]) {
+    assertContentInvalid(() =>
+      contentModule.parseSiteContent({ ...siteContent, accessibility }),
+    );
+  }
   assertContentInvalid(() =>
     contentModule.parseSiteContent({
       ...siteContent,
@@ -991,6 +1141,7 @@ test("generated section parsing is bounded, ordered, and link-safe", async () =>
     assert.deepEqual(
       contentModule.parseSiteContent({
         metadata: { title: "Example", description: "Example description" },
+        accessibility: { skipToContent: "Skip to sentinel content" },
         home: { sections: [hero] },
         navigation: [{ href, label: "Destination" }],
       }).navigation,
@@ -1056,6 +1207,7 @@ test("generated section parsing is bounded, ordered, and link-safe", async () =>
     assertContentInvalid(() =>
       contentModule.parseSiteContent({
         metadata: { title: "Example", description: "Example description" },
+        accessibility: { skipToContent: "Skip to sentinel content" },
         home: { sections: [hero] },
         navigation: [{ href, label: "Destination" }],
       }),
@@ -1420,6 +1572,111 @@ test("the source-owned registry declares and renders every approved section", as
   }
 });
 
+test("generated presentation composes skip navigation and responsive section layouts", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "site",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const files = indexFiles(rendered.files);
+  const contentModule = await loadGeneratedContentModule(rendered.files);
+  const sectionModule = await loadGeneratedSectionModule(rendered.files);
+  const presentationModule = await loadGeneratedPresentationModule(
+    rendered.files,
+  );
+  const content = contentModule.parseSiteContent(
+    contentModule.parseYamlContent(
+      files.get("apps/web/content/en-CA/site.yaml"),
+    ),
+  );
+  const pageTree = presentationModule.ContentPage({
+    sections: content.home.sections,
+    navigation: content.navigation,
+    skipToContent: "Skip to sentinel content",
+  });
+
+  assert.equal(pageTree.type, Symbol.for("react.fragment"));
+  const [skipLink, main] = pageTree.props.children;
+  assert.equal(skipLink.type, "a");
+  assert.equal(skipLink.props.href, "#main-content");
+  assert.equal(skipLink.props.children, "Skip to sentinel content");
+  assert.match(skipLink.props.className, /focus:translate-y-0/u);
+  assert.equal(main.type, "main");
+  assert.equal(main.props.id, "main-content");
+  assert.equal(main.props.tabIndex, -1);
+  const article = main.props.children;
+  const [navigation, sectionComposition] = article.props.children;
+  assert.equal(navigation.type, "nav");
+  const navigationList = navigation.props.children;
+  const navigationLink = navigationList.props.children[0].props.children;
+  assert.match(navigationList.props.className, /flex-wrap/u);
+  assert.match(navigationLink.props.className, /min-h-11/u);
+  assert.equal(typeof sectionComposition.type, "function");
+  assert.equal(sectionComposition.type(sectionComposition.props).type, "section-composition");
+
+  const pageWithoutNavigation = presentationModule.ContentPage({
+    sections: content.home.sections,
+    navigation: [],
+    skipToContent: "Skip to sentinel content",
+  });
+  assert.equal(pageWithoutNavigation.props.children[0], null);
+
+  const projectList = sectionModule.sectionRegistry["project-list"].Component({
+    section: {
+      id: "selected-work",
+      type: "project-list",
+      variant: "default",
+      enabled: true,
+      content: {
+        heading: "Selected work",
+        projects: [
+          {
+            title: "Project",
+            summary: "Project summary",
+            href: "https://example.com/project",
+          },
+        ],
+      },
+    },
+  });
+  const projectListElement = projectList.props.children[1];
+  assert.match(projectListElement.props.className, /md:grid-cols-2/u);
+  assert.match(
+    projectListElement.props.children[0].props.children.props.children[0].props
+      .children.props.className,
+    /min-h-11/u,
+  );
+
+  const callToAction = sectionModule.sectionRegistry["call-to-action"].Component({
+    section: {
+      id: "contact",
+      type: "call-to-action",
+      variant: "default",
+      enabled: true,
+      content: {
+        heading: "Contact",
+        summary: "Start a conversation",
+        label: "Send an email",
+        href: "mailto:hello@example.com",
+      },
+    },
+  });
+  assert.match(callToAction.props.children[2].props.className, /min-h-12/u);
+
+  assert.match(
+    files.get("apps/web/app/page.tsx"),
+    /skipToContent=\{content\.accessibility\.skipToContent\}/u,
+  );
+  assert.match(
+    files.get("apps/web/app/about/page.tsx"),
+    /skipToContent=\{accessibility\.skipToContent\}/u,
+  );
+});
+
 test("Cloudflare imports and types stay in generated configuration boundaries", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(
@@ -1529,8 +1786,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 43],
-    ["site", 45],
+    ["portfolio", 47],
+    ["site", 49],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -1560,6 +1817,12 @@ test("ownership descriptors cover every generated surface without overlap", asyn
     assert.deepEqual(
       rendered.surfaces.filter(({ owner }) => owner.kind === "capability"),
       expectedCapabilitySurfaces,
+    );
+    assert.equal(
+      rendered.surfaces.some(
+        ({ identifier }) => identifier === "builder-global-styles",
+      ),
+      false,
     );
 
     const fullFileOwners = new Map();
@@ -1595,11 +1858,14 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       "/dependencies/react-dom",
       "/dependencies/yaml",
       "/devDependencies/@egeria-systems~1standards",
+      "/devDependencies/@tailwindcss~1postcss",
       "/devDependencies/@types~1node",
       "/devDependencies/@types~1react",
       "/devDependencies/@types~1react-dom",
       "/devDependencies/eslint",
       "/devDependencies/eslint-config-next",
+      "/devDependencies/postcss",
+      "/devDependencies/tailwindcss",
       "/devDependencies/typescript",
       "/devDependencies/typescript-eslint",
       "/devDependencies/wrangler",

@@ -133,7 +133,7 @@ function createDescriptors(
     },
     {
       identifier: "content-files",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -196,21 +196,48 @@ function createDescriptors(
     },
     {
       identifier: "section-composition",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
       dependencies: ["content-files"],
       ...sharedCapabilityMetadata,
       supportedProfiles: ["portfolio", "site"],
-      requiredPackages: [],
+      requiredPackages: ["@tailwindcss/postcss", "postcss", "tailwindcss"],
       platformResources: [],
       adapterSemanticRequirements: [],
       managedSurfaces: [
         createFileSurface(
+          "section-composition-global-styles",
+          "section-composition",
+          "apps/web/app/globals.css",
+          "application-owned",
+        ),
+        createFileSurface(
           "section-composition-home-route",
           "section-composition",
           "apps/web/app/page.tsx",
+          "application-owned",
+        ),
+        createPackageSurface(
+          "section-composition-postcss-package",
+          "section-composition",
+          "/devDependencies/postcss",
+        ),
+        createPackageSurface(
+          "section-composition-tailwind-package",
+          "section-composition",
+          "/devDependencies/tailwindcss",
+        ),
+        createPackageSurface(
+          "section-composition-tailwind-postcss-package",
+          "section-composition",
+          "/devDependencies/@tailwindcss~1postcss",
+        ),
+        createFileSurface(
+          "section-composition-postcss-configuration",
+          "section-composition",
+          "apps/web/postcss.config.mjs",
           "application-owned",
         ),
         createFileSurface(
@@ -227,7 +254,16 @@ function createDescriptors(
         ),
       ],
       inferenceProbes: [
+        createPackageProbe(
+          "devDependencies",
+          "@tailwindcss/postcss",
+          "4.3.3",
+        ),
+        createPackageProbe("devDependencies", "postcss", "8.5.22"),
+        createPackageProbe("devDependencies", "tailwindcss", "4.3.3"),
+        createFileProbe("apps/web/app/globals.css"),
         createFileProbe("apps/web/app/page.tsx"),
+        createFileProbe("apps/web/postcss.config.mjs"),
         createFileProbe("apps/web/src/presentation/content-page.tsx"),
         createFileProbe("apps/web/src/sections/section-registry.tsx"),
       ],
