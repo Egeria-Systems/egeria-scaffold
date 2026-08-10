@@ -674,18 +674,7 @@ async function runExpectedCommand(runCommand, input, failureCode) {
   }
 }
 
-async function verifyWithAdapters(adapters) {
-  const sourcesBefore = await Promise.all(
-    generatedFixtureContracts.map(async (contract) => ({
-      contract,
-      root: resolve(repositoryRoot, contract.relativeRoot),
-      snapshot: await inspectFixture(
-        resolve(repositoryRoot, contract.relativeRoot),
-        contract,
-      ),
-    })),
-  );
-
+async function verifySourcesWithAdapters(adapters, sourcesBefore) {
   let owner;
   try {
     owner = await adapters.createOwner();
@@ -833,22 +822,22 @@ async function verifyWithAdapters(adapters) {
 
   return {
     ok: true,
-    fixtures: generatedFixtureContracts.map(({ identifier }) => identifier),
+    fixtures: sourcesBefore.map(({ contract }) => contract.identifier),
     profiles: [
-      ...new Set(generatedFixtureContracts.map(({ profile }) => profile)),
+      ...new Set(sourcesBefore.map(({ contract }) => contract.profile)),
     ],
     checks: verificationChecks,
   };
 }
 
 export function verifyGeneratedSkeletons() {
-  return verifyWithAdapters({
+  return verifyGeneratedSkeletonsForTesting({
     createOwner: createOwnedDirectory,
     runCommand: defaultRunCommand,
   });
 }
 
-export function verifyGeneratedSkeletonsForTesting(adapters) {
+function requireAdapters(adapters) {
   if (
     adapters === null ||
     typeof adapters !== "object" ||
@@ -857,7 +846,43 @@ export function verifyGeneratedSkeletonsForTesting(adapters) {
   ) {
     fail("VERIFICATION_ADAPTER_INVALID");
   }
-  return verifyWithAdapters(adapters);
+}
+
+async function sourceForRoot(root, contract) {
+  const fixedRoot = resolve(root);
+  return {
+    contract,
+    root: fixedRoot,
+    snapshot: await inspectFixture(fixedRoot, contract),
+  };
+}
+
+export async function verifyGeneratedSkeletonsForTesting(adapters) {
+  requireAdapters(adapters);
+  const sources = await Promise.all(
+    generatedFixtureContracts.map((contract) =>
+      sourceForRoot(resolve(repositoryRoot, contract.relativeRoot), contract),
+    ),
+  );
+  return verifySourcesWithAdapters(adapters, sources);
+}
+
+export function verifyGeneratedProject(root, identifier) {
+  return verifyGeneratedProjectForTesting(root, identifier, {
+    createOwner: createOwnedDirectory,
+    runCommand: defaultRunCommand,
+  });
+}
+
+export async function verifyGeneratedProjectForTesting(
+  root,
+  identifier,
+  adapters,
+) {
+  requireAdapters(adapters);
+  const contract = contractForIdentifier(identifier);
+  const source = await sourceForRoot(root, contract);
+  return verifySourcesWithAdapters(adapters, [source]);
 }
 
 async function runMain() {

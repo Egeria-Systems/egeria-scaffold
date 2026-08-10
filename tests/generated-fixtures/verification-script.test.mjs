@@ -19,6 +19,7 @@ import test from "node:test";
 import {
   generatedFixtureContracts,
   inspectGeneratedFixture,
+  verifyGeneratedProjectForTesting,
   verifyGeneratedSkeletonsForTesting,
 } from "../../scripts/verify-generated-skeletons.mjs";
 
@@ -359,6 +360,81 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
     );
   } finally {
     await rm(owner, { recursive: true, force: true });
+  }
+});
+
+test("single-root verification runs the exact fixed checks against caller output", async () => {
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-single-root-"));
+  const sourceRoot = await copyFixture(
+    ownerParent,
+    "portfolio-calendly",
+    "source",
+  );
+  const sourceBefore = await inspectGeneratedFixture(
+    sourceRoot,
+    "portfolio-calendly",
+  );
+  const commands = [];
+  let ownedPath;
+
+  try {
+    const result = await verifyGeneratedProjectForTesting(
+      sourceRoot,
+      "portfolio-calendly",
+      {
+        async createOwner() {
+          const identity = await createKnownOwner(ownerParent);
+          ownedPath = identity.path;
+          return identity;
+        },
+        async runCommand(input) {
+          commands.push(input);
+          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+        },
+      },
+    );
+
+    assert.deepEqual(result, {
+      ok: true,
+      fixtures: ["portfolio-calendly"],
+      profiles: ["portfolio"],
+      checks: [
+        "pnpm-version",
+        "frozen-install",
+        "peer-dependencies",
+        "dependency-audit",
+        "registry-signatures",
+        "lint",
+        "typecheck",
+        "next-build",
+        "opennext-build",
+        "browser-install",
+        "browser-development",
+        "browser-preview",
+      ],
+    });
+    assert.equal(commands.length, 12);
+    assert.equal(commands.every(({ cwd }) => cwd.startsWith(`${ownedPath}/`)), true);
+    assert.equal(await pathExists(ownedPath), false);
+    assert.deepEqual(
+      await inspectGeneratedFixture(sourceRoot, "portfolio-calendly"),
+      sourceBefore,
+    );
+
+    await expectFixtureError(
+      () =>
+        verifyGeneratedProjectForTesting(sourceRoot, "unknown-capability", {
+          async createOwner() {
+            throw new Error("owner must not be created");
+          },
+          async runCommand() {
+            throw new Error("command must not run");
+          },
+        }),
+      "FIXTURE_IDENTIFIER_INVALID",
+    );
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
   }
 });
 

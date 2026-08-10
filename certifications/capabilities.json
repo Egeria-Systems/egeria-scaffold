@@ -14,7 +14,12 @@
       ],
       "status": "pending",
       "taskPlan": "docs/superpowers/plans/2026-08-10-booking-calendly-certification.md",
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-08-10-booking-calendly-certification-verification.md"
+        }
+      ]
     },
     "content-files": {
       "subject": {
