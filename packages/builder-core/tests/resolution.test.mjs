@@ -109,7 +109,7 @@ test("standards hybrid ownership declares generated browser quality", () => {
   ]);
 });
 
-test("the portfolio and site catalog declares the exact six executable capability contracts", async () => {
+test("the portfolio and site catalog declares the exact seven executable capability contracts", async () => {
   const catalogEntry = builtDeclaration.match(
     /export \* from "(\.\/catalog\/[^\"]+)\.js";/,
   )?.[1];
@@ -124,6 +124,18 @@ test("the portfolio and site catalog declares the exact six executable capabilit
   assert.match(catalogDeclaration, /\bCapabilityPackageVersions\b/);
 
   const catalog = createCatalog();
+  const bookingCalendly = catalog.find(
+    ({ identifier }) => identifier === "booking-calendly",
+  );
+
+  assert.notEqual(bookingCalendly, undefined);
+  assert.deepEqual(bookingCalendly.externalDomains, [
+    "calendly.com",
+    "www.calendly.com",
+  ]);
+  assert.deepEqual(bookingCalendly.contentSecurityPolicyContributions, [
+    "frame-src https://calendly.com https://www.calendly.com",
+  ]);
 
   assert.deepEqual(catalog, [
     {
@@ -872,6 +884,48 @@ test("the portfolio and site catalog declares the exact six executable capabilit
       documentationEvidenceRequirements: ["multi-page-routing-contract"],
       removalAndRecoveryRequirements: ["review-route-and-content-removal"],
     },
+    {
+      identifier: "booking-calendly",
+      version: "0.1.0",
+      deliveryMode: "source-generated",
+      stateClassifications: ["repository-stateful"],
+      removalPolicy: "automatic",
+      dependencies: ["section-composition"],
+      optionalIntegrations: [],
+      conflicts: [],
+      supportedProfiles: ["portfolio", "site"],
+      requiredPackages: [],
+      environmentVariables: [],
+      secrets: [],
+      platformResources: [],
+      externalDomains: ["calendly.com", "www.calendly.com"],
+      contentSecurityPolicyContributions: [
+        "frame-src https://calendly.com https://www.calendly.com",
+      ],
+      browserStorage: ["provider-controlled-cross-origin-frame"],
+      dataClassifications: ["provider-controlled-scheduling-data"],
+      retentionAssumptions: ["provider-controlled"],
+      privilegedOperations: [],
+      threatReviewLevel: "elevated",
+      adapterSemanticRequirements: [],
+      managedSurfaces: [],
+      inferenceProbes: [],
+      migrationPlanners: [],
+      verificationPlan: [
+        "typecheck",
+        "next-build",
+        "browser-development",
+        "browser-preview",
+      ],
+      documentationEvidenceRequirements: [
+        "cross-origin-provider-data-boundary",
+        "booking-fallback-and-activation-contract",
+      ],
+      removalAndRecoveryRequirements: [
+        "remove-generated-booking-surfaces",
+        "exclude-calendly-account-and-provider-data",
+      ],
+    },
   ]);
 });
 
@@ -925,7 +979,7 @@ test("the verified generation catalog pins exact public package releases", () =>
   assert.equal(core.verifiedCapabilityPackageVersions.standards, "0.1.0");
 
   const catalog = assertOk(core.createVerifiedCapabilityCatalog());
-  assert.equal(catalog.length, 6);
+  assert.equal(catalog.length, 7);
   assert.deepEqual(
     catalog.map(({ identifier }) => identifier),
     [
@@ -935,6 +989,7 @@ test("the verified generation catalog pins exact public package releases", () =>
       "deployment-cloudflare",
       "observability",
       "site-routing",
+      "booking-calendly",
     ],
   );
 
@@ -1042,6 +1097,33 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     ],
   );
 
+  for (const profile of ["portfolio", "site"]) {
+    const selected = assertOk(
+      resolveRequest({
+        profile,
+        requestedCapabilities: ["booking-calendly"],
+      }),
+    );
+    const selectedIdentifiers = selected.capabilities.map(
+      ({ identifier }) => identifier,
+    );
+
+    assert.equal(selected.recipeVersion, "0.5.0");
+    assert.equal(
+      selectedIdentifiers.indexOf("section-composition") <
+        selectedIdentifiers.indexOf("booking-calendly"),
+      true,
+    );
+    assert.equal(selectedIdentifiers.at(-1), "booking-calendly");
+    assert.deepEqual(core.createInstalledManifest(selected).at(-1), {
+      identifier: "booking-calendly",
+      version: "0.1.0",
+      deliveryMode: "source-generated",
+      stateClassifications: ["repository-stateful"],
+      removalPolicy: "automatic",
+    });
+  }
+
   assert.deepEqual(core.createInstalledManifest(site), [
     {
       identifier: "standards",
@@ -1130,7 +1212,6 @@ test("resolution rejects unknown profiles and later-stage capability identifiers
   }
 
   for (const identifier of [
-    "booking-calendly",
     "app-foundation",
     "application-persistence",
     "transactional-email-resend",

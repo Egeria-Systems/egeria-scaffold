@@ -1,6 +1,8 @@
 import {
+  calendlyBookingSettingsSchema,
   profileIdentifierSchema,
   projectConfigurationSchema,
+  type CalendlyBookingSettings,
   type ProfileIdentifier,
   type ValidationResult,
 } from "@egeria-systems/builder-core";
@@ -13,6 +15,7 @@ export type CliCommand =
       projectName: string;
       displayName: string;
       directory: string;
+      bookingCalendly?: CalendlyBookingSettings;
     }>
   | Readonly<{
       kind: "infer" | "doctor" | "diff";
@@ -66,6 +69,8 @@ function parseCreate(
         name: { type: "string" },
         "display-name": { type: "string" },
         directory: { type: "string" },
+        "calendly-url": { type: "string" },
+        "calendly-mode": { type: "string" },
       },
       strict: true,
       allowPositionals: false,
@@ -75,20 +80,38 @@ function parseCreate(
     const projectName = values.name;
     const displayName = values["display-name"];
     const directory = values.directory;
+    const calendlyUrl = values["calendly-url"];
+    const calendlyMode = values["calendly-mode"];
     const parsedProfile = profileIdentifierSchema.safeParse(profile);
     const parsedProjectName = projectFields.name.safeParse(projectName);
     const parsedDisplayName = projectFields.displayName.safeParse(displayName);
+    const hasCalendlyUrl = calendlyUrl !== undefined;
+    const hasCalendlyMode = calendlyMode !== undefined;
+    const hasCalendlySelection = hasCalendlyUrl && hasCalendlyMode;
+    const parsedCalendly = hasCalendlySelection
+      ? calendlyBookingSettingsSchema.safeParse({
+          destination: calendlyUrl,
+          mode: calendlyMode,
+        })
+      : undefined;
+    const expectedOptions = hasCalendlySelection
+      ? [
+          "profile",
+          "name",
+          "display-name",
+          "directory",
+          "calendly-url",
+          "calendly-mode",
+        ]
+      : ["profile", "name", "display-name", "directory"];
 
     if (
-      !hasExactOptions(tokens, [
-        "profile",
-        "name",
-        "display-name",
-        "directory",
-      ]) ||
+      !hasExactOptions(tokens, expectedOptions) ||
       !parsedProfile.success ||
       !parsedProjectName.success ||
       !parsedDisplayName.success ||
+      hasCalendlyUrl !== hasCalendlyMode ||
+      (parsedCalendly !== undefined && !parsedCalendly.success) ||
       !validDirectory(directory)
     ) {
       return invalidArguments();
@@ -102,6 +125,9 @@ function parseCreate(
         projectName: parsedProjectName.data,
         displayName: parsedDisplayName.data,
         directory,
+        ...(parsedCalendly?.success === true
+          ? { bookingCalendly: parsedCalendly.data }
+          : {}),
       },
     };
   } catch {

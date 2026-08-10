@@ -21,11 +21,33 @@
       "type": "string"
     },
     "capabilitySettings": {
-      "additionalProperties": {
-        "not": {}
-      },
-      "propertyNames": {
-        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+      "additionalProperties": false,
+      "properties": {
+        "booking-calendly": {
+          "additionalProperties": false,
+          "properties": {
+            "destination": {
+              "maxLength": 2048,
+              "minLength": 1,
+              "pattern": "^https:\\/\\/(?:www\\.)?calendly\\.com\\/[^\\s/?#][^\\s?#]*(?:\\?[^\\s#]*)?$",
+              "type": "string"
+            },
+            "mode": {
+              "enum": [
+                "link",
+                "inline",
+                "popup"
+              ],
+              "type": "string"
+            }
+          },
+          "readOnly": true,
+          "required": [
+            "destination",
+            "mode"
+          ],
+          "type": "object"
+        }
       },
       "readOnly": true,
       "type": "object"

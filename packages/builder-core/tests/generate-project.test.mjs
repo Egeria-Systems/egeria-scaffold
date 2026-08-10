@@ -707,6 +707,54 @@ test("generation rejects caller version overrides before creating a destination"
   });
 });
 
+test("generation accepts only the exact optional Calendly request key", async () => {
+  await withTestRoot(async (owner) => {
+    const bookingCalendly = {
+      destination: "https://calendly.com/acme/intro",
+      mode: "popup",
+    };
+    const acceptedDestination = join(owner, "accepted-selection");
+    const acceptedVerifier = createFakeVerifier();
+    const accepted = await core.generateProject({
+      request: { ...request(), bookingCalendly },
+      destination: acceptedDestination,
+      verifier: acceptedVerifier.verifier,
+    });
+
+    assertFailure(accepted, "PRE_STATE_INFERENCE_FAILED");
+    assert.deepEqual(acceptedVerifier.calls, ["prepare-lockfile"]);
+    assert.equal(await exists(acceptedDestination), false);
+
+    for (const [index, invalidRequest] of [
+      { ...request(), bookingCalendly: undefined },
+      {
+        ...request(),
+        bookingCalendly: {
+          destination: "https://calendar.example/private",
+          mode: "popup",
+        },
+      },
+      { ...request(), bookingCalendly, unexpected: true },
+    ].entries()) {
+      const destination = join(owner, `invalid-${index}`);
+      const fake = createFakeVerifier();
+      const result = await core.generateProject({
+        request: invalidRequest,
+        destination,
+        verifier: fake.verifier,
+      });
+
+      assertFailure(result, "PROJECT_GENERATION_REQUEST_INVALID");
+      assert.deepEqual(fake.calls, []);
+      assert.equal(await exists(destination), false);
+      assert.doesNotMatch(
+        JSON.stringify(result.issues),
+        /calendar\.example|private|unexpected/u,
+      );
+    }
+  });
+});
+
 test("generation preserves every existing destination kind", async () => {
   await withTestRoot(async (owner) => {
     const targets = [

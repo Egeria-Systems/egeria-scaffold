@@ -608,6 +608,40 @@ test("rendered manifests and desired project match the approved resolved recipe"
   });
 });
 
+test("rendering materializes each explicit Calendly mode without changing defaults", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+
+  for (const mode of ["link", "inline", "popup"]) {
+    const bookingCalendly = {
+      destination: "https://calendly.com/acme/intro",
+      mode,
+    };
+    const rendered = assertSuccess(
+      await renderSkeleton({
+        profile: "portfolio",
+        projectName: "acme-studio",
+        displayName: "Acme Studio",
+        bookingCalendly,
+        packageVersions,
+      }),
+    );
+
+    assert.equal(rendered.project.schemaVersion, "1.0.0");
+    assert.equal(rendered.project.recipeVersion, "0.5.0");
+    assert.equal(
+      rendered.project.selectedCapabilities.at(-1),
+      "booking-calendly",
+    );
+    assert.deepEqual(rendered.project.capabilitySettings, {
+      "booking-calendly": bookingCalendly,
+    });
+    assert.deepEqual(
+      rendered.resolved.capabilities.map(({ identifier }) => identifier),
+      rendered.project.selectedCapabilities,
+    );
+  }
+});
+
 test("generated browser quality is environment-specific and content-agnostic", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(

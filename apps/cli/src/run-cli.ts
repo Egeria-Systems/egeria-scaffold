@@ -62,6 +62,9 @@ async function runCreate(
       profile: command.profile,
       projectName: command.projectName,
       displayName: command.displayName,
+      ...(command.bookingCalendly === undefined
+        ? {}
+        : { bookingCalendly: command.bookingCalendly }),
     },
     destination: resolve(command.directory),
     verifier: dependencies.createVerifier(),

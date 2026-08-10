@@ -175,6 +175,39 @@ test("the parser accepts only the exact command-specific arguments", () => {
     },
   );
 
+  for (const mode of ["link", "inline", "popup"]) {
+    assert.deepEqual(
+      assertSuccess(
+        cliArguments.parseCliArguments([
+          "create",
+          "--profile",
+          "portfolio",
+          "--name",
+          "acme-portfolio",
+          "--display-name",
+          "Acme Portfolio",
+          "--directory",
+          "/private/tmp/acme-portfolio",
+          "--calendly-url",
+          "https://calendly.com/acme/intro",
+          "--calendly-mode",
+          mode,
+        ]),
+      ),
+      {
+        kind: "create",
+        profile: "portfolio",
+        projectName: "acme-portfolio",
+        displayName: "Acme Portfolio",
+        directory: "/private/tmp/acme-portfolio",
+        bookingCalendly: {
+          destination: "https://calendly.com/acme/intro",
+          mode,
+        },
+      },
+    );
+  }
+
   for (const kind of ["infer", "doctor", "diff"]) {
     assert.deepEqual(
       assertSuccess(
@@ -231,6 +264,47 @@ test("the parser rejects missing, repeated, unknown, abbreviated, and crossed ar
       "--directory",
       "/tmp/acme",
     ],
+    [
+      "create",
+      "--profile",
+      "portfolio",
+      "--name",
+      "acme",
+      "--display-name",
+      "Acme",
+      "--directory",
+      "/tmp/acme",
+      "--calendly-url",
+      "https://calendly.com/acme/intro",
+    ],
+    [
+      "create",
+      "--profile",
+      "portfolio",
+      "--name",
+      "acme",
+      "--display-name",
+      "Acme",
+      "--directory",
+      "/tmp/acme",
+      "--calendly-mode",
+      "popup",
+    ],
+    [
+      "create",
+      "--profile",
+      "portfolio",
+      "--name",
+      "acme",
+      "--display-name",
+      "Acme",
+      "--directory",
+      "/tmp/acme",
+      "--calendly-url",
+      "https://calendar.example/private",
+      "--calendly-mode",
+      "popup",
+    ],
   ];
 
   for (const arguments_ of invalidCases) {
@@ -247,7 +321,61 @@ test("the parser rejects missing, repeated, unknown, abbreviated, and crossed ar
       ],
       JSON.stringify(arguments_),
     );
-    assert.doesNotMatch(JSON.stringify(result), /Not-Kebab|application|\/tmp\/b/);
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /Not-Kebab|application|\/tmp\/b|calendar\.example|private/u,
+    );
+  }
+});
+
+test("the runner forwards paired Calendly selection without exposing its URL", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-cli-calendly-"));
+  const destination = join(owner, "acme-portfolio");
+  const fakeVerifier = createFakeVerifier();
+  const runCli = cli.createCliRunner({
+    createVerifier: () => fakeVerifier,
+  });
+  const captured = captureOutput();
+
+  try {
+    assert.equal(
+      await runCli(
+        [
+          "create",
+          "--profile",
+          "portfolio",
+          "--name",
+          "acme-portfolio",
+          "--display-name",
+          "Acme Portfolio",
+          "--directory",
+          destination,
+          "--calendly-url",
+          "https://calendly.com/acme/private-intro",
+          "--calendly-mode",
+          "popup",
+        ],
+        captured.output,
+      ),
+      1,
+    );
+    assert.deepEqual(captured.standard, []);
+    assert.deepEqual(captured.error, [
+      JSON.stringify({
+        ok: false,
+        command: "create",
+        issues: [
+          {
+            code: "PRE_STATE_INFERENCE_FAILED",
+            path: [],
+            context: { reason: "evidence-mismatch" },
+          },
+        ],
+      }),
+    ]);
+    assert.doesNotMatch(captured.error[0], /private-intro|calendly\.com/u);
+  } finally {
+    await rm(owner, { recursive: true, force: true });
   }
 });
 

@@ -569,6 +569,43 @@ function createDescriptors(
       documentationEvidenceRequirements: ["multi-page-routing-contract"],
       removalAndRecoveryRequirements: ["review-route-and-content-removal"],
     },
+    {
+      identifier: "booking-calendly",
+      version: "0.1.0",
+      deliveryMode: "source-generated",
+      stateClassifications: ["repository-stateful"],
+      removalPolicy: "automatic",
+      dependencies: ["section-composition"],
+      ...sharedCapabilityMetadata,
+      supportedProfiles: ["portfolio", "site"],
+      requiredPackages: [],
+      externalDomains: ["calendly.com", "www.calendly.com"],
+      contentSecurityPolicyContributions: [
+        "frame-src https://calendly.com https://www.calendly.com",
+      ],
+      browserStorage: ["provider-controlled-cross-origin-frame"],
+      dataClassifications: ["provider-controlled-scheduling-data"],
+      retentionAssumptions: ["provider-controlled"],
+      threatReviewLevel: "elevated",
+      platformResources: [],
+      adapterSemanticRequirements: [],
+      managedSurfaces: [],
+      inferenceProbes: [],
+      verificationPlan: [
+        "typecheck",
+        "next-build",
+        "browser-development",
+        "browser-preview",
+      ],
+      documentationEvidenceRequirements: [
+        "cross-origin-provider-data-boundary",
+        "booking-fallback-and-activation-contract",
+      ],
+      removalAndRecoveryRequirements: [
+        "remove-generated-booking-surfaces",
+        "exclude-calendly-account-and-provider-data",
+      ],
+    },
   ];
 }
 

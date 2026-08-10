@@ -25,6 +25,10 @@ import type {
   ContractIssue,
   ValidationResult,
 } from "../contracts/result.js";
+import {
+  calendlyBookingSettingsSchema,
+  type CalendlyBookingSettings,
+} from "../contracts/project.js";
 import { validateContract } from "../contracts/result.js";
 import {
   installedStateSchema,
@@ -78,6 +82,10 @@ const exactRequestKeys = [
   "profile",
   "projectName",
 ] as const;
+const exactCalendlyRequestKeys = [
+  "bookingCalendly",
+  ...exactRequestKeys,
+] as const;
 function issue(
   code: string,
   path: readonly (string | number)[] = [],
@@ -118,9 +126,13 @@ function validateRequest(
   }
 
   const keys = Object.keys(value).sort();
+  const includesCalendly = Object.hasOwn(value, "bookingCalendly");
+  const expectedKeys = includesCalendly
+    ? exactCalendlyRequestKeys
+    : exactRequestKeys;
   if (
-    keys.length !== exactRequestKeys.length ||
-    keys.some((key, index) => key !== exactRequestKeys[index])
+    keys.length !== expectedKeys.length ||
+    keys.some((key, index) => key !== expectedKeys[index])
   ) {
     return issue(
       "PROJECT_GENERATION_REQUEST_INVALID",
@@ -129,12 +141,29 @@ function validateRequest(
     );
   }
 
+  let bookingCalendly: CalendlyBookingSettings | undefined;
+  if (includesCalendly) {
+    const parsed = calendlyBookingSettingsSchema.safeParse(
+      value.bookingCalendly,
+    );
+
+    if (!parsed.success) {
+      return issue(
+        "PROJECT_GENERATION_REQUEST_INVALID",
+        ["request", "bookingCalendly"],
+        "invalid-settings",
+      );
+    }
+    bookingCalendly = parsed.data;
+  }
+
   return {
     ok: true,
     value: {
       profile: value.profile as ProjectGenerationRequest["profile"],
       projectName: value.projectName as string,
       displayName: value.displayName as string,
+      ...(bookingCalendly === undefined ? {} : { bookingCalendly }),
     },
   };
 }

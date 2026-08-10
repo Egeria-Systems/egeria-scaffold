@@ -34,6 +34,53 @@ const ejectedAreaListSchema = z
 const displayNameSchema = z
   .string()
   .regex(/^(?=.{1,120}$)(?=.*\S)[^\p{Cc}]+$/u);
+const calendlyDestinationPattern =
+  /^https:\/\/(?:www\.)?calendly\.com\/[^\s/?#][^\s?#]*(?:\?[^\s#]*)?$/u;
+
+function isCalendlyDestination(value: string): boolean {
+  if (value.length > 2_048 || /\s/u.test(value) || value.includes("#")) {
+    return false;
+  }
+
+  try {
+    const destination = new URL(value);
+
+    return (
+      destination.protocol === "https:" &&
+      (destination.hostname === "calendly.com" ||
+        destination.hostname === "www.calendly.com") &&
+      destination.port === "" &&
+      destination.pathname !== "/" &&
+      destination.username === "" &&
+      destination.password === "" &&
+      destination.hash === ""
+    );
+  } catch {
+    return false;
+  }
+}
+
+export const calendlyBookingSettingsSchema = z
+  .strictObject({
+    destination: z
+      .string()
+      .min(1)
+      .max(2_048)
+      .regex(calendlyDestinationPattern)
+      .refine(isCalendlyDestination),
+    mode: z.enum(["link", "inline", "popup"]),
+  })
+  .readonly();
+
+export type CalendlyBookingSettings = z.infer<
+  typeof calendlyBookingSettingsSchema
+>;
+
+const capabilitySettingsSchema = z
+  .strictObject({
+    "booking-calendly": calendlyBookingSettingsSchema.optional(),
+  })
+  .readonly();
 
 export const projectConfigurationSchema = z
   .strictObject({
@@ -50,10 +97,23 @@ export const projectConfigurationSchema = z
     recipeVersion: profileRecipeVersionSchema,
     platformAdapter: z.literal("cloudflare-workers"),
     selectedCapabilities: capabilityIdentifierListSchema,
-    capabilitySettings: z
-      .record(stableIdentifierSchema, z.never())
-      .readonly(),
+    capabilitySettings: capabilitySettingsSchema,
     ejectedAreas: ejectedAreaListSchema,
+  })
+  .superRefine((project, context) => {
+    const selected = project.selectedCapabilities.includes("booking-calendly");
+    const configured =
+      project.capabilitySettings["booking-calendly"] !== undefined;
+
+    if (selected !== configured) {
+      context.addIssue({
+        code: "custom",
+        message: "booking-calendly selection and settings must agree",
+        path: configured
+          ? ["selectedCapabilities"]
+          : ["capabilitySettings", "booking-calendly"],
+      });
+    }
   })
   .readonly()
   .meta({

@@ -81,6 +81,11 @@ const validProject = {
   ejectedAreas: [],
 };
 
+const validCalendlyBookingSettings = {
+  destination: "https://calendly.com/acme/intro",
+  mode: "popup",
+};
+
 const validInstalledSurface = {
   identifier: "standards-typescript",
   owner: { kind: "capability", identifier: "standards" },
@@ -170,6 +175,7 @@ test("builder-core exports the executable contract boundary", () => {
     "capabilityDescriptorSchema",
     "capabilityRemovalPolicySchema",
     "capabilityStateClassificationSchema",
+    "calendlyBookingSettingsSchema",
     "createJsonSchemaArtifacts",
     "fingerprintSchema",
     "inferenceProbeSchema",
@@ -413,6 +419,93 @@ test("project configuration is strict and materializes safe capability identifie
   });
 });
 
+test("Calendly settings enforce paired capability state and sanitized destinations", () => {
+  const maximumDestination = "https://calendly.com/".padEnd(2_048, "a");
+
+  assertAccepts(contracts.calendlyBookingSettingsSchema, {
+    destination: "https://www.calendly.com/acme/intro?month=2026-08",
+    mode: "link",
+  });
+
+  for (const mode of ["link", "inline", "popup"]) {
+    const capabilitySettings = {
+      "booking-calendly": {
+        destination: maximumDestination,
+        mode,
+      },
+    };
+
+    assertAccepts(
+      contracts.calendlyBookingSettingsSchema,
+      capabilitySettings["booking-calendly"],
+    );
+    assertAccepts(contracts.projectConfigurationSchema, {
+      ...validProject,
+      selectedCapabilities: ["standards", "booking-calendly"],
+      capabilitySettings,
+    });
+  }
+
+  assertRejects(contracts.projectConfigurationSchema, {
+    ...validProject,
+    selectedCapabilities: ["standards", "booking-calendly"],
+  });
+  assertRejects(contracts.projectConfigurationSchema, {
+    ...validProject,
+    capabilitySettings: {
+      "booking-calendly": validCalendlyBookingSettings,
+    },
+  });
+  assertRejects(contracts.projectConfigurationSchema, {
+    ...validProject,
+    capabilitySettings: { unknown: {} },
+  });
+  assertRejects(contracts.calendlyBookingSettingsSchema, {
+    ...validCalendlyBookingSettings,
+    mode: "widget",
+  });
+  assertRejects(contracts.calendlyBookingSettingsSchema, {
+    ...validCalendlyBookingSettings,
+    extra: true,
+  });
+
+  const rejectedDestinations = [
+    "http://calendly.com/acme/intro",
+    "https://calendar.example/acme/intro",
+    "https://calendar.example/calendly.com/acme/intro",
+    "https://calendly.com/",
+    "https://user:password@calendly.com/acme/intro",
+    "https://calendly.com/acme/intro#booking",
+    " https://calendly.com/acme/intro",
+    "https://calendly.com/acme/intro ",
+    "https://calendly.com/acme /intro",
+    `${maximumDestination}a`,
+  ];
+
+  for (const destination of rejectedDestinations) {
+    assertRejects(contracts.calendlyBookingSettingsSchema, {
+      destination,
+      mode: "popup",
+    });
+
+    const result = contracts.validateContract(
+      contracts.projectConfigurationSchema,
+      {
+        ...validProject,
+        selectedCapabilities: ["standards", "booking-calendly"],
+        capabilitySettings: {
+          "booking-calendly": { destination, mode: "popup" },
+        },
+      },
+    );
+    assert.equal(result.ok, false);
+    assert.doesNotMatch(JSON.stringify(result.issues), new RegExp(
+      destination.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"),
+      "u",
+    ));
+  }
+});
+
 test("project display names preserve Unicode while rejecting controls and whitespace-only input", () => {
   const acceptedDisplayNames = [
     "Sample Portfolio",
@@ -579,6 +672,45 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
   const projectDisplayNamePattern =
     generated["project.schema.json"].properties.project.properties.displayName
       .pattern;
+  const calendlyDestinationContract =
+    generated["project.schema.json"].properties.capabilitySettings.properties[
+      "booking-calendly"
+    ].properties.destination;
+
+  assert.deepEqual(
+    Object.keys(
+      generated["project.schema.json"].properties.capabilitySettings
+        .properties,
+    ),
+    ["booking-calendly"],
+  );
+  assert.equal(
+    generated["project.schema.json"].properties.capabilitySettings
+      .additionalProperties,
+    false,
+  );
+  assert.equal(calendlyDestinationContract.maxLength, 2_048);
+  assert.equal(typeof calendlyDestinationContract.pattern, "string");
+  const calendlyDestinationPattern = new RegExp(
+    calendlyDestinationContract.pattern,
+    "u",
+  );
+  for (const destination of [
+    "https://calendly.com/acme/intro",
+    "https://www.calendly.com/acme/intro?month=2026-08",
+  ]) {
+    assert.match(destination, calendlyDestinationPattern);
+  }
+  for (const destination of [
+    "http://calendly.com/acme/intro",
+    "https://calendar.example/calendly.com/acme/intro",
+    "https://calendly.com/",
+    "https://user@calendly.com/acme/intro",
+    "https://calendly.com/acme/intro#booking",
+    " https://calendly.com/acme/intro",
+  ]) {
+    assert.doesNotMatch(destination, calendlyDestinationPattern);
+  }
 
   assert.equal(projectDisplayNamePattern, displayNamePattern.source);
   const schemaDisplayNamePattern = new RegExp(projectDisplayNamePattern, "u");

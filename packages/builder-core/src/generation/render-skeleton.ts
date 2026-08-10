@@ -6,6 +6,7 @@ import {
 } from "../catalog/capability-catalog.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
+  type CalendlyBookingSettings,
   projectConfigurationSchema,
   type ProjectConfiguration,
 } from "../contracts/project.js";
@@ -34,6 +35,7 @@ export type GenerationRequest = Readonly<{
   profile: "portfolio" | "site";
   projectName: string;
   displayName: string;
+  bookingCalendly?: CalendlyBookingSettings;
   packageVersions: CapabilityPackageVersions;
 }>;
 
@@ -85,7 +87,10 @@ function createProject(
     selectedCapabilities: resolved.capabilities.map(
       ({ identifier }) => identifier,
     ),
-    capabilitySettings: {},
+    capabilitySettings:
+      request.bookingCalendly === undefined
+        ? {}
+        : { "booking-calendly": request.bookingCalendly },
     ejectedAreas: [],
   });
 }
@@ -351,7 +356,12 @@ export async function renderSkeleton(
   }
 
   const resolutionResult = resolveCapabilities(
-    { profile: request.profile },
+    {
+      profile: request.profile,
+      ...(request.bookingCalendly === undefined
+        ? {}
+        : { requestedCapabilities: ["booking-calendly"] }),
+    },
     catalogResult.value,
     profileRecipes,
   );
