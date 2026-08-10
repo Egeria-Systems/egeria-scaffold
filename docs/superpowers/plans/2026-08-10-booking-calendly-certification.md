@@ -8,6 +8,30 @@
 
 **Toolchain:** Node.js `22.23.2`, pnpm `11.20.0`, TypeScript `6.0.3`, Zod `4.4.3`, YAML `2.9.0`, Next.js `16.3.0`, React `19.2.8`, OpenNext Cloudflare `1.20.2`, Wrangler `4.118.0`, Playwright `1.62.1`, axe Playwright `4.12.1`, Chromium, Node test runner, GitHub Actions, Cloudflare Workers, and Calendly Free or higher.
 
+## Approved sole-developer execution amendment
+
+**Approval date:** 2026-08-10 (America/Toronto)
+
+The user confirmed that `CoveMB` is the repository's sole developer and sole eligible human reviewer, accepted the resulting sole-developer risk exception, and authorized this exact runbook amendment plus creation or designation of one free synthetic Calendly event type without a paid upgrade. The account is currently in a free trial, but the trial grants no certification authority: the journey must use only behavior documented for Calendly Free and remain usable after the trial expires without payment. The existing public `30 Minute Meeting` one-on-one event is designated for the bounded certification journey; its URL remains a workflow input and is not committed. No new Calendly event type is required or created by this amendment.
+
+The independent implementation reviews required by repository governance remain read-only agent reviews. They are distinct from GitHub's human environment-approval feature. The protected-staging execution records `CoveMB` separately in every role actually performed: GitHub repository administrator, workflow dispatcher, deployment risk owner, Cloudflare account administrator, Calendly certification operator, and implemented-task reviewer. It must not claim that a second person reviewed or approved the deployment.
+
+The `compatibility` environment remains manual-workflow, exact-revision, `main`-branch, least-privilege-secret, one-booking, no-spend, and explicit-checkpoint bounded. Its observed lack of a required reviewer and enabled administrator bypass are accepted limitations for this non-production certification run, not independent-review evidence. The operator must inspect the workflow and exact revision immediately before dispatch and separately authorize dispatch, booking, cancellation, and Worker rollback or deletion.
+
+The Free-compatible provider baseline is exactly one one-on-one event type, one connected calendar, bounded availability, supported video conferencing, and ordinary scheduling. The journey must not depend on trial-only or paid workflows, routing, payments, multiple event types, multiple connected calendars, or premium branding controls. Stop at any upgrade, billing, trial-extension, or paid-feature prompt. Because the designated event type predates this certification journey, cleanup cancels and verifies the single synthetic meeting but preserves the event type. Event-type deletion or disabling is allowed only when the certification journey created that event type and receives separate cleanup authorization.
+
+This amendment adds no workflow behavior and changes no capability, schema, registry, generated source, fixture, dependency, or application runtime. It authorizes only these repository files:
+
+```text
+docs/superpowers/plans/2026-08-10-booking-calendly-certification.md
+docs/implementation-evidence/2026-08-10-booking-calendly-certification-preparation.md
+docs/implementation-evidence/booking-calendly-provider-receipt-template.md
+tests/constitution/constitution.test.mjs
+docs/review-packets/2026-08-10-booking-calendly-sole-developer-exception.md
+```
+
+Implementation uses one focused RED/GREEN contract: first require the preparation, plan, and receipt to declare the truthful sole-operator role assignment, lack of independent human deployment approval, accepted bypass limitation, compensating controls, Free-after-trial baseline, and preservation of a pre-existing designated event; then make only the minimum documentation changes. After focused and full relevant verification, dispatch the required read-only requirements, architecture/anti-overengineering, and test-evidence reviews, record dispositions in the new review packet, and stop for exact-diff approval. Workflow dispatch, deployment, GitHub variable or environment mutation, provider booking, cancellation, and Worker cleanup remain separately gated external actions.
+
 ## Global constraints
 
 - Work on clean sequential local `main` frozen at planning base `542660b5a3d25709ade6d8536c8c65bd1e6b6038`; do not touch separate worktrees.
