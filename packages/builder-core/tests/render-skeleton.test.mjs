@@ -1004,8 +1004,13 @@ test("generated section parsing is bounded, ordered, and link-safe", async () =>
   for (const href of [
     "",
     "#",
+    " /work",
+    "/work ",
     "//example.com/path",
     "/\\example.com/path",
+    "/\t/user:secret@example.com/path",
+    "/\n/user:secret@example.com/path",
+    "/\r/user:secret@example.com/path",
     "http://example.com/path",
     "https://user:secret@example.com/path",
     "javascript:alert(1)",
@@ -1018,6 +1023,22 @@ test("generated section parsing is bounded, ordered, and link-safe", async () =>
         metadata: { title: "Example", description: "Example description" },
         home: { sections: [hero] },
         navigation: [{ href, label: "Destination" }],
+      }),
+    );
+    assertContentInvalid(() =>
+      contentModule.parsePageContent({
+        sections: [
+          hero,
+          {
+            ...projectList,
+            content: {
+              ...projectList.content,
+              projects: [
+                { ...projectList.content.projects[0], href },
+              ],
+            },
+          },
+        ],
       }),
     );
     assertContentInvalid(() =>
@@ -1167,29 +1188,56 @@ test("the source-owned registry declares and renders every approved section", as
       {
         type: "header",
         id: "introduction",
-        labelledBy: "introduction-heading",
+        labelledBy: "introduction--heading",
         childTypes: ["h1", "p"],
       },
       {
         type: "section",
         id: "approach",
-        labelledBy: "approach-heading",
+        labelledBy: "approach--heading",
         childTypes: ["h2", "p"],
       },
       {
         type: "section",
         id: "selected-work",
-        labelledBy: "selected-work-heading",
+        labelledBy: "selected-work--heading",
         childTypes: ["h2", "ul"],
       },
       {
         type: "section",
         id: "contact",
-        labelledBy: "contact-heading",
+        labelledBy: "contact--heading",
         childTypes: ["h2", "p", "a"],
       },
     ],
   );
+
+  const collisionProneSections = contentModule.parsePageContent({
+    sections: [
+      { ...content.home.sections[0], id: "introduction" },
+      { ...content.home.sections[1], id: "introduction-heading" },
+    ],
+  }).sections;
+  const collisionProneElements = collisionProneSections.map((section) =>
+    sectionModule.sectionRegistry[section.type].Component({ section }),
+  );
+  const elementIdentifiers = collisionProneElements.flatMap(({ props }) => [
+    props.id,
+    ...props.children
+      .filter(({ props: childProperties }) => childProperties.id !== undefined)
+      .map(({ props: childProperties }) => childProperties.id),
+  ]);
+  assert.deepEqual(elementIdentifiers, [
+    "introduction",
+    "introduction--heading",
+    "introduction-heading",
+    "introduction-heading--heading",
+  ]);
+  assert.equal(new Set(elementIdentifiers).size, elementIdentifiers.length);
+  for (const { props } of collisionProneElements) {
+    assert.ok(elementIdentifiers.includes(props["aria-labelledby"]));
+  }
+
   for (const section of content.home.sections) {
     assert.deepEqual(
       sectionModule.sectionRegistry[section.type].contentSchema(section.content),
