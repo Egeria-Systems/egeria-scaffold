@@ -268,7 +268,9 @@ async function loadGeneratedPresentationModule(files) {
   );
 }
 
-async function loadGeneratedDeployedConfigurationModule(files) {
+let deployedConfigurationLoad = 0;
+
+async function loadGeneratedDeployedConfigurationModule(files, deployedURL) {
   const source = indexFiles(files).get(
     "apps/web/playwright.deployed.config.ts",
   );
@@ -277,10 +279,6 @@ async function loadGeneratedDeployedConfigurationModule(files) {
     .replace(
       'import { createBrowserQualityConfig } from "./playwright.config.shared";',
       "const createBrowserQualityConfig = (options: unknown) => options;",
-    )
-    .replace(
-      "const baseURL = parseDeployedBaseURL(process.env.PLAYWRIGHT_DEPLOYED_URL);",
-      'const baseURL = "https://example.com";',
     );
   assert.notEqual(executableSource, source);
   const typescriptModule = await import("typescript");
@@ -292,9 +290,25 @@ async function loadGeneratedDeployedConfigurationModule(files) {
     },
   }).outputText;
 
-  return import(
-    `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`
-  );
+  const previousDeployedURL = process.env.PLAYWRIGHT_DEPLOYED_URL;
+  if (deployedURL === undefined) {
+    delete process.env.PLAYWRIGHT_DEPLOYED_URL;
+  } else {
+    process.env.PLAYWRIGHT_DEPLOYED_URL = deployedURL;
+  }
+
+  try {
+    deployedConfigurationLoad += 1;
+    return await import(
+      `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#load-${deployedConfigurationLoad}`
+    );
+  } finally {
+    if (previousDeployedURL === undefined) {
+      delete process.env.PLAYWRIGHT_DEPLOYED_URL;
+    } else {
+      process.env.PLAYWRIGHT_DEPLOYED_URL = previousDeployedURL;
+    }
+  }
 }
 
 function assertContentInvalid(operation) {
@@ -641,9 +655,24 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.match(deployed, /DEPLOYED_URL_INVALID/u);
   assert.doesNotMatch(deployed, /COMPATIBILITY_URL/u);
 
+  await assert.rejects(
+    loadGeneratedDeployedConfigurationModule(rendered.files, undefined),
+    { name: "Error", message: "DEPLOYED_URL_REQUIRED" },
+  );
+  await assert.rejects(
+    loadGeneratedDeployedConfigurationModule(
+      rendered.files,
+      "http://example.com",
+    ),
+    { name: "Error", message: "DEPLOYED_URL_INVALID" },
+  );
   const deployedModule = await loadGeneratedDeployedConfigurationModule(
     rendered.files,
+    "https://example.com/quality/",
   );
+  assert.deepEqual(deployedModule.default, {
+    baseURL: "https://example.com/quality/",
+  });
   assert.equal(
     deployedModule.parseDeployedBaseURL("https://example.com/quality/"),
     "https://example.com/quality/",
@@ -677,6 +706,7 @@ test("generated browser quality is environment-specific and content-agnostic", a
     /pageerror/u,
     /wcag22aa/u,
     /keyboard\.press\("Tab"\)/u,
+    /const LANDING_PATH = "\.\/"/u,
     /element\.hasAttribute\("download"\)/u,
     /const paths = await discoverContentPaths\(page\);/u,
     /for \(const path of paths\)/u,
@@ -731,8 +761,59 @@ test("generated browser quality is environment-specific and content-agnostic", a
     group: "${{ github.workflow }}-${{ github.ref }}",
     "cancel-in-progress": true,
   });
-  assert.equal(workflowConfiguration.jobs.verify["runs-on"], "ubuntu-24.04");
-  assert.equal(workflowConfiguration.jobs.verify["timeout-minutes"], 30);
+  assert.deepEqual(workflowConfiguration.jobs, {
+    verify: {
+      "runs-on": "ubuntu-24.04",
+      "timeout-minutes": 30,
+      steps: [
+        {
+          name: "Check out repository",
+          uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          with: { "persist-credentials": false },
+        },
+        {
+          name: "Set up pnpm and Node.js",
+          uses: "pnpm/setup@4700d737c3d7a2e7199f3d42a920f0bf7f34e411",
+          with: {
+            version: "11.20.0",
+            runtime: "node@22.23.2",
+            cache: false,
+            install: false,
+          },
+        },
+        {
+          name: "Install dependencies",
+          run: "pnpm install --frozen-lockfile",
+        },
+        {
+          name: "Install Chromium",
+          run: "pnpm --dir apps/web run browser:install:ci",
+        },
+        { name: "Run static and build gates", run: "pnpm run verify" },
+        {
+          name: "Test Next.js development",
+          run: "pnpm --dir apps/web run test:e2e:dev",
+        },
+        {
+          name: "Test OpenNext workerd preview",
+          if: "!cancelled()",
+          run: "pnpm --dir apps/web run test:e2e:preview",
+        },
+        {
+          name: "Upload browser failure artifacts",
+          if: "failure()",
+          uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          with: {
+            name: "browser-failure-artifacts",
+            path: "apps/web/playwright-report/\napps/web/test-results/\n",
+            "if-no-files-found": "ignore",
+            "include-hidden-files": false,
+            "retention-days": 7,
+          },
+        },
+      ],
+    },
+  });
 
   assert.match(ignore, /^playwright-report\/$/mu);
   assert.match(ignore, /^test-results\/$/mu);

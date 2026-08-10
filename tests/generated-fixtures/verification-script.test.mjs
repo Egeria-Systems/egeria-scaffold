@@ -293,10 +293,19 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     ),
   );
 
-  process.env.NPM_TOKEN = "PRIVATE_VALUE";
-  process.env.PLAYWRIGHT_BROWSERS_PATH = "/private/unapproved-browsers";
-  process.env.PLAYWRIGHT_DEPLOYED_URL = "https://private.invalid";
-  process.env.XDG_CACHE_HOME = "/private/unapproved-cache";
+  const injectedEnvironment = {
+    CLOUDFLARE_API_TOKEN: "PRIVATE_VALUE",
+    NODE_OPTIONS: "--require=/private/unapproved-module.cjs",
+    NPM_CONFIG_USERCONFIG: "/private/unapproved-npmrc",
+    NPM_TOKEN: "PRIVATE_VALUE",
+    PLAYWRIGHT_BROWSERS_PATH: "/private/unapproved-browsers",
+    PLAYWRIGHT_DEPLOYED_URL: "https://private.invalid",
+    XDG_CACHE_HOME: "/private/unapproved-cache",
+  };
+  const previousEnvironment = Object.fromEntries(
+    Object.keys(injectedEnvironment).map((key) => [key, process.env[key]]),
+  );
+  Object.assign(process.env, injectedEnvironment);
   try {
     const result = await verifyGeneratedSkeletonsForTesting({
       async createOwner() {
@@ -310,6 +319,8 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         assert.equal(input.environment.NPM_TOKEN, undefined);
         assert.equal(input.environment.NODE_AUTH_TOKEN, undefined);
         assert.equal(input.environment.PLAYWRIGHT_DEPLOYED_URL, undefined);
+        assert.equal(input.environment.CLOUDFLARE_API_TOKEN, undefined);
+        assert.equal(input.environment.NODE_OPTIONS, undefined);
         assert.equal(input.environment.CI, "true");
         assert.equal(input.environment.NEXT_TELEMETRY_DISABLED, "1");
         assert.equal(
@@ -327,6 +338,32 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
           input.environment.XDG_CACHE_HOME.startsWith(`${ownedPath}/`),
           true,
         );
+        const inheritedKeys = [
+          "PATH",
+          "SystemRoot",
+          "ComSpec",
+          "PATHEXT",
+          "LANG",
+        ].filter((key) =>
+          Object.keys(process.env).some(
+            (candidate) => candidate.toLowerCase() === key.toLowerCase(),
+          ),
+        );
+        assert.deepEqual(Object.keys(input.environment).sort(), [
+          ...inheritedKeys,
+          ...(process.platform === "darwin" ? ["__CF_USER_TEXT_ENCODING"] : []),
+          "CI",
+          "HOME",
+          "NEXT_TELEMETRY_DISABLED",
+          "NPM_CONFIG_REGISTRY",
+          "NPM_CONFIG_USERCONFIG",
+          "PLAYWRIGHT_BROWSERS_PATH",
+          "TEMP",
+          "TMP",
+          "TMPDIR",
+          "USERPROFILE",
+          "XDG_CACHE_HOME",
+        ].sort());
         return input.arguments[0] === "--version" ? "11.20.0\n" : "";
       },
     });
@@ -350,11 +387,46 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
       ],
     });
   } finally {
-    delete process.env.NPM_TOKEN;
-    delete process.env.PLAYWRIGHT_BROWSERS_PATH;
-    delete process.env.PLAYWRIGHT_DEPLOYED_URL;
-    delete process.env.XDG_CACHE_HOME;
+    for (const [key, value] of Object.entries(previousEnvironment)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
   }
+
+  const commandsPerProfile = 12;
+  const profileCommands = [
+    commands.slice(0, commandsPerProfile),
+    commands.slice(commandsPerProfile),
+  ];
+  assert.equal(profileCommands.every((entries) => entries.length === 12), true);
+  const [portfolioCommand, siteCommand] = profileCommands.map(
+    ([command]) => command,
+  );
+  assert.notEqual(portfolioCommand.cwd, siteCommand.cwd);
+  for (const key of [
+    "HOME",
+    "USERPROFILE",
+    "TMPDIR",
+    "TMP",
+    "TEMP",
+    "NPM_CONFIG_USERCONFIG",
+    "PLAYWRIGHT_BROWSERS_PATH",
+    "XDG_CACHE_HOME",
+  ]) {
+    assert.notEqual(
+      portfolioCommand.environment[key],
+      siteCommand.environment[key],
+      `${key} must be isolated per profile`,
+    );
+  }
+  assert.notEqual(
+    profileCommands[0][1].arguments.at(-1),
+    profileCommands[1][1].arguments.at(-1),
+    "pnpm stores must be isolated per profile",
+  );
 
   const argumentLists = commands.map(({ arguments: arguments_ }) => arguments_);
   const perProfile = argumentLists.slice(0, 12).map((arguments_) =>
