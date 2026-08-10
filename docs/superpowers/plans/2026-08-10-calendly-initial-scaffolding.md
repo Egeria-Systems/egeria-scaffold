@@ -57,6 +57,7 @@ Modify common generated composition/copy guidance and root lint coverage:
 packages/builder-core/templates/common/apps/web/src/presentation/content-page.tsx
 packages/builder-core/templates/common/apps/web/AGENTS.md.template
 packages/builder-core/templates/common/README.md.template
+eslint.config.mjs
 package.json
 ```
 
@@ -121,10 +122,16 @@ fixtures/generated/portfolio-calendly/pnpm-lock.yaml
 fixtures/generated/portfolio-calendly/pnpm-workspace.yaml
 ```
 
-Update only the ownership record required in the two existing retained fixtures:
+Update only the enumerated common composition/guidance bytes and their required ownership records in the two existing retained fixtures:
 
 ```text
+fixtures/generated/portfolio/README.md
+fixtures/generated/portfolio/apps/web/AGENTS.md
+fixtures/generated/portfolio/apps/web/src/presentation/content-page.tsx
 fixtures/generated/portfolio/.egeria/state.json
+fixtures/generated/site/README.md
+fixtures/generated/site/apps/web/AGENTS.md
+fixtures/generated/site/apps/web/src/presentation/content-page.tsx
 fixtures/generated/site/.egeria/state.json
 ```
 
@@ -149,7 +156,7 @@ docs/superpowers/specs/2026-08-10-calendly-initial-scaffolding-design.md
 docs/superpowers/plans/2026-08-10-calendly-initial-scaffolding.md
 ```
 
-Do not touch any other existing `fixtures/generated/portfolio` or `fixtures/generated/site` byte. The two listed state files may change only for the directly required home-route ownership transfer and must otherwise reproduce exactly. No other file is in scope without a documented preapproved plan amendment.
+Do not touch any other existing `fixtures/generated/portfolio` or `fixtures/generated/site` byte. The listed common output files may change only for the typed composition child and generated booking guidance; the two listed state files may change only for those exact fingerprints and the home-route ownership transfer. All other bytes must reproduce exactly. No other file is in scope without a documented preapproved plan amendment.
 
 ## Task 1: Freeze preparation, design, and plan
 
@@ -163,12 +170,12 @@ Do not touch any other existing `fixtures/generated/portfolio` or `fixtures/gene
 
 **RED files:** contract/resolution/generation/CLI tests listed above.
 
-- [ ] Add focused failing tests for the seventh descriptor; dependency-first optional resolution; unchanged default recipes; strict settings/capability parity; all three modes; URL hostname/protocol/path/credentials/fragment/whitespace/length rejection; sanitized failures; paired CLI arguments; exact generated request keys; and no-selection compatibility.
-- [ ] Run the smallest targeted tests and record the expected assertion failures before production edits.
-- [ ] Implement `CalendlyBookingSettings`, the strict optional project settings object, `booking-calendly@0.1.0`, optional request resolution, CLI parsing/forwarding, and generated JSON Schema.
-- [ ] Keep project schema version and profile recipe version at `1.0.0` and `0.5.0`; add no package version.
-- [ ] Run contract, resolution, generation, CLI, schema, semantic-naming, and package-boundary checks GREEN.
-- [ ] Commit with message `Add Calendly scaffold contracts`.
+- [x] Add focused failing tests for the seventh descriptor; dependency-first optional resolution; unchanged default recipes; strict settings/capability parity; all three modes; URL hostname/protocol/path/credentials/fragment/whitespace/length rejection; sanitized failures; paired CLI arguments; exact generated request keys; and no-selection compatibility.
+- [x] Run the smallest targeted tests and record the expected assertion failures before production edits.
+- [x] Implement `CalendlyBookingSettings`, the strict optional project settings object, `booking-calendly@0.1.0`, optional request resolution, CLI parsing/forwarding, and generated JSON Schema.
+- [x] Keep project schema version and profile recipe version at `1.0.0` and `0.5.0`; add no package version.
+- [x] Run contract, resolution, generation, CLI, schema, semantic-naming, and package-boundary checks GREEN.
+- [x] Commit with message `Add Calendly scaffold contracts`.
 
 ## Task 3: Generate bounded link, inline, and popup presentation
 
@@ -179,7 +186,7 @@ Do not touch any other existing `fixtures/generated/portfolio` or `fixtures/gene
 - [ ] Add the six capability template files. Keep booking content application-owned, settings managed, and all visible strings in YAML.
 - [ ] Add typed React children to `ContentPage`; keep it pure. Keep observer/dialog/frame lifecycle inside `CalendlyBooking`.
 - [ ] Implement normal link fallback, intersection-activated inline iframe, activation-bound native popup dialog, cross-origin referrer policy, close cleanup, focus/reflow styling, and unsupported-API fallback.
-- [ ] Extend root copy externalization lint to integration TSX templates and update generated guidance.
+- [ ] Extend both the root copy-lint command glob and ESLint configuration scope to integration TSX templates, and update generated guidance.
 - [ ] Run builder rendering tests, copy lint, source lint, typecheck, semantic naming, and package-boundary inventory GREEN.
 - [ ] Commit with message `Generate Calendly booking presentation`.
 

@@ -82,6 +82,7 @@ No contradiction blocks local implementation.
 5. A host-page Calendly script would add mutable third-party code and extra CSP domains. The documented direct iframe supports the required scheduling page while keeping provider execution cross-origin and activation-bounded. Native `dialog` supplies popup presentation without a provider script.
 6. The current `section-composition` descriptor owns the home composition root. Optional integration composition requires conditional root templates. Ownership moves atomically to the builder kernel while `section-composition` continues to own the section registry, presentation component, styles, and PostCSS/Tailwind surfaces.
 7. Protected-staging provider certification requires a staging deployment, a synthetic Calendly event type, and an external booking. Those are explicit external mutations and require separate authority and environment inputs. This increment specifies but does not perform that certification. It remains a P2 acceptance risk rather than a reason to broaden local source authority.
+8. The selected composition requires `ContentPage` to accept a typed child and generated guidance to explain the optional booking surface. Those three common-template changes necessarily update the corresponding unselected fixture bytes; the preapproved exact-file plan amendment enumerates those exceptions. Root copy enforcement also requires both the command glob and `eslint.config.mjs` file scope to include integration TSX templates.
 
 ## Selected implementation boundary
 

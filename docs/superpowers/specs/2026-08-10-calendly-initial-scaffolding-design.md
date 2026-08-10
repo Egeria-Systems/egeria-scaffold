@@ -6,7 +6,7 @@
 
 ## Outcome
 
-An explicit Calendly selection during initial `portfolio` or `site` creation materializes `booking-calendly` with one validated destination and one of three presentation modes: `link`, `inline`, or `popup`. The selected capability and its settings become authoritative repository state. Omitting the selection preserves the existing generated recipes byte for byte except for state ownership changes directly required to make the home route a composition root.
+An explicit Calendly selection during initial `portfolio` or `site` creation materializes `booking-calendly` with one validated destination and one of three presentation modes: `link`, `inline`, or `popup`. The selected capability and its settings become authoritative repository state. Omitting the selection preserves the existing recipe defaults, selected capabilities, empty settings, file inventory, and runtime behavior. The common `ContentPage` child slot and generated guidance are emitted for both selected and unselected projects, and state records the home composition root's required ownership transfer.
 
 ## Selection and state contract
 
@@ -55,7 +55,7 @@ The cross-origin iframe executes provider content outside the host origin. The g
 
 ## Verification
 
-Builder-core and CLI tests cover strict paired selection, URL/mode rejection, sanitization, capability/settings agreement, dependency-first resolution, conditional template selection, all three modes, copy validation, ownership/probe agreement, deterministic files, and unchanged output when unselected.
+Builder-core and CLI tests cover strict paired selection, URL/mode rejection, sanitization, capability/settings agreement, dependency-first resolution, conditional template selection, all three modes, copy validation, ownership/probe agreement, deterministic files, unchanged unselected file inventory and behavior, and only the enumerated common byte changes when unselected.
 
 The retained `portfolio-calendly` fixture uses popup mode because it has the largest local interaction surface. Its capability-owned Playwright test stubs the cross-origin scheduling document, proves no eager provider request, proves enhanced dialog behavior and cleanup, proves the ordinary anchor works with JavaScript disabled, checks 320 CSS-pixel reflow, and runs the selected axe rules with the dialog open. Existing generic browser checks continue to cover the complete generated page in development and OpenNext/workerd preview.
 
