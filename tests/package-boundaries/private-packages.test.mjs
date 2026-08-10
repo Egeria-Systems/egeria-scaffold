@@ -282,6 +282,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/playwright.preview.config.ts",
       "common/apps/web/postcss.config.mjs",
       "common/apps/web/src/content/content-schema.ts",
+      "common/apps/web/src/content/content-source.d.ts",
       "common/apps/web/src/content/read-content.ts",
       "common/apps/web/src/infrastructure/observability/installed-capability.ts",
       "common/apps/web/src/presentation/content-page.tsx",
