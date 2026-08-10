@@ -180,6 +180,30 @@ test("workspace documentation reserves apps for builder code and proofs for evid
   assert.match(overview, /`packages\/\*` contains deliberately owned packages/);
 });
 
+test("canonical Cloudflare boundaries permit provider-specific generated templates", async () => {
+  const [enforcementMap, packageOwnership] = await Promise.all([
+    readRepositoryFile("docs/architecture/enforcement-map.md"),
+    readRepositoryFile("docs/architecture/package-ownership.md"),
+  ]);
+
+  assert.match(
+    enforcementMap,
+    /INV-CLOUDFLARE-ISOLATION[^\n]+Calendly integration templates contain no Cloudflare imports or types/i,
+  );
+  assert.doesNotMatch(
+    enforcementMap,
+    /provider-neutral Calendly integration source/i,
+  );
+  assert.match(
+    packageOwnership,
+    /Builder-core's core infrastructure and consuming-boundary ports remain provider-neutral[^\n]+generated application templates may be provider-specific/i,
+  );
+  assert.match(
+    packageOwnership,
+    /`booking-calendly`[^\n]+adds no public package, provider adapter[^\n]+API client/i,
+  );
+});
+
 test("package ownership documentation records the approved release boundary", async () => {
   const builderFoundationPhase = compactLabel("P", "0", ".", "3");
   const builderKernelPhase = compactLabel("P", "1");
@@ -258,11 +282,11 @@ test("package ownership documentation records the approved release boundary", as
   );
   assert.match(
     enforcementMap,
-    /INV-ACCESSIBILITY-AUTOMATION[^\n]+both profiles now pass local development and workerd Playwright\/axe/i,
+    /INV-ACCESSIBILITY-AUTOMATION[^\n]+all three retained fixtures pass local development and workerd Playwright\/axe/i,
   );
   assert.match(
     enforcementMap,
-    /deployed execution and any conformance claim remain separate/i,
+    /deployed execution.*any conformance claim remain separate/i,
   );
 
   const completedBuilderFoundationSection = roadmap
@@ -794,9 +818,12 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     readme,
     contributing,
     overview,
+    capabilityModel,
     enforcementMap,
     packageOwnership,
     roadmap,
+    builderCoreReadme,
+    cliReadme,
     eslintConfiguration,
   ] = await Promise.all(
     [
@@ -804,9 +831,12 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
       "README.md",
       "CONTRIBUTING.md",
       "docs/architecture/overview.md",
+      "docs/architecture/capability-model.md",
       "docs/architecture/enforcement-map.md",
       "docs/architecture/package-ownership.md",
       "docs/roadmaps/program-roadmap.md",
+      "packages/builder-core/README.md",
+      "apps/cli/README.md",
       "eslint.config.mjs",
     ].map(readRepositoryFile),
   );
@@ -832,9 +862,11 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     },
   );
   await Promise.all(
-    ["fixtures/generated/portfolio", "fixtures/generated/site"].map((path) =>
-      access(resolve(repositoryRoot, path)),
-    ),
+    [
+      "fixtures/generated/portfolio",
+      "fixtures/generated/portfolio-calendly",
+      "fixtures/generated/site",
+    ].map((path) => access(resolve(repositoryRoot, path))),
   );
 
   assert.match(
@@ -844,6 +876,23 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     readme,
     /builder kernel has received verified-final-diff approval.*committed golden fixtures.*client-ready portfolio stage is in progress/iu,
+  );
+  assert.match(readme, /retained `portfolio-calendly` fixture/iu);
+  assert.match(
+    capabilityModel,
+    /seven `portfolio`\/`site` descriptors.*are executable/iu,
+  );
+  assert.match(
+    packageOwnership,
+    /exact seven-capability catalog/iu,
+  );
+  assert.match(
+    builderCoreReadme,
+    /exact seven executable capability descriptors/iu,
+  );
+  assert.match(
+    cliReadme,
+    /paired `--calendly-url` and `--calendly-mode`/iu,
   );
   assert.match(
     roadmap,
@@ -869,12 +918,12 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         escapeRegularExpression(browserTestingTask) +
         "'s generated browser-quality foundation at committed artifact `02ec5eb12741c1622beec02529c38965e7501d68`[\\s\\S]+" +
         escapeRegularExpression(calendlyTask) +
-        " Calendly initial scaffolding is in preparation; later task numbering is unchanged[\\s\\S]+develops directly on clean local `main`",
+        " Calendly initial scaffolding is implemented and awaiting final review; later task numbering is unchanged[\\s\\S]+develops directly on clean local `main`",
     ),
   );
   assert.match(
     contributing,
-    /The approved builder kernel.*responsive Tailwind interface.*Playwright\/axe quality foundation.*both fixtures are certified.*Calendly remain separately reviewed outcomes/iu,
+    /The executable builder currently has seven capability descriptors.*retains exact `portfolio`, `portfolio-calendly`, and `site` fixtures.*all three fixtures are certified locally.*protected-staging\/provider-confirmed certification.*separately authorized outcomes/isu,
   );
   assert.match(
     packageOwnership,
@@ -883,7 +932,10 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   for (const document of [rootInstructions, readme, contributing]) {
     assert.match(document, /verify:builder-kernel/u);
   }
-  assert.match(overview, /committed portfolio and site fixtures/iu);
+  assert.match(
+    overview,
+    /committed portfolio, portfolio-with-Calendly, and site fixtures/iu,
+  );
   assert.match(enforcementMap, /verify:generated-skeletons/u);
   assert.match(packageOwnership, /committed golden fixtures/u);
   assert.doesNotMatch(enforcementMap, /temporary repository-local ESLint adapter/u);

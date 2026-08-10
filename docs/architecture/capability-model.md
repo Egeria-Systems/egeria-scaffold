@@ -1,8 +1,8 @@
 # Capability Model
 
-**Status:** Controlling capability vocabulary through P1 Task 2
+**Status:** Controlling capability vocabulary through the current Calendly initial-scaffolding implementation
 
-**Runtime status:** The six `portfolio`/`site` descriptors and two recipes named below are executable in private builder-core. Every other program capability and profile remains documentation-only.
+**Runtime status:** The seven `portfolio`/`site` descriptors and two recipes named below are executable in private builder-core. `booking-calendly` is an explicit optional initial-scaffolding selection; every other program capability and profile remains documentation-only.
 
 ## Descriptor contract
 
@@ -124,9 +124,11 @@ authenticated-app
 
 These expressions define generation-time resolution only. The resolved installed capability set becomes authoritative. Recipe inheritance is not stored as a live mutation channel.
 
+The executable `portfolio` and `site` recipes remain at `0.5.0` with unchanged defaults. An initial-scaffolding request may explicitly add `booking-calendly`; dependency-first resolution adds its existing `section-composition` dependency, and the generated installed manifest—not a changed recipe—records the resulting selection.
+
 ## Initial catalog
 
-The current executable catalog contains exactly `standards`, `content-files`, `section-composition`, `deployment-cloudflare`, `observability`, and `site-routing` for the `portfolio` and `site` recipes. The other rows remain program visibility only and have no runtime descriptor, resolver availability, generated surface, state, or provider effect yet.
+The current executable catalog contains exactly `standards`, `content-files`, `section-composition`, `deployment-cloudflare`, `observability`, `booking-calendly`, and `site-routing` for `portfolio` and `site`. The other rows remain program visibility only and have no runtime descriptor, resolver availability, generated surface, state, or provider effect yet.
 
 State classifications below describe repository, external-provider, and persistent-data effects managed by the capability. Dependencies may also vary by an explicitly selected mode; those conditional rules are called out rather than hidden.
 
@@ -139,7 +141,7 @@ Profile inclusion distinguishes recipe defaults from independent selections. `de
 | `section-composition` | `source-generated` | `repository-stateful` | `reviewed` | default: portfolio, site | `content-files`; owns Tailwind CSS and PostCSS package/configuration surfaces, global semantic design tokens, and responsive pure presentation |
 | `deployment-cloudflare` | `hybrid` | `repository-stateful`, `external-stateful` | `reviewed` | default: portfolio, site, app, authenticated-app | `standards` |
 | `observability` | `hybrid` | `repository-stateful`, `external-stateful` | `reviewed` | default: portfolio, site, app, authenticated-app | `deployment-cloudflare` |
-| `booking-calendly` | `source-generated` | `repository-stateful` | `automatic` | optional: portfolio, site, app, authenticated-app | Public profile plus an existing Calendly destination |
+| `booking-calendly` | `source-generated` | `repository-stateful` | `automatic` | optional: portfolio, site | `section-composition`; initial scaffolding also requires the strict paired destination/mode settings described below |
 | `site-routing` | `source-generated` | `repository-stateful` | `reviewed` | default: site | `content-files`, `section-composition` |
 | `app-foundation` | `source-generated` | `repository-stateful` | `reviewed` | default: app, authenticated-app; dependency-only: portfolio, site | `standards`, `deployment-cloudflare`, `observability` |
 | `application-persistence` | `hybrid` | `repository-stateful`, `external-stateful`, `persistent-data` | `export-and-remove` | default: authenticated-app; optional: app; dependency-only: portfolio, site | `app-foundation` |
@@ -165,11 +167,23 @@ Profile inclusion distinguishes recipe defaults from independent selections. `de
 - `durable-contact-submissions` persists an accepted submission before acknowledging success. Resend notification is optional; queued delivery is optional when jobs are installed. Notification failure never erases an accepted submission.
 - `transactional-email-resend` exposes a provider-neutral sender and a Resend adapter. Contact and identity flows may share the adapter but retain separate templates, policies, tokens, rate limits, and use cases.
 - `background-job-delivery` provides provider-neutral dispatch/handler contracts and a Cloudflare Queue adapter. A queue does not automatically require a separate jobs Worker.
-- `booking-calendly` manages generated repository integration around a user-supplied destination. It does not manage the Calendly account or provider configuration, so provider state and provider cleanup remain outside this capability's authority.
+- `booking-calendly` manages generated repository integration around a user-supplied destination. It does not manage the Calendly account, event configuration, provider data, cookies, or retention, so provider state and provider cleanup remain outside this capability's authority.
 - `identity-2fa` and `identity-passkeys` remain independently addable after `identity-core`.
 - `payments-stripe` supports `one-time`, `subscriptions`, or `both`. The resolver adds mode-required persistence and background processing explicitly. Removing source does not cancel subscriptions, refund payments, or delete provider/legal records.
 - Cloudflare Web Analytics belongs only to `analytics`; it is never implied by `observability`.
 - `support-console` exposes only bounded identity, session, account-lifecycle, audit, and installed-capability reconciliation workflows. It is not a generic database browser or business CRUD framework.
+
+### Executable Calendly boundary
+
+Initial selection is one atomic request containing `destination` and `mode`. `destination` accepts at most 2,048 characters and must be HTTPS on `calendly.com` or `www.calendly.com`, use a non-root path, and contain no credentials, fragment, normalization whitespace, or non-default port. `mode` is exactly `link`, `inline`, or `popup`. Stable validation issues do not contain rejected destinations.
+
+`.egeria/project.yaml` permits one strict optional `capabilitySettings.booking-calendly` object and requires settings presence to agree exactly with the selected capability. `.egeria/state.json` records `booking-calendly@0.1.0`, its source-generated delivery, repository-stateful classification, automatic source-removal policy, and surface fingerprints. Existing projects with `capabilitySettings: {}` remain valid.
+
+The capability owns five declared surfaces and matching file probes: the booking browser specification, client component, externalized booking copy, typed copy reader, and generated settings. Copy, reader, client, and browser files are application-owned after creation; settings remain managed. The builder kernel owns the conditional home route, preventing overlapping capability ownership. Removal means removing generated booking surfaces and settings; it does not imply provider configuration or data cleanup.
+
+Security metadata declares both accepted Calendly hosts, their exact `frame-src` contribution, provider-controlled browser storage and scheduling data inside the cross-origin frame, provider-controlled retention, and elevated threat review. The generated presentation uses an ordinary link, a near-viewport direct iframe for inline mode, or an anchor enhanced to a native dialog and user-activated iframe for popup mode. It loads no Calendly host-page script or API and listens to no provider event.
+
+The verification plan includes typecheck, Next build, development browser checks, and OpenNext/workerd preview browser checks. The retained `portfolio-calendly` popup fixture provides deterministic selected-state and stubbed-browser evidence while contract tests cover all three modes. That evidence does not call Calendly, make or confirm a booking, prove deployed or hosted execution, establish visual or human accessibility quality, or support a WCAG conformance claim. Protected-staging/provider-confirmed certification remains unexecuted and separately authorized.
 
 ## Delivery and package ownership
 
@@ -177,4 +191,4 @@ Package-backed delivery uses an ordinary replaceable dependency. Source-generate
 
 Initial public packages are limited to `@egeria-systems/standards` and `@egeria-systems/observability`, and they are created only in P0.3. P0.3 reserves private `builder-core` ownership of project/state schemas; P1 implements them there. They remain private until a proven independent consumer justifies extraction.
 
-The full catalog preserves future visibility without prematurely implementing later stages. P1 Task 2 adds only the six descriptors and two recipes identified above. It adds no template, `.egeria` file, inference engine, migration executor, binding, provider integration, generated application, or generated profile skeleton.
+The full catalog preserves future visibility without prematurely implementing later stages. The executable boundary is limited to the seven descriptors and two recipes identified above. Calendly adds only initial-scaffolding settings, declared generated surfaces, inference probes, and retained local verification; it adds no package, secret, environment variable, platform resource, provider adapter or mutation, later-add command, existing-repository transformation, webhook, or new profile.
