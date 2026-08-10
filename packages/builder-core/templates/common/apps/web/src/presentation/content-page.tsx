@@ -22,28 +22,28 @@ export function ContentPage({
           {skipToContent}
         </a>
       ) : null}
+      {navigation.length > 0 ? (
+        <nav className="pt-6 pe-4 ps-4 sm:pt-8 sm:pe-6 sm:ps-6 lg:pt-12 lg:pe-8 lg:ps-8">
+          <ul className="mx-auto flex w-full max-w-5xl flex-wrap gap-2 border-b border-line pb-6">
+            {navigation.map((item) => (
+              <li key={item.href}>
+                <a
+                  href={item.href}
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md py-2 pe-3 ps-3 font-semibold text-accent underline decoration-2 underline-offset-4 hover:text-accent-hover"
+                >
+                  {item.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ) : null}
       <main
         id="main-content"
         tabIndex={-1}
         className="min-h-screen py-6 pe-4 ps-4 sm:py-8 sm:pe-6 sm:ps-6 lg:py-12 lg:pe-8 lg:ps-8"
       >
         <article className="mx-auto flex w-full max-w-5xl flex-col gap-16 sm:gap-20">
-          {navigation.length > 0 ? (
-            <nav>
-              <ul className="flex flex-wrap gap-2 border-b border-line pb-6">
-                {navigation.map((item) => (
-                  <li key={item.href}>
-                    <a
-                      href={item.href}
-                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md py-2 pe-3 ps-3 font-semibold text-accent underline decoration-2 underline-offset-4 hover:text-accent-hover"
-                    >
-                      {item.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ) : null}
           <SectionComposition sections={sections} />
         </article>
       </main>

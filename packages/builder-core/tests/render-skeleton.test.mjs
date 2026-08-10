@@ -627,6 +627,26 @@ test("generated global styles expose the approved responsive accessibility token
       line: "#c5cfca",
     },
   );
+  assert.deepEqual(
+    Object.fromEntries(
+      [
+        ...styles.matchAll(
+          /--color-([a-z-]+):\s*var\(--design-color-([a-z-]+)\);/gu,
+        ),
+      ].map(([, semanticName, designName]) => [semanticName, designName]),
+    ),
+    {
+      canvas: "canvas",
+      surface: "surface",
+      ink: "ink",
+      muted: "muted",
+      accent: "accent",
+      "accent-hover": "accent-hover",
+      "accent-contrast": "accent-contrast",
+      focus: "focus",
+      line: "line",
+    },
+  );
   assert.match(postcss, /const postcssConfiguration = \{/u);
   assert.match(postcss, /"@tailwindcss\/postcss": \{\}/u);
   assert.match(postcss, /export default postcssConfiguration;/u);
@@ -1604,24 +1624,26 @@ test("generated presentation composes skip navigation and responsive section lay
   });
 
   assert.equal(pageTree.type, Symbol.for("react.fragment"));
-  const [skipLink, main] = pageTree.props.children;
+  const [skipLink, navigation, main] = pageTree.props.children;
   assert.equal(skipLink.type, "a");
   assert.equal(skipLink.props.href, "#main-content");
   assert.equal(skipLink.props.children, "S");
   assert.match(skipLink.props.className, /focus:translate-y-0/u);
   assert.match(skipLink.props.className, /min-h-11/u);
   assert.match(skipLink.props.className, /min-w-11/u);
+  assert.match(skipLink.props.className, /inline-flex/u);
+  assert.equal(navigation.type, "nav");
   assert.equal(main.type, "main");
   assert.equal(main.props.id, "main-content");
   assert.equal(main.props.tabIndex, -1);
   const article = main.props.children;
-  const [navigation, sectionComposition] = article.props.children;
-  assert.equal(navigation.type, "nav");
+  const sectionComposition = article.props.children;
   const navigationList = navigation.props.children;
   const navigationLink = navigationList.props.children[0].props.children;
   assert.match(navigationList.props.className, /flex-wrap/u);
   assert.match(navigationLink.props.className, /min-h-11/u);
   assert.match(navigationLink.props.className, /min-w-11/u);
+  assert.match(navigationLink.props.className, /inline-flex/u);
   assert.equal(navigationLink.props.children, "N");
   assert.equal(typeof sectionComposition.type, "function");
   assert.equal(sectionComposition.type(sectionComposition.props).type, "section-composition");
@@ -1632,6 +1654,7 @@ test("generated presentation composes skip navigation and responsive section lay
     skipToContent: "Skip to sentinel content",
   });
   assert.equal(pageWithoutNavigation.props.children[0], null);
+  assert.equal(pageWithoutNavigation.props.children[1], null);
 
   const projectList = sectionModule.sectionRegistry["project-list"].Component({
     section: {
@@ -1663,6 +1686,11 @@ test("generated presentation composes skip navigation and responsive section lay
       .children.props.className,
     /min-w-11/u,
   );
+  assert.match(
+    projectListElement.props.children[0].props.children.props.children[0].props
+      .children.props.className,
+    /inline-flex/u,
+  );
 
   const callToAction = sectionModule.sectionRegistry["call-to-action"].Component({
     section: {
@@ -1680,6 +1708,7 @@ test("generated presentation composes skip navigation and responsive section lay
   });
   assert.match(callToAction.props.children[2].props.className, /min-h-12/u);
   assert.match(callToAction.props.children[2].props.className, /min-w-11/u);
+  assert.match(callToAction.props.children[2].props.className, /inline-flex/u);
 
   assert.match(
     files.get("apps/web/app/page.tsx"),
