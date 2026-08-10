@@ -697,14 +697,30 @@ test("provider execution remains truthful and Free-compatible for a sole develop
     assert.match(document, /trial-only or paid/iu);
     assert.match(document, /pre-existing designated event/iu);
     assert.match(document, /preserve[s]? the event type/iu);
+    assert.match(document, /designation is the only authorized event-type action/iu);
+    assert.doesNotMatch(
+      document,
+      /authorized (?:creation or designation|creating or designating)/iu,
+    );
   }
 
-  assert.match(receipt, /independent human deployment reviewer/iu);
-  assert.match(receipt, /required-reviewer status/iu);
-  assert.match(receipt, /administrator bypass/iu);
+  assert.match(
+    receipt,
+    /Independent human deployment reviewer: `none — sole-developer exception`/u,
+  );
+  assert.match(
+    receipt,
+    /GitHub environment required-reviewer status: `none configured`/u,
+  );
+  assert.match(
+    receipt,
+    /Administrator bypass: \[enabled and accepted for this non-production risk exception \/ unexpected state requiring stop\]/u,
+  );
+  assert.match(receipt, /identify `CoveMB` in every role/u);
   assert.match(receipt, /Free-compatible during and after trial/iu);
   assert.match(receipt, /pre-existing designated/iu);
   assert.match(receipt, /event-?type[^.]+preserved/iu);
+  assert.doesNotMatch(receipt, /certification-created|disabled or deleted/iu);
 });
 
 test("repository documentation has no broken local Markdown links", async () => {

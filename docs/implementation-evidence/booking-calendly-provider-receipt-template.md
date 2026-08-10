@@ -34,7 +34,7 @@ Use this template only after the separately authorized protected-staging and pro
 - Local receipt artifact digest: [GitHub-reported artifact SHA-256]
 - Staging origin: [dedicated non-production origin; omit private query data]
 - Worker-name preflight for `acme-portfolio-calendly`: [absent before deployment / approved dedicated certification resource]
-- Action owners and roles: [GitHub repository administrator; workflow dispatcher; deployment risk owner; Cloudflare account administrator; Calendly certification operator; implemented-task reviewer; identify the sole operator in every role]
+- Action owners and roles: [GitHub repository administrator; workflow dispatcher; deployment risk owner; Cloudflare account administrator; Calendly certification operator; implemented-task reviewer; identify `CoveMB` in every role]
 - Credential disposition: [task token revoked / exposed or over-scoped token rotated / shared compatibility token unchanged under named rotation plan]
 
 ## Synthetic-data declaration
@@ -44,7 +44,7 @@ Use this template only after the separately authorized protected-staging and pro
 - Real client data, identities, messages, calendars, and production resources excluded: [yes / no]
 - Calendly service-tier basis: `Free-compatible during and after trial`
 - Free-baseline check: [one one-on-one event type; one connected calendar; bounded availability; supported video conferencing; ordinary scheduling; no trial-only or paid dependency]
-- Event-type lifecycle: [pre-existing designated event / certification-created event]
+- Event-type lifecycle: `pre-existing designated event; preserved`
 - Quota and spend result: [one event slot and one booking; existing GitHub/Cloudflare quota; no paid upgrade or incremental spend]
 
 ## Deployed application evidence
@@ -67,7 +67,7 @@ Use this template only after the separately authorized protected-staging and pro
 ## Cancellation and cleanup evidence
 
 - Synthetic meeting cancellation status and timestamp: [status]
-- Event-type cleanup: [pre-existing designated event preserved / certification-created event disabled or deleted under separate approval]
+- Event-type cleanup: `pre-existing designated event preserved; no event-type mutation`
 - Test calendar/inbox cleanup: [status]
 - Certification Worker rolled back or removed: [status]
 - Staging origin no longer serves the certification Worker: [verification]
