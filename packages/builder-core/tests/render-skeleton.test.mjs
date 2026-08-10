@@ -16,6 +16,7 @@ const tokens = {
 };
 
 const portfolioPaths = [
+  ".github/workflows/quality.yml",
   ".gitignore",
   ".nvmrc",
   "AGENTS.md",
@@ -31,12 +32,17 @@ const portfolioPaths = [
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
+  "apps/web/playwright.config.shared.ts",
+  "apps/web/playwright.deployed.config.ts",
+  "apps/web/playwright.dev.config.ts",
+  "apps/web/playwright.preview.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/sections/section-registry.tsx",
+  "apps/web/tests/e2e/site-quality.spec.ts",
   "apps/web/tsconfig.json",
   "apps/web/wrangler.jsonc",
   "package.json",
@@ -44,6 +50,7 @@ const portfolioPaths = [
 ];
 
 const sitePaths = [
+  ".github/workflows/quality.yml",
   ".gitignore",
   ".nvmrc",
   "AGENTS.md",
@@ -61,12 +68,17 @@ const sitePaths = [
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
+  "apps/web/playwright.config.shared.ts",
+  "apps/web/playwright.deployed.config.ts",
+  "apps/web/playwright.dev.config.ts",
+  "apps/web/playwright.preview.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/sections/section-registry.tsx",
+  "apps/web/tests/e2e/site-quality.spec.ts",
   "apps/web/tsconfig.json",
   "apps/web/wrangler.jsonc",
   "package.json",
@@ -297,14 +309,15 @@ async function snapshotDirectory(root) {
   return snapshot;
 }
 
-test("template rendering replaces only the three approved tokens", () => {
+test("template rendering replaces only the approved dynamic and workflow tokens", () => {
   const result = renderTemplateSource({
     source: "common/package.json.template",
     text: [
       "{",
       '  \"name\": \"{{projectName}}\",',
       '  \"displayName\": {{displayNameJson}},',
-      '  \"worker\": \"{{workerName}}\"',
+      '  \"worker\": \"{{workerName}}\",',
+      '  \"group\": \"{{githubWorkflowExpression}}-{{githubRefExpression}}\"',
       "}",
       "",
     ].join("\r\n"),
@@ -314,12 +327,13 @@ test("template rendering replaces only the three approved tokens", () => {
   const rendered = assertSuccess(result);
   assert.equal(
     rendered,
-    '{\n  "name": "acme-studio",\n  "displayName": "Acme \\"Studio\\"\\nMontréal",\n  "worker": "acme-studio-web"\n}\n',
+    '{\n  "name": "acme-studio",\n  "displayName": "Acme \\"Studio\\"\\nMontréal",\n  "worker": "acme-studio-web",\n  "group": "${{ github.workflow }}-${{ github.ref }}"\n}\n',
   );
   assert.deepEqual(JSON.parse(rendered), {
     name: "acme-studio",
     displayName: 'Acme "Studio"\nMontréal',
     worker: "acme-studio-web",
+    group: "${{ github.workflow }}-${{ github.ref }}",
   });
 });
 
@@ -458,7 +472,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.4.0",
+    recipeVersion: "0.5.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -504,6 +518,8 @@ test("rendered manifests and desired project match the approved resolved recipe"
     private: true,
     type: "module",
     scripts: {
+      "browser:install": "playwright install chromium",
+      "browser:install:ci": "playwright install --with-deps chromium",
       build: "next build",
       "build:cloudflare": "opennextjs-cloudflare build",
       "cf-typegen":
@@ -512,6 +528,11 @@ test("rendered manifests and desired project match the approved resolved recipe"
       lint: "eslint . --max-warnings 0",
       preview:
         "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+      "test:e2e:deployed":
+        "playwright test --config playwright.deployed.config.ts",
+      "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
+      "test:e2e:preview":
+        "playwright test --config playwright.preview.config.ts",
       typecheck: "next typegen && tsc --noEmit",
     },
     dependencies: {
@@ -523,7 +544,9 @@ test("rendered manifests and desired project match the approved resolved recipe"
       yaml: "2.9.0",
     },
     devDependencies: {
+      "@axe-core/playwright": "4.12.1",
       "@egeria-systems/standards": "0.1.0",
+      "@playwright/test": "1.62.1",
       "@tailwindcss/postcss": "4.3.3",
       "@types/node": "22.20.1",
       "@types/react": "19.2.18",
@@ -537,6 +560,92 @@ test("rendered manifests and desired project match the approved resolved recipe"
       wrangler: "4.118.0",
     },
   });
+});
+
+test("generated browser quality is environment-specific and content-agnostic", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "site",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const files = indexFiles(rendered.files);
+  const shared = files.get("apps/web/playwright.config.shared.ts");
+  const development = files.get("apps/web/playwright.dev.config.ts");
+  const preview = files.get("apps/web/playwright.preview.config.ts");
+  const deployed = files.get("apps/web/playwright.deployed.config.ts");
+  const specification = files.get("apps/web/tests/e2e/site-quality.spec.ts");
+  const workflow = files.get(".github/workflows/quality.yml");
+  const ignore = files.get(".gitignore");
+  const readme = files.get("README.md");
+
+  assert.match(shared, /fullyParallel: false/u);
+  assert.match(shared, /forbidOnly: Boolean\(process\.env\.CI\)/u);
+  assert.match(shared, /workers: process\.env\.CI \? 1 : undefined/u);
+  assert.match(shared, /name: "chromium"/u);
+  assert.match(shared, /trace: "retain-on-failure"/u);
+  assert.match(shared, /screenshot: "only-on-failure"/u);
+  assert.match(shared, /video: "retain-on-failure"/u);
+
+  assert.match(development, /http:\/\/127\.0\.0\.1:3100/u);
+  assert.match(development, /pnpm run dev -- --hostname 127\.0\.0\.1 --port 3100/u);
+  assert.match(development, /reuseExistingServer: false/u);
+  assert.match(preview, /http:\/\/127\.0\.0\.1:3101/u);
+  assert.match(preview, /pnpm run preview -- --ip 127\.0\.0\.1 --port 3101/u);
+  assert.match(preview, /reuseExistingServer: false/u);
+
+  assert.match(deployed, /PLAYWRIGHT_DEPLOYED_URL/u);
+  assert.match(deployed, /protocol !== "https:"/u);
+  assert.match(deployed, /url\.username !== "" \|\| url\.password !== ""/u);
+  assert.match(deployed, /url\.hash !== ""/u);
+  assert.match(deployed, /DEPLOYED_URL_REQUIRED/u);
+  assert.match(deployed, /DEPLOYED_URL_INVALID/u);
+  assert.doesNotMatch(deployed, /COMPATIBILITY_URL/u);
+
+  for (const contract of [
+    /getByRole\("main"\)/u,
+    /getByRole\("heading", \{ level: 1 \}\)/u,
+    /console/u,
+    /pageerror/u,
+    /wcag22aa/u,
+    /keyboard\.press\("Tab"\)/u,
+    /outlineStyle/u,
+    /boxShadow/u,
+    /width: 320/u,
+    /scrollWidth/u,
+    /reducedMotion: "reduce"/u,
+    /transitionDuration/u,
+    /animationDuration/u,
+  ]) {
+    assert.match(specification, contract);
+  }
+  assert.doesNotMatch(specification, /Acme|Portfolio|About|Contact/u);
+
+  assert.match(workflow, /^permissions:\n  contents: read$/mu);
+  assert.match(workflow, /cancel-in-progress: true/u);
+  assert.match(workflow, /\$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}/u);
+  assert.match(workflow, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/u);
+  assert.match(workflow, /pnpm\/setup@4700d737c3d7a2e7199f3d42a920f0bf7f34e411/u);
+  assert.match(workflow, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/u);
+  assert.match(workflow, /persist-credentials: false/u);
+  assert.match(workflow, /version: 11\.20\.0/u);
+  assert.match(workflow, /runtime: node@22\.23\.2/u);
+  assert.match(workflow, /pnpm install --frozen-lockfile/u);
+  assert.match(workflow, /browser:install:ci/u);
+  assert.match(workflow, /pnpm run verify/u);
+  assert.match(workflow, /test:e2e:dev/u);
+  assert.match(workflow, /test:e2e:preview/u);
+  assert.match(workflow, /if: failure\(\)/u);
+  assert.match(workflow, /retention-days: 7/u);
+  assert.doesNotMatch(workflow, /secrets\.|deploy|release|PLAYWRIGHT_DEPLOYED_URL/iu);
+
+  assert.match(ignore, /^playwright-report\/$/mu);
+  assert.match(ignore, /^test-results\/$/mu);
+  assert.match(readme, /explicitly install Chromium/iu);
+  assert.match(readme, /does not establish WCAG conformance/iu);
 });
 
 test("rendered files satisfy every inference probe in their resolved recipes", async () => {
@@ -1804,7 +1913,7 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
     const paths = rendered.files.map(({ path }) => path).join("\n");
     assert.doesNotMatch(
       paths,
-      /(?:apps\/jobs|packages\/|\.egeria|pnpm-lock\.yaml|middleware|\.github\/workflows)/,
+      /(?:apps\/jobs|packages\/|\.egeria|pnpm-lock\.yaml|middleware)/,
     );
     const output = [...indexFiles(rendered.files).values()].join("\n").toLowerCase();
     for (const marker of [
@@ -1829,8 +1938,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 47],
-    ["site", 49],
+    ["portfolio", 66],
+    ["site", 68],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -1900,7 +2009,9 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       "/dependencies/react",
       "/dependencies/react-dom",
       "/dependencies/yaml",
+      "/devDependencies/@axe-core~1playwright",
       "/devDependencies/@egeria-systems~1standards",
+      "/devDependencies/@playwright~1test",
       "/devDependencies/@tailwindcss~1postcss",
       "/devDependencies/@types~1node",
       "/devDependencies/@types~1react",
@@ -1914,7 +2025,18 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       "/devDependencies/wrangler",
       "/name",
       "/private",
-      "/scripts",
+      "/scripts/browser:install",
+      "/scripts/browser:install:ci",
+      "/scripts/build",
+      "/scripts/build:cloudflare",
+      "/scripts/cf-typegen",
+      "/scripts/dev",
+      "/scripts/lint",
+      "/scripts/preview",
+      "/scripts/test:e2e:deployed",
+      "/scripts/test:e2e:dev",
+      "/scripts/test:e2e:preview",
+      "/scripts/typecheck",
       "/type",
       "/version",
     ]);

@@ -26,7 +26,7 @@
 Create generated templates:
 
 ```text
-packages/builder-core/templates/common/.github/workflows/quality.yml
+packages/builder-core/templates/common/.github/workflows/quality.yml.template
 packages/builder-core/templates/common/apps/web/playwright.config.shared.ts
 packages/builder-core/templates/common/apps/web/playwright.dev.config.ts
 packages/builder-core/templates/common/apps/web/playwright.preview.config.ts
@@ -49,6 +49,7 @@ Modify runtime contracts, catalogs, ownership, rendering, and checked schemas:
 packages/builder-core/src/contracts/profile.ts
 packages/builder-core/src/catalog/capability-catalog.ts
 packages/builder-core/src/profiles/profile-recipes.ts
+packages/builder-core/src/generation/render-template.ts
 packages/builder-core/src/generation/template-catalog.ts
 packages/builder-core/src/generation/render-skeleton.ts
 packages/builder-core/schemas/profile.schema.json
@@ -102,6 +103,8 @@ docs/review-packets/2026-08-10-generated-browser-testing-foundation.md
 ```
 
 Expected rendered template counts are 31/33, ownership descriptor counts are 66/68, installed state surface counts are 69/71, and committed fixture file counts are 35/37 for portfolio/site. Another direct current-contract consumer permits an appended exact-file plan amendment under the user's advance approval; unrelated scope stops execution.
+
+**Exact-file amendment (2026-08-10):** The generated workflow requires GitHub's `${{ github.workflow }}` and `${{ github.ref }}` expressions, while the existing renderer deliberately rejects unapproved double-brace syntax. The workflow source therefore uses the normal `.template` suffix, and `render-template.ts` gains exactly two fixed, trusted workflow-expression tokens. They are not caller inputs and do not broaden user-controlled interpolation. The existing render-template tests in `render-skeleton.test.mjs` cover their exact output and preserve rejection of every other token.
 
 ## Task 1: Freeze preparation, roadmap, design, and exact plan
 

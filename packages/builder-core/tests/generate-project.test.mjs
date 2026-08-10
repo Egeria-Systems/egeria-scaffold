@@ -28,6 +28,7 @@ const completeChecks = [
   "post-state-inference",
 ];
 const portfolioRenderedPaths = [
+  ".github/workflows/quality.yml",
   ".gitignore",
   ".nvmrc",
   "AGENTS.md",
@@ -43,12 +44,17 @@ const portfolioRenderedPaths = [
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
+  "apps/web/playwright.config.shared.ts",
+  "apps/web/playwright.deployed.config.ts",
+  "apps/web/playwright.dev.config.ts",
+  "apps/web/playwright.preview.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/sections/section-registry.tsx",
+  "apps/web/tests/e2e/site-quality.spec.ts",
   "apps/web/tsconfig.json",
   "apps/web/wrangler.jsonc",
   "package.json",
@@ -275,6 +281,12 @@ test("builder-core exports new-directory generation without caller package versi
 test("the internal generated-project verification receipt is frozen", () => {
   assert.deepEqual(verifierModule.verificationChecks, generatedChecks);
   assert.equal(Object.isFrozen(verifierModule.verificationChecks), true);
+  assert.equal(
+    verifierModule.verificationChecks.some((check) =>
+      /browser|playwright|e2e/u.test(check),
+    ),
+    false,
+  );
 });
 
 test("the pnpm verifier uses exact commands, isolated copies, and an allowlisted environment", async () => {
@@ -520,10 +532,16 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
-      assert.equal(generated.state.origin.recipeVersion, "0.4.0");
+      assert.equal(generated.state.origin.recipeVersion, "0.5.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 50 : 52,
+        profile === "portfolio" ? 69 : 71,
+      );
+      assert.equal(
+        generated.state.installedCapabilities.find(
+          ({ identifier }) => identifier === "standards",
+        )?.version,
+        "0.2.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -616,6 +634,33 @@ test("portfolio and site generation writes exact state-last repositories", async
       assert.equal(
         webManifest.devDependencies["@egeria-systems/standards"],
         "0.1.0",
+      );
+      assert.equal(
+        webManifest.devDependencies["@axe-core/playwright"],
+        "4.12.1",
+      );
+      assert.equal(
+        webManifest.devDependencies["@playwright/test"],
+        "1.62.1",
+      );
+      assert.deepEqual(
+        Object.fromEntries(
+          Object.entries(webManifest.scripts).filter(([name]) =>
+            /^(?:browser:install(?::ci)?|test:e2e:(?:deployed|dev|preview))$/u.test(
+              name,
+            ),
+          ),
+        ),
+        {
+          "browser:install": "playwright install chromium",
+          "browser:install:ci": "playwright install --with-deps chromium",
+          "test:e2e:deployed":
+            "playwright test --config playwright.deployed.config.ts",
+          "test:e2e:dev":
+            "playwright test --config playwright.dev.config.ts",
+          "test:e2e:preview":
+            "playwright test --config playwright.preview.config.ts",
+        },
       );
       assert.equal(
         webManifest.devDependencies["@tailwindcss/postcss"],

@@ -262,6 +262,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
   assert.deepEqual(
     await listFiles(resolve(repositoryRoot, "packages/builder-core/templates")),
     [
+      "common/.github/workflows/quality.yml.template",
       "common/.gitignore.template",
       "common/.nvmrc",
       "common/AGENTS.md.template",
@@ -275,12 +276,17 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/next.config.ts",
       "common/apps/web/open-next.config.ts",
       "common/apps/web/package.json.template",
+      "common/apps/web/playwright.config.shared.ts",
+      "common/apps/web/playwright.deployed.config.ts",
+      "common/apps/web/playwright.dev.config.ts",
+      "common/apps/web/playwright.preview.config.ts",
       "common/apps/web/postcss.config.mjs",
       "common/apps/web/src/content/content-schema.ts",
       "common/apps/web/src/content/read-content.ts",
       "common/apps/web/src/infrastructure/observability/installed-capability.ts",
       "common/apps/web/src/presentation/content-page.tsx",
       "common/apps/web/src/sections/section-registry.tsx",
+      "common/apps/web/tests/e2e/site-quality.spec.ts",
       "common/apps/web/tsconfig.json",
       "common/apps/web/wrangler.jsonc.template",
       "common/package.json.template",
@@ -339,9 +345,10 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /explicit allowlisted templates/);
   assert.match(builderInstructions, /YAML 1.2/);
   assert.match(builderInstructions, /Markdown with validated YAML front matter/);
-  assert.match(builderInstructions, /recipe `0.4.0`/);
+  assert.match(builderInstructions, /recipe `0.5.0`/);
   assert.match(builderInstructions, /source-owned typed section registry/);
   assert.match(builderInstructions, /Tailwind CSS and PostCSS/);
+  assert.match(builderInstructions, /Playwright and axe/);
   assert.match(builderInstructions, /state-last generation/);
   assert.match(builderInstructions, /exact verified public package versions/);
   assert.match(builderInstructions, /identity-recorded sibling temporary directory/);
@@ -357,9 +364,10 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /explicit allowlisted templates/);
   assert.match(builderReadme, /YAML 1.2/);
   assert.match(builderReadme, /Markdown with validated YAML front matter/);
-  assert.match(builderReadme, /recipe `0.4.0`/);
+  assert.match(builderReadme, /recipe `0.5.0`/);
   assert.match(builderReadme, /four source-registered typed section shapes/);
   assert.match(builderReadme, /Tailwind CSS and PostCSS/);
+  assert.match(builderReadme, /Playwright and axe/);
   assert.match(builderReadme, /generateProject/);
   assert.match(builderReadme, /previously absent destination/);
   assert.match(builderReadme, /installed state last/);

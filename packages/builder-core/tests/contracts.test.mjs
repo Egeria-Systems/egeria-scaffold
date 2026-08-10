@@ -374,6 +374,14 @@ test("project configuration is strict and materializes safe capability identifie
     ...validProfile,
     recipeVersion: "0.4.0",
   });
+  assertAccepts(contracts.projectConfigurationSchema, {
+    ...validProject,
+    recipeVersion: "0.5.0",
+  });
+  assertAccepts(contracts.profileRecipeSchema, {
+    ...validProfile,
+    recipeVersion: "0.5.0",
+  });
 
   assertRejects(contracts.projectConfigurationSchema, {
     ...validProject,
@@ -397,11 +405,11 @@ test("project configuration is strict and materializes safe capability identifie
   });
   assertRejects(contracts.projectConfigurationSchema, {
     ...validProject,
-    recipeVersion: "0.5.0",
+    recipeVersion: "0.6.0",
   });
   assertRejects(contracts.profileRecipeSchema, {
     ...validProfile,
-    recipeVersion: "0.5.0",
+    recipeVersion: "0.6.0",
   });
 });
 
@@ -466,6 +474,10 @@ test("installed state is strict and records the exact successful generation chec
   assertAccepts(contracts.installedStateSchema, {
     ...validState,
     origin: { ...validState.origin, recipeVersion: "0.4.0" },
+  });
+  assertAccepts(contracts.installedStateSchema, {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.5.0" },
   });
   for (const surface of [
     { ...validInstalledSurface, mergeStrategy: "json-property" },

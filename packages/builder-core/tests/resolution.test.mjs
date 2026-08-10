@@ -39,6 +39,76 @@ function resolveRequest(
   return core.resolveCapabilities(request, catalog, profiles);
 }
 
+test("standards hybrid ownership declares generated browser quality", () => {
+  const standards = createCatalog().find(
+    ({ identifier }) => identifier === "standards",
+  );
+
+  assert.notEqual(standards, undefined);
+  assert.equal(standards.version, "0.2.0");
+  assert.equal(standards.deliveryMode, "hybrid");
+  assert.deepEqual(standards.requiredPackages, [
+    "@axe-core/playwright",
+    "@egeria-systems/standards",
+    "@playwright/test",
+  ]);
+  assert.deepEqual(standards.environmentVariables, [
+    "PLAYWRIGHT_DEPLOYED_URL",
+  ]);
+  assert.deepEqual(standards.secrets, []);
+  assert.deepEqual(standards.externalDomains, [
+    "cdn.playwright.dev",
+    "playwright.download.prss.microsoft.com",
+  ]);
+  assert.deepEqual(standards.retentionAssumptions, [
+    "ci-failure-artifacts-seven-days",
+  ]);
+  assert.deepEqual(standards.privilegedOperations, [
+    "browser-binary-installation",
+    "browser-process-execution",
+  ]);
+  assert.equal(standards.threatReviewLevel, "elevated");
+  assert.deepEqual(
+    standards.managedSurfaces.map(({ identifier }) => identifier).toSorted(),
+    [
+      "standards-axe-playwright-package",
+      "standards-browser-install-ci-script",
+      "standards-browser-install-script",
+      "standards-browser-quality-specification",
+      "standards-deployed-browser-test-script",
+      "standards-development-browser-test-script",
+      "standards-eslint-configuration",
+      "standards-playwright-deployed-configuration",
+      "standards-playwright-development-configuration",
+      "standards-playwright-package",
+      "standards-playwright-preview-configuration",
+      "standards-playwright-shared-configuration",
+      "standards-preview-browser-test-script",
+      "standards-package",
+      "standards-quality-workflow",
+      "standards-typescript-configuration",
+    ].toSorted(),
+  );
+  assert.equal(standards.inferenceProbes.length, 16);
+  assert.deepEqual(standards.verificationPlan, [
+    "package-resolution",
+    "lint",
+    "typecheck",
+    "browser-development",
+    "browser-preview",
+    "deployed-configuration",
+    "workflow-contracts",
+  ]);
+  assert.deepEqual(standards.documentationEvidenceRequirements, [
+    "public-package-version-and-provenance",
+    "browser-testing-claim-boundaries",
+  ]);
+  assert.deepEqual(standards.removalAndRecoveryRequirements, [
+    "review-package-and-configuration-removal",
+    "review-generated-quality-surface-removal",
+  ]);
+});
+
 test("the portfolio and site catalog declares the exact six executable capability contracts", async () => {
   const catalogEntry = builtDeclaration.match(
     /export \* from "(\.\/catalog\/[^\"]+)\.js";/,
@@ -681,7 +751,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.4.0",
+      recipeVersion: "0.5.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -693,7 +763,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.4.0",
+      recipeVersion: "0.5.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -724,7 +794,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.4.0");
+  assert.equal(portfolio.recipeVersion, "0.5.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
