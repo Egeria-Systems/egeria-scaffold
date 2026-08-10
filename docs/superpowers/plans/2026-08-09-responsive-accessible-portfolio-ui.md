@@ -115,11 +115,11 @@ Expected generated counts are 25/27 in-memory template files, 47/49 ownership de
 - Consumes: accepted design `docs/superpowers/specs/2026-08-09-responsive-accessible-portfolio-ui-design.md` and preparation evidence.
 - Produces: exact versions, file scope, tests, commits, review roles, and recovery boundary for all later tasks.
 
-- [ ] **Step 1: Self-review spec coverage and exact paths**
+- [x] **Step 1: Self-review spec coverage and exact paths**
 
 Confirm every design section maps to Tasks 2–6 and every referenced source/test path exists except the two explicitly new files.
 
-- [ ] **Step 2: Scan for plan failures**
+- [x] **Step 2: Scan for plan failures**
 
 Run:
 
@@ -129,7 +129,7 @@ rtk rg -n "T[B]D|T[O]DO|F[I]XME|PLACEH[O]LDER|add appropriat[e]|write tests fo[r
 
 Expected: no matches.
 
-- [ ] **Step 3: Verify planning-only contracts**
+- [x] **Step 3: Verify planning-only contracts**
 
 Run:
 
@@ -140,7 +140,7 @@ rtk git diff --check
 
 Expected: 21/21 tests pass and no diff-check output.
 
-- [ ] **Step 4: Commit the plan**
+- [x] **Step 4: Commit the plan**
 
 Stage only this plan, inspect the cached diff, and commit:
 
@@ -164,7 +164,7 @@ git commit -m "Plan responsive portfolio interface"
 - Consumes: existing `parseSiteContent`, `ContentPage`, `sectionRegistry`, capability descriptors, profile recipes, template catalog, and ownership materialization.
 - Produces: failing contracts for `SiteContent.accessibility.skipToContent`, recipe `0.4.0`, `content-files@0.3.0`, `section-composition@0.3.0`, exact Tailwind/PostCSS surfaces, and responsive class/token behavior.
 
-- [ ] **Step 1: Write version and capability RED assertions**
+- [x] **Step 1: Write version and capability RED assertions**
 
 Add exact acceptance for retained recipe versions through `0.4.0`, rejection of `0.5.0`, and descriptor expectations equivalent to:
 
@@ -192,7 +192,7 @@ assert.deepEqual(
 
 Assert three exact package probes, the PostCSS/global-style file probes, profile recipe `0.4.0`, content-files `0.3.0`, and 47/49 ownership descriptors. Assert `builder-global-styles` is absent so the global stylesheet has only the capability owner.
 
-- [ ] **Step 2: Write externalized accessibility-copy RED cases**
+- [x] **Step 2: Write externalized accessibility-copy RED cases**
 
 Require exact top-level site keys `metadata`, `accessibility`, `home`, and `navigation`, returning:
 
@@ -202,7 +202,7 @@ accessibility: { skipToContent: "Skip to sentinel content" }
 
 Add rejection cases for missing/extra accessibility keys, empty/non-string labels, and forbidden decoded control characters. Require `ContentPage` callers to pass `content.accessibility.skipToContent` and require no quoted visible skip literal in TSX.
 
-- [ ] **Step 3: Write deterministic design-token RED assertions**
+- [x] **Step 3: Write deterministic design-token RED assertions**
 
 Read rendered `globals.css` and require `@import "tailwindcss"`, exact semantic token values, `@theme inline`, `overflow-wrap: anywhere`, `:focus-visible`, forced-colours, and reduced-motion rules. Calculate palette contrast using the WCAG relative-luminance formula:
 
@@ -224,7 +224,7 @@ function contrastRatio(foreground, background) {
 
 Require at least 4.5 for ink/canvas, muted/canvas, accent/canvas, accent-contrast/accent, focus/canvas, ink/surface, and muted/surface.
 
-- [ ] **Step 4: Write pure responsive-component RED assertions**
+- [x] **Step 4: Write pure responsive-component RED assertions**
 
 Extend the deterministic JSX runtime assertions to require:
 
@@ -240,7 +240,7 @@ assert.match(callToActionLink.props.className, /min-h-12/u);
 
 Require the skip link only when navigation is non-empty, stable semantic IDs/ARIA associations, one `main`, native `nav`, existing heading/list/article structure, and no client/effect/browser/platform imports.
 
-- [ ] **Step 5: Write template/package/inventory RED assertions**
+- [x] **Step 5: Write template/package/inventory RED assertions**
 
 Require `postcss.config.mjs` in the exact template allowlist and rendered inventories; exact generated dev dependencies:
 
@@ -254,7 +254,7 @@ Require `postcss.config.mjs` in the exact template allowlist and rendered invent
 
 Require 25/27 in-memory files, 50/52 installed surfaces, and current capability/recipe versions.
 
-- [ ] **Step 6: Run the focused RED batch**
+- [x] **Step 6: Run the focused RED batch**
 
 Run:
 
@@ -274,7 +274,7 @@ Expected: failures only for absent `0.4.0`, new capability/package/surface contr
 - Consumes: Task 2 failing tests and current safe content/section contracts.
 - Produces: parsed `SiteContent.accessibility`, `ContentPage({ sections, navigation, skipToContent })`, responsive Tailwind components, exact generated package/configuration surfaces, and current recipe/capability metadata.
 
-- [ ] **Step 1: Implement version and ownership contracts**
+- [x] **Step 1: Implement version and ownership contracts**
 
 Add `"0.4.0"` to `profileRecipeVersionSchema`, advance both recipes, advance only content-files and section-composition capability versions, and add the exact package/file surfaces and probes. Remove only this builder surface:
 
@@ -288,7 +288,7 @@ createFileSurface(
 
 Regenerate the three checked schemas with `pnpm --filter @egeria-systems/builder-core run schema:generate`; never hand-edit them.
 
-- [ ] **Step 2: Implement the exact Tailwind/PostCSS templates**
+- [x] **Step 2: Implement the exact Tailwind/PostCSS templates**
 
 Create:
 
@@ -302,7 +302,7 @@ export default {
 
 Add the exact three dev dependencies, catalog the configuration, and replace global CSS with the accepted token/theme/focus/wrapping/motion contract. Keep all colour literals confined to the global token owner.
 
-- [ ] **Step 3: Implement externalized skip-navigation content**
+- [x] **Step 3: Implement externalized skip-navigation content**
 
 Add the exact readonly type:
 
@@ -312,15 +312,15 @@ accessibility: Readonly<{ skipToContent: string }>;
 
 Parse it through `isNonEmptyString`, add `Skip to content` to both site-content templates, and pass it through the home and about routes. Invalid input must still throw only `TypeError("CONTENT_INVALID")`.
 
-- [ ] **Step 4: Implement responsive pure presentation**
+- [x] **Step 4: Implement responsive pure presentation**
 
 Keep the components as Server Components. Use semantic Tailwind classes for fluid shell spacing, wrapped navigation, readable measure, responsive project grid, high-contrast CTA, and large link targets. `ContentPage` renders the skip link conditionally before `<main id="main-content" tabIndex={-1}>` and never embeds visible copy.
 
-- [ ] **Step 5: Update direct guidance and canonical owners**
+- [x] **Step 5: Update direct guidance and canonical owners**
 
 Record current recipe/capability versions, Tailwind/PostCSS ownership, externalized accessibility copy, responsive source evidence, and claim limits. Advance the roadmap status through Task 4 while naming Calendly as the next separately gated outcome. Update README/CONTRIBUTING and their exact constitution consumers together.
 
-- [ ] **Step 6: Run focused GREEN and package boundaries**
+- [x] **Step 6: Run focused GREEN and package boundaries**
 
 Run:
 
@@ -334,7 +334,7 @@ rtk node --test tests/constitution/*.test.mjs
 
 Expected: all focused tests pass; full builder-core generation/fixture assertions may remain RED only where old committed fixtures are the direct cause.
 
-- [ ] **Step 7: Commit the coherent source batch**
+- [x] **Step 7: Commit the coherent source batch**
 
 Commit exact source, tests, schemas, and direct documentation with:
 
@@ -356,11 +356,11 @@ git commit -m "Add responsive portfolio interface"
 - Consumes: production CLI at Task 3 HEAD.
 - Produces: exact 29/31-file committed fixtures, patched dependency locks, 50/52 installed surfaces, and byte/state/inference agreement.
 
-- [ ] **Step 1: Update expected fixture contracts before replacement**
+- [x] **Step 1: Update expected fixture contracts before replacement**
 
 Add `apps/web/postcss.config.mjs`; require recipe `0.4.0`, content-files `0.3.0`, section-composition `0.3.0`, surfaces 50/52, and the exact three manifest versions in the fixed-root verifier.
 
-- [ ] **Step 2: Run fixture assertions against old bytes and record RED**
+- [x] **Step 2: Run fixture assertions against old bytes and record RED**
 
 Run:
 
@@ -371,7 +371,7 @@ rtk node --test tests/generated-fixtures/determinism.test.mjs
 
 Expected: failure caused by committed old inventory/package/version/content/style/fingerprint bytes.
 
-- [ ] **Step 3: Generate each profile twice with the production CLI**
+- [x] **Step 3: Generate each profile twice with the production CLI**
 
 Use identity-bounded temporary parents and exact commands:
 
@@ -382,11 +382,11 @@ node apps/cli/dist/index.js create --profile site --name acme-site --display-nam
 
 Require each command's one-line success JSON, two byte-identical snapshots per profile, exact inventories, exact manifest versions, patched PostCSS resolution, and state/inference agreement.
 
-- [ ] **Step 4: Replace only the committed fixture roots**
+- [x] **Step 4: Replace only the committed fixture roots**
 
 Use the identity-matched generated outputs; do not edit generated files by hand. Confirm the root `pnpm-lock.yaml`, public package versions, compatibility proof, workflows, and unrelated worktrees remain unchanged.
 
-- [ ] **Step 5: Run fixture and fixed-root GREEN**
+- [x] **Step 5: Run fixture and fixed-root GREEN**
 
 Run:
 
@@ -397,7 +397,7 @@ rtk pnpm run verify:generated-skeletons
 
 Expected: deterministic regeneration passes and both isolated fixture copies pass pnpm version, frozen install, peers, moderate audit, registry signatures, lint, typecheck, Next build, and OpenNext build.
 
-- [ ] **Step 6: Commit fixture evidence**
+- [x] **Step 6: Commit fixture evidence**
 
 Commit exact fixture, fixture-test, and verifier changes with:
 
@@ -414,23 +414,23 @@ git commit -m "Refresh responsive portfolio fixtures"
 - Consumes: frozen planning-base-to-implementation-HEAD comparison and fresh verification output.
 - Produces: requirements, architecture/anti-overengineering, test-evidence, and accessibility dispositions with no unresolved material defect.
 
-- [ ] **Step 1: Freeze review scope**
+- [x] **Step 1: Freeze review scope**
 
 Record exact base/head hashes, `git diff --name-status`, commit list, and commands/results. Prohibit reviewer edits, recursive fan-out, external mutation, review-comment responses, and scope expansion.
 
-- [ ] **Step 2: Dispatch independent read-only reviewers**
+- [x] **Step 2: Dispatch independent read-only reviewers**
 
 Requirements checks accepted scope and exact version/content/ownership behavior. Architecture checks cohesion, six-capability preservation, pure presentation, no abstraction/package/provider drift, and single ownership. Test evidence checks RED causality, deterministic fixture/state evidence, audits/builds, and claim limits. Accessibility checks semantics, skip behavior, focus, colour calculations, target sizing, wrapping/reflow source contract, reduced motion, and conformance language.
 
-- [ ] **Step 3: Validate every finding**
+- [x] **Step 3: Validate every finding**
 
 Reproduce or disconfirm each finding against current source and the smallest deterministic command. Do not implement preferences or speculative hardening.
 
-- [ ] **Step 4: Repair only material defects through TDD**
+- [x] **Step 4: Repair only material defects through TDD**
 
 For each accepted defect, add a focused causal RED, make the minimum correction, rerun the affected checks, append its exact files/rationale to this plan, and commit with a short message naming the repair.
 
-- [ ] **Step 5: Recheck material repairs once**
+- [x] **Step 5: Recheck material repairs once**
 
 Use at most one bounded read-only reviewer for the combined repair set. Do not repeat unchanged reviews.
 
@@ -447,7 +447,7 @@ Use at most one bounded read-only reviewer for the combined repair set. Do not r
 - Consumes: settled reviewed HEAD and every fresh command receipt.
 - Produces: final comparison, change inventory, review dispositions, risks, deferrals, recovery, and explicit implemented-task approval request.
 
-- [ ] **Step 1: Run the complete builder candidate once**
+- [x] **Step 1: Run the complete builder candidate once**
 
 Run against the unchanged settled tree:
 
@@ -457,7 +457,7 @@ rtk pnpm run verify:builder-kernel
 
 Expected: constitution, semantic naming, package boundaries, builder-core, CLI, generated fixtures, copy lint, builds, typechecks, fixed-root generated verification, and changeset status all pass.
 
-- [ ] **Step 2: Run fresh proportional security and diff checks**
+- [x] **Step 2: Run fresh proportional security and diff checks**
 
 Run:
 
@@ -471,15 +471,15 @@ rtk git status --short
 
 Record exact results without treating point-in-time audit/signature evidence as provenance or general security proof. Do not repeat the unchanged expensive generated build harness.
 
-- [ ] **Step 3: Write verification evidence and review packet**
+- [x] **Step 3: Write verification evidence and review packet**
 
 Record exact commits/comparison, changed files, RED/GREEN evidence, current official sources/advisories, final commands/results, dependency/lock versions, generated counts/hashes, reviewer dispositions, risks, deferred browser/visual/performance/human checks, no-conformance language, and source/dependency recovery.
 
-- [ ] **Step 4: Confirm authorization boundaries**
+- [x] **Step 4: Confirm authorization boundaries**
 
 State that no unauthorized push, pull request, merge, publication, deployment, workflow/provider/persistent-data/production mutation, permission change, external message, or review-comment response occurred.
 
-- [ ] **Step 5: Commit final artifacts and stop**
+- [x] **Step 5: Commit final artifacts and stop**
 
 Commit only the completed plan checklist, final evidence, and packet with:
 
