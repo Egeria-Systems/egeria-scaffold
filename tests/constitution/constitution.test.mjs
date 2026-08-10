@@ -863,10 +863,13 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         " materialized the source-owned typed section catalog[\\s\\S]+" +
         escapeRegularExpression(responsiveInterfaceTask) +
         "'s responsive Tailwind presentation[\\s\\S]+are approved at committed artifact `e7026bd9e8c7a7ca20b5a485ee6702d2921a7586`[\\s\\S]+" +
-        escapeRegularExpression(browserTestingTask) +
-        " is implemented and awaiting verified-final-diff approval immediately after responsive accessible UI[\\s\\S]+Calendly remains " +
+        "Selecting " +
         escapeRegularExpression(calendlyTask) +
-        "; later task numbering is unchanged[\\s\\S]+develops directly on clean local `main`",
+        " as the next increment approves " +
+        escapeRegularExpression(browserTestingTask) +
+        "'s generated browser-quality foundation at committed artifact `02ec5eb12741c1622beec02529c38965e7501d68`[\\s\\S]+" +
+        escapeRegularExpression(calendlyTask) +
+        " Calendly initial scaffolding is in preparation; later task numbering is unchanged[\\s\\S]+develops directly on clean local `main`",
     ),
   );
   assert.match(
