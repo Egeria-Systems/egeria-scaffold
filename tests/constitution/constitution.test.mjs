@@ -808,6 +808,8 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   const copyEnforcementTask = namedLabel("Task", "2");
   const sectionCatalogTask = namedLabel("Task", "3");
   const responsiveInterfaceTask = namedLabel("Task", "4");
+  const browserTestingTask = namedLabel("Task", "4B");
+  const calendlyTask = namedLabel("Task", "5");
 
   assert.deepEqual(
     {
@@ -853,7 +855,11 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         escapeRegularExpression(sectionCatalogTask) +
         " materialized the source-owned typed section catalog[\\s\\S]+" +
         escapeRegularExpression(responsiveInterfaceTask) +
-        " now has an implementation candidate for responsive Tailwind presentation[\\s\\S]+Calendly is the next separately gated outcome after approval[\\s\\S]+develops directly on clean local `main`",
+        "'s responsive Tailwind presentation[\\s\\S]+are approved at committed artifact `e7026bd9e8c7a7ca20b5a485ee6702d2921a7586`[\\s\\S]+" +
+        escapeRegularExpression(browserTestingTask) +
+        " now adds the generated browser-testing foundation immediately after responsive accessible UI[\\s\\S]+Calendly remains " +
+        escapeRegularExpression(calendlyTask) +
+        "; later task numbering is unchanged[\\s\\S]+develops directly on clean local `main`",
     ),
   );
   assert.match(
