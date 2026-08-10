@@ -37,9 +37,13 @@ async function pathExists(path) {
   }
 }
 
-async function copyFixture(owner, profile, label) {
-  const root = join(owner, `${profile}-${label}`);
-  await cp(resolve(repositoryRoot, `fixtures/generated/${profile}`), root, {
+async function copyFixture(owner, identifier, label) {
+  const fixtureCase = generatedFixtureContracts.find(
+    (candidate) => candidate.identifier === identifier,
+  );
+  assert.notEqual(fixtureCase, undefined);
+  const root = join(owner, `${identifier}-${label}`);
+  await cp(resolve(repositoryRoot, fixtureCase.relativeRoot), root, {
     recursive: true,
     force: false,
     errorOnExist: true,
@@ -65,36 +69,54 @@ async function createKnownOwner(parent) {
 
 test("fixture inspection accepts only the exact portable generated trees", async () => {
   assert.deepEqual(
-    generatedFixtureContracts.map(({ profile, relativeRoot }) => ({
+    generatedFixtureContracts.map(({ identifier, profile, relativeRoot }) => ({
+      identifier,
       profile,
       relativeRoot,
     })),
     [
-      { profile: "portfolio", relativeRoot: "fixtures/generated/portfolio" },
-      { profile: "site", relativeRoot: "fixtures/generated/site" },
+      {
+        identifier: "portfolio",
+        profile: "portfolio",
+        relativeRoot: "fixtures/generated/portfolio",
+      },
+      {
+        identifier: "portfolio-calendly",
+        profile: "portfolio",
+        relativeRoot: "fixtures/generated/portfolio-calendly",
+      },
+      {
+        identifier: "site",
+        profile: "site",
+        relativeRoot: "fixtures/generated/site",
+      },
     ],
   );
 
   for (const contract of generatedFixtureContracts) {
-    assert.equal(
-      contract.expectedFiles.length,
-      contract.profile === "portfolio" ? 36 : 38,
-    );
     assert.equal(contract.expectedRecipeVersion, "0.5.0");
     assert.equal(contract.expectedStandardsVersion, "0.2.0");
     assert.equal(contract.expectedContentFilesVersion, "0.4.0");
     assert.equal(contract.expectedDeploymentCloudflareVersion, "0.2.0");
     assert.equal(
       contract.expectedSiteRoutingVersion,
-      contract.profile === "portfolio" ? null : "0.3.0",
+      contract.identifier === "site" ? "0.3.0" : null,
+    );
+    assert.equal(
+      contract.expectedBookingCalendlyVersion,
+      contract.identifier === "portfolio-calendly" ? "0.1.0" : null,
     );
     assert.equal(
       contract.expectedSurfaces,
-      contract.profile === "portfolio" ? 71 : 73,
+      contract.identifier === "portfolio-calendly"
+        ? 76
+        : contract.identifier === "portfolio"
+          ? 71
+          : 73,
     );
     const snapshot = await inspectGeneratedFixture(
       resolve(repositoryRoot, contract.relativeRoot),
-      contract.profile,
+      contract.identifier,
     );
     assert.equal(snapshot.length, contract.expectedFiles.length);
     assert.deepEqual(
@@ -102,6 +124,61 @@ test("fixture inspection accepts only the exact portable generated trees", async
       contract.expectedFiles,
     );
   }
+
+  const basePortfolio = generatedFixtureContracts.find(
+    ({ identifier }) => identifier === "portfolio",
+  );
+  const calendlyPortfolio = generatedFixtureContracts.find(
+    ({ identifier }) => identifier === "portfolio-calendly",
+  );
+  const site = generatedFixtureContracts.find(
+    ({ identifier }) => identifier === "site",
+  );
+  assert.equal(basePortfolio.expectedFiles.length, 36);
+  assert.equal(site.expectedFiles.length, 38);
+  assert.equal(
+    calendlyPortfolio.expectedFiles.length,
+    36 - 1 + 6,
+    "six booking sources replace one common home destination and add five distinct paths",
+  );
+  assert.deepEqual(calendlyPortfolio.createArguments, [
+    "--profile",
+    "portfolio",
+    "--name",
+    "acme-portfolio-calendly",
+    "--display-name",
+    "Acme Portfolio Booking",
+    "--calendly-url",
+    "https://calendly.com/example/intro",
+    "--calendly-mode",
+    "popup",
+  ]);
+  assert.deepEqual(calendlyPortfolio.expectedCapabilitySettings, {
+    "booking-calendly": {
+      destination: "https://calendly.com/example/intro",
+      mode: "popup",
+    },
+  });
+  assert.deepEqual(calendlyPortfolio.expectedCapabilities, [
+    "standards",
+    "content-files",
+    "section-composition",
+    "deployment-cloudflare",
+    "observability",
+    "booking-calendly",
+  ]);
+  assert.deepEqual(
+    calendlyPortfolio.expectedFiles.filter(
+      (path) => !basePortfolio.expectedFiles.includes(path),
+    ),
+    [
+      "apps/web/content/en-CA/booking-calendly.yaml",
+      "apps/web/src/integrations/booking-calendly/booking-content.ts",
+      "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+      "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+      "apps/web/tests/e2e/calendly-booking.spec.ts",
+    ],
+  );
 });
 
 test("generated fixture checkout bytes are pinned to LF", async () => {
@@ -117,6 +194,8 @@ test("generated fixture checkout bytes are pinned to LF", async () => {
   assert.deepEqual(stdout.trimEnd().split("\n"), [
     "fixtures/generated/portfolio/package.json: text: set",
     "fixtures/generated/portfolio/package.json: eol: lf",
+    "fixtures/generated/portfolio-calendly/package.json: text: set",
+    "fixtures/generated/portfolio-calendly/package.json: eol: lf",
     "fixtures/generated/site/package.json: text: set",
     "fixtures/generated/site/package.json: eol: lf",
   ]);
@@ -288,8 +367,8 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   let ownedPath;
   const commands = [];
   const sourceBefore = await Promise.all(
-    generatedFixtureContracts.map(({ profile, relativeRoot }) =>
-      inspectGeneratedFixture(resolve(repositoryRoot, relativeRoot), profile),
+    generatedFixtureContracts.map(({ identifier, relativeRoot }) =>
+      inspectGeneratedFixture(resolve(repositoryRoot, relativeRoot), identifier),
     ),
   );
 
@@ -370,6 +449,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
 
     assert.deepEqual(result, {
       ok: true,
+      fixtures: ["portfolio", "portfolio-calendly", "site"],
       profiles: ["portfolio", "site"],
       checks: [
         "pnpm-version",
@@ -396,16 +476,18 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     }
   }
 
-  const commandsPerProfile = 12;
-  const profileCommands = [
-    commands.slice(0, commandsPerProfile),
-    commands.slice(commandsPerProfile),
-  ];
-  assert.equal(profileCommands.every((entries) => entries.length === 12), true);
-  const [portfolioCommand, siteCommand] = profileCommands.map(
+  const commandsPerFixture = 12;
+  const fixtureCommands = generatedFixtureContracts.map((_, index) =>
+    commands.slice(
+      index * commandsPerFixture,
+      (index + 1) * commandsPerFixture,
+    ),
+  );
+  assert.equal(fixtureCommands.every((entries) => entries.length === 12), true);
+  const firstCommands = fixtureCommands.map(
     ([command]) => command,
   );
-  assert.notEqual(portfolioCommand.cwd, siteCommand.cwd);
+  assert.equal(new Set(firstCommands.map(({ cwd }) => cwd)).size, 3);
   for (const key of [
     "HOME",
     "USERPROFILE",
@@ -416,33 +498,39 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     "PLAYWRIGHT_BROWSERS_PATH",
     "XDG_CACHE_HOME",
   ]) {
-    assert.notEqual(
-      portfolioCommand.environment[key],
-      siteCommand.environment[key],
-      `${key} must be isolated per profile`,
+    assert.equal(
+      new Set(firstCommands.map(({ environment }) => environment[key])).size,
+      3,
+      `${key} must be isolated per fixture identifier`,
     );
   }
-  assert.notEqual(
-    profileCommands[0][1].arguments.at(-1),
-    profileCommands[1][1].arguments.at(-1),
-    "pnpm stores must be isolated per profile",
+  assert.equal(
+    new Set(fixtureCommands.map((entries) => entries[1].arguments.at(-1))).size,
+    3,
+    "pnpm stores must be isolated per fixture identifier",
   );
 
   const argumentLists = commands.map(({ arguments: arguments_ }) => arguments_);
-  const perProfile = argumentLists.slice(0, 12).map((arguments_) =>
+  const perFixture = argumentLists.slice(0, 12).map((arguments_) =>
     arguments_.map((argument) =>
       ownedPath !== undefined && argument.startsWith(ownedPath)
         ? "<owned-path>"
         : argument,
     ),
   );
-  assert.deepEqual(argumentLists.slice(12).map((arguments_) =>
-    arguments_.map((argument) =>
-      ownedPath !== undefined && argument.startsWith(ownedPath)
-        ? "<owned-path>"
-        : argument,
-    )), perProfile);
-  assert.deepEqual(perProfile, [
+  for (const arguments_ of fixtureCommands.slice(1)) {
+    assert.deepEqual(
+      arguments_.map(({ arguments: current }) =>
+        current.map((argument) =>
+          ownedPath !== undefined && argument.startsWith(ownedPath)
+            ? "<owned-path>"
+            : argument,
+        ),
+      ),
+      perFixture,
+    );
+  }
+  assert.deepEqual(perFixture, [
     ["--version"],
     ["install", "--frozen-lockfile", "--store-dir", "<owned-path>"],
     ["peers", "check"],
@@ -459,8 +547,8 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   assert.equal(await pathExists(ownedPath), false);
 
   const sourceAfter = await Promise.all(
-    generatedFixtureContracts.map(({ profile, relativeRoot }) =>
-      inspectGeneratedFixture(resolve(repositoryRoot, relativeRoot), profile),
+    generatedFixtureContracts.map(({ identifier, relativeRoot }) =>
+      inspectGeneratedFixture(resolve(repositoryRoot, relativeRoot), identifier),
     ),
   );
   assert.deepEqual(sourceAfter, sourceBefore);

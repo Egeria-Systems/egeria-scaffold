@@ -57,12 +57,12 @@
     },
     {
       "deliveryMode": "source-generated",
-      "identifier": "site-routing",
-      "removalPolicy": "reviewed",
+      "identifier": "booking-calendly",
+      "removalPolicy": "automatic",
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.3.0"
+      "version": "0.1.0"
     }
   ],
   "lastSuccessfulVerification": {
@@ -80,6 +80,76 @@
     "kind": "generation"
   },
   "managedSurfaces": [
+    {
+      "fingerprint": "sha256:6e469c76bc09942bad66322bc01b02b7915bc468e237d500b7d42bd0867692ba",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "booking-calendly-browser-specification",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "booking-calendly",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/e2e/calendly-booking.spec.ts"
+    },
+    {
+      "fingerprint": "sha256:99bf5d995e6e9252ed2c5628d5cfddc2b2d488a56fc23ec431a906eddbac3122",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "booking-calendly-client-component",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "booking-calendly",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/integrations/booking-calendly/calendly-booking.tsx"
+    },
+    {
+      "fingerprint": "sha256:b865e37a96244aab4519358756795bb0a575e5e816a065477a9a7f3edf517402",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "booking-calendly-content",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "booking-calendly",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/content/en-CA/booking-calendly.yaml"
+    },
+    {
+      "fingerprint": "sha256:b434f726779cc240a6bfef0b349b532665f587ccf652ed43d11f515d080d37d5",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "booking-calendly-content-reader",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "booking-calendly",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/integrations/booking-calendly/booking-content.ts"
+    },
+    {
+      "fingerprint": "sha256:9cfdd273417c50624a257081581e49a8a355331c3ee28b43afd64d0a71d9bcf6",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "booking-calendly-settings",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "booking-calendly",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/src/integrations/booking-calendly/booking-settings.ts"
+    },
     {
       "fingerprint": "sha256:bd843e0cab3dd775ae9cee9e60476dfdef122682c15a6c4e1706d6a0562f6b12",
       "fingerprintTarget": {
@@ -107,7 +177,7 @@
       "path": ".gitignore"
     },
     {
-      "fingerprint": "sha256:5affb1baee147023b57f32c9947fab4c64de9afe613fe89d28c6ff4e2a2231e8",
+      "fingerprint": "sha256:87fd53257bc4d2518ec7cb745243b6c46c440015fab940c74282e7cc37461619",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -146,7 +216,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:992bcf566cddc0b8e4ea3c6e3a309705b620577250d139c43d24faeb3d774b08",
+      "fingerprint": "sha256:c2f4e5c7416842447e2dca28f3b411be85cfd4aa5dab47fc224fad239752f593",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -159,7 +229,7 @@
       "path": ".egeria/project.yaml"
     },
     {
-      "fingerprint": "sha256:0b1f94a79feebea3db4667ce36ab00b2aecbec311e1303d29ca811fbdc2f105f",
+      "fingerprint": "sha256:63feaf3e5081cecf4ab8945a66f96a0a88cfaa573ee29969dd599066f8325e18",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -172,7 +242,7 @@
       "path": "README.md"
     },
     {
-      "fingerprint": "sha256:3f8497101acdab5ec3f2f0bbee8d1b596fcf66f889037de9baaa8a96c9894161",
+      "fingerprint": "sha256:0ca614ce273a1736cd2e6f568b0a8f79d3ea217652f7fb0256d0b61444e26832",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -198,7 +268,7 @@
       "path": "apps/web/app/layout.tsx"
     },
     {
-      "fingerprint": "sha256:533d5d786bc5f8a24e23e3019014e97a84cffa36217911ce5848060839e55a2a",
+      "fingerprint": "sha256:a3a35ab24bc29e64f8696584a77d6fe130bfe166d3d7bd5a144bf628dd76bd72",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -267,7 +337,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:6ff192d0836bb79a1c5e8c7e8ecf327defd4f192f6bbed2f56f1d1c7d35cd5ff",
+      "fingerprint": "sha256:a678f9dcda09fadc38a3b2eac9b795c429747c7707e470530e0c49d83363285c",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -322,7 +392,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:3ca0ca51666ebbf821afaf2ee89828e4f3b146f3cbb7a36f6d6733220efe8837",
+      "fingerprint": "sha256:73fc8a27dd831220927d4bf0601c7ece54be93aecf098e50e7a44f53cbd0c70d",
       "fingerprintTarget": {
         "kind": "json-value",
         "pointer": "/name"
@@ -545,7 +615,7 @@
       "path": "apps/web/content/content.config.yaml"
     },
     {
-      "fingerprint": "sha256:34e5e5cbf8e3988a5b5976fcb3763580f54461977787001105b75d81d434fc0a",
+      "fingerprint": "sha256:c54b204b7784a878afe2e7f87ae62cc5c5eb0dffae459e4b73a3b5abea6c2274",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -602,7 +672,7 @@
       "path": "apps/web/src/content/content-schema.ts"
     },
     {
-      "fingerprint": "sha256:e70c4d0c8193f5695fd7eb43b7f037fb16594476e2e76a7723c6a706823a1687",
+      "fingerprint": "sha256:53a3081d08e624ab749f9bada427c201c1e45cd6c1edd54fea95920eaf4372fc",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -688,7 +758,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:974bac413012924364529374e04b446644608abb0ca8f8791f7f94fbaf08e8d6",
+      "fingerprint": "sha256:7305098da0d03993ec7ca8be54facb2795da5bd0fa76e3116f1c6af2c4bef235",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -845,34 +915,6 @@
       },
       "ownership": "merge-managed",
       "path": "apps/web/package.json"
-    },
-    {
-      "fingerprint": "sha256:da0b64a7e507af85066af37d6fc7292e296d87590305ec2c7d71b5fa0db2a857",
-      "fingerprintTarget": {
-        "kind": "file"
-      },
-      "identifier": "site-routing-about-content",
-      "mergeStrategy": "replace-file",
-      "owner": {
-        "identifier": "site-routing",
-        "kind": "capability"
-      },
-      "ownership": "application-owned",
-      "path": "apps/web/content/en-CA/about.yaml"
-    },
-    {
-      "fingerprint": "sha256:42b9a5777cd82f9ddedab4f5e82ea23cc2ae3dcce22d05e5e8deb1ce05d7ce7c",
-      "fingerprintTarget": {
-        "kind": "file"
-      },
-      "identifier": "site-routing-about-route",
-      "mergeStrategy": "replace-file",
-      "owner": {
-        "identifier": "site-routing",
-        "kind": "capability"
-      },
-      "ownership": "application-owned",
-      "path": "apps/web/app/about/page.tsx"
     },
     {
       "fingerprint": "sha256:a34b8455789ad192f62d9d3e732553d26494caf9d900efc45a6976345799b6b3",
@@ -1108,7 +1150,7 @@
     }
   ],
   "origin": {
-    "profile": "site",
+    "profile": "portfolio",
     "recipeVersion": "0.5.0"
   },
   "projectSchemaVersion": "1.0.0",

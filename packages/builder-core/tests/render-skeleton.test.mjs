@@ -980,8 +980,16 @@ test("generated Calendly presentation preserves link, lazy inline, and native di
   assert.doesNotMatch(component, /<script|Calendly\.init|fetch\(/u);
 
   for (const contract of [
-    /page\.route\(bookingCalendlySettings\.destination/u,
+    /new URL\(bookingCalendlySettings\.destination\)\.origin/u,
+    /target\.route\(\s*\(url\) => url\.origin === providerOrigin/u,
+    /requestUrl === bookingCalendlySettings\.destination/u,
+    /unexpectedRequestUrls\.push\(requestUrl\)/u,
+    /route\.abort\("blockedbyclient"\)/u,
     /route\.fulfill/u,
+    /<link rel="icon" href="data:,">/u,
+    /stubSchedulingDocument\(page\)/u,
+    /stubSchedulingDocument\(context\)/u,
+    /expect\(providerAudit\.unexpectedRequestUrls\(\)\)\.toEqual\(\[\]\)/u,
     /javaScriptEnabled: false/u,
     /CalendlyBookingSettings\["mode"\]/u,
     /bookingMode === "link"/u,
@@ -994,6 +1002,8 @@ test("generated Calendly presentation preserves link, lazy inline, and native di
     /keyboard\.press\("Escape"\)/u,
     /document\.activeElement/u,
     /width: 320/u,
+    /getBoundingClientRect\(\)/u,
+    /dialogBounds\.right\)\.toBeLessThanOrEqual\(dialogBounds\.innerWidth\)/u,
     /scrollWidth/u,
     /AxeBuilder/u,
     /wcag22aa/u,

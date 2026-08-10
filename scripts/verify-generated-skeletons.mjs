@@ -65,11 +65,58 @@ const portfolioFiles = Object.freeze([
   "pnpm-workspace.yaml",
 ].sort(codePointCompare));
 
+const bookingCalendlyFiles = Object.freeze([
+  "apps/web/app/page.tsx",
+  "apps/web/content/en-CA/booking-calendly.yaml",
+  "apps/web/src/integrations/booking-calendly/booking-content.ts",
+  "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+  "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+  "apps/web/tests/e2e/calendly-booking.spec.ts",
+].sort(codePointCompare));
+
+const createArguments = ({
+  profile,
+  projectName,
+  displayName,
+  bookingCalendly,
+}) =>
+  Object.freeze([
+    "--profile",
+    profile,
+    "--name",
+    projectName,
+    "--display-name",
+    displayName,
+    ...(bookingCalendly === undefined
+      ? []
+      : [
+          "--calendly-url",
+          bookingCalendly.destination,
+          "--calendly-mode",
+          bookingCalendly.mode,
+        ]),
+  ]);
+
+const noCapabilitySettings = Object.freeze({});
+const portfolioCalendlySettings = Object.freeze({
+  "booking-calendly": Object.freeze({
+    destination: "https://calendly.com/example/intro",
+    mode: "popup",
+  }),
+});
+
 export const generatedFixtureContracts = Object.freeze([
   Object.freeze({
+    identifier: "portfolio",
     profile: "portfolio",
     projectName: "acme-portfolio",
     displayName: "Acme Portfolio",
+    createArguments: createArguments({
+      profile: "portfolio",
+      projectName: "acme-portfolio",
+      displayName: "Acme Portfolio",
+    }),
+    expectedCapabilitySettings: noCapabilitySettings,
     relativeRoot: "fixtures/generated/portfolio",
     expectedFiles: portfolioFiles,
     expectedCapabilities: Object.freeze([
@@ -85,12 +132,56 @@ export const generatedFixtureContracts = Object.freeze([
     expectedSectionCompositionVersion: "0.3.0",
     expectedDeploymentCloudflareVersion: "0.2.0",
     expectedSiteRoutingVersion: null,
+    expectedBookingCalendlyVersion: null,
     expectedSurfaces: 71,
   }),
   Object.freeze({
+    identifier: "portfolio-calendly",
+    profile: "portfolio",
+    projectName: "acme-portfolio-calendly",
+    displayName: "Acme Portfolio Booking",
+    createArguments: createArguments({
+      profile: "portfolio",
+      projectName: "acme-portfolio-calendly",
+      displayName: "Acme Portfolio Booking",
+      bookingCalendly: portfolioCalendlySettings["booking-calendly"],
+    }),
+    expectedCapabilitySettings: portfolioCalendlySettings,
+    relativeRoot: "fixtures/generated/portfolio-calendly",
+    expectedFiles: Object.freeze([
+      ...portfolioFiles.filter(
+        (path) => path !== "apps/web/app/page.tsx",
+      ),
+      ...bookingCalendlyFiles,
+    ].sort(codePointCompare)),
+    expectedCapabilities: Object.freeze([
+      "standards",
+      "content-files",
+      "section-composition",
+      "deployment-cloudflare",
+      "observability",
+      "booking-calendly",
+    ]),
+    expectedRecipeVersion: "0.5.0",
+    expectedStandardsVersion: "0.2.0",
+    expectedContentFilesVersion: "0.4.0",
+    expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.2.0",
+    expectedSiteRoutingVersion: null,
+    expectedBookingCalendlyVersion: "0.1.0",
+    expectedSurfaces: 76,
+  }),
+  Object.freeze({
+    identifier: "site",
     profile: "site",
     projectName: "acme-site",
     displayName: "Acme Site",
+    createArguments: createArguments({
+      profile: "site",
+      projectName: "acme-site",
+      displayName: "Acme Site",
+    }),
+    expectedCapabilitySettings: noCapabilitySettings,
     relativeRoot: "fixtures/generated/site",
     expectedFiles: Object.freeze([
       ...portfolioFiles,
@@ -111,6 +202,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedSectionCompositionVersion: "0.3.0",
     expectedDeploymentCloudflareVersion: "0.2.0",
     expectedSiteRoutingVersion: "0.3.0",
+    expectedBookingCalendlyVersion: null,
     expectedSurfaces: 73,
   }),
 ]);
@@ -543,18 +635,18 @@ async function inspectFixture(root, contract) {
   return snapshot;
 }
 
-function contractForProfile(profile) {
+function contractForIdentifier(identifier) {
   const contract = generatedFixtureContracts.find(
-    (candidate) => candidate.profile === profile,
+    (candidate) => candidate.identifier === identifier,
   );
   if (contract === undefined) {
-    fail("FIXTURE_PROFILE_INVALID");
+    fail("FIXTURE_IDENTIFIER_INVALID");
   }
   return contract;
 }
 
-export function inspectGeneratedFixture(root, profile) {
-  return inspectFixture(resolve(root), contractForProfile(profile));
+export function inspectGeneratedFixture(root, identifier) {
+  return inspectFixture(resolve(root), contractForIdentifier(identifier));
 }
 
 async function defaultRunCommand(input) {
@@ -607,8 +699,14 @@ async function verifyWithAdapters(adapters) {
   let pendingError;
   try {
     for (const source of sourcesBefore) {
-      const validationRoot = join(owner.path, `${source.contract.profile}-project`);
-      const supportRoot = join(owner.path, `${source.contract.profile}-support`);
+      const validationRoot = join(
+        owner.path,
+        `${source.contract.identifier}-project`,
+      );
+      const supportRoot = join(
+        owner.path,
+        `${source.contract.identifier}-support`,
+      );
 
       await cp(source.root, validationRoot, {
         recursive: true,
@@ -735,7 +833,10 @@ async function verifyWithAdapters(adapters) {
 
   return {
     ok: true,
-    profiles: generatedFixtureContracts.map(({ profile }) => profile),
+    fixtures: generatedFixtureContracts.map(({ identifier }) => identifier),
+    profiles: [
+      ...new Set(generatedFixtureContracts.map(({ profile }) => profile)),
+    ],
     checks: verificationChecks,
   };
 }

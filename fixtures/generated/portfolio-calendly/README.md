@@ -1,4 +1,4 @@
-# acme-site
+# acme-portfolio-calendly
 
 Generated as a lightweight pnpm workspace with its web application in `apps/web`.
 

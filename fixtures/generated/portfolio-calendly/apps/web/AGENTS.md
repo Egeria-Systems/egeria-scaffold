@@ -1,4 +1,4 @@
-# acme-site web application guidance
+# acme-portfolio-calendly web application guidance
 
 - Load validated locale content in routes and pass typed values into pure presentation components.
 - Add page sections through the typed source registry and preserve exact content validation, stable instance identifiers, and one enabled hero first among enabled sections per page.

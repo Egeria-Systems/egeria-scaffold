@@ -98,6 +98,19 @@
       "path": ".gitignore"
     },
     {
+      "fingerprint": "sha256:5affb1baee147023b57f32c9947fab4c64de9afe613fe89d28c6ff4e2a2231e8",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "builder-home-route",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "kind": "builder-kernel"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/app/page.tsx"
+    },
+    {
       "fingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "fingerprintTarget": {
         "kind": "file"
@@ -137,7 +150,7 @@
       "path": ".egeria/project.yaml"
     },
     {
-      "fingerprint": "sha256:d0f6bcbf0958ad653596dcedec0bcee9f14dddf79e86484a5d92ff8010109196",
+      "fingerprint": "sha256:67f914b00b64a2a29ab73861487604b0033c0bb67cfcd93efd36488fbe58df6e",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -245,7 +258,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:340f286bf80c6ab3db399f57f65af20c6f9edbfa208dba0e46fc7190d70613ed",
+      "fingerprint": "sha256:7b85122456e30733cd9d09f8dfd0fa9c87655ce45a3496d596ee7bdb3a021a2a",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -738,20 +751,6 @@
       "path": "apps/web/app/globals.css"
     },
     {
-      "fingerprint": "sha256:5affb1baee147023b57f32c9947fab4c64de9afe613fe89d28c6ff4e2a2231e8",
-      "fingerprintTarget": {
-        "kind": "file"
-      },
-      "identifier": "section-composition-home-route",
-      "mergeStrategy": "replace-file",
-      "owner": {
-        "identifier": "section-composition",
-        "kind": "capability"
-      },
-      "ownership": "application-owned",
-      "path": "apps/web/app/page.tsx"
-    },
-    {
       "fingerprint": "sha256:b24e265a48887c14722800bc0968fa807151a8a08228b2498c43ee860c1b25e9",
       "fingerprintTarget": {
         "kind": "file"
@@ -781,7 +780,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:2d6d6b27564cf4f51e0dc22486fbbac61186093ad44085cde07f39861e95a839",
+      "fingerprint": "sha256:fc3187b34aff7b20c39cf588a199a26eb2c83072694805bd6fb4c5b026882212",
       "fingerprintTarget": {
         "kind": "file"
       },

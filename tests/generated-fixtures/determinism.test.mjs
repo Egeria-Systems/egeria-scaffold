@@ -137,7 +137,7 @@ function assertPortablePublicLockfile(lockfile) {
   assert.match(lockfile, /tailwindcss@4\.3\.3/u);
 }
 
-test("compiled project generation matches committed portfolio and site fixtures", async (context) => {
+test("compiled project generation matches every committed fixture identifier", async (context) => {
   for (const fixtureCase of generatedFixtureContracts) {
     assert.equal(
       await pathExists(resolve(repositoryRoot, fixtureCase.relativeRoot)),
@@ -151,20 +151,15 @@ test("compiled project generation matches committed portfolio and site fixtures"
   try {
     for (const fixtureCase of generatedFixtureContracts) {
       const generatedRoots = [
-        join(owner, `${fixtureCase.profile}-first`),
-        join(owner, `${fixtureCase.profile}-second`),
+        join(owner, `${fixtureCase.identifier}-first`),
+        join(owner, `${fixtureCase.identifier}-second`),
       ];
       const generatedSnapshots = [];
 
       for (const destination of generatedRoots) {
         const created = await runCli([
           "create",
-          "--profile",
-          fixtureCase.profile,
-          "--name",
-          fixtureCase.projectName,
-          "--display-name",
-          fixtureCase.displayName,
+          ...fixtureCase.createArguments,
           "--directory",
           destination,
         ]);
@@ -225,9 +220,38 @@ test("compiled project generation matches committed portfolio and site fixtures"
           fixtureCase.expectedSiteRoutingVersion,
         );
         assert.equal(
+          state.installedCapabilities.find(
+            ({ identifier }) => identifier === "booking-calendly",
+          )?.version ?? null,
+          fixtureCase.expectedBookingCalendlyVersion,
+        );
+        assert.equal(
           state.managedSurfaces.length,
           fixtureCase.expectedSurfaces,
         );
+        const projectConfiguration = await readFile(
+          join(destination, ".egeria/project.yaml"),
+          "utf8",
+        );
+        const expectedSettings = fixtureCase.expectedCapabilitySettings[
+          "booking-calendly"
+        ];
+        if (expectedSettings === undefined) {
+          assert.match(projectConfiguration, /^capabilitySettings: \{\}$/mu);
+        } else {
+          assert.match(
+            projectConfiguration,
+            new RegExp(
+              [
+                "^capabilitySettings:$",
+                "^  booking-calendly:$",
+                `^    destination: ${expectedSettings.destination}$`,
+                `^    mode: ${expectedSettings.mode}$`,
+              ].join("\\n"),
+              "mu",
+            ),
+          );
+        }
         assert.deepEqual(state.lastSuccessfulVerification.checks, [
           "contracts",
           "pre-state-inference",
@@ -255,7 +279,7 @@ test("compiled project generation matches committed portfolio and site fixtures"
       );
       assert.deepEqual(committedSnapshot, generatedSnapshots[0]);
       context.diagnostic(
-        `${fixtureCase.profile}: ${committedSnapshot.length} byte-stable files`,
+        `${fixtureCase.identifier}: ${committedSnapshot.length} byte-stable files`,
       );
     }
   } finally {
