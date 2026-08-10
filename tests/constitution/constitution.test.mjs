@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { access, readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -12,6 +13,10 @@ const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
+const requireFromBuilderCore = createRequire(
+  resolve(repositoryRoot, "packages/builder-core/package.json"),
+);
+const { parse } = requireFromBuilderCore("yaml");
 const compactLabel = (...parts) => parts.join("");
 const namedLabel = (prefix, ordinal, separator = " ") =>
   [prefix, separator, ordinal].join("");
@@ -476,6 +481,135 @@ test("the deployment credential contract rejects build work in the secret-bearin
     validateCompatibilityDeploymentCredentialBoundary(insecureWorkflow),
     /must not build under Cloudflare credentials/,
   );
+});
+
+test("Calendly certification deployment is manual, revision-bound, and secret-minimal", async () => {
+  const source = await readRepositoryFile(
+    ".github/workflows/booking-calendly-certification.yml",
+  );
+  const workflow = parse(source);
+
+  assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
+  assert.deepEqual(workflow.on.workflow_dispatch.inputs, {
+    expected_revision: {
+      description: "Exact main revision approved for certification",
+      required: true,
+      type: "string",
+    },
+    calendly_url: {
+      description: "Synthetic Calendly event URL",
+      required: true,
+      type: "string",
+    },
+  });
+  assert.deepEqual(workflow.permissions, { contents: "read" });
+  assert.deepEqual(workflow.concurrency, {
+    group: "booking-calendly-certification",
+    "cancel-in-progress": false,
+  });
+
+  const job = workflow.jobs["verify-and-deploy"];
+  assert.equal(job.if, "github.ref == 'refs/heads/main'");
+  assert.equal(job["runs-on"], "ubuntu-24.04");
+  assert.deepEqual(job.environment, {
+    name: "compatibility",
+    url: "${{ vars.BOOKING_CALENDLY_CERTIFICATION_URL }}",
+  });
+  assert.deepEqual(job.env, {
+    CERTIFICATION_ROOT:
+      "${{ runner.temp }}/booking-calendly-certification/project",
+  });
+
+  const stepsByName = Object.fromEntries(
+    job.steps.map((step) => [step.name, step]),
+  );
+  assert.equal(
+    stepsByName["Check out repository"].uses,
+    "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+  );
+  assert.deepEqual(stepsByName["Check out repository"].with, {
+    ref: "${{ github.sha }}",
+    "persist-credentials": false,
+  });
+  assert.equal(
+    stepsByName["Set up pnpm and Node.js"].uses,
+    "pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c",
+  );
+  assert.deepEqual(stepsByName["Set up pnpm and Node.js"].with, {
+    version: "11.20.0",
+    runtime: "node@22.23.2",
+    cache: true,
+    install: false,
+  });
+  assert.equal(
+    stepsByName["Upload local certification receipt"].uses,
+    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+  );
+  assert.equal(
+    stepsByName["Upload local certification receipt"].with["retention-days"],
+    7,
+  );
+
+  const revisionIndex = job.steps.findIndex(
+    ({ name }) => name === "Verify approved revision",
+  );
+  const deployIndex = job.steps.findIndex(
+    ({ name }) => name === "Deploy certification Worker",
+  );
+  const deployedTestIndex = job.steps.findIndex(
+    ({ name }) => name === "Test deployed application behavior",
+  );
+  assert.ok(revisionIndex > -1 && revisionIndex < deployIndex);
+  assert.ok(deployIndex < deployedTestIndex);
+  assert.deepEqual(stepsByName["Deploy certification Worker"].env, {
+    CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
+    CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
+  });
+  assert.deepEqual(
+    stepsByName["Test deployed application behavior"].env,
+    {
+      PLAYWRIGHT_DEPLOYED_URL:
+        "${{ vars.BOOKING_CALENDLY_CERTIFICATION_URL }}",
+    },
+  );
+
+  const secretSteps = job.steps.filter((step) =>
+    JSON.stringify(step).includes("secrets.CLOUDFLARE_"),
+  );
+  assert.deepEqual(
+    secretSteps.map(({ name }) => name),
+    ["Deploy certification Worker"],
+  );
+  assert.doesNotMatch(
+    stepsByName["Deploy certification Worker"].run,
+    /pnpm\b[^\n]*(?:build|test)|calendly/iu,
+  );
+  assert.doesNotMatch(source, /^  (?:pull_request|push|schedule):/mu);
+  assert.doesNotMatch(source, /wrangler delete|calendly\.com\/api|provider token/iu);
+});
+
+test("the provider receipt template separates application, provider, and cleanup evidence", async () => {
+  const template = await readRepositoryFile(
+    "docs/implementation-evidence/booking-calendly-provider-receipt-template.md",
+  );
+
+  for (const heading of [
+    "Workflow and revision identity",
+    "Synthetic-data declaration",
+    "Deployed application evidence",
+    "Provider-confirmed evidence",
+    "Cancellation and cleanup evidence",
+    "Privacy exclusions",
+    "Claim boundary",
+  ]) {
+    assert.match(template, new RegExp(`^## ${heading}$`, "mu"));
+  }
+  assert.match(template, /synthetic host and invitee/iu);
+  assert.match(template, /meeting status/iu);
+  assert.match(template, /acme-portfolio-calendly-web/u);
+  assert.match(template, /Worker.*removed|removed.*Worker/iu);
+  assert.match(template, /must not contain.*email address/iu);
+  assert.match(template, /does not establish WCAG conformance/iu);
 });
 
 test("repository documentation has no broken local Markdown links", async () => {

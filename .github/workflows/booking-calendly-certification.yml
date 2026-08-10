@@ -1,0 +1,107 @@
+name: Booking Calendly certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_revision:
+        description: Exact main revision approved for certification
+        required: true
+        type: string
+      calendly_url:
+        description: Synthetic Calendly event URL
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: booking-calendly-certification
+  cancel-in-progress: false
+
+jobs:
+  verify-and-deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment:
+      name: compatibility
+      url: ${{ vars.BOOKING_CALENDLY_CERTIFICATION_URL }}
+    env:
+      CERTIFICATION_ROOT: ${{ runner.temp }}/booking-calendly-certification/project
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: true
+          install: false
+
+      - name: Verify approved revision
+        env:
+          EXPECTED_REVISION: ${{ inputs.expected_revision }}
+        run: |
+          test "$GITHUB_SHA" = "$EXPECTED_REVISION"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Install builder dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check capability admission
+        run: pnpm run check:capability-certification
+
+      - name: Build builder packages
+        run: pnpm run build:builder
+
+      - name: Verify fresh local scaffold
+        env:
+          CALENDLY_URL: ${{ inputs.calendly_url }}
+        run: |
+          test -n "$CALENDLY_URL"
+          node scripts/certify-booking-calendly.mjs --calendly-url "$CALENDLY_URL" > "$RUNNER_TEMP/booking-calendly-local-receipt.json"
+          test "$(wc -l < "$RUNNER_TEMP/booking-calendly-local-receipt.json")" -eq 1
+
+      - name: Create deployment candidate
+        env:
+          CALENDLY_URL: ${{ inputs.calendly_url }}
+        run: |
+          test -n "$CALENDLY_URL"
+          mkdir -p "$RUNNER_TEMP/booking-calendly-certification"
+          node apps/cli/dist/index.js create --profile portfolio --name acme-portfolio-calendly --display-name "Acme Portfolio Booking" --directory "$CERTIFICATION_ROOT" --calendly-url "$CALENDLY_URL" --calendly-mode popup
+
+      - name: Prepare deployment candidate
+        run: |
+          pnpm --dir "$CERTIFICATION_ROOT" install --frozen-lockfile
+          pnpm --dir "$CERTIFICATION_ROOT" run build:cloudflare
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" run browser:install:ci
+
+      - name: Deploy certification Worker
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec opennextjs-cloudflare deploy
+
+      - name: Test deployed application behavior
+        env:
+          PLAYWRIGHT_DEPLOYED_URL: ${{ vars.BOOKING_CALENDLY_CERTIFICATION_URL }}
+        run: |
+          test -n "$PLAYWRIGHT_DEPLOYED_URL"
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:e2e:deployed
+
+      - name: Upload local certification receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: booking-calendly-local-receipt
+          path: ${{ runner.temp }}/booking-calendly-local-receipt.json
+          if-no-files-found: error
+          retention-days: 7
