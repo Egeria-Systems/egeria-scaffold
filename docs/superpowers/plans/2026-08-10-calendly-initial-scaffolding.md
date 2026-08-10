@@ -71,6 +71,9 @@ packages/builder-core/tests/generate-project.test.mjs
 packages/builder-core/schemas/project.schema.json
 apps/cli/tests/cli.test.mjs
 tests/package-boundaries/private-packages.test.mjs
+tests/package-boundaries/internal-linting.test.mjs
+tests/package-boundaries/public-standards.test.mjs
+tests/package-boundaries/release-safeguards.test.mjs
 tests/generated-fixtures/determinism.test.mjs
 tests/generated-fixtures/verification-script.test.mjs
 scripts/verify-generated-skeletons.mjs
@@ -181,14 +184,14 @@ Do not touch any other existing `fixtures/generated/portfolio` or `fixtures/gene
 
 **RED files:** rendering, copy, inventory, and browser contract tests listed above.
 
-- [ ] Add focused failing tests for conditional template selection, exact generated settings bytes, JSON-safe token insertion, strict externalized copy parsing, all three presentation modes, unchanged unselected file sets, home-root ownership transfer, capability surfaces/probes, copy-lint coverage, and Cloudflare-boundary purity.
-- [ ] Run the smallest targeted tests and record the expected assertion failures before template edits.
-- [ ] Add the six capability template files. Keep booking content application-owned, settings managed, and all visible strings in YAML.
-- [ ] Add typed React children to `ContentPage`; keep it pure. Keep observer/dialog/frame lifecycle inside `CalendlyBooking`.
-- [ ] Implement normal link fallback, intersection-activated inline iframe, activation-bound native popup dialog, cross-origin referrer policy, close cleanup, focus/reflow styling, and unsupported-API fallback.
-- [ ] Extend both the root copy-lint command glob and ESLint configuration scope to integration TSX templates, and update generated guidance.
-- [ ] Run builder rendering tests, copy lint, source lint, typecheck, semantic naming, and package-boundary inventory GREEN.
-- [ ] Commit with message `Generate Calendly booking presentation`.
+- [x] Add focused failing tests for conditional template selection, exact generated settings bytes, JSON-safe token insertion, strict externalized copy parsing, all three presentation modes, unchanged unselected file sets, home-root ownership transfer, capability surfaces/probes, copy-lint coverage, and Cloudflare-boundary purity.
+- [x] Run the smallest targeted tests and record the expected assertion failures before template edits.
+- [x] Add the six capability template files. Keep booking content application-owned, settings managed, and all visible strings in YAML.
+- [x] Add typed React children to `ContentPage`; keep it pure. Keep observer/dialog/frame lifecycle inside `CalendlyBooking`.
+- [x] Implement normal link fallback, intersection-activated inline iframe, activation-bound native popup dialog, cross-origin referrer policy, close cleanup, focus/reflow styling, and unsupported-API fallback.
+- [x] Extend both the root copy-lint command glob and ESLint configuration scope to integration TSX templates, and update generated guidance.
+- [x] Run builder rendering tests, copy lint, source lint, typecheck, semantic naming, and package-boundary inventory GREEN.
+- [x] Commit with message `Generate Calendly booking presentation`.
 
 ## Task 4: Retain and certify the representative generated project
 
