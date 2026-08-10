@@ -6,8 +6,7 @@ export default function Home() {
 
   return (
     <ContentPage
-      heading={content.home.heading}
-      summary={content.home.summary}
+      sections={content.home.sections}
       navigation={content.navigation}
     />
   );

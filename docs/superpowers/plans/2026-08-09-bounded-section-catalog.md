@@ -57,6 +57,7 @@ Modify tests, verification contracts, root copy coverage, and checked schemas:
 
 ```text
 package.json
+eslint.config.mjs
 packages/builder-core/tests/contracts.test.mjs
 packages/builder-core/tests/diagnostics.test.mjs
 packages/builder-core/tests/resolution.test.mjs
@@ -64,6 +65,8 @@ packages/builder-core/tests/render-skeleton.test.mjs
 packages/builder-core/tests/generate-project.test.mjs
 tests/package-boundaries/private-packages.test.mjs
 tests/package-boundaries/internal-linting.test.mjs
+tests/package-boundaries/public-standards.test.mjs
+tests/package-boundaries/release-safeguards.test.mjs
 tests/generated-fixtures/determinism.test.mjs
 scripts/verify-generated-skeletons.mjs
 packages/builder-core/schemas/profile.schema.json
@@ -129,26 +132,26 @@ All raw and decoded strings reject the existing forbidden control set. Navigatio
 - Modify: `tests/package-boundaries/internal-linting.test.mjs`
 - Modify: `package.json`
 
-- [ ] Add runtime contract tests accepting retained `0.1.0`/`0.2.0` and current `0.3.0` while rejecting `0.4.0`.
-- [ ] Specify `section-composition@0.2.0`, its exact new application-owned registry surface/probe, unchanged dependency/security/provider declarations, and recipe `0.3.0`.
-- [ ] Add the registry source to exact template, rendered-path, ownership-count, and private-package allowlist assertions.
-- [ ] Add parser cases for all valid section types; source ordering; disabled omission; exact keys/types/variants; duplicate or invalid IDs; missing/multiple/disabled heroes; empty projects; control characters; and safe/unsafe link destinations.
-- [ ] Add executable registry assertions for exact metadata, parser associations, pure semantic component structure, enabled ordering, stable IDs, and exhaustive four-type rendering. Transpile only the generated modules and use a deterministic test JSX runtime; also retain real generated Next/OpenNext build verification.
-- [ ] Expand the root copy command to `src/sections/**/*.tsx` and require the exact new file to be linted with zero messages.
-- [ ] Build builder-core, run the focused tests, and record RED caused only by absent `0.3.0`, new registry/template, parser behavior, and copy path.
+- [x] Add runtime contract tests accepting retained `0.1.0`/`0.2.0` and current `0.3.0` while rejecting `0.4.0`.
+- [x] Specify `section-composition@0.2.0`, its exact new application-owned registry surface/probe, unchanged dependency/security/provider declarations, and recipe `0.3.0`.
+- [x] Add the registry source to exact template, rendered-path, ownership-count, and private-package allowlist assertions.
+- [x] Add parser cases for all valid section types; source ordering; disabled omission; exact keys/types/variants; duplicate or invalid IDs; missing/multiple/disabled heroes; empty projects; control characters; and safe/unsafe link destinations.
+- [x] Add executable registry assertions for exact metadata, parser associations, pure semantic component structure, enabled ordering, stable IDs, and exhaustive four-type rendering. Transpile only the generated modules and use a deterministic test JSX runtime; also retain real generated Next/OpenNext build verification.
+- [x] Expand the root copy command to `src/sections/**/*.tsx` and require the exact new file to be linted with zero messages.
+- [x] Build builder-core, run the focused tests, and record RED caused only by absent `0.3.0`, new registry/template, parser behavior, and copy path.
 
 ## Task 3: GREEN — implement the minimum bounded registry
 
 **Files:** the exact runtime/template/schema/documentation files listed above.
 
-- [ ] Add current recipe provenance and regenerate, never hand-edit, all three checked schema artifacts.
-- [ ] Advance only `section-composition` and current profile recipe versions; add one exact registry surface/probe; leave every package/provider/dependency contract unchanged.
-- [ ] Implement pure exact section parsers and shared safe-link validation in the existing generated content schema.
-- [ ] Implement one cohesive four-entry registry and pure server-rendered components with semantic heading/list/link structure.
-- [ ] Update home and site-about routes, pure page shell, and all structured YAML to consume typed ordered sections with externalized fictional copy.
-- [ ] Update direct generated guidance and canonical owners without copying the full source-plan contract.
-- [ ] Run focused parser/registry/render/resolution/copy tests until GREEN, then the full builder-core and package-boundary suites once for this coherent source batch.
-- [ ] Inspect changed files and commit the exact source/test/schema/doc batch with message `Add bounded section composition`.
+- [x] Add current recipe provenance and regenerate, never hand-edit, all three checked schema artifacts.
+- [x] Advance only `section-composition` and current profile recipe versions; add one exact registry surface/probe; leave every package/provider/dependency contract unchanged.
+- [x] Implement pure exact section parsers and shared safe-link validation in the existing generated content schema.
+- [x] Implement one cohesive four-entry registry and pure server-rendered components with semantic heading/list/link structure.
+- [x] Update home and site-about routes, pure page shell, and all structured YAML to consume typed ordered sections with externalized fictional copy.
+- [x] Update direct generated guidance and canonical owners without copying the full source-plan contract.
+- [x] Run focused parser/registry/render/resolution/copy tests until GREEN and the full package-boundary suite for this coherent source batch; defer the full builder-core suite until its generation/fixture consumers are updated in Task 4.
+- [x] Inspect changed files and commit the exact source/test/schema/doc batch with message `Add bounded section composition`.
 
 ## Task 4: RED/GREEN — refresh production generation evidence
 
@@ -195,3 +198,7 @@ All raw and decoded strings reject the existing forbidden control set. Navigatio
 Use focused newest-first `git revert` commits, never reset or history rewriting. Reverting fixture/evidence commits restores prior generated evidence; reverting implementation restores recipe `0.2.0`, `section-composition@0.1.0`, the prior simple page shape, and checked schemas; reverting planning withdraws only dated design records. After any source revert, regenerate both fixtures from the restored production CLI and rerun `verify:builder-kernel`.
 
 There is no dependency, deployment, provider, persistent-data, analytics, or booking rollback. Temporary generation, install, build, and test-runtime directories are non-authoritative and recreatable from the pinned toolchain.
+
+## Execution amendment — root copy-config consumer
+
+The first focused GREEN run proved that the root command glob alone is not the complete canonical copy-lint consumer: `eslint.config.mjs` independently passes the accepted template patterns into the standards factory. The plan therefore adds that exact file to the copy-coverage batch and adds only `packages/builder-core/templates/**/src/sections/**/*.tsx` to the existing factory configuration. The full package-boundary run then identified two literal command-contract consumers, `tests/package-boundaries/public-standards.test.mjs` and `tests/package-boundaries/release-safeguards.test.mjs`; both are added only to expect the same widened exact command. No lint rule, standards API, generated dependency, release behavior, or other path is added.

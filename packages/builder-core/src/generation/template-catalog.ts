@@ -27,6 +27,7 @@ const commonTemplateSources = [
   "common/apps/web/src/content/content-schema.ts",
   "common/apps/web/src/content/read-content.ts",
   "common/apps/web/src/presentation/content-page.tsx",
+  "common/apps/web/src/sections/section-registry.tsx",
   "common/apps/web/src/infrastructure/observability/installed-capability.ts",
 ] as const;
 

@@ -50,7 +50,7 @@ test("the builder root owns an exact ESLint 10 lint boundary", async () => {
   );
   assert.equal(
     rootManifest.scripts?.["check:copy-externalization"],
-    'eslint "packages/builder-core/templates/**/app/**/*.tsx" "packages/builder-core/templates/**/src/presentation/**/*.tsx" --config eslint.config.mjs --max-warnings 0',
+    'eslint "packages/builder-core/templates/**/app/**/*.tsx" "packages/builder-core/templates/**/src/presentation/**/*.tsx" "packages/builder-core/templates/**/src/sections/**/*.tsx" --config eslint.config.mjs --max-warnings 0',
   );
   assert.equal(
     rootManifest.scripts?.["check:semantic-naming"],
@@ -81,6 +81,7 @@ test("copy externalization covers canonical builder TSX templates", async () => 
   const results = await eslint.lintFiles([
     "packages/builder-core/templates/**/app/**/*.tsx",
     "packages/builder-core/templates/**/src/presentation/**/*.tsx",
+    "packages/builder-core/templates/**/src/sections/**/*.tsx",
   ]);
 
   assert.deepEqual(
@@ -101,6 +102,11 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       {
         filePath:
           "packages/builder-core/templates/common/apps/web/src/presentation/content-page.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/common/apps/web/src/sections/section-registry.tsx",
         messages: [],
       },
       {

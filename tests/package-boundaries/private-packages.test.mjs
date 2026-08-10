@@ -279,6 +279,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/src/content/read-content.ts",
       "common/apps/web/src/infrastructure/observability/installed-capability.ts",
       "common/apps/web/src/presentation/content-page.tsx",
+      "common/apps/web/src/sections/section-registry.tsx",
       "common/apps/web/tsconfig.json",
       "common/apps/web/wrangler.jsonc.template",
       "common/package.json.template",
@@ -337,7 +338,8 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /explicit allowlisted templates/);
   assert.match(builderInstructions, /YAML 1.2/);
   assert.match(builderInstructions, /Markdown with validated YAML front matter/);
-  assert.match(builderInstructions, /recipe `0.2.0`/);
+  assert.match(builderInstructions, /recipe `0.3.0`/);
+  assert.match(builderInstructions, /source-owned typed section registry/);
   assert.match(builderInstructions, /state-last generation/);
   assert.match(builderInstructions, /exact verified public package versions/);
   assert.match(builderInstructions, /identity-recorded sibling temporary directory/);
@@ -353,7 +355,8 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /explicit allowlisted templates/);
   assert.match(builderReadme, /YAML 1.2/);
   assert.match(builderReadme, /Markdown with validated YAML front matter/);
-  assert.match(builderReadme, /recipe `0.2.0`/);
+  assert.match(builderReadme, /recipe `0.3.0`/);
+  assert.match(builderReadme, /four source-registered typed section shapes/);
   assert.match(builderReadme, /generateProject/);
   assert.match(builderReadme, /previously absent destination/);
   assert.match(builderReadme, /installed state last/);

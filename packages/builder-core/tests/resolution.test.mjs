@@ -226,7 +226,7 @@ test("the portfolio and site catalog declares the exact six executable capabilit
     },
     {
       identifier: "section-composition",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -263,12 +263,24 @@ test("the portfolio and site catalog declares the exact six executable capabilit
           fingerprintTarget: { kind: "file" },
           mergeStrategy: "replace-file",
         },
+        {
+          identifier: "section-composition-registry",
+          owner: { kind: "capability", identifier: "section-composition" },
+          path: "apps/web/src/sections/section-registry.tsx",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
       ],
       inferenceProbes: [
         { kind: "file", path: "apps/web/app/page.tsx" },
         {
           kind: "file",
           path: "apps/web/src/presentation/content-page.tsx",
+        },
+        {
+          kind: "file",
+          path: "apps/web/src/sections/section-registry.tsx",
         },
       ],
       migrationPlanners: [],
@@ -597,7 +609,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.2.0",
+      recipeVersion: "0.3.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -609,7 +621,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.2.0",
+      recipeVersion: "0.3.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -640,7 +652,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.2.0");
+  assert.equal(portfolio.recipeVersion, "0.3.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -680,7 +692,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "section-composition",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",

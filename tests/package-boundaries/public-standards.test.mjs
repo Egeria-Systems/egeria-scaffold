@@ -112,7 +112,7 @@ test("each standards API has a concrete workspace consumer", async () => {
   );
   assert.equal(
     rootManifest.scripts?.["check:copy-externalization"],
-    'eslint "packages/builder-core/templates/**/app/**/*.tsx" "packages/builder-core/templates/**/src/presentation/**/*.tsx" --config eslint.config.mjs --max-warnings 0',
+    'eslint "packages/builder-core/templates/**/app/**/*.tsx" "packages/builder-core/templates/**/src/presentation/**/*.tsx" "packages/builder-core/templates/**/src/sections/**/*.tsx" --config eslint.config.mjs --max-warnings 0',
   );
   assert.match(
     rootConfiguration,

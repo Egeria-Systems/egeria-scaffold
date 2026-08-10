@@ -209,7 +209,7 @@ test("root release commands use the pinned Changesets boundary", async () => {
       build:
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run build",
       copyExternalization:
-        'eslint "packages/builder-core/templates/**/app/**/*.tsx" "packages/builder-core/templates/**/src/presentation/**/*.tsx" --config eslint.config.mjs --max-warnings 0',
+      'eslint "packages/builder-core/templates/**/app/**/*.tsx" "packages/builder-core/templates/**/src/presentation/**/*.tsx" "packages/builder-core/templates/**/src/sections/**/*.tsx" --config eslint.config.mjs --max-warnings 0',
       changeset: "changeset",
       changesetStatus: "changeset status",
       releaseCheck: "node scripts/check-package-release.mjs",

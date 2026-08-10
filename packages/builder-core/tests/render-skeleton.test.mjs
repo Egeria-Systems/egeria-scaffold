@@ -35,6 +35,7 @@ const portfolioPaths = [
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/presentation/content-page.tsx",
+  "apps/web/src/sections/section-registry.tsx",
   "apps/web/tsconfig.json",
   "apps/web/wrangler.jsonc",
   "package.json",
@@ -63,6 +64,7 @@ const sitePaths = [
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/presentation/content-page.tsx",
+  "apps/web/src/sections/section-registry.tsx",
   "apps/web/tsconfig.json",
   "apps/web/wrangler.jsonc",
   "package.json",
@@ -128,7 +130,7 @@ async function loadRenderSkeleton() {
   return module.renderSkeleton;
 }
 
-async function loadGeneratedContentModule(files) {
+async function compileGeneratedContentModule(files) {
   const source = indexFiles(files).get(
     "apps/web/src/content/content-schema.ts",
   );
@@ -146,6 +148,48 @@ async function loadGeneratedContentModule(files) {
     `from ${JSON.stringify(import.meta.resolve("yaml"))}`,
   );
   assert.notEqual(executable, transpiled);
+
+  const moduleUrl = `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`;
+
+  return { moduleUrl, module: await import(moduleUrl) };
+}
+
+async function loadGeneratedContentModule(files) {
+  return (await compileGeneratedContentModule(files)).module;
+}
+
+async function loadGeneratedSectionModule(files) {
+  const source = indexFiles(files).get(
+    "apps/web/src/sections/section-registry.tsx",
+  );
+  assert.notEqual(source, undefined);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      jsx: typescript.JsxEmit.ReactJSX,
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const contentModule = await compileGeneratedContentModule(files);
+  const jsxRuntimeUrl = `data:text/javascript;base64,${Buffer.from(
+    [
+      "export const Fragment = Symbol.for('test.fragment');",
+      "export function jsx(type, props, key) { return { type, props: props ?? {}, key: key ?? null }; }",
+      "export const jsxs = jsx;",
+    ].join("\n"),
+  ).toString("base64")}`;
+  const withContentImport = transpiled.replace(
+    'from "../content/content-schema"',
+    `from ${JSON.stringify(contentModule.moduleUrl)}`,
+  );
+  const executable = withContentImport.replace(
+    'from "react/jsx-runtime"',
+    `from ${JSON.stringify(jsxRuntimeUrl)}`,
+  );
+  assert.notEqual(withContentImport, transpiled);
+  assert.notEqual(executable, withContentImport);
 
   return import(
     `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`
@@ -338,7 +382,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.2.0",
+    recipeVersion: "0.3.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -496,8 +540,58 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
     {
       metadata: { title: displayName, description: "A focused portfolio." },
       home: {
-        heading: displayName,
-        summary: "A concise introduction to selected work.",
+        sections: [
+          {
+            id: "introduction",
+            type: "hero",
+            variant: "default",
+            enabled: true,
+            content: {
+              heading: displayName,
+              summary: "A concise introduction to selected work.",
+            },
+          },
+          {
+            id: "approach",
+            type: "text",
+            variant: "default",
+            enabled: true,
+            content: {
+              heading: "Approach",
+              body: "Thoughtful work begins with clear goals and practical decisions.",
+            },
+          },
+          {
+            id: "selected-work",
+            type: "project-list",
+            variant: "default",
+            enabled: true,
+            content: {
+              heading: "Selected work",
+              projects: [
+                {
+                  title: "Example project",
+                  summary:
+                    "A representative project demonstrating focused delivery.",
+                  href: "https://example.com/work/example-project",
+                },
+              ],
+            },
+          },
+          {
+            id: "contact",
+            type: "call-to-action",
+            variant: "default",
+            enabled: true,
+            content: {
+              heading: "Start a conversation",
+              summary:
+                "Share the goals and constraints shaping your next project.",
+              label: "Send an email",
+              href: "mailto:hello@example.com",
+            },
+          },
+        ],
       },
       navigation: [],
     },
@@ -527,8 +621,40 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
         description: "A multi-page public website.",
       },
       home: {
-        heading: displayName,
-        summary: "A clear starting point for this website.",
+        sections: [
+          {
+            id: "introduction",
+            type: "hero",
+            variant: "default",
+            enabled: true,
+            content: {
+              heading: displayName,
+              summary: "A clear starting point for this website.",
+            },
+          },
+          {
+            id: "welcome",
+            type: "text",
+            variant: "default",
+            enabled: true,
+            content: {
+              heading: "Welcome",
+              body: "Explore the work, background, and ways to connect.",
+            },
+          },
+          {
+            id: "contact",
+            type: "call-to-action",
+            variant: "default",
+            enabled: true,
+            content: {
+              heading: "Get in touch",
+              summary: "Start a conversation about your next project.",
+              label: "Send an email",
+              href: "mailto:hello@example.com",
+            },
+          },
+        ],
       },
       navigation: [
         { href: "/", label: "Home" },
@@ -538,16 +664,46 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
   );
   assert.deepEqual(
     parseGeneratedYaml(site.files, "apps/web/content/en-CA/about.yaml"),
-    { heading: "About", summary: "Background and approach." },
+    {
+      sections: [
+        {
+          id: "introduction",
+          type: "hero",
+          variant: "default",
+          enabled: true,
+          content: {
+            heading: "About",
+            summary: "Background and approach.",
+          },
+        },
+        {
+          id: "principles",
+          type: "text",
+          variant: "default",
+          enabled: true,
+          content: {
+            heading: "Working principles",
+            body:
+              "Clear communication, careful craft, and practical outcomes guide the work.",
+          },
+        },
+      ],
+    },
   );
 
   const visibleCopy = [
     displayName,
     "A focused portfolio.",
     "A concise introduction to selected work.",
+    "Thoughtful work begins with clear goals and practical decisions.",
+    "A representative project demonstrating focused delivery.",
+    "Share the goals and constraints shaping your next project.",
     "A multi-page public website.",
     "A clear starting point for this website.",
+    "Explore the work, background, and ways to connect.",
+    "Start a conversation about your next project.",
     "Background and approach.",
+    "Clear communication, careful craft, and practical outcomes guide the work.",
     "A focused introduction.",
     "A concise overview of selected work and the approach behind it.",
     "A website introduction.",
@@ -670,8 +826,11 @@ test("the emitted YAML parser rejects unsafe syntax and invalid content shapes",
     siteContent,
     parseGeneratedYaml(rendered.files, "apps/web/content/en-CA/site.yaml"),
   );
+  const aboutContent = contentModule.parsePageContent(
+    contentModule.parseYamlContent(aboutSource),
+  );
   assert.deepEqual(
-    contentModule.parsePageContent(contentModule.parseYamlContent(aboutSource)),
+    aboutContent,
     parseGeneratedYaml(rendered.files, "apps/web/content/en-CA/about.yaml"),
   );
 
@@ -690,7 +849,18 @@ test("the emitted YAML parser rejects unsafe syntax and invalid content shapes",
   assertContentInvalid(() =>
     contentModule.parseSiteContent({
       ...siteContent,
-      home: { ...siteContent.home, heading: " " },
+      home: {
+        sections: [
+          {
+            ...siteContent.home.sections[0],
+            content: {
+              ...siteContent.home.sections[0].content,
+              heading: " ",
+            },
+          },
+          ...siteContent.home.sections.slice(1),
+        ],
+      },
     }),
   );
   assertContentInvalid(() =>
@@ -701,8 +871,7 @@ test("the emitted YAML parser rejects unsafe syntax and invalid content shapes",
   );
   assertContentInvalid(() =>
     contentModule.parsePageContent({
-      heading: "About",
-      summary: "Background and approach.",
+      ...aboutContent,
       extra: true,
     }),
   );
@@ -727,6 +896,304 @@ test("the emitted YAML parser rejects unsafe syntax and invalid content shapes",
   ]) {
     assertContentInvalid(() =>
       contentModule.parseMarkdownContent(invalidMarkdown),
+    );
+  }
+});
+
+test("generated section parsing is bounded, ordered, and link-safe", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const contentModule = await loadGeneratedContentModule(rendered.files);
+  const source = indexFiles(rendered.files).get(
+    "apps/web/content/en-CA/site.yaml",
+  );
+  assert.notEqual(source, undefined);
+  const siteContent = contentModule.parseSiteContent(
+    contentModule.parseYamlContent(source),
+  );
+  assert.deepEqual(
+    siteContent.home.sections.map(({ id, type, enabled }) => ({
+      id,
+      type,
+      enabled,
+    })),
+    [
+      { id: "introduction", type: "hero", enabled: true },
+      { id: "approach", type: "text", enabled: true },
+      { id: "selected-work", type: "project-list", enabled: true },
+      { id: "contact", type: "call-to-action", enabled: true },
+    ],
+  );
+
+  const [hero, textSection, projectList, callToAction] =
+    siteContent.home.sections;
+  const withDisabledText = contentModule.parsePageContent({
+    sections: [hero, { ...textSection, enabled: false }, projectList, callToAction],
+  });
+  assert.deepEqual(
+    withDisabledText.sections.map(({ id, enabled }) => ({ id, enabled })),
+    [
+      { id: "introduction", enabled: true },
+      { id: "approach", enabled: false },
+      { id: "selected-work", enabled: true },
+      { id: "contact", enabled: true },
+    ],
+  );
+
+  const safeDestinations = [
+    "/work",
+    "#selected-work",
+    "https://example.com/work",
+    "mailto:hello@example.com",
+  ];
+  for (const href of safeDestinations) {
+    assert.deepEqual(
+      contentModule.parseSiteContent({
+        metadata: { title: "Example", description: "Example description" },
+        home: { sections: [hero] },
+        navigation: [{ href, label: "Destination" }],
+      }).navigation,
+      [{ href, label: "Destination" }],
+    );
+  }
+
+  const invalidPages = [
+    { sections: [] },
+    { sections: [{ ...hero, id: "Introduction" }] },
+    { sections: [hero, { ...textSection, id: hero.id }] },
+    { sections: [{ ...hero, type: "unknown" }] },
+    { sections: [{ ...hero, variant: "split" }] },
+    { sections: [{ ...hero, enabled: "yes" }] },
+    { sections: [{ ...hero, content: { ...hero.content, extra: true } }] },
+    { sections: [{ ...hero, enabled: false }] },
+    { sections: [hero, { ...hero, id: "second-introduction" }] },
+    {
+      sections: [
+        hero,
+        { ...projectList, content: { ...projectList.content, projects: [] } },
+      ],
+    },
+    {
+      sections: [
+        hero,
+        {
+          ...projectList,
+          content: {
+            ...projectList.content,
+            projects: [
+              projectList.content.projects[0],
+              projectList.content.projects[0],
+            ],
+          },
+        },
+      ],
+    },
+    { sections: [hero], extra: true },
+  ];
+  for (const invalidPage of invalidPages) {
+    assertContentInvalid(() => contentModule.parsePageContent(invalidPage));
+  }
+
+  for (const href of [
+    "",
+    "#",
+    "//example.com/path",
+    "/\\example.com/path",
+    "http://example.com/path",
+    "https://user:secret@example.com/path",
+    "javascript:alert(1)",
+    "data:text/html,unsafe",
+    "file:///private/example",
+    "relative/path",
+  ]) {
+    assertContentInvalid(() =>
+      contentModule.parseSiteContent({
+        metadata: { title: "Example", description: "Example description" },
+        home: { sections: [hero] },
+        navigation: [{ href, label: "Destination" }],
+      }),
+    );
+    assertContentInvalid(() =>
+      contentModule.parsePageContent({
+        sections: [
+          hero,
+          {
+            ...callToAction,
+            content: { ...callToAction.content, href },
+          },
+        ],
+      }),
+    );
+  }
+});
+
+test("the source-owned registry declares and renders every approved section", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const contentModule = await loadGeneratedContentModule(rendered.files);
+  const sectionModule = await loadGeneratedSectionModule(rendered.files);
+  const source = indexFiles(rendered.files).get(
+    "apps/web/content/en-CA/site.yaml",
+  );
+  const content = contentModule.parseSiteContent(
+    contentModule.parseYamlContent(source),
+  );
+
+  assert.deepEqual(Object.keys(sectionModule.sectionRegistry), [
+    "hero",
+    "text",
+    "project-list",
+    "call-to-action",
+  ]);
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(sectionModule.sectionRegistry).map(([type, entry]) => [
+        type,
+        {
+          type: entry.type,
+          contentSchemaVersion: entry.contentSchemaVersion,
+          approvedVariants: entry.approvedVariants,
+          supportedProfiles: entry.supportedProfiles,
+          accessibilityRequirements: entry.accessibilityRequirements,
+          analyticsDeclarations: entry.analyticsDeclarations,
+          migrationHooks: entry.migrationHooks,
+        },
+      ]),
+    ),
+    {
+      hero: {
+        type: "hero",
+        contentSchemaVersion: "1.0.0",
+        approvedVariants: ["default"],
+        supportedProfiles: ["portfolio", "site"],
+        accessibilityRequirements: ["page-heading-level-one"],
+        analyticsDeclarations: [],
+        migrationHooks: [],
+      },
+      text: {
+        type: "text",
+        contentSchemaVersion: "1.0.0",
+        approvedVariants: ["default"],
+        supportedProfiles: ["portfolio", "site"],
+        accessibilityRequirements: ["section-heading-level-two"],
+        analyticsDeclarations: [],
+        migrationHooks: [],
+      },
+      "project-list": {
+        type: "project-list",
+        contentSchemaVersion: "1.0.0",
+        approvedVariants: ["default"],
+        supportedProfiles: ["portfolio", "site"],
+        accessibilityRequirements: [
+          "section-heading-level-two",
+          "project-list-semantics",
+          "descriptive-link-labels",
+        ],
+        analyticsDeclarations: [],
+        migrationHooks: [],
+      },
+      "call-to-action": {
+        type: "call-to-action",
+        contentSchemaVersion: "1.0.0",
+        approvedVariants: ["default"],
+        supportedProfiles: ["portfolio", "site"],
+        accessibilityRequirements: [
+          "section-heading-level-two",
+          "descriptive-link-labels",
+        ],
+        analyticsDeclarations: [],
+        migrationHooks: [],
+      },
+    },
+  );
+
+  const composition = sectionModule.SectionComposition({
+    sections: content.home.sections.map((section) =>
+      section.type === "text" ? { ...section, enabled: false } : section,
+    ),
+  });
+  assert.deepEqual(
+    composition.map(({ type, props, key }) => ({
+      component: type,
+      id: props.section.id,
+      key,
+    })),
+    [
+      {
+        component: sectionModule.sectionRegistry.hero.Component,
+        id: "introduction",
+        key: "introduction",
+      },
+      {
+        component: sectionModule.sectionRegistry["project-list"].Component,
+        id: "selected-work",
+        key: "selected-work",
+      },
+      {
+        component: sectionModule.sectionRegistry["call-to-action"].Component,
+        id: "contact",
+        key: "contact",
+      },
+    ],
+  );
+
+  const renderedSections = content.home.sections.map((section) =>
+    sectionModule.sectionRegistry[section.type].Component({ section }),
+  );
+  assert.deepEqual(
+    renderedSections.map(({ type, props }) => ({
+      type,
+      id: props.id,
+      labelledBy: props["aria-labelledby"] ?? null,
+      childTypes: Array.isArray(props.children)
+        ? props.children.map((child) => child.type)
+        : [props.children.type],
+    })),
+    [
+      {
+        type: "header",
+        id: "introduction",
+        labelledBy: "introduction-heading",
+        childTypes: ["h1", "p"],
+      },
+      {
+        type: "section",
+        id: "approach",
+        labelledBy: "approach-heading",
+        childTypes: ["h2", "p"],
+      },
+      {
+        type: "section",
+        id: "selected-work",
+        labelledBy: "selected-work-heading",
+        childTypes: ["h2", "ul"],
+      },
+      {
+        type: "section",
+        id: "contact",
+        labelledBy: "contact-heading",
+        childTypes: ["h2", "p", "a"],
+      },
+    ],
+  );
+  for (const section of content.home.sections) {
+    assert.deepEqual(
+      sectionModule.sectionRegistry[section.type].contentSchema(section.content),
+      section.content,
     );
   }
 });
@@ -775,12 +1242,19 @@ test("generated presentation remains a pure typed-data boundary", async () => {
   );
   assert.notEqual(presentationSource, undefined);
   assert.deepEqual(presentationSource.match(/^import .*;$/gm), [
-    'import type { NavigationItem } from "../content/content-schema";',
+    'import type { NavigationItem, PageSection } from "../content/content-schema";',
+    'import { SectionComposition } from "../sections/section-registry";',
   ]);
-  assert.doesNotMatch(
-    presentationSource,
-    /(?:\b(?:fetch|process|readFile|readFileSync|useEffect|useLayoutEffect|useState)\b|node:)/,
+  const registrySource = indexFiles(rendered.files).get(
+    "apps/web/src/sections/section-registry.tsx",
   );
+  assert.notEqual(registrySource, undefined);
+  for (const source of [presentationSource, registrySource]) {
+    assert.doesNotMatch(
+      source,
+      /(?:\b(?:fetch|process|readFile|readFileSync|useEffect|useLayoutEffect|useState)\b|node:|"use client")/,
+    );
+  }
 });
 
 test("profiles remain narrow and exclude later capabilities and surfaces", async () => {
@@ -819,7 +1293,6 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
       "resend",
       "better-auth",
       "stripe",
-      "analytics",
       "web-analytics",
       "cms",
       "contact-submission",
@@ -834,8 +1307,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 42],
-    ["site", 44],
+    ["portfolio", 43],
+    ["site", 45],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({

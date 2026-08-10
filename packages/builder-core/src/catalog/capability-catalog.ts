@@ -196,7 +196,7 @@ function createDescriptors(
     },
     {
       identifier: "section-composition",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -219,10 +219,17 @@ function createDescriptors(
           "apps/web/src/presentation/content-page.tsx",
           "application-owned",
         ),
+        createFileSurface(
+          "section-composition-registry",
+          "section-composition",
+          "apps/web/src/sections/section-registry.tsx",
+          "application-owned",
+        ),
       ],
       inferenceProbes: [
         createFileProbe("apps/web/app/page.tsx"),
         createFileProbe("apps/web/src/presentation/content-page.tsx"),
+        createFileProbe("apps/web/src/sections/section-registry.tsx"),
       ],
       verificationPlan: ["typecheck", "next-build"],
       documentationEvidenceRequirements: ["bounded-section-composition"],
