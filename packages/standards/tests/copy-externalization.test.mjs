@@ -269,6 +269,18 @@ export { createMetadata as generateMetadata };
         severity: 2,
       },
     ]);
+
+    assert.deepEqual(
+      await lintSource(
+        eslintPackage,
+        `type PageMetadata = { title: string };
+const PageMetadata = { title: "Not runtime metadata" };
+
+export type { PageMetadata as metadata };
+`,
+      ),
+      [],
+    );
   });
 
   test(`${eslintName} ignores non-rendered JSX control literals`, async () => {

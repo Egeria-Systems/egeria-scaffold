@@ -196,7 +196,11 @@ function collectExportedLocalNames(program) {
   ]);
 
   for (const statement of program.body) {
-    if (statement.type !== "ExportNamedDeclaration" || statement.source) {
+    if (
+      statement.type !== "ExportNamedDeclaration" ||
+      statement.source ||
+      statement.exportKind === "type"
+    ) {
       continue;
     }
 
@@ -213,7 +217,10 @@ function collectExportedLocalNames(program) {
     }
 
     for (const specifier of statement.specifiers) {
-      if (specifier.type !== "ExportSpecifier") {
+      if (
+        specifier.type !== "ExportSpecifier" ||
+        specifier.exportKind === "type"
+      ) {
         continue;
       }
 
