@@ -806,6 +806,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   const builderStage = compactLabel("P", "1");
   const portfolioStage = compactLabel("P", "2");
   const copyEnforcementTask = namedLabel("Task", "2");
+  const sectionCatalogTask = namedLabel("Task", "3");
 
   assert.deepEqual(
     {
@@ -847,7 +848,9 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         escapeRegularExpression(portfolioStage) +
         " — Client-ready portfolio[\\s\\S]+" +
         escapeRegularExpression(copyEnforcementTask) +
-        " is the separately reviewed, standards-owned copy-enforcement increment[\\s\\S]+develops directly on clean local `main`",
+        " added standards-owned static visible-copy enforcement for canonical templates[\\s\\S]+" +
+        escapeRegularExpression(sectionCatalogTask) +
+        " materializes the source-owned typed section catalog and remains at its implemented-task review gate[\\s\\S]+develops directly on clean local `main`",
     ),
   );
   assert.match(
