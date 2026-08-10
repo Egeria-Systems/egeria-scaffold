@@ -29,7 +29,7 @@
             "destination": {
               "maxLength": 2048,
               "minLength": 1,
-              "pattern": "^https:\\/\\/(?:www\\.)?calendly\\.com\\/[^\\s/?#][^\\s?#]*(?:\\?[^\\s#]*)?$",
+              "pattern": "^https:\\/\\/(?:www\\.)?calendly\\.com(?::443)?\\/[^\\s/?#][^\\s?#]*(?:\\?[^\\s#]*)?$",
               "type": "string"
             },
             "mode": {

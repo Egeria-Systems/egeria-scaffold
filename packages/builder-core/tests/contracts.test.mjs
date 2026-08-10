@@ -506,6 +506,17 @@ test("Calendly settings enforce paired capability state and sanitized destinatio
   }
 });
 
+test("Calendly settings accept only the default explicit HTTPS port", () => {
+  assertAccepts(contracts.calendlyBookingSettingsSchema, {
+    destination: "https://calendly.com:443/acme/intro",
+    mode: "popup",
+  });
+  assertRejects(contracts.calendlyBookingSettingsSchema, {
+    destination: "https://calendly.com:444/acme/intro",
+    mode: "popup",
+  });
+});
+
 test("project display names preserve Unicode while rejecting controls and whitespace-only input", () => {
   const acceptedDisplayNames = [
     "Sample Portfolio",
@@ -697,6 +708,7 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
   );
   for (const destination of [
     "https://calendly.com/acme/intro",
+    "https://calendly.com:443/acme/intro",
     "https://www.calendly.com/acme/intro?month=2026-08",
   ]) {
     assert.match(destination, calendlyDestinationPattern);
@@ -705,6 +717,7 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
     "http://calendly.com/acme/intro",
     "https://calendar.example/calendly.com/acme/intro",
     "https://calendly.com/",
+    "https://calendly.com:444/acme/intro",
     "https://user@calendly.com/acme/intro",
     "https://calendly.com/acme/intro#booking",
     " https://calendly.com/acme/intro",
