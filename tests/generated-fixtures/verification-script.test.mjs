@@ -76,6 +76,16 @@ test("fixture inspection accepts only the exact portable generated trees", async
   );
 
   for (const contract of generatedFixtureContracts) {
+    assert.equal(
+      contract.expectedFiles.length,
+      contract.profile === "portfolio" ? 35 : 37,
+    );
+    assert.equal(contract.expectedRecipeVersion, "0.5.0");
+    assert.equal(contract.expectedStandardsVersion, "0.2.0");
+    assert.equal(
+      contract.expectedSurfaces,
+      contract.profile === "portfolio" ? 69 : 71,
+    );
     const snapshot = await inspectGeneratedFixture(
       resolve(repositoryRoot, contract.relativeRoot),
       contract.profile,
@@ -278,6 +288,9 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   );
 
   process.env.NPM_TOKEN = "PRIVATE_VALUE";
+  process.env.PLAYWRIGHT_BROWSERS_PATH = "/private/unapproved-browsers";
+  process.env.PLAYWRIGHT_DEPLOYED_URL = "https://private.invalid";
+  process.env.XDG_CACHE_HOME = "/private/unapproved-cache";
   try {
     const result = await verifyGeneratedSkeletonsForTesting({
       async createOwner() {
@@ -290,6 +303,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         assert.equal(input.executable, "pnpm");
         assert.equal(input.environment.NPM_TOKEN, undefined);
         assert.equal(input.environment.NODE_AUTH_TOKEN, undefined);
+        assert.equal(input.environment.PLAYWRIGHT_DEPLOYED_URL, undefined);
         assert.equal(input.environment.CI, "true");
         assert.equal(input.environment.NEXT_TELEMETRY_DISABLED, "1");
         assert.equal(
@@ -297,6 +311,16 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
           "https://registry.npmjs.org/",
         );
         assert.equal(input.cwd.startsWith(`${ownedPath}/`), true);
+        assert.equal(
+          input.environment.PLAYWRIGHT_BROWSERS_PATH.startsWith(
+            `${ownedPath}/`,
+          ),
+          true,
+        );
+        assert.equal(
+          input.environment.XDG_CACHE_HOME.startsWith(`${ownedPath}/`),
+          true,
+        );
         return input.arguments[0] === "--version" ? "11.20.0\n" : "";
       },
     });
@@ -314,21 +338,27 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         "typecheck",
         "next-build",
         "opennext-build",
+        "browser-install",
+        "browser-development",
+        "browser-preview",
       ],
     });
   } finally {
     delete process.env.NPM_TOKEN;
+    delete process.env.PLAYWRIGHT_BROWSERS_PATH;
+    delete process.env.PLAYWRIGHT_DEPLOYED_URL;
+    delete process.env.XDG_CACHE_HOME;
   }
 
   const argumentLists = commands.map(({ arguments: arguments_ }) => arguments_);
-  const perProfile = argumentLists.slice(0, 9).map((arguments_) =>
+  const perProfile = argumentLists.slice(0, 12).map((arguments_) =>
     arguments_.map((argument) =>
       ownedPath !== undefined && argument.startsWith(ownedPath)
         ? "<owned-path>"
         : argument,
     ),
   );
-  assert.deepEqual(argumentLists.slice(9).map((arguments_) =>
+  assert.deepEqual(argumentLists.slice(12).map((arguments_) =>
     arguments_.map((argument) =>
       ownedPath !== undefined && argument.startsWith(ownedPath)
         ? "<owned-path>"
@@ -344,6 +374,9 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     ["run", "typecheck"],
     ["run", "build"],
     ["run", "build:cloudflare"],
+    ["--dir", "apps/web", "run", "browser:install"],
+    ["--dir", "apps/web", "run", "test:e2e:dev"],
+    ["--dir", "apps/web", "run", "test:e2e:preview"],
   ]);
   assert.equal(await pathExists(ownedPath), false);
 
