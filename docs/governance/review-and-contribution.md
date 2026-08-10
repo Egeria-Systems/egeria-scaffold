@@ -40,6 +40,17 @@ If the runbook concludes that no human setup is required, the plan records the e
 
 The [approved source plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md) owns which capability deliveries require a separate certification task. This protocol owns how each task prepares, plans, obtains approval, and separates local proof from external outcomes.
 
+The current private registry is [`certifications/capabilities.json`](../../certifications/capabilities.json); builder-core owns its strict schema and pure gate semantics. After building the private package, use these exact repository commands:
+
+```sh
+pnpm run check:capability-certification
+node scripts/check-capability-certification.mjs --closure legacy-backfill-exempt
+node scripts/check-capability-certification.mjs --closure all-certified
+pnpm run verify:booking-calendly-certification
+```
+
+Admission must pass for a builder candidate. Run the closure policy required by the named phase or release and treat its rejecting exit as a stop, not a warning. The local Calendly command supplies only fresh-scaffold evidence; it does not authorize or prove protected-staging, provider, cancellation, cleanup, or recovery outcomes.
+
 ## Builder-repository development boundary
 
 Development of this repository may proceed directly on `main` only when the approved work is one clean, sequential implementation stream, no user-owned work is at risk, repository protections permit it, and isolation has no material safety or coordination benefit.

@@ -1092,7 +1092,7 @@ test("capability delivery requires a separately planned certification task", asy
 
   assert.match(
     enforcementMap,
-    /INV-CAPABILITY-CERTIFICATION[^\n]+planned[^\n]+certification coverage registry/i,
+    /INV-CAPABILITY-CERTIFICATION[^\n]+actual[^\n]+certification coverage registry/i,
   );
   assert.match(
     enforcementMap,
@@ -1121,6 +1121,67 @@ test("capability delivery requires a separately planned certification task", asy
     design,
     /descriptor version or behavior-contract digest[\s\S]+material change[\s\S]+new task-linked pending record/i,
   );
+});
+
+test("executable capability certification ownership is current", async () => {
+  const [
+    overview,
+    capabilityModel,
+    enforcementMap,
+    reviewProtocol,
+    roadmap,
+    builderCoreInstructions,
+    builderCoreReadme,
+  ] = await Promise.all([
+    readRepositoryFile("docs/architecture/overview.md"),
+    readRepositoryFile("docs/architecture/capability-model.md"),
+    readRepositoryFile("docs/architecture/enforcement-map.md"),
+    readRepositoryFile("docs/governance/review-and-contribution.md"),
+    readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+    readRepositoryFile("packages/builder-core/AGENTS.md"),
+    readRepositoryFile("packages/builder-core/README.md"),
+  ]);
+
+  for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
+    assert.match(document, /certifications\/capabilities\.json/u);
+    assert.match(
+      document,
+      /booking-calendly[\s\S]+pending[\s\S]+protected-staging[\s\S]+unexecuted/iu,
+    );
+  }
+  assert.match(
+    enforcementMap,
+    /admission[^\n]+actual[^\n]+closure[^\n]+reject/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /fresh-scaffold[^\n]+actual[^\n]+provider[^\n]+unexecuted/iu,
+  );
+  assert.match(
+    reviewProtocol,
+    /pnpm run check:capability-certification/iu,
+  );
+  assert.match(
+    reviewProtocol,
+    /--closure legacy-backfill-exempt/iu,
+  );
+  assert.match(
+    reviewProtocol,
+    /--closure all-certified/iu,
+  );
+  assert.match(
+    reviewProtocol,
+    /pnpm run verify:booking-calendly-certification/iu,
+  );
+  assert.match(
+    roadmap,
+    /local certification foundation[^.]+implemented/iu,
+  );
+  for (const document of [builderCoreInstructions, builderCoreReadme]) {
+    assert.match(document, /private certification registry/iu);
+    assert.match(document, /descriptor admission/iu);
+    assert.match(document, /closure/iu);
+  }
 });
 
 test("accepted ADRs use the repository decision contract", async () => {
@@ -1183,6 +1244,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   const responsiveInterfaceTask = namedLabel("Task", "4");
   const browserTestingTask = namedLabel("Task", "4B");
   const calendlyTask = namedLabel("Task", "5");
+  const calendlyCertificationTask = namedLabel("Task", "5B");
 
   assert.deepEqual(
     {
@@ -1253,8 +1315,13 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         " as the next increment approves " +
         escapeRegularExpression(browserTestingTask) +
         "'s generated browser-quality foundation at committed artifact `02ec5eb12741c1622beec02529c38965e7501d68`[\\s\\S]+" +
+        "Selecting " +
+        escapeRegularExpression(calendlyCertificationTask) +
+        " as the next increment accepts " +
         escapeRegularExpression(calendlyTask) +
-        " Calendly initial scaffolding is implemented and awaiting final review; later task numbering is unchanged[\\s\\S]+develops directly on clean local `main`",
+        " Calendly initial scaffolding[\\s\\S]+" +
+        escapeRegularExpression(calendlyCertificationTask) +
+        "'s local certification foundation is implemented and awaiting review; later task numbering is unchanged[\\s\\S]+develops directly on clean local `main`",
     ),
   );
   assert.match(

@@ -1,8 +1,8 @@
 # Capability Model
 
-**Status:** Controlling capability vocabulary through the current Calendly initial-scaffolding implementation
+**Status:** Controlling capability vocabulary through the current Calendly initial-scaffolding implementation and local certification foundation
 
-**Runtime status:** The seven `portfolio`/`site` descriptors and two recipes named below are executable in private builder-core. `booking-calendly` is an explicit optional initial-scaffolding selection; every other program capability and profile remains documentation-only.
+**Runtime status:** The seven `portfolio`/`site` descriptors and two recipes named below are executable in private builder-core. `booking-calendly` is an explicit optional initial-scaffolding selection with a pending subject-bound certification record and actual fresh-scaffold evidence; every other program capability and profile remains documentation-only.
 
 ## Descriptor contract
 
@@ -183,7 +183,15 @@ The capability owns five declared surfaces and matching file probes: the booking
 
 Security metadata declares both accepted Calendly hosts, their exact `frame-src` contribution, provider-controlled browser storage and scheduling data inside the cross-origin frame, provider-controlled retention, and elevated threat review. The generated presentation uses an ordinary link, a near-viewport direct iframe for inline mode, or an anchor enhanced to a native dialog and user-activated iframe for popup mode. It loads no Calendly host-page script or API and listens to no provider event.
 
-The verification plan includes typecheck, Next build, development browser checks, and OpenNext/workerd preview browser checks. The retained `portfolio-calendly` popup fixture provides deterministic selected-state and stubbed-browser evidence while contract tests cover all three modes. That evidence does not call Calendly, make or confirm a booking, prove deployed or hosted execution, establish visual or human accessibility quality, or support a WCAG conformance claim. Protected-staging/provider-confirmed certification remains unexecuted and separately authorized.
+The verification plan includes typecheck, Next build, development browser checks, and OpenNext/workerd preview browser checks. The retained `portfolio-calendly` popup fixture provides deterministic selected-state and stubbed-browser evidence while contract tests cover all three modes. That evidence does not call Calendly, make or confirm a booking, prove deployed or hosted execution, establish visual or human accessibility quality, or support a WCAG conformance claim.
+
+## Certification coverage
+
+The strict repository-owned [`certifications/capabilities.json`](../../certifications/capabilities.json) registry is keyed by executable capability identifier. Each subject binds the exact descriptor version and a canonical SHA-256 digest of the descriptor plus ordered required-evidence contract. Builder-core owns the private schema and pure descriptor-admission and closure decisions; registry presence alone never means certified.
+
+Admission is actual and rejects absent, unknown, stale-version, stale-digest, or unauthorized backfill records. Current P2 closure exempts only the six exact accepted pre-foundation `backfill-pending` records and rejects the current `booking-calendly` pending record. Later all-certified closure rejects every non-certified record. A material descriptor or evidence-contract change therefore requires a newly subject-bound task-linked pending record rather than inheriting stale coverage.
+
+The actual fresh-scaffold runner creates a new `portfolio` project through the compiled CLI, re-infers it, requires healthy diagnostics and an empty exact diff, and reuses the fixed generated-project install/build/browser verifier against that output. This supplies only the registered `fresh-scaffold` evidence for `booking-calendly`; the capability remains pending. Its manual protected-staging workflow and human receipt contract are prepared, while protected-staging deployment, provider-confirmed booking, cancellation, and cleanup outcomes remain unexecuted and separately authorized.
 
 ## Delivery and package ownership
 
