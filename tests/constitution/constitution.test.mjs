@@ -704,7 +704,7 @@ test("provider execution remains truthful and Free-compatible for a sole develop
     );
     assert.doesNotMatch(
       document,
-      /event-type (?:creation|change|disabling|deletion)[^.]+separate(?:ly)? (?:authorized|approval)/iu,
+      /event-type (?:creation|change|disabling|deletion)[^.]+separate(?:ly)? (?:authorized|approv(?:al|ed))/iu,
     );
   }
 
@@ -727,7 +727,7 @@ test("provider execution remains truthful and Free-compatible for a sole develop
   assert.doesNotMatch(receipt, /certification-created|disabled or deleted/iu);
   assert.doesNotMatch(
     receipt,
-    /event-type (?:creation|change|disabling|deletion)[^.]+separate(?:ly)? (?:authorized|approval)/iu,
+    /event-type (?:creation|change|disabling|deletion)[^.]+separate(?:ly)? (?:authorized|approv(?:al|ed))/iu,
   );
 });
 
