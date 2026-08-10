@@ -201,9 +201,13 @@ test("provides keyboard focus with a computed visible indicator", async ({
           value.match(/(?:rgba?|hsla?)\([^)]*\)|\btransparent\b/gu) ?? [];
         const hasVisibleColor =
           colors.length === 0 || colors.some(isPerceptibleColor);
+        const geometry = colors.reduce(
+          (shadow, color) => shadow.replace(color, ""),
+          value,
+        );
         const hasVisibleGeometry =
-          value
-            .match(/-?(?:\d*\.)?\d+px/gu)
+          geometry
+            .match(/-?(?:\d*\.)?\d+[a-z]+/gu)
             ?.some((length) => Number.parseFloat(length) !== 0) ?? false;
 
         return hasVisibleColor && hasVisibleGeometry;
