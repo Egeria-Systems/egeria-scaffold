@@ -1,14 +1,13 @@
-import type { NavigationItem } from "../content/content-schema";
+import type { NavigationItem, PageSection } from "../content/content-schema";
+import { SectionComposition } from "../sections/section-registry";
 
 export type ContentPageProperties = Readonly<{
-  heading: string;
-  summary: string;
+  sections: readonly PageSection[];
   navigation: readonly NavigationItem[];
 }>;
 
 export function ContentPage({
-  heading,
-  summary,
+  sections,
   navigation,
 }: ContentPageProperties) {
   return (
@@ -25,8 +24,7 @@ export function ContentPage({
             </ul>
           </nav>
         ) : null}
-        <h1>{heading}</h1>
-        <p>{summary}</p>
+        <SectionComposition sections={sections} />
       </article>
     </main>
   );

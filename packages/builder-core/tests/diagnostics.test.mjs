@@ -395,6 +395,7 @@ test("doctor and diff agree across the canonical portfolio composition", async (
     "apps/web/src/content/read-content.ts": "export {};\n",
     "apps/web/app/page.tsx": "export default function Page() {}\n",
     "apps/web/src/presentation/content-page.tsx": "export {};\n",
+    "apps/web/src/sections/section-registry.tsx": "export {};\n",
     "apps/web/next.config.ts": "export default {};\n",
     "apps/web/open-next.config.ts": "export default {};\n",
     "apps/web/wrangler.jsonc": "{}\n",

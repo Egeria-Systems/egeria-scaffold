@@ -33,7 +33,7 @@
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
       "deliveryMode": "hybrid",
@@ -137,7 +137,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:bf3f2af1bde2f9e6a0ada1d13919bfc436c093e25af90bfedff9b2cffa04da14",
+      "fingerprint": "sha256:c12c66c1558835bfb7437b066180b58b60c7a16e3db1d1f91bdea57d9a792deb",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -163,7 +163,7 @@
       "path": "README.md"
     },
     {
-      "fingerprint": "sha256:00a90f66dd956955a452c3fea9b96b1962666497d62dd4755c7731e9aea709d9",
+      "fingerprint": "sha256:9f6c555a23ac54b185b3ae55ceedc8066cbfc0c479e11152e09fd3328107b1ee",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -202,7 +202,7 @@
       "path": "package.json"
     },
     {
-      "fingerprint": "sha256:2702fb20bcb4835c576b229b09eac728ea79387b497a99e3b9c3b972f2d31848",
+      "fingerprint": "sha256:6eca495e95fff9a277275b0c81b179865b6c827bd0ad58838921fb8c36dffbae",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -480,7 +480,7 @@
       "path": "apps/web/src/content/read-content.ts"
     },
     {
-      "fingerprint": "sha256:828703cb9f90d1cf074107c5998a601756eb336c12acf25bdf138ff02f7547f5",
+      "fingerprint": "sha256:3c3210e228e8165c9f8e5cb6f4534681510ede94fc477ecfafbd106d3bfb3604",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -494,7 +494,7 @@
       "path": "apps/web/src/content/content-schema.ts"
     },
     {
-      "fingerprint": "sha256:f362a43efabefc2f87b43c45aa808dd589dcb34a11d9d30f36a10163adeb19fa",
+      "fingerprint": "sha256:3890fab75f577b066ce7109684abf72efe51962f1e944fc0d477e23ecf2e290a",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -624,7 +624,7 @@
       "path": "apps/web/src/infrastructure/observability/installed-capability.ts"
     },
     {
-      "fingerprint": "sha256:ea6013625505dc2bf08798aeec38666c1251fd0e8ffe11274be90da599c3b948",
+      "fingerprint": "sha256:29895bcf5e09b24086ab60c22fe59ad27ad43926753da72b117146b703d51c39",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -638,7 +638,7 @@
       "path": "apps/web/app/page.tsx"
     },
     {
-      "fingerprint": "sha256:3b9ab069f4c9dd9a80f1ab41c7b126383056eaef6f52ac7c470acbc2308465f5",
+      "fingerprint": "sha256:58474443e54def72437a2839527ddb2d9dc736fc119859c5aea82fb0264210da",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -650,6 +650,20 @@
       },
       "ownership": "application-owned",
       "path": "apps/web/src/presentation/content-page.tsx"
+    },
+    {
+      "fingerprint": "sha256:6f2dd091a769bd5183c361fc6525a25784e013bdc2b215d2f30826c803f906ac",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "section-composition-registry",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "section-composition",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/sections/section-registry.tsx"
     },
     {
       "fingerprint": "sha256:d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
@@ -697,7 +711,7 @@
   ],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.2.0"
+    "recipeVersion": "0.3.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

@@ -49,6 +49,7 @@ const portfolioFiles = Object.freeze([
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/presentation/content-page.tsx",
+  "apps/web/src/sections/section-registry.tsx",
   "apps/web/tsconfig.json",
   "apps/web/wrangler.jsonc",
   "package.json",
@@ -70,9 +71,10 @@ export const generatedFixtureContracts = Object.freeze([
       "deployment-cloudflare",
       "observability",
     ]),
-    expectedRecipeVersion: "0.2.0",
+    expectedRecipeVersion: "0.3.0",
     expectedContentFilesVersion: "0.2.0",
-    expectedSurfaces: 45,
+    expectedSectionCompositionVersion: "0.2.0",
+    expectedSurfaces: 46,
   }),
   Object.freeze({
     profile: "site",
@@ -92,9 +94,10 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "site-routing",
     ]),
-    expectedRecipeVersion: "0.2.0",
+    expectedRecipeVersion: "0.3.0",
     expectedContentFilesVersion: "0.2.0",
-    expectedSurfaces: 47,
+    expectedSectionCompositionVersion: "0.2.0",
+    expectedSurfaces: 48,
   }),
 ]);
 

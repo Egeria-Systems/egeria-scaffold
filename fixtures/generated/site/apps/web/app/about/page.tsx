@@ -18,8 +18,7 @@ export default function About() {
 
   return (
     <ContentPage
-      heading={content.heading}
-      summary={content.summary}
+      sections={content.sections}
       navigation={navigation}
     />
   );

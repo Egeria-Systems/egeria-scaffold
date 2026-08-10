@@ -164,12 +164,12 @@ All raw and decoded strings reject the existing forbidden control set. Navigatio
 - Regenerate: `fixtures/generated/portfolio/**`
 - Regenerate: `fixtures/generated/site/**`
 
-- [ ] Update expected generated paths, recipe/section capability versions, and exact 46/48 surface counts before fixture replacement.
-- [ ] Run focused generation/fixture assertions against old fixtures and record the expected path/version/state/fingerprint mismatch.
-- [ ] Build the production CLI and generate portfolio/site twice in fresh identity-bounded temporary roots. Require byte-identical pairs and exact expected inventories.
-- [ ] Inspect the generated trees, confirm lockfile dependency graphs and manifest versions are unchanged, and replace only the two committed fixture roots with their identity-matched outputs.
-- [ ] Run production generation, fixture determinism, inference/state agreement, copy lint, generated lint/typecheck/Next/OpenNext checks until GREEN.
-- [ ] Commit exact fixture/test/harness changes with message `Refresh generated section fixtures`.
+- [x] Update expected generated paths, recipe/section capability versions, and exact 46/48 surface counts before fixture replacement.
+- [x] Run focused generation/fixture assertions against old fixtures and record the expected path/version/state/fingerprint mismatch.
+- [x] Build the production CLI and generate portfolio/site twice in fresh identity-bounded temporary roots. Require byte-identical pairs and exact expected inventories.
+- [x] Inspect the generated trees, confirm lockfile dependency graphs and manifest versions are unchanged, and replace only the two committed fixture roots with their identity-matched outputs.
+- [x] Run production generation, fixture determinism, inference/state agreement, copy lint, generated lint/typecheck/Next/OpenNext checks until GREEN.
+- [x] Commit exact fixture/test/harness changes with message `Refresh generated section fixtures`.
 
 ## Task 5: Independent reviews and evidence-backed repair
 

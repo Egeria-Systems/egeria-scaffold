@@ -47,6 +47,7 @@ const portfolioRenderedPaths = [
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/presentation/content-page.tsx",
+  "apps/web/src/sections/section-registry.tsx",
   "apps/web/tsconfig.json",
   "apps/web/wrangler.jsonc",
   "package.json",
@@ -518,14 +519,20 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
-      assert.equal(generated.state.origin.recipeVersion, "0.2.0");
+      assert.equal(generated.state.origin.recipeVersion, "0.3.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 45 : 47,
+        profile === "portfolio" ? 46 : 48,
       );
       assert.equal(
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "content-files",
+        )?.version,
+        "0.2.0",
+      );
+      assert.equal(
+        generated.state.installedCapabilities.find(
+          ({ identifier }) => identifier === "section-composition",
         )?.version,
         "0.2.0",
       );

@@ -195,6 +195,12 @@ test("compiled project generation matches committed portfolio and site fixtures"
           fixtureCase.expectedContentFilesVersion,
         );
         assert.equal(
+          state.installedCapabilities.find(
+            ({ identifier }) => identifier === "section-composition",
+          )?.version,
+          fixtureCase.expectedSectionCompositionVersion,
+        );
+        assert.equal(
           state.managedSurfaces.length,
           fixtureCase.expectedSurfaces,
         );
