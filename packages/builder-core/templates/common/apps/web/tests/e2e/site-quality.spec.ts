@@ -225,7 +225,19 @@ test("provides keyboard focus with a computed visible indicator", async ({
       const style = getComputedStyle(element);
 
       return {
+        acceptsVisibleShadow: hasPerceptibleFocusIndicator({
+          outlineColor: "transparent",
+          outlineStyle: "none",
+          outlineWidth: "0",
+          boxShadow: "rgb(0, 0, 0) 0rem 0rem 0rem 0.2rem",
+        }),
         hasVisibleFocus: hasPerceptibleFocusIndicator(style),
+        rejectsNoGeometryShadow: !hasPerceptibleFocusIndicator({
+          outlineColor: "transparent",
+          outlineStyle: "none",
+          outlineWidth: "0",
+          boxShadow: "rgb(0, 0, 0) 0rem 0rem 0rem 0rem",
+        }),
         rejectsTransparentIndicator: !hasPerceptibleFocusIndicator({
           outlineColor: "rgba(0, 0, 0, 0)",
           outlineStyle: "solid",
@@ -235,6 +247,8 @@ test("provides keyboard focus with a computed visible indicator", async ({
       };
     });
 
+    expect(focusEvidence.acceptsVisibleShadow).toBe(true);
+    expect(focusEvidence.rejectsNoGeometryShadow).toBe(true);
     expect(focusEvidence.rejectsTransparentIndicator).toBe(true);
     expect(focusEvidence.hasVisibleFocus).toBe(true);
   }
