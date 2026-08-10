@@ -5,9 +5,20 @@ import {
   type Page,
 } from "@playwright/test";
 
-import { bookingCalendlySettings } from "../../src/integrations/booking-calendly/booking-settings";
+import {
+  bookingCalendlySettings,
+  type CalendlyBookingSettings,
+} from "../../src/integrations/booking-calendly/booking-settings";
 
 const LANDING_PATH = "./";
+
+function readBookingMode(
+  settings: CalendlyBookingSettings,
+): CalendlyBookingSettings["mode"] {
+  return settings.mode;
+}
+
+const bookingMode = readBookingMode(bookingCalendlySettings);
 
 async function stubSchedulingDocument(page: Page): Promise<() => number> {
   let requestCount = 0;
@@ -37,7 +48,7 @@ test("loads the scheduling frame only through the configured interaction", async
     bookingCalendlySettings.destination,
   );
 
-  if (bookingCalendlySettings.mode === "link") {
+  if (bookingMode === "link") {
     await expect(page.getByTestId("booking-frame")).toHaveCount(0);
     expect(providerRequestCount()).toBe(0);
     return;
@@ -47,7 +58,7 @@ test("loads the scheduling frame only through the configured interaction", async
   await expect(bookingFrame).toHaveCount(0);
   expect(providerRequestCount()).toBe(0);
 
-  if (bookingCalendlySettings.mode === "inline") {
+  if (bookingMode === "inline") {
     await page.getByTestId("booking-inline-region").scrollIntoViewIfNeeded();
     await expect(bookingFrame).toHaveCount(1);
     await expect(bookingFrame).toHaveAttribute(
@@ -121,7 +132,7 @@ test("preserves ordinary anchor navigation without JavaScript", async ({
 test("activates inline fallback when IntersectionObserver is unavailable", async ({
   page,
 }) => {
-  test.skip(bookingCalendlySettings.mode !== "inline");
+  test.skip(bookingMode !== "inline");
   await page.addInitScript(() => {
     Object.defineProperty(window, "IntersectionObserver", {
       configurable: true,
@@ -143,7 +154,7 @@ test("activates inline fallback when IntersectionObserver is unavailable", async
 test("preserves popup navigation when native modal support is unavailable", async ({
   page,
 }) => {
-  test.skip(bookingCalendlySettings.mode !== "popup");
+  test.skip(bookingMode !== "popup");
   await page.addInitScript(() => {
     Object.defineProperty(
       HTMLDialogElement.prototype,
@@ -217,7 +228,7 @@ test("preserves popup navigation when native modal support is unavailable", asyn
 test("keeps the open popup bounded and free of selected axe violations", async ({
   page,
 }) => {
-  test.skip(bookingCalendlySettings.mode !== "popup");
+  test.skip(bookingMode !== "popup");
   await page.setViewportSize({ width: 320, height: 800 });
   await stubSchedulingDocument(page);
   await page.goto(LANDING_PATH, { waitUntil: "domcontentloaded" });

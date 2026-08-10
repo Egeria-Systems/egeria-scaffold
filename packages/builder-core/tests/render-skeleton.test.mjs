@@ -131,6 +131,76 @@ function indexFiles(files) {
   return new Map(files.map((file) => [file.path, decoder.decode(file.content)]));
 }
 
+async function findGeneratedTypeScriptDiagnostics(files, sourcePath, code) {
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const projectRoot = "/generated";
+  const settingsPath =
+    "apps/web/src/integrations/booking-calendly/booking-settings.ts";
+  const indexedFiles = indexFiles(files);
+  const generatedSources = new Map([
+    [join(projectRoot, sourcePath), indexedFiles.get(sourcePath)],
+    [join(projectRoot, settingsPath), indexedFiles.get(settingsPath)],
+  ]);
+  for (const source of generatedSources.values()) {
+    assert.notEqual(source, undefined);
+  }
+  const compilerOptions = {
+    module: typescript.ModuleKind.ESNext,
+    moduleResolution: typescript.ModuleResolutionKind.Bundler,
+    noEmit: true,
+    skipLibCheck: true,
+    strict: true,
+    target: typescript.ScriptTarget.ES2022,
+  };
+  const compilerHost = typescript.createCompilerHost(compilerOptions);
+  const getSourceFile = compilerHost.getSourceFile.bind(compilerHost);
+  compilerHost.getSourceFile = (
+    fileName,
+    languageVersion,
+    onError,
+    shouldCreateNewSourceFile,
+  ) => {
+    const source = generatedSources.get(fileName);
+    return source === undefined
+      ? getSourceFile(
+          fileName,
+          languageVersion,
+          onError,
+          shouldCreateNewSourceFile,
+        )
+      : typescript.createSourceFile(fileName, source, languageVersion, true);
+  };
+  compilerHost.resolveModuleNames = (moduleNames) =>
+    moduleNames.map((moduleName) =>
+      moduleName ===
+      "../../src/integrations/booking-calendly/booking-settings"
+        ? {
+            extension: typescript.Extension.Ts,
+            isExternalLibraryImport: false,
+            resolvedFileName: join(projectRoot, settingsPath),
+          }
+        : undefined,
+    );
+
+  const sourceFileName = join(projectRoot, sourcePath);
+  const program = typescript.createProgram(
+    [...generatedSources.keys()],
+    compilerOptions,
+    compilerHost,
+  );
+  const sourceFile = program.getSourceFile(sourceFileName);
+  assert.notEqual(sourceFile, undefined);
+
+  return program
+    .getSemanticDiagnostics(sourceFile)
+    .filter((diagnostic) => diagnostic.code === code)
+    .map((diagnostic) => typescript.flattenDiagnosticMessageText(
+      diagnostic.messageText,
+      "\n",
+    ));
+}
+
 function parseGeneratedJson(files, path) {
   const source = indexFiles(files).get(path);
   assert.notEqual(source, undefined);
@@ -913,7 +983,11 @@ test("generated Calendly presentation preserves link, lazy inline, and native di
     /page\.route\(bookingCalendlySettings\.destination/u,
     /route\.fulfill/u,
     /javaScriptEnabled: false/u,
-    /bookingCalendlySettings\.mode/u,
+    /CalendlyBookingSettings\["mode"\]/u,
+    /bookingMode === "link"/u,
+    /bookingMode === "inline"/u,
+    /test\.skip\(bookingMode !== "inline"\)/u,
+    /test\.skip\(bookingMode !== "popup"\)/u,
     /toHaveAttribute\(\s*"href",\s*bookingCalendlySettings\.destination/u,
     /toHaveAttribute\(\s*"src",\s*bookingCalendlySettings\.destination/u,
     /toHaveCount\(0\)[\s\S]+toHaveCount\(1\)/u,
@@ -961,6 +1035,31 @@ test("generated Calendly browser behavior covers unavailable platform APIs", asy
   ]) {
     assert.match(browserSpecification, contract);
   }
+});
+
+test("generated popup Calendly browser specification keeps every configured mode comparable", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      bookingCalendly: {
+        destination: "https://calendly.com/acme/intro",
+        mode: "popup",
+      },
+      packageVersions,
+    }),
+  );
+
+  assert.deepEqual(
+    await findGeneratedTypeScriptDiagnostics(
+      rendered.files,
+      "apps/web/tests/e2e/calendly-booking.spec.ts",
+      2367,
+    ),
+    [],
+  );
 });
 
 test("generated browser quality is environment-specific and content-agnostic", async () => {
