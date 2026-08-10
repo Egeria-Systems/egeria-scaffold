@@ -6,6 +6,7 @@ import {
   certificationRegistrySchema,
   createVerifiedCapabilityCatalog,
   validateCertificationAdmission,
+  validateCertificationArtifacts,
   validateCertificationClosure,
   validateContract,
 } from "../packages/builder-core/dist/index.js";
@@ -48,6 +49,14 @@ async function readRegistry() {
   }
 }
 
+async function readArtifact(path) {
+  try {
+    return await readFile(resolve(repositoryRoot, path), "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
 async function runMain() {
   const command = parseArguments(process.argv.slice(2));
   if (command === undefined) {
@@ -70,6 +79,36 @@ async function runMain() {
       ok: false,
       gate: "contract",
       issues: registry.ok ? catalog.issues : registry.issues,
+    });
+    process.exitCode = 1;
+    return;
+  }
+
+  const artifactPaths = new Set();
+  for (const record of Object.values(registry.value.records)) {
+    if (record.taskPlan !== null) {
+      artifactPaths.add(record.taskPlan);
+    }
+    for (const evidence of record.evidence) {
+      artifactPaths.add(evidence.path);
+    }
+  }
+  const artifacts = Object.fromEntries(
+    await Promise.all(
+      [...artifactPaths]
+        .sort()
+        .map(async (path) => [path, await readArtifact(path)]),
+    ),
+  );
+  const artifactValidation = validateCertificationArtifacts({
+    registry: registry.value,
+    artifacts,
+  });
+  if (!artifactValidation.ok) {
+    writeStandard({
+      ok: false,
+      gate: "artifacts",
+      issues: artifactValidation.issues,
     });
     process.exitCode = 1;
     return;

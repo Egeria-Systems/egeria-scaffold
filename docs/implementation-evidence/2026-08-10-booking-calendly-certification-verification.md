@@ -6,6 +6,16 @@
 
 **Planning base:** `542660b5a3d25709ade6d8536c8c65bd1e6b6038`
 
+**Certification capability:** `booking-calendly`
+
+**Certification descriptor version:** `0.1.0`
+
+**Certification behavior-contract digest:** `sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab`
+
+**Certification evidence revision:** `636df53958c0e3421b7f493d83493724b67b41f3`
+
+**Passed certification outcomes:** `fresh-scaffold`
+
 ## Registry and gate evidence
 
 The repository-owned certification registry contains one key for each of the seven executable capability descriptors. Every subject is bound to the descriptor version and the lowercase SHA-256 digest of canonical `{ descriptor, requiredEvidence }` data.
@@ -13,8 +23,10 @@ The repository-owned certification registry contains one key for each of the sev
 Current status is intentionally non-closing:
 
 - `booking-calendly@0.1.0`: `pending`, linked to the separate Task 5B plan, with only `fresh-scaffold` evidence recorded;
-- the six accepted pre-foundation descriptors: `backfill-pending`, restricted by an executable exact-identifier transition allowlist; and
+- the six accepted pre-foundation subjects: `backfill-pending`, restricted by executable exact identifier/version/digest tuples; and
 - no record: `certified`.
+
+Admission also loads each referenced task/evidence artifact and requires evidence metadata to match its capability, descriptor subject, evidence-producing revision, and explicit passed outcomes. The local receipt declares only `fresh-scaffold`; relabeling it as deployed, provider, cleanup, or recovery evidence rejects.
 
 The admission command passed:
 

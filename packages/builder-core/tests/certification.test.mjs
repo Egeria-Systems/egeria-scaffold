@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import * as core from "../dist/index.js";
@@ -7,6 +8,11 @@ const planPath =
   "docs/superpowers/plans/2026-08-10-booking-calendly-certification.md";
 const evidencePath =
   "docs/implementation-evidence/2026-08-10-booking-calendly-certification-verification.md";
+const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
+const evidenceDocumentSource = readFileSync(
+  new URL(`../../../${evidencePath}`, import.meta.url),
+  "utf8",
+);
 
 const descriptorDigests = Object.freeze({
   "booking-calendly":
@@ -86,8 +92,14 @@ function cloneRegistry() {
   return structuredClone(registry);
 }
 
-function evidenceFor(record) {
-  return record.requiredEvidence.map((kind) => ({ kind, path: evidencePath }));
+function evidenceFor(record, kinds = record.requiredEvidence) {
+  return kinds.map((kind) => ({
+    kind,
+    path: evidencePath,
+    outcome: "passed",
+    revision: evidenceRevision,
+    subject: structuredClone(record.subject),
+  }));
 }
 
 test("the registry contract is strict, sorted, and status-aware", () => {
@@ -130,7 +142,12 @@ test("the registry contract is strict, sorted, and status-aware", () => {
 
   const unexpectedEvidence = cloneRegistry();
   unexpectedEvidence.records["booking-calendly"].evidence = [
-    { kind: "unrequired-outcome", path: evidencePath },
+    {
+      ...evidenceFor(unexpectedEvidence.records["booking-calendly"], [
+        "fresh-scaffold",
+      ])[0],
+      kind: "unrequired-outcome",
+    },
   ];
   assert.equal(
     core.certificationRegistrySchema.safeParse(unexpectedEvidence).success,
@@ -232,6 +249,105 @@ test("descriptor admission rejects incomplete, stale, extra, and false-legacy co
         code: "CERTIFICATION_RECORD_UNKNOWN",
         path: ["records", "unknown-capability"],
         context: { reason: "unknown" },
+      },
+    ],
+  );
+
+  const changedLegacyCatalog = catalog.map((descriptor) =>
+    descriptor.identifier === "standards"
+      ? { ...descriptor, version: "0.2.1" }
+      : descriptor,
+  );
+  const changedLegacy = cloneRegistry();
+  const changedStandards = changedLegacyCatalog.find(
+    ({ identifier }) => identifier === "standards",
+  );
+  assert.notEqual(changedStandards, undefined);
+  changedLegacy.records.standards.subject = core.createCertificationSubject(
+    changedStandards,
+    changedLegacy.records.standards.requiredEvidence,
+  );
+  assert.deepEqual(
+    core.validateCertificationAdmission({
+      catalog: changedLegacyCatalog,
+      registry: changedLegacy,
+    }).issues,
+    [
+      {
+        code: "CERTIFICATION_BACKFILL_SUBJECT_MISMATCH",
+        path: ["records", "standards", "subject"],
+        context: { reason: "not-accepted-subject" },
+      },
+    ],
+  );
+  assert.deepEqual(
+    core.validateCertificationClosure({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { standards: changedLegacy.records.standards },
+      },
+      policy: "legacy-backfill-exempt",
+    }).issues,
+    [
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "standards", "status"],
+        context: { reason: "backfill-pending" },
+      },
+    ],
+  );
+});
+
+test("repository artifacts bind successful evidence to capability, subject, revision, and outcome", () => {
+  const recorded = cloneRegistry();
+  const booking = recorded.records["booking-calendly"];
+  booking.evidence = evidenceFor(booking, ["fresh-scaffold"]);
+
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: recorded,
+      artifacts: {
+        [planPath]: "# approved plan",
+        [evidencePath]: evidenceDocumentSource,
+      },
+    }),
+    { ok: true, value: undefined },
+  );
+
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: recorded,
+      artifacts: {
+        [evidencePath]: evidenceDocumentSource,
+      },
+    }).issues,
+    [
+      {
+        code: "CERTIFICATION_TASK_PLAN_MISSING",
+        path: ["records", "booking-calendly", "taskPlan"],
+        context: { reason: "missing" },
+      },
+    ],
+  );
+
+  const relabeled = cloneRegistry();
+  const relabeledBooking = relabeled.records["booking-calendly"];
+  relabeledBooking.evidence = evidenceFor(relabeledBooking, [
+    "deployed-application",
+  ]);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: relabeled,
+      artifacts: {
+        [planPath]: "# approved plan",
+        [evidencePath]: evidenceDocumentSource,
+      },
+    }).issues,
+    [
+      {
+        code: "CERTIFICATION_EVIDENCE_OUTCOME_MISMATCH",
+        path: ["records", "booking-calendly", "evidence", 0, "kind"],
+        context: { reason: "not-passed-by-artifact" },
       },
     ],
   );

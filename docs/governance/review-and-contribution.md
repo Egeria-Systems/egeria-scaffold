@@ -49,7 +49,7 @@ node scripts/check-capability-certification.mjs --closure all-certified
 pnpm run verify:booking-calendly-certification
 ```
 
-Admission must pass for a builder candidate. Run the closure policy required by the named phase or release and treat its rejecting exit as a stop, not a warning. The local Calendly command supplies only fresh-scaffold evidence; it does not authorize or prove protected-staging, provider, cancellation, cleanup, or recovery outcomes.
+Admission must pass for a builder candidate. It validates the registry plus every referenced repository plan/evidence artifact; passed evidence metadata must match its capability, descriptor subject, evidence-producing revision, and explicit outcome. Run the closure policy required by the named phase or release and treat its rejecting exit as a stop, not a warning. The local Calendly command and receipt declare only fresh-scaffold evidence; relabeling them cannot prove protected-staging, provider, cancellation, cleanup, or recovery outcomes.
 
 ## Builder-repository development boundary
 

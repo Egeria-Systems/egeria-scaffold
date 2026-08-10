@@ -17,7 +17,13 @@
       "evidence": [
         {
           "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-10-booking-calendly-certification-verification.md"
+          "path": "docs/implementation-evidence/2026-08-10-booking-calendly-certification-verification.md",
+          "outcome": "passed",
+          "revision": "636df53958c0e3421b7f493d83493724b67b41f3",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab"
+          }
         }
       ]
     },

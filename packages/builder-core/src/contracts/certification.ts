@@ -57,6 +57,9 @@ export const certificationEvidenceSchema = z
   .strictObject({
     kind: stableIdentifierSchema,
     path: certificationEvidencePathSchema,
+    outcome: z.literal("passed"),
+    revision: z.string().regex(/^[a-f0-9]{40}$/),
+    subject: certificationSubjectSchema,
   })
   .readonly();
 
@@ -128,6 +131,21 @@ export const capabilityCertificationRecordSchema = z
         message: "each evidence kind can be recorded once",
         path: ["evidence"],
       });
+    }
+
+    for (const [index, evidence] of record.evidence.entries()) {
+      if (
+        evidence.subject.descriptorVersion !==
+          record.subject.descriptorVersion ||
+        evidence.subject.behaviorContractDigest !==
+          record.subject.behaviorContractDigest
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "evidence must bind the certification subject",
+          path: ["evidence", index, "subject"],
+        });
+      }
     }
 
     if (

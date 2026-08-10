@@ -35,14 +35,42 @@
                 "kind": {
                   "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
                 },
+                "outcome": {
+                  "const": "passed",
+                  "type": "string"
+                },
                 "path": {
                   "$ref": "#/$defs/urn:egeria-systems:schema:safe-relative-path:1.0.0"
+                },
+                "revision": {
+                  "pattern": "^[a-f0-9]{40}$",
+                  "type": "string"
+                },
+                "subject": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "behaviorContractDigest": {
+                      "$ref": "#/$defs/urn:egeria-systems:schema:sha256-fingerprint:1.0.0"
+                    },
+                    "descriptorVersion": {
+                      "$ref": "#/$defs/urn:egeria-systems:schema:semantic-version:1.0.0"
+                    }
+                  },
+                  "readOnly": true,
+                  "required": [
+                    "descriptorVersion",
+                    "behaviorContractDigest"
+                  ],
+                  "type": "object"
                 }
               },
               "readOnly": true,
               "required": [
                 "kind",
-                "path"
+                "path",
+                "outcome",
+                "revision",
+                "subject"
               ],
               "type": "object"
             },
