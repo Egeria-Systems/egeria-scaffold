@@ -134,7 +134,7 @@ Profile inclusion distinguishes recipe defaults from independent selections. `de
 
 | Capability | Delivery mode | State classifications | Removal policy | Profile inclusion | Required or conditional dependencies |
 |---|---|---|---|---|---|
-| `standards` | `package-backed` | `repository-stateful` | `reviewed` | default: portfolio, site, app, authenticated-app | None |
+| `standards` | `hybrid` | `repository-stateful` | `reviewed` | default: portfolio, site, app, authenticated-app | Owns the ordinary standards package plus generated lint/type/browser-quality configuration, exact Playwright/axe package and script properties, the content-agnostic starter specification, and the read-only quality workflow |
 | `content-files` | `source-generated` | `repository-stateful` | `reviewed` | default: portfolio, site | `standards`; generated YAML 1.2 parsing uses ordinary dependency `yaml`; owns validated externalized accessibility copy |
 | `section-composition` | `source-generated` | `repository-stateful` | `reviewed` | default: portfolio, site | `content-files`; owns Tailwind CSS and PostCSS package/configuration surfaces, global semantic design tokens, and responsive pure presentation |
 | `deployment-cloudflare` | `hybrid` | `repository-stateful`, `external-stateful` | `reviewed` | default: portfolio, site, app, authenticated-app | `standards` |

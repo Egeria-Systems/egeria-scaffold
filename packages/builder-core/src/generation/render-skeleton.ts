@@ -276,7 +276,22 @@ function createBuilderSurfaces(): readonly ManagedSurfaceDescriptor[] {
     createPackageSurface("builder-web-package-version", "/version"),
     createPackageSurface("builder-web-package-private", "/private"),
     createPackageSurface("builder-web-package-type", "/type"),
-    createPackageSurface("builder-web-package-scripts", "/scripts"),
+    createPackageSurface("builder-web-build-script", "/scripts/build"),
+    createPackageSurface(
+      "builder-web-cloudflare-build-script",
+      "/scripts/build:cloudflare",
+    ),
+    createPackageSurface(
+      "builder-web-cloudflare-type-generation-script",
+      "/scripts/cf-typegen",
+    ),
+    createPackageSurface("builder-web-development-script", "/scripts/dev"),
+    createPackageSurface("builder-web-lint-script", "/scripts/lint"),
+    createPackageSurface("builder-web-preview-script", "/scripts/preview"),
+    createPackageSurface(
+      "builder-web-typecheck-script",
+      "/scripts/typecheck",
+    ),
     createPackageSurface("builder-web-package-next", "/dependencies/next"),
     createPackageSurface("builder-web-package-react", "/dependencies/react"),
     createPackageSurface(

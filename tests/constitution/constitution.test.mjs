@@ -864,7 +864,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     contributing,
-    /The approved builder kernel.*responsive Tailwind interface.*Calendly remain separately reviewed increments/iu,
+    /The approved builder kernel.*responsive Tailwind interface.*Playwright\/axe quality foundation.*Calendly remain separately reviewed outcomes/iu,
   );
   assert.match(
     packageOwnership,

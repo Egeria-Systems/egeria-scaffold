@@ -9,15 +9,33 @@ const templateTokenNames = new Set([
   "projectName",
   "displayNameJson",
   "workerName",
+  "githubWorkflowExpression",
+  "githubRefExpression",
 ]);
-const templateTokenPattern = /{{(projectName|displayNameJson|workerName)}}/g;
+const templateTokenPattern =
+  /{{(projectName|displayNameJson|workerName|githubWorkflowExpression|githubRefExpression)}}/g;
 const completeTokenPattern = /{{([^{}]*)}}/g;
+const fixedTemplateTokens = {
+  githubWorkflowExpression: "${{ github.workflow }}",
+  githubRefExpression: "${{ github.ref }}",
+} as const;
 
 export type TemplateTokens = Readonly<{
   projectName: string;
   displayNameJson: string;
   workerName: string;
 }>;
+
+type TemplateTokenName = keyof TemplateTokens | keyof typeof fixedTemplateTokens;
+
+function resolveTemplateToken(
+  token: TemplateTokenName,
+  tokens: TemplateTokens,
+): string {
+  return token in fixedTemplateTokens
+    ? fixedTemplateTokens[token as keyof typeof fixedTemplateTokens]
+    : tokens[token as keyof TemplateTokens];
+}
 
 function templateIssue(code: string, reason: string): ContractIssue {
   return {
@@ -127,7 +145,8 @@ export function renderTemplateSource(input: Readonly<{
 
   const rendered = input.text.replace(
     templateTokenPattern,
-    (_match, token: keyof TemplateTokens): string => input.tokens[token],
+    (_match, token: TemplateTokenName): string =>
+      resolveTemplateToken(token, input.tokens),
   );
 
   return { ok: true, value: normalizeText(rendered) };

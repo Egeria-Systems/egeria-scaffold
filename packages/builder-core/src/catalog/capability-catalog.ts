@@ -79,33 +79,80 @@ function createPackageProbe(
   };
 }
 
+function createJsonValueProbe(
+  pointer: string,
+  expected: string,
+): InferenceProbe {
+  return {
+    kind: "json-value",
+    path: "apps/web/package.json",
+    pointer,
+    expected,
+  };
+}
+
 function createDescriptors(
   packageVersions: CapabilityPackageVersions,
 ): readonly CapabilityDescriptor[] {
   return [
     {
       identifier: "standards",
-      version: "0.1.0",
-      deliveryMode: "package-backed",
+      version: "0.2.0",
+      deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
       dependencies: [],
       ...sharedCapabilityMetadata,
       supportedProfiles: ["portfolio", "site"],
-      requiredPackages: ["@egeria-systems/standards"],
+      requiredPackages: [
+        "@axe-core/playwright",
+        "@egeria-systems/standards",
+        "@playwright/test",
+      ],
+      environmentVariables: ["PLAYWRIGHT_DEPLOYED_URL"],
+      externalDomains: [
+        "cdn.playwright.dev",
+        "playwright.download.prss.microsoft.com",
+      ],
+      retentionAssumptions: ["ci-failure-artifacts-seven-days"],
+      privilegedOperations: [
+        "browser-binary-installation",
+        "browser-process-execution",
+      ],
+      threatReviewLevel: "elevated",
       platformResources: [],
       adapterSemanticRequirements: [],
       managedSurfaces: [
         createPackageSurface(
-          "standards-package",
+          "standards-axe-playwright-package",
           "standards",
-          "/devDependencies/@egeria-systems~1standards",
+          "/devDependencies/@axe-core~1playwright",
+        ),
+        createPackageSurface(
+          "standards-browser-install-ci-script",
+          "standards",
+          "/scripts/browser:install:ci",
+        ),
+        createPackageSurface(
+          "standards-browser-install-script",
+          "standards",
+          "/scripts/browser:install",
         ),
         createFileSurface(
-          "standards-typescript-configuration",
+          "standards-browser-quality-specification",
           "standards",
-          "apps/web/tsconfig.json",
-          "managed",
+          "apps/web/tests/e2e/site-quality.spec.ts",
+          "application-owned",
+        ),
+        createPackageSurface(
+          "standards-deployed-browser-test-script",
+          "standards",
+          "/scripts/test:e2e:deployed",
+        ),
+        createPackageSurface(
+          "standards-development-browser-test-script",
+          "standards",
+          "/scripts/test:e2e:dev",
         ),
         createFileSurface(
           "standards-eslint-configuration",
@@ -113,22 +160,119 @@ function createDescriptors(
           "apps/web/eslint.config.mjs",
           "managed",
         ),
+        createPackageSurface(
+          "standards-package",
+          "standards",
+          "/devDependencies/@egeria-systems~1standards",
+        ),
+        createFileSurface(
+          "standards-playwright-deployed-configuration",
+          "standards",
+          "apps/web/playwright.deployed.config.ts",
+          "managed",
+        ),
+        createFileSurface(
+          "standards-playwright-development-configuration",
+          "standards",
+          "apps/web/playwright.dev.config.ts",
+          "managed",
+        ),
+        createPackageSurface(
+          "standards-playwright-package",
+          "standards",
+          "/devDependencies/@playwright~1test",
+        ),
+        createFileSurface(
+          "standards-playwright-preview-configuration",
+          "standards",
+          "apps/web/playwright.preview.config.ts",
+          "managed",
+        ),
+        createFileSurface(
+          "standards-playwright-shared-configuration",
+          "standards",
+          "apps/web/playwright.config.shared.ts",
+          "managed",
+        ),
+        createPackageSurface(
+          "standards-preview-browser-test-script",
+          "standards",
+          "/scripts/test:e2e:preview",
+        ),
+        createFileSurface(
+          "standards-quality-workflow",
+          "standards",
+          ".github/workflows/quality.yml",
+          "managed",
+        ),
+        createFileSurface(
+          "standards-typescript-configuration",
+          "standards",
+          "apps/web/tsconfig.json",
+          "managed",
+        ),
       ],
       inferenceProbes: [
+        createPackageProbe(
+          "devDependencies",
+          "@axe-core/playwright",
+          "4.12.1",
+        ),
+        createJsonValueProbe(
+          "/scripts/browser:install:ci",
+          "playwright install --with-deps chromium",
+        ),
+        createJsonValueProbe(
+          "/scripts/browser:install",
+          "playwright install chromium",
+        ),
+        createFileProbe("apps/web/tests/e2e/site-quality.spec.ts"),
+        createJsonValueProbe(
+          "/scripts/test:e2e:deployed",
+          "playwright test --config playwright.deployed.config.ts",
+        ),
+        createJsonValueProbe(
+          "/scripts/test:e2e:dev",
+          "playwright test --config playwright.dev.config.ts",
+        ),
+        createFileProbe("apps/web/eslint.config.mjs"),
         createPackageProbe(
           "devDependencies",
           "@egeria-systems/standards",
           packageVersions.standards,
         ),
+        createFileProbe("apps/web/playwright.deployed.config.ts"),
+        createFileProbe("apps/web/playwright.dev.config.ts"),
+        createPackageProbe(
+          "devDependencies",
+          "@playwright/test",
+          "1.62.1",
+        ),
+        createFileProbe("apps/web/playwright.preview.config.ts"),
+        createFileProbe("apps/web/playwright.config.shared.ts"),
+        createJsonValueProbe(
+          "/scripts/test:e2e:preview",
+          "playwright test --config playwright.preview.config.ts",
+        ),
+        createFileProbe(".github/workflows/quality.yml"),
         createFileProbe("apps/web/tsconfig.json"),
-        createFileProbe("apps/web/eslint.config.mjs"),
       ],
-      verificationPlan: ["package-resolution", "lint", "typecheck"],
+      verificationPlan: [
+        "package-resolution",
+        "lint",
+        "typecheck",
+        "browser-development",
+        "browser-preview",
+        "deployed-configuration",
+        "workflow-contracts",
+      ],
       documentationEvidenceRequirements: [
         "public-package-version-and-provenance",
+        "browser-testing-claim-boundaries",
       ],
       removalAndRecoveryRequirements: [
         "review-package-and-configuration-removal",
+        "review-generated-quality-surface-removal",
       ],
     },
     {

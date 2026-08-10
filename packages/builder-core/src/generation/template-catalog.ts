@@ -7,6 +7,7 @@ export type TemplateCatalogEntry = Readonly<{
 }>;
 
 const commonTemplateSources = [
+  "common/.github/workflows/quality.yml.template",
   "common/.gitignore.template",
   "common/.nvmrc",
   "common/AGENTS.md.template",
@@ -20,6 +21,10 @@ const commonTemplateSources = [
   "common/apps/web/eslint.config.mjs",
   "common/apps/web/next.config.ts",
   "common/apps/web/open-next.config.ts",
+  "common/apps/web/playwright.config.shared.ts",
+  "common/apps/web/playwright.deployed.config.ts",
+  "common/apps/web/playwright.dev.config.ts",
+  "common/apps/web/playwright.preview.config.ts",
   "common/apps/web/wrangler.jsonc.template",
   "common/apps/web/app/globals.css",
   "common/apps/web/app/layout.tsx",
@@ -29,6 +34,7 @@ const commonTemplateSources = [
   "common/apps/web/src/content/read-content.ts",
   "common/apps/web/src/presentation/content-page.tsx",
   "common/apps/web/src/sections/section-registry.tsx",
+  "common/apps/web/tests/e2e/site-quality.spec.ts",
   "common/apps/web/src/infrastructure/observability/installed-capability.ts",
 ] as const;
 

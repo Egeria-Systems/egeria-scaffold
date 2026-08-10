@@ -266,6 +266,35 @@ async function loadGeneratedPresentationModule(files) {
   );
 }
 
+async function loadGeneratedDeployedConfigurationModule(files) {
+  const source = indexFiles(files).get(
+    "apps/web/playwright.deployed.config.ts",
+  );
+  assert.notEqual(source, undefined);
+  const executableSource = source
+    .replace(
+      'import { createBrowserQualityConfig } from "./playwright.config.shared";',
+      "const createBrowserQualityConfig = (options: unknown) => options;",
+    )
+    .replace(
+      "const baseURL = parseDeployedBaseURL(process.env.PLAYWRIGHT_DEPLOYED_URL);",
+      'const baseURL = "https://example.com";',
+    );
+  assert.notEqual(executableSource, source);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const executable = typescript.transpileModule(executableSource, {
+    compilerOptions: {
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+
+  return import(
+    `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`
+  );
+}
+
 function assertContentInvalid(operation) {
   assert.throws(operation, {
     name: "TypeError",
@@ -604,6 +633,28 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.match(deployed, /DEPLOYED_URL_REQUIRED/u);
   assert.match(deployed, /DEPLOYED_URL_INVALID/u);
   assert.doesNotMatch(deployed, /COMPATIBILITY_URL/u);
+
+  const deployedModule = await loadGeneratedDeployedConfigurationModule(
+    rendered.files,
+  );
+  assert.equal(
+    deployedModule.parseDeployedBaseURL("https://example.com/quality/"),
+    "https://example.com/quality",
+  );
+  for (const [value, message] of [
+    [undefined, "DEPLOYED_URL_REQUIRED"],
+    ["", "DEPLOYED_URL_REQUIRED"],
+    ["not a url", "DEPLOYED_URL_INVALID"],
+    ["http://example.com", "DEPLOYED_URL_INVALID"],
+    ["https://user@example.com", "DEPLOYED_URL_INVALID"],
+    ["https://example.com?token=private", "DEPLOYED_URL_INVALID"],
+    ["https://example.com#fragment", "DEPLOYED_URL_INVALID"],
+  ]) {
+    assert.throws(() => deployedModule.parseDeployedBaseURL(value), {
+      name: "Error",
+      message,
+    });
+  }
 
   for (const contract of [
     /getByRole\("main"\)/u,
@@ -1915,7 +1966,11 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
       paths,
       /(?:apps\/jobs|packages\/|\.egeria|pnpm-lock\.yaml|middleware)/,
     );
-    const output = [...indexFiles(rendered.files).values()].join("\n").toLowerCase();
+    const output = [...indexFiles(rendered.files)]
+      .filter(([path]) => path !== ".github/workflows/quality.yml")
+      .map(([, content]) => content)
+      .join("\n")
+      .toLowerCase();
     for (const marker of [
       "app-foundation",
       "database",

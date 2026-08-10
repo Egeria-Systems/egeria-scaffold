@@ -522,7 +522,7 @@ test("installed state is strict and records the exact successful generation chec
   });
   assertRejects(contracts.installedStateSchema, {
     ...validState,
-    origin: { ...validState.origin, recipeVersion: "0.5.0" },
+    origin: { ...validState.origin, recipeVersion: "0.6.0" },
   });
 });
 
