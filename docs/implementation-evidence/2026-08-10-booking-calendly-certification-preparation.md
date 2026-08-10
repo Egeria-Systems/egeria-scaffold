@@ -2,13 +2,28 @@
 
 **Date:** 2026-08-10 (America/Toronto)
 
-**Status:** Gate 1 complete; the sole-developer and Free-compatible execution amendment is approved, while every deployment and provider mutation remains separately approval-gated
+**Status:** Gate 1 complete; authorized credential preflight complete; workflow dispatch, deployment, booking, cancellation, and Worker cleanup remain separately approval-gated
 
 **Increment:** P2 Task 5B — `booking-calendly` capability certification and the first reusable fresh-scaffold certification foundation
 
 ## Approval and repository freeze
 
-The user selected P2 Task 5B, preapproved necessary exact-file plan amendments, and authorized continuous local implementation through review of the implemented task. On 2026-08-10, the user confirmed that `CoveMB` is the sole developer and sole eligible human reviewer, accepted the sole-developer risk exception, and authorized designation of the existing free Calendly event type without a paid upgrade. The existing `30 Minute Meeting` one-on-one event was designated. Designation is the only authorized event-type action; no Calendly object was created or changed. This approval does not include verified-final-diff approval, push, pull request, merge, publication, workflow dispatch, deployment, GitHub environment, variable, or secret mutation, Cloudflare mutation, a synthetic booking, provider cleanup, spending, production action, or another external mutation.
+The user selected P2 Task 5B, preapproved necessary exact-file plan amendments, and authorized continuous local implementation through review of the implemented task. On 2026-08-10, the user confirmed that `CoveMB` is the sole developer and sole eligible human reviewer, accepted the sole-developer risk exception, and authorized designation of the existing free Calendly event type without a paid upgrade. The existing `30 Minute Meeting` one-on-one event was designated. Designation is the only authorized event-type action; no Calendly object was created or changed. That initial approval did not include verified-final-diff approval, push, pull request, merge, publication, workflow dispatch, deployment, GitHub environment, variable, or secret mutation, Cloudflare mutation, a synthetic booking, provider cleanup, spending, production action, or another external mutation.
+
+After the approved source commits were pushed, the user separately authorized creation of one dedicated Cloudflare token restricted to `Workers Scripts: Edit` for account `cbfe11087a24ce4f815da7a0dc232b87`, expiring 2026-08-12, and replacement of the GitHub `compatibility` environment's `CLOUDFLARE_API_TOKEN`. The token was created as `egeria-scaffold Calendly certification`; its one-time value was transferred directly to GitHub, was not printed or committed, and was cleared from the temporary clipboard and browser session. GitHub reported the environment secret updated at `2026-08-10T23:30:00Z`. No workflow was manually dispatched.
+
+Read-only Cloudflare inspection also confirmed the dedicated Worker name `acme-portfolio-calendly` was absent, the account subdomain was `bmarquiscom.workers.dev`, and the bounded run had available quota without an upgrade. The prior two active user tokens were over-scoped and had no expiry; neither was used for the certification secret after this preflight.
+
+## Live workflow validation finding
+
+Remote `main` resolved to the approved revision `bbfc15a429bd460f6b32a0df39492926232b9963`. GitHub created push-time validation record `31441374064` for the newly introduced manual workflow and rejected it before job creation. The public annotation was:
+
+```text
+Invalid workflow file: .github/workflows/booking-calendly-certification.yml#L1
+(Line: 31, Col: 27): Unrecognized named-value: 'runner'. Located at position 1 within expression: runner.temp
+```
+
+The record had zero jobs, so no checkout, credential exposure, deployment, application test, booking, or provider mutation occurred. The invalid value is the job-level `CERTIFICATION_ROOT: ${{ runner.temp }}/booking-calendly-certification/project`; GitHub's current [context-availability reference](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability) excludes `runner` from `jobs.<job_id>.env` and permits it in `jobs.<job_id>.steps.env`. The bounded repair moves that unchanged path expression to the four consuming step-level environments, adds a regression contract, and remains prohibited from dispatch until a new exact-diff approval.
 
 Preparation froze clean sequential local `main` at:
 
@@ -30,7 +45,7 @@ Preparation read and reconciled:
 - implementation evidence, plans, and review packets through Calendly initial scaffolding and the capability-certification roadmap gate; and
 - current branch, status, recent commits, comparison scope, GitHub repository visibility, existing environment protection metadata, and existing environment secret names without reading any secret value.
 
-The public repository is `Egeria-Systems/egeria-scaffold` with default branch `main`. The existing `compatibility` environment admits only `main`, has no required reviewer, permits administrator bypass, and has environment secrets named `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`. `CoveMB` is the only current organization member. The environment has no `BOOKING_CALENDLY_CERTIFICATION_URL` variable yet. Secret values and token scopes were not accessed. No GitHub setting was changed.
+At the initial preparation snapshot, the public repository was `Egeria-Systems/egeria-scaffold` with default branch `main`. The existing `compatibility` environment admitted only `main`, had no required reviewer, permitted administrator bypass, and had environment secrets named `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`. `CoveMB` was the only current organization member. The environment had no `BOOKING_CALENDLY_CERTIFICATION_URL` variable. During that initial snapshot, secret values and token scopes were not accessed and no GitHub setting changed. The later separately authorized preflight described above inspected Cloudflare token permission metadata and replaced only the `compatibility` environment's `CLOUDFLARE_API_TOKEN`; it did not expose or retain the token value.
 
 ## Current official setup and security evidence
 

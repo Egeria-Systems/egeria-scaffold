@@ -32,6 +32,26 @@ docs/review-packets/2026-08-10-booking-calendly-sole-developer-exception.md
 
 Implementation uses one focused RED/GREEN contract: first require the preparation, plan, and receipt to declare the truthful sole-operator role assignment, lack of independent human deployment approval, accepted bypass limitation, compensating controls, Free-after-trial baseline, and preservation of a pre-existing designated event; then make only the minimum documentation changes. After focused and full relevant verification, dispatch the required read-only requirements, architecture/anti-overengineering, and test-evidence reviews, record dispositions in the new review packet, and stop for exact-diff approval. Workflow dispatch, deployment, GitHub variable or environment mutation, provider booking, cancellation, and Worker cleanup remain separately gated external actions.
 
+## Live workflow-validation repair amendment
+
+**Approval basis:** The user's preapproved exact-file amendment authority remains in force for evidence-backed defects found before the implemented-task review completes. The user separately authorized creating one dedicated Cloudflare token and replacing the `compatibility` environment's `CLOUDFLARE_API_TOKEN`, while explicitly prohibiting workflow dispatch.
+
+After the approved commits reached remote `main` at `bbfc15a429bd460f6b32a0df39492926232b9963`, GitHub rejected the workflow definition before creating any job. Run `31441374064` reported `.github/workflows/booking-calendly-certification.yml` line 31: `Unrecognized named-value: 'runner'` for the job-level `${{ runner.temp }}` expression. The workflow therefore did not expose credentials, deploy, test, book, or mutate a provider. The root cause is the workflow's use of the step-scoped `runner` context in a job-level `env` expression, which the existing static contract incorrectly required.
+
+This repair is limited to these exact files:
+
+```text
+.github/workflows/booking-calendly-certification.yml
+tests/constitution/constitution.test.mjs
+docs/superpowers/plans/2026-08-10-booking-calendly-certification.md
+docs/implementation-evidence/2026-08-10-booking-calendly-certification-preparation.md
+docs/review-packets/2026-08-10-booking-calendly-workflow-validation-repair.md
+```
+
+Use focused RED/GREEN cycles. First change the real parsed-workflow contract to reject any job-level environment value containing `${{ runner.` and to require the certification root only on the steps that consume it. Verify that the focused test fails against the current invalid workflow. Then remove the job-level environment and set the same `${{ runner.temp }}/booking-calendly-certification/project` value on `Create deployment candidate`, `Prepare deployment candidate`, `Deploy certification Worker`, and `Test deployed application behavior`. Do not change the generated path, command sequence, secret boundary, action versions, deployment URL, capability state, or any provider behavior.
+
+Run the focused constitution test, the full constitution and semantic-naming tests, semantic naming, capability admission, the expected rejecting closure, YAML parsing, and `git diff --check`. Dispatch the required independent read-only requirements, architecture/anti-overengineering, and test-evidence reviews; repair only material findings; create the named repair review packet; and stop for a new exact-diff approval. Do not push or dispatch the workflow.
+
 ## Global constraints
 
 - Work on clean sequential local `main` frozen at planning base `542660b5a3d25709ade6d8536c8c65bd1e6b6038`; do not touch separate worktrees.

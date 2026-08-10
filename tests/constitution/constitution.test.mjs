@@ -530,14 +530,20 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     name: "compatibility",
     url: "${{ vars.BOOKING_CALENDLY_CERTIFICATION_URL }}",
   });
-  assert.deepEqual(job.env, {
-    CERTIFICATION_ROOT:
-      "${{ runner.temp }}/booking-calendly-certification/project",
-  });
+  assert.doesNotMatch(JSON.stringify(job.env ?? {}), /\$\{\{\s*runner\./u);
 
   const stepsByName = Object.fromEntries(
     job.steps.map((step) => [step.name, step]),
   );
+  const certificationRoot =
+    "${{ runner.temp }}/booking-calendly-certification/project";
+  assert.deepEqual(stepsByName["Create deployment candidate"].env, {
+    CALENDLY_URL: "${{ inputs.calendly_url }}",
+    CERTIFICATION_ROOT: certificationRoot,
+  });
+  assert.deepEqual(stepsByName["Prepare deployment candidate"].env, {
+    CERTIFICATION_ROOT: certificationRoot,
+  });
   assert.equal(
     stepsByName["Check out repository"].uses,
     "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
@@ -580,10 +586,12 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   assert.deepEqual(stepsByName["Deploy certification Worker"].env, {
     CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
     CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
+    CERTIFICATION_ROOT: certificationRoot,
   });
   assert.deepEqual(
     stepsByName["Test deployed application behavior"].env,
     {
+      CERTIFICATION_ROOT: certificationRoot,
       PLAYWRIGHT_DEPLOYED_URL:
         "${{ vars.BOOKING_CALENDLY_CERTIFICATION_URL }}",
     },
