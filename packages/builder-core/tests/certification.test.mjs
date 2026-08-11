@@ -317,7 +317,7 @@ test("descriptor admission rejects incomplete, stale, extra, and false-legacy co
   );
 });
 
-test("material observability requires an ordinary pending certification task", () => {
+test("material observability remains pending with only reviewed fresh-scaffold evidence", () => {
   const observabilityDescriptor = descriptorsByIdentifier.get("observability");
   assert.notEqual(observabilityDescriptor, undefined);
   const observabilityRecord = committedRegistry.records.observability;
@@ -335,7 +335,18 @@ test("material observability requires an ordinary pending certification task", (
     ],
     status: "pending",
     taskPlan: observabilityPlanPath,
-    evidence: [],
+    evidence: [
+      {
+        kind: "fresh-scaffold",
+        path: "docs/implementation-evidence/2026-08-11-production-observability-certification-verification.md",
+        outcome: "passed",
+        revision: "ef845b1e0551d3b43e17969cc00f21960c90769b",
+        subject: core.createCertificationSubject(
+          observabilityDescriptor,
+          ["cleanup-recovery", "deployed-application", "fresh-scaffold"],
+        ),
+      },
+    ],
   });
   assert.doesNotThrow(() =>
     readFileSync(new URL(`../../../${observabilityPlanPath}`, import.meta.url)),

@@ -139,3 +139,7 @@ $ changeset status
 ```
 
 The unchanged full package-boundary suite then exited 1 with 44/45 tests passing: the stale release safeguard expected no Changeset Markdown files but found the intentional marker. The approved direct consumer repair requires exactly the single filename and its exact empty content, so an extra marker or any package-bump content still fails closed. This local reconciliation does not version or publish a package, mutate the marker, dispatch the prepared workflow, execute its browser or upload steps, use credentials, transmit telemetry, inspect or mutate a provider, perform cleanup, or change certification status.
+
+## Final verification fixture reconciliation (2026-08-11)
+
+The first settled `pnpm run verify:builder-kernel` run passed constitution 47/47 and package boundaries 45/45, then exited 1 because builder-core passed 135/136. The sole failure was `material observability requires an ordinary pending certification task`: its expected record retained `evidence: []`, while the canonical registry correctly contains the reviewed, passed `fresh-scaffold` entry recorded by Task 3. The dated verification receipt, exact evidence-producing revision, subject digest, pending status, admission behavior, and both expected-rejecting closure policies provide counterevidence to changing the registry. The approved direct-consumer repair updates only the literal expected test record; no evidence outcome, status, runtime, workflow, provider, credential, or external state changes.

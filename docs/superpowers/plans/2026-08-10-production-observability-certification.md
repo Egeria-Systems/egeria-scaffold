@@ -90,6 +90,18 @@ The minimum repair is test-contract-only: the recursive enumerator must fail clo
 
 It does not change the workflow or any runtime, provider, credential, deployment, telemetry, registry, publication, integration, or push surface. Final verification remains paused until this finding passes a bounded re-review.
 
+### User-preapproved Task 7 verification repair — current observability evidence fixture (2026-08-11)
+
+The first settled `verify:builder-kernel` run passed constitution and package boundaries, then stopped in builder-core at 135/136. The failing direct-consumer test still expected the pending observability record to have `evidence: []`, but Task 3 correctly recorded one reviewed, passed `fresh-scaffold` entry at revision `ef845b1e0551d3b43e17969cc00f21960c90769b`. The executable registry, dated receipt, admission behavior, and current architecture all agree; only this stale expected fixture disagrees.
+
+The already-failing builder-core test is the focused RED case. The minimum repair updates its literal expected record to include the exact existing subject-bound evidence while retaining `pending` status and the absent `deployed-application` and `cleanup-recovery` outcomes. This repair owns exactly:
+
+- `docs/superpowers/plans/2026-08-10-production-observability-certification.md`;
+- `docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md`; and
+- `packages/builder-core/tests/certification.test.mjs`.
+
+It does not modify the registry, evidence receipt, runtime, workflow, generated project, provider, credentials, deployment, telemetry, cleanup, publication, integration, or push. After focused GREEN, the complete final gate must restart because the earlier builder-kernel run stopped before its remaining commands.
+
 ## Exact file structure
 
 Create local runner, deployed exercise, certification fixture, workflow, and tests:
