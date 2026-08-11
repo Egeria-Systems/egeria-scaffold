@@ -1625,7 +1625,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         escapeRegularExpression(observabilityTask) +
         "'s exact implementation diff `717c3bb0f048f4a4bc544100125ae42d818f09bc\\.\\.45b57d2dc265ef6ba9ac805d7352a01db5f1081d` is approved and the implementation task is complete[\\s\\S]+" +
         escapeRegularExpression(observabilityCertificationTask) +
-        " remains a separate unapproved certification plan[\\s\\S]+develops directly on clean local `main`",
+        " local certification work is authorized and in progress with reviewed local fresh-scaffold evidence[\\s\\S]+Protected-staging, provider/source, credentials, telemetry transmission, cleanup, registry transition, merge, and push remain separately unauthorized[\\s\\S]+develops directly on clean local `main`",
     ),
   );
   assert.match(
