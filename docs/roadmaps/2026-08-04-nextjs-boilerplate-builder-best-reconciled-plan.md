@@ -32,6 +32,8 @@ The following decisions supersede conflicting wording in earlier plans:
     - `migrations.jsonl` for append-only migration/reconciliation history.
 14. Public packages are ordinary replaceable dependencies. Their use does not reduce client ownership.
 15. Every capability declares whether its delivery is package-backed, source-generated, or hybrid.
+16. Test tooling is selected by execution and evidence boundary rather than standardized on one runner. Builder, CLI, and package tests retain the Node.js test runner; generated TypeScript and React tests use Vitest with React Testing Library; binding-level Cloudflare runtime tests use Workers Vitest only after a capability installs the relevant binding; and Playwright retains browser, route, layout, and end-to-end responsibilities.
+17. Every applicable repository and generated-project `AGENTS.md` must name the correct test tool, command, escalation boundary, and claim limit for the code it governs. Continuous integration must execute every applicable test boundary for the builder, CLI, packages, compatibility proof, retained generated fixtures, and generated repositories.
 
 ## 2. Product model
 
@@ -50,6 +52,7 @@ Materializes:
 - SEO and metadata foundation;
 - Cloudflare deployment adapter;
 - Cloudflare Workers Logs and Better Stack observability;
+- generated Vitest Node unit and jsdom React component testing foundations;
 - CI, automated accessibility, visual, performance, and end-to-end foundations;
 - root and scoped `AGENTS.md` files.
 
@@ -489,7 +492,7 @@ Contains:
 - architecture-boundary rules;
 - Cloudflare-import restrictions;
 - user-visible-copy lint rules;
-- test-rule presets.
+- test-rule presets, without exporting a public Vitest runtime or configuration package.
 
 #### `@egeria-systems/observability`
 
@@ -508,6 +511,7 @@ Contains:
 - Calendly integration;
 - page and section composition;
 - Cloudflare deployment configuration;
+- generated Vitest configuration, component-test setup, and starter tests through the hybrid `standards` capability;
 - application persistence;
 - transactional email and Resend adapter;
 - background jobs;
@@ -989,10 +993,24 @@ The first client launch is not blocked by a mandatory manual review under the de
 
 ## 18. Testing strategy
 
+### Test-tool and evidence ownership
+
+The [approved generated unit and component testing design](../superpowers/specs/2026-08-10-generated-unit-component-testing-design.md) owns the detailed boundary. Its [Task 6C implementation plan](../superpowers/plans/2026-08-10-generated-unit-component-testing.md) and separate [Task 6D certification plan](../superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md) provide the gated execution sequence.
+
+- Builder-core, CLI, standards, observability, and other authored builder-repository unit, integration, subprocess, and contract tests retain the Node.js test runner. No mass Vitest migration is planned.
+- P3 introduces `fast-check` with the Node.js test runner for materially combinatorial capability resolution, state, migration, version-graph, and recovery invariants. Property failures must retain counterexample, seed, path, and any model-command replay data. `fast-check` is not a default generated-project dependency.
+- Generated pure TypeScript tests use a named Vitest Node project. Generated synchronous React component tests use a separate named Vitest jsdom project with React Testing Library, `user-event` where interaction exists, and `jest-dom` assertions. Tests use explicit Vitest imports, and continuous integration uses explicit non-watch commands.
+- Playwright remains responsible for CSS layout, computed focus visibility, real browser APIs, dialogs, iframes, async Server Components, routes, development/OpenNext behavior, and complete journeys. jsdom results must not be presented as evidence for those boundaries.
+- P4 provider-neutral app-foundation contracts use the generated Vitest Node project. Whole built-Worker route contracts may use Wrangler `createTestHarness()` under a Node runner. P4 installs no Workers Vitest pool because it creates no D1, KV, R2, Queue, Durable Object, or equivalent binding.
+- P5C `application-persistence` is the first planned owner of Workers Vitest, for direct D1 and Workers-runtime assertions. Shared Workers-runtime configuration belongs to `deployment-cloudflare`; later binding capabilities reuse it while owning their capability-specific fixtures and tests. Workers Vitest does not replace provider-neutral tests, whole-Worker harness tests, browser tests, or deployed certification.
+- Exact dependency versions and peer/runtime compatibility are revalidated and frozen at each implementation entry. A coverage provider or threshold, Vitest Browser Mode, MSW, Cypress, and additional generated test dependencies require their own evidenced need; they are not part of the initial foundation.
+
+P2 Task 6C follows approved production-observability implementation and its separate Task 6B certification. It advances the existing hybrid `standards` capability and generated-project recipe; it does not create a selectable testing capability or a public testing package. It owns generated dependencies, named Node/jsdom configuration, component setup, semantic scripts, real starter specifications, state/receipt changes, generated CI, and root/scoped testing instructions. Because this materially changes the `standards` descriptor and evidence contract, the capability returns to pending and P2 remains open until separate Task 6D certifies the exact subject.
+
 ### Builder monorepo
 
 - unit tests for schemas, capability resolution, inference, planning, merge logic, and error normalization;
-- property-based tests for materially complex state combinations and migration invariants;
+- P3 property-based tests with `fast-check` for materially complex state combinations and migration invariants;
 - CLI integration tests in temporary Git repositories;
 - deterministic generation fixtures;
 - manifest/inference drift fixtures;
@@ -1018,8 +1036,8 @@ Unit, property-based, and temporary-repository integration tests remain responsi
 
 ### Generated applications
 
-1. Unit tests for domain policies, transformations, content normalization, and state transitions.
-2. Component tests for presentation, keyboard interaction, user-visible states, copy resolution, and focused axe checks.
+1. Vitest Node unit tests for domain policies, transformations, content normalization, and state transitions.
+2. Vitest jsdom component tests with React Testing Library for synchronous presentation, semantic interaction, user-visible states, copy resolution, and focused DOM accessibility assertions. Real keyboard, focus, CSS, browser API, routing, and axe journey evidence remains in Playwright.
 3. Contract tests for every interchangeable adapter, normalized errors, idempotency, and missing-resource behavior.
 4. Cloudflare integration tests for routing, bindings, D1, R2, queues, and environment isolation where installed.
 5. Production-like OpenNext end-to-end tests.
@@ -1123,6 +1141,26 @@ Pull-request gates include, as relevant:
 - affected compiled-CLI lifecycle end-to-end fixtures;
 - security checks matched to changed scope.
 
+The builder repository's ordinary read-only quality workflow must make the following boundaries independently inspectable: constitution and semantic-governance checks; package-boundary and release safeguards; builder-core and CLI tests; standards and observability package tests; capability-certification admission and behavior tests; lint, build, and typecheck; deterministic generated-fixture tests; the full fixed-root generated-project verifier; and the local compatibility proof's ordinary Vitest, whole-Worker harness, build/type, and development/workerd browser checks. Package-release workflows continue to execute their package-specific tests, while deployment and provider workflows retain separate authority.
+
+Every generated repository's read-only quality workflow must execute, as separately named steps:
+
+1. frozen dependency installation;
+2. lint;
+3. strict typecheck;
+4. Vitest Node unit tests;
+5. Vitest jsdom component tests;
+6. Next.js build;
+7. OpenNext build;
+8. explicit Chromium installation;
+9. Playwright against Next.js development;
+10. Playwright against OpenNext/workerd preview; and
+11. failure-only browser artifact upload.
+
+Binding-specific Workers Vitest steps are added only when the installed capability provides the corresponding Workers-runtime configuration and test command. Generated workflows remain read-only, pin action revisions, disable credential persistence, and perform no deployment, publication, provider, release, secret, or production operation.
+
+The repository root testing instructions are the canonical test-tool selection owner for authored builder code. Every applicable nested builder, CLI, package, compatibility-proof, generated-root, and generated-web `AGENTS.md` must link to that owner or generated-project equivalent and state its boundary-specific commands and evidence limits. Derived fixture instructions are regenerated from their templates rather than hand-edited. No instruction may require a command or tool that its governed project does not install.
+
 Release gates include:
 
 - full applicable test matrix;
@@ -1204,10 +1242,13 @@ P10 Fleet hardening, package review, and portability evidence
 ### Sequencing rules
 
 - P2 retains every approved portfolio, Calendly, observability, CI/deployment, visual, performance, and automated-accessibility task and closes a production-ready portfolio baseline; it does not generate the real client project early.
-- P3 remains unchanged and must close its clean-state, isolated-worktree, migration, drift, upgrade, recovery, compiled-CLI lifecycle, and capability-certification backfill requirements before P3B begins.
+- P2 Task 6C begins only after production-observability implementation and separate Task 6B certification are integrated and approved. Separate Task 6D then certifies the materially changed `standards` capability before P2 can close. Existing later task numbers remain unchanged.
+- P3 retains its clean-state, isolated-worktree, migration, drift, upgrade, recovery, compiled-CLI lifecycle, and capability-certification backfill requirements and adds `fast-check` only at that lifecycle-invariant boundary. P3 must close before P3B begins.
 - P3B relocates only the production-complete `site` work formerly assigned to P4 and the P5A `multilingual` and P5B `analytics` capability task pairs. It changes no default recipe, creates no composite client profile or capability, and does not waive or merge any implementation, certification, deployment, provider, privacy, recovery, or approval gate.
 - P3B work is delivered sequentially: production `site`, `multilingual`, `analytics`, then the combined real-client journey. The three capability changes use the P3 lifecycle for initial creation and later addition, upgrade, removal, refusal, and recovery evidence.
 - P5C through P5E may be developed in isolated worktrees after P4 when they do not alter shared contracts concurrently.
+- P4 uses generated Vitest Node tests for provider-neutral app-foundation behavior and may use `createTestHarness()` for whole built-Worker contracts; it does not introduce Workers Vitest without an installed binding.
+- P5C introduces the shared Workers Vitest integration with application persistence and direct D1 evidence. P5E, P6, and P7 reuse that lane only for the binding behavior they own.
 - They merge sequentially, rerunning generated-project and migration fixtures after every merge.
 - P5F requires P5C. Its email and queue integrations require P5D and P5E respectively.
 - P6 follows stable content and multilingual contracts.
@@ -1243,6 +1284,8 @@ P10 Fleet hardening, package review, and portability evidence
 - separate Task 5B capability certification after the implemented Calendly task, including current human-prerequisite planning and the first reusable fresh-scaffold certification foundation;
 - protected-staging certification of `booking-calendly` selected during initial scaffolding, including a synthetic booking and provider-confirmed outcome;
 - production observability;
+- Task 6C generated Vitest Node and React Testing Library/jsdom foundations, semantic run/watch commands, starter unit/component specifications, state and receipt integration, generated and builder-repository CI coverage, and context-specific root/scoped testing instructions;
+- separate Task 6D certification of the exact materially changed `standards` capability subject;
 - CI/deployment, visual, performance, and automated accessibility gates;
 - production-ready portfolio baseline retained as a P3 lifecycle input;
 - the real-client generation and migration-evidence requirement is fulfilled in P3B rather than waived or replaced.
@@ -1254,6 +1297,7 @@ P10 Fleet hardening, package review, and portability evidence
 - plan and final-diff approval;
 - ownership-aware migrations;
 - drift reconciliation;
+- bounded deterministic `fast-check` properties for materially combinatorial builder state and migration invariants, with replayable failure evidence and the existing Node.js test runner;
 - current/previous-major upgrade matrix;
 - portfolio-to-site transition;
 - bounded compiled-CLI end-to-end coverage for representative capability addition, upgrade, migration, refusal, and recovery paths;
@@ -1293,11 +1337,15 @@ P5A and P5B are therefore not deleted and not renumbered.
 
 - internal `app-foundation` capability;
 - public `app` recipe resolving to `app-foundation`;
+- generated Vitest Node tests for provider-neutral use cases, ports, errors, and in-memory adapters;
+- whole built-Worker contracts through `createTestHarness()` where justified, without adding Workers Vitest before a binding exists;
 - tested portfolio/site-to-app transitions without automatically adding stateful infrastructure.
 
 #### P5C–P5F — Remaining independent backend capabilities
 
 P5A `multilingual` and P5B `analytics` retain their identifiers as requirements relocated intact to P3B; they are not deleted or renumbered. Implement application persistence, Resend email, Cloudflare job delivery, and durable contact submissions through the existing P5C–P5F capability prompts.
+
+P5C introduces Workers Vitest with the shared Cloudflare deployment test configuration and application-persistence-owned D1 specifications. P5E reuses it for Queue behavior, P6 for D1/R2 behavior, and P7 for persistence-backed identity behavior. Each capability retains ownership of its own tests and does not treat the shared runner as evidence for another capability.
 
 Each capability implementation is followed by its separately planned and approved capability-certification task. Each capability completes its base fresh-project certification journey. Capabilities with provider, persistent-data, privileged, or security-sensitive behavior also complete a separately approved deployed certification plan before their phase is accepted.
 
