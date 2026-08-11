@@ -31,6 +31,12 @@ Deployed mode rejects missing, malformed, non-HTTPS, credential-bearing, query-b
 
 Playwright reports and test results are ignored locally and uploaded for seven days when generated CI browser checks fail. Axe and browser checks provide bounded evidence for selected automated and interaction behaviors. Passing them does not establish WCAG conformance, assistive-technology compatibility, or human usability.
 
+## Operational telemetry
+
+This project generates bounded server-error, browser-error, and web-vital events. Browser reports use the same-origin `/api/observability` route; the route accepts only a strict size-limited vocabulary and never receives raw error messages, stacks, URLs, headers, cookies, form values, or arbitrary attributes. Telemetry failures are isolated from application behavior.
+
+Cloudflare Workers Logs and version metadata are configured in `apps/web/wrangler.jsonc`. Optional Better Stack delivery requires both `BETTER_STACK_INGESTING_HOST` and `BETTER_STACK_SOURCE_TOKEN` to be configured as runtime secrets. The generated project does not create that provider source, configure secrets, deploy, or install Cloudflare Web Analytics. Provider retention, endpoint abuse/cost controls, and credential/provider cleanup remain deployment responsibilities. Local builds and browser checks do not prove deployed telemetry receipt or production readiness.
+
 ## Calendly booking
 
 When Calendly booking is selected, the generated integration keeps an ordinary link fallback and loads the direct cross-origin scheduling frame only near the viewport or after popup activation. It does not load Calendly host-page JavaScript. Calendly controls provider-side behavior, browser storage, and provider-controlled scheduling data; local checks do not prove provider availability or a completed booking.

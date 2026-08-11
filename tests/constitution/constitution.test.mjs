@@ -340,14 +340,13 @@ test("package ownership documentation records the approved release boundary", as
   assert.match(contributing, /public API.*approved Changeset/i);
 
   for (const document of [readme, packageOwnership]) {
-    assert.match(
-      document,
-      /exactly `@egeria-systems\/standards@0\.1\.0` and `@egeria-systems\/observability@0\.1\.0` are publicly available on npm/i,
-    );
+    assert.match(document, /@egeria-systems\/standards/iu);
+    assert.match(document, /@egeria-systems\/observability/iu);
+    assert.match(document, /`0\.1\.0`[\s\S]+`0\.2\.0`/iu);
     assert.match(document, /registry signatures/i);
-    assert.match(document, /approved bootstrap provenance exception/i);
-    assert.match(document, /future releases.*OIDC trusted publishing/i);
-    assert.match(document, /explicit provenance request/i);
+    assert.match(document, /bootstrap[\s\S]+exception/i);
+    assert.match(document, /OIDC trusted publishing/i);
+    assert.match(document, /explicit provenance/i);
   }
   assert.match(packageOwnership, /Changesets.*versioning and publication/i);
   assert.match(packageOwnership, /does not create.*release resolver/i);
@@ -1071,6 +1070,7 @@ test("capability delivery requires a separately planned certification task", asy
   const lifecyclePhase = compactLabel("P", "3");
   const appFoundationPhase = compactLabel("P", "4");
   const initialCertificationTask = namedLabel("Task", "5B");
+  const currentCertificationTask = namedLabel("Task", "6B");
   const preparationGate = namedLabel("Gate", "1");
 
   assert.match(
@@ -1132,6 +1132,13 @@ test("capability delivery requires a separately planned certification task", asy
     clientReadySection,
     new RegExp(
       `${escapeRegularExpression(initialCertificationTask)}[^#]+booking-calendly`,
+      "i",
+    ),
+  );
+  assert.match(
+    clientReadySection,
+    new RegExp(
+      `${escapeRegularExpression(currentCertificationTask)}[^#]+observability@0\\.2\\.0`,
       "i",
     ),
   );
@@ -1227,7 +1234,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+pending[^\n]+closure[^\n]+backfill-pending/i,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+five unchanged subjects[^\n]+backfill-pending[^\n]+observability@0\.2\.0[^\n]+pending/i,
   );
   assert.match(
     enforcementMap,
@@ -1235,10 +1242,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    new RegExp(
-      `backfill-pending[^\\n]+${escapeRegularExpression(clientReadyPhase)} closure[^\\n]+${escapeRegularExpression(lifecyclePhase)} closure[^\\n]+reject`,
-      "i",
-    ),
+    /descriptor admission passes[^\n]+transition and all-certified closure[^\n]+remain open/i,
   );
   assert.match(
     design,
@@ -1374,6 +1378,9 @@ test("executable capability certification ownership is current", async () => {
 
   for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
     assert.match(document, /certifications\/capabilities\.json/u);
+    assert.match(document, /booking-calendly[\s\S]+certified/iu);
+  }
+  for (const document of [capabilityModel, enforcementMap]) {
     assert.match(
       document,
       /booking-calendly[\s\S]+certified[\s\S]+provider-confirmed[\s\S]+cleanup/iu,
@@ -1442,11 +1449,11 @@ test("executable capability certification ownership is current", async () => {
   assert.doesNotMatch(providerReceipt, privateCalendlyUrlPattern);
   assert.match(
     enforcementMap,
-    /admission[^\n]+actual[^\n]+closure[^\n]+pass/iu,
+    /descriptor admission passes[^\n]+transition and all-certified closure[^\n]+remain open/iu,
   );
   assert.match(
     enforcementMap,
-    /fresh-scaffold[^\n]+actual[^\n]+provider[^\n]+passed/iu,
+    /booking-calendly@0\.1\.0[^\n]+certified from fresh-scaffold[^\n]+provider-confirmed[^\n]+cleanup/iu,
   );
   assert.match(
     reviewProtocol,
@@ -1536,6 +1543,8 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   const browserTestingTask = namedLabel("Task", "4B");
   const calendlyTask = namedLabel("Task", "5");
   const calendlyCertificationTask = namedLabel("Task", "5B");
+  const observabilityTask = namedLabel("Task", "6");
+  const observabilityCertificationTask = namedLabel("Task", "6B");
 
   assert.deepEqual(
     {
@@ -1603,16 +1612,20 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         "'s responsive Tailwind presentation[\\s\\S]+are approved at committed artifact `e7026bd9e8c7a7ca20b5a485ee6702d2921a7586`[\\s\\S]+" +
         "Selecting " +
         escapeRegularExpression(calendlyTask) +
-        " as the next increment approves " +
+        " as the next increment approved " +
         escapeRegularExpression(browserTestingTask) +
         "'s generated browser-quality foundation at committed artifact `02ec5eb12741c1622beec02529c38965e7501d68`[\\s\\S]+" +
         "Selecting " +
         escapeRegularExpression(calendlyCertificationTask) +
-        " as the next increment accepts " +
+        " as the next increment accepted " +
         escapeRegularExpression(calendlyTask) +
         " Calendly initial scaffolding[\\s\\S]+" +
         escapeRegularExpression(calendlyCertificationTask) +
-        "'s bounded provider certification is complete and awaiting verified-final-diff review; later task numbering is unchanged[\\s\\S]+develops directly on clean local `main`",
+        "'s bounded provider certification evidence is complete[\\s\\S]+" +
+        escapeRegularExpression(observabilityTask) +
+        " now implements and locally verifies production observability[\\s\\S]+" +
+        escapeRegularExpression(observabilityCertificationTask) +
+        " remains a separate unapproved certification plan[\\s\\S]+develops directly on clean local `main`",
     ),
   );
   assert.match(

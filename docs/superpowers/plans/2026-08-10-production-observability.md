@@ -183,10 +183,14 @@ The user's preapproved plan-amendment authority adds this direct template-bounda
 
 ```text
 packages/builder-core/templates/common/pnpm-workspace.yaml
+packages/builder-core/AGENTS.md
+packages/builder-core/README.md
 tests/package-boundaries/private-packages.test.mjs
+tests/capability-certification/certification-runner.test.mjs
+tests/constitution/constitution.test.mjs
 ```
 
-The generated workspace policy must also exempt the exact verified `@egeria-systems/observability@0.2.0` release from pnpm's otherwise strict 1,440-minute cooling period: official pnpm documentation permits version-specific `minimumReleaseAgeExclude` entries, and without the narrow exclusion real production generation fails closed immediately after the authorized release. The 1,440-minute policy remains enforced for all other dependency versions. The boundary test owns the allowlisted private builder template inventory and the generated-instruction recipe assertions; it must advance atomically with the seven added observability templates and, during documentation reconciliation, the recipe version rendered by the same private package.
+The generated workspace policy must also exempt the exact verified `@egeria-systems/observability@0.2.0` release from pnpm's otherwise strict 1,440-minute cooling period: official pnpm documentation permits version-specific `minimumReleaseAgeExclude` entries, and without the narrow exclusion real production generation fails closed immediately after the authorized release. The 1,440-minute policy remains enforced for all other dependency versions. Builder-core's nested instructions and README are canonical direct consumers of its recipe, package, generated-adapter, and certification-closure boundaries. The boundary test owns their recipe assertions and the allowlisted private template inventory. The certification runner owns the repository registry's admission and closure expectations; the new ordinary `pending` observability record must make both transition and all-certified closure fail until the separate certification task succeeds. The constitution test owns exact prose and command contracts for public-package publication, certification status, Cloudflare isolation, and retained-fixture verification, so those assertions must advance atomically with their canonical owners rather than preserving the superseded release and verification boundary.
 
 ## Task 1: Freeze preparation, design, and exact plan
 
@@ -276,12 +280,12 @@ The verified publication produced both public `0.2.0` artifacts, but public avai
 
 ## Task 8: Reconcile canonical documentation
 
-- [ ] Update package ownership, architecture overview, capability model, enforcement map, program roadmap, root README, and generated instructions/readmes only where they directly consume the implemented behavior.
-- [ ] Link canonical owners instead of copying descriptor, schema, security, or lifecycle rules.
-- [ ] Mark production-observability implementation as awaiting Task 6B certification. Do not mark P2 or the capability certified.
-- [ ] Record public-package provenance/integrity, local runtime/browser evidence, claim limits, residual unauthenticated-endpoint risk, and provider/deployment/certification deferral.
-- [ ] Run documentation links/contracts and semantic naming GREEN.
-- [ ] Commit with message `Document production observability`.
+- [x] Update package ownership, architecture overview, capability model, enforcement map, program roadmap, root README, and generated instructions/readmes only where they directly consume the implemented behavior.
+- [x] Link canonical owners instead of copying descriptor, schema, security, or lifecycle rules.
+- [x] Mark production-observability implementation as awaiting Task 6B certification. Do not mark P2 or the capability certified.
+- [x] Record public-package provenance/integrity, local runtime/browser evidence, claim limits, residual unauthenticated-endpoint risk, and provider/deployment/certification deferral.
+- [x] Run documentation links/contracts and semantic naming GREEN.
+- [x] Commit with message `Document production observability`.
 
 ## Task 9: Independent final review and bounded repair
 

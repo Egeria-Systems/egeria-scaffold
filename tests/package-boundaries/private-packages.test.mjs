@@ -383,7 +383,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /explicit allowlisted templates/);
   assert.match(builderInstructions, /YAML 1.2/);
   assert.match(builderInstructions, /Markdown with validated YAML front matter/);
-  assert.match(builderInstructions, /recipe `0.5.0`/);
+  assert.match(builderInstructions, /recipe `0.6.0`/);
   assert.match(builderInstructions, /source-owned typed section registry/);
   assert.match(builderInstructions, /Tailwind CSS and PostCSS/);
   assert.match(builderInstructions, /Playwright and axe/);
@@ -402,7 +402,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /explicit allowlisted templates/);
   assert.match(builderReadme, /YAML 1.2/);
   assert.match(builderReadme, /Markdown with validated YAML front matter/);
-  assert.match(builderReadme, /recipe `0.5.0`/);
+  assert.match(builderReadme, /recipe `0.6.0`/);
   assert.match(builderReadme, /four source-registered typed section shapes/);
   assert.match(builderReadme, /Tailwind CSS and PostCSS/);
   assert.match(builderReadme, /Playwright and axe/);
