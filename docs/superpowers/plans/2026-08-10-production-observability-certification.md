@@ -31,6 +31,12 @@ The first registry-enabled real local journey reached `verifyGeneratedProject(ro
 
 Under the user's preapproved plan-amendment authority, the local runner uses the exact canonical `portfolio` identity `acme-portfolio` / `Acme Portfolio`. The manual protected-staging candidate remains the separately named dedicated Worker `acme-portfolio-observability`. A focused test must fail against the old local identity before production configuration changes. No generated template, fixture, verifier contract, provider surface, registry evidence, or external state changes under this amendment.
 
+### Preapproved review amendment — current authorization status (2026-08-11)
+
+Task 3 review found that `docs/roadmaps/program-roadmap.md` and its direct constitution assertion still called Task 6B an unapproved plan after bounded local execution was authorized and reviewed fresh-scaffold evidence was recorded. That current-status wording is false even though the protected-staging/provider/external limits remain correct.
+
+The repair modifies already inventoried `tests/constitution/constitution.test.mjs` first so its current-status expectation fails against the stale roadmap, then updates only the roadmap's Task 6B status sentences. Local Task 6B is authorized and in progress; protected-staging deployment, provider/source and credential mutations, telemetry transmission, cleanup, registry transition, merge, and push remain separately unauthorized. No runtime, registry, evidence subject, external state, or later task changes under this amendment.
+
 ## Exact file structure
 
 Create local runner, deployed exercise, certification fixture, workflow, and tests:
