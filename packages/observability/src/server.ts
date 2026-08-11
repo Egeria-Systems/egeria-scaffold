@@ -3,6 +3,7 @@ import type {
   OperationalSink,
   SinkWriteResult,
 } from "./contracts.js";
+import { isOperationalEvent } from "./events.js";
 
 const maximumPayloadBytes = 96_000;
 const betterStackHostPattern =
@@ -11,7 +12,7 @@ const sourceTokenPattern = /^[A-Za-z0-9._~-]{16,512}$/u;
 
 export type OperationalRecord = Readonly<{
   schema_version: "1.0.0";
-  timestamp: string;
+  dt: string;
   event_name: string;
   event_kind: OperationalEvent["kind"];
   runtime: OperationalEvent["runtime"];
@@ -94,9 +95,12 @@ function readBetterStackConfiguration(
 }
 
 function createOperationalRecord(event: OperationalEvent): OperationalRecord {
+  if (!isOperationalEvent(event)) {
+    throw new TypeError("OPERATIONAL_EVENT_INVALID");
+  }
   return Object.freeze({
     schema_version: "1.0.0" as const,
-    timestamp: event.occurredAt,
+    dt: event.occurredAt,
     event_name: event.name,
     event_kind: event.kind,
     runtime: event.runtime,
@@ -139,6 +143,9 @@ export function createStructuredLogSink(input: Readonly<{
   return Object.freeze({
     identifier: input.identifier,
     write: async (event): Promise<SinkWriteResult> => {
+      if (!isOperationalEvent(event)) {
+        return Object.freeze({ status: "failed", reason: "invalid-event" });
+      }
       try {
         await input.write(createOperationalRecord(event));
         return Object.freeze({ status: "delivered" });
@@ -162,6 +169,9 @@ export function createBetterStackSink(
   const value: OperationalSink = Object.freeze({
     identifier: "better-stack",
     write: async (event): Promise<SinkWriteResult> => {
+      if (!isOperationalEvent(event)) {
+        return Object.freeze({ status: "failed", reason: "invalid-event" });
+      }
       let body: string;
       try {
         body = serializeOperationalRecord(event);
@@ -192,7 +202,7 @@ export function createBetterStackSink(
           }),
         );
 
-        return response.status >= 200 && response.status < 300
+        return response.status === 202
           ? Object.freeze({ status: "delivered" })
           : Object.freeze({
               status: "failed",

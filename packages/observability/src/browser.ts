@@ -3,7 +3,7 @@ import type {
   OperationalSink,
   SinkWriteResult,
 } from "./contracts.js";
-import { copyOperationalEvent } from "./events.js";
+import { isOperationalEvent } from "./events.js";
 
 export type BrowserEnvelope = Readonly<{
   schemaVersion: "1.0.0";
@@ -17,17 +17,17 @@ export type BrowserEnvelopeResult =
 export function createBrowserEnvelope(
   event: OperationalEvent,
 ): BrowserEnvelopeResult {
-  const copied = copyOperationalEvent(event);
   if (
-    copied?.runtime !== "browser" ||
-    (copied.kind !== "application.error" && copied.kind !== "web.vital")
+    !isOperationalEvent(event) ||
+    event.runtime !== "browser" ||
+    (event.kind !== "application.error" && event.kind !== "web.vital")
   ) {
     return Object.freeze({ ok: false, code: "BROWSER_EVENT_INVALID" });
   }
 
   return Object.freeze({
     ok: true,
-    value: Object.freeze({ schemaVersion: "1.0.0", event: copied }),
+    value: Object.freeze({ schemaVersion: "1.0.0", event }),
   });
 }
 

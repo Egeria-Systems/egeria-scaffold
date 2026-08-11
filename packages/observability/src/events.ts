@@ -17,6 +17,8 @@ import {
 
 const eventNamePattern = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/u;
 const contextTokenPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const maximumEventNameLength = 64;
+const createdOperationalEvents = new WeakSet();
 
 function includes<const Value extends string>(
   values: readonly Value[],
@@ -63,7 +65,7 @@ function createFrozenEvent(input: Readonly<{
   errorCategory?: OperationalErrorCategory;
   attributes: OperationalEvent["attributes"];
 }>): OperationalEvent {
-  return Object.freeze({
+  const event = Object.freeze({
     schemaVersion: "1.0.0" as const,
     occurredAt: input.occurredAt,
     name: input.name,
@@ -76,6 +78,8 @@ function createFrozenEvent(input: Readonly<{
       : { errorCategory: input.errorCategory }),
     attributes: input.attributes,
   });
+  createdOperationalEvents.add(event);
+  return event;
 }
 
 function resultFailure(
@@ -88,7 +92,11 @@ function createOperationalEventUnchecked(
   input: OperationalEventInput,
   options: CreateOperationalEventOptions,
 ): OperationalEventResult {
-  if (typeof input.name !== "string" || !eventNamePattern.test(input.name)) {
+  if (
+    typeof input.name !== "string" ||
+    input.name.length > maximumEventNameLength ||
+    !eventNamePattern.test(input.name)
+  ) {
     return resultFailure("EVENT_NAME_INVALID");
   }
   if (!includes(operationalEventKinds, input.kind)) {
@@ -194,65 +202,10 @@ export function normalizeErrorCategory(
   return "unexpected";
 }
 
-export function copyOperationalEvent(value: unknown): OperationalEvent | undefined {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return undefined;
-  }
-
-  try {
-    const record = value as Readonly<Record<string, unknown>>;
-    if (
-      record.schemaVersion !== "1.0.0" ||
-      typeof record.occurredAt !== "string" ||
-      new Date(record.occurredAt).toISOString() !== record.occurredAt ||
-      typeof record.name !== "string" ||
-      !eventNamePattern.test(record.name) ||
-      !includes(operationalEventKinds, record.kind) ||
-      !includes(operationalRuntimes, record.runtime) ||
-      !includes(operationalSeverities, record.severity)
-    ) {
-      return undefined;
-    }
-
-    const context = createContext(record.context);
-    if (context === undefined) return undefined;
-    const errorCategory = record.errorCategory;
-    const hasValidErrorCategory = includes(
-      operationalErrorCategories,
-      errorCategory,
-    );
-    if (
-      (record.kind === "application.error" && !hasValidErrorCategory) ||
-      (record.kind !== "application.error" && errorCategory !== undefined)
-    ) {
-      return undefined;
-    }
-
-    const attributeRecord =
-      typeof record.attributes === "object" &&
-      record.attributes !== null &&
-      !Array.isArray(record.attributes)
-        ? (record.attributes as Readonly<Record<string, unknown>>)
-        : {};
-    const allowedAttributeNames = Object.keys(attributeRecord).filter(
-      (name) => validateAttributeAllowlist([name]),
-    );
-    if (!validateAttributeAllowlist(allowedAttributeNames)) return undefined;
-
-    return createFrozenEvent({
-      occurredAt: record.occurredAt,
-      name: record.name,
-      kind: record.kind,
-      runtime: record.runtime,
-      severity: record.severity,
-      context,
-      ...(hasValidErrorCategory ? { errorCategory } : {}),
-      attributes: redactOperationalAttributes(
-        attributeRecord,
-        allowedAttributeNames,
-      ),
-    });
-  } catch {
-    return undefined;
-  }
+export function isOperationalEvent(value: unknown): value is OperationalEvent {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    createdOperationalEvents.has(value)
+  );
 }

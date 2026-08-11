@@ -8,7 +8,7 @@ The package has no runtime dependencies. It imports no framework, platform SDK, 
 
 - `@egeria-systems/observability` creates immutable allowlisted events, normalizes error categories without reading messages, and dispatches to every sink without letting telemetry failure escape.
 - `@egeria-systems/observability/server` provides injected structured-object logging and Better Stack HTTP protocol delivery.
-- `@egeria-systems/observability/browser` reconstructs a bounded browser envelope and sends it through an injected same-origin boundary.
+- `@egeria-systems/observability/browser` admits canonical browser events into a bounded envelope and sends it through an injected same-origin boundary.
 - `@egeria-systems/observability/testing` provides an in-memory sink and content-safe event assertions.
 
 ```ts

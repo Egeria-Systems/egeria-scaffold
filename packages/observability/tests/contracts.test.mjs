@@ -101,6 +101,82 @@ test("invalid event identity and context fail without echoing rejected values", 
     assert.deepEqual(result, { ok: false, code });
     assert.doesNotMatch(JSON.stringify(result), /credential-secret|credential secret/u);
   }
+
+  const longNameResult = createOperationalEvent(
+    {
+      name: `event.${"a".repeat(100_000)}`,
+      kind: "application.lifecycle",
+      runtime: "server",
+      severity: "info",
+      context: { correlationId: "ray-123" },
+    },
+    { clock: fixedClock },
+  );
+  assert.deepEqual(longNameResult, {
+    ok: false,
+    code: "EVENT_NAME_INVALID",
+  });
+  assert.equal(JSON.stringify(longNameResult).length < 100, true);
+});
+
+test("private-data keys and secret-like string values are never admitted", () => {
+  for (const prohibitedName of [
+    "console_output",
+    "credential_value",
+    "filename",
+    "form_value",
+    "request_body",
+    "response_body",
+  ]) {
+    const result = createOperationalEvent(
+      {
+        name: "application.ready",
+        kind: "application.lifecycle",
+        runtime: "server",
+        severity: "info",
+        context: { correlationId: "ray-123" },
+        attributes: { [prohibitedName]: "private-value" },
+      },
+      {
+        allowedAttributeNames: [prohibitedName],
+        clock: fixedClock,
+      },
+    );
+
+    assert.deepEqual(result, {
+      ok: false,
+      code: "EVENT_ATTRIBUTE_POLICY_INVALID",
+    });
+  }
+
+  for (const privateValue of [
+    "credential-secret",
+    "ghp_fictionalAccessToken123",
+    "sk_live_fictionalValue123",
+    "source-token-123456",
+    "aaaabbbb.ccccdddd.eeeeffff",
+    "127.0.0.1",
+    "2001:db8:1:2:3:4:5:6",
+  ]) {
+    const result = createOperationalEvent(
+      {
+        name: "application.ready",
+        kind: "application.lifecycle",
+        runtime: "server",
+        severity: "info",
+        context: { correlationId: "ray-123" },
+        attributes: { operation: privateValue },
+      },
+      {
+        allowedAttributeNames: ["operation"],
+        clock: fixedClock,
+      },
+    );
+
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.value.attributes, {});
+    assert.doesNotMatch(JSON.stringify(result), new RegExp(privateValue, "u"));
+  }
 });
 
 test("error categories are present only on application errors", () => {

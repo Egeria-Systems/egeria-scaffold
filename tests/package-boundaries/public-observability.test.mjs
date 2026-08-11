@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
-import { access, readFile, readdir } from "node:fs/promises";
-import { dirname, relative, resolve } from "node:path";
+import { execFile } from "node:child_process";
+import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import test from "node:test";
 
+const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../..",
@@ -17,6 +21,86 @@ async function pathExists(relativePath) {
     return false;
   }
 }
+
+test("the packed observability package loads every exact public surface in isolation", async () => {
+  const consumerRoot = await mkdtemp(
+    join(tmpdir(), "egeria-observability-consumer-"),
+  );
+
+  try {
+    await execFileAsync(
+      "pnpm",
+      [
+        "--filter",
+        "@egeria-systems/observability",
+        "pack",
+        "--pack-destination",
+        consumerRoot,
+      ],
+      { cwd: repositoryRoot, encoding: "utf8" },
+    );
+    const archiveName = (await readdir(consumerRoot)).find((name) =>
+      name.endsWith(".tgz"),
+    );
+    assert.notEqual(archiveName, undefined);
+
+    const packageRoot = resolve(
+      consumerRoot,
+      "node_modules/@egeria-systems/observability",
+    );
+    await mkdir(packageRoot, { recursive: true });
+    await execFileAsync(
+      "tar",
+      [
+        "-xzf",
+        resolve(consumerRoot, archiveName),
+        "--strip-components=1",
+        "-C",
+        packageRoot,
+      ],
+      { cwd: consumerRoot, encoding: "utf8" },
+    );
+
+    const consumerPath = resolve(consumerRoot, "consumer.mjs");
+    await writeFile(
+      consumerPath,
+      `const surfaces = await Promise.all([
+  import("@egeria-systems/observability"),
+  import("@egeria-systems/observability/browser"),
+  import("@egeria-systems/observability/server"),
+  import("@egeria-systems/observability/testing"),
+]);
+process.stdout.write(JSON.stringify(surfaces.map((surface) => Object.keys(surface).sort())));
+`,
+      "utf8",
+    );
+    const { stdout } = await execFileAsync(process.execPath, [consumerPath], {
+      cwd: consumerRoot,
+      encoding: "utf8",
+    });
+
+    assert.deepEqual(JSON.parse(stdout), [
+      [
+        "createOperationalEvent",
+        "dispatchOperationalEvent",
+        "normalizeErrorCategory",
+        "operationalErrorCategories",
+        "operationalEventKinds",
+        "operationalRuntimes",
+        "operationalSeverities",
+      ],
+      ["createBrowserEnvelope", "createBrowserSink"],
+      [
+        "createBetterStackSink",
+        "createStructuredLogSink",
+        "serializeOperationalRecord",
+      ],
+      ["assertOperationalEvent", "createMemorySink"],
+    ]);
+  } finally {
+    await rm(consumerRoot, { force: true, recursive: true });
+  }
+});
 
 async function readJson(relativePath) {
   return JSON.parse(

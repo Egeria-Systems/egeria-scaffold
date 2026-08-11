@@ -166,7 +166,7 @@ No other file is in scope without a documented evidence-backed amendment.
 
 **RED files:** package tests plus exact package-boundary tests named above.
 
-- [ ] Add failing literal behavior tests for event vocabulary, ISO time, context-token bounds, immutable results, attribute allowlisting, recursive redaction, secret-like values, normalized error categories, and absence of raw error content.
+- [ ] Add failing literal behavior tests for event vocabulary, ISO time, context-token bounds, immutable results, attribute allowlisting, prohibited and nested-value rejection, secret-like values, normalized error categories, and absence of raw error content.
 - [ ] Add failing tests proving one thrown/rejected sink cannot suppress another or escape dispatch, and every failure result is content-safe.
 - [ ] Add failing server tests for structured-object output, Better Stack host/token/request shape, payload bounds, documented success, status/fetch failure classification, and zero response/token/payload echo.
 - [ ] Add failing browser tests for the exact bounded envelope, unknown-field rejection, no raw error fields, injected delivery, and failure isolation.

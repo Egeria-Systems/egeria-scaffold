@@ -31,9 +31,9 @@ The package exposes four explicit ESM surfaces:
 - `./browser`: bounded same-origin browser envelope construction and injected delivery;
 - `./testing`: an in-memory sink plus assertions that fail with stable content-safe codes.
 
-Events have fixed severity, runtime, and kind vocabularies; a semantic event name; an ISO timestamp from an injected clock; optional normalized error category; correlation/release context made only from bounded tokens; and attributes admitted through an explicit allowlist. Redaction drops prohibited keys, replaces secret-like values, bounds strings and collection size, and never serializes `Error`, message, stack, cause, request data, or arbitrary objects.
+Events have fixed severity, runtime, and kind vocabularies; a semantic event name; an ISO timestamp from an injected clock; optional normalized error category; correlation/release context made only from bounded tokens; and attributes admitted through an explicit allowlist. Redaction drops prohibited keys and secret-like values, bounds strings and collection size, and never serializes `Error`, message, stack, cause, request data, nested values, or arbitrary objects.
 
-The dispatcher freezes the event, invokes every sink, converts thrown/rejected sinks to content-safe failure results, and never lets telemetry failure become an application failure. Better Stack delivery accepts only a validated `*.betterstackdata.com` HTTPS host, sets the bearer token only in the injected request headers, caps the encoded record below the provider limit, accepts documented success statuses, and returns status categories without response content, URL, token, or payload echoes.
+The constructor freezes each canonical event. The dispatcher admits only those canonical events, invokes every valid sink, converts malformed/thrown/rejected sinks to content-safe failure results, and never lets telemetry failure become an application failure. Better Stack delivery accepts only a validated `*.betterstackdata.com` HTTPS host, sets the bearer token only in the injected request headers, caps the encoded record below the provider limit, accepts documented success statuses, and returns status categories without response content, URL, token, or payload echoes.
 
 ## Generated composition after publication
 

@@ -3,6 +3,7 @@ import type {
   OperationalSeverity,
   OperationalSink,
 } from "./contracts.js";
+import { isOperationalEvent } from "./events.js";
 
 export type MemorySink = Readonly<{
   sink: OperationalSink;
@@ -15,6 +16,9 @@ export function createMemorySink(): MemorySink {
     sink: Object.freeze({
       identifier: "memory",
       write: (event: OperationalEvent) => {
+        if (!isOperationalEvent(event)) {
+          return Object.freeze({ status: "failed", reason: "invalid-event" });
+        }
         events.push(event);
         return Object.freeze({ status: "delivered" });
       },

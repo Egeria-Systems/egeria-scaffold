@@ -36,7 +36,7 @@ function createEvent() {
 
 const expectedRecord = {
   schema_version: "1.0.0",
-  timestamp: "2026-08-10T18:00:00.000Z",
+  dt: "2026-08-10T18:00:00.000Z",
   event_name: "next.request.error",
   event_kind: "application.error",
   runtime: "server",
@@ -143,6 +143,9 @@ test("Better Stack configuration and delivery fail closed without content echoes
   assert.doesNotMatch(JSON.stringify(hostileResult), /credential-secret/u);
 
   for (const [request, reason] of [
+    [async () => ({ status: 200 }), "provider-rejected"],
+    [async () => ({ status: 204 }), "provider-rejected"],
+    [async () => ({ status: 299 }), "provider-rejected"],
     [async () => ({ status: 403, body: "credential-secret" }), "provider-rejected"],
     [
       async () => {
@@ -165,7 +168,7 @@ test("Better Stack configuration and delivery fail closed without content echoes
   }
 });
 
-test("Better Stack delivery rejects an oversized runtime value before HTTP", async () => {
+test("Better Stack delivery rejects an oversized structural value before HTTP", async () => {
   let requests = 0;
   const configured = createBetterStackSink({
     ingestingHost: "s123.eu-nbg-2.betterstackdata.com",
@@ -182,6 +185,43 @@ test("Better Stack delivery rejects an oversized runtime value before HTTP", asy
     attributes: { oversized: "x".repeat(100_000) },
   });
 
-  assert.deepEqual(result, { status: "failed", reason: "payload-too-large" });
+  assert.deepEqual(result, { status: "failed", reason: "invalid-event" });
   assert.equal(requests, 0);
+});
+
+test("server effects reject structural event bypasses before delivery", async () => {
+  const invalidEvent = {
+    ...createEvent(),
+    attributes: { response_body: "credential-secret response body" },
+  };
+  const records = [];
+  const structured = createStructuredLogSink({
+    identifier: "workers-logs",
+    write: (record) => records.push(record),
+  });
+  assert.deepEqual(await structured.write(invalidEvent), {
+    status: "failed",
+    reason: "invalid-event",
+  });
+  assert.deepEqual(records, []);
+
+  let requests = 0;
+  const configured = createBetterStackSink({
+    ingestingHost: "s123.eu-nbg-2.betterstackdata.com",
+    sourceToken: "source-token-123456",
+    request: async () => {
+      requests += 1;
+      return { status: 202 };
+    },
+  });
+  assert.equal(configured.ok, true);
+  assert.deepEqual(await configured.value.write(invalidEvent), {
+    status: "failed",
+    reason: "invalid-event",
+  });
+  assert.equal(requests, 0);
+
+  assert.throws(() => serializeOperationalRecord(invalidEvent), {
+    message: "OPERATIONAL_EVENT_INVALID",
+  });
 });

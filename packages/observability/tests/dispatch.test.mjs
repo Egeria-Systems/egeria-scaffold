@@ -87,3 +87,77 @@ test("dispatch preserves bounded sink failure categories", async () => {
     },
   ]);
 });
+
+test("dispatch contains malformed sinks and rejects noncanonical events", async () => {
+  const event = createEvent();
+  const hostileSink = {
+    get identifier() {
+      throw new Error("credential-secret response body");
+    },
+    write: () => ({ status: "delivered" }),
+  };
+  const results = await dispatchOperationalEvent(event, [
+    null,
+    hostileSink,
+    {
+      identifier: "credential-secret",
+      write: () => ({ status: "delivered" }),
+    },
+  ]);
+
+  assert.deepEqual(results, [
+    { sink: "invalid-sink", status: "failed", reason: "invalid-result" },
+    { sink: "invalid-sink", status: "failed", reason: "sink-threw" },
+    { sink: "invalid-sink", status: "delivered" },
+  ]);
+  assert.doesNotMatch(JSON.stringify(results), /credential-secret/u);
+
+  let calls = 0;
+  const invalidEventResults = await dispatchOperationalEvent(
+    { ...event, attributes: { response_body: "credential-secret" } },
+    [
+      {
+        identifier: "workers-logs",
+        write: () => {
+          calls += 1;
+          return { status: "delivered" };
+        },
+      },
+    ],
+  );
+
+  assert.deepEqual(invalidEventResults, [
+    { sink: "workers-logs", status: "failed", reason: "invalid-event" },
+  ]);
+  assert.equal(calls, 0);
+});
+
+test("dispatch contains mutation attempts before the next sink observes them", async () => {
+  const event = createEvent();
+  let observedEvent;
+  const results = await dispatchOperationalEvent(event, [
+    {
+      identifier: "mutating-sink",
+      write: (received) => {
+        received.context.correlationId = "credential-secret";
+        return { status: "delivered" };
+      },
+    },
+    {
+      identifier: "observing-sink",
+      write: (received) => {
+        observedEvent = received;
+        return { status: "delivered" };
+      },
+    },
+  ]);
+
+  assert.deepEqual(results, [
+    { sink: "mutating-sink", status: "failed", reason: "sink-threw" },
+    { sink: "observing-sink", status: "delivered" },
+  ]);
+  assert.equal(observedEvent, event);
+  assert.equal(observedEvent.context.correlationId, "correlation-1");
+  assert.equal(Object.isFrozen(observedEvent), true);
+  assert.equal(Object.isFrozen(observedEvent.context), true);
+});

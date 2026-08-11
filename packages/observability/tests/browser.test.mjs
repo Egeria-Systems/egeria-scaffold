@@ -30,23 +30,19 @@ function createEvent(runtime = "browser") {
   return result.value;
 }
 
-test("browser envelopes reconstruct only bounded operational fields", () => {
-  const result = createBrowserEnvelope({
-    ...createEvent(),
-    message: "credential-secret response body",
-    stack: "credential-secret stack",
-  });
+test("browser envelopes contain only canonical bounded operational fields", () => {
+  const event = createEvent();
+  const result = createBrowserEnvelope(event);
 
   assert.deepEqual(result, {
     ok: true,
     value: {
       schemaVersion: "1.0.0",
-      event: createEvent(),
+      event,
     },
   });
   assert.equal(Object.isFrozen(result.value), true);
   assert.equal(Object.isFrozen(result.value.event), true);
-  assert.doesNotMatch(JSON.stringify(result), /credential-secret|message|stack/u);
 });
 
 test("browser envelopes reject server and unsupported event kinds", () => {
@@ -61,6 +57,15 @@ test("browser envelopes reject server and unsupported event kinds", () => {
     }),
     { ok: false, code: "BROWSER_EVENT_INVALID" },
   );
+  const structuralBypass = createBrowserEnvelope({
+    ...createEvent(),
+    message: "credential-secret response body",
+  });
+  assert.deepEqual(structuralBypass, {
+    ok: false,
+    code: "BROWSER_EVENT_INVALID",
+  });
+  assert.doesNotMatch(JSON.stringify(structuralBypass), /credential-secret/u);
 });
 
 test("browser delivery uses an injected sender and contains rejection or failure", async () => {
@@ -93,4 +98,14 @@ test("browser delivery uses an injected sender and contains rejection or failure
     assert.deepEqual(result, { status: "failed", reason });
     assert.doesNotMatch(JSON.stringify(result), /credential-secret/u);
   }
+
+  const structuralResult = await sink.write({
+    ...createEvent(),
+    attributes: { response_body: "credential-secret" },
+  });
+  assert.deepEqual(structuralResult, {
+    status: "failed",
+    reason: "invalid-event",
+  });
+  assert.equal(envelopes.length, 1);
 });

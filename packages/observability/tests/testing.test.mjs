@@ -44,6 +44,23 @@ test("the memory sink returns immutable snapshots and exact event assertions", a
 test("event assertions fail with stable content-safe errors", () => {
   const events = [createEvent("application.ready")];
 
+  assert.equal(
+    assertOperationalEvent(events, {
+      name: "application.ready",
+      severity: "info",
+    }),
+    events[0],
+  );
+
+  assert.throws(
+    () =>
+      assertOperationalEvent(events, {
+        name: "application.ready",
+        severity: "error",
+      }),
+    { message: "OPERATIONAL_EVENT_NOT_FOUND" },
+  );
+
   assert.throws(
     () =>
       assertOperationalEvent(events, {
@@ -52,4 +69,16 @@ test("event assertions fail with stable content-safe errors", () => {
       }),
     { message: "OPERATIONAL_EVENT_NOT_FOUND" },
   );
+});
+
+test("the memory sink rejects structural event bypasses", async () => {
+  const memory = createMemorySink();
+  const result = await memory.sink.write({
+    ...createEvent("application.ready"),
+    attributes: { response_body: "credential-secret response body" },
+  });
+
+  assert.deepEqual(result, { status: "failed", reason: "invalid-event" });
+  assert.deepEqual(memory.snapshot(), []);
+  assert.doesNotMatch(JSON.stringify(result), /credential-secret/u);
 });
