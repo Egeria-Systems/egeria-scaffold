@@ -24,8 +24,8 @@ export class ProductionObservabilityCertificationError extends Error {
 
 const configuration = Object.freeze({
   profile: "portfolio",
-  projectName: "acme-portfolio-observability",
-  displayName: "Acme Portfolio Observability",
+  projectName: "acme-portfolio",
+  displayName: "Acme Portfolio",
   createArguments: Object.freeze([]),
   expectedCapabilities,
   capabilityIdentifier: "observability",
