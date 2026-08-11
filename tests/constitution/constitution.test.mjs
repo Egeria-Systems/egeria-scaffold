@@ -2247,10 +2247,20 @@ test("executable capability certification ownership is current", async () => {
   }
 });
 
-test("future execution plans enforce their direct predecessor before implementation", async () => {
-  const [reviewProtocol, implementationPlan, certificationPlan] =
+test("execution plans enforce direct predecessors and bounded independent-work exceptions", async () => {
+  const [
+    reviewProtocol,
+    sourcePlan,
+    roadmap,
+    implementationPlan,
+    certificationPlan,
+  ] =
     await Promise.all([
       readRepositoryFile("docs/governance/review-and-contribution.md"),
+      readRepositoryFile(
+        "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+      ),
+      readRepositoryFile("docs/roadmaps/program-roadmap.md"),
       readRepositoryFile(
         "docs/superpowers/plans/2026-08-10-generated-unit-component-testing.md",
       ),
@@ -2259,7 +2269,8 @@ test("future execution plans enforce their direct predecessor before implementat
       ),
     ]);
   const implementationTask = namedLabel("Task", "6C");
-  const implementationPredecessor = namedLabel("Task", "6B");
+  const implementationPredecessor = namedLabel("Task", "6");
+  const independentStream = namedLabel("Task", "6B");
   const certificationTask = namedLabel("Task", "6D");
   const portfolioPhase = compactLabel("P", "2");
 
@@ -2280,25 +2291,64 @@ test("future execution plans enforce their direct predecessor before implementat
     reviewProtocol,
     /never infer[^.]+incrementing[^.]+number/iu,
   );
+  assert.match(
+    reviewProtocol,
+    /bounded independent-work exception[^.]+explicit human approval[^.]+plan amendment/iu,
+  );
+  assert.match(
+    reviewProtocol,
+    /exact base and isolated worktree[^.]+non-overlapping scope[^.]+state that must remain unchanged[^.]+reconciliation boundary/iu,
+  );
+  assert.match(
+    reviewProtocol,
+    /does not approve[^.]+waive[^.]+final-diff gate[^.]+external mutation/iu,
+  );
+
+  for (const canonicalDocument of [sourcePlan, roadmap]) {
+    assert.match(canonicalDocument, /2026-08-11[^.]+independent-work exception/iu);
+    assert.match(
+      canonicalDocument,
+      /main@f4f682d4c711dc86a0158ab7f05393d5c33f0160/iu,
+    );
+    assert.match(
+      canonicalDocument,
+      new RegExp(
+        `${escapeRegularExpression(implementationPredecessor)}[^.]+direct predecessor|accepted ${escapeRegularExpression(implementationPredecessor)}`,
+        "iu",
+      ),
+    );
+    assert.match(
+      canonicalDocument,
+      new RegExp(
+        `${escapeRegularExpression(independentStream)}[^.]+pending[^.]+unchanged|preserve ${escapeRegularExpression(independentStream)}'s pending`,
+        "iu",
+      ),
+    );
+    assert.match(canonicalDocument, /reconciliation[^.]+separate review/iu);
+  }
 
   assert.match(
     implementationPlan,
     new RegExp(
-      `\\*\\*Direct predecessor:\\*\\* ${portfolioPhase} ${escapeRegularExpression(implementationPredecessor)} production-observability certification`,
+      `\\*\\*Direct predecessor under the approved independent-work exception:\\*\\* ${portfolioPhase} ${escapeRegularExpression(implementationPredecessor)} production-observability implementation`,
       "u",
     ),
   );
   assert.match(
     implementationPlan,
-    /approved exact committed comparison[^.]+merge-base --is-ancestor[^.]+ HEAD/iu,
+    /approved exact committed comparison[^.]+45b57d2dc265ef6ba9ac805d7352a01db5f1081d[^.]+ancestor of `HEAD`/iu,
   );
   assert.match(
     implementationPlan,
-    /check-capability-certification\.mjs --closure legacy-backfill-exempt/u,
+    /pnpm run check:capability-certification/u,
   );
   assert.match(
     implementationPlan,
-    /`observability`[^.]+`certified`[^.]+evidence revisions[^.]+ancestors of `HEAD`/iu,
+    /`observability@0\.2\.0` record[^.]+`pending` subject/iu,
+  );
+  assert.match(
+    implementationPlan,
+    /unexpected observability status[^.]+hard stop/iu,
   );
 
   assert.match(

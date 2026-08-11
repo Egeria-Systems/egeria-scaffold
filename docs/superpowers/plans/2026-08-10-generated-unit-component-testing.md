@@ -6,7 +6,7 @@
 
 **Architecture:** Advance the existing hybrid `standards` capability rather than creating a testing capability or package. Generate one Vitest configuration with named Node and jsdom projects, real starter specifications, explicit scripts, root/scoped guidance, and quality-workflow steps. Expand ordinary generated-project verification with fast unit/component checks while retaining browser checks only in fixed-root certification. Add a read-only repository-quality workflow that executes builder, CLI, packages, capability, generated-project, and compatibility-proof lanes. Admit the material standards change against a separate pending Task 6D certification plan.
 
-**Toolchain:** Settled post-Task-6B Node.js, pnpm, TypeScript, Next.js, React, OpenNext, Wrangler, Playwright, and axe pins; current reference Vitest `4.1.10`; exact current compatible `@vitejs/plugin-react`, `vite-tsconfig-paths`, `jsdom`, `@testing-library/react`, `@testing-library/dom`, `@testing-library/user-event`, and `@testing-library/jest-dom` pins selected only after fresh registry, peer, engine, signature, and advisory checks.
+**Toolchain:** Node.js `22.23.2`, pnpm `11.20.0`, Vitest `4.1.10`, `@vitejs/plugin-react@6.0.5`, `vite-tsconfig-paths@6.1.1`, `jsdom@30.0.1`, `@testing-library/react@16.3.2`, `@testing-library/dom@10.4.1`, `@testing-library/user-event@14.6.3`, and `@testing-library/jest-dom@7.0.1`, together with the settled exact Next.js, React, TypeScript, OpenNext, Wrangler, Playwright, and axe pins already present at the frozen base. CI uses `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1`, `pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2`, and `actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` where applicable.
 
 ## Approval and prerequisite boundary
 
@@ -15,19 +15,23 @@ The user approved this design on 2026-08-10 with two explicit additions:
 1. appropriate CI steps must execute every test type for the builder, CLI, packages, compatibility proof, generated fixtures, and scaffolded projects; and
 2. every authored `AGENTS.md` that owns requirements for a different code context must state the correct test tool, command, and evidence boundary.
 
-This plan creation does not authorize implementation. Task 6C must not begin until:
+On 2026-08-11, the user explicitly authorized Task 6C to start in its own worktree from current `main` while Task 6B remains under certification, and preapproved evidence-backed amendments through presentation of the implemented Task 6C review. This is a narrow independent-work exception to the previously documented Task 6B sequencing dependency; it does not approve, complete, certify, mutate, or import Task 6B work.
+
+Under that explicit exception, Task 6C must not begin until:
 
 - production-observability Task 6 is implemented, reviewed, approved, and integrated;
-- its separate Task 6B certification is completed, reviewed, approved, and integrated;
-- local `main` is clean, sequential, and contains those accepted commits;
+- local `main` is clean and contains the accepted Task 6 implementation;
+- a dedicated Task 6C branch and ignored isolated worktree are created from that exact `main`;
 - no separate worktree is modifying the Task 6C exact-file scope; and
 - the user explicitly selects Task 6C for implementation.
 
-**Direct predecessor:** P2 Task 6B production-observability certification.
+**Direct predecessor under the approved independent-work exception:** P2 Task 6 production-observability implementation.
 
-Before RED work, require its review packet to record the approved exact committed comparison and verify it with `git merge-base --is-ancestor <accepted-revision> HEAD`. Run `pnpm run check:capability-certification` and `node scripts/check-capability-certification.mjs --closure legacy-backfill-exempt`; require the exact `observability` record to be `certified` and all of its evidence revisions to be ancestors of `HEAD`. Any rejection is a hard stop.
+Before RED work, require its review packet to record the approved exact committed comparison and verify accepted revision `45b57d2dc265ef6ba9ac805d7352a01db5f1081d` is an ancestor of `HEAD`. Run `pnpm run check:capability-certification`; require the exact `observability@0.2.0` record to remain the admitted `pending` subject present at the frozen base. Any unexpected observability status, subject, evidence, descriptor, workflow, or separate-worktree mutation is a hard stop.
 
-Do not rebase, merge, commit, push, publish, deploy, dispatch a workflow, mutate a provider, or alter another worktree under this planning approval.
+Implementation proceeds only on branch `generated-unit-component-testing` in `.worktrees/generated-unit-component-testing` from `main@f4f682d4c711dc86a0158ab7f05393d5c33f0160`. Do not rebase, merge, push, publish, deploy, dispatch a workflow, mutate a provider, alter another worktree, or reconcile later Task 6B changes without separate authority. Focused local commits are required by the approved increment method.
+
+The frozen successor contract is `standards@0.3.0` and profile recipe `0.7.0`. Project/state schema version remains `1.0.0`; the ordinary generated dependency remains exact public `@egeria-systems/standards@0.1.0`; and `observability@0.2.0` plus exact public `@egeria-systems/observability@0.2.0` remain unchanged. Task 6C creates an ordinary pending `standards@0.3.0` certification subject for Task 6D and does not mark it certified.
 
 ## Global constraints
 
@@ -56,13 +60,13 @@ docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification
 
 ```text
 .github/workflows/repository-quality.yml
-docs/implementation-evidence/2026-08-10-generated-unit-component-testing-preparation.md
+docs/implementation-evidence/2026-08-11-generated-unit-component-testing-preparation.md
 packages/builder-core/templates/common/apps/web/vitest.config.ts
 packages/builder-core/templates/common/apps/web/tests/setup/component.ts
 packages/builder-core/templates/common/apps/web/tests/unit/content-schema.test.ts
 packages/builder-core/templates/common/apps/web/tests/component/content-page.test.tsx
-docs/implementation-evidence/2026-08-10-generated-unit-component-testing-verification.md
-docs/review-packets/2026-08-10-generated-unit-component-testing.md
+docs/implementation-evidence/2026-08-11-generated-unit-component-testing-verification.md
+docs/review-packets/2026-08-11-generated-unit-component-testing.md
 ```
 
 If implementation occurs on a later date, retain these semantic subjects but use one consistent actual implementation date for newly created evidence and packet filenames. Amend this exact-file plan before creating differently dated files.
@@ -155,7 +159,7 @@ fixtures/generated/site
 fixtures/generated/portfolio-calendly
 ```
 
-### Reconcile canonical documentation after the active observability stream is settled
+### Reconcile canonical documentation while preserving the independent observability stream
 
 ```text
 README.md
@@ -165,24 +169,26 @@ docs/architecture/overview.md
 docs/architecture/capability-model.md
 docs/architecture/package-ownership.md
 docs/architecture/enforcement-map.md
+docs/governance/review-and-contribution.md
 docs/roadmaps/program-roadmap.md
 docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md
+docs/superpowers/specs/2026-08-10-generated-unit-component-testing-design.md
 ```
 
-These amendments record Task 6C/6D, the actual standards subject/version, generated test ownership, CI gates, P3 `fast-check` placement, P4 Node/harness behavior, and P5C Workers Vitest introduction. They must describe later work as planned, not actual.
+These amendments record the approved Task 6C independent-work exception, Task 6C/6D, the actual standards subject/version, generated test ownership, CI gates, P3 `fast-check` placement, P4 Node/harness behavior, and P5C Workers Vitest introduction. They must describe later work as planned, not actual and must preserve Task 6B's separate pending state.
 
 ## Task 1: Revalidate the integrated baseline and freeze exact pins
 
 **Read:** Root and applicable nested AGENTS, accepted ADRs, canonical source plan, program roadmap, package ownership, capability model, enforcement map, review protocol, compatibility record, current generated browser plan/evidence, settled observability Task 6/6B packets, current manifests/lockfiles/workflows, and all current test aggregates.
 
-- [ ] Verify clean local `main`, exact HEAD, `origin/main` relationship, status, worktree inventory, and no overlapping writer.
-- [ ] Confirm Tasks 6 and 6B are approved and integrated. Stop if either is absent or pending.
-- [ ] Record current profile recipes, standards descriptor/version/digest/certification record, public package versions, managed surfaces, inference probes, verification tuple, and retained fixture inventory.
-- [ ] Recheck official Next.js Vitest, Vitest projects/environments, Testing Library setup/user-event, Cloudflare testing, and fast-check documentation.
-- [ ] Query exact registry metadata for all eight generated development dependencies. Check peer/engine compatibility, signatures, tarball identity, license, and current advisories.
-- [ ] Revalidate Node, pnpm, Next.js, React, TypeScript, OpenNext, Wrangler, Playwright, and axe compatibility. Never copy a stale exact version from this plan if current evidence contradicts it.
-- [ ] Record the selected exact pins, accepted limitations, no-coverage decision, no-Workers-pool decision, and claim boundaries in preparation evidence.
-- [ ] Amend this plan before implementation if the settled source tree changes any exact owner or required file.
+- [x] Verify clean local `main`, exact HEAD, `origin/main` relationship, status, worktree inventory, and no overlapping writer.
+- [x] Confirm Task 6 is approved and integrated. Record the user's narrow exception allowing Task 6C while Task 6B remains pending; stop on any unapproved observability mutation.
+- [x] Record current profile recipes, standards descriptor/version/digest/certification record, public package versions, managed surfaces, inference probes, verification tuple, and retained fixture inventory.
+- [x] Recheck official Next.js Vitest, Vitest projects/environments, Testing Library setup/user-event, Cloudflare testing, and later-phase property-testing placement.
+- [x] Query exact registry metadata for all eight generated development dependencies. Check peer/engine compatibility, signatures, tarball identity, license, and current advisories.
+- [x] Revalidate Node, pnpm, Next.js, React, TypeScript, OpenNext, Wrangler, Playwright, and axe compatibility. Never copy a stale exact version from this plan if current evidence contradicts it.
+- [x] Record the selected exact pins, accepted limitations, no-coverage decision, no-Workers-pool decision, and claim boundaries in preparation evidence.
+- [x] Amend this plan before implementation for the approved sequencing exception, actual evidence date, exact successor versions, exact dependency pins, and current action SHAs.
 
 **Focused checks:**
 
@@ -199,7 +205,7 @@ pnpm run test:capability-certification
 pnpm run check:capability-certification
 ```
 
-Expected: current integrated baseline passes before Task 6C RED work. Do not rerun unchanged expensive browser or compatibility checks merely to populate preparation prose; use the settled Task 6B receipts unless compatibility-sensitive inputs changed.
+Expected: current integrated baseline passes before Task 6C RED work. Do not rerun unchanged expensive browser or compatibility checks merely to populate preparation prose; use the settled base receipts and the reviewed Task 6B local receipt only for unchanged behavior it actually exercised. Do not describe Task 6B as certified.
 
 ## Task 2: RED — specify capability ownership, generated inventory, and verification state
 

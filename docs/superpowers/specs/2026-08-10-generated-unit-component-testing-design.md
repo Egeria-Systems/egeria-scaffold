@@ -29,7 +29,7 @@ The builder, CLI, standards package, and observability package are not migrated 
 
 ## P2 Task 6C boundary
 
-Task 6C follows production-observability Task 6 and its separate Task 6B certification. Existing later task numbers remain unchanged.
+Task 6C normally follows production-observability Task 6 and its separate Task 6B certification. The user explicitly approved a narrow 2026-08-11 independent-work exception from clean `main@f4f682d4c711dc86a0158ab7f05393d5c33f0160`: Task 6 is the accepted direct predecessor, Task 6C uses its own isolated branch/worktree, Task 6B remains pending and unchanged, and later reconciliation requires separate review. Existing later task numbers remain unchanged.
 
 Task 6C advances the existing hybrid `standards` capability because that capability already owns generated lint, type, Playwright, axe, and quality-workflow surfaces. It adds no selectable testing capability and no public testing runtime package. The capability gains exact ownership of:
 
@@ -43,7 +43,7 @@ Task 6C advances the existing hybrid `standards` capability because that capabil
 
 Because the descriptor, evidence contract, managed surfaces, and generated behavior change materially, Task 6C replaces the old frozen `standards` certification subject with an ordinary pending subject linked to separate Task 6D. The standards capability and P2 cannot be accepted on Task 6C implementation evidence alone.
 
-Exact successor capability and recipe versions are frozen only after Task 6B is integrated. The task must not guess versions from the current pre-observability branch or reuse a stale descriptor digest.
+The independently frozen successor versions are `standards@0.3.0` and recipe `0.7.0`. Project/state schema remains `1.0.0`, public `@egeria-systems/standards@0.1.0` remains unchanged, and the final pending certification subject digest is recomputed only after the complete Task 6C behavior contract settles.
 
 ## Generated Vitest and Testing Library contract
 

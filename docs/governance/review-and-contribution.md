@@ -18,6 +18,8 @@ Every implementation or certification plan must name its direct predecessor, or 
 
 A missing, pending, unapproved, non-ancestor, or ambiguous predecessor is a hard stop even when the user requests a later item. Never infer the next item by incrementing a task number; resolve it from the approved source plan and current program roadmap.
 
+A bounded independent-work exception may change one plan's direct predecessor only when explicit human approval and a plan amendment record the accepted earlier predecessor and artifact, exact base and isolated worktree, non-overlapping scope, state that must remain unchanged, and later reconciliation boundary. The approved source plan and current program roadmap must record the same exception before implementation proceeds. An exception does not approve the independent stream, waive either stream's final-diff gate, or authorize merge, deployment, provider action, or external mutation.
+
 Gate 1 evidence is not permission to edit implementation files or take external action.
 
 ## Gate 2: implementation-plan approval
