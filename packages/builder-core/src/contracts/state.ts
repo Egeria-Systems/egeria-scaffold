@@ -62,6 +62,8 @@ const verificationChecksSchema = z
     z.literal("frozen-install"),
     z.literal("lint"),
     z.literal("typecheck"),
+    z.literal("unit-tests"),
+    z.literal("component-tests"),
     z.literal("next-build"),
     z.literal("opennext-build"),
     z.literal("post-state-inference"),

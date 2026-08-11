@@ -56,6 +56,8 @@ export const verificationChecks = Object.freeze([
   "frozen-install",
   "lint",
   "typecheck",
+  "unit-tests",
+  "component-tests",
   "next-build",
   "opennext-build",
 ] as const);
@@ -445,6 +447,14 @@ async function verifyInIsolatedCopy(
           {
             arguments: ["run", "typecheck"],
             failureCode: "TYPECHECK_FAILED",
+          },
+          {
+            arguments: ["run", "test:unit"],
+            failureCode: "UNIT_TESTS_FAILED",
+          },
+          {
+            arguments: ["run", "test:component"],
+            failureCode: "COMPONENT_TESTS_FAILED",
           },
           { arguments: ["run", "build"], failureCode: "NEXT_BUILD_FAILED" },
           {

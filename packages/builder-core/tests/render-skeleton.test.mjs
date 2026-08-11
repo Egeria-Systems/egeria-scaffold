@@ -1017,7 +1017,6 @@ test("rendered manifests and desired project match the approved resolved recipe"
       tailwindcss: "4.3.3",
       typescript: "6.0.3",
       "typescript-eslint": "8.66.0",
-      "vite-tsconfig-paths": "6.1.1",
       vitest: "4.1.10",
       wrangler: "4.118.0",
     },
@@ -1055,7 +1054,9 @@ test("generated unit and component tests use distinct named environments", async
   );
   assert.match(configuration, /setupFiles: \["\.\/tests\/setup\/component\.ts"\]/u);
   assert.match(configuration, /globals: false/u);
+  assert.match(configuration, /resolve: \{ tsconfigPaths: true \}/u);
   assert.doesNotMatch(configuration, /workers|cloudflare|miniflare|coverage/iu);
+  assert.doesNotMatch(configuration, /vite-tsconfig-paths/u);
 
   assert.match(setup, /@testing-library\/jest-dom\/vitest/u);
   assert.match(setup, /afterEach\(cleanup\)/u);
@@ -1063,7 +1064,7 @@ test("generated unit and component tests use distinct named environments", async
   assert.match(unitTest, /parseYamlContent/u);
   assert.match(unitTest, /CONTENT_INVALID/u);
   assert.doesNotMatch(unitTest, /passWithNoTests|snapshot/iu);
-  assert.match(componentTest, /render\(<ContentPage/u);
+  assert.match(componentTest, /render\(\s*<ContentPage/u);
   assert.match(componentTest, /getByRole\("main"\)/u);
   assert.match(componentTest, /getByRole\("navigation"\)/u);
   assert.match(componentTest, /getByRole\("heading"/u);
@@ -2048,14 +2049,19 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.match(workflow, /cancel-in-progress: true/u);
   assert.match(workflow, /\$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}/u);
   assert.match(workflow, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/u);
-  assert.match(workflow, /pnpm\/setup@4700d737c3d7a2e7199f3d42a920f0bf7f34e411/u);
+  assert.match(workflow, /pnpm\/setup@84cb39b217b10273981911c288cd62326dc7c6d2/u);
   assert.match(workflow, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/u);
   assert.match(workflow, /persist-credentials: false/u);
   assert.match(workflow, /version: 11\.20\.0/u);
   assert.match(workflow, /runtime: node@22\.23\.2/u);
   assert.match(workflow, /pnpm install --frozen-lockfile/u);
+  assert.match(workflow, /pnpm run lint/u);
+  assert.match(workflow, /pnpm run typecheck/u);
+  assert.match(workflow, /pnpm run test:unit/u);
+  assert.match(workflow, /pnpm run test:component/u);
+  assert.match(workflow, /pnpm run build/u);
+  assert.match(workflow, /pnpm run build:cloudflare/u);
   assert.match(workflow, /browser:install:ci/u);
-  assert.match(workflow, /pnpm run verify/u);
   assert.match(workflow, /test:e2e:dev/u);
   assert.match(workflow, /test:e2e:preview/u);
   assert.match(workflow, /if: failure\(\)/u);
@@ -2078,7 +2084,7 @@ test("generated browser quality is environment-specific and content-agnostic", a
         },
         {
           name: "Set up pnpm and Node.js",
-          uses: "pnpm/setup@4700d737c3d7a2e7199f3d42a920f0bf7f34e411",
+          uses: "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
           with: {
             version: "11.20.0",
             runtime: "node@22.23.2",
@@ -2090,11 +2096,16 @@ test("generated browser quality is environment-specific and content-agnostic", a
           name: "Install dependencies",
           run: "pnpm install --frozen-lockfile",
         },
+        { name: "Lint generated project", run: "pnpm run lint" },
+        { name: "Typecheck generated project", run: "pnpm run typecheck" },
+        { name: "Test generated unit behavior", run: "pnpm run test:unit" },
+        { name: "Test generated components", run: "pnpm run test:component" },
+        { name: "Build Next.js application", run: "pnpm run build" },
+        { name: "Build OpenNext application", run: "pnpm run build:cloudflare" },
         {
           name: "Install Chromium",
           run: "pnpm --dir apps/web run browser:install:ci",
         },
-        { name: "Run static and build gates", run: "pnpm run verify" },
         {
           name: "Test Next.js development",
           run: "pnpm --dir apps/web run test:e2e:dev",
@@ -2123,6 +2134,9 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.match(ignore, /^playwright-report\/$/mu);
   assert.match(ignore, /^test-results\/$/mu);
   assert.match(readme, /explicitly install Chromium/iu);
+  assert.match(readme, /pnpm run test:unit/u);
+  assert.match(readme, /pnpm run test:component/u);
+  assert.match(readme, /jsdom does not exercise CSS layout/iu);
   assert.match(readme, /does not establish WCAG conformance/iu);
 });
 
@@ -2509,7 +2523,11 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
       false,
     );
     const executableSource = [...files]
-      .filter(([path]) => path.endsWith(".ts") || path.endsWith(".tsx"))
+      .filter(
+        ([path]) =>
+          !path.startsWith("apps/web/tests/") &&
+          (path.endsWith(".ts") || path.endsWith(".tsx")),
+      )
       .map(([, source]) => source)
       .join("\n");
     for (const copy of visibleCopy) {
@@ -3471,8 +3489,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 75],
-    ["site", 77],
+    ["portfolio", 92],
+    ["site", 94],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -3559,16 +3577,23 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       "/devDependencies/@egeria-systems~1standards",
       "/devDependencies/@playwright~1test",
       "/devDependencies/@tailwindcss~1postcss",
+      "/devDependencies/@testing-library~1dom",
+      "/devDependencies/@testing-library~1jest-dom",
+      "/devDependencies/@testing-library~1react",
+      "/devDependencies/@testing-library~1user-event",
       "/devDependencies/@types~1node",
       "/devDependencies/@types~1react",
       "/devDependencies/@types~1react-dom",
+      "/devDependencies/@vitejs~1plugin-react",
       "/devDependencies/eslint",
       "/devDependencies/eslint-config-next",
+      "/devDependencies/jsdom",
       "/devDependencies/postcss",
       "/devDependencies/raw-loader",
       "/devDependencies/tailwindcss",
       "/devDependencies/typescript",
       "/devDependencies/typescript-eslint",
+      "/devDependencies/vitest",
       "/devDependencies/wrangler",
       "/name",
       "/private",
@@ -3580,9 +3605,15 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       "/scripts/dev",
       "/scripts/lint",
       "/scripts/preview",
+      "/scripts/test",
+      "/scripts/test:component",
+      "/scripts/test:component:watch",
       "/scripts/test:e2e:deployed",
       "/scripts/test:e2e:dev",
       "/scripts/test:e2e:preview",
+      "/scripts/test:unit",
+      "/scripts/test:unit:watch",
+      "/scripts/test:watch",
       "/scripts/typecheck",
       "/type",
       "/version",
@@ -3601,7 +3632,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       packageVersions,
     }),
   );
-  assert.equal(selected.surfaces.length, 80);
+  assert.equal(selected.surfaces.length, 97);
   assert.deepEqual(
     selected.surfaces
       .filter(

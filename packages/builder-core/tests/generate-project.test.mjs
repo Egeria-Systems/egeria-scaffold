@@ -207,7 +207,7 @@ async function createFakePnpmExecutable(owner) {
   const executable = join(owner, "fake-pnpm");
   const controlPath = join(owner, "fake-pnpm-control.json");
   const logPath = join(owner, "fake-pnpm-log.jsonl");
-  const source = `#!/usr/bin/env node
+  const source = `#!${process.execPath}
 import { appendFileSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 
 const control = JSON.parse(readFileSync(${JSON.stringify(controlPath)}, "utf8"));
@@ -560,7 +560,7 @@ test("portfolio and site generation writes exact state-last repositories", async
       assert.equal(generated.state.origin.recipeVersion, "0.7.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 96 : 98,
+        profile === "portfolio" ? 95 : 97,
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -684,7 +684,6 @@ test("portfolio and site generation writes exact state-last repositories", async
               "@testing-library/user-event",
               "@vitejs/plugin-react",
               "jsdom",
-              "vite-tsconfig-paths",
               "vitest",
             ].includes(name),
           ),
@@ -696,7 +695,6 @@ test("portfolio and site generation writes exact state-last repositories", async
           "@testing-library/user-event": "14.6.3",
           "@vitejs/plugin-react": "6.0.5",
           jsdom: "30.0.1",
-          "vite-tsconfig-paths": "6.1.1",
           vitest: "4.1.10",
         },
       );
@@ -844,7 +842,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
       accepted.state.installedCapabilities,
       core.createInstalledManifest(resolved),
     );
-    assert.equal(accepted.state.managedSurfaces.length, 101);
+    assert.equal(accepted.state.managedSurfaces.length, 100);
     assert.equal(
       accepted.state.managedSurfaces.filter(
         ({ owner }) =>
