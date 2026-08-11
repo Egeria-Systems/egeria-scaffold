@@ -33,7 +33,7 @@ test("standards exposes only its approved public configuration APIs", async () =
 
   assert.deepEqual(await readJson("packages/standards/package.json"), {
     name: "@egeria-systems/standards",
-    version: "0.1.0",
+    version: "0.2.0",
     type: "module",
     license: "Apache-2.0",
     repository: {

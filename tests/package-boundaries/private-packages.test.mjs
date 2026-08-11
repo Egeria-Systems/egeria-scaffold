@@ -88,13 +88,13 @@ test("the workspace materializes the approved private builder boundaries", async
       name: "@egeria-systems/observability",
       path: "packages/observability",
       private: false,
-      version: "0.1.0",
+      version: "0.2.0",
     },
     {
       name: "@egeria-systems/standards",
       path: "packages/standards",
       private: false,
-      version: "0.1.0",
+      version: "0.2.0",
     },
     {
       name: "@egeria-systems/nextjs-cloudflare-proof",
