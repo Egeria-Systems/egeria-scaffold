@@ -1,0 +1,268 @@
+# Production Observability Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` task-by-task, `superpowers:test-driven-development` for every behavior change, `superpowers:systematic-debugging` for unexpected failures, `superpowers:requesting-code-review` for the mandatory reviews, and `superpowers:verification-before-completion` before any completion claim. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Deliver the P2 production-observability capability through a reviewed public-package release, actual generated `portfolio`/`site` integration, and a separately pending certification task, without installing analytics or performing an unapproved external action.
+
+**Architecture:** A zero-runtime-dependency public package owns immutable provider-neutral operational events, bounded context, normalized error categories, redaction, non-throwing dispatch, Better Stack protocol encoding, structured-log/browser sinks, and test assertions. Generated Next.js/Cloudflare adapters inject runtime effects and keep Cloudflare types in infrastructure/composition roots. The public registry release is a hard gate: generated integration never uses a workspace/file/tarball substitute. The deployment capability continues to own the full Wrangler file while observability infers dependency-owned JSON values. A materially changed descriptor receives an ordinary pending certification record linked to a separate plan.
+
+**Toolchain:** Node.js `22.23.2`, pnpm `11.20.0`, TypeScript `6.0.3`, Node test runner, Changesets `2.31.1`, npm `12.0.2`, Next.js `16.3.0`, React `19.2.8`, OpenNext Cloudflare `1.20.2`, Wrangler `4.118.0`, Playwright `1.62.1`, Cloudflare Workers Logs/version metadata/secrets, and Better Stack HTTP ingestion.
+
+## Approval and stop boundaries
+
+The user's 2026-08-10 instruction preapproves this exact plan and evidence-backed exact-file amendments through implemented-task review. It does not authorize version materialization, package publication, commit integration to `main`, push, workflow dispatch, deployment, provider/source creation, secret or environment mutation, spending, production action, or certification.
+
+The first execution batch ends after the public-package source candidate has passed independent review and has a review packet. Tasks 4 onward are blocked until the user approves that exact diff and separately authorizes the necessary release integration/push/publication actions. Do not make builder templates depend on an unpublished version.
+
+## Global constraints
+
+- Work only in the isolated `production-observability` worktree from planning base `c6617e5192e7e3a983a82d074791e451cfbe9bd7` until the publication gate is resolved.
+- Keep runtime behavior provider-neutral. The public package imports no Next.js, React, DOM, Cloudflare, Node runtime, or Better Stack SDK dependency.
+- Never emit raw `Error`, message, stack, cause, URL, pathname, query, referrer, headers, cookies, form values, email, IP address, user agent, console output, response body, credential, token, or arbitrary unvalidated attributes.
+- Telemetry failures never fail an application request, render, or browser interaction.
+- Keep analytics absent: no Cloudflare Web Analytics, GA4, Clarity, consent state, session replay, autocapture, console interception, or browser storage.
+- Do not create a generic platform or database port, a second production adapter, database, queue, identity, provider resource, rate-limit resource, WAF rule, `apps/jobs`, later profile, migration command, or invented CRUD.
+- Preserve the deployment capability's full-file ownership of `apps/web/wrangler.jsonc`; do not create overlapping managed surfaces.
+- Capability state, fixtures, and checked schemas update only from successfully rendered, verified, and re-inferred output.
+- Before each commit, verify branch/status, stage only intended paths, inspect the cached diff, and run `git diff --cached --check`.
+- Use focused commits named for the actual behavior. No push, pull request, merge, publication, workflow dispatch, deployment, provider mutation, permission change, production action, or review-comment response is authorized.
+
+## Exact file structure
+
+### Planning and package source candidate
+
+Create:
+
+```text
+docs/implementation-evidence/2026-08-10-production-observability-preparation.md
+docs/superpowers/specs/2026-08-10-production-observability-design.md
+docs/superpowers/plans/2026-08-10-production-observability.md
+.changeset/add-production-observability.md
+packages/observability/src/contracts.ts
+packages/observability/src/events.ts
+packages/observability/src/redaction.ts
+packages/observability/src/dispatch.ts
+packages/observability/src/server.ts
+packages/observability/src/browser.ts
+packages/observability/src/testing.ts
+packages/observability/tests/contracts.test.mjs
+packages/observability/tests/dispatch.test.mjs
+packages/observability/tests/server.test.mjs
+packages/observability/tests/browser.test.mjs
+packages/observability/tests/testing.test.mjs
+docs/implementation-evidence/2026-08-10-production-observability-package-verification.md
+docs/review-packets/2026-08-10-production-observability-package.md
+```
+
+Modify:
+
+```text
+packages/observability/src/index.ts
+packages/observability/package.json
+packages/observability/README.md
+packages/observability/tests/public-api.test.mjs
+tests/package-boundaries/public-observability.test.mjs
+tests/package-boundaries/release-safeguards.test.mjs
+```
+
+Delete no published-history or license file. Do not materialize package versions or modify the lockfile in this batch unless the exact no-runtime-dependency manifest export change requires a mechanical lockfile update.
+
+### Publication checkpoint
+
+The separately authorized release batch may modify only after focused RED tests:
+
+```text
+.changeset/add-production-observability.md
+.changeset/externalize-visible-copy.md
+packages/observability/package.json
+packages/observability/CHANGELOG.md
+packages/standards/package.json
+packages/standards/CHANGELOG.md
+pnpm-lock.yaml
+scripts/check-package-release.mjs
+tests/package-boundaries/package-release.test.mjs
+tests/package-boundaries/release-safeguards.test.mjs
+.github/workflows/package-release.yml
+docs/implementation-evidence/2026-08-10-production-observability-package-release.md
+docs/review-packets/2026-08-10-production-observability-package-release.md
+```
+
+Any release-tool amendment must preserve manual exact-main-commit dispatch, least privilege, trusted publishing/provenance, full verification, exact-version absence, cleanup, and both-package awareness.
+
+### Generated capability integration after verified publication
+
+Create:
+
+```text
+packages/builder-core/templates/common/apps/web/instrumentation.ts
+packages/builder-core/templates/common/apps/web/instrumentation-client.ts
+packages/builder-core/templates/common/apps/web/app/api/observability/route.ts
+packages/builder-core/templates/common/apps/web/src/infrastructure/cloudflare/observability-context.ts
+packages/builder-core/templates/common/apps/web/src/infrastructure/observability/browser-reporter.ts
+packages/builder-core/templates/common/apps/web/src/infrastructure/observability/server-reporter.ts
+packages/builder-core/templates/common/apps/web/src/infrastructure/observability/web-vitals-reporter.tsx
+docs/superpowers/plans/2026-08-10-production-observability-certification.md
+docs/implementation-evidence/2026-08-10-production-observability-verification.md
+docs/review-packets/2026-08-10-production-observability.md
+```
+
+Modify:
+
+```text
+packages/builder-core/src/catalog/capability-catalog.ts
+packages/builder-core/src/catalog/verified-package-versions.ts
+packages/builder-core/src/profiles/profile-recipes.ts
+packages/builder-core/src/contracts/profile.ts
+packages/builder-core/src/generation/template-catalog.ts
+packages/builder-core/templates/common/apps/web/package.json.template
+packages/builder-core/templates/common/apps/web/wrangler.jsonc.template
+packages/builder-core/templates/common/apps/web/app/layout.tsx
+packages/builder-core/templates/common/apps/web/AGENTS.md.template
+packages/builder-core/templates/common/AGENTS.md.template
+packages/builder-core/templates/common/README.md.template
+packages/builder-core/tests/contracts.test.mjs
+packages/builder-core/tests/resolution.test.mjs
+packages/builder-core/tests/render-skeleton.test.mjs
+packages/builder-core/tests/generate-project.test.mjs
+packages/builder-core/tests/inference.test.mjs
+packages/builder-core/tests/diagnostics.test.mjs
+packages/builder-core/tests/certification.test.mjs
+packages/builder-core/schemas/profile.schema.json
+packages/builder-core/schemas/project.schema.json
+packages/builder-core/schemas/state.schema.json
+certifications/capabilities.json
+tests/generated-fixtures/determinism.test.mjs
+tests/generated-fixtures/verification-script.test.mjs
+scripts/verify-generated-skeletons.mjs
+docs/architecture/overview.md
+docs/architecture/capability-model.md
+docs/architecture/enforcement-map.md
+docs/architecture/package-ownership.md
+docs/roadmaps/program-roadmap.md
+README.md
+```
+
+Regenerate the three exact fixture trees from the production CLI only after the public packages resolve:
+
+```text
+fixtures/generated/portfolio/**
+fixtures/generated/portfolio-calendly/**
+fixtures/generated/site/**
+```
+
+`fixtures/generated/**` includes regenerated `.egeria/project.yaml`, `.egeria/state.json`, manifests, lockfiles, Wrangler configuration, package-owned and source-generated files, and the exact generated documentation. Never hand-edit retained fixture fingerprints or state.
+
+No other file is in scope without a documented evidence-backed amendment.
+
+## Task 1: Freeze preparation, design, and exact plan
+
+- [ ] Record branch/base/status, canonical sources, manifests, current descriptors/recipes/certification, prior packet conclusions, exact baseline behavior, official documentation, advisories, audits, contradictions, resolutions, authority boundary, and claim limits.
+- [ ] Record the selected architecture and rejected alternatives.
+- [ ] Record this exact-file plan, including the unavoidable public-package checkpoint and separate certification task.
+- [ ] Run documentation links/contracts, semantic naming, and `git diff --check`.
+- [ ] Commit only the preparation, design, and plan with message `Plan production observability`.
+
+## Task 2: Implement the provider-neutral public contract with TDD
+
+**RED files:** package tests plus exact package-boundary tests named above.
+
+- [ ] Add failing literal behavior tests for event vocabulary, ISO time, context-token bounds, immutable results, attribute allowlisting, recursive redaction, secret-like values, normalized error categories, and absence of raw error content.
+- [ ] Add failing tests proving one thrown/rejected sink cannot suppress another or escape dispatch, and every failure result is content-safe.
+- [ ] Add failing server tests for structured-object output, Better Stack host/token/request shape, payload bounds, documented success, status/fetch failure classification, and zero response/token/payload echo.
+- [ ] Add failing browser tests for the exact bounded envelope, unknown-field rejection, no raw error fields, injected delivery, and failure isolation.
+- [ ] Add failing testing-surface tests for memory capture, immutable snapshots, positive assertions, and stable content-safe assertion failures.
+- [ ] Add failing package-boundary tests for exact exports, source inventory, zero runtime dependencies, pack inventory, and concrete public consumer imports.
+- [ ] Run each focused RED test against real package output and record the expected missing-export or old-empty-contract failure before production edits.
+- [ ] Implement the minimum strict TypeScript source. Keep all platform effects injected and all public values readonly/frozen.
+- [ ] Export root, `./server`, `./browser`, and `./testing` explicitly. Update package documentation with examples that use fictional identifiers and no secrets.
+- [ ] Add one observability minor Changeset. Do not version or publish.
+- [ ] Run package build, tests, lint, typecheck, package boundaries, pack dry run, and Changesets status GREEN.
+- [ ] Make a focused DRY pass only for repeated validated transformations or result construction whose extraction materially improves maintenance.
+- [ ] Commit with message `Add operational telemetry contracts`.
+
+## Task 3: Review and verify the public-package source candidate
+
+**Comparison:** `c6617e5192e7e3a983a82d074791e451cfbe9bd7..HEAD`.
+
+- [ ] Dispatch one read-only requirements reviewer for the exact public-package obligations, privacy exclusions, zero dependency, release boundary, and unsupported claims.
+- [ ] Dispatch one read-only architecture/anti-overengineering reviewer for package/generated ownership, provider neutrality, API size, error/redaction model, runtime isolation, replacement, and analytics separation.
+- [ ] Dispatch one read-only test-evidence reviewer for causal RED/GREEN evidence, realistic mutations, public consumer/pack evidence, provider protocol boundaries, and claim calibration.
+- [ ] Prohibit edits and recursive fan-out; wait for every reviewer; validate findings against the current tree.
+- [ ] Repair only evidence-backed material defects through focused RED/GREEN cycles and rerun affected checks.
+- [ ] Run exact pinned package verification, root package boundaries, lint/build/typecheck, moderate dependency audits, registry signatures, Changesets status, semantic naming, docs links, and `git diff --check` once on the settled tree.
+- [ ] Record commands/results, changed files, reviewer dispositions, risks, deferred generated/provider behavior, and rollback in the package verification evidence and review packet.
+- [ ] Commit final package evidence with message `Record observability package review`.
+- [ ] Re-run only documentation/semantic/status checks affected by the evidence commit.
+- [ ] Stop for exact-diff approval and separate release authority. Do not begin Task 4 on an unpublished package.
+
+## Task 4: Materialize and publish exact public releases — external gate
+
+- [ ] Require explicit user authorization for the exact source-candidate integration, push, and trusted-publication actions. Plan approval alone is insufficient.
+- [ ] Add focused failing release tests that replace initial-release assumptions with the exact approved standards and observability target versions, existing package histories, absent target versions, no unexpected public package, no pending Changeset after materialization, and sanitized network failures.
+- [ ] Run `changeset version` once and inspect both resulting package versions, changelogs, Changeset removal, and lockfile diff. Do not hand-edit version artifacts.
+- [ ] Update only the release checker/workflow behavior proven necessary for a subsequent two-package release; retain exact-main-commit dispatch, full verification, OIDC/provenance, least privilege, cleanup, and fail-closed registry checks.
+- [ ] Independently review the exact release candidate and stop for its verified-final-diff approval before push/publication.
+- [ ] After explicit publication authority, integrate the exact reviewed commits to `main`, push only that branch, dispatch only the manual exact-commit release workflow, and wait for completion.
+- [ ] Verify both exact registry artifacts, integrity, provenance/attestations, exports, pack inventory, and fresh consumer imports. Record any absence of provenance honestly.
+- [ ] Stop on an existing target version, unexpected package history/version, non-exact commit, missing environment protection, permission drift, audit failure, signature failure, publish retry request, or partial release. Never republish an immutable version.
+
+## Task 5: Admit the material capability change before generated integration
+
+**RED files:** builder-core catalog/resolution/render/inference/diagnostics/certification tests.
+
+- [ ] Add focused failing tests for the new exact public package pins, recipe versions, descriptor version, security metadata, managed/application ownership, Wrangler JSON probes, required source files, verification plan, and absence of analytics/browser-storage/console capture.
+- [ ] Add a failing certification test proving the changed observability subject cannot retain `backfill-pending` and must link an ordinary `pending` record to a present separate task plan.
+- [ ] Implement the descriptor/version/recipe/registry changes and exact certification plan. Keep the sibling plan execution unapproved.
+- [ ] Generate checked JSON Schemas through the canonical script; never hand-edit generated schema JSON.
+- [ ] Run contracts, catalog, resolution, inference, diagnostics, certification, schema, and admission checks GREEN before template work.
+- [ ] Commit with message `Admit production observability capability`.
+
+## Task 6: Generate server, browser, and Cloudflare composition with TDD
+
+**RED files:** render, generation, template-boundary, fixture-contract, and browser tests.
+
+- [ ] Add focused failing tests for exact template destinations, package manifests, Workers Logs configuration, head sampling, version metadata, required secret names, adapter-only Cloudflare imports, server failure isolation, Next server-error registration, bounded same-origin browser error payloads, web-vitals registration, no raw/private fields, no browser storage, and analytics absence.
+- [ ] Add mutation cases for cross-origin, oversized, wrong-content-type, malformed, extra-field, invalid-vocabulary, secret-bearing, and transport-failure inputs.
+- [ ] Implement the minimum templates and composition. Keep presentation pure; the web-vitals side effect remains infrastructure-owned.
+- [ ] Use Cloudflare execution-context lifetime extension for provider delivery; do not block or fail application behavior on telemetry delivery.
+- [ ] Render into temporary roots, infer, diagnose, diff, build, and exercise focused browser behavior before retaining any state/fixture update.
+- [ ] Commit with message `Generate production observability adapters`.
+
+## Task 7: Regenerate immutable fixtures from production output
+
+- [ ] Run the production CLI twice for every fixture identifier under approved registry access and compare exact byte snapshots before changing committed fixtures.
+- [ ] Replace fixture trees only with successful production output. Verify state is written last, installed capability versions/recipe versions match, all managed-surface fingerprints agree, inference is unambiguous, diagnostics are healthy, and diff is empty.
+- [ ] Run frozen install, audits, signatures, lint, typecheck, Next build, OpenNext build, Wrangler type generation, development browser suite, and workerd-preview browser suite through the existing fixed verifier.
+- [ ] Do not claim deployed, Better Stack, Workers Logs UI, visual, performance, human accessibility, production, or WCAG evidence.
+- [ ] Commit with message `Refresh observable portfolio fixtures`.
+
+## Task 8: Reconcile canonical documentation
+
+- [ ] Update package ownership, architecture overview, capability model, enforcement map, program roadmap, root README, and generated instructions/readmes only where they directly consume the implemented behavior.
+- [ ] Link canonical owners instead of copying descriptor, schema, security, or lifecycle rules.
+- [ ] Mark production-observability implementation as awaiting Task 6B certification. Do not mark P2 or the capability certified.
+- [ ] Record public-package provenance/integrity, local runtime/browser evidence, claim limits, residual unauthenticated-endpoint risk, and provider/deployment/certification deferral.
+- [ ] Run documentation links/contracts and semantic naming GREEN.
+- [ ] Commit with message `Document production observability`.
+
+## Task 9: Independent final review and bounded repair
+
+**Comparison:** exact post-publication implementation base through `HEAD`, recorded before dispatch.
+
+- [ ] Dispatch one read-only requirements reviewer for every Task 6 behavior, package release, profile/capability/state agreement, privacy exclusion, external boundary, and claim limit.
+- [ ] Dispatch one read-only architecture/anti-overengineering reviewer for functional-core/imperative-shell design, public/generated ownership, Cloudflare isolation, narrow ports, no overlap, no analytics, package replaceability, lifecycle, and low-churn scope.
+- [ ] Dispatch one read-only test-evidence reviewer for causal TDD, package/provider contract evidence, actual production generation, inference/state/diff, fixed installs/builds, browser behavior, negative privacy cases, and unsupported claims.
+- [ ] Add one security/privacy specialist because this increment handles public telemetry input and bearer credentials. Review secret placement, exfiltration, injection, origin/size/schema bounds, data minimization, error/response leakage, abuse/cost risk, and dependency/advisory evidence.
+- [ ] Prohibit edits and recursive fan-out; wait for every result; validate every finding against the current tree.
+- [ ] Repair only evidence-backed material defects using focused RED/GREEN cycles, rerun affected checks, and record every disposition.
+- [ ] Use no more than one bounded final recheck unless a repaired material defect directly requires it.
+
+## Task 10: Final verification and implemented-task review packet
+
+- [ ] Run `git diff --check`, semantic naming, documentation/constitution, package boundaries, observability package verification, builder-core, CLI, certification admission, generated-fixture tests, builder lint/build/typecheck, fixed-root full generated verification, moderate root/production audits, registry signatures, and Changesets status on the settled tree.
+- [ ] Do not repeat an unchanged successful expensive check. Record exact command, exit, relevant count, duration where material, and bounded claim.
+- [ ] Verify branch/status, exact base/head comparison, changed-file inventory, ignored/untracked artifacts, public registry versions/integrity/provenance, registry subject/status, and no analytics/provider/deployment mutation beyond the separately authorized package release.
+- [ ] Record reviewer dispositions, known risks, deferred protected-staging/provider certification, source/package/provider/credential recovery domains, and no-WCAG/no-production claim.
+- [ ] Commit final verification and review packet with message `Record production observability review`.
+- [ ] Re-run only final-tree identity/status and documentation/semantic checks affected by the evidence commit.
+- [ ] Stop for explicit implemented-task review. Do not execute the sibling certification plan or begin the next P2 increment.
