@@ -13,8 +13,9 @@ const secretPrefixPattern =
   /^(?:gh[opsu]_|github_pat_|xox[baprs]-|AIza|(?:pk|sk)_(?:live|test)_)/u;
 const compactTokenPattern =
   /^[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}$/u;
-const networkAddressPattern =
-  /^(?:(?:\d{1,3}\.){3}\d{1,3}|(?:[A-Fa-f0-9]{1,4}:){2,7}[A-Fa-f0-9]{0,4})$/u;
+const ipv4AddressPattern = /^(?:\d{1,3}\.){3}\d{1,3}$/u;
+const ipv6AddressPattern =
+  /^(?=[A-Fa-f0-9:]*:[A-Fa-f0-9:]*:)[A-Fa-f0-9:]+$/u;
 
 function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -37,7 +38,8 @@ export function isPrivateDataLikeString(value: string): boolean {
     secretWordPattern.test(value) ||
     secretPrefixPattern.test(value) ||
     compactTokenPattern.test(value) ||
-    networkAddressPattern.test(value)
+    ipv4AddressPattern.test(value) ||
+    ipv6AddressPattern.test(value)
   );
 }
 

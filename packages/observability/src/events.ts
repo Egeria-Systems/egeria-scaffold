@@ -11,6 +11,7 @@ import {
   type OperationalEventResult,
 } from "./contracts.js";
 import {
+  isPrivateDataLikeString,
   redactOperationalAttributes,
   validateAttributeAllowlist,
 } from "./redaction.js";
@@ -39,9 +40,11 @@ function createContext(value: unknown): OperationalContext | undefined {
     if (
       typeof correlationId !== "string" ||
       !contextTokenPattern.test(correlationId) ||
+      isPrivateDataLikeString(correlationId) ||
       (releaseId !== undefined &&
         (typeof releaseId !== "string" ||
-          !contextTokenPattern.test(releaseId)))
+          !contextTokenPattern.test(releaseId) ||
+          isPrivateDataLikeString(releaseId)))
     ) {
       return undefined;
     }
