@@ -18,6 +18,8 @@ const generatedChecks = [
   "frozen-install",
   "lint",
   "typecheck",
+  "unit-tests",
+  "component-tests",
   "next-build",
   "opennext-build",
 ];
@@ -62,8 +64,12 @@ const portfolioRenderedPaths = [
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/sections/section-registry.tsx",
+  "apps/web/tests/component/content-page.test.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
+  "apps/web/tests/setup/component.ts",
+  "apps/web/tests/unit/content-schema.test.ts",
   "apps/web/tsconfig.json",
+  "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
   "package.json",
   "pnpm-workspace.yaml",
@@ -341,6 +347,8 @@ test("the pnpm verifier uses exact commands, isolated copies, and an allowlisted
         ],
         ["run", "lint"],
         ["run", "typecheck"],
+        ["run", "test:unit"],
+        ["run", "test:component"],
         ["run", "build"],
         ["run", "build:cloudflare"],
       ],
@@ -442,6 +450,8 @@ test("the pnpm verifier maps command failures without child output", async () =>
       ],
       ["run lint", "LINT_FAILED", "verify"],
       ["run typecheck", "TYPECHECK_FAILED", "verify"],
+      ["run test:unit", "UNIT_TESTS_FAILED", "verify"],
+      ["run test:component", "COMPONENT_TESTS_FAILED", "verify"],
       ["run build", "NEXT_BUILD_FAILED", "verify"],
       ["run build:cloudflare", "OPENNEXT_BUILD_FAILED", "verify"],
     ];
@@ -547,10 +557,10 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
-      assert.equal(generated.state.origin.recipeVersion, "0.6.0");
+      assert.equal(generated.state.origin.recipeVersion, "0.7.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 78 : 80,
+        profile === "portfolio" ? 96 : 98,
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -562,7 +572,7 @@ test("portfolio and site generation writes exact state-last repositories", async
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "standards",
         )?.version,
-        "0.2.0",
+        "0.3.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -663,6 +673,47 @@ test("portfolio and site generation writes exact state-last repositories", async
       assert.equal(
         webManifest.devDependencies["@playwright/test"],
         "1.62.1",
+      );
+      assert.deepEqual(
+        Object.fromEntries(
+          Object.entries(webManifest.devDependencies).filter(([name]) =>
+            [
+              "@testing-library/dom",
+              "@testing-library/jest-dom",
+              "@testing-library/react",
+              "@testing-library/user-event",
+              "@vitejs/plugin-react",
+              "jsdom",
+              "vite-tsconfig-paths",
+              "vitest",
+            ].includes(name),
+          ),
+        ),
+        {
+          "@testing-library/dom": "10.4.1",
+          "@testing-library/jest-dom": "7.0.1",
+          "@testing-library/react": "16.3.2",
+          "@testing-library/user-event": "14.6.3",
+          "@vitejs/plugin-react": "6.0.5",
+          jsdom: "30.0.1",
+          "vite-tsconfig-paths": "6.1.1",
+          vitest: "4.1.10",
+        },
+      );
+      assert.deepEqual(
+        Object.fromEntries(
+          Object.entries(webManifest.scripts).filter(([name]) =>
+            /^test(?::(?:component|unit))?(?::watch)?$/u.test(name),
+          ),
+        ),
+        {
+          test: "vitest run",
+          "test:component": "vitest run --project component",
+          "test:component:watch": "vitest --project component",
+          "test:unit": "vitest run --project unit",
+          "test:unit:watch": "vitest --project unit",
+          "test:watch": "vitest",
+        },
       );
       assert.deepEqual(
         Object.fromEntries(
@@ -793,7 +844,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
       accepted.state.installedCapabilities,
       core.createInstalledManifest(resolved),
     );
-    assert.equal(accepted.state.managedSurfaces.length, 83);
+    assert.equal(accepted.state.managedSurfaces.length, 101);
     assert.equal(
       accepted.state.managedSurfaces.filter(
         ({ owner }) =>

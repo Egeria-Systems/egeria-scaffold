@@ -50,8 +50,12 @@ const portfolioPaths = [
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/sections/section-registry.tsx",
+  "apps/web/tests/component/content-page.test.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
+  "apps/web/tests/setup/component.ts",
+  "apps/web/tests/unit/content-schema.test.ts",
   "apps/web/tsconfig.json",
+  "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
   "package.json",
   "pnpm-workspace.yaml",
@@ -94,8 +98,12 @@ const sitePaths = [
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/sections/section-registry.tsx",
+  "apps/web/tests/component/content-page.test.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
+  "apps/web/tests/setup/component.ts",
+  "apps/web/tests/unit/content-schema.test.ts",
   "apps/web/tsconfig.json",
+  "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
   "package.json",
   "pnpm-workspace.yaml",
@@ -905,7 +913,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.6.0",
+    recipeVersion: "0.7.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -933,9 +941,15 @@ test("rendered manifests and desired project match the approved resolved recipe"
       "build:cloudflare": "pnpm --dir apps/web run build:cloudflare",
       dev: "pnpm --dir apps/web run dev",
       lint: "pnpm --dir apps/web run lint",
+      test: "pnpm --dir apps/web run test",
+      "test:component": "pnpm --dir apps/web run test:component",
+      "test:component:watch": "pnpm --dir apps/web run test:component:watch",
+      "test:unit": "pnpm --dir apps/web run test:unit",
+      "test:unit:watch": "pnpm --dir apps/web run test:unit:watch",
+      "test:watch": "pnpm --dir apps/web run test:watch",
       typecheck: "pnpm --dir apps/web run typecheck",
       verify:
-        "pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run build:cloudflare",
+        "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run build:cloudflare",
     },
     engines: { node: "22.23.2", pnpm: "11.20.0" },
     packageManager: "pnpm@11.20.0",
@@ -961,11 +975,17 @@ test("rendered manifests and desired project match the approved resolved recipe"
       lint: "eslint . --max-warnings 0",
       preview:
         "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+      test: "vitest run",
+      "test:component": "vitest run --project component",
+      "test:component:watch": "vitest --project component",
       "test:e2e:deployed":
         "playwright test --config playwright.deployed.config.ts",
       "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
       "test:e2e:preview":
         "playwright test --config playwright.preview.config.ts",
+      "test:unit": "vitest run --project unit",
+      "test:unit:watch": "vitest --project unit",
+      "test:watch": "vitest",
       typecheck: "next typegen && tsc --noEmit",
     },
     dependencies: {
@@ -981,19 +1001,75 @@ test("rendered manifests and desired project match the approved resolved recipe"
       "@egeria-systems/standards": "0.1.0",
       "@playwright/test": "1.62.1",
       "@tailwindcss/postcss": "4.3.3",
+      "@testing-library/dom": "10.4.1",
+      "@testing-library/jest-dom": "7.0.1",
+      "@testing-library/react": "16.3.2",
+      "@testing-library/user-event": "14.6.3",
       "@types/node": "22.20.1",
       "@types/react": "19.2.18",
       "@types/react-dom": "19.2.4",
+      "@vitejs/plugin-react": "6.0.5",
       eslint: "9.39.5",
       "eslint-config-next": "16.3.0",
+      jsdom: "30.0.1",
       postcss: "8.5.26",
       "raw-loader": "4.0.2",
       tailwindcss: "4.3.3",
       typescript: "6.0.3",
       "typescript-eslint": "8.66.0",
+      "vite-tsconfig-paths": "6.1.1",
+      vitest: "4.1.10",
       wrangler: "4.118.0",
     },
   });
+});
+
+test("generated unit and component tests use distinct named environments", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const files = indexFiles(rendered.files);
+  const configuration = files.get("apps/web/vitest.config.ts");
+  const setup = files.get("apps/web/tests/setup/component.ts");
+  const unitTest = files.get("apps/web/tests/unit/content-schema.test.ts");
+  const componentTest = files.get(
+    "apps/web/tests/component/content-page.test.tsx",
+  );
+  const typescript = parseGeneratedJson(rendered.files, "apps/web/tsconfig.json");
+
+  assert.match(configuration, /name: "unit"[\s\S]+environment: "node"/u);
+  assert.match(
+    configuration,
+    /include: \["tests\/unit\/\*\*\/\*\.test\.ts"\]/u,
+  );
+  assert.match(configuration, /name: "component"[\s\S]+environment: "jsdom"/u);
+  assert.match(
+    configuration,
+    /include: \["tests\/component\/\*\*\/\*\.test\.tsx"\]/u,
+  );
+  assert.match(configuration, /setupFiles: \["\.\/tests\/setup\/component\.ts"\]/u);
+  assert.match(configuration, /globals: false/u);
+  assert.doesNotMatch(configuration, /workers|cloudflare|miniflare|coverage/iu);
+
+  assert.match(setup, /@testing-library\/jest-dom\/vitest/u);
+  assert.match(setup, /afterEach\(cleanup\)/u);
+  assert.match(unitTest, /parseContentConfiguration/u);
+  assert.match(unitTest, /parseYamlContent/u);
+  assert.match(unitTest, /CONTENT_INVALID/u);
+  assert.doesNotMatch(unitTest, /passWithNoTests|snapshot/iu);
+  assert.match(componentTest, /render\(<ContentPage/u);
+  assert.match(componentTest, /getByRole\("main"\)/u);
+  assert.match(componentTest, /getByRole\("navigation"\)/u);
+  assert.match(componentTest, /getByRole\("heading"/u);
+  assert.doesNotMatch(componentTest, /snapshot|fireEvent/iu);
+  assert.ok(typescript.include.includes("tests/**/*.ts"));
+  assert.ok(typescript.include.includes("tests/**/*.tsx"));
 });
 
 test("production observability renders bounded Next and Cloudflare composition", async () => {
@@ -1481,7 +1557,7 @@ test("rendering conditionally overlays the home route and materializes each Cale
     );
 
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, "0.6.0");
+    assert.equal(rendered.project.recipeVersion, "0.7.0");
     assert.equal(
       rendered.project.selectedCapabilities.at(-1),
       "booking-calendly",

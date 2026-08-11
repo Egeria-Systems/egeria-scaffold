@@ -39,18 +39,26 @@ function resolveRequest(
   return core.resolveCapabilities(request, catalog, profiles);
 }
 
-test("standards hybrid ownership declares generated browser quality", () => {
+test("standards hybrid ownership declares generated unit, component, and browser quality", () => {
   const standards = createCatalog().find(
     ({ identifier }) => identifier === "standards",
   );
 
   assert.notEqual(standards, undefined);
-  assert.equal(standards.version, "0.2.0");
+  assert.equal(standards.version, "0.3.0");
   assert.equal(standards.deliveryMode, "hybrid");
   assert.deepEqual(standards.requiredPackages, [
     "@axe-core/playwright",
     "@egeria-systems/standards",
     "@playwright/test",
+    "@testing-library/dom",
+    "@testing-library/jest-dom",
+    "@testing-library/react",
+    "@testing-library/user-event",
+    "@vitejs/plugin-react",
+    "jsdom",
+    "vite-tsconfig-paths",
+    "vitest",
   ]);
   assert.deepEqual(standards.environmentVariables, [
     "PLAYWRIGHT_DEPLOYED_URL",
@@ -75,9 +83,16 @@ test("standards hybrid ownership declares generated browser quality", () => {
       "standards-browser-install-ci-script",
       "standards-browser-install-script",
       "standards-browser-quality-specification",
+      "standards-component-test-script",
+      "standards-component-test-setup",
+      "standards-component-test-specification",
+      "standards-component-watch-script",
       "standards-deployed-browser-test-script",
       "standards-development-browser-test-script",
+      "standards-dom-testing-library-package",
       "standards-eslint-configuration",
+      "standards-jest-dom-package",
+      "standards-jsdom-package",
       "standards-playwright-deployed-configuration",
       "standards-playwright-development-configuration",
       "standards-playwright-package",
@@ -86,14 +101,27 @@ test("standards hybrid ownership declares generated browser quality", () => {
       "standards-preview-browser-test-script",
       "standards-package",
       "standards-quality-workflow",
+      "standards-react-testing-library-package",
+      "standards-test-script",
+      "standards-test-watch-script",
+      "standards-tsconfig-paths-package",
       "standards-typescript-configuration",
+      "standards-unit-test-script",
+      "standards-unit-test-specification",
+      "standards-unit-watch-script",
+      "standards-user-event-package",
+      "standards-vite-react-package",
+      "standards-vitest-configuration",
+      "standards-vitest-package",
     ].toSorted(),
   );
-  assert.equal(standards.inferenceProbes.length, 16);
+  assert.equal(standards.inferenceProbes.length, 34);
   assert.deepEqual(standards.verificationPlan, [
     "package-resolution",
     "lint",
     "typecheck",
+    "unit-tests",
+    "component-tests",
     "browser-development",
     "browser-preview",
     "deployed-configuration",
@@ -101,6 +129,7 @@ test("standards hybrid ownership declares generated browser quality", () => {
   ]);
   assert.deepEqual(standards.documentationEvidenceRequirements, [
     "public-package-version-and-provenance",
+    "unit-and-component-testing-claim-boundaries",
     "browser-testing-claim-boundaries",
   ]);
   assert.deepEqual(standards.removalAndRecoveryRequirements, [
@@ -1260,7 +1289,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.6.0",
+      recipeVersion: "0.7.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1272,7 +1301,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.6.0",
+      recipeVersion: "0.7.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1303,7 +1332,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.6.0");
+  assert.equal(portfolio.recipeVersion, "0.7.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1337,7 +1366,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
       ({ identifier }) => identifier,
     );
 
-    assert.equal(selected.recipeVersion, "0.6.0");
+    assert.equal(selected.recipeVersion, "0.7.0");
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
         selectedIdentifiers.indexOf("booking-calendly"),
@@ -1356,7 +1385,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   assert.deepEqual(core.createInstalledManifest(site), [
     {
       identifier: "standards",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",

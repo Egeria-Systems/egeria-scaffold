@@ -31,6 +31,8 @@ const verificationChecks = [
   "frozen-install",
   "lint",
   "typecheck",
+  "unit-tests",
+  "component-tests",
   "next-build",
   "opennext-build",
   "post-state-inference",
