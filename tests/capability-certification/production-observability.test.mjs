@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { access, lstat, mkdir, readFile, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 import { certifyProductionObservabilityForTesting } from "../../scripts/certify-production-observability.mjs";
@@ -25,6 +25,15 @@ const certificationCheckScript = resolve(
   repositoryRoot,
   "scripts/check-capability-certification.mjs",
 );
+const deployedExerciseScript = resolve(
+  repositoryRoot,
+  "scripts/exercise-production-observability.mjs",
+);
+
+const deployedBaseUrl = "https://observability-certification.example/";
+const deployedRevision = "0123456789abcdef0123456789abcdef01234567";
+const browserErrorMarker = `obs-cert-error-${deployedRevision}`;
+const webVitalMarker = `obs-cert-vital-${deployedRevision}`;
 
 const fixedChecks = Object.freeze([
   "pnpm-version",
@@ -128,6 +137,29 @@ async function runCertificationClosure(policy) {
       stderr: error.stderr,
     };
   }
+}
+
+async function loadDeployedExercise() {
+  return import(pathToFileURL(deployedExerciseScript).href);
+}
+
+function responseWithoutReadableContent(status) {
+  return new Proxy(
+    { status },
+    {
+      get(target, property) {
+        if (property in target) return target[property];
+        if (
+          ["arrayBuffer", "blob", "body", "formData", "json", "text"].includes(
+            property,
+          )
+        ) {
+          throw new Error("response content must not be read");
+        }
+        return undefined;
+      },
+    },
+  );
 }
 
 test("the observability registry records only reviewed local fresh-scaffold evidence while remaining pending", async () => {
@@ -440,4 +472,263 @@ test("the observability certification entry rejects unknown arguments without ec
     })}\n`,
   );
   assert.doesNotMatch(result.stderr, /private-value/u);
+});
+
+test("the deployed observability exercise sends the fixed bounded journey and returns content-safe markers", async () => {
+  const { exerciseProductionObservabilityForTesting } =
+    await loadDeployedExercise();
+  const expectedStatuses = [200, 500, 202, 202, 403, 415, 413, 400, 400, 400, 400];
+  const requests = [];
+  const timeoutDurations = [];
+  const timeoutSignal = Object.freeze({ identifier: "test-timeout" });
+
+  const receipt = await exerciseProductionObservabilityForTesting(
+    { baseUrl: deployedBaseUrl, revision: deployedRevision },
+    {
+      async fetch(url, init) {
+        requests.push({ url, init });
+        return responseWithoutReadableContent(
+          expectedStatuses[requests.length - 1],
+        );
+      },
+      createTimeoutSignal(milliseconds) {
+        timeoutDurations.push(milliseconds);
+        return timeoutSignal;
+      },
+    },
+  );
+
+  assert.deepEqual(receipt, {
+    ok: true,
+    capability: "observability",
+    version: "0.2.0",
+    revision: deployedRevision,
+    markers: {
+      browserError: browserErrorMarker,
+      webVital: webVitalMarker,
+    },
+    checks: [
+      "home-response",
+      "certification-error-response",
+      "browser-error-accepted",
+      "web-vital-accepted",
+      "cross-origin-rejected",
+      "media-type-rejected",
+      "oversize-rejected",
+      "malformed-json-rejected",
+      "extra-field-rejected",
+      "vocabulary-rejected",
+      "secret-bearing-rejected",
+    ],
+  });
+  assert.equal(requests.length, expectedStatuses.length);
+  assert.deepEqual(timeoutDurations, expectedStatuses.map(() => 10_000));
+  assert.equal(requests.every(({ init }) => init.signal === timeoutSignal), true);
+  assert.deepEqual(
+    requests.map(({ url, init }) => [url, init.method]),
+    [
+      [deployedBaseUrl, "GET"],
+      [`${deployedBaseUrl}api/observability-certification-error`, "GET"],
+      [`${deployedBaseUrl}api/observability`, "POST"],
+      [`${deployedBaseUrl}api/observability`, "POST"],
+      [`${deployedBaseUrl}api/observability`, "POST"],
+      [`${deployedBaseUrl}api/observability`, "POST"],
+      [`${deployedBaseUrl}api/observability`, "POST"],
+      [`${deployedBaseUrl}api/observability`, "POST"],
+      [`${deployedBaseUrl}api/observability`, "POST"],
+      [`${deployedBaseUrl}api/observability`, "POST"],
+      [`${deployedBaseUrl}api/observability`, "POST"],
+    ],
+  );
+
+  const [
+    home,
+    certificationError,
+    browserError,
+    webVital,
+    crossOrigin,
+    mediaType,
+    oversize,
+    malformed,
+    extraField,
+    vocabulary,
+    secretBearing,
+  ] = requests;
+  assert.deepEqual(home.init.headers, undefined);
+  assert.equal(home.init.body, undefined);
+  assert.deepEqual(certificationError.init.headers, undefined);
+  assert.equal(certificationError.init.body, undefined);
+  assert.deepEqual(browserError.init.headers, {
+    "Content-Type": "application/json",
+    Origin: "https://observability-certification.example",
+  });
+  assert.deepEqual(JSON.parse(browserError.init.body), {
+    schemaVersion: "1.0.0",
+    event: {
+      name: "browser.window.error",
+      kind: "application.error",
+      runtime: "browser",
+      severity: "error",
+      context: { correlationId: browserErrorMarker },
+      errorCategory: "unexpected",
+      attributes: { source: "window-error" },
+    },
+  });
+  assert.deepEqual(JSON.parse(webVital.init.body), {
+    schemaVersion: "1.0.0",
+    event: {
+      name: "browser.web.vital",
+      kind: "web.vital",
+      runtime: "browser",
+      severity: "info",
+      context: { correlationId: webVitalMarker },
+      attributes: {
+        metricName: "LCP",
+        value: 123.4,
+        delta: 12.3,
+        rating: "good",
+        navigationType: "navigate",
+      },
+    },
+  });
+  assert.equal(
+    crossOrigin.init.headers.Origin,
+    "https://cross-origin.invalid",
+  );
+  assert.equal(mediaType.init.headers["Content-Type"], "text/plain");
+  assert.equal(new TextEncoder().encode(oversize.init.body).byteLength, 8_193);
+  assert.equal(malformed.init.body, "{]");
+  assert.equal(JSON.parse(extraField.init.body).unexpected, true);
+  assert.equal(
+    JSON.parse(vocabulary.init.body).event.kind,
+    "application.lifecycle",
+  );
+  assert.match(
+    JSON.parse(secretBearing.init.body).event.context.correlationId,
+    /token/iu,
+  );
+  assert.doesNotMatch(JSON.stringify(receipt), /observability-certification\.example/u);
+  assert.doesNotMatch(JSON.stringify(receipt), /response content must not be read/u);
+});
+
+test("the deployed observability exercise accepts only an HTTPS root origin and exact revision", async () => {
+  const { exerciseProductionObservabilityForTesting } =
+    await loadDeployedExercise();
+  const adapters = {
+    async fetch() {
+      throw new Error("must not fetch");
+    },
+    createTimeoutSignal() {
+      throw new Error("must not create a timeout");
+    },
+  };
+
+  for (const baseUrl of [
+    "http://observability-certification.example/",
+    "https://observability-certification.example/path",
+    "https://observability-certification.example/?private=query",
+    "https://observability-certification.example/#private",
+    "https://user:password@observability-certification.example/",
+    " https://observability-certification.example/",
+    "not-a-url",
+  ]) {
+    await assert.rejects(
+      () =>
+        exerciseProductionObservabilityForTesting(
+          { baseUrl, revision: deployedRevision },
+          adapters,
+        ),
+      (error) => {
+        assert.equal(error?.name, "ProductionObservabilityExerciseError");
+        assert.equal(error?.code, "EXERCISE_BASE_URL_INVALID");
+        assert.doesNotMatch(
+          error.message,
+          /password|private|certification\.example/iu,
+        );
+        return true;
+      },
+    );
+  }
+
+  for (const revision of [
+    deployedRevision.slice(1),
+    `${deployedRevision}0`,
+    deployedRevision.toUpperCase(),
+    `${deployedRevision.slice(0, -1)}g`,
+    "private-secret-revision",
+  ]) {
+    await assert.rejects(
+      () =>
+        exerciseProductionObservabilityForTesting(
+          { baseUrl: deployedBaseUrl, revision },
+          adapters,
+        ),
+      (error) => {
+        assert.equal(error?.name, "ProductionObservabilityExerciseError");
+        assert.equal(error?.code, "EXERCISE_REVISION_INVALID");
+        assert.doesNotMatch(error.message, /private|secret|012345/iu);
+        return true;
+      },
+    );
+  }
+});
+
+test("the deployed observability exercise reports stable sanitized request failures", async () => {
+  const { exerciseProductionObservabilityForTesting } =
+    await loadDeployedExercise();
+
+  for (const [failure, expectedCode] of [
+    [
+      Object.assign(new Error("private timeout at staging origin"), {
+        name: "TimeoutError",
+      }),
+      "EXERCISE_REQUEST_TIMEOUT",
+    ],
+    [
+      new Error("private-secret fetch failure at staging origin"),
+      "EXERCISE_REQUEST_FAILED",
+    ],
+  ]) {
+    await assert.rejects(
+      () =>
+        exerciseProductionObservabilityForTesting(
+          { baseUrl: deployedBaseUrl, revision: deployedRevision },
+          {
+            async fetch() {
+              throw failure;
+            },
+            createTimeoutSignal() {
+              return Object.freeze({});
+            },
+          },
+        ),
+      (error) => {
+        assert.equal(error?.name, "ProductionObservabilityExerciseError");
+        assert.equal(error?.code, expectedCode);
+        assert.doesNotMatch(error.message, /private|secret|staging/iu);
+        return true;
+      },
+    );
+  }
+
+  await assert.rejects(
+    () =>
+      exerciseProductionObservabilityForTesting(
+        { baseUrl: deployedBaseUrl, revision: deployedRevision },
+        {
+          async fetch() {
+            return responseWithoutReadableContent(418);
+          },
+          createTimeoutSignal() {
+            return Object.freeze({});
+          },
+        },
+      ),
+    (error) => {
+      assert.equal(error?.name, "ProductionObservabilityExerciseError");
+      assert.equal(error?.code, "EXERCISE_STATUS_UNEXPECTED");
+      assert.doesNotMatch(error.message, /418|observability-certification/iu);
+      return true;
+    },
+  );
 });
