@@ -38,4 +38,4 @@ Consent orchestration is provider-neutral, defaults optional tracking to denied 
 
 ## Enforcement
 
-`INV-ANALYTICS-SEPARATION` is planned for P5B capability resolution, generated configuration, consent, CSP/storage, and provider-combination tests. P0.1 records only the architecture boundary.
+`INV-ANALYTICS-SEPARATION` is planned for P3B capability resolution, generated configuration, consent, CSP/storage, and provider-combination tests. P0.1 records only the architecture boundary.

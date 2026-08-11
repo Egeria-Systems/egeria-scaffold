@@ -1069,7 +1069,7 @@ test("capability delivery requires a separately planned certification task", asy
     ]);
   const clientReadyPhase = compactLabel("P", "2");
   const lifecyclePhase = compactLabel("P", "3");
-  const siteAndAppPhase = compactLabel("P", "4");
+  const appFoundationPhase = compactLabel("P", "4");
   const initialCertificationTask = namedLabel("Task", "5B");
   const preparationGate = namedLabel("Gate", "1");
 
@@ -1153,7 +1153,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   const programTaskPair = programRoadmap
     .split("## Capability delivery task pair\n", 2)[1]
-    .split(`## ${siteAndAppPhase} — Site and app foundation`, 1)[0];
+    .split(`## ${appFoundationPhase} — App foundation`, 1)[0];
   assert.ok(programTaskPair, "program task-pair contract is missing");
   assert.match(
     programTaskPair,
@@ -1247,6 +1247,103 @@ test("capability delivery requires a separately planned certification task", asy
   assert.match(
     design,
     /descriptor version or behavior-contract digest[\s\S]+material change[\s\S]+new task-linked pending record/i,
+  );
+});
+
+test("client-required public-site work is relocated after lifecycle without requirement loss", async () => {
+  const [sourcePlan, programRoadmap, overview, capabilityModel, enforcementMap, analyticsAdr] =
+    await Promise.all([
+      readRepositoryFile(
+        "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+      ),
+      readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+      readRepositoryFile("docs/architecture/overview.md"),
+      readRepositoryFile("docs/architecture/capability-model.md"),
+      readRepositoryFile("docs/architecture/enforcement-map.md"),
+      readRepositoryFile("docs/adr/0010-analytics-and-observability.md"),
+    ]);
+  const lifecyclePhase = compactLabel("P", "3");
+  const clientExpansionPhase = compactLabel("P", "3", "B");
+  const appFoundationPhase = compactLabel("P", "4");
+  const portfolioBaselinePhase = compactLabel("P", "2");
+  const multilingualSlot = compactLabel("P", "5", "A");
+  const analyticsSlot = compactLabel("P", "5", "B");
+
+  const roadmapPortfolio = programRoadmap
+    .split(`## ${portfolioBaselinePhase} — Client-ready portfolio\n`, 2)[1]
+    .split(`## ${lifecyclePhase} — Transactional lifecycle`, 1)[0];
+  const sourceExpansion = sourcePlan
+    .split(
+      `#### ${clientExpansionPhase} — Client-required public-site expansion\n`,
+      2,
+    )[1]
+    .split(`#### ${appFoundationPhase} — App foundation`, 1)[0];
+  const roadmapExpansion = programRoadmap
+    .split(`## ${clientExpansionPhase} — Client-required public-site expansion\n`, 2)[1]
+    .split(`## ${appFoundationPhase} — App foundation`, 1)[0];
+
+  assert.ok(roadmapPortfolio, "portfolio baseline roadmap section is missing");
+  assert.doesNotMatch(roadmapPortfolio, /urgent first-client milestone/iu);
+  assert.match(
+    roadmapExpansion,
+    /first client-ready milestone[\s\S]+real client/iu,
+  );
+
+  for (const section of [sourceExpansion, roadmapExpansion]) {
+    assert.ok(section, "client-required public-site expansion is missing");
+    assert.match(section, /production-complete `site` profile/iu);
+    assert.match(section, /`multilingual`[\s\S]+independently selectable/iu);
+    assert.match(
+      section,
+      /`analytics`[\s\S]+independently selectable[\s\S]+provider-neutral consent/iu,
+    );
+    assert.match(
+      section,
+      /capability implementation task[\s\S]+separate capability-certification task/iu,
+    );
+    assert.match(
+      section,
+      /real client project[\s\S]+generated[\s\S]+retained as migration evidence/iu,
+    );
+    assert.match(section, /no composite[\s\S]+profile[\s\S]+capability/iu);
+    assert.match(section, /relocation ledger/iu);
+    assert.match(
+      section,
+      new RegExp(
+        `${escapeRegularExpression(multilingualSlot)}[\\s\\S]+${escapeRegularExpression(analyticsSlot)}[\\s\\S]+not deleted[\\s\\S]+not renumbered`,
+        "iu",
+      ),
+    );
+  }
+
+  assert.match(
+    sourcePlan,
+    new RegExp(
+      `${escapeRegularExpression(lifecyclePhase)}[\\s\\S]+${escapeRegularExpression(clientExpansionPhase)}[\\s\\S]+FIRST CLIENT-READY MILESTONE[\\s\\S]+${escapeRegularExpression(appFoundationPhase)}`,
+      "u",
+    ),
+  );
+  assert.match(
+    overview,
+    /transactional lifecycle[\s\S]+client-required public-site expansion[\s\S]+app-foundation/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /multilingual[\s\S]+analytics[\s\S]+optional[\s\S]+initial scaffolding[\s\S]+addable later[\s\S]+no composite/iu,
+  );
+  assert.match(
+    enforcementMap,
+    new RegExp(
+      `INV-ANALYTICS-SEPARATION[^\\n]+${escapeRegularExpression(clientExpansionPhase)}`,
+      "iu",
+    ),
+  );
+  assert.match(
+    analyticsAdr,
+    new RegExp(
+      `INV-ANALYTICS-SEPARATION[^.]+${escapeRegularExpression(clientExpansionPhase)}`,
+      "iu",
+    ),
   );
 });
 

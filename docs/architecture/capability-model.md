@@ -126,6 +126,8 @@ These expressions define generation-time resolution only. The resolved installed
 
 The executable `portfolio` and `site` recipes remain at `0.5.0` with unchanged defaults. An initial-scaffolding request may explicitly add `booking-calendly`; dependency-first resolution adds its existing `section-composition` dependency, and the generated installed manifest—not a changed recipe—records the resulting selection.
 
+The planned P3B boundary delivers `multilingual` and `analytics` as optional capabilities during initial scaffolding and addable later through the completed P3 lifecycle; there is no composite profile or capability and no client-specific default recipe. `site-routing` remains the default capability for `site`, while each optional capability retains its own state, dependencies, migrations, verification, certification, and removal policy.
+
 ## Initial catalog
 
 The current executable catalog contains exactly `standards`, `content-files`, `section-composition`, `deployment-cloudflare`, `observability`, `booking-calendly`, and `site-routing` for `portfolio` and `site`. The other rows remain program visibility only and have no runtime descriptor, resolver availability, generated surface, state, or provider effect yet.
