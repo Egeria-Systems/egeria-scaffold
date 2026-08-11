@@ -37,6 +37,8 @@ Use this template only after the separately authorized protected-staging and pro
 - Fixed application/custom event markers declared before execution: [browser error and web-vital correlation markers from the deployed JSON receipt]
 - Certification-only framework error: `synthetic observability certification error`
 - Expected bounded requests: [one home response, one generic error response, two accepted custom events, and seven rejected route inputs]
+- The `Exercise deployed observability` step predeclares one `browser.window.error` with its revision-derived correlation marker, one `browser.web.vital` with its revision-derived correlation marker, and the `server.request.error` produced by the thrown certification route with a generated UUID that is not a revision-derived marker.
+- The `Test deployed application behavior` step predeclares bounded `browser.web.vital` emissions from Playwright navigation. Their occurrence, metric mix, generated correlation identifiers, and count are non-deterministic; the receipt must not predeclare an exact marker or count for this class.
 - Real client traffic, content, identities, request data, and production resources excluded: [yes / no]
 
 ## Deployed application and custom-event evidence
@@ -44,7 +46,10 @@ Use this template only after the separately authorized protected-staging and pro
 - Home response and certification-error response: [exact `200` and `500` status result]
 - Browser-error and web-vital route acceptance: [exact `202` status results]
 - Cross-origin, media-type, oversize, malformed JSON, extra-field, vocabulary, and secret-bearing rejection: [exact `403`, `415`, `413`, `400`, `400`, `400`, `400` status results]
-- Cloudflare Workers Logs application/custom event evidence: [two expected bounded structured records matched by revision-derived correlation marker]
+- Complete observed custom-event inventory in Cloudflare Workers Logs and Better Stack: [for every predeclared class above, record the workflow source step, event name/kind/runtime/severity, content-safe correlation classification, allowed attribute names and vocabulary, deployed `release_id` match, and provider-specific observed count, including zero]
+- Deterministic exercise reconciliation: [the revision-marker browser error, revision-marker web vital, and generated-UUID server request error are each present as expected in both providers / stop and reject]
+- Playwright navigation reconciliation: [record the complete observed `browser.web.vital` metric-name set and count in each provider without claiming an exact expected marker or count]
+- Additional custom event reconciliation: [reject the receipt unless every additional custom event is predeclared, bounded by the workflow step and generated vocabulary, and reconciled in the complete inventory]
 - Application/custom event fields observed: [`schema_version`, `dt`, `event_name`, `event_kind`, `runtime`, `severity`, `correlation_id`, `release_id`, `error_category` when applicable, and allowlisted `attributes`; record field names and bounded expected values only]
 - Unexpected or private fields observed: [none / stop and reject]
 
@@ -60,7 +65,9 @@ Use this template only after the separately authorized protected-staging and pro
 
 - Source, region, tier, quota, and retention: [content-safe source label; region; plan tier; quota before/after; retention; no ingestion host or private provider URL]
 - Browser-error record receipt: [`schema_version`, `dt`, `event_name`, `event_kind`, `runtime`, `severity`, `correlation_id`, `release_id`, `error_category`, and `attributes` matched to the expected bounded values]
-- Web-vital record receipt: [`schema_version`, `dt`, `event_name`, `event_kind`, `runtime`, `severity`, `correlation_id`, `release_id`, and `attributes` matched to the expected bounded values]
+- Exercise web-vital record receipt: [`schema_version`, `dt`, `event_name`, `event_kind`, `runtime`, `severity`, revision-derived `correlation_id`, `release_id`, and `attributes` matched to the expected bounded values]
+- Server-request-error record receipt: [`server.request.error` with bounded server/error vocabulary, generated UUID correlation identifier, deployed `release_id`, empty `attributes`, and no raw error content]
+- Playwright-navigation web-vital inventory: [complete observed metric-name set and count with bounded browser/info vocabulary; do not assign an exact expected marker or count]
 - Exact deployed revision match through `release_id`: [yes / no]
 - Unexpected fields or events and post-run quota/spend result: [none and bounded result / stop and reject]
 
@@ -90,10 +97,13 @@ Use this template only after the separately authorized protected-staging and pro
 
 ## Worker, source, and data cleanup
 
-- Cloudflare Worker cleanup: [removed / retained under explicit owner, expiry, and recovery decision]
+- Selected route-removal cleanup: [delete the certification Worker / clean redeploy without the certification fixture; `not executed` means `cleanup-recovery` cannot pass]
+- Cloudflare Worker cleanup: [deleted certification Worker / clean replacement deployed without the certification fixture / not executed — cleanup-recovery fails]
 - Better Stack source cleanup: [deleted / retained under explicit owner, expiry, and recovery decision]
 - Better Stack retained data cleanup: [deleted or expired / retained under explicit retention and owner]
-- Staging origin final state: [no longer serves certification Worker / explicitly retained]
+- Staging origin final state: [Worker unavailable after deletion / serves the clean replacement without the certification route]
+- Post-cleanup reachability verification for `/api/observability-certification-error`: [confirm the route is unreachable, then record the observed result as `404` after clean redeploy or Worker/origin unavailable after deletion; record no response body]
+- Cleanup outcome gate: `cleanup-recovery` cannot pass when the route remains reachable or the reachability result is not verified.
 - Temporary generated candidate and certification-only route disposition: [runner-temporary project expired; route absent from builder templates and generated fixtures and retained only as the certification test fixture]
 - Recovery evidence for source, deployment, credentials, provider source, and retained data: [separate content-safe outcomes]
 
@@ -113,6 +123,7 @@ This receipt records one exact protected-staging journey. It does not establish 
 - Failure-containment basis accepted: [yes / no and reason]
 - Abuse/cost decision accepted: [yes / no and reason]
 - Credential disposition accepted: [yes / no and reason]
+- Certification-only error-route unreachability accepted: [yes / no and reason]
 - Cleanup/recovery evidence accepted: [yes / no and reason]
 - Registry may change from `pending` to `certified`: [yes / no]
 - Review revision: [40-character Git commit]

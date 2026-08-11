@@ -948,6 +948,85 @@ test("the observability provider receipt separates custom, platform, provider, a
   assert.match(template, /does not establish.*durable delivery/iu);
 });
 
+test("the observability receipt reconciles every custom event class emitted after secret installation", async () => {
+  const [workflowSource, template] = await Promise.all([
+    readRepositoryFile(
+      ".github/workflows/production-observability-certification.yml",
+    ),
+    readRepositoryFile(
+      "docs/implementation-evidence/production-observability-provider-receipt-template.md",
+    ),
+  ]);
+  const job = parse(workflowSource).jobs["verify-and-deploy"];
+  const secretStepIndex = job.steps.findIndex(
+    ({ name }) => name === "Install observability provider secrets",
+  );
+  const exerciseStepIndex = job.steps.findIndex(
+    ({ name }) => name === "Exercise deployed observability",
+  );
+  const browserStepIndex = job.steps.findIndex(
+    ({ name }) => name === "Test deployed application behavior",
+  );
+
+  assert.ok(secretStepIndex > -1 && secretStepIndex < exerciseStepIndex);
+  assert.ok(exerciseStepIndex < browserStepIndex);
+  assert.match(
+    template,
+    /`Exercise deployed observability`[\s\S]+`browser\.window\.error`[\s\S]+revision-derived correlation marker/iu,
+  );
+  assert.match(
+    template,
+    /`Exercise deployed observability`[\s\S]+`browser\.web\.vital`[\s\S]+revision-derived correlation marker/iu,
+  );
+  assert.match(
+    template,
+    /`Exercise deployed observability`[\s\S]+`server\.request\.error`[\s\S]+generated UUID[\s\S]+not a revision-derived marker/iu,
+  );
+  assert.match(
+    template,
+    /`Test deployed application behavior`[\s\S]+`browser\.web\.vital`[\s\S]+non-deterministic[\s\S]+must not predeclare an exact marker or count/iu,
+  );
+  assert.match(
+    template,
+    /complete observed custom-event inventory[\s\S]+Cloudflare Workers Logs[\s\S]+Better Stack/iu,
+  );
+  assert.match(
+    template,
+    /additional custom event[\s\S]+reject[\s\S]+predeclared[\s\S]+bounded[\s\S]+reconciled/iu,
+  );
+});
+
+test("cleanup-recovery requires the certification error route to be unreachable after cleanup", async () => {
+  const template = await readRepositoryFile(
+    "docs/implementation-evidence/production-observability-provider-receipt-template.md",
+  );
+  const cleanupSection = template
+    .split("## Worker, source, and data cleanup\n", 2)[1]
+    .split("## Privacy exclusions", 1)[0];
+
+  assert.ok(cleanupSection, "observability cleanup section is missing");
+  assert.match(
+    cleanupSection,
+    /delete the certification Worker[\s\S]+clean redeploy without the certification fixture/iu,
+  );
+  assert.match(
+    cleanupSection,
+    /post-cleanup[\s\S]+`\/api\/observability-certification-error`[\s\S]+unreachable[\s\S]+observed result/iu,
+  );
+  assert.match(
+    cleanupSection,
+    /cleanup-recovery[\s\S]+cannot pass[\s\S]+route remains reachable or the reachability result is not verified/iu,
+  );
+  assert.doesNotMatch(
+    cleanupSection,
+    /Cloudflare Worker cleanup: \[[^\]]*retained/iu,
+  );
+  assert.match(
+    template,
+    /Certification-only error-route unreachability accepted: \[yes \/ no and reason\]/u,
+  );
+});
+
 test("provider preparation defines the external safety envelope", async () => {
   const [preparation, plan, receipt] = await Promise.all([
     readRepositoryFile(
