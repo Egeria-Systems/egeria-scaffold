@@ -137,7 +137,7 @@ test("the registry command rejects unknown arguments without registry content", 
   assert.doesNotMatch(`${result.stdout}${result.stderr}`, /private-value/u);
 });
 
-test("fresh certification drives the compiled CLI and fixed verifier without leaking ambient data", async () => {
+test("Calendly fresh certification drives the compiled CLI and fixed verifier without leaking ambient data", async () => {
   const ownerParent = await mkdtemp(join(tmpdir(), "egeria-certification-test-"));
   const commands = [];
   let ownedPath;
@@ -273,7 +273,7 @@ test("fresh certification drives the compiled CLI and fixed verifier without lea
   }
 });
 
-test("fresh certification maps failures and still removes its identity-bound owner", async () => {
+test("Calendly fresh certification maps failures and still removes its identity-bound owner", async () => {
   const ownerParent = await mkdtemp(join(tmpdir(), "egeria-certification-failure-"));
   let ownedPath;
 
