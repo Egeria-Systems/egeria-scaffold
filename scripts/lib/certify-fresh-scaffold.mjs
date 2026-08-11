@@ -215,7 +215,6 @@ function requireAdapters(configuration, adapters) {
   if (
     adapters === null ||
     typeof adapters !== "object" ||
-    typeof adapters.createOwner !== "function" ||
     typeof adapters.runCommand !== "function" ||
     typeof adapters.verifyProject !== "function"
   ) {
@@ -223,26 +222,23 @@ function requireAdapters(configuration, adapters) {
   }
 }
 
-function defaultAdapters() {
+function productionAdapters() {
   return {
-    createOwner: createOwnedDirectory,
     runCommand: defaultRunCommand,
     verifyProject: verifyGeneratedProject,
   };
 }
 
-export async function certifyFreshScaffoldForTesting(
-  configuration,
-  adapters = defaultAdapters(),
-) {
+export function certifyFreshScaffold(configuration) {
+  return certifyFreshScaffoldForTesting(configuration, productionAdapters());
+}
+
+export async function certifyFreshScaffoldForTesting(configuration, adapters) {
   requireAdapters(configuration, adapters);
   let owner;
   try {
-    owner = await adapters.createOwner();
-  } catch (error) {
-    if (configuration.isCertificationError(error)) {
-      throw error;
-    }
+    owner = await createOwnedDirectory();
+  } catch {
     fail(configuration, "CERTIFICATION_SETUP_FAILED");
   }
   if (!(await pathIdentityMatches(owner))) {

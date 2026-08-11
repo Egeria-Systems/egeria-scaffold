@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, lstat, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { access, lstat, mkdir, rm } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -34,6 +33,59 @@ const fixedChecks = Object.freeze([
   "browser-preview",
 ]);
 
+function observabilityCommandOutput(
+  command,
+  version = "0.2.0",
+  category = "confirmed",
+) {
+  if (command === "create") {
+    return {
+      ok: true,
+      command: "create",
+      profile: "portfolio",
+      capabilities: [
+        "standards",
+        "content-files",
+        "section-composition",
+        "deployment-cloudflare",
+        "observability",
+      ],
+    };
+  }
+  if (command === "infer") {
+    return {
+      ok: true,
+      command: "infer",
+      result: {
+        state: {
+          kind: "valid",
+          value: {
+            installedCapabilities: [
+              { identifier: "observability", version },
+            ],
+          },
+        },
+        capabilities: [{ identifier: "observability", category }],
+      },
+    };
+  }
+  if (command === "doctor") {
+    return {
+      ok: true,
+      command: "doctor",
+      result: { healthy: true, diagnostics: [] },
+    };
+  }
+  if (command === "diff") {
+    return {
+      ok: true,
+      command: "diff",
+      result: { equal: true, differences: [] },
+    };
+  }
+  throw new Error("unexpected command");
+}
+
 async function pathExists(path) {
   try {
     await access(path);
@@ -43,27 +95,22 @@ async function pathExists(path) {
   }
 }
 
-async function createKnownOwner(parent) {
-  const path = await mkdtemp(join(parent, "certification-owner-"));
-  const stats = await lstat(path, { bigint: true });
-  return { path, device: stats.dev, inode: stats.ino };
+async function cleanupRetainedDirectory(path) {
+  if (path !== undefined) {
+    await rm(path, { recursive: true, force: true });
+  }
 }
 
-test("observability fresh certification drives the compiled CLI and fixed verifier without provider input", async () => {
-  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-observability-certification-test-"));
+test("observability production mutation keeps real owner identity while testing mocks commands and verification", async () => {
   const commands = [];
   let ownedPath;
+  let projectRoot;
   let verifiedRoot;
   const previousToken = process.env.CLOUDFLARE_API_TOKEN;
   process.env.CLOUDFLARE_API_TOKEN = "PRIVATE_VALUE";
 
   try {
     const result = await certifyProductionObservabilityForTesting({
-      async createOwner() {
-        const identity = await createKnownOwner(ownerParent);
-        ownedPath = identity.path;
-        return identity;
-      },
       async runCommand(input) {
         commands.push(input);
         assert.equal(input.executable, process.execPath);
@@ -73,10 +120,15 @@ test("observability fresh certification drives the compiled CLI and fixed verifi
         const command = input.arguments[1];
 
         if (command === "create") {
+          projectRoot = input.arguments[
+            input.arguments.indexOf("--directory") + 1
+          ];
+          ownedPath = dirname(projectRoot);
+          assert.equal((await lstat(ownedPath)).mode & 0o777, 0o700);
           return `${JSON.stringify({
             ok: true,
             command: "create",
-            destination: join(ownedPath, "project"),
+            destination: projectRoot,
             profile: "portfolio",
             capabilities: [
               "standards",
@@ -149,21 +201,25 @@ test("observability fresh certification drives the compiled CLI and fixed verifi
     });
     assert.equal(commands.length, 4);
     assert.deepEqual(
-      commands.map(({ arguments: arguments_ }) => arguments_[1]),
-      ["create", "infer", "doctor", "diff"],
+      commands.map(({ arguments: arguments_ }) => arguments_.slice(1)),
+      [
+        [
+          "create",
+          "--profile",
+          "portfolio",
+          "--name",
+          "acme-portfolio-observability",
+          "--display-name",
+          "Acme Portfolio Observability",
+          "--directory",
+          projectRoot,
+        ],
+        ["infer", "--directory", projectRoot],
+        ["doctor", "--directory", projectRoot],
+        ["diff", "--directory", projectRoot],
+      ],
     );
-    assert.deepEqual(commands[0].arguments.slice(1), [
-      "create",
-      "--profile",
-      "portfolio",
-      "--name",
-      "acme-portfolio-observability",
-      "--display-name",
-      "Acme Portfolio Observability",
-      "--directory",
-      join(ownedPath, "project"),
-    ]);
-    assert.equal(verifiedRoot, join(ownedPath, "project"));
+    assert.equal(verifiedRoot, projectRoot);
     assert.equal(await pathExists(ownedPath), false);
     assert.doesNotMatch(JSON.stringify(result), /PRIVATE_VALUE/u);
   } finally {
@@ -172,52 +228,120 @@ test("observability fresh certification drives the compiled CLI and fixed verifi
     } else {
       process.env.CLOUDFLARE_API_TOKEN = previousToken;
     }
-    await rm(ownerParent, { recursive: true, force: true });
   }
 });
 
-test("observability fresh certification rejects an invalid subject and still removes its identity-bound owner", async () => {
-  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-observability-certification-failure-"));
+test("observability production mutation rejects a wrong installed capability version", async () => {
   let ownedPath;
 
-  try {
-    await assert.rejects(
+  await assert.rejects(
       () =>
         certifyProductionObservabilityForTesting({
-          async createOwner() {
-            const identity = await createKnownOwner(ownerParent);
-            ownedPath = identity.path;
-            return identity;
-          },
           async runCommand(input) {
-            if (input.arguments[1] !== "create") {
-              throw new Error("must not run later commands");
-            }
-            return `${JSON.stringify({
-              ok: true,
-              command: "create",
-              profile: "portfolio",
-              capabilities: [
-                "standards",
-                "content-files",
-                "section-composition",
-                "deployment-cloudflare",
-              ],
-            })}\n`;
+            const command = input.arguments[1];
+            ownedPath = dirname(
+              input.arguments[input.arguments.indexOf("--directory") + 1],
+            );
+            return `${JSON.stringify(
+              observabilityCommandOutput(command, "0.1.0"),
+            )}\n`;
           },
           async verifyProject() {
             throw new Error("must not verify");
           },
         }),
+    (error) => {
+      assert.equal(error?.name, "ProductionObservabilityCertificationError");
+      assert.equal(error?.code, "FRESH_SCAFFOLD_INFERENCE_INVALID");
+      return true;
+    },
+  );
+  assert.equal(await pathExists(ownedPath), false);
+});
+
+test("observability production mutation rejects an unconfirmed inference category", async () => {
+  let ownedPath;
+
+  await assert.rejects(
+    () =>
+      certifyProductionObservabilityForTesting({
+          async runCommand(input) {
+            ownedPath = dirname(
+              input.arguments[input.arguments.indexOf("--directory") + 1],
+            );
+            return `${JSON.stringify(
+              observabilityCommandOutput(
+                input.arguments[1],
+                "0.2.0",
+                "inferred",
+              ),
+            )}\n`;
+          },
+          async verifyProject() {
+            throw new Error("must not verify");
+          },
+        }),
+    (error) => {
+      assert.equal(error?.name, "ProductionObservabilityCertificationError");
+      assert.equal(error?.code, "FRESH_SCAFFOLD_INFERENCE_INVALID");
+      return true;
+    },
+  );
+  assert.equal(await pathExists(ownedPath), false);
+});
+
+test("observability production mutation refuses identity-replacement cleanup", async () => {
+  let retainedOwner;
+
+  try {
+    await assert.rejects(
+      () =>
+        certifyProductionObservabilityForTesting({
+          async runCommand(input) {
+            const command = input.arguments[1];
+            const projectRoot = input.arguments[
+              input.arguments.indexOf("--directory") + 1
+            ];
+            if (command === "create") {
+              retainedOwner = dirname(projectRoot);
+              assert.equal((await lstat(retainedOwner)).mode & 0o777, 0o700);
+              await rm(retainedOwner, { recursive: true });
+              await mkdir(retainedOwner, { mode: 0o700 });
+            }
+            return `${JSON.stringify(observabilityCommandOutput(command))}\n`;
+          },
+          async verifyProject(root, identifier) {
+            assert.equal(identifier, "portfolio");
+            return {
+              ok: true,
+              fixtures: ["portfolio"],
+              profiles: ["portfolio"],
+              checks: fixedChecks,
+            };
+          },
+        }),
       (error) => {
         assert.equal(error?.name, "ProductionObservabilityCertificationError");
-        assert.equal(error?.code, "FRESH_SCAFFOLD_CREATE_INVALID");
+        assert.equal(error?.code, "CERTIFICATION_CLEANUP_FAILED");
         return true;
       },
     );
-    assert.equal(await pathExists(ownedPath), false);
+    assert.equal(await pathExists(retainedOwner), true);
   } finally {
-    await rm(ownerParent, { recursive: true, force: true });
+    await cleanupRetainedDirectory(retainedOwner);
+  }
+});
+
+test("observability testing API rejects the production-adapter mutation", async () => {
+  for (const adapters of [undefined, null, {}, { runCommand() {} }]) {
+    await assert.rejects(
+      () => certifyProductionObservabilityForTesting(adapters),
+      (error) => {
+        assert.equal(error?.name, "ProductionObservabilityCertificationError");
+        assert.equal(error?.code, "CERTIFICATION_ADAPTER_INVALID");
+        return true;
+      },
+    );
   }
 });
 

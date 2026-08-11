@@ -1,7 +1,10 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { certifyFreshScaffoldForTesting } from "./lib/certify-fresh-scaffold.mjs";
+import {
+  certifyFreshScaffold,
+  certifyFreshScaffoldForTesting,
+} from "./lib/certify-fresh-scaffold.mjs";
 
 const expectedCapabilities = Object.freeze([
   "standards",
@@ -35,7 +38,7 @@ const configuration = Object.freeze({
 });
 
 export function certifyProductionObservability() {
-  return certifyProductionObservabilityForTesting();
+  return certifyFreshScaffold(configuration);
 }
 
 export function certifyProductionObservabilityForTesting(adapters) {

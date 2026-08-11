@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, lstat, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { access, lstat } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
@@ -45,12 +44,6 @@ async function pathExists(path) {
   } catch {
     return false;
   }
-}
-
-async function createKnownOwner(parent) {
-  const path = await mkdtemp(join(parent, "certification-owner-"));
-  const stats = await lstat(path, { bigint: true });
-  return { path, device: stats.dev, inode: stats.ino };
 }
 
 async function runCheck(arguments_) {
@@ -137,10 +130,10 @@ test("the registry command rejects unknown arguments without registry content", 
   assert.doesNotMatch(`${result.stdout}${result.stderr}`, /private-value/u);
 });
 
-test("Calendly fresh certification drives the compiled CLI and fixed verifier without leaking ambient data", async () => {
-  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-certification-test-"));
+test("Calendly production mutation keeps real owner identity while testing mocks commands and verification", async () => {
   const commands = [];
   let ownedPath;
+  let projectRoot;
   let verifiedRoot;
   const previousToken = process.env.CLOUDFLARE_API_TOKEN;
   process.env.CLOUDFLARE_API_TOKEN = "PRIVATE_VALUE";
@@ -149,11 +142,6 @@ test("Calendly fresh certification drives the compiled CLI and fixed verifier wi
     const result = await certifyBookingCalendlyForTesting(
       { calendlyUrl: "https://calendly.com/example/intro" },
       {
-        async createOwner() {
-          const identity = await createKnownOwner(ownerParent);
-          ownedPath = identity.path;
-          return identity;
-        },
         async runCommand(input) {
           commands.push(input);
           assert.equal(input.executable, process.execPath);
@@ -163,10 +151,15 @@ test("Calendly fresh certification drives the compiled CLI and fixed verifier wi
           const command = input.arguments[1];
 
           if (command === "create") {
+            projectRoot = input.arguments[
+              input.arguments.indexOf("--directory") + 1
+            ];
+            ownedPath = dirname(projectRoot);
+            assert.equal((await lstat(ownedPath)).mode & 0o777, 0o700);
             return `${JSON.stringify({
               ok: true,
               command: "create",
-              destination: join(ownedPath, "project"),
+              destination: projectRoot,
               profile: "portfolio",
               capabilities: [
                 "standards",
@@ -242,25 +235,29 @@ test("Calendly fresh certification drives the compiled CLI and fixed verifier wi
     });
     assert.equal(commands.length, 4);
     assert.deepEqual(
-      commands.map(({ arguments: arguments_ }) => arguments_[1]),
-      ["create", "infer", "doctor", "diff"],
+      commands.map(({ arguments: arguments_ }) => arguments_.slice(1)),
+      [
+        [
+          "create",
+          "--profile",
+          "portfolio",
+          "--name",
+          "acme-portfolio-calendly",
+          "--display-name",
+          "Acme Portfolio Booking",
+          "--directory",
+          projectRoot,
+          "--calendly-url",
+          "https://calendly.com/example/intro",
+          "--calendly-mode",
+          "popup",
+        ],
+        ["infer", "--directory", projectRoot],
+        ["doctor", "--directory", projectRoot],
+        ["diff", "--directory", projectRoot],
+      ],
     );
-    assert.deepEqual(commands[0].arguments.slice(1), [
-      "create",
-      "--profile",
-      "portfolio",
-      "--name",
-      "acme-portfolio-calendly",
-      "--display-name",
-      "Acme Portfolio Booking",
-      "--directory",
-      join(ownedPath, "project"),
-      "--calendly-url",
-      "https://calendly.com/example/intro",
-      "--calendly-mode",
-      "popup",
-    ]);
-    assert.equal(verifiedRoot, join(ownedPath, "project"));
+    assert.equal(verifiedRoot, projectRoot);
     assert.equal(await pathExists(ownedPath), false);
     assert.doesNotMatch(JSON.stringify(result), /calendly\.com|PRIVATE_VALUE/u);
   } finally {
@@ -269,43 +266,52 @@ test("Calendly fresh certification drives the compiled CLI and fixed verifier wi
     } else {
       process.env.CLOUDFLARE_API_TOKEN = previousToken;
     }
-    await rm(ownerParent, { recursive: true, force: true });
   }
 });
 
-test("Calendly fresh certification maps failures and still removes its identity-bound owner", async () => {
-  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-certification-failure-"));
+test("Calendly production mutation maps command failures and removes its real owner", async () => {
   let ownedPath;
 
-  try {
+  await assert.rejects(
+    () =>
+      certifyBookingCalendlyForTesting(
+        { calendlyUrl: "https://calendly.com/example/private-value" },
+        {
+          async runCommand(input) {
+            ownedPath = dirname(
+              input.arguments[input.arguments.indexOf("--directory") + 1],
+            );
+            throw new Error("PRIVATE_VALUE");
+          },
+          async verifyProject() {
+            throw new Error("must not verify");
+          },
+        },
+      ),
+    (error) => {
+      assert.equal(error?.name, "BookingCalendlyCertificationError");
+      assert.equal(error?.code, "FRESH_SCAFFOLD_CREATE_FAILED");
+      assert.doesNotMatch(String(error), /PRIVATE_VALUE|calendly\.com/u);
+      return true;
+    },
+  );
+  assert.equal(await pathExists(ownedPath), false);
+});
+
+test("Calendly testing API rejects the production-adapter mutation", async () => {
+  for (const adapters of [undefined, null, {}, { runCommand() {} }]) {
     await assert.rejects(
       () =>
         certifyBookingCalendlyForTesting(
-          { calendlyUrl: "https://calendly.com/example/private-value" },
-          {
-            async createOwner() {
-              const identity = await createKnownOwner(ownerParent);
-              ownedPath = identity.path;
-              return identity;
-            },
-            async runCommand() {
-              throw new Error("PRIVATE_VALUE");
-            },
-            async verifyProject() {
-              throw new Error("must not verify");
-            },
-          },
+          { calendlyUrl: "https://calendly.com/example/intro" },
+          adapters,
         ),
       (error) => {
         assert.equal(error?.name, "BookingCalendlyCertificationError");
-        assert.equal(error?.code, "FRESH_SCAFFOLD_CREATE_FAILED");
-        assert.doesNotMatch(String(error), /PRIVATE_VALUE|calendly\.com/u);
+        assert.equal(error?.code, "CERTIFICATION_ADAPTER_INVALID");
         return true;
       },
     );
-    assert.equal(await pathExists(ownedPath), false);
-  } finally {
-    await rm(ownerParent, { recursive: true, force: true });
   }
 });
 

@@ -1,7 +1,10 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { certifyFreshScaffoldForTesting } from "./lib/certify-fresh-scaffold.mjs";
+import {
+  certifyFreshScaffold,
+  certifyFreshScaffoldForTesting,
+} from "./lib/certify-fresh-scaffold.mjs";
 
 const defaultCalendlyUrl = "https://calendly.com/example/intro";
 const expectedCapabilities = Object.freeze([
@@ -44,7 +47,8 @@ function configurationFor(calendlyUrl) {
 }
 
 export function certifyBookingCalendly(input = {}) {
-  return certifyBookingCalendlyForTesting(input);
+  const calendlyUrl = input?.calendlyUrl ?? defaultCalendlyUrl;
+  return certifyFreshScaffold(configurationFor(calendlyUrl));
 }
 
 export function certifyBookingCalendlyForTesting(input, adapters) {
