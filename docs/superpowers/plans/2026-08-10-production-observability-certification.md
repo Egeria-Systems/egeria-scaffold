@@ -13,7 +13,7 @@
 - Obtain explicit authority for workflow dispatch, non-production deployment, Better Stack source creation or reuse, Cloudflare secret mutation, synthetic telemetry delivery, provider inspection, credential disposition, and Worker/source cleanup.
 - Bind execution to an exact reviewed `main` revision whose certification subject equals the committed registry record.
 - Use least-privilege, task-bounded credentials and a protected non-production environment. Stop on permission, billing, retention, unexpected-provider, revision, or subject drift.
-- Use synthetic bounded values only. Never transmit real client data, URLs, request data, headers, cookies, user agents, error messages, stacks, email addresses, form content, provider responses, tokens, or secrets.
+- Use synthetic bounded values only. Never transmit real client data, URLs, request data, headers, cookies, user agents, email addresses, form content, provider responses, tokens, or secrets. The separately approved platform-error probe may use only one exact generic synthetic exception message and its provider-produced stack; review that value before deployment and never substitute real application or client content.
 
 ## Task 1: Prepare an exact certification candidate
 
@@ -26,15 +26,17 @@
 
 - [ ] Inspect and approve the exact workflow/revision and all provider-side targets before exposing credentials.
 - [ ] Configure only the declared Better Stack host/token secrets and deploy one dedicated non-production Worker.
-- [ ] Exercise bounded synthetic server error, browser error, and web-vitals events.
-- [ ] Confirm structured Workers Logs and Better Stack receipt by event name, correlation identifier, release identifier, runtime, kind, severity, and bounded allowlisted attributes only.
+- [ ] Exercise bounded synthetic server error, browser error, and web-vitals custom events.
+- [ ] Through an exact reviewed certification-only staging trigger that is unreachable after cleanup, exercise one content-safe synthetic platform or framework exception without adding that trigger to retained builder templates or fixtures.
+- [ ] Confirm custom structured Workers Logs and Better Stack receipt by event name, correlation identifier, release identifier, runtime, kind, severity, and bounded allowlisted attributes only.
+- [ ] Separately inventory the provider-controlled platform error/exception record fields and Workers Logs retention. Do not classify those records as bounded custom events; stop on unexpected real/private content, an unreviewed field, an unbounded retention decision, or inability to inspect the provider surface.
 - [ ] Confirm application responses remain successful when Better Stack rejects, times out, or is unreachable.
 - [ ] Confirm the browser route rejects cross-origin, oversized, wrong-content-type, malformed, extra-field, invalid-vocabulary, and secret-bearing inputs without echoing content.
 
 ## Task 3: Cleanup, review, and certification decision
 
 - [ ] Remove or roll back the dedicated Worker and dispose of the task credentials according to the approved credential plan.
-- [ ] Remove or preserve the Better Stack source only according to the separately approved provider-state decision; record its final state and retention limits.
+- [ ] Remove or preserve the Better Stack source only according to the separately approved provider-state decision; record its final state and retention limits. Record the final Workers Logs state and retention separately.
 - [ ] Verify the deployment target no longer serves the certification candidate when deletion is selected.
 - [ ] Dispatch independent read-only requirements, architecture/anti-overengineering, test-evidence, and security/privacy reviews of the exact evidence.
 - [ ] Update the registry to `certified` only after every required outcome is passed, subject/revision-bound, reviewed, and present. Otherwise retain `pending` and record the blocker.
