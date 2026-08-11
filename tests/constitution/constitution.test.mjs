@@ -1623,7 +1623,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         escapeRegularExpression(calendlyCertificationTask) +
         "'s bounded provider certification evidence is complete[\\s\\S]+" +
         escapeRegularExpression(observabilityTask) +
-        " now implements and locally verifies production observability[\\s\\S]+" +
+        "'s exact implementation diff `717c3bb0f048f4a4bc544100125ae42d818f09bc\\.\\.45b57d2dc265ef6ba9ac805d7352a01db5f1081d` is approved and the implementation task is complete[\\s\\S]+" +
         escapeRegularExpression(observabilityCertificationTask) +
         " remains a separate unapproved certification plan[\\s\\S]+develops directly on clean local `main`",
     ),

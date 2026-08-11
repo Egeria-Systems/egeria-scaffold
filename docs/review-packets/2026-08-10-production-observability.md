@@ -2,7 +2,7 @@
 
 **Review date:** 2026-08-11 (America/Toronto)
 
-**Outcome:** READY FOR IMPLEMENTED-TASK REVIEW; CAPABILITY CERTIFICATION, DEPLOYMENT, LAUNCH, AND P2 COMPLETION REMAIN PENDING
+**Outcome:** IMPLEMENTED TASK APPROVED; CAPABILITY CERTIFICATION, DEPLOYMENT, LAUNCH, AND P2 COMPLETION REMAIN PENDING
 
 **Comparison base:** `717c3bb0f048f4a4bc544100125ae42d818f09bc`
 
@@ -173,4 +173,6 @@ Fixture/state rollback must follow the producing descriptor/template commits; ne
 
 ## Approval and stop gate
 
-Please review the final comparison after the evidence commit. Approval of this implemented task is distinct from authority to integrate to `main`, push, deploy, create/reuse provider resources, configure secrets, execute certification, approve launch scope, claim P2 completion, or begin the next increment.
+On 2026-08-11, the user gave verified-final-diff approval for exact comparison `717c3bb0f048f4a4bc544100125ae42d818f09bc..45b57d2dc265ef6ba9ac805d7352a01db5f1081d`. Task 6 is approved and complete.
+
+This approval is distinct from authority to integrate to `main`, push, deploy, create or reuse provider resources, configure secrets, execute certification, publish another package version, approve launch scope, claim P2 completion, implement Task 6B, or begin another increment. The branch and worktree remain preserved at this stop gate.

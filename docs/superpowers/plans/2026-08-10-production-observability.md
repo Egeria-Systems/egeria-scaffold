@@ -311,3 +311,8 @@ The verified publication produced both public `0.2.0` artifacts, but public avai
 - [x] Commit final verification and review packet with message `Record production observability review`.
 - [x] Re-run only final-tree identity/status and documentation/semantic checks affected by the evidence commit.
 - [x] Stop for explicit implemented-task review. Do not execute the sibling certification plan or begin the next P2 increment.
+
+## Implemented-task approval
+
+- [x] On 2026-08-11, the user gave verified-final-diff approval for exact comparison `717c3bb0f048f4a4bc544100125ae42d818f09bc..45b57d2dc265ef6ba9ac805d7352a01db5f1081d`. Task 6 is complete.
+- [x] The approval does not authorize merge, push, deployment, provider mutation, certification, additional publication, or Task 6B implementation. Stop with the branch and worktree preserved.
