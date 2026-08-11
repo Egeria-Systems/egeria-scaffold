@@ -1,8 +1,8 @@
 # Package release fresh-checkout remediation plan
 
-**Date:** 2026-08-11  
-**Status:** Approved for execution by the user's direct request to fix the failed release and push a new publication SHA  
-**Failed run:** `31457236804`, job `93673502739`  
+**Date:** 2026-08-11
+**Status:** Approved for execution by the user's direct request to fix the failed release and push a new publication SHA
+**Failed run:** `31457236804`, job `93673502739`
 **Failed commit:** `8b09d1b00004cafe0bd63405b956dd7122e2cbec`
 
 ## Goal and completion criteria
