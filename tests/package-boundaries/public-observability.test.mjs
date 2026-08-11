@@ -30,6 +30,11 @@ test("the packed observability package loads every exact public surface in isola
   try {
     await execFileAsync(
       "pnpm",
+      ["--filter", "@egeria-systems/observability", "run", "build"],
+      { cwd: repositoryRoot, encoding: "utf8" },
+    );
+    await execFileAsync(
+      "pnpm",
       [
         "--filter",
         "@egeria-systems/observability",
