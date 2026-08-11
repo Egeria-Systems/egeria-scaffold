@@ -70,7 +70,7 @@ async function runCheck(arguments_) {
   }
 }
 
-test("the repository registry passes admission without implying closure", async () => {
+test("the repository registry passes transition closure but not full closure", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -84,18 +84,34 @@ test("the repository registry passes admission without implying closure", async 
 
   const closure = await runCheck(["--closure", "legacy-backfill-exempt"]);
   assert.deepEqual(closure, {
+    exitCode: 0,
+    stdout: `${JSON.stringify({
+      ok: true,
+      gate: "closure",
+      policy: "legacy-backfill-exempt",
+    })}\n`,
+    stderr: "",
+  });
+
+  const fullClosure = await runCheck(["--closure", "all-certified"]);
+  assert.deepEqual(fullClosure, {
     exitCode: 1,
     stdout: `${JSON.stringify({
       ok: false,
       gate: "closure",
-      policy: "legacy-backfill-exempt",
+      policy: "all-certified",
       issues: [
-        {
-          code: "CAPABILITY_CERTIFICATION_PENDING",
-          path: ["records", "booking-calendly", "status"],
-          context: { reason: "pending" },
-        },
-      ],
+        "content-files",
+        "deployment-cloudflare",
+        "observability",
+        "section-composition",
+        "site-routing",
+        "standards",
+      ].map((capabilityIdentifier) => ({
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", capabilityIdentifier, "status"],
+        context: { reason: "backfill-pending" },
+      })),
     })}\n`,
     stderr: "",
   });

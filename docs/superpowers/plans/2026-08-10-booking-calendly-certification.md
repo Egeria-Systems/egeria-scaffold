@@ -52,6 +52,40 @@ Use focused RED/GREEN cycles. First change the real parsed-workflow contract to 
 
 Run the focused constitution test, the full constitution and semantic-naming tests, semantic naming, capability admission, the expected rejecting closure, YAML parsing, and `git diff --check`. Dispatch the required independent read-only requirements, architecture/anti-overengineering, and test-evidence reviews; repair only material findings; create the named repair review packet; and stop for a new exact-diff approval. Do not push or dispatch the workflow.
 
+## Live provider-certification closure amendment
+
+**Approval date:** 2026-08-10 (America/Toronto)
+
+The user separately authorized the live workflow, completed the single synthetic booking as the Calendly certification operator, confirmed provider delivery and the matching meeting, cancelled the meeting, preserved the pre-existing event type, removed the dedicated certification Worker, confirmed cleanup, and explicitly approved changing `booking-calendly` from `pending` to `certified`. The successful hosted evidence is GitHub Actions run `31443784009`, attempt 2, at exact deployed revision `f9ccb143724b4f1dd7f05a2ee8e3219c224d5558`. GitHub reports the retained seven-day artifact digest as `sha256:aafab7d79e3791b90d269fee515ef3d3e6feb9ce09922a538a224d08d731b26e`. A fresh read-only origin check after the user's deletion returned HTTP `404` for the dedicated staging URL. No further provider action is authorized or required by this amendment.
+
+The user preapproved necessary exact-file plan amendments and authorized continuous local implementation through review of the implemented task. This closure amendment therefore proceeds through focused TDD, deterministic verification, independent read-only requirements, architecture/anti-overengineering, and test-evidence review, content-safe evidence, focused commits, and a new final review packet. It still stops for verified-final-diff approval and does not authorize push, pull request, merge, publication, another workflow run, another booking, credential mutation, launch-scope approval, or a later task.
+
+This amendment is limited to these exact files:
+
+```text
+certifications/capabilities.json
+tests/constitution/constitution.test.mjs
+tests/capability-certification/certification-runner.test.mjs
+README.md
+CONTRIBUTING.md
+packages/builder-core/AGENTS.md
+packages/builder-core/README.md
+docs/architecture/overview.md
+docs/architecture/capability-model.md
+docs/architecture/enforcement-map.md
+docs/roadmaps/program-roadmap.md
+docs/implementation-evidence/2026-08-10-booking-calendly-certification-verification.md
+docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md
+docs/superpowers/plans/2026-08-10-booking-calendly-certification.md
+docs/review-packets/2026-08-10-booking-calendly-provider-certification.md
+```
+
+Use one focused RED/GREEN contract. First update the constitution test to require a complete, privacy-safe, subject/revision/outcome-bound provider receipt; four sorted evidence entries for the certified record; consistent current-status consumers; the successful transition closure; retained six-subject backfill boundary; no WCAG or ongoing-provider claim; and no secret, invitee address, meeting link, or private provider content. Verify the focused test fails against the pending tree. Then add the receipt, change only the actual `booking-calendly` record to `certified`, add the three external evidence outcomes against the deployed revision, and update only current canonical/status consumers. Historical preparation and earlier review packets retain their dated pre-execution claims unchanged.
+
+The first complete-gate run must also exercise the existing command-level closure expectation. If it still encodes the formerly pending registry state, treat that stale expectation as the focused RED state and update it to require successful `legacy-backfill-exempt` closure plus rejection of exactly the six frozen records under `all-certified`; do not change certification runtime behavior.
+
+Run the focused constitution test; builder-core certification tests; full constitution and semantic-naming tests; semantic naming; capability admission; `legacy-backfill-exempt` closure, which must now pass; `all-certified` closure, which must still reject only the six frozen backfill records; exact pinned builder-kernel verification; moderate dependency audit; registry-signature audit; and `git diff --check`. Do not rerun the unchanged live workflow, make another provider booking, or recreate the deleted Worker. Record provider, deployment, source, credential, and persistent-data recovery as separate domains.
+
 ## Global constraints
 
 - Work on clean sequential local `main` frozen at planning base `542660b5a3d25709ade6d8536c8c65bd1e6b6038`; do not touch separate worktrees.
@@ -59,7 +93,7 @@ Run the focused constitution test, the full constitution and semantic-naming tes
 - Keep certification data private to builder-core and the repository. Do not extract a public package or add a third-party dependency.
 - Bind subjects to both the descriptor and required-evidence contract. Do not let registry presence, a task link, local output, or `backfill-pending` imply certification.
 - Restrict `backfill-pending` to the six exact descriptor-version/digest subjects accepted before this foundation. New or materially changed subjects require ordinary task-linked pending records.
-- Keep descriptor admission and phase/release closure as distinct rejecting gates. Admission becomes part of the builder candidate; closure remains explicit and is expected to reject while Calendly is pending.
+- Keep descriptor admission and phase/release closure distinct. Admission remains part of the builder candidate. Under the live closure amendment, `legacy-backfill-exempt` closure must pass with certified Calendly while `all-certified` must reject only the six frozen backfill records.
 - Exercise only initial scaffolding. Do not add existing-repository add/remove/migrate/recover CLI behavior; that belongs to P3.
 - Reuse the exact generated-project verifier. Do not create a second install/build/browser command matrix or infer transitive runtime evidence from static tests.
 - Emit only content-safe certification output. Never print Calendly invitee data, provider confirmations, GitHub secrets, Cloudflare tokens, cookies, private URLs, or temporary environment contents.
@@ -172,7 +206,7 @@ No other file is in scope without a documented preapproved amendment. In particu
 
 ## Task 6: Independent review and bounded repair
 
-**Comparison:** planning base `542660b5a3d25709ade6d8536c8c65bd1e6b6038..HEAD` plus current uncommitted final evidence.
+**Comparison:** the original local-foundation review used planning base `542660b5a3d25709ade6d8536c8c65bd1e6b6038..HEAD`; the live provider-closure review uses `f9ccb143724b4f1dd7f05a2ee8e3219c224d5558` plus the exact certification-only working-tree diff.
 
 - [ ] Dispatch one read-only requirements reviewer for exact certification acceptance, local/protected/provider separation, prerequisite completeness, registry/gate semantics, external authority, and claim boundaries.
 - [ ] Dispatch one read-only architecture/anti-overengineering reviewer for canonical ownership, digest design, transition allowlist, managed/application boundaries, runner reuse, content safety, least privilege, and exclusion of P3/general deployment work.
@@ -185,12 +219,12 @@ The preapproved amendment for the final test-evidence finding modifies only file
 
 ## Task 7: Final verification, review packet, and external stop gate
 
-- [ ] Run `git diff --check`, semantic naming, documentation/constitution, package boundaries, builder-core, CLI, certification static tests, admission, generated-fixture tests, builder lint/build/typecheck, root audit/signatures, real local Calendly certification, fixed-root full generated verification, and changeset status on the settled tree.
+- [ ] Run certification-scoped `git diff --check`, semantic naming, documentation/constitution, package boundaries, builder-core, CLI, certification static tests, admission, generated-fixture tests, builder lint/build/typecheck, root audit/signatures, fixed-root full generated verification, and changeset status on the settled tree. Reuse the unchanged accepted local Calendly receipt instead of rerunning its expensive journey.
 - [ ] Do not repeat an unchanged successful expensive check. Record exact command, exit, relevant count, duration where material, and bounded claim for each result.
-- [ ] Run both closure policies and record their expected rejecting exits while Calendly/backfill records remain non-certified.
+- [ ] Run both closure policies: record the successful `legacy-backfill-exempt` exit and the `all-certified` rejection of exactly the six frozen backfill records.
 - [ ] Verify branch/status, exact comparison, changed-file inventory, ignored/untracked artifacts, and no changes in separate worktrees.
-- [ ] Record exact registry subjects/statuses, local receipt, workflow non-execution, provider prerequisites, reviewer dispositions, risks, deferred provider proof, source rollback, Worker rollback/deletion, provider cancellation/event cleanup, and no-conformance boundary.
-- [ ] Create the review packet for exact committed comparison `542660b5a3d25709ade6d8536c8c65bd1e6b6038..HEAD`.
+- [ ] Record exact registry subjects/statuses, the unchanged local receipt, successful exact-revision workflow and artifact, provider-confirmed booking, cancellation, Worker deletion and `404`, credential disposition, reviewer dispositions, risks, source/provider/credential/persistent-data recovery separation, and the no-conformance boundary.
+- [ ] Create the provider-closure review packet for the exact certification-only comparison from `f9ccb143724b4f1dd7f05a2ee8e3219c224d5558`, excluding and preserving any concurrent user-owned work.
 - [ ] Commit final evidence with message `Record Calendly certification review`.
 - [ ] Re-run only final-tree identity/status and documentation/semantic checks affected by the evidence commit.
-- [ ] Stop for the user's explicit implemented-task review. Do not dispatch the workflow or begin a later P2 outcome.
+- [ ] Stop for the user's explicit implemented-task review. Do not dispatch another workflow, make another booking, recreate the Worker, or begin a later increment.

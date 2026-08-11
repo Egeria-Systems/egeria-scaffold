@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-10 (America/Toronto)
 
-**Status:** Local fresh-scaffold evidence passed; protected-staging, provider-confirmed, and cleanup/recovery evidence not executed
+**Status:** Local fresh-scaffold evidence passed at this revision; later external outcomes are recorded separately
 
 **Planning base:** `542660b5a3d25709ade6d8536c8c65bd1e6b6038`
 
@@ -28,7 +28,7 @@
 
 The repository-owned certification registry contains one key for each of the seven executable capability descriptors. Every subject is bound to the descriptor version and the lowercase SHA-256 digest of canonical `{ descriptor, requiredEvidence }` data.
 
-Current status is intentionally non-closing:
+At this local evidence-producing revision, status was intentionally non-closing:
 
 - `booking-calendly@0.1.0`: `pending`, linked to the separate Task 5B plan, with only `fresh-scaffold` evidence recorded;
 - the six accepted pre-foundation subjects: `backfill-pending`, restricted by executable exact identifier/version/digest tuples; and
@@ -42,7 +42,7 @@ The admission command passed:
 {"ok":true,"gate":"admission","records":7}
 ```
 
-The current transition closure command rejected only `booking-calendly` as pending. The full closure command rejected all seven non-certified records. These rejecting exits are required evidence that registry presence and local execution do not imply certification.
+At this revision, the transition closure command rejected only `booking-calendly` as pending. The full closure command rejected all seven non-certified records. These rejecting exits are required evidence that registry presence and local execution do not imply certification.
 
 ## TDD evidence
 
@@ -76,8 +76,12 @@ It built the current private builder packages, created a fresh absent temporary 
 
 This establishes actual initial-scaffolding output, valid `.egeria` state, confirmed inference, healthy diagnostics, an empty exact diff, exact pnpm, frozen installation, peer compatibility, the execution-time moderate advisory result, registry signatures, lint, typecheck, Next build, OpenNext build, explicit Chromium installation, development browser behavior, and OpenNext/workerd preview browser behavior for the synthetic local configuration.
 
-## Unsupported outcomes
+## Later external closure
 
-No workflow was dispatched. No GitHub environment or secret changed. No Worker was deployed, rolled back, or deleted. No Calendly account, event type, calendar, meeting, invitee, or provider record was created, read, changed, cancelled, or deleted. No cost was incurred by this task.
+After this local receipt was committed, the separately authorized [provider receipt](2026-08-10-booking-calendly-provider-receipt.md) recorded the exact-revision protected-staging application, provider-confirmed booking, cancellation, and cleanup outcomes. The current registry combines those outcomes with this unchanged `fresh-scaffold` receipt and marks `booking-calendly@0.1.0` certified. The local evidence above is not relabelled as external evidence.
 
-Local browser checks stub the provider origin. They do not establish provider availability, a real booking, provider-side confirmation, hosted-runner behavior, a live staging URL, cleanup/recovery, visual approval, human accessibility, production readiness, or WCAG conformance. `booking-calendly` and P2 remain unable to close until the separately authorized external journey supplies the three missing evidence outcomes and the reviewed registry is updated to `certified`.
+## Unsupported outcomes at this revision
+
+This local evidence-producing revision dispatched no workflow. It changed no GitHub environment or secret. It deployed, rolled back, or deleted no Worker and created, read, changed, cancelled, or deleted no Calendly account, event type, calendar, meeting, invitee, or provider record. No cost was incurred by this local journey.
+
+Local browser checks stub the provider origin. They do not establish provider availability, a real booking, provider-side confirmation, hosted-runner behavior, a live staging URL, cleanup/recovery, visual approval, human accessibility, production readiness, or WCAG conformance. The later provider receipt establishes only its one bounded journey; it does not expand these local claim limits or establish ongoing provider availability, general production readiness, or WCAG conformance.

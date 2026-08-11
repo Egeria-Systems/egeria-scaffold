@@ -1259,6 +1259,8 @@ test("executable capability certification ownership is current", async () => {
     roadmap,
     builderCoreInstructions,
     builderCoreReadme,
+    registrySource,
+    providerReceipt,
   ] = await Promise.all([
     readRepositoryFile("docs/architecture/overview.md"),
     readRepositoryFile("docs/architecture/capability-model.md"),
@@ -1267,22 +1269,87 @@ test("executable capability certification ownership is current", async () => {
     readRepositoryFile("docs/roadmaps/program-roadmap.md"),
     readRepositoryFile("packages/builder-core/AGENTS.md"),
     readRepositoryFile("packages/builder-core/README.md"),
+    readRepositoryFile("certifications/capabilities.json"),
+    readRepositoryFile(
+      "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
+    ),
   ]);
 
   for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
     assert.match(document, /certifications\/capabilities\.json/u);
     assert.match(
       document,
-      /booking-calendly[\s\S]+pending[\s\S]+protected-staging[\s\S]+unexecuted/iu,
+      /booking-calendly[\s\S]+certified[\s\S]+provider-confirmed[\s\S]+cleanup/iu,
     );
   }
+  const registry = JSON.parse(registrySource);
+  const bookingRecord = registry.records["booking-calendly"];
+  assert.equal(bookingRecord.status, "certified");
+  assert.deepEqual(
+    bookingRecord.evidence.map(({ kind }) => kind),
+    [
+      "cleanup-recovery",
+      "deployed-application",
+      "fresh-scaffold",
+      "provider-confirmed",
+    ],
+  );
+  assert.deepEqual(
+    bookingRecord.evidence
+      .filter(({ kind }) => kind !== "fresh-scaffold")
+      .map(({ path, revision }) => ({ path, revision })),
+    [
+      "cleanup-recovery",
+      "deployed-application",
+      "provider-confirmed",
+    ].map(() => ({
+      path: "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
+      revision: "f9ccb143724b4f1dd7f05a2ee8e3219c224d5558",
+    })),
+  );
+  assert.match(
+    providerReceipt,
+    /Certification receipt status:\*\* `complete`/u,
+  );
+  assert.match(
+    providerReceipt,
+    /Certification reviewer decision:\*\* `accepted`/u,
+  );
+  assert.match(
+    providerReceipt,
+    /Passed certification outcomes:\*\* `cleanup-recovery, deployed-application, provider-confirmed`/u,
+  );
+  assert.match(providerReceipt, /HTTP `404`/u);
+  assert.match(providerReceipt, /pre-existing designated event; preserved/u);
+  assert.match(providerReceipt, /no WCAG conformance/iu);
+  assert.match(providerReceipt, /^## Privacy exclusions$/mu);
+  assert.match(
+    providerReceipt,
+    /invitee[^.]+address[^.]+omitted[\s\S]+confirmation[^.]+content[^.]+not copied or retained[\s\S]+provider[^.]+identifiers[^.]+not copied or retained/iu,
+  );
+  assert.doesNotMatch(providerReceipt, /:\s*\[[^\]\n]+\]\s*$/mu);
+  assert.doesNotMatch(
+    providerReceipt,
+    /(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\bcf(?:at|ut)_[A-Za-z0-9_-]+\b|\bgh[pousr]_[A-Za-z0-9_]+\b|\bgithub_pat_[A-Za-z0-9_]+\b)/iu,
+  );
+  const privateCalendlyUrlPattern =
+    /https:\/\/(?:www\.)?calendly\.com\/(?!help(?:\/|\b))[^\s)`]+/iu;
+  assert.match(
+    "https://calendly.com/synthetic-host/private-meeting",
+    privateCalendlyUrlPattern,
+  );
+  assert.doesNotMatch(
+    "https://calendly.com/help/how-to-cancel-a-meeting",
+    privateCalendlyUrlPattern,
+  );
+  assert.doesNotMatch(providerReceipt, privateCalendlyUrlPattern);
   assert.match(
     enforcementMap,
-    /admission[^\n]+actual[^\n]+closure[^\n]+reject/iu,
+    /admission[^\n]+actual[^\n]+closure[^\n]+pass/iu,
   );
   assert.match(
     enforcementMap,
-    /fresh-scaffold[^\n]+actual[^\n]+provider[^\n]+unexecuted/iu,
+    /fresh-scaffold[^\n]+actual[^\n]+provider[^\n]+passed/iu,
   );
   assert.match(
     reviewProtocol,
@@ -1302,7 +1369,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     roadmap,
-    /local certification foundation[^.]+implemented/iu,
+    /provider certification[^.]+complete/iu,
   );
   for (const document of [builderCoreInstructions, builderCoreReadme]) {
     assert.match(document, /private certification registry/iu);
@@ -1448,12 +1515,12 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         escapeRegularExpression(calendlyTask) +
         " Calendly initial scaffolding[\\s\\S]+" +
         escapeRegularExpression(calendlyCertificationTask) +
-        "'s local certification foundation is implemented and awaiting review; later task numbering is unchanged[\\s\\S]+develops directly on clean local `main`",
+        "'s bounded provider certification is complete and awaiting verified-final-diff review; later task numbering is unchanged[\\s\\S]+develops directly on clean local `main`",
     ),
   );
   assert.match(
     contributing,
-    /The executable builder currently has seven capability descriptors.*retains exact `portfolio`, `portfolio-calendly`, and `site` fixtures.*all three fixtures are certified locally.*protected-staging\/provider-confirmed certification.*separately authorized outcomes/isu,
+    /The executable builder currently has seven capability descriptors.*retains exact `portfolio`, `portfolio-calendly`, and `site` fixtures.*all three fixtures are certified locally.*recurring Calendly browser proof.*separate exact-revision provider receipt certifies.*protected-staging.*confirmation.*cancellation.*cleanup/isu,
   );
   assert.match(
     packageOwnership,
