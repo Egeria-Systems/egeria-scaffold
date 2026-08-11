@@ -22,6 +22,7 @@ const portfolioPaths = [
   "AGENTS.md",
   "README.md",
   "apps/web/AGENTS.md",
+  "apps/web/app/api/observability/route.ts",
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
@@ -29,6 +30,8 @@ const portfolioPaths = [
   "apps/web/content/en-CA/long-form/introduction.md",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
+  "apps/web/instrumentation-client.ts",
+  "apps/web/instrumentation.ts",
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
@@ -40,7 +43,11 @@ const portfolioPaths = [
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
+  "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+  "apps/web/src/infrastructure/observability/browser-reporter.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
+  "apps/web/src/infrastructure/observability/server-reporter.ts",
+  "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/sections/section-registry.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
@@ -58,6 +65,7 @@ const sitePaths = [
   "README.md",
   "apps/web/AGENTS.md",
   "apps/web/app/about/page.tsx",
+  "apps/web/app/api/observability/route.ts",
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
@@ -66,6 +74,8 @@ const sitePaths = [
   "apps/web/content/en-CA/long-form/introduction.md",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
+  "apps/web/instrumentation-client.ts",
+  "apps/web/instrumentation.ts",
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
@@ -77,7 +87,11 @@ const sitePaths = [
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
+  "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+  "apps/web/src/infrastructure/observability/browser-reporter.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
+  "apps/web/src/infrastructure/observability/server-reporter.ts",
+  "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/sections/section-registry.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
@@ -433,6 +447,135 @@ async function loadGeneratedDeployedConfigurationModule(files, deployedURL) {
   }
 }
 
+let observabilityRouteLoad = 0;
+
+async function loadGeneratedObservabilityRoute(files, throwOnReport = false) {
+  const source = indexFiles(files).get(
+    "apps/web/app/api/observability/route.ts",
+  );
+  assert.notEqual(source, undefined);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  observabilityRouteLoad += 1;
+  const reportKey = `__observabilityReports${observabilityRouteLoad}`;
+  globalThis[reportKey] = [];
+  const reporterModule = `data:text/javascript;base64,${Buffer.from(
+    [
+      `export async function reportBrowserEvent(input) { globalThis[${JSON.stringify(reportKey)}].push(input);`,
+      ...(throwOnReport ? ['throw new Error("transport failed");'] : []),
+      "}",
+    ].join("\n"),
+  ).toString("base64")}`;
+  const executable = transpiled.replace(
+    'from "../../../src/infrastructure/observability/server-reporter"',
+    `from ${JSON.stringify(reporterModule)}`,
+  );
+  assert.notEqual(executable, transpiled);
+
+  return {
+    module: await import(
+      `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#route-${observabilityRouteLoad}`
+    ),
+    reports: globalThis[reportKey],
+  };
+}
+
+function browserErrorEnvelope(overrides = {}) {
+  return {
+    schemaVersion: "1.0.0",
+    event: {
+      name: "browser.window.error",
+      kind: "application.error",
+      runtime: "browser",
+      severity: "error",
+      context: { correlationId: "browser-event-123" },
+      errorCategory: "unexpected",
+      attributes: { source: "window-error" },
+    },
+    ...overrides,
+  };
+}
+
+function observabilityRequest(body, overrides = {}) {
+  return new Request("https://portfolio.example/api/observability", {
+    method: "POST",
+    headers: {
+      origin: "https://portfolio.example",
+      "content-type": "application/json",
+      ...overrides.headers,
+    },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+}
+
+let serverReporterLoad = 0;
+
+async function loadGeneratedServerReporter(files) {
+  const source = indexFiles(files).get(
+    "apps/web/src/infrastructure/observability/server-reporter.ts",
+  );
+  assert.notEqual(source, undefined);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  serverReporterLoad += 1;
+  const eventKey = `__serverReporterEvents${serverReporterLoad}`;
+  globalThis[eventKey] = [];
+  const rootModule = `data:text/javascript;base64,${Buffer.from(
+    [
+      `export function createOperationalEvent(input) { globalThis[${JSON.stringify(eventKey)}].push(input); return { ok: true, value: Object.freeze({}) }; }`,
+      'export function normalizeErrorCategory() { return "unexpected"; }',
+      'export function dispatchOperationalEvent() { return Promise.reject(new Error("provider failed")); }',
+    ].join("\n"),
+  ).toString("base64")}`;
+  const serverModule = `data:text/javascript;base64,${Buffer.from(
+    [
+      "export function createStructuredLogSink() { return Object.freeze({}); }",
+      "export function createBetterStackSink() { return Object.freeze({ ok: false }); }",
+    ].join("\n"),
+  ).toString("base64")}`;
+  const contextModule = `data:text/javascript;base64,${Buffer.from(
+    [
+      "export async function readObservabilityRuntimeContext() {",
+      'return { ingestingHost: "", sourceToken: "", releaseId: "release-123", schedule() { throw new Error("context failed"); } };',
+      "}",
+    ].join("\n"),
+  ).toString("base64")}`;
+  const withRoot = transpiled.replace(
+    'from "@egeria-systems/observability"',
+    `from ${JSON.stringify(rootModule)}`,
+  );
+  const withServer = withRoot.replace(
+    'from "@egeria-systems/observability/server"',
+    `from ${JSON.stringify(serverModule)}`,
+  );
+  const executable = withServer.replace(
+    'from "../cloudflare/observability-context"',
+    `from ${JSON.stringify(contextModule)}`,
+  );
+  assert.notEqual(withRoot, transpiled);
+  assert.notEqual(withServer, withRoot);
+  assert.notEqual(executable, withServer);
+
+  return {
+    module: await import(
+      `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#reporter-${serverReporterLoad}`
+    ),
+    events: globalThis[eventKey],
+  };
+}
+
 function assertContentInvalid(operation) {
   assert.throws(operation, {
     name: "TypeError",
@@ -775,6 +918,218 @@ test("rendered manifests and desired project match the approved resolved recipe"
       wrangler: "4.118.0",
     },
   });
+});
+
+test("production observability renders bounded Next and Cloudflare composition", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const files = indexFiles(rendered.files);
+  const wrangler = parseGeneratedJson(rendered.files, "apps/web/wrangler.jsonc");
+  const workspace = files.get("pnpm-workspace.yaml");
+
+  assert.match(
+    workspace,
+    /minimumReleaseAgeExclude:\n  - "@egeria-systems\/observability@0\.2\.0"/u,
+  );
+
+  assert.deepEqual(wrangler.observability, {
+    enabled: true,
+    head_sampling_rate: 1,
+  });
+  assert.deepEqual(wrangler.version_metadata, {
+    binding: "CF_VERSION_METADATA",
+  });
+  assert.equal("analytics_engine_datasets" in wrangler, false);
+
+  assert.match(
+    files.get("apps/web/instrumentation.ts"),
+    /export const onRequestError/u,
+  );
+  assert.match(
+    files.get("apps/web/instrumentation-client.ts"),
+    /addEventListener\("error"/u,
+  );
+  assert.match(
+    files.get("apps/web/instrumentation-client.ts"),
+    /addEventListener\("unhandledrejection"/u,
+  );
+  assert.match(
+    files.get(
+      "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
+    ),
+    /useReportWebVitals/u,
+  );
+  assert.match(
+    files.get("apps/web/app/layout.tsx"),
+    /<WebVitalsReporter \/>/u,
+  );
+
+  const generatedSources = [...files.entries()]
+    .filter(([path]) => path.endsWith(".ts") || path.endsWith(".tsx"))
+    .map(([, source]) => source)
+    .join("\n");
+  assert.doesNotMatch(
+    generatedSources,
+    /Cloudflare Web Analytics|sessionStorage|localStorage|document\.cookie|console\.(?:debug|error|warn)\s*=|window\.console/u,
+  );
+});
+
+test("the browser route accepts only bounded same-origin operational envelopes", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedObservabilityRoute(rendered.files);
+
+  assert.equal(
+    (await loaded.module.POST(observabilityRequest(browserErrorEnvelope())))
+      .status,
+    202,
+  );
+  assert.deepEqual(loaded.reports, [
+    {
+      name: "browser.window.error",
+      kind: "application.error",
+      severity: "error",
+      correlationId: "browser-event-123",
+      errorCategory: "unexpected",
+      attributes: { source: "window-error" },
+      allowedAttributeNames: ["source"],
+    },
+  ]);
+
+  const invalidRequests = [
+    [
+      observabilityRequest(browserErrorEnvelope(), {
+        headers: { origin: "https://cross-origin.example" },
+      }),
+      403,
+    ],
+    [
+      observabilityRequest(browserErrorEnvelope(), {
+        headers: { "content-type": "text/plain" },
+      }),
+      415,
+    ],
+    [observabilityRequest("{"), 400],
+    [
+      observabilityRequest({
+        ...browserErrorEnvelope(),
+        unexpected: true,
+      }),
+      400,
+    ],
+    [
+      observabilityRequest({
+        ...browserErrorEnvelope(),
+        event: {
+          ...browserErrorEnvelope().event,
+          message: "private error message",
+        },
+      }),
+      400,
+    ],
+    [
+      observabilityRequest({
+        ...browserErrorEnvelope(),
+        event: {
+          ...browserErrorEnvelope().event,
+          kind: "visitor.analytics",
+        },
+      }),
+      400,
+    ],
+    [
+      observabilityRequest({
+        ...browserErrorEnvelope(),
+        event: {
+          ...browserErrorEnvelope().event,
+          context: { correlationId: "bearer-secret-token" },
+        },
+      }),
+      400,
+    ],
+    [
+      observabilityRequest("x".repeat(8_193)),
+      413,
+    ],
+    [
+      observabilityRequest(browserErrorEnvelope(), {
+        headers: { "content-length": "8193" },
+      }),
+      413,
+    ],
+  ];
+  for (const [request, status] of invalidRequests) {
+    assert.equal((await loaded.module.POST(request)).status, status);
+  }
+  assert.equal(loaded.reports.length, 1);
+
+  const failedTransport = await loadGeneratedObservabilityRoute(
+    rendered.files,
+    true,
+  );
+  assert.equal(
+    (
+      await failedTransport.module.POST(
+        observabilityRequest(browserErrorEnvelope()),
+      )
+    ).status,
+    202,
+  );
+  assert.equal(failedTransport.reports.length, 1);
+});
+
+test("server reporting contains runtime and provider failures without raw error data", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedServerReporter(rendered.files);
+
+  await assert.doesNotReject(() =>
+    loaded.module.reportServerError(
+      new Error("private message with bearer-secret-token"),
+    ),
+  );
+  assert.equal(loaded.events.length, 1);
+  assert.deepEqual(loaded.events[0], {
+    name: "server.request.error",
+    kind: "application.error",
+    runtime: "server",
+    severity: "error",
+    context: {
+      correlationId: loaded.events[0].context.correlationId,
+      releaseId: "release-123",
+    },
+    errorCategory: "unexpected",
+    attributes: {},
+  });
+  assert.match(
+    loaded.events[0].context.correlationId,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+  );
+  assert.doesNotMatch(
+    JSON.stringify(loaded.events),
+    /private message|bearer-secret-token/u,
+  );
 });
 
 test("rendering conditionally overlays the home route and materializes each Calendly mode", async () => {
@@ -2608,6 +2963,7 @@ test("Cloudflare imports and types stay in generated configuration boundaries", 
   const approvedConfigurationPaths = new Set([
     "apps/web/next.config.ts",
     "apps/web/open-next.config.ts",
+    "apps/web/src/infrastructure/cloudflare/observability-context.ts",
   ]);
 
   for (const [path, source] of indexFiles(rendered.files)) {
@@ -2709,8 +3065,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 68],
-    ["site", 70],
+    ["portfolio", 75],
+    ["site", 77],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -2839,7 +3195,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       packageVersions,
     }),
   );
-  assert.equal(selected.surfaces.length, 73);
+  assert.equal(selected.surfaces.length, 80);
   assert.deepEqual(
     selected.surfaces
       .filter(

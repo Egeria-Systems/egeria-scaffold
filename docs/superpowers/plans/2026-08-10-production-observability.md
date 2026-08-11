@@ -177,6 +177,17 @@ fixtures/generated/site/**
 
 No other file is in scope without a documented evidence-backed amendment.
 
+#### Generated integration amendment — 2026-08-11
+
+The user's preapproved plan-amendment authority adds this direct template-boundary consumer after the focused generation RED test exposed its exact inventory contract:
+
+```text
+packages/builder-core/templates/common/pnpm-workspace.yaml
+tests/package-boundaries/private-packages.test.mjs
+```
+
+The generated workspace policy must also exempt the exact verified `@egeria-systems/observability@0.2.0` release from pnpm's otherwise strict 1,440-minute cooling period: official pnpm documentation permits version-specific `minimumReleaseAgeExclude` entries, and without the narrow exclusion real production generation fails closed immediately after the authorized release. The 1,440-minute policy remains enforced for all other dependency versions. The boundary test owns the allowlisted private builder template inventory and the generated-instruction recipe assertions; it must advance atomically with the seven added observability templates and, during documentation reconciliation, the recipe version rendered by the same private package.
+
 ## Task 1: Freeze preparation, design, and exact plan
 
 - [x] Record branch/base/status, canonical sources, manifests, current descriptors/recipes/certification, prior packet conclusions, exact baseline behavior, official documentation, advisories, audits, contradictions, resolutions, authority boundary, and claim limits.
@@ -242,18 +253,18 @@ The verified publication produced both public `0.2.0` artifacts, but public avai
 - [x] Implement the descriptor/version/recipe/registry changes and exact certification plan. Keep the sibling plan execution unapproved.
 - [x] Generate checked JSON Schemas through the canonical script; never hand-edit generated schema JSON.
 - [x] Run contracts, catalog, resolution, inference, diagnostics, certification, schema, and admission checks GREEN before template work.
-- [ ] Commit with message `Admit production observability capability`.
+- [x] Commit with message `Admit production observability capability`.
 
 ## Task 6: Generate server, browser, and Cloudflare composition with TDD
 
 **RED files:** render, generation, template-boundary, fixture-contract, and browser tests.
 
-- [ ] Add focused failing tests for exact template destinations, package manifests, Workers Logs configuration, head sampling, version metadata, required secret names, adapter-only Cloudflare imports, server failure isolation, Next server-error registration, bounded same-origin browser error payloads, web-vitals registration, no raw/private fields, no browser storage, and analytics absence.
-- [ ] Add mutation cases for cross-origin, oversized, wrong-content-type, malformed, extra-field, invalid-vocabulary, secret-bearing, and transport-failure inputs.
-- [ ] Implement the minimum templates and composition. Keep presentation pure; the web-vitals side effect remains infrastructure-owned.
-- [ ] Use Cloudflare execution-context lifetime extension for provider delivery; do not block or fail application behavior on telemetry delivery.
-- [ ] Render into temporary roots, infer, diagnose, diff, build, and exercise focused browser behavior before retaining any state/fixture update.
-- [ ] Commit with message `Generate production observability adapters`.
+- [x] Add focused failing tests for exact template destinations, package manifests, Workers Logs configuration, head sampling, version metadata, required secret names, adapter-only Cloudflare imports, server failure isolation, Next server-error registration, bounded same-origin browser error payloads, web-vitals registration, no raw/private fields, no browser storage, and analytics absence.
+- [x] Add mutation cases for cross-origin, oversized, wrong-content-type, malformed, extra-field, invalid-vocabulary, secret-bearing, and transport-failure inputs.
+- [x] Implement the minimum templates and composition. Keep presentation pure; the web-vitals side effect remains infrastructure-owned.
+- [x] Use Cloudflare execution-context lifetime extension for provider delivery; do not block or fail application behavior on telemetry delivery.
+- [x] Render into temporary roots, infer, diagnose, diff, build, and exercise focused browser behavior before retaining any state/fixture update.
+- [x] Commit with message `Generate production observability adapters`.
 
 ## Task 7: Regenerate immutable fixtures from production output
 
