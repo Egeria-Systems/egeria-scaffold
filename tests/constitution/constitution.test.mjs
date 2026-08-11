@@ -21,6 +21,77 @@ const compactLabel = (...parts) => parts.join("");
 const namedLabel = (prefix, ordinal, separator = " ") =>
   [prefix, separator, ordinal].join("");
 
+function assertObservabilityWorkflowSecretBoundary(workflow) {
+  const enumerateSecretReferences = (value, path = "") => {
+    if (typeof value === "string") {
+      return [...value.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)].flatMap(
+        ([, expression]) =>
+          [...expression.matchAll(/\bsecrets\.([A-Za-z_][A-Za-z0-9_]*)\b/gu)].map(
+            ([, secretName]) => ({
+              path,
+              reference: `secrets.${secretName}`,
+            }),
+          ),
+      );
+    }
+
+    if (Array.isArray(value)) {
+      return value.flatMap((entry, index) => {
+        const entryIdentifier =
+          entry && typeof entry === "object" && typeof entry.name === "string"
+            ? JSON.stringify(entry.name)
+            : index;
+
+        return enumerateSecretReferences(
+          entry,
+          `${path}[${entryIdentifier}]`,
+        );
+      });
+    }
+
+    if (value && typeof value === "object") {
+      return Object.entries(value).flatMap(([key, entry]) =>
+        enumerateSecretReferences(entry, path ? `${path}.${key}` : key),
+      );
+    }
+
+    return [];
+  };
+
+  assert.deepEqual(enumerateSecretReferences(workflow), [
+    {
+      path: 'jobs.verify-and-deploy.steps["Deploy certification Worker"].env.CLOUDFLARE_ACCOUNT_ID',
+      reference: "secrets.CLOUDFLARE_ACCOUNT_ID",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Deploy certification Worker"].env.CLOUDFLARE_API_TOKEN',
+      reference: "secrets.CLOUDFLARE_API_TOKEN",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Install observability provider secrets"].env.CLOUDFLARE_ACCOUNT_ID',
+      reference: "secrets.CLOUDFLARE_ACCOUNT_ID",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Install observability provider secrets"].env.CLOUDFLARE_API_TOKEN',
+      reference: "secrets.CLOUDFLARE_API_TOKEN",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Install observability provider secrets"].env.BETTER_STACK_INGESTING_HOST',
+      reference: "secrets.BETTER_STACK_INGESTING_HOST",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Install observability provider secrets"].env.BETTER_STACK_SOURCE_TOKEN',
+      reference: "secrets.BETTER_STACK_SOURCE_TOKEN",
+    },
+  ]);
+}
+
+function extractObservabilityHumanPrerequisiteRunbook(document) {
+  return document
+    .split("## Human prerequisite runbook\n", 2)[1]
+    ?.split("\n## Consolidated contradictions and live-run blockers", 1)[0];
+}
+
 async function readRepositoryFile(relativePath) {
   return readFile(resolve(repositoryRoot, relativePath), "utf8");
 }
@@ -841,13 +912,7 @@ test("observability certification deployment is manual, exact-revision, and secr
     /pnpm --dir "\$CERTIFICATION_ROOT\/apps\/web" run test:e2e:deployed/u,
   );
 
-  const secretReferences = job.steps
-    .filter((step) => JSON.stringify(step).includes("${{ secrets."))
-    .map(({ name }) => name);
-  assert.deepEqual(secretReferences, [
-    "Deploy certification Worker",
-    "Install observability provider secrets",
-  ]);
+  assertObservabilityWorkflowSecretBoundary(workflow);
   const betterStackSecretReferences = job.steps
     .filter((step) => JSON.stringify(step).includes("secrets.BETTER_STACK_"))
     .map(({ name }) => name);
@@ -886,6 +951,153 @@ test("observability certification deployment is manual, exact-revision, and secr
   assert.doesNotMatch(
     source,
     /gh workflow run|betterstack\.com\/api|api\.betterstack|wrangler\s+delete|rollback/iu,
+  );
+});
+
+test("observability workflow secrets are rejected outside exact approved step environment paths", async (t) => {
+  const source = await readRepositoryFile(
+    ".github/workflows/production-observability-certification.yml",
+  );
+  const workflow = parse(source);
+  const secretExpression = "${{ secrets.CLOUDFLARE_API_TOKEN }}";
+  const mutations = [
+    [
+      "workflow environment",
+      (candidate) => (candidate.env = { LEAK: secretExpression }),
+    ],
+    [
+      "job environment",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].env = {
+          LEAK: secretExpression,
+        }),
+    ],
+    [
+      "job defaults",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].defaults = {
+          run: { shell: secretExpression },
+        }),
+    ],
+    [
+      "job container",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].container = {
+          image: secretExpression,
+        }),
+    ],
+    [
+      "job matrix",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].strategy = {
+          matrix: { leak: [secretExpression] },
+        }),
+    ],
+    [
+      "step run string",
+      (candidate) => {
+        const deployStep = candidate.jobs["verify-and-deploy"].steps.find(
+          ({ name }) => name === "Deploy certification Worker",
+        );
+        deployStep.run = `${deployStep.run}\n${secretExpression}`;
+      },
+    ],
+  ];
+
+  for (const [name, mutate] of mutations) {
+    await t.test(name, () => {
+      const mutatedWorkflow = structuredClone(workflow);
+
+      mutate(mutatedWorkflow);
+      assert.throws(() =>
+        assertObservabilityWorkflowSecretBoundary(mutatedWorkflow),
+      );
+    });
+  }
+});
+
+test("observability preparation provides the required step-by-step human prerequisite runbook", async () => {
+  const [preparation, plan] = await Promise.all([
+    readRepositoryFile(
+      "docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md",
+    ),
+    readRepositoryFile(
+      "docs/superpowers/plans/2026-08-10-production-observability-certification.md",
+    ),
+  ]);
+  const runbook = extractObservabilityHumanPrerequisiteRunbook(preparation);
+
+  assert.ok(runbook, "observability human-prerequisite runbook is missing");
+  assert.match(
+    runbook,
+    /account owner[\s\S]+account type[\s\S]+subscription tier[\s\S]+sandbox or test environment[\s\S]+eligibility[\s\S]+waiting period/iu,
+  );
+  assert.match(
+    runbook,
+    /GitHub repository administrator[\s\S]+Cloudflare account administrator[\s\S]+Better Stack operator[\s\S]+privacy and cost owner[\s\S]+cleanup owner[\s\S]+evidence reviewer/iu,
+  );
+  assert.match(
+    runbook,
+    /`observability-certification`[\s\S]+`CLOUDFLARE_ACCOUNT_ID`[\s\S]+`CLOUDFLARE_API_TOKEN`[\s\S]+`BETTER_STACK_INGESTING_HOST`[\s\S]+`BETTER_STACK_SOURCE_TOKEN`[\s\S]+GitHub environment secrets/iu,
+  );
+  assert.match(
+    runbook,
+    /`Workers Scripts Write`[\s\S]+human[\s\S]+approve[\s\S]+exact command/iu,
+  );
+  assert.match(
+    runbook,
+    /credential[\s\S]+scope[\s\S]+lifetime[\s\S]+expir[\s\S]+rotat/iu,
+  );
+  assert.match(
+    runbook,
+    /public HTTPS staging origin[\s\S]+`OBSERVABILITY_CERTIFICATION_URL`[\s\S]+synthetic/iu,
+  );
+  assert.match(
+    runbook,
+    /no callback, webhook, redirect, or allowlist[\s\S]+no synthetic human identity/iu,
+  );
+  assert.match(runbook, /readiness preflight/iu);
+  assert.match(
+    runbook,
+    /every 30 seconds[\s\S]+5-minute deadline[\s\S]+stop[\s\S]+fail/iu,
+  );
+  assert.match(
+    runbook,
+    /rate limit[\s\S]+quota[\s\S]+no paid upgrade[\s\S]+retention/iu,
+  );
+  assert.match(
+    plan,
+    /- \[x\] Add the governance-required step-by-step human-prerequisite runbook/u,
+  );
+});
+
+test("observability runbook keeps external actions gated and defines ordered cleanup and recovery", async () => {
+  const preparation = await readRepositoryFile(
+    "docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md",
+  );
+  const runbook = extractObservabilityHumanPrerequisiteRunbook(preparation);
+
+  assert.ok(runbook, "observability human-prerequisite runbook is missing");
+  assert.match(
+    runbook,
+    /explicit approval checkpoint[\s\S]+integration and push[\s\S]+environment[\s\S]+provider source[\s\S]+credential[\s\S]+workflow dispatch[\s\S]+telemetry[\s\S]+provider inspection[\s\S]+cleanup/iu,
+  );
+  assert.match(
+    runbook,
+    /cleanup order[\s\S]+certification-only route[\s\S]+Worker[\s\S]+Better Stack source[\s\S]+retained data[\s\S]+GitHub environment secrets[\s\S]+revoke or rotate/iu,
+  );
+  assert.match(
+    runbook,
+    /source rollback[\s\S]+deployment rollback[\s\S]+provider recovery[\s\S]+credential recovery/iu,
+  );
+  assert.match(runbook, /rerun triggers/iu);
+  assert.match(
+    runbook,
+    /Every external action remains separately unauthorized/iu,
+  );
+  assert.match(
+    runbook,
+    /content-safe placeholder[\s\S]+must not contain[\s\S]+secret[\s\S]+private URL[\s\S]+raw log/iu,
   );
 });
 

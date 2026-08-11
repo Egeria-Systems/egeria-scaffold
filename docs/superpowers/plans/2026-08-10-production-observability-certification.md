@@ -47,6 +47,32 @@ The official Changesets command-line documentation supports `add --empty` when n
 
 This dated amendment adds the existing preparation-evidence owner and that direct test consumer to the repair inventory before the consumer edit. The unchanged baseline full package-boundary run exited 1 with 44/45 tests passing because the consumer expected `[]` but found `clarify-observability-boundary.md`. After the direct consumer repair, the focused release safeguard passed 1/1 and the full package-boundary suite reached final GREEN at 45/45; constitution passed 34/34, semantic naming and capability admission exited 0, both closure policies rejected exactly the still-pending records as expected, documentation links passed 1/1, and `git diff --check` exited 0. No other plan, test, release, registry, workflow, provider, or external-state surface is authorized.
 
+### User-preapproved Task 6 review-repair amendment — certification safeguards (2026-08-11)
+
+The independent requirements, test-evidence, and security/privacy reviewers retained four material findings. The architecture and anti-overengineering reviewer reported no material findings.
+
+1. Task 1 and Gate 1 were marked complete even though the preparation record contained only an unresolved decision checklist, not the step-by-step human-prerequisite runbook required by the review protocol. Repair increment A must add the current account/eligibility, least-privilege resource, secret-store, credential-lifecycle, origin, synthetic-data, readiness, bounded-polling, quota/spend/retention, action-owner/approval, ordered cleanup, rollback/recovery, and rerun instructions while keeping every external action separately unauthorized and every placeholder content-safe.
+2. The deployed exercise handcrafts Node requests for `browser.window.error` and `browser.web.vital`, while the generic deployed Playwright suite emits no intentional browser error. This bypasses the generated `instrumentation-client.ts` browser reporter's privacy and delivery path. Repair increment B must add one certification-only Playwright fixture that dispatches an actual browser error event with a synthetic same-origin cookie, observes the generated request with no `Cookie` or `Referer` and an exact `202`, and writes only a bounded UUID receipt. Direct Node posts remain route-envelope evidence rather than browser-reporter evidence.
+3. The constitution test inspects secret expressions only within workflow step objects. A secret expression at workflow, job, defaults, container, matrix, or run-string scope could escape the approved two step-level environment boundaries. Repair increment A must recursively enumerate every parsed `${{ secrets.* }}` expression and accept only the exact current secret names at their approved step `env` paths; focused mutations must prove disallowed top-level, job-level, defaults, container, matrix, and run-string references fail.
+4. The provider receipt asks for the Git revision through event `release_id`, but the generated runtime obtains `release_id` from `CF_VERSION_METADATA.id`, which is a Cloudflare version identifier. The bulk secret installation also creates the final version/deployment without capturing that identity. Repair increment B must capture `wrangler deployments list --json` after secret installation into a runner-temporary raw file, sanitize it through a tested repository script into a bounded Git revision plus Cloudflare deployment/version receipt, delete the raw file, upload only the bounded receipt, and require provider `release_id` to equal the captured Cloudflare version identifier rather than the Git revision.
+
+The repair is split into two sequential exact-file increments. Increment A owns only:
+
+- `docs/superpowers/plans/2026-08-10-production-observability-certification.md`;
+- `docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md`; and
+- `tests/constitution/constitution.test.mjs`.
+
+Increment B owns only:
+
+- `.github/workflows/production-observability-certification.yml`;
+- `docs/implementation-evidence/production-observability-provider-receipt-template.md`;
+- `scripts/exercise-production-observability.mjs`;
+- new `scripts/create-cloudflare-deployment-receipt.mjs`;
+- new `tests/capability-certification/fixtures/observability-browser-error.spec.ts`; and
+- `tests/capability-certification/production-observability.test.mjs`.
+
+No other file is authorized. Increment A must finish before increment B begins and must not modify the prepared workflow. Neither repair increment authorizes integration, push, workflow dispatch, provider/source or credential access, secret use, deployment, telemetry transmission, cleanup, registry mutation, publication, or another external action.
+
 ## Exact file structure
 
 Create local runner, deployed exercise, certification fixture, workflow, and tests:
@@ -102,7 +128,7 @@ Do not modify capability descriptors, certification schemas/runtime policy, publ
 
 - [x] Record repository/worktree/branch identity, local and remote refs without fetching, recent commits, manifests, exact toolchain, accepted architecture owners, `.egeria`/certification contracts, prior packets, and baseline results.
 - [x] Record current official Cloudflare, OpenNext, Next.js, GitHub Actions, Better Stack, Node, pnpm, npm, and GitHub Advisory evidence with dated primary-source links and claim limits.
-- [x] Consolidate the live-run blockers and human decisions: exact integration/push SHA, dedicated GitHub environment, owners/roles, Cloudflare account/Worker/token scope, Better Stack account/team/region/source/plan/retention/spend, source token storage, staging origin, provider inspection, credential disposition, Worker/source/data cleanup, and registry-transition authority.
+- [x] Add the governance-required step-by-step human-prerequisite runbook covering the exact integration/push SHA, dedicated GitHub environment and secret storage, action owners and approval checkpoints, Cloudflare account/Worker/token scope and lifecycle, Better Stack account/team/region/source/plan/retention/spend and source-token storage, staging origin, synthetic data, readiness, bounded provider polling, credential disposition, ordered route/Worker/source/data/environment-secret cleanup, rollback/recovery, and rerun triggers. Retain the existing live-run blocker and human-decision record.
 - [x] State that no unresolved contradiction blocks local implementation and that the workflow cannot be dispatched until it is on the default branch at an explicitly approved revision.
 - [x] Run `node --test tests/constitution/constitution.test.mjs`, `node scripts/check-semantic-naming.mjs`, and `git diff --check` with the exact toolchain.
 - [x] Commit only these two documents with message `Plan observability capability certification`.
@@ -205,7 +231,7 @@ Do not modify capability descriptors, certification schemas/runtime policy, publ
 - Consumes: exact Task 6B implementation base through current `HEAD`.
 - Produces: reconciled read-only requirements, architecture/anti-overengineering, test-evidence, and security/privacy review dispositions.
 
-- [ ] Dispatch independent read-only reviewers for requirements, architecture/anti-overengineering, and test evidence. Add one security/privacy specialist because the workflow handles deployment credentials and external telemetry. Prohibit edits and recursive fan-out; give each the exact range and current clean worktree.
+- [x] Dispatch independent read-only reviewers for requirements, architecture/anti-overengineering, and test evidence. Add one security/privacy specialist because the workflow handles deployment credentials and external telemetry. Prohibit edits and recursive fan-out; give each the exact range and current clean worktree. Requirements, test-evidence, and security/privacy review retained the four findings in the dated amendment above; architecture/anti-overengineering reported no material findings.
 - [ ] Validate every finding against the current tree. For each material defect, write or amend a focused test to show RED, implement the minimum repair, rerun the affected check, and obtain one bounded re-review. Record unsupported/preference-only findings without code churn.
 - [ ] Commit evidence-backed repairs with a message naming the actual correction.
 
