@@ -78,6 +78,18 @@ Increment B owns only:
 
 No other file is authorized. Increment A must finish before increment B begins and must not modify the prepared workflow. Neither repair increment authorizes integration, push, workflow dispatch, provider/source or credential access, secret use, deployment, telemetry transmission, cleanup, registry mutation, publication, or another external action.
 
+### User-preapproved Task 6 recheck repair — fail-closed secret context syntax (2026-08-11)
+
+The bounded test-evidence recheck approved the deployed browser-instrumentation repair but found that the recursive workflow secret guard recognizes only property dereference such as `secrets.NAME`. GitHub's official [contexts reference](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts) also permits index syntax such as `secrets['NAME']`. A bracket, bare, or dynamic `secrets` context expression therefore could bypass the exact-path allowlist even though the prior six scope mutations pass.
+
+The minimum repair is test-contract-only: the recursive enumerator must fail closed on every `secrets` context token that is not one exact allowlisted `secrets.NAME` reference at an approved step `env` path. Focused mutations must demonstrate rejection of bracket, bare, and dynamic context access before the enumerator changes. This follow-up owns exactly:
+
+- `docs/superpowers/plans/2026-08-10-production-observability-certification.md`;
+- `docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md`; and
+- `tests/constitution/constitution.test.mjs`.
+
+It does not change the workflow or any runtime, provider, credential, deployment, telemetry, registry, publication, integration, or push surface. Final verification remains paused until this finding passes a bounded re-review.
+
 ## Exact file structure
 
 Create local runner, deployed exercise, certification fixture, workflow, and tests:

@@ -26,11 +26,23 @@ function assertObservabilityWorkflowSecretBoundary(workflow) {
     if (typeof value === "string") {
       return [...value.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)].flatMap(
         ([, expression]) =>
-          [...expression.matchAll(/\bsecrets\.([A-Za-z_][A-Za-z0-9_]*)\b/gu)].map(
-            ([, secretName]) => ({
-              path,
-              reference: `secrets.${secretName}`,
-            }),
+          [...expression.matchAll(/\bsecrets\b/gu)].map(
+            (secretContextMatch) => {
+              const referenceSuffix = expression.slice(
+                secretContextMatch.index,
+              );
+              const approvedReference =
+                /^secrets\.([A-Za-z_][A-Za-z0-9_]*)\b/u.exec(
+                  referenceSuffix,
+                );
+
+              return {
+                path,
+                reference: approvedReference
+                  ? `secrets.${approvedReference[1]}`
+                  : "secrets",
+              };
+            },
           ),
       );
     }
@@ -1076,6 +1088,27 @@ test("observability workflow secrets are rejected outside exact approved step en
         );
         deployStep.run = `${deployStep.run}\n${secretExpression}`;
       },
+    ],
+    [
+      "bracket secret syntax",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].env = {
+          LEAK: "${{ secrets['CLOUDFLARE_API_TOKEN'] }}",
+        }),
+    ],
+    [
+      "bare secret context",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].env = {
+          LEAK: "${{ secrets }}",
+        }),
+    ],
+    [
+      "dynamic secret context",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].env = {
+          LEAK: "${{ secrets[github.event.inputs.secret_name] }}",
+        }),
     ],
   ];
 
