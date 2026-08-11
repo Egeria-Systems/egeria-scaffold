@@ -8,6 +8,8 @@
 
 **Tech stack:** Node.js `22.23.2`, pnpm `11.20.0`, Node test runner, Next.js `16.3.0`, `@opennextjs/cloudflare@1.20.2`, Wrangler `4.118.0`, GitHub Actions, Cloudflare Workers Logs, and Better Stack HTTP ingestion.
 
+**Current local status (2026-08-11):** The approved Task 6 comparison remains `717c3bb0f048f4a4bc544100125ae42d818f09bc..45b57d2dc265ef6ba9ac805d7352a01db5f1081d`. The local fresh-scaffold journey passed at `ef845b1e0551d3b43e17969cc00f21960c90769b`; the manual protected-staging workflow, deployed exercise, and provider receipt path are prepared but have not been dispatched or executed. `observability@0.2.0` remains `pending`, and Tasks 6–7 plus every external action remain open.
+
 ## Global constraints
 
 - Work only on clean branch `observability-certification` in the existing isolated worktree `.worktrees/production-observability`, based on approved Task 6 record commit `fb3af7fef7602764432f16940abff0ffc65a5b67`.
@@ -89,12 +91,12 @@ Do not modify capability descriptors, certification schemas/runtime policy, publ
 - Consumes: approved Task 6 comparison `717c3bb0f048f4a4bc544100125ae42d818f09bc..45b57d2dc265ef6ba9ac805d7352a01db5f1081d`, approval record `fb3af7fef7602764432f16940abff0ffc65a5b67`, registry subject `observability@0.2.0` / `sha256:a4f15a132e08da307ab412673b02152fee8509c0cc1dabb4b60856abd61f5d97`.
 - Produces: one exact-file plan and one dated source/provider/security/prerequisite record that later tasks must obey.
 
-- [ ] Record repository/worktree/branch identity, local and remote refs without fetching, recent commits, manifests, exact toolchain, accepted architecture owners, `.egeria`/certification contracts, prior packets, and baseline results.
-- [ ] Record current official Cloudflare, OpenNext, Next.js, GitHub Actions, Better Stack, Node, pnpm, npm, and GitHub Advisory evidence with dated primary-source links and claim limits.
-- [ ] Consolidate the live-run blockers and human decisions: exact integration/push SHA, dedicated GitHub environment, owners/roles, Cloudflare account/Worker/token scope, Better Stack account/team/region/source/plan/retention/spend, source token storage, staging origin, provider inspection, credential disposition, Worker/source/data cleanup, and registry-transition authority.
-- [ ] State that no unresolved contradiction blocks local implementation and that the workflow cannot be dispatched until it is on the default branch at an explicitly approved revision.
-- [ ] Run `node --test tests/constitution/constitution.test.mjs`, `node scripts/check-semantic-naming.mjs`, and `git diff --check` with the exact toolchain.
-- [ ] Commit only these two documents with message `Plan observability capability certification`.
+- [x] Record repository/worktree/branch identity, local and remote refs without fetching, recent commits, manifests, exact toolchain, accepted architecture owners, `.egeria`/certification contracts, prior packets, and baseline results.
+- [x] Record current official Cloudflare, OpenNext, Next.js, GitHub Actions, Better Stack, Node, pnpm, npm, and GitHub Advisory evidence with dated primary-source links and claim limits.
+- [x] Consolidate the live-run blockers and human decisions: exact integration/push SHA, dedicated GitHub environment, owners/roles, Cloudflare account/Worker/token scope, Better Stack account/team/region/source/plan/retention/spend, source token storage, staging origin, provider inspection, credential disposition, Worker/source/data cleanup, and registry-transition authority.
+- [x] State that no unresolved contradiction blocks local implementation and that the workflow cannot be dispatched until it is on the default branch at an explicitly approved revision.
+- [x] Run `node --test tests/constitution/constitution.test.mjs`, `node scripts/check-semantic-naming.mjs`, and `git diff --check` with the exact toolchain.
+- [x] Commit only these two documents with message `Plan observability capability certification`.
 
 ### Task 2: Reuse the fresh-scaffold harness and certify actual local output
 
@@ -110,14 +112,14 @@ Do not modify capability descriptors, certification schemas/runtime policy, publ
 - Consumes: compiled `apps/cli/dist/index.js` and `verifyGeneratedProject(root, "portfolio")`.
 - Produces: `certifyFreshScaffoldForTesting(configuration, adapters)`, unchanged `certifyBookingCalendlyForTesting(input, adapters)`, `certifyProductionObservabilityForTesting(adapters)`, and root script `verify:production-observability-certification`.
 
-- [ ] RED: add tests whose production mutation is a missing/wrong project identity, capability/version, CLI order, environment scrub, generated verifier identifier, cleanup, receipt, argument rejection, or preserved Calendly behavior. Use literal expected CLI arrays and receipts; mock only command execution and the expensive fixed verifier.
-- [ ] Run `node --test tests/capability-certification/production-observability.test.mjs tests/capability-certification/certification-runner.test.mjs`; capture the expected missing-module/export failure.
-- [ ] GREEN: extract only the identity-owned temporary root, sanitized compiled-CLI `create`/`infer`/`doctor`/`diff`, installed/confirmed capability validation, fixed verifier invocation, bounded receipt, and identity-checked cleanup into the private helper.
-- [ ] Keep the Calendly wrapper API, arguments, error type/codes, receipt, and tests byte-behavior compatible. Add the observability wrapper with the canonical fixed-verifier project `acme-portfolio`, display name `Acme Portfolio`, base `portfolio`, exact default capability list, `observability@0.2.0`, verifier identifier `portfolio`, and no provider value or secret input. The later staging workflow retains dedicated Worker identity `acme-portfolio-observability`.
-- [ ] Add `verify:production-observability-certification` as `pnpm run build:builder && node scripts/certify-production-observability.mjs`.
-- [ ] Run the focused tests GREEN, then the complete capability-certification and generated-verifier tests.
-- [ ] Commit implementation and tests with message `Verify fresh observability scaffold`.
-- [ ] From that clean source commit, run the real `verify:production-observability-certification` once with exact Node/pnpm and registry access. Retain only its bounded JSON receipt and command result; the identity-owned generated project must be removed.
+- [x] RED: add tests whose production mutation is a missing/wrong project identity, capability/version, CLI order, environment scrub, generated verifier identifier, cleanup, receipt, argument rejection, or preserved Calendly behavior. Use literal expected CLI arrays and receipts; mock only command execution and the expensive fixed verifier.
+- [x] Run `node --test tests/capability-certification/production-observability.test.mjs tests/capability-certification/certification-runner.test.mjs`; capture the expected missing-module/export failure.
+- [x] GREEN: extract only the identity-owned temporary root, sanitized compiled-CLI `create`/`infer`/`doctor`/`diff`, installed/confirmed capability validation, fixed verifier invocation, bounded receipt, and identity-checked cleanup into the private helper.
+- [x] Keep the Calendly wrapper API, arguments, error type/codes, receipt, and tests byte-behavior compatible. Add the observability wrapper with the canonical fixed-verifier project `acme-portfolio`, display name `Acme Portfolio`, base `portfolio`, exact default capability list, `observability@0.2.0`, verifier identifier `portfolio`, and no provider value or secret input. The later staging workflow retains dedicated Worker identity `acme-portfolio-observability`.
+- [x] Add `verify:production-observability-certification` as `pnpm run build:builder && node scripts/certify-production-observability.mjs`.
+- [x] Run the focused tests GREEN, then the complete capability-certification and generated-verifier tests.
+- [x] Commit implementation and tests with message `Verify fresh observability scaffold`.
+- [x] From that clean source commit, run the real `verify:production-observability-certification` once with exact Node/pnpm and registry access. Retain only its bounded JSON receipt and command result; the identity-owned generated project must be removed.
 
 ### Task 3: Bind passed local evidence without closing certification
 
@@ -133,12 +135,12 @@ Do not modify capability descriptors, certification schemas/runtime policy, publ
 - Consumes: Task 2's clean source commit and exact bounded local receipt.
 - Produces: one passed/reviewed/complete `fresh-scaffold` evidence entry whose revision is Task 2's ancestor commit; status remains `pending` with no deployed or cleanup evidence.
 
-- [ ] RED: add a repository-level test requiring exactly one sorted observability evidence entry of kind `fresh-scaffold`, the unchanged subject and task plan, `pending` status, and continued rejection by both closure policies.
-- [ ] Run the focused test and capture its expected empty-evidence failure.
-- [ ] GREEN: write the verification receipt with exact capability/version/digest/revision/outcome/review/completion metadata and bounded command result. Add the matching registry entry without changing the subject, required-evidence list, task plan, or status.
-- [ ] Reconcile only direct current-status documentation to distinguish passed local fresh-scaffold evidence from absent protected-staging/provider/cleanup evidence.
-- [ ] Run focused tests, admission, both expected-rejecting closure commands, documentation links, and semantic naming.
-- [ ] Commit with message `Record local observability evidence`.
+- [x] RED: add a repository-level test requiring exactly one sorted observability evidence entry of kind `fresh-scaffold`, the unchanged subject and task plan, `pending` status, and continued rejection by both closure policies.
+- [x] Run the focused test and capture its expected empty-evidence failure.
+- [x] GREEN: write the verification receipt with exact capability/version/digest/revision/outcome/review/completion metadata and bounded command result. Add the matching registry entry without changing the subject, required-evidence list, task plan, or status.
+- [x] Reconcile only direct current-status documentation to distinguish passed local fresh-scaffold evidence from absent protected-staging/provider/cleanup evidence.
+- [x] Run focused tests, admission, both expected-rejecting closure commands, documentation links, and semantic naming.
+- [x] Commit with message `Record local observability evidence`.
 
 ### Task 4: Prepare the protected-staging exercise and provider receipt
 
@@ -154,16 +156,16 @@ Do not modify capability descriptors, certification schemas/runtime policy, publ
 - Consumes: `exerciseProductionObservabilityForTesting({ baseUrl, revision }, adapters)` and the generated route `/api/observability`.
 - Produces: a bounded deployed-exercise JSON receipt; one manual exact-revision workflow; and a human receipt template for `deployed-application` plus `cleanup-recovery` evidence.
 
-- [ ] RED: add behavior tests for HTTPS/root-only staging URL validation, 40-character revision validation, successful home and certification-error responses, valid browser-error/web-vital acceptance, cross-origin/media-type/oversize/malformed/extra-field/vocabulary/secret-bearing rejection, bounded markers, timeouts/fetch failures, and output that omits the origin and response bodies.
-- [ ] RED: add parsed workflow tests for manual-only dispatch, exact `main`/SHA checks, protected `observability-certification` environment, pinned actions, exact runtime, compiled fresh generation, temporary fixture copy, credential-free build, secret-minimal deploy, separate two-provider-secret installation, deployed exercise/browser checks without secrets, bounded artifact retention, and absence of push/pull-request/schedule/provider-source API/delete paths.
-- [ ] Run focused tests and capture the missing exercise/workflow/template failures.
-- [ ] GREEN: implement the exercise as fixed HTTPS requests with 10-second request timeouts, no body reads, fixed revision-derived synthetic correlation identifiers, exact expected statuses, and stable content-safe errors.
-- [ ] Add one route fixture that throws only `Error("synthetic observability certification error")`; the workflow copies it into the temporary generated project before build.
-- [ ] Add a manual workflow requiring only `expected_revision`, using project/Worker `acme-portfolio-observability`, environment `observability-certification`, `contents: read`, non-cancelling concurrency, full-history checkout, exact revision checks, local runner, temporary fresh generation, OpenNext build/deploy, then Wrangler bulk installation of only `BETTER_STACK_INGESTING_HOST` and `BETTER_STACK_SOURCE_TOKEN`. Secret values may exist only in the single secret-install step and its mode-0600 runner-temporary file, removed by an exit trap.
-- [ ] Run the deployed exercise and existing generated deployed Playwright suite only after secret installation. Upload only the local/deployed JSON receipts for seven days. Do not create/query/delete a Better Stack source or delete/rollback the Worker in automation.
-- [ ] Add a human provider template that separately records app/custom-event evidence, Workers Logs platform/framework fields and retention, Better Stack source/region/tier/quota/retention and exact event-field receipt, provider-failure containment test basis, unauthenticated-route abuse/cost decision, GitHub/Cloudflare/Better Stack credential disposition, Worker/source/data cleanup, and claim limits. Prompts must forbid secrets, hosts, private URLs, raw logs, stacks, request metadata, and client data.
-- [ ] Run focused behavior/constitution tests, YAML parse, action-pin checks, docs links, semantic naming, and `git diff --check`.
-- [ ] Commit with message `Prepare observability staging certification`.
+- [x] RED: add behavior tests for HTTPS/root-only staging URL validation, 40-character revision validation, successful home and certification-error responses, valid browser-error/web-vital acceptance, cross-origin/media-type/oversize/malformed/extra-field/vocabulary/secret-bearing rejection, bounded markers, timeouts/fetch failures, and output that omits the origin and response bodies.
+- [x] RED: add parsed workflow tests for manual-only dispatch, exact `main`/SHA checks, protected `observability-certification` environment, pinned actions, exact runtime, compiled fresh generation, temporary fixture copy, credential-free build, secret-minimal deploy, separate two-provider-secret installation, deployed exercise/browser checks without secrets, bounded artifact retention, and absence of push/pull-request/schedule/provider-source API/delete paths.
+- [x] Run focused tests and capture the missing exercise/workflow/template failures.
+- [x] GREEN: implement the exercise as fixed HTTPS requests with 10-second request timeouts, no body reads, fixed revision-derived synthetic correlation identifiers, exact expected statuses, and stable content-safe errors.
+- [x] Add one route fixture that throws only `Error("synthetic observability certification error")`; the workflow copies it into the temporary generated project before build.
+- [x] Add a manual workflow requiring only `expected_revision`, using project/Worker `acme-portfolio-observability`, environment `observability-certification`, `contents: read`, non-cancelling concurrency, full-history checkout, exact revision checks, local runner, temporary fresh generation, OpenNext build/deploy, then Wrangler bulk installation of only `BETTER_STACK_INGESTING_HOST` and `BETTER_STACK_SOURCE_TOKEN`. Secret values may exist only in the single secret-install step and its mode-0600 runner-temporary file, removed by an exit trap.
+- [x] Run the deployed exercise and existing generated deployed Playwright suite only after secret installation. Upload only the local/deployed JSON receipts for seven days. Do not create/query/delete a Better Stack source or delete/rollback the Worker in automation.
+- [x] Add a human provider template that separately records app/custom-event evidence, Workers Logs platform/framework fields and retention, Better Stack source/region/tier/quota/retention and exact event-field receipt, provider-failure containment test basis, unauthenticated-route abuse/cost decision, GitHub/Cloudflare/Better Stack credential disposition, Worker/source/data cleanup, and claim limits. Prompts must forbid secrets, hosts, private URLs, raw logs, stacks, request metadata, and client data.
+- [x] Run focused behavior/constitution tests, YAML parse, action-pin checks, docs links, semantic naming, and `git diff --check`.
+- [x] Commit with message `Prepare observability staging certification`.
 
 ### Task 5: Reconcile current documentation and external stop gate
 
@@ -179,11 +181,11 @@ Do not modify capability descriptors, certification schemas/runtime policy, publ
 - Consumes: Tasks 2–4 local artifacts.
 - Produces: one truthful current status: local fresh-scaffold passed, protected-staging/provider path prepared but not executed, status still `pending`.
 
-- [ ] Update direct status owners with the new local runner/workflow/receipt path and no broader claim. Keep the Task 6 approved comparison and Task 6B external blockers explicit.
-- [ ] Record official-source claim limits: `waitUntil()` is not durable, platform logs are separate/provider-controlled, retention and quotas are plan-dependent, and OpenNext/Next compatibility still requires the actual pinned build/deploy evidence.
-- [ ] Mark Tasks 1–5 complete in this plan only after their commits and checks exist; do not mark live certification or the capability complete.
-- [ ] Run constitution, semantic naming, package boundaries, capability admission, and both expected-rejecting closure policies.
-- [ ] Commit with message `Document observability certification path`.
+- [x] Update direct status owners with the new local runner/workflow/receipt path and no broader claim. Keep the Task 6 approved comparison and Task 6B external blockers explicit.
+- [x] Record official-source claim limits: `waitUntil()` is not durable, platform logs are separate/provider-controlled, retention and quotas are plan-dependent, and OpenNext/Next compatibility still requires the actual pinned build/deploy evidence.
+- [x] Mark Tasks 1–5 complete in this plan only after their commits and checks exist; do not mark live certification or the capability complete.
+- [x] Run constitution, semantic naming, package boundaries, capability admission, and both expected-rejecting closure policies.
+- [x] Commit with message `Document observability certification path`.
 
 ### Task 6: Independent review and bounded repair
 
