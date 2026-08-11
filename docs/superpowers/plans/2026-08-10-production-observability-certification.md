@@ -39,6 +39,14 @@ Task 3 review found that `docs/roadmaps/program-roadmap.md` and its direct const
 
 The repair modifies already inventoried `tests/constitution/constitution.test.mjs` first so its current-status expectation fails against the stale roadmap, then updates only the roadmap's Task 6B status sentences. Local Task 6B is authorized and in progress; protected-staging deployment, provider/source and credential mutations, telemetry transmission, cleanup, registry transition, merge, and push remain separately unauthorized. No runtime, registry, evidence subject, external state, or later task changes under this amendment.
 
+### Preapproved review repair — release-evidence reconciliation (2026-08-11)
+
+Task 5 review found two documentation overclaims and one inherited release-gate mismatch. The checked Task 4 wording described the configured protected-staging exercise as though it had executed, and Task 5 did not record that the full package-boundary gate finished 44/45 because its stale release safeguard required zero Changeset Markdown files. The dedicated workflow remains configured but undispatched and unexecuted; no browser, upload, provider, credential, telemetry, cleanup, publication, or registry-status action occurred.
+
+The official Changesets command-line documentation supports `add --empty` when no package is being bumped and shows an empty Changeset with only YAML delimiters. The intentional release-evidence marker is exactly `.changeset/clarify-observability-boundary.md`, with the exact 8-byte content `---\n---\n`. The marker predates this repair and must not be modified or deleted. The direct consumer `tests/package-boundaries/release-safeguards.test.mjs` must require exactly that one filename and exact content, continuing to reject every extra Changeset and every package-bump Changeset.
+
+This dated amendment adds the existing preparation-evidence owner and that direct test consumer to the repair inventory before the consumer edit. The unchanged baseline full package-boundary run exited 1 with 44/45 tests passing because the consumer expected `[]` but found `clarify-observability-boundary.md`. After the direct consumer repair, the focused release safeguard passed 1/1 and the full package-boundary suite reached final GREEN at 45/45; constitution passed 34/34, semantic naming and capability admission exited 0, both closure policies rejected exactly the still-pending records as expected, documentation links passed 1/1, and `git diff --check` exited 0. No other plan, test, release, registry, workflow, provider, or external-state surface is authorized.
+
 ## Exact file structure
 
 Create local runner, deployed exercise, certification fixture, workflow, and tests:
@@ -75,6 +83,7 @@ docs/architecture/capability-model.md
 docs/architecture/enforcement-map.md
 docs/roadmaps/program-roadmap.md
 docs/superpowers/plans/2026-08-10-production-observability-certification.md
+tests/package-boundaries/release-safeguards.test.mjs
 ```
 
 Do not modify capability descriptors, certification schemas/runtime policy, public package source or version, Changesets, CLI arguments, profile recipes, generated templates, generated fixtures, lockfiles, deployment compatibility proof, analytics, or prior evidence/review packets.
@@ -162,7 +171,7 @@ Do not modify capability descriptors, certification schemas/runtime policy, publ
 - [x] GREEN: implement the exercise as fixed HTTPS requests with 10-second request timeouts, no body reads, fixed revision-derived synthetic correlation identifiers, exact expected statuses, and stable content-safe errors.
 - [x] Add one route fixture that throws only `Error("synthetic observability certification error")`; the workflow copies it into the temporary generated project before build.
 - [x] Add a manual workflow requiring only `expected_revision`, using project/Worker `acme-portfolio-observability`, environment `observability-certification`, `contents: read`, non-cancelling concurrency, full-history checkout, exact revision checks, local runner, temporary fresh generation, OpenNext build/deploy, then Wrangler bulk installation of only `BETTER_STACK_INGESTING_HOST` and `BETTER_STACK_SOURCE_TOKEN`. Secret values may exist only in the single secret-install step and its mode-0600 runner-temporary file, removed by an exit trap.
-- [x] Run the deployed exercise and existing generated deployed Playwright suite only after secret installation. Upload only the local/deployed JSON receipts for seven days. Do not create/query/delete a Better Stack source or delete/rollback the Worker in automation.
+- [x] Configure the workflow to run the deployed exercise and existing generated deployed Playwright suite only after secret installation, and to upload only the local/deployed JSON receipts for seven days. Do not create/query/delete a Better Stack source or delete/rollback the Worker in automation.
 - [x] Add a human provider template that separately records app/custom-event evidence, Workers Logs platform/framework fields and retention, Better Stack source/region/tier/quota/retention and exact event-field receipt, provider-failure containment test basis, unauthenticated-route abuse/cost decision, GitHub/Cloudflare/Better Stack credential disposition, Worker/source/data cleanup, and claim limits. Prompts must forbid secrets, hosts, private URLs, raw logs, stacks, request metadata, and client data.
 - [x] Run focused behavior/constitution tests, YAML parse, action-pin checks, docs links, semantic naming, and `git diff --check`.
 - [x] Commit with message `Prepare observability staging certification`.

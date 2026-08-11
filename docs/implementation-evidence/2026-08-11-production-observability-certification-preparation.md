@@ -101,3 +101,20 @@ Cloudflare and Better Stack plans control retention/quota/cost. OpenNext's relea
 ## Local claim limits
 
 The planned local runner can establish actual builder output, `.egeria` agreement, inference, diagnostics, exact diff, install, audit, signature, lint, typecheck, Next/OpenNext build, and local browser behavior through the fixed verifier. A prepared workflow and receipt template establish no hosted execution or provider outcome. Until a separately authorized journey and review occur, there is no deployed-application, Workers Logs UI, Better Stack receipt, retention, abuse/cost, cleanup/recovery, production, performance, visual, human-accessibility, WCAG-conformance, analytics, security-completeness, or ongoing-availability evidence.
+
+## Release-evidence reconciliation (2026-08-11)
+
+[Official Changesets command-line documentation](https://github.com/changesets/changesets/blob/main/docs/command-line-options.md) documents `add --empty` for a Changeset with no package bumps and shows the empty file as YAML opening and closing delimiters only. The intentional release-evidence marker is exactly `.changeset/clarify-observability-boundary.md`; local byte inspection found the exact 8-byte content `---\n---\n`.
+
+With that marker unchanged, the exact-toolchain local command `pnpm run changeset:status` exited 0 and reported:
+
+```text
+$ changeset status
+🦋  info NO packages to be bumped at patch
+🦋  ---
+🦋  info NO packages to be bumped at minor
+🦋  ---
+🦋  info NO packages to be bumped at major
+```
+
+The unchanged full package-boundary suite then exited 1 with 44/45 tests passing: the stale release safeguard expected no Changeset Markdown files but found the intentional marker. The approved direct consumer repair requires exactly the single filename and its exact empty content, so an extra marker or any package-bump content still fails closed. This local reconciliation does not version or publish a package, mutate the marker, dispatch the prepared workflow, execute its browser or upload steps, use credentials, transmit telemetry, inspect or mutate a provider, perform cleanup, or change certification status.
