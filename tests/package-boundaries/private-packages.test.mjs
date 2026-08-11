@@ -298,11 +298,14 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/AGENTS.md.template",
       "common/README.md.template",
       "common/apps/web/AGENTS.md.template",
+      "common/apps/web/app/api/observability/route.ts",
       "common/apps/web/app/globals.css",
       "common/apps/web/app/layout.tsx",
       "common/apps/web/app/page.tsx",
       "common/apps/web/content/content.config.yaml",
       "common/apps/web/eslint.config.mjs",
+      "common/apps/web/instrumentation-client.ts",
+      "common/apps/web/instrumentation.ts",
       "common/apps/web/next.config.ts",
       "common/apps/web/open-next.config.ts",
       "common/apps/web/package.json.template",
@@ -314,7 +317,11 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/src/content/content-schema.ts",
       "common/apps/web/src/content/content-source.d.ts",
       "common/apps/web/src/content/read-content.ts",
+      "common/apps/web/src/infrastructure/cloudflare/observability-context.ts",
+      "common/apps/web/src/infrastructure/observability/browser-reporter.ts",
       "common/apps/web/src/infrastructure/observability/installed-capability.ts",
+      "common/apps/web/src/infrastructure/observability/server-reporter.ts",
+      "common/apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
       "common/apps/web/src/presentation/content-page.tsx",
       "common/apps/web/src/sections/section-registry.tsx",
       "common/apps/web/tests/e2e/site-quality.spec.ts",
@@ -376,7 +383,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /explicit allowlisted templates/);
   assert.match(builderInstructions, /YAML 1.2/);
   assert.match(builderInstructions, /Markdown with validated YAML front matter/);
-  assert.match(builderInstructions, /recipe `0.5.0`/);
+  assert.match(builderInstructions, /recipe `0.6.0`/);
   assert.match(builderInstructions, /source-owned typed section registry/);
   assert.match(builderInstructions, /Tailwind CSS and PostCSS/);
   assert.match(builderInstructions, /Playwright and axe/);
@@ -395,7 +402,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /explicit allowlisted templates/);
   assert.match(builderReadme, /YAML 1.2/);
   assert.match(builderReadme, /Markdown with validated YAML front matter/);
-  assert.match(builderReadme, /recipe `0.5.0`/);
+  assert.match(builderReadme, /recipe `0.6.0`/);
   assert.match(builderReadme, /four source-registered typed section shapes/);
   assert.match(builderReadme, /Tailwind CSS and PostCSS/);
   assert.match(builderReadme, /Playwright and axe/);

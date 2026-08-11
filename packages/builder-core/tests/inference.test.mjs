@@ -590,6 +590,69 @@ test("capability inference applies the approved category precedence and omission
   );
 });
 
+test("observability inference requires source files and deployment-owned Wrangler values", async () => {
+  const catalogResult = core.createVerifiedCapabilityCatalog();
+  assert.equal(catalogResult.ok, true);
+  const descriptor = catalogResult.value.find(
+    ({ identifier }) => identifier === "observability",
+  );
+  assert.notEqual(descriptor, undefined);
+  assert.equal(descriptor.version, "0.2.0");
+
+  const files = Object.fromEntries(
+    descriptor.inferenceProbes
+      .filter(({ kind }) => kind === "file")
+      .map(({ path }) => [path, "export {};\n"]),
+  );
+  files["apps/web/package.json"] = `${JSON.stringify({
+    dependencies: { "@egeria-systems/observability": "0.2.0" },
+  })}\n`;
+  files["apps/web/wrangler.jsonc"] = `${JSON.stringify({
+    observability: {
+      enabled: true,
+      head_sampling_rate: 1,
+      logs: { invocation_logs: false },
+    },
+    version_metadata: { binding: "CF_VERSION_METADATA" },
+  })}\n`;
+  const state = createState({
+    origin: { profile: "portfolio", recipeVersion: "0.6.0" },
+    installedCapabilities: [installCapability(descriptor)],
+  });
+
+  const inference = await core.inferRepository({
+    catalog: [descriptor],
+    reader: core.createInMemoryRepositoryReader(stateFiles(state, files)),
+  });
+  assert.equal(inference.capabilities.length, 1);
+  assert.equal(inference.capabilities[0]?.identifier, "observability");
+  assert.equal(inference.capabilities[0]?.category, "confirmed");
+  assert.equal(
+    inference.capabilities[0]?.probes.length,
+    descriptor.inferenceProbes.length,
+  );
+  assert.equal(
+    inference.capabilities[0]?.probes.every(
+      ({ status }) => status === "present",
+    ),
+    true,
+  );
+
+  files["apps/web/wrangler.jsonc"] = `${JSON.stringify({
+    observability: {
+      enabled: true,
+      head_sampling_rate: 0,
+      logs: { invocation_logs: false },
+    },
+    version_metadata: { binding: "CF_VERSION_METADATA" },
+  })}\n`;
+  const mismatched = await core.inferRepository({
+    catalog: [descriptor],
+    reader: core.createInMemoryRepositoryReader(stateFiles(state, files)),
+  });
+  assert.equal(mismatched.capabilities[0]?.category, "contradictory");
+});
+
 test("ambiguous probes take precedence over installed metadata mismatch", async () => {
   const descriptor = createDescriptor("ambiguous-precedence", [
     { kind: "json-value", path: "invalid.json", pointer: "/enabled", expected: true },

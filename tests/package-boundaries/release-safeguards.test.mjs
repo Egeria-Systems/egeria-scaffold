@@ -303,10 +303,15 @@ test("Changesets keeps a restricted default and excludes private releases", asyn
 });
 
 test("the release candidate materializes only the approved public versions", async () => {
+  const releaseEvidenceChangeset = "clarify-observability-boundary.md";
   const changesetFiles = (await readdir(resolve(repositoryRoot, ".changeset")))
     .filter((file) => file.endsWith(".md") && file !== "README.md")
     .sort();
-  assert.deepEqual(changesetFiles, []);
+  assert.deepEqual(changesetFiles, [releaseEvidenceChangeset]);
+  assert.deepEqual(
+    await readFile(resolve(repositoryRoot, ".changeset", releaseEvidenceChangeset)),
+    Buffer.from("---\n---\n"),
+  );
 
   for (const [manifestPath, changelogPath, packageName, releaseSummary] of [
     [

@@ -760,7 +760,7 @@ test("the portfolio and site catalog declares the exact seven executable capabil
     },
     {
       identifier: "observability",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -770,16 +770,32 @@ test("the portfolio and site catalog declares the exact seven executable capabil
       supportedProfiles: ["portfolio", "site"],
       requiredPackages: ["@egeria-systems/observability"],
       environmentVariables: [],
-      secrets: [],
-      platformResources: [],
-      externalDomains: [],
+      secrets: [
+        "BETTER_STACK_INGESTING_HOST",
+        "BETTER_STACK_SOURCE_TOKEN",
+      ],
+      platformResources: [
+        "better-stack-telemetry-source",
+        "cloudflare-workers-logs",
+      ],
+      externalDomains: ["*.betterstackdata.com"],
       contentSecurityPolicyContributions: [],
       browserStorage: [],
-      dataClassifications: [],
-      retentionAssumptions: [],
-      privilegedOperations: [],
-      threatReviewLevel: "standard",
-      adapterSemanticRequirements: [],
+      dataClassifications: [
+        "bounded-operational-telemetry",
+        "provider-platform-error-and-exception-logs",
+      ],
+      retentionAssumptions: ["provider-controlled-operational-log-retention"],
+      privilegedOperations: [
+        "cloudflare-secret-configuration",
+        "provider-source-configuration",
+      ],
+      threatReviewLevel: "elevated",
+      adapterSemanticRequirements: [
+        "cloudflare-execution-context-lifetime",
+        "cloudflare-version-metadata",
+        "same-origin-browser-ingest",
+      ],
       managedSurfaces: [
         {
           identifier: "observability-package",
@@ -793,11 +809,71 @@ test("the portfolio and site catalog declares the exact seven executable capabil
           mergeStrategy: "json-property",
         },
         {
+          identifier: "observability-browser-ingest-route",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/app/api/observability/route.ts",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-browser-instrumentation",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/instrumentation-client.ts",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-browser-reporter",
+          owner: { kind: "capability", identifier: "observability" },
+          path:
+            "apps/web/src/infrastructure/observability/browser-reporter.ts",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-cloudflare-context",
+          owner: { kind: "capability", identifier: "observability" },
+          path:
+            "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
           identifier: "observability-registration",
           owner: { kind: "capability", identifier: "observability" },
           path:
             "apps/web/src/infrastructure/observability/installed-capability.ts",
           ownership: "managed",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-server-instrumentation",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/instrumentation.ts",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-server-reporter",
+          owner: { kind: "capability", identifier: "observability" },
+          path:
+            "apps/web/src/infrastructure/observability/server-reporter.ts",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-web-vitals-reporter",
+          owner: { kind: "capability", identifier: "observability" },
+          path:
+            "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
+          ownership: "application-owned",
           fingerprintTarget: { kind: "file" },
           mergeStrategy: "replace-file",
         },
@@ -812,17 +888,89 @@ test("the portfolio and site catalog declares the exact seven executable capabil
         },
         {
           kind: "file",
+          path: "apps/web/app/api/observability/route.ts",
+        },
+        {
+          kind: "file",
+          path: "apps/web/instrumentation-client.ts",
+        },
+        {
+          kind: "file",
+          path: "apps/web/instrumentation.ts",
+        },
+        {
+          kind: "file",
+          path:
+            "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+        },
+        {
+          kind: "file",
+          path:
+            "apps/web/src/infrastructure/observability/browser-reporter.ts",
+        },
+        {
+          kind: "file",
           path:
             "apps/web/src/infrastructure/observability/installed-capability.ts",
         },
+        {
+          kind: "file",
+          path:
+            "apps/web/src/infrastructure/observability/server-reporter.ts",
+        },
+        {
+          kind: "file",
+          path:
+            "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
+        },
+        {
+          kind: "json-value",
+          path: "apps/web/wrangler.jsonc",
+          pointer: "/observability/enabled",
+          expected: true,
+        },
+        {
+          kind: "json-value",
+          path: "apps/web/wrangler.jsonc",
+          pointer: "/observability/head_sampling_rate",
+          expected: 1,
+        },
+        {
+          kind: "json-value",
+          path: "apps/web/wrangler.jsonc",
+          pointer: "/observability/logs/invocation_logs",
+          expected: false,
+        },
+        {
+          kind: "json-value",
+          path: "apps/web/wrangler.jsonc",
+          pointer: "/version_metadata/binding",
+          expected: "CF_VERSION_METADATA",
+        },
       ],
       migrationPlanners: [],
-      verificationPlan: ["package-resolution", "typecheck", "next-build"],
+      verificationPlan: [
+        "package-resolution",
+        "observability-contracts",
+        "lint",
+        "typecheck",
+        "next-build",
+        "opennext-build",
+        "wrangler-types",
+        "browser-development",
+        "browser-preview",
+      ],
       documentationEvidenceRequirements: [
         "public-package-version-and-provenance",
         "analytics-separation",
       ],
       removalAndRecoveryRequirements: [
+        "review-deployment-observability-configuration-removal",
+        "review-generated-observability-source-removal",
+        "review-observability-credential-revocation-or-rotation",
+        "review-observability-provider-resource-removal",
+        "review-observability-retention-and-data-disposition",
+        "review-observability-source-provider-and-credential-recovery-separately",
         "review-package-and-registration-removal",
       ],
     },
@@ -986,6 +1134,28 @@ test("the portfolio and site catalog declares the exact seven executable capabil
       ],
     },
   ]);
+
+  const observability = catalog.find(
+    ({ identifier }) => identifier === "observability",
+  );
+  assert.notEqual(observability, undefined);
+  assert.equal(
+    observability.managedSurfaces.some(
+      ({ path }) => path === "apps/web/wrangler.jsonc",
+    ),
+    false,
+  );
+  assert.equal(observability.browserStorage.length, 0);
+  assert.doesNotMatch(
+    JSON.stringify({
+      requiredPackages: observability.requiredPackages,
+      platformResources: observability.platformResources,
+      externalDomains: observability.externalDomains,
+      browserStorage: observability.browserStorage,
+      privilegedOperations: observability.privilegedOperations,
+    }),
+    /analytics|console-(?:capture|interception)|session-replay/iu,
+  );
 });
 
 test("capability package versions must be exact stable releases and issues do not echo inputs", () => {
@@ -1029,7 +1199,7 @@ test("capability package versions must be exact stable releases and issues do no
 test("the verified generation catalog pins exact public package releases", () => {
   assert.deepEqual(core.verifiedCapabilityPackageVersions, {
     standards: "0.1.0",
-    observability: "0.1.0",
+    observability: "0.2.0",
   });
   assert.equal(Object.isFrozen(core.verifiedCapabilityPackageVersions), true);
   assert.throws(() => {
@@ -1072,7 +1242,7 @@ test("the verified generation catalog pins exact public package releases", () =>
         path: "apps/web/package.json",
         section: "dependencies",
         packageName: "@egeria-systems/observability",
-        version: "0.1.0",
+        version: "0.2.0",
       },
     ],
   );
@@ -1090,7 +1260,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.5.0",
+      recipeVersion: "0.6.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1102,7 +1272,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.5.0",
+      recipeVersion: "0.6.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1133,7 +1303,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.5.0");
+  assert.equal(portfolio.recipeVersion, "0.6.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1167,7 +1337,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
       ({ identifier }) => identifier,
     );
 
-    assert.equal(selected.recipeVersion, "0.5.0");
+    assert.equal(selected.recipeVersion, "0.6.0");
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
         selectedIdentifiers.indexOf("booking-calendly"),
@@ -1214,7 +1384,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "observability",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",

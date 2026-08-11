@@ -34,6 +34,7 @@ const portfolioRenderedPaths = [
   "AGENTS.md",
   "README.md",
   "apps/web/AGENTS.md",
+  "apps/web/app/api/observability/route.ts",
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
@@ -41,6 +42,8 @@ const portfolioRenderedPaths = [
   "apps/web/content/en-CA/long-form/introduction.md",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
+  "apps/web/instrumentation-client.ts",
+  "apps/web/instrumentation.ts",
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
@@ -52,7 +55,11 @@ const portfolioRenderedPaths = [
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
+  "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+  "apps/web/src/infrastructure/observability/browser-reporter.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
+  "apps/web/src/infrastructure/observability/server-reporter.ts",
+  "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/sections/section-registry.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
@@ -540,10 +547,16 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
-      assert.equal(generated.state.origin.recipeVersion, "0.5.0");
+      assert.equal(generated.state.origin.recipeVersion, "0.6.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 71 : 73,
+        profile === "portfolio" ? 78 : 80,
+      );
+      assert.equal(
+        generated.state.installedCapabilities.find(
+          ({ identifier }) => identifier === "observability",
+        )?.version,
+        "0.2.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -678,7 +691,7 @@ test("portfolio and site generation writes exact state-last repositories", async
       assert.equal(webManifest.devDependencies.tailwindcss, "4.3.3");
       assert.equal(
         webManifest.dependencies["@egeria-systems/observability"],
-        "0.1.0",
+        "0.2.0",
       );
 
       const deliveredPaths = await listFiles(destination);
@@ -780,7 +793,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
       accepted.state.installedCapabilities,
       core.createInstalledManifest(resolved),
     );
-    assert.equal(accepted.state.managedSurfaces.length, 76);
+    assert.equal(accepted.state.managedSurfaces.length, 83);
     assert.equal(
       accepted.state.managedSurfaces.filter(
         ({ owner }) =>

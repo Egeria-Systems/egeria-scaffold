@@ -21,6 +21,89 @@ const compactLabel = (...parts) => parts.join("");
 const namedLabel = (prefix, ordinal, separator = " ") =>
   [prefix, separator, ordinal].join("");
 
+function assertObservabilityWorkflowSecretBoundary(workflow) {
+  const enumerateSecretReferences = (value, path = "") => {
+    if (typeof value === "string") {
+      return [...value.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)].flatMap(
+        ([, expression]) =>
+          [...expression.matchAll(/\bsecrets\b/gu)].map(
+            (secretContextMatch) => {
+              const referenceSuffix = expression.slice(
+                secretContextMatch.index,
+              );
+              const approvedReference =
+                /^secrets\.([A-Za-z_][A-Za-z0-9_]*)\b/u.exec(
+                  referenceSuffix,
+                );
+
+              return {
+                path,
+                reference: approvedReference
+                  ? `secrets.${approvedReference[1]}`
+                  : "secrets",
+              };
+            },
+          ),
+      );
+    }
+
+    if (Array.isArray(value)) {
+      return value.flatMap((entry, index) => {
+        const entryIdentifier =
+          entry && typeof entry === "object" && typeof entry.name === "string"
+            ? JSON.stringify(entry.name)
+            : index;
+
+        return enumerateSecretReferences(
+          entry,
+          `${path}[${entryIdentifier}]`,
+        );
+      });
+    }
+
+    if (value && typeof value === "object") {
+      return Object.entries(value).flatMap(([key, entry]) =>
+        enumerateSecretReferences(entry, path ? `${path}.${key}` : key),
+      );
+    }
+
+    return [];
+  };
+
+  assert.deepEqual(enumerateSecretReferences(workflow), [
+    {
+      path: 'jobs.verify-and-deploy.steps["Deploy certification Worker"].env.CLOUDFLARE_ACCOUNT_ID',
+      reference: "secrets.CLOUDFLARE_ACCOUNT_ID",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Deploy certification Worker"].env.CLOUDFLARE_API_TOKEN',
+      reference: "secrets.CLOUDFLARE_API_TOKEN",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Install observability provider secrets"].env.CLOUDFLARE_ACCOUNT_ID',
+      reference: "secrets.CLOUDFLARE_ACCOUNT_ID",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Install observability provider secrets"].env.CLOUDFLARE_API_TOKEN',
+      reference: "secrets.CLOUDFLARE_API_TOKEN",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Install observability provider secrets"].env.BETTER_STACK_INGESTING_HOST',
+      reference: "secrets.BETTER_STACK_INGESTING_HOST",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Install observability provider secrets"].env.BETTER_STACK_SOURCE_TOKEN',
+      reference: "secrets.BETTER_STACK_SOURCE_TOKEN",
+    },
+  ]);
+}
+
+function extractObservabilityHumanPrerequisiteRunbook(document) {
+  return document
+    .split("## Human prerequisite runbook\n", 2)[1]
+    ?.split("\n## Consolidated contradictions and live-run blockers", 1)[0];
+}
+
 async function readRepositoryFile(relativePath) {
   return readFile(resolve(repositoryRoot, relativePath), "utf8");
 }
@@ -340,14 +423,13 @@ test("package ownership documentation records the approved release boundary", as
   assert.match(contributing, /public API.*approved Changeset/i);
 
   for (const document of [readme, packageOwnership]) {
-    assert.match(
-      document,
-      /exactly `@egeria-systems\/standards@0\.1\.0` and `@egeria-systems\/observability@0\.1\.0` are publicly available on npm/i,
-    );
+    assert.match(document, /@egeria-systems\/standards/iu);
+    assert.match(document, /@egeria-systems\/observability/iu);
+    assert.match(document, /`0\.1\.0`[\s\S]+`0\.2\.0`/iu);
     assert.match(document, /registry signatures/i);
-    assert.match(document, /approved bootstrap provenance exception/i);
-    assert.match(document, /future releases.*OIDC trusted publishing/i);
-    assert.match(document, /explicit provenance request/i);
+    assert.match(document, /bootstrap[\s\S]+exception/i);
+    assert.match(document, /OIDC trusted publishing/i);
+    assert.match(document, /explicit provenance/i);
   }
   assert.match(packageOwnership, /Changesets.*versioning and publication/i);
   assert.match(packageOwnership, /does not create.*release resolver/i);
@@ -649,6 +731,688 @@ test("the provider receipt template separates application, provider, and cleanup
   assert.match(template, /Worker.*removed|removed.*Worker/iu);
   assert.match(template, /must not contain.*email address/iu);
   assert.match(template, /does not establish WCAG conformance/iu);
+});
+
+test("observability certification deployment is manual, exact-revision, and secret-isolated", async () => {
+  const [source, wranglerTemplate, renderingSource] = await Promise.all([
+    readRepositoryFile(
+      ".github/workflows/production-observability-certification.yml",
+    ),
+    readRepositoryFile(
+      "packages/builder-core/templates/common/apps/web/wrangler.jsonc.template",
+    ),
+    readRepositoryFile(
+      "packages/builder-core/src/generation/render-skeleton.ts",
+    ),
+  ]);
+  const workflow = parse(source);
+
+  assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
+  assert.deepEqual(workflow.on.workflow_dispatch.inputs, {
+    expected_revision: {
+      description: "Exact main revision approved for certification",
+      required: true,
+      type: "string",
+    },
+  });
+  assert.deepEqual(workflow.permissions, { contents: "read" });
+  assert.deepEqual(workflow.concurrency, {
+    group: "production-observability-certification",
+    "cancel-in-progress": false,
+  });
+
+  const job = workflow.jobs["verify-and-deploy"];
+  assert.equal(job.if, "github.ref == 'refs/heads/main'");
+  assert.equal(job["runs-on"], "ubuntu-24.04");
+  assert.equal(job["timeout-minutes"], 60);
+  assert.deepEqual(job.environment, {
+    name: "observability-certification",
+    url: "${{ vars.OBSERVABILITY_CERTIFICATION_URL }}",
+  });
+  const stepsByName = Object.fromEntries(
+    job.steps.map((step) => [step.name, step]),
+  );
+  const certificationRoot =
+    "${{ runner.temp }}/production-observability-certification/project";
+  const secretFile =
+    "${{ runner.temp }}/production-observability-provider-secrets.json";
+  const deploymentsFile =
+    "${{ runner.temp }}/production-observability-cloudflare-deployments.json";
+  const deploymentReceipt =
+    "${{ runner.temp }}/production-observability-cloudflare-receipt.json";
+  const browserReceipt =
+    "${{ runner.temp }}/production-observability-browser-receipt.json";
+
+  assert.equal(
+    stepsByName["Check out repository"].uses,
+    "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+  );
+  assert.deepEqual(stepsByName["Check out repository"].with, {
+    "fetch-depth": 0,
+    ref: "${{ github.sha }}",
+    "persist-credentials": false,
+  });
+  assert.equal(
+    stepsByName["Set up pnpm and Node.js"].uses,
+    "pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c",
+  );
+  assert.deepEqual(stepsByName["Set up pnpm and Node.js"].with, {
+    version: "11.20.0",
+    runtime: "node@22.23.2",
+    cache: true,
+    install: false,
+  });
+
+  assert.deepEqual(stepsByName["Verify approved revision"].env, {
+    EXPECTED_REVISION: "${{ inputs.expected_revision }}",
+  });
+  assert.match(
+    stepsByName["Verify approved revision"].run,
+    /test "\$GITHUB_REF" = "refs\/heads\/main"/u,
+  );
+  assert.match(
+    stepsByName["Verify approved revision"].run,
+    /\[\[ "\$EXPECTED_REVISION" =~ \^\[0-9a-f\]\{40\}\$ \]\]/u,
+  );
+  assert.match(
+    stepsByName["Verify approved revision"].run,
+    /test "\$GITHUB_SHA" = "\$EXPECTED_REVISION"/u,
+  );
+  assert.match(
+    stepsByName["Verify approved revision"].run,
+    /test "\$\(git rev-parse HEAD\)" = "\$GITHUB_SHA"/u,
+  );
+  assert.equal(
+    stepsByName["Install builder dependencies"].run,
+    "pnpm install --frozen-lockfile",
+  );
+  assert.equal(
+    stepsByName["Build builder packages"].run,
+    "pnpm run build:builder",
+  );
+  assert.match(
+    stepsByName["Verify fresh local scaffold"].run,
+    /node scripts\/certify-production-observability\.mjs > "\$RUNNER_TEMP\/production-observability-local-receipt\.json"/u,
+  );
+  assert.match(
+    stepsByName["Verify fresh local scaffold"].run,
+    /wc -c < "\$RUNNER_TEMP\/production-observability-local-receipt\.json"\)" -le 2048/u,
+  );
+
+  assert.deepEqual(stepsByName["Create deployment candidate"].env, {
+    CERTIFICATION_ROOT: certificationRoot,
+  });
+  assert.match(
+    stepsByName["Create deployment candidate"].run,
+    /node apps\/cli\/dist\/index\.js create --profile portfolio --name acme-portfolio-observability --display-name "Acme Portfolio Observability" --directory "\$CERTIFICATION_ROOT"/u,
+  );
+  assert.match(wranglerTemplate, /"name": "\{\{workerName\}\}"/u);
+  assert.match(
+    renderingSource,
+    /workerName: projectResult\.value\.project\.name/u,
+  );
+  assert.deepEqual(stepsByName["Add certification fixtures"].env, {
+    CERTIFICATION_ROOT: certificationRoot,
+  });
+  assert.match(
+    stepsByName["Add certification fixtures"].run,
+    /tests\/capability-certification\/fixtures\/observability-error-route\.ts/u,
+  );
+  assert.match(
+    stepsByName["Add certification fixtures"].run,
+    /apps\/web\/app\/api\/observability-certification-error\/route\.ts/u,
+  );
+  assert.match(
+    stepsByName["Add certification fixtures"].run,
+    /tests\/capability-certification\/fixtures\/observability-browser-error\.spec\.ts/u,
+  );
+  assert.match(
+    stepsByName["Add certification fixtures"].run,
+    /apps\/web\/tests\/e2e\/observability-browser-error\.spec\.ts/u,
+  );
+  assert.deepEqual(stepsByName["Prepare deployment candidate"].env, {
+    CERTIFICATION_ROOT: certificationRoot,
+  });
+  assert.match(
+    stepsByName["Prepare deployment candidate"].run,
+    /pnpm --dir "\$CERTIFICATION_ROOT" install --frozen-lockfile/u,
+  );
+  assert.match(
+    stepsByName["Prepare deployment candidate"].run,
+    /pnpm --dir "\$CERTIFICATION_ROOT" run build:cloudflare/u,
+  );
+  assert.match(
+    stepsByName["Prepare deployment candidate"].run,
+    /pnpm --dir "\$CERTIFICATION_ROOT\/apps\/web" run browser:install:ci/u,
+  );
+
+  assert.deepEqual(stepsByName["Deploy certification Worker"].env, {
+    CERTIFICATION_ROOT: certificationRoot,
+    CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
+    CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
+  });
+  assert.match(
+    stepsByName["Deploy certification Worker"].run,
+    /pnpm --dir "\$CERTIFICATION_ROOT\/apps\/web" exec opennextjs-cloudflare deploy/u,
+  );
+  assert.doesNotMatch(
+    stepsByName["Deploy certification Worker"].run,
+    /\bbuild\b|\btest\b|better[_ -]?stack/iu,
+  );
+
+  const secretStep = stepsByName["Install observability provider secrets"];
+  assert.deepEqual(secretStep.env, {
+    CERTIFICATION_ROOT: certificationRoot,
+    SECRET_FILE: secretFile,
+    DEPLOYMENTS_FILE: deploymentsFile,
+    DEPLOYMENT_RECEIPT: deploymentReceipt,
+    CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
+    CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
+    BETTER_STACK_INGESTING_HOST:
+      "${{ secrets.BETTER_STACK_INGESTING_HOST }}",
+    BETTER_STACK_SOURCE_TOKEN:
+      "${{ secrets.BETTER_STACK_SOURCE_TOKEN }}",
+  });
+  assert.match(secretStep.run, /^umask 077$/mu);
+  assert.match(
+    secretStep.run,
+    /trap 'rm -f "\$SECRET_FILE" "\$DEPLOYMENTS_FILE"' EXIT/u,
+  );
+  assert.match(secretStep.run, /BETTER_STACK_INGESTING_HOST:\s*process\.env\.BETTER_STACK_INGESTING_HOST/u);
+  assert.match(secretStep.run, /BETTER_STACK_SOURCE_TOKEN:\s*process\.env\.BETTER_STACK_SOURCE_TOKEN/u);
+  assert.match(secretStep.run, /mode:\s*0o600/u);
+  assert.match(secretStep.run, /flag:\s*"wx"/u);
+  assert.match(secretStep.run, /stat -c "%a" "\$SECRET_FILE"/u);
+  assert.match(
+    secretStep.run,
+    /wrangler secret bulk "\$SECRET_FILE"/u,
+  );
+  assert.match(
+    secretStep.run,
+    /wrangler deployments list --name acme-portfolio-observability --json > "\$DEPLOYMENTS_FILE"/u,
+  );
+  assert.match(
+    secretStep.run,
+    /node scripts\/create-cloudflare-deployment-receipt\.mjs --input "\$DEPLOYMENTS_FILE" --revision "\$GITHUB_SHA" --worker acme-portfolio-observability > "\$DEPLOYMENT_RECEIPT"/u,
+  );
+  assert.match(
+    secretStep.run,
+    /test "\$\(wc -l < "\$DEPLOYMENT_RECEIPT"\)" -eq 1/u,
+  );
+  assert.match(
+    secretStep.run,
+    /test "\$\(wc -c < "\$DEPLOYMENT_RECEIPT"\)" -le 1024/u,
+  );
+  assert.match(
+    secretStep.run,
+    /stat -c "%a" "\$DEPLOYMENT_RECEIPT"/u,
+  );
+  assert.ok(
+    secretStep.run.indexOf('wrangler secret bulk "$SECRET_FILE"') <
+      secretStep.run.indexOf("wrangler deployments list"),
+  );
+  assert.ok(
+    secretStep.run.indexOf("wrangler deployments list") <
+      secretStep.run.indexOf(
+        "node scripts/create-cloudflare-deployment-receipt.mjs",
+      ),
+  );
+  assert.doesNotMatch(secretStep.run, /\$BETTER_STACK_|\$\{\{\s*secrets\./u);
+
+  assert.deepEqual(stepsByName["Exercise deployed observability"].env, {
+    OBSERVABILITY_CERTIFICATION_URL:
+      "${{ vars.OBSERVABILITY_CERTIFICATION_URL }}",
+    EXPECTED_REVISION: "${{ inputs.expected_revision }}",
+  });
+  assert.match(
+    stepsByName["Exercise deployed observability"].run,
+    /node scripts\/exercise-production-observability\.mjs --base-url "\$OBSERVABILITY_CERTIFICATION_URL" --revision "\$EXPECTED_REVISION" > "\$RUNNER_TEMP\/production-observability-route-receipt\.json"/u,
+  );
+  assert.match(
+    stepsByName["Exercise deployed observability"].run,
+    /wc -c < "\$RUNNER_TEMP\/production-observability-route-receipt\.json"\)" -le 2048/u,
+  );
+  assert.deepEqual(stepsByName["Test deployed application behavior"].env, {
+    CERTIFICATION_ROOT: certificationRoot,
+    PLAYWRIGHT_DEPLOYED_URL:
+      "${{ vars.OBSERVABILITY_CERTIFICATION_URL }}",
+    OBSERVABILITY_BROWSER_RECEIPT_PATH: browserReceipt,
+  });
+  assert.match(
+    stepsByName["Test deployed application behavior"].run,
+    /pnpm --dir "\$CERTIFICATION_ROOT\/apps\/web" run test:e2e:deployed/u,
+  );
+  assert.match(
+    stepsByName["Test deployed application behavior"].run,
+    /wc -l < "\$OBSERVABILITY_BROWSER_RECEIPT_PATH"\)" -eq 1/u,
+  );
+  assert.match(
+    stepsByName["Test deployed application behavior"].run,
+    /wc -c < "\$OBSERVABILITY_BROWSER_RECEIPT_PATH"\)" -le 1024/u,
+  );
+  assert.match(
+    stepsByName["Test deployed application behavior"].run,
+    /stat -c "%a" "\$OBSERVABILITY_BROWSER_RECEIPT_PATH"/u,
+  );
+
+  assertObservabilityWorkflowSecretBoundary(workflow);
+  const betterStackSecretReferences = job.steps
+    .filter((step) => JSON.stringify(step).includes("secrets.BETTER_STACK_"))
+    .map(({ name }) => name);
+  assert.deepEqual(betterStackSecretReferences, [
+    "Install observability provider secrets",
+  ]);
+  const secretStepIndex = job.steps.findIndex(
+    ({ name }) => name === "Install observability provider secrets",
+  );
+  const exerciseIndex = job.steps.findIndex(
+    ({ name }) => name === "Exercise deployed observability",
+  );
+  const browserIndex = job.steps.findIndex(
+    ({ name }) => name === "Test deployed application behavior",
+  );
+  assert.ok(secretStepIndex > -1 && secretStepIndex < exerciseIndex);
+  assert.ok(exerciseIndex < browserIndex);
+  assert.doesNotMatch(
+    JSON.stringify(job.steps.slice(secretStepIndex + 1)),
+    /\$\{\{\s*secrets\./u,
+  );
+
+  const uploadStep = stepsByName["Upload certification receipts"];
+  assert.equal(
+    uploadStep.uses,
+    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+  );
+  assert.deepEqual(uploadStep.with, {
+    name: "production-observability-certification-receipts",
+    path:
+      "${{ runner.temp }}/production-observability-local-receipt.json\n${{ runner.temp }}/production-observability-route-receipt.json\n${{ runner.temp }}/production-observability-browser-receipt.json\n${{ runner.temp }}/production-observability-cloudflare-receipt.json\n",
+    "if-no-files-found": "error",
+    "retention-days": 7,
+  });
+  assert.doesNotMatch(
+    uploadStep.with.path,
+    /deployments|provider-secrets/iu,
+  );
+  assert.doesNotMatch(source, /^  (?:pull_request|push|schedule):/mu);
+  assert.doesNotMatch(
+    source,
+    /gh workflow run|betterstack\.com\/api|api\.betterstack|wrangler\s+delete|rollback/iu,
+  );
+});
+
+test("observability workflow secrets are rejected outside exact approved step environment paths", async (t) => {
+  const source = await readRepositoryFile(
+    ".github/workflows/production-observability-certification.yml",
+  );
+  const workflow = parse(source);
+  const secretExpression = "${{ secrets.CLOUDFLARE_API_TOKEN }}";
+  const mutations = [
+    [
+      "workflow environment",
+      (candidate) => (candidate.env = { LEAK: secretExpression }),
+    ],
+    [
+      "job environment",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].env = {
+          LEAK: secretExpression,
+        }),
+    ],
+    [
+      "job defaults",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].defaults = {
+          run: { shell: secretExpression },
+        }),
+    ],
+    [
+      "job container",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].container = {
+          image: secretExpression,
+        }),
+    ],
+    [
+      "job matrix",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].strategy = {
+          matrix: { leak: [secretExpression] },
+        }),
+    ],
+    [
+      "step run string",
+      (candidate) => {
+        const deployStep = candidate.jobs["verify-and-deploy"].steps.find(
+          ({ name }) => name === "Deploy certification Worker",
+        );
+        deployStep.run = `${deployStep.run}\n${secretExpression}`;
+      },
+    ],
+    [
+      "bracket secret syntax",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].env = {
+          LEAK: "${{ secrets['CLOUDFLARE_API_TOKEN'] }}",
+        }),
+    ],
+    [
+      "bare secret context",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].env = {
+          LEAK: "${{ secrets }}",
+        }),
+    ],
+    [
+      "dynamic secret context",
+      (candidate) =>
+        (candidate.jobs["verify-and-deploy"].env = {
+          LEAK: "${{ secrets[github.event.inputs.secret_name] }}",
+        }),
+    ],
+  ];
+
+  for (const [name, mutate] of mutations) {
+    await t.test(name, () => {
+      const mutatedWorkflow = structuredClone(workflow);
+
+      mutate(mutatedWorkflow);
+      assert.throws(() =>
+        assertObservabilityWorkflowSecretBoundary(mutatedWorkflow),
+      );
+    });
+  }
+});
+
+test("observability preparation provides the required step-by-step human prerequisite runbook", async () => {
+  const [preparation, plan] = await Promise.all([
+    readRepositoryFile(
+      "docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md",
+    ),
+    readRepositoryFile(
+      "docs/superpowers/plans/2026-08-10-production-observability-certification.md",
+    ),
+  ]);
+  const runbook = extractObservabilityHumanPrerequisiteRunbook(preparation);
+
+  assert.ok(runbook, "observability human-prerequisite runbook is missing");
+  assert.match(
+    runbook,
+    /account owner[\s\S]+account type[\s\S]+subscription tier[\s\S]+sandbox or test environment[\s\S]+eligibility[\s\S]+waiting period/iu,
+  );
+  assert.match(
+    runbook,
+    /GitHub repository administrator[\s\S]+Cloudflare account administrator[\s\S]+Better Stack operator[\s\S]+privacy and cost owner[\s\S]+cleanup owner[\s\S]+evidence reviewer/iu,
+  );
+  assert.match(
+    runbook,
+    /`observability-certification`[\s\S]+`CLOUDFLARE_ACCOUNT_ID`[\s\S]+`CLOUDFLARE_API_TOKEN`[\s\S]+`BETTER_STACK_INGESTING_HOST`[\s\S]+`BETTER_STACK_SOURCE_TOKEN`[\s\S]+GitHub environment secrets/iu,
+  );
+  assert.match(
+    runbook,
+    /`Workers Scripts Write`[\s\S]+human[\s\S]+approve[\s\S]+exact command/iu,
+  );
+  assert.match(
+    runbook,
+    /credential[\s\S]+scope[\s\S]+lifetime[\s\S]+expir[\s\S]+rotat/iu,
+  );
+  assert.match(
+    runbook,
+    /public HTTPS staging origin[\s\S]+`OBSERVABILITY_CERTIFICATION_URL`[\s\S]+synthetic/iu,
+  );
+  assert.match(
+    runbook,
+    /no callback, webhook, redirect, or allowlist[\s\S]+no synthetic human identity/iu,
+  );
+  assert.match(runbook, /readiness preflight/iu);
+  assert.match(
+    runbook,
+    /every 30 seconds[\s\S]+5-minute deadline[\s\S]+stop[\s\S]+fail/iu,
+  );
+  assert.match(
+    runbook,
+    /rate limit[\s\S]+quota[\s\S]+no paid upgrade[\s\S]+retention/iu,
+  );
+  assert.match(
+    plan,
+    /- \[x\] Add the governance-required step-by-step human-prerequisite runbook/u,
+  );
+});
+
+test("observability runbook keeps external actions gated and defines ordered cleanup and recovery", async () => {
+  const preparation = await readRepositoryFile(
+    "docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md",
+  );
+  const runbook = extractObservabilityHumanPrerequisiteRunbook(preparation);
+
+  assert.ok(runbook, "observability human-prerequisite runbook is missing");
+  assert.match(
+    runbook,
+    /explicit approval checkpoint[\s\S]+integration and push[\s\S]+environment[\s\S]+provider source[\s\S]+credential[\s\S]+workflow dispatch[\s\S]+telemetry[\s\S]+provider inspection[\s\S]+cleanup/iu,
+  );
+  assert.match(
+    runbook,
+    /cleanup order[\s\S]+certification-only route[\s\S]+Worker[\s\S]+Better Stack source[\s\S]+retained data[\s\S]+GitHub environment secrets[\s\S]+revoke or rotate/iu,
+  );
+  assert.match(
+    runbook,
+    /source rollback[\s\S]+deployment rollback[\s\S]+provider recovery[\s\S]+credential recovery/iu,
+  );
+  assert.match(runbook, /rerun triggers/iu);
+  assert.match(
+    runbook,
+    /Every external action remains separately unauthorized/iu,
+  );
+  assert.match(
+    runbook,
+    /content-safe placeholder[\s\S]+must not contain[\s\S]+secret[\s\S]+private URL[\s\S]+raw log/iu,
+  );
+});
+
+test("the observability certification error fixture contains only the bounded throwing GET handler", async () => {
+  const fixture = await readRepositoryFile(
+    "tests/capability-certification/fixtures/observability-error-route.ts",
+  );
+
+  assert.equal(
+    fixture,
+    'export function GET(): never {\n  throw new Error("synthetic observability certification error");\n}\n',
+  );
+});
+
+test("the deployed browser fixture exercises the generated global reporter and writes only a bounded UUID receipt", async () => {
+  const fixture = await readRepositoryFile(
+    "tests/capability-certification/fixtures/observability-browser-error.spec.ts",
+  );
+
+  assert.match(fixture, /page\.goto\("\/"\)/u);
+  assert.match(fixture, /context\(\)\.addCookies/u);
+  assert.match(fixture, /name: "observability-certification"/u);
+  assert.match(fixture, /value: "synthetic"/u);
+  assert.match(fixture, /page\.waitForResponse/u);
+  assert.match(fixture, /\/api\/observability/u);
+  assert.match(fixture, /browser\.window\.error/u);
+  assert.match(fixture, /new ErrorEvent\("error"\)/u);
+  assert.match(fixture, /globalThis\.dispatchEvent/u);
+  assert.ok(
+    fixture.indexOf("page.waitForResponse") <
+      fixture.indexOf('new ErrorEvent("error")'),
+  );
+  assert.doesNotMatch(fixture, /page\.route|route\.(?:abort|continue|fulfill)/u);
+  assert.match(fixture, /request\.allHeaders\(\)/u);
+  assert.match(fixture, /cookie/u);
+  assert.match(fixture, /referer/u);
+  for (const literal of [
+    'envelope.schemaVersion !== "1.0.0"',
+    'event.name !== "browser.window.error"',
+    'event.kind !== "application.error"',
+    'event.runtime !== "browser"',
+    'event.severity !== "error"',
+    'event.errorCategory !== "unexpected"',
+    'event.attributes.source !== "window-error"',
+  ]) {
+    assert.match(fixture, new RegExp(escapeRegularExpression(literal), "u"));
+  }
+  assert.match(fixture, /UUID|uuid/iu);
+  assert.match(fixture, /OBSERVABILITY_BROWSER_RECEIPT_PATH/u);
+  assert.match(fixture, /isAbsolute/u);
+  assert.match(fixture, /browserReporterCorrelationId/u);
+  assert.match(fixture, /flag: "wx"/u);
+  assert.match(fixture, /mode: 0o600/u);
+  assert.match(fixture, /trace: "off"/u);
+  assert.match(fixture, /screenshot: "off"/u);
+  assert.match(fixture, /video: "off"/u);
+  assert.doesNotMatch(
+    fixture,
+    /console\.|\.attach\(|writeFile\([^,]+,\s*(?:headers|requestEnvelope|body)/u,
+  );
+});
+
+test("the observability provider receipt separates custom, platform, provider, and cleanup evidence", async () => {
+  const template = await readRepositoryFile(
+    "docs/implementation-evidence/production-observability-provider-receipt-template.md",
+  );
+
+  for (const heading of [
+    "Workflow and revision identity",
+    "Synthetic-data declaration",
+    "Deployed application and custom-event evidence",
+    "Cloudflare platform and framework log evidence",
+    "Better Stack evidence",
+    "Provider-failure containment test basis",
+    "Unauthenticated route abuse and cost decision",
+    "Credential disposition",
+    "Worker, source, and data cleanup",
+    "Privacy exclusions",
+    "Claim boundary",
+    "Reviewer decision",
+  ]) {
+    assert.match(template, new RegExp(`^## ${heading}$`, "mu"));
+  }
+  assert.match(template, /observability-certification/iu);
+  assert.match(template, /acme-portfolio-observability/u);
+  assert.match(template, /cleanup-recovery, deployed-application/u);
+  assert.match(template, /application\/custom event/iu);
+  assert.match(template, /Workers Logs.*platform\/framework/iu);
+  assert.match(template, /source.*region.*tier.*quota.*retention/isu);
+  for (const field of [
+    "schema_version",
+    "dt",
+    "event_name",
+    "event_kind",
+    "runtime",
+    "severity",
+    "correlation_id",
+    "release_id",
+    "error_category",
+    "attributes",
+  ]) {
+    assert.match(template, new RegExp(`\\b${field}\\b`, "u"));
+  }
+  assert.match(template, /provider rejection.*timeout.*unreachable.*containment/isu);
+  assert.match(template, /GitHub.*Cloudflare.*Better Stack/isu);
+  assert.match(template, /Worker.*source.*retained data/isu);
+  assert.match(template, /must not contain.*secret.*ingestion host.*private URL.*raw log.*stack.*request metadata.*client data/isu);
+  assert.match(template, /does not establish.*durable delivery/iu);
+  assert.match(
+    template,
+    /local receipt[\s\S]+route-envelope receipt[\s\S]+browser-instrumentation receipt[\s\S]+Cloudflare identity receipt/iu,
+  );
+  assert.match(
+    template,
+    /checked Git SHA[\s\S]+secret installation[\s\S]+deployments list[\s\S]+Cloudflare deployment identifier[\s\S]+Cloudflare version identifier/iu,
+  );
+  assert.match(
+    template,
+    /`CF_VERSION_METADATA\.id`[\s\S]+Cloudflare version identifier[\s\S]+not the Git revision/iu,
+  );
+  assert.match(
+    template,
+    /every provider custom event[\s\S]+`release_id`[\s\S]+captured Cloudflare version identifier[\s\S]+never the Git SHA/iu,
+  );
+});
+
+test("the observability receipt reconciles every custom event class emitted after secret installation", async () => {
+  const [workflowSource, template] = await Promise.all([
+    readRepositoryFile(
+      ".github/workflows/production-observability-certification.yml",
+    ),
+    readRepositoryFile(
+      "docs/implementation-evidence/production-observability-provider-receipt-template.md",
+    ),
+  ]);
+  const job = parse(workflowSource).jobs["verify-and-deploy"];
+  const secretStepIndex = job.steps.findIndex(
+    ({ name }) => name === "Install observability provider secrets",
+  );
+  const exerciseStepIndex = job.steps.findIndex(
+    ({ name }) => name === "Exercise deployed observability",
+  );
+  const browserStepIndex = job.steps.findIndex(
+    ({ name }) => name === "Test deployed application behavior",
+  );
+
+  assert.ok(secretStepIndex > -1 && secretStepIndex < exerciseStepIndex);
+  assert.ok(exerciseStepIndex < browserStepIndex);
+  assert.match(
+    template,
+    /`Exercise deployed observability`[\s\S]+`browser\.window\.error`[\s\S]+route-envelope[\s\S]+revision-derived correlation marker/iu,
+  );
+  assert.match(
+    template,
+    /`Exercise deployed observability`[\s\S]+`browser\.web\.vital`[\s\S]+route-envelope[\s\S]+revision-derived correlation marker/iu,
+  );
+  assert.match(
+    template,
+    /`Exercise deployed observability`[\s\S]+`server\.request\.error`[\s\S]+generated UUID[\s\S]+not a revision-derived marker/iu,
+  );
+  assert.match(
+    template,
+    /`Test deployed application behavior`[\s\S]+actual generated browser reporter[\s\S]+`browser\.window\.error`[\s\S]+UUID/iu,
+  );
+  assert.match(
+    template,
+    /`Test deployed application behavior`[\s\S]+`browser\.web\.vital`[\s\S]+non-deterministic[\s\S]+must not predeclare an exact marker or count/iu,
+  );
+  assert.match(
+    template,
+    /complete observed custom-event inventory[\s\S]+Cloudflare Workers Logs[\s\S]+Better Stack/iu,
+  );
+  assert.match(
+    template,
+    /additional custom event[\s\S]+reject[\s\S]+predeclared[\s\S]+bounded[\s\S]+reconciled/iu,
+  );
+});
+
+test("cleanup-recovery requires the certification error route to be unreachable after cleanup", async () => {
+  const template = await readRepositoryFile(
+    "docs/implementation-evidence/production-observability-provider-receipt-template.md",
+  );
+  const cleanupSection = template
+    .split("## Worker, source, and data cleanup\n", 2)[1]
+    .split("## Privacy exclusions", 1)[0];
+
+  assert.ok(cleanupSection, "observability cleanup section is missing");
+  assert.match(
+    cleanupSection,
+    /delete the certification Worker[\s\S]+clean redeploy without the certification fixture/iu,
+  );
+  assert.match(
+    cleanupSection,
+    /post-cleanup[\s\S]+`\/api\/observability-certification-error`[\s\S]+unreachable[\s\S]+observed result/iu,
+  );
+  assert.match(
+    cleanupSection,
+    /cleanup-recovery[\s\S]+cannot pass[\s\S]+route remains reachable or the reachability result is not verified/iu,
+  );
+  assert.doesNotMatch(
+    cleanupSection,
+    /Cloudflare Worker cleanup: \[[^\]]*retained/iu,
+  );
+  assert.match(
+    template,
+    /Certification-only error-route unreachability accepted: \[yes \/ no and reason\]/u,
+  );
 });
 
 test("provider preparation defines the external safety envelope", async () => {
@@ -1071,6 +1835,7 @@ test("capability delivery requires a separately planned certification task", asy
   const lifecyclePhase = compactLabel("P", "3");
   const appFoundationPhase = compactLabel("P", "4");
   const initialCertificationTask = namedLabel("Task", "5B");
+  const currentCertificationTask = namedLabel("Task", "6B");
   const preparationGate = namedLabel("Gate", "1");
 
   assert.match(
@@ -1132,6 +1897,13 @@ test("capability delivery requires a separately planned certification task", asy
     clientReadySection,
     new RegExp(
       `${escapeRegularExpression(initialCertificationTask)}[^#]+booking-calendly`,
+      "i",
+    ),
+  );
+  assert.match(
+    clientReadySection,
+    new RegExp(
+      `${escapeRegularExpression(currentCertificationTask)}[^#]+observability@0\\.2\\.0`,
       "i",
     ),
   );
@@ -1227,7 +1999,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+pending[^\n]+closure[^\n]+backfill-pending/i,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+five unchanged subjects[^\n]+backfill-pending[^\n]+observability@0\.2\.0[^\n]+pending/i,
   );
   assert.match(
     enforcementMap,
@@ -1235,10 +2007,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    new RegExp(
-      `backfill-pending[^\\n]+${escapeRegularExpression(clientReadyPhase)} closure[^\\n]+${escapeRegularExpression(lifecyclePhase)} closure[^\\n]+reject`,
-      "i",
-    ),
+    /descriptor admission passes[^\n]+transition and all-certified closure[^\n]+remain open/i,
   );
   assert.match(
     design,
@@ -1374,6 +2143,9 @@ test("executable capability certification ownership is current", async () => {
 
   for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
     assert.match(document, /certifications\/capabilities\.json/u);
+    assert.match(document, /booking-calendly[\s\S]+certified/iu);
+  }
+  for (const document of [capabilityModel, enforcementMap]) {
     assert.match(
       document,
       /booking-calendly[\s\S]+certified[\s\S]+provider-confirmed[\s\S]+cleanup/iu,
@@ -1442,11 +2214,11 @@ test("executable capability certification ownership is current", async () => {
   assert.doesNotMatch(providerReceipt, privateCalendlyUrlPattern);
   assert.match(
     enforcementMap,
-    /admission[^\n]+actual[^\n]+closure[^\n]+pass/iu,
+    /descriptor admission passes[^\n]+transition and all-certified closure[^\n]+remain open/iu,
   );
   assert.match(
     enforcementMap,
-    /fresh-scaffold[^\n]+actual[^\n]+provider[^\n]+passed/iu,
+    /booking-calendly@0\.1\.0[^\n]+certified from fresh-scaffold[^\n]+provider-confirmed[^\n]+cleanup/iu,
   );
   assert.match(
     reviewProtocol,
@@ -1616,6 +2388,8 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   const browserTestingTask = namedLabel("Task", "4B");
   const calendlyTask = namedLabel("Task", "5");
   const calendlyCertificationTask = namedLabel("Task", "5B");
+  const observabilityTask = namedLabel("Task", "6");
+  const observabilityCertificationTask = namedLabel("Task", "6B");
 
   assert.deepEqual(
     {
@@ -1683,16 +2457,20 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         "'s responsive Tailwind presentation[\\s\\S]+are approved at committed artifact `e7026bd9e8c7a7ca20b5a485ee6702d2921a7586`[\\s\\S]+" +
         "Selecting " +
         escapeRegularExpression(calendlyTask) +
-        " as the next increment approves " +
+        " as the next increment approved " +
         escapeRegularExpression(browserTestingTask) +
         "'s generated browser-quality foundation at committed artifact `02ec5eb12741c1622beec02529c38965e7501d68`[\\s\\S]+" +
         "Selecting " +
         escapeRegularExpression(calendlyCertificationTask) +
-        " as the next increment accepts " +
+        " as the next increment accepted " +
         escapeRegularExpression(calendlyTask) +
         " Calendly initial scaffolding[\\s\\S]+" +
         escapeRegularExpression(calendlyCertificationTask) +
-        "'s bounded provider certification is complete and awaiting verified-final-diff review; later task numbering is unchanged[\\s\\S]+develops directly on clean local `main`",
+        "'s bounded provider certification evidence is complete[\\s\\S]+" +
+        escapeRegularExpression(observabilityTask) +
+        "'s exact implementation diff `717c3bb0f048f4a4bc544100125ae42d818f09bc\\.\\.45b57d2dc265ef6ba9ac805d7352a01db5f1081d` is approved and the implementation task is complete[\\s\\S]+" +
+        escapeRegularExpression(observabilityCertificationTask) +
+        " local certification work is authorized and in progress with reviewed local fresh-scaffold evidence[\\s\\S]+Protected-staging, provider/source, credentials, telemetry transmission, cleanup, registry transition, merge, and push remain separately unauthorized[\\s\\S]+develops directly on clean local `main`",
     ),
   );
   assert.match(

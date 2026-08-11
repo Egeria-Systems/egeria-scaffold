@@ -416,8 +416,26 @@ test("doctor and diff agree across the canonical portfolio composition", async (
     "apps/web/src/sections/section-registry.tsx": "export {};\n",
     "apps/web/next.config.ts": "export default {};\n",
     "apps/web/open-next.config.ts": "export default {};\n",
-    "apps/web/wrangler.jsonc": "{}\n",
+    "apps/web/wrangler.jsonc": `${JSON.stringify({
+      observability: {
+        enabled: true,
+        head_sampling_rate: 1,
+        logs: { invocation_logs: false },
+      },
+      version_metadata: { binding: "CF_VERSION_METADATA" },
+    }, null, 2)}\n`,
+    "apps/web/instrumentation-client.ts": "export {};\n",
+    "apps/web/instrumentation.ts": "export {};\n",
+    "apps/web/app/api/observability/route.ts": "export {};\n",
+    "apps/web/src/infrastructure/cloudflare/observability-context.ts":
+      "export {};\n",
+    "apps/web/src/infrastructure/observability/browser-reporter.ts":
+      "export {};\n",
     "apps/web/src/infrastructure/observability/installed-capability.ts":
+      "export {};\n",
+    "apps/web/src/infrastructure/observability/server-reporter.ts":
+      "export {};\n",
+    "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx":
       "export {};\n",
     ".github/workflows/quality.yml": "name: Quality\n",
     "apps/web/playwright.config.shared.ts": "export {};\n",

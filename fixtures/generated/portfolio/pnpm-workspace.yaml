@@ -4,6 +4,8 @@ packages:
 pmOnFail: error
 
 minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - "@egeria-systems/observability@0.2.0"
 
 resolutionMode: time-based
 

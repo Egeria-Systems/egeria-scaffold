@@ -83,13 +83,28 @@
     },
     "observability": {
       "subject": {
-        "descriptorVersion": "0.1.0",
-        "behaviorContractDigest": "sha256:1f070bdb531d8bcec8a7ebf5b081cde8466dcd0d72d5f16b5a5a3ac2bd65af93"
+        "descriptorVersion": "0.2.0",
+        "behaviorContractDigest": "sha256:a4f15a132e08da307ab412673b02152fee8509c0cc1dabb4b60856abd61f5d97"
       },
-      "requiredEvidence": ["deployed-application", "fresh-scaffold"],
-      "status": "backfill-pending",
-      "taskPlan": null,
-      "evidence": []
+      "requiredEvidence": [
+        "cleanup-recovery",
+        "deployed-application",
+        "fresh-scaffold"
+      ],
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-08-10-production-observability-certification.md",
+      "evidence": [
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-08-11-production-observability-certification-verification.md",
+          "outcome": "passed",
+          "revision": "ef845b1e0551d3b43e17969cc00f21960c90769b",
+          "subject": {
+            "descriptorVersion": "0.2.0",
+            "behaviorContractDigest": "sha256:a4f15a132e08da307ab412673b02152fee8509c0cc1dabb4b60856abd61f5d97"
+          }
+        }
+      ]
     },
     "section-composition": {
       "subject": {

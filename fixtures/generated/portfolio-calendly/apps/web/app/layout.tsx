@@ -5,6 +5,7 @@ import {
   readContentConfiguration,
   readSiteContent,
 } from "../src/content/read-content";
+import { WebVitalsReporter } from "../src/infrastructure/observability/web-vitals-reporter";
 import "./globals.css";
 
 const { metadata: contentMetadata } = readSiteContent();
@@ -20,7 +21,10 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang={defaultLocale}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <WebVitalsReporter />
+      </body>
     </html>
   );
 }
