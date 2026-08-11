@@ -55,6 +55,7 @@ The successor contract is frozen as `standards@0.3.0` and recipe `0.7.0`. This i
 ## Official documentation revalidation
 
 - [Next.js Vitest guidance](https://nextjs.org/docs/app/guides/testing/vitest) continues to recommend Vitest, jsdom, React Testing Library, Vite's React plugin, and tsconfig-path resolution for synchronous components. It explicitly defers async Server Components to end-to-end tests; Task 6C retains Playwright for those/browser boundaries.
+- [Vite shared options](https://vite.dev/config/shared-options.html#resolve-tsconfigpaths) now provide native `resolve.tsconfigPaths`. The first isolated generated run emitted Vite's deprecation warning for the separate plugin, so the preapproved plan was amended to remove `vite-tsconfig-paths@6.1.1` and use the native Vite 8 option instead.
 - [Vitest projects](https://vitest.dev/guide/projects) and [Vitest CLI guidance](https://vitest.dev/guide/cli) support named projects plus explicit run/watch commands. Generated configuration therefore uses distinct `unit` and `component` projects rather than one ambiguous environment.
 - [Testing Library setup](https://testing-library.com/docs/react-testing-library/setup/) supports explicit cleanup when test globals are disabled. [user-event setup](https://testing-library.com/docs/user-event/setup/) uses `userEvent.setup()` for interaction state. The generated setup imports `@testing-library/jest-dom/vitest` and starter component tests use semantic queries and user events.
 - [Cloudflare Workers Vitest integration](https://developers.cloudflare.com/workers/testing/vitest-integration/) is specifically for Workers-runtime/binding behavior. No current generated portfolio/site capability owns a D1, KV, R2, Queue, Durable Object, or other binding, so Workers Vitest remains deferred to the accepted later application-persistence boundary.
@@ -71,7 +72,6 @@ Registry metadata was queried on 2026-08-11. Every selected artifact is MIT lice
 | --- | --- | --- | --- |
 | `vitest` | `4.1.10` | Node `^20 || ^22 || >=24`; Vite `^6 || ^7 || ^8` | `sha512-R9jUTe5S4Qb0HCd4TNqpC7oGcrMssMRGXLW80ubjWsW9VH5GF8y1Y0SFLY9AbqSk6nt0PnOx4H4WNJYZ13GUPw==` |
 | `@vitejs/plugin-react` | `6.0.5` | Node `^20.19 || >=22.12`; Vite `^8` | `sha512-BOVzne/NL162sMdResB25mUv+vWMF5NoAjNf09TeGlE7ZpszZWSD3winycicLJw72yeVsoCn/2kOhEuCvEShMA==` |
-| `vite-tsconfig-paths` | `6.1.1` | Vite `*` | `sha512-2cihq7zliibCCZ8P9cKJrQBkfgdvcFkOOc3Y02o3GWUDLgqjWsZudaoiuOwO/gzTzy17cS5F7ZPo4bsnS4DGkg==` |
 | `jsdom` | `30.0.1` | Node `^22.22.2 || ^24.15 || >=26`; optional canvas only | `sha512-52v7mUVUfNQVYYqE1lcdaymWL0njO7lTLUog6ZvW2U5KsbiLk/GnZlVJ+qx0xfNJZ6Gn+KSpPNE52vurbxZwrA==` |
 | `@testing-library/react` | `16.3.2` | React/React DOM 18 or 19; DOM `^10`; Node `>=18` | `sha512-XU5/SytQM+ykqMnAnvB2umaJNIOsLF3PVv//1Ew4CTcpz0/BRyy/af40qqrt7SjKpDdT1saBMc42CUok5gaw+g==` |
 | `@testing-library/dom` | `10.4.1` | Node `>=18` | `sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==` |

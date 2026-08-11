@@ -6,7 +6,7 @@
 
 **Architecture:** Advance the existing hybrid `standards` capability rather than creating a testing capability or package. Generate one Vitest configuration with named Node and jsdom projects, real starter specifications, explicit scripts, root/scoped guidance, and quality-workflow steps. Expand ordinary generated-project verification with fast unit/component checks while retaining browser checks only in fixed-root certification. Add a read-only repository-quality workflow that executes builder, CLI, packages, capability, generated-project, and compatibility-proof lanes. Admit the material standards change against a separate pending Task 6D certification plan.
 
-**Toolchain:** Node.js `22.23.2`, pnpm `11.20.0`, Vitest `4.1.10`, `@vitejs/plugin-react@6.0.5`, `vite-tsconfig-paths@6.1.1`, `jsdom@30.0.1`, `@testing-library/react@16.3.2`, `@testing-library/dom@10.4.1`, `@testing-library/user-event@14.6.3`, and `@testing-library/jest-dom@7.0.1`, together with the settled exact Next.js, React, TypeScript, OpenNext, Wrangler, Playwright, and axe pins already present at the frozen base. CI uses `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1`, `pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2`, and `actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` where applicable.
+**Toolchain:** Node.js `22.23.2`, pnpm `11.20.0`, Vitest `4.1.10`, `@vitejs/plugin-react@6.0.5`, jsdom `30.0.1`, `@testing-library/react@16.3.2`, `@testing-library/dom@10.4.1`, `@testing-library/user-event@14.6.3`, and `@testing-library/jest-dom@7.0.1`, together with Vite 8's native `resolve.tsconfigPaths` support and the settled exact Next.js, React, TypeScript, OpenNext, Wrangler, Playwright, and axe pins already present at the frozen base. CI uses `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1`, `pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2`, and `actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` where applicable.
 
 ## Approval and prerequisite boundary
 
@@ -185,7 +185,7 @@ These amendments record the approved Task 6C independent-work exception, Task 6C
 - [x] Confirm Task 6 is approved and integrated. Record the user's narrow exception allowing Task 6C while Task 6B remains pending; stop on any unapproved observability mutation.
 - [x] Record current profile recipes, standards descriptor/version/digest/certification record, public package versions, managed surfaces, inference probes, verification tuple, and retained fixture inventory.
 - [x] Recheck official Next.js Vitest, Vitest projects/environments, Testing Library setup/user-event, Cloudflare testing, and later-phase property-testing placement.
-- [x] Query exact registry metadata for all eight generated development dependencies. Check peer/engine compatibility, signatures, tarball identity, license, and current advisories.
+- [x] Query exact registry metadata for all seven generated development dependencies. Check peer/engine compatibility, signatures, tarball identity, license, and current advisories.
 - [x] Revalidate Node, pnpm, Next.js, React, TypeScript, OpenNext, Wrangler, Playwright, and axe compatibility. Never copy a stale exact version from this plan if current evidence contradicts it.
 - [x] Record the selected exact pins, accepted limitations, no-coverage decision, no-Workers-pool decision, and claim boundaries in preparation evidence.
 - [x] Amend this plan before implementation for the approved sequencing exception, actual evidence date, exact successor versions, exact dependency pins, and current action SHAs.
@@ -211,32 +211,32 @@ Expected: current integrated baseline passes before Task 6C RED work. Do not rer
 
 **Tests first:** builder-core contract/resolution/render/generation/inference/diagnostic/state/certification tests and generated fixture contracts.
 
-- [ ] Require a successor standards descriptor and profile recipe without guessing the version before Task 1 freezes it.
-- [ ] Require exact package/script/file managed surfaces and one matching inference probe for every managed generated test surface.
-- [ ] Require exact security metadata for test child processes and no new secret, external provider, persistent data, storage, or deployment authority.
-- [ ] Require an ordinary pending standards certification record linked to the present Task 6D plan; reject inheritance of the frozen backfill subject.
-- [ ] Require the four new common template paths, updated manifests, TypeScript `.tsx` test inclusion, instructions, README commands, and exact workflow step names.
-- [ ] Require the ordered generated verification tuple to contain `unit-tests` and `component-tests` between typecheck and builds.
-- [ ] Require no browser installation/E2E, Workers Vitest, fast-check, coverage, MSW, Browser Mode, Cypress, or `passWithNoTests` in ordinary generated-project verification.
-- [ ] Require every retained fixture contract to include both starter specifications, setup, config, exact manifest/lockfile entries, updated state, and derived guidance.
-- [ ] Run the smallest focused Node test batches and verify failure only for the absent approved contracts.
-- [ ] In an authorized implementation run, commit the RED tests with a message naming generated unit/component testing behavior.
+- [x] Require a successor standards descriptor and profile recipe without guessing the version before Task 1 freezes it.
+- [x] Require exact package/script/file managed surfaces and one matching inference probe for every managed generated test surface.
+- [x] Require exact security metadata for test child processes and no new secret, external provider, persistent data, storage, or deployment authority.
+- [x] Require an ordinary pending standards certification record linked to the present Task 6D plan; reject inheritance of the frozen backfill subject.
+- [x] Require the four new common template paths, updated manifests, TypeScript `.tsx` test inclusion, instructions, README commands, and exact workflow step names.
+- [x] Require the ordered generated verification tuple to contain `unit-tests` and `component-tests` between typecheck and builds.
+- [x] Require no browser installation/E2E, Workers Vitest, fast-check, coverage, MSW, Browser Mode, Cypress, or `passWithNoTests` in ordinary generated-project verification.
+- [x] Require every retained fixture contract to include both starter specifications, setup, config, exact manifest/lockfile entries, updated state, and derived guidance.
+- [x] Run the smallest focused Node test batches and verify failure only for the absent approved contracts.
+- [x] In an authorized implementation run, commit the RED tests with a message naming generated unit/component testing behavior.
 
 ## Task 3: GREEN — implement generated manifests, Vitest projects, and starter tests
 
 **Templates and owners:** web manifest, root manifest, Vitest config, component setup, unit/component specifications, TypeScript config, template catalog, capability descriptor, recipe/state owners, and checked schemas.
 
-- [ ] Add exact compatible development-dependency properties selected in Task 1.
-- [ ] Add `test`, `test:unit`, `test:component`, and explicit watch commands at the web boundary; add only delegating root commands.
-- [ ] Define named `unit` and `component` projects with disjoint includes, Node/jsdom environments, explicit imports, and no global APIs.
-- [ ] Add jest-dom matchers and explicit cleanup only to component tests.
-- [ ] Add a content-parser unit specification with representative valid and invalid inputs and stable error assertions.
-- [ ] Add a synchronous `ContentPage` component specification using semantic Testing Library queries and minimal typed content.
-- [ ] Add `.tsx` test inclusion to TypeScript without broadening source ownership.
-- [ ] Advance standards capability and recipes exactly as frozen, add all surfaces/probes, update the state verification tuple, and generate schemas from runtime owners.
-- [ ] Keep all visible test fixture copy test-owned and non-product; do not weaken copy externalization.
-- [ ] Run focused builder-core tests, schema check, template lint, builder build, and typecheck to GREEN.
-- [ ] Run the generated Vitest projects directly in one isolated temporary rendered project before fixture regeneration.
+- [x] Add exact compatible development-dependency properties selected in Task 1.
+- [x] Add `test`, `test:unit`, `test:component`, and explicit watch commands at the web boundary; add only delegating root commands.
+- [x] Define named `unit` and `component` projects with disjoint includes, Node/jsdom environments, explicit imports, and no global APIs.
+- [x] Add jest-dom matchers and explicit cleanup only to component tests.
+- [x] Add a content-parser unit specification with representative valid and invalid inputs and stable error assertions.
+- [x] Add a synchronous `ContentPage` component specification using semantic Testing Library queries and minimal typed content.
+- [x] Add `.tsx` test inclusion to TypeScript without broadening source ownership.
+- [x] Advance standards capability and recipes exactly as frozen, add all surfaces/probes, update the state verification tuple, and generate schemas from runtime owners.
+- [x] Keep all visible test fixture copy test-owned and non-product; do not weaken copy externalization.
+- [x] Run focused builder-core tests, schema check, template lint, builder build, and typecheck to GREEN.
+- [x] Run the generated Vitest projects directly in one isolated temporary rendered project before fixture regeneration.
 
 Expected generated commands:
 
@@ -252,18 +252,18 @@ Expected: both named projects discover at least one test, pass in run mode, and 
 
 **Canonical instruction owner:** root `AGENTS.md` for authored repository code; generated root `AGENTS.md` for scaffolded code.
 
-- [ ] Add constitution tests that enumerate every authored applicable AGENT file and reject a missing testing-boundary reference.
-- [ ] Add generated-template and fixture assertions for the complete project-level selection matrix and scoped web additions.
-- [ ] Update root instructions with Node runner, generated Vitest, Playwright, proof harness, later fast-check, later Workers Vitest, certification, and claim boundaries.
-- [ ] Update CLI instructions with Node unit/integration/subprocess requirements and no Vitest migration.
-- [ ] Update builder-core instructions with Node contracts, generated Vitest ownership, exact verification ordering, fixture certification, and P3-only fast-check.
-- [ ] Update standards instructions with Node public-API behavior tests and no public Vitest preset without a separate extraction/release gate.
-- [ ] Update observability instructions against the settled post-Task-6 API with Node contract, privacy/redaction, sink, adapter, and failure-behavior tests.
-- [ ] Update proof instructions with Vitest unit, `createTestHarness()` integration, Playwright environments, and no reuse as product architecture.
-- [ ] Update generated root instructions with the tool-selection table and exact commands.
-- [ ] Update generated web instructions with role/label queries, `user-event`, cleanup, no broad snapshots, jsdom limitations, Playwright/browser ownership, accessibility claim limits, and conditional Workers guidance.
-- [ ] Ensure nested files link to their canonical parent rather than copying every normative paragraph.
-- [ ] Regenerate fixture AGENT files only through production generation.
+- [x] Add constitution tests that enumerate every authored applicable AGENT file and reject a missing testing-boundary reference.
+- [x] Add generated-template and fixture assertions for the complete project-level selection matrix and scoped web additions.
+- [x] Update root instructions with Node runner, generated Vitest, Playwright, proof harness, later fast-check, later Workers Vitest, certification, and claim boundaries.
+- [x] Update CLI instructions with Node unit/integration/subprocess requirements and no Vitest migration.
+- [x] Update builder-core instructions with Node contracts, generated Vitest ownership, exact verification ordering, fixture certification, and P3-only fast-check.
+- [x] Update standards instructions with Node public-API behavior tests and no public Vitest preset without a separate extraction/release gate.
+- [x] Update observability instructions against the settled post-Task-6 API with Node contract, privacy/redaction, sink, adapter, and failure-behavior tests.
+- [x] Update proof instructions with Vitest unit, `createTestHarness()` integration, Playwright environments, and no reuse as product architecture.
+- [x] Update generated root instructions with the tool-selection table and exact commands.
+- [x] Update generated web instructions with role/label queries, `user-event`, cleanup, no broad snapshots, jsdom limitations, Playwright/browser ownership, accessibility claim limits, and conditional Workers guidance.
+- [x] Ensure nested files link to their canonical parent rather than copying every normative paragraph.
+- [x] Regenerate fixture AGENT files only through production generation.
 
 Expected: every authored code context tells an agent which runner to use, when to escalate to a broader layer, which command to run, and what the result cannot prove.
 
@@ -271,67 +271,67 @@ Expected: every authored code context tells an agent which runner to use, when t
 
 ### Generated workflow
 
-- [ ] Add static workflow contracts requiring separate named lint, typecheck, unit, component, Next build, OpenNext build, Chromium install, development E2E, preview E2E, and failure-artifact steps.
-- [ ] Require unit/component steps before browser installation and prohibit watch mode, deployment, secrets, releases, write permissions, and ambient servers.
-- [ ] Preserve exact action SHAs, frozen install, read-only permissions, disabled credential persistence, concurrency cancellation, timeout, fixed Node/pnpm, and seven-day failure artifacts.
-- [ ] Make root `verify` include unit/component testing for local completeness while allowing CI to call distinct semantic commands without duplicate execution.
+- [x] Add static workflow contracts requiring separate named lint, typecheck, unit, component, Next build, OpenNext build, Chromium install, development E2E, preview E2E, and failure-artifact steps.
+- [x] Require unit/component steps before browser installation and prohibit watch mode, deployment, secrets, releases, write permissions, and ambient servers.
+- [x] Preserve exact action SHAs, frozen install, read-only permissions, disabled credential persistence, concurrency cancellation, timeout, fixed Node/pnpm, and seven-day failure artifacts.
+- [x] Make root `verify` include unit/component testing for local completeness while allowing CI to call distinct semantic commands without duplicate execution.
 
 ### Builder repository workflow
 
-- [ ] Add RED constitution tests for a new ordinary pull-request/push workflow with read-only permissions, pinned actions, no environment, no credentials, no deployment/publication/provider commands, cancellation, and bounded timeouts.
-- [ ] Add a builder/packages lane covering constitution, semantic naming, package boundaries, builder-core, CLI, standards, observability, capability certification/admission, lint, build, and typecheck.
-- [ ] Add a generated-project lane covering deterministic fixture tests and the full fixed-root verifier, which now runs both Vitest projects and both Playwright environments for every retained fixture.
-- [ ] Add a compatibility-proof local lane covering proof lint/typecheck, Vitest unit, builds/type generation, `createTestHarness()` Cloudflare integration, and Playwright development/preview tests without deployment.
-- [ ] Use explicit commands/step names so a future missing lane cannot hide behind an ambiguous aggregate.
-- [ ] Strengthen `verify:builder-kernel` to include public package tests if the settled command still omits them.
-- [ ] Preserve package-release's package-specific verification and manual authority.
-- [ ] Add explicit generated unit/component execution to the Calendly fresh deployment candidate before its separately authorized deploy step.
-- [ ] Change compatibility or package-release workflows only if their actual scoped aggregate fails an applicable contract.
+- [x] Add RED constitution tests for a new ordinary pull-request/push workflow with read-only permissions, pinned actions, no environment, no credentials, no deployment/publication/provider commands, cancellation, and bounded timeouts.
+- [x] Add a builder/packages lane covering constitution, semantic naming, package boundaries, builder-core, CLI, standards, observability, capability certification/admission, lint, build, and typecheck.
+- [x] Add a generated-project lane covering deterministic fixture tests and the full fixed-root verifier, which now runs both Vitest projects and both Playwright environments for every retained fixture.
+- [x] Add a compatibility-proof local lane covering proof lint/typecheck, Vitest unit, builds/type generation, `createTestHarness()` Cloudflare integration, and Playwright development/preview tests without deployment.
+- [x] Use explicit commands/step names so a future missing lane cannot hide behind an ambiguous aggregate.
+- [x] Strengthen `verify:builder-kernel` to include public package tests if the settled command still omits them.
+- [x] Preserve package-release's package-specific verification and manual authority.
+- [x] Add explicit generated unit/component execution to the Calendly fresh deployment candidate before its separately authorized deploy step.
+- [x] Change compatibility or package-release workflows only if their actual scoped aggregate fails an applicable contract.
 
 Expected: CI covers every current test-owning component, but external workflows remain separately manual and authority-bounded.
 
 ## Task 6: RED/GREEN — expand generated-project receipts and fixed-root certification
 
-- [ ] Update the runtime state schema and generated JSON Schema with exact `unit-tests` and `component-tests` positions.
-- [ ] Add verifier commands using argument arrays and the generated semantic scripts; retain bounded output, timeout, empty home/config, disabled telemetry, fixed registry, and no shell.
-- [ ] Assert exact failure normalization for either test lane without returning source, test data, child stdout/stderr, environment, or paths beyond existing content-safe policy.
-- [ ] Update write/state tests to reject missing, duplicate, reordered, or extra receipt entries.
-- [ ] Add both commands to fixed-root verification before builds and browser installation.
-- [ ] Preserve separate per-profile HOME, temporary, XDG cache, pnpm store, browser cache, reports, server state, and fixed ports.
-- [ ] Ensure unit/component cache/environment values are not inherited from the operator.
-- [ ] Update fixture verification tests with exact per-fixture command ordering and no duplicate successful run against an unchanged copy.
-- [ ] Run focused verifier/generation/state tests to GREEN.
+- [x] Update the runtime state schema and generated JSON Schema with exact `unit-tests` and `component-tests` positions.
+- [x] Add verifier commands using argument arrays and the generated semantic scripts; retain bounded output, timeout, empty home/config, disabled telemetry, fixed registry, and no shell.
+- [x] Assert exact failure normalization for either test lane without returning source, test data, child stdout/stderr, environment, or paths beyond existing content-safe policy.
+- [x] Update write/state tests to reject missing, duplicate, reordered, or extra receipt entries.
+- [x] Add both commands to fixed-root verification before builds and browser installation.
+- [x] Preserve separate per-profile HOME, temporary, XDG cache, pnpm store, browser cache, reports, server state, and fixed ports.
+- [x] Ensure unit/component cache/environment values are not inherited from the operator.
+- [x] Update fixture verification tests with exact per-fixture command ordering and no duplicate successful run against an unchanged copy.
+- [x] Run focused verifier/generation/state tests to GREEN.
 
 ## Task 7: Regenerate and certify immutable fixtures
 
-- [ ] Build the production CLI and render each portfolio, site, and portfolio-with-Calendly project twice in absent temporary destinations.
-- [ ] Require byte equality, exact file inventories, exact dependency/script/config/test/guidance/workflow contents, portable lockfiles, state/manifest/inference agreement, and an empty exact diff.
-- [ ] Replace committed fixture roots only from the validated production output. Never hand-edit derived fixture files.
-- [ ] Run unit and component tests for all three fixtures.
+- [x] Build the production CLI and render each portfolio, site, and portfolio-with-Calendly project twice in absent temporary destinations.
+- [x] Require byte equality, exact file inventories, exact dependency/script/config/test/guidance/workflow contents, portable lockfiles, state/manifest/inference agreement, and an empty exact diff.
+- [x] Replace committed fixture roots only from the validated production output. Never hand-edit derived fixture files.
+- [x] Run unit and component tests for all three fixtures.
 - [ ] Run lint, typecheck, Next build, OpenNext build, development Playwright/axe, and preview Playwright/axe for all three fixtures through the fixed verifier.
 - [ ] Record exact test counts and environment boundaries without claiming hosted CI, deployment, visual quality, human usability, or WCAG conformance.
 - [ ] Run deterministic fixture tests and read-only infer/doctor/diff against the settled fixtures.
 
 ## Task 8: Reconcile canonical owners and later-phase testing decisions
 
-- [ ] Update the source plan testing section with the exact runner matrix and CI coverage.
-- [ ] Add Task 6C implementation and Task 6D standards certification without renumbering later work.
-- [ ] Record that P3 introduces `fast-check` with `node:test` for material state/migration invariants, including seed/path replay evidence.
-- [ ] Record that P4 uses generated Vitest Node tests and `createTestHarness()` but does not install Workers Vitest without bindings.
-- [ ] Record that P5C introduces the shared deployment-cloudflare-owned Workers Vitest configuration and application-persistence-owned D1 specs; P5E/P6/P7 reuse it for their own bindings.
-- [ ] Update capability model and package ownership with actual standards-generated test surfaces and no public test API.
-- [ ] Update the enforcement map with actual unit/component and CI gates, leaving Workers Vitest/property-based runtime status planned until their phases.
-- [ ] Update overview, README, contribution guide, and builder-core README with current commands and bounded claims.
-- [ ] Run documentation, constitution, semantic-naming, and link/path assertions.
+- [x] Update the source plan testing section with the exact runner matrix and CI coverage.
+- [x] Add Task 6C implementation and Task 6D standards certification without renumbering later work.
+- [x] Record that P3 introduces `fast-check` with `node:test` for material state/migration invariants, including seed/path replay evidence.
+- [x] Record that P4 uses generated Vitest Node tests and `createTestHarness()` but does not install Workers Vitest without bindings.
+- [x] Record that P5C introduces the shared deployment-cloudflare-owned Workers Vitest configuration and application-persistence-owned D1 specs; P5E/P6/P7 reuse it for their own bindings.
+- [x] Update capability model and package ownership with actual standards-generated test surfaces and no public test API.
+- [x] Update the enforcement map with actual unit/component and CI gates, leaving Workers Vitest/property-based runtime status planned until their phases.
+- [x] Update overview, README, contribution guide, and builder-core README with current commands and bounded claims.
+- [x] Run documentation, constitution, semantic-naming, and link/path assertions.
 
 ## Task 9: Prepare the separate Task 6D certification subject
 
-- [ ] Recompute the canonical standards descriptor/evidence digest after every Task 6C behavior-contract change.
-- [ ] Replace the stale frozen/backfill record with an ordinary `pending` record linked to the present Task 6D plan.
-- [ ] Keep implementation admission and certification closure distinct.
-- [ ] Require repository-present Task 6D plan, fresh-scaffold/local test outcomes, subject-bound evidence, complete review receipt, and no unresolved prompts.
-- [ ] Run admission GREEN and expected P2/all-certified closure RED while standards remains pending.
-- [ ] Do not mark standards or P2 certified in Task 6C.
+- [x] Recompute the canonical standards descriptor/evidence digest after every Task 6C behavior-contract change.
+- [x] Replace the stale frozen/backfill record with an ordinary `pending` record linked to the present Task 6D plan.
+- [x] Keep implementation admission and certification closure distinct.
+- [x] Require repository-present Task 6D plan, fresh-scaffold/local test outcomes, subject-bound evidence, complete review receipt, and no unresolved prompts.
+- [x] Run admission GREEN and expected P2/all-certified closure RED while standards remains pending.
+- [x] Do not mark standards or P2 certified in Task 6C.
 
 ## Task 10: Independent review and bounded repair
 

@@ -1,6 +1,6 @@
 # Generated Unit and Component Testing Design
 
-**Status:** Approved for planning; implementation begins only after production-observability implementation and Task 6B certification are integrated and approved
+**Status:** Implementation candidate awaiting verified-final-diff review under the approved 2026-08-11 independent-work exception; Task 6D certification remains separate
 
 **Date:** 2026-08-10
 
@@ -53,7 +53,7 @@ The generated development dependency set is:
 
 - `vitest`;
 - `@vitejs/plugin-react`;
-- `vite-tsconfig-paths`;
+- Vite 8 native `resolve.tsconfigPaths` configuration;
 - `jsdom`;
 - `@testing-library/react`;
 - `@testing-library/dom`;

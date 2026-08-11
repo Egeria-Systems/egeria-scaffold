@@ -1007,6 +1007,8 @@ The [approved generated unit and component testing design](../superpowers/specs/
 
 Under the explicit 2026-08-11 independent-work exception, P2 Task 6C follows the approved production-observability Task 6 implementation from clean `main@f4f682d4c711dc86a0158ab7f05393d5c33f0160` in isolated branch/worktree `generated-unit-component-testing` while separate Task 6B certification continues. Task 6C must preserve Task 6B's pending observability subject, evidence, workflow, branch, and worktree; later reconciliation is a separate review decision. Task 6C advances the existing hybrid `standards` capability and generated-project recipe; it does not create a selectable testing capability or a public testing package. It owns generated dependencies, named Node/jsdom configuration, component setup, semantic scripts, real starter specifications, state/receipt changes, generated CI, and root/scoped testing instructions. Because this materially changes the `standards` descriptor and evidence contract, the capability returns to pending and P2 remains open until separate Task 6D certifies the exact subject.
 
+The Task 6C implementation candidate materializes `standards@0.3.0` and recipe `0.7.0`, uses Vite's native TypeScript-path resolution, retains exact public `@egeria-systems/standards@0.1.0`, and leaves both Task 6B and Task 6D certification outcomes pending. Its local implementation, review, and verification cannot certify standards or authorize hosted CI, deployment, publication, provider action, reconciliation, merge, or push.
+
 ### Builder monorepo
 
 - unit tests for schemas, capability resolution, inference, planning, merge logic, and error normalization;
