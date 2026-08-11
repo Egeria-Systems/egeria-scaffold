@@ -9,4 +9,5 @@ Read the repository [`AGENTS.md`](../../AGENTS.md), the canonical [package owner
 - Keep provider protocol encoding separate from provider effects. The package performs no fetch, console interception, browser storage, analytics, resource creation, or credential discovery.
 - Keep zero runtime dependencies. Cloudflare types and bindings belong only in generated platform adapters and composition roots, never in this package.
 - Keep exports, source inventory, and packaged files explicit. Local release configuration never authorizes publication.
+- Test the public API with Node's test runner (`node --test`) through `pnpm --filter @egeria-systems/observability run test`. Preserve coverage of bounded validation, privacy and redaction, sink/protocol encoding, adapter separation, and non-throwing failure behavior. These tests do not establish Cloudflare delivery, provider ingestion, deployment, or production behavior.
 - Follow the currently approved increment and stop at its review gate before expanding this boundary.

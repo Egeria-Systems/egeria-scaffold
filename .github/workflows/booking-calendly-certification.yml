@@ -29,14 +29,14 @@ jobs:
       url: ${{ vars.BOOKING_CALENDLY_CERTIFICATION_URL }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
           ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Set up pnpm and Node.js
-        uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
         with:
           version: 11.20.0
           runtime: node@22.23.2
@@ -76,11 +76,25 @@ jobs:
           mkdir -p "$RUNNER_TEMP/booking-calendly-certification"
           node apps/cli/dist/index.js create --profile portfolio --name acme-portfolio-calendly --display-name "Acme Portfolio Booking" --directory "$CERTIFICATION_ROOT" --calendly-url "$CALENDLY_URL" --calendly-mode popup
 
-      - name: Prepare deployment candidate
+      - name: Install deployment candidate dependencies
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/booking-calendly-certification/project
+        run: pnpm --dir "$CERTIFICATION_ROOT" install --frozen-lockfile
+
+      - name: Test deployment candidate unit behavior
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/booking-calendly-certification/project
+        run: pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:unit
+
+      - name: Test deployment candidate component behavior
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/booking-calendly-certification/project
+        run: pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:component
+
+      - name: Build and prepare deployment candidate
         env:
           CERTIFICATION_ROOT: ${{ runner.temp }}/booking-calendly-certification/project
         run: |
-          pnpm --dir "$CERTIFICATION_ROOT" install --frozen-lockfile
           pnpm --dir "$CERTIFICATION_ROOT" run build:cloudflare
           pnpm --dir "$CERTIFICATION_ROOT/apps/web" run browser:install:ci
 
