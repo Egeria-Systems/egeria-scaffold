@@ -509,7 +509,10 @@ function createDescriptors(
         "cloudflare-workers-logs",
       ],
       externalDomains: ["*.betterstackdata.com"],
-      dataClassifications: ["bounded-operational-telemetry"],
+      dataClassifications: [
+        "bounded-operational-telemetry",
+        "provider-platform-error-and-exception-logs",
+      ],
       retentionAssumptions: ["provider-controlled-operational-log-retention"],
       privilegedOperations: [
         "cloudflare-secret-configuration",

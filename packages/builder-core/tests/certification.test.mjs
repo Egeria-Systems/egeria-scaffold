@@ -30,7 +30,7 @@ const descriptorDigests = Object.freeze({
   "deployment-cloudflare":
     "sha256:846ae45d15ba9d8f256a9b7a1d8a4f3cda1b871a3b3f79f7656fd621050e8273",
   observability:
-    "sha256:edbd86f5b77a4d2ae14dac314113876f256babe0c7c34568f7df04e48f34c35b",
+    "sha256:a4f15a132e08da307ab412673b02152fee8509c0cc1dabb4b60856abd61f5d97",
   "section-composition":
     "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
   "site-routing":

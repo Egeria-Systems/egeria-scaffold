@@ -27,7 +27,8 @@ function createSameOriginSink() {
       const response = await fetch("/api/observability", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
+        credentials: "omit",
+        referrerPolicy: "no-referrer",
         keepalive: true,
         body: JSON.stringify({
           schemaVersion: envelope.schemaVersion,

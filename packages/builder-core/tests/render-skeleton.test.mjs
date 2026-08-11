@@ -514,9 +514,73 @@ function observabilityRequest(body, overrides = {}) {
   });
 }
 
+let browserReporterLoad = 0;
+
+async function loadGeneratedBrowserReporter(files) {
+  const source = indexFiles(files).get(
+    "apps/web/src/infrastructure/observability/browser-reporter.ts",
+  );
+  assert.notEqual(source, undefined);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  browserReporterLoad += 1;
+  const eventKey = `__browserReporterEvents${browserReporterLoad}`;
+  globalThis[eventKey] = [];
+  const rootModule = `data:text/javascript;base64,${Buffer.from(
+    [
+      `export function createOperationalEvent(input) { globalThis[${JSON.stringify(eventKey)}].push(input); return { ok: true, value: Object.freeze(input) }; }`,
+      "export async function dispatchOperationalEvent(event, sinks) {",
+      "return Promise.all(sinks.map(async (sink) => {",
+      "try { await sink.emit(event); return { ok: true }; } catch { return { ok: false }; }",
+      "}));",
+      "}",
+    ].join("\n"),
+  ).toString("base64")}`;
+  const browserModule = `data:text/javascript;base64,${Buffer.from(
+    [
+      "export function createBrowserSink(configuration) {",
+      "return Object.freeze({ emit(event) {",
+      'return configuration.send({ schemaVersion: "1.0.0", event });',
+      "} });",
+      "}",
+    ].join("\n"),
+  ).toString("base64")}`;
+  const withRoot = transpiled.replace(
+    'from "@egeria-systems/observability"',
+    `from ${JSON.stringify(rootModule)}`,
+  );
+  const executable = withRoot.replace(
+    'from "@egeria-systems/observability/browser"',
+    `from ${JSON.stringify(browserModule)}`,
+  );
+  assert.notEqual(withRoot, transpiled);
+  assert.notEqual(executable, withRoot);
+
+  return {
+    module: await import(
+      `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#browser-reporter-${browserReporterLoad}`
+    ),
+    events: globalThis[eventKey],
+  };
+}
+
 let serverReporterLoad = 0;
 
-async function loadGeneratedServerReporter(files) {
+async function loadGeneratedServerReporter(
+  files,
+  {
+    dispatchShouldReject = false,
+    ingestingHost = "s123.eu-nbg-2.betterstackdata.com",
+    scheduleShouldThrow = false,
+    sourceToken = "source-token-123456",
+  } = {},
+) {
   const source = indexFiles(files).get(
     "apps/web/src/infrastructure/observability/server-reporter.ts",
   );
@@ -531,24 +595,32 @@ async function loadGeneratedServerReporter(files) {
   }).outputText;
   serverReporterLoad += 1;
   const eventKey = `__serverReporterEvents${serverReporterLoad}`;
+  const structuredKey = `__serverReporterStructured${serverReporterLoad}`;
+  const betterStackKey = `__serverReporterBetterStack${serverReporterLoad}`;
+  const dispatchKey = `__serverReporterDispatches${serverReporterLoad}`;
+  const scheduleKey = `__serverReporterScheduled${serverReporterLoad}`;
   globalThis[eventKey] = [];
+  globalThis[structuredKey] = [];
+  globalThis[betterStackKey] = [];
+  globalThis[dispatchKey] = [];
+  globalThis[scheduleKey] = [];
   const rootModule = `data:text/javascript;base64,${Buffer.from(
     [
-      `export function createOperationalEvent(input) { globalThis[${JSON.stringify(eventKey)}].push(input); return { ok: true, value: Object.freeze({}) }; }`,
+      `export function createOperationalEvent(input) { globalThis[${JSON.stringify(eventKey)}].push(input); return { ok: true, value: Object.freeze(input) }; }`,
       'export function normalizeErrorCategory() { return "unexpected"; }',
-      'export function dispatchOperationalEvent() { return Promise.reject(new Error("provider failed")); }',
+      `export function dispatchOperationalEvent(event, sinks) { globalThis[${JSON.stringify(dispatchKey)}].push({ event, sinks }); return ${dispatchShouldReject ? 'Promise.reject(new Error("provider failed"))' : "Promise.resolve([])"}; }`,
     ].join("\n"),
   ).toString("base64")}`;
   const serverModule = `data:text/javascript;base64,${Buffer.from(
     [
-      "export function createStructuredLogSink() { return Object.freeze({}); }",
-      "export function createBetterStackSink() { return Object.freeze({ ok: false }); }",
+      `export function createStructuredLogSink(configuration) { globalThis[${JSON.stringify(structuredKey)}].push(configuration); return Object.freeze({ kind: "structured" }); }`,
+      `export function createBetterStackSink(configuration) { globalThis[${JSON.stringify(betterStackKey)}].push(configuration); return configuration.ingestingHost === "" || configuration.sourceToken === "" ? Object.freeze({ ok: false }) : Object.freeze({ ok: true, value: Object.freeze({ kind: "better-stack" }) }); }`,
     ].join("\n"),
   ).toString("base64")}`;
   const contextModule = `data:text/javascript;base64,${Buffer.from(
     [
       "export async function readObservabilityRuntimeContext() {",
-      'return { ingestingHost: "", sourceToken: "", releaseId: "release-123", schedule() { throw new Error("context failed"); } };',
+      `return { ingestingHost: ${JSON.stringify(ingestingHost)}, sourceToken: ${JSON.stringify(sourceToken)}, releaseId: "release-123", schedule(delivery) { globalThis[${JSON.stringify(scheduleKey)}].push(delivery); ${scheduleShouldThrow ? 'throw new Error("context failed");' : ""} } };`,
       "}",
     ].join("\n"),
   ).toString("base64")}`;
@@ -573,6 +645,10 @@ async function loadGeneratedServerReporter(files) {
       `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#reporter-${serverReporterLoad}`
     ),
     events: globalThis[eventKey],
+    structuredConfigurations: globalThis[structuredKey],
+    betterStackConfigurations: globalThis[betterStackKey],
+    dispatches: globalThis[dispatchKey],
+    scheduled: globalThis[scheduleKey],
   };
 }
 
@@ -984,6 +1060,111 @@ test("production observability renders bounded Next and Cloudflare composition",
   );
 });
 
+test("the browser reporter emits exact credential-free bounded envelopes", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedBrowserReporter(rendered.files);
+  const requests = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    requests.push({ input, init });
+    return { ok: true };
+  };
+
+  try {
+    assert.equal(loaded.module.reportBrowserError("window-error"), undefined);
+    assert.equal(
+      loaded.module.reportWebVital({
+        name: "LCP",
+        value: 1_234.5,
+        delta: 10.25,
+        rating: "good",
+        navigationType: "navigate",
+        message: "private value",
+        url: "https://portfolio.example/private?token=secret",
+      }),
+      undefined,
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(requests.length, 2);
+  for (const request of requests) {
+    assert.equal(request.input, "/api/observability");
+    assert.equal(request.init.method, "POST");
+    assert.deepEqual(request.init.headers, {
+      "Content-Type": "application/json",
+    });
+    assert.equal(request.init.credentials, "omit");
+    assert.equal(request.init.referrerPolicy, "no-referrer");
+    assert.equal(request.init.keepalive, true);
+  }
+
+  const [browserError, webVital] = requests.map(({ init }) =>
+    JSON.parse(init.body),
+  );
+  assert.deepEqual(browserError, {
+    schemaVersion: "1.0.0",
+    event: {
+      name: "browser.window.error",
+      kind: "application.error",
+      runtime: "browser",
+      severity: "error",
+      context: {
+        correlationId: browserError.event.context.correlationId,
+      },
+      errorCategory: "unexpected",
+      attributes: { source: "window-error" },
+    },
+  });
+  assert.match(
+    browserError.event.context.correlationId,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+  );
+  assert.deepEqual(webVital, {
+    schemaVersion: "1.0.0",
+    event: {
+      name: "browser.web.vital",
+      kind: "web.vital",
+      runtime: "browser",
+      severity: "info",
+      context: { correlationId: webVital.event.context.correlationId },
+      attributes: {
+        metricName: "LCP",
+        value: 1_234.5,
+        delta: 10.25,
+        rating: "good",
+        navigationType: "navigate",
+      },
+    },
+  });
+  assert.doesNotMatch(
+    JSON.stringify(requests),
+    /private value|portfolio\.example|token=secret|message|url/u,
+  );
+
+  globalThis.fetch = async () => {
+    throw new Error("transport failed with private response");
+  };
+  try {
+    await assert.doesNotReject(async () => {
+      loaded.module.reportBrowserError("unhandled-rejection");
+      await new Promise((resolve) => setImmediate(resolve));
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("the browser route accepts only bounded same-origin operational envelopes", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(
@@ -1165,6 +1346,120 @@ test("server reporting contains runtime and provider failures without raw error 
     JSON.stringify(loaded.events),
     /private message|bearer-secret-token/u,
   );
+
+  assert.equal(loaded.structuredConfigurations.length, 1);
+  assert.equal(loaded.betterStackConfigurations.length, 1);
+  assert.deepEqual(
+    {
+      identifier: loaded.structuredConfigurations[0].identifier,
+      write: typeof loaded.structuredConfigurations[0].write,
+    },
+    { identifier: "cloudflare-workers-logs", write: "function" },
+  );
+  assert.deepEqual(
+    {
+      ingestingHost: loaded.betterStackConfigurations[0].ingestingHost,
+      sourceToken: loaded.betterStackConfigurations[0].sourceToken,
+      timeoutMilliseconds:
+        loaded.betterStackConfigurations[0].timeoutMilliseconds,
+      request: typeof loaded.betterStackConfigurations[0].request,
+    },
+    {
+      ingestingHost: "s123.eu-nbg-2.betterstackdata.com",
+      sourceToken: "source-token-123456",
+      timeoutMilliseconds: 5_000,
+      request: "function",
+    },
+  );
+  assert.equal(loaded.dispatches.length, 1);
+  assert.deepEqual(
+    loaded.dispatches[0].sinks.map(({ kind }) => kind),
+    ["structured", "better-stack"],
+  );
+  assert.equal(loaded.scheduled.length, 1);
+  await assert.doesNotReject(() => loaded.scheduled[0]);
+
+  const structuredRecords = [];
+  const originalConsoleInfo = console.info;
+  console.info = (record) => structuredRecords.push(record);
+  try {
+    loaded.structuredConfigurations[0].write({ bounded: true });
+  } finally {
+    console.info = originalConsoleInfo;
+  }
+  assert.deepEqual(structuredRecords, [{ bounded: true }]);
+
+  const providerRequests = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    providerRequests.push({ url, init });
+    return { status: 202 };
+  };
+  try {
+    assert.deepEqual(
+      await loaded.betterStackConfigurations[0].request({
+        url: "https://s123.eu-nbg-2.betterstackdata.com",
+        method: "POST",
+        headers: { Authorization: "Bearer source-token-123456" },
+        body: '{"bounded":true}',
+        timeoutMilliseconds: 5_000,
+      }),
+      { status: 202 },
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(providerRequests.length, 1);
+  assert.equal(
+    providerRequests[0].url,
+    "https://s123.eu-nbg-2.betterstackdata.com",
+  );
+  assert.deepEqual(
+    {
+      method: providerRequests[0].init.method,
+      headers: providerRequests[0].init.headers,
+      body: providerRequests[0].init.body,
+    },
+    {
+      method: "POST",
+      headers: { Authorization: "Bearer source-token-123456" },
+      body: '{"bounded":true}',
+    },
+  );
+  assert.equal(providerRequests[0].init.signal instanceof AbortSignal, true);
+});
+
+test("server reporting omits invalid provider credentials and contains failures", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const withoutProvider = await loadGeneratedServerReporter(rendered.files, {
+    ingestingHost: "",
+    sourceToken: "",
+  });
+  await assert.doesNotReject(() =>
+    withoutProvider.module.reportServerError(new Error("private failure")),
+  );
+  assert.deepEqual(
+    withoutProvider.dispatches[0].sinks.map(({ kind }) => kind),
+    ["structured"],
+  );
+
+  const failing = await loadGeneratedServerReporter(rendered.files, {
+    dispatchShouldReject: true,
+    scheduleShouldThrow: true,
+  });
+  await assert.doesNotReject(() =>
+    failing.module.reportServerError(new Error("private failure")),
+  );
+  assert.equal(failing.scheduled.length, 1);
+  await assert.doesNotReject(() => failing.scheduled[0]);
 });
 
 test("rendering conditionally overlays the home route and materializes each Calendly mode", async () => {

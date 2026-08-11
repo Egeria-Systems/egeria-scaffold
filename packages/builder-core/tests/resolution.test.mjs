@@ -781,7 +781,10 @@ test("the portfolio and site catalog declares the exact seven executable capabil
       externalDomains: ["*.betterstackdata.com"],
       contentSecurityPolicyContributions: [],
       browserStorage: [],
-      dataClassifications: ["bounded-operational-telemetry"],
+      dataClassifications: [
+        "bounded-operational-telemetry",
+        "provider-platform-error-and-exception-logs",
+      ],
       retentionAssumptions: ["provider-controlled-operational-log-retention"],
       privilegedOperations: [
         "cloudflare-secret-configuration",

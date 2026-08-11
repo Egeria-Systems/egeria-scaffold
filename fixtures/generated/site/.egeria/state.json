@@ -159,7 +159,7 @@
       "path": ".egeria/project.yaml"
     },
     {
-      "fingerprint": "sha256:25f2971ece74f3a884b47f110eda152c5af95d168ba823c1c42f049866f9dc07",
+      "fingerprint": "sha256:4880530d46647b699b6175ee8e057de7a6f5e9aac5471aeeef0486cc257af979",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -267,7 +267,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:1d7e16d759fe843e8ab5d5e520d9b1dd7dab051499787512e645165e1b27cfee",
+      "fingerprint": "sha256:598a9bb232db9675ece72fe50c6beba670d157e87f8fca25684927a366c020cc",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -745,7 +745,7 @@
       "path": "apps/web/instrumentation-client.ts"
     },
     {
-      "fingerprint": "sha256:8c3b27c2ba503c71ce9dce7071ccdae62a3b620e7dabb3ed5cdeb3e313a4c22f",
+      "fingerprint": "sha256:a36c88c7f7a3f1a33265fbc92e375b07b3542b011601c28c5280af29e0ee924b",
       "fingerprintTarget": {
         "kind": "file"
       },

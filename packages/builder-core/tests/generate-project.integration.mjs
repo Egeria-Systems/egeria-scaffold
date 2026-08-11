@@ -20,15 +20,19 @@ const publicRegistry = "https://registry.npmjs.org/";
 const packages = [
   {
     name: "@egeria-systems/standards",
+    version: "0.1.0",
     integrity:
       "sha512-BmDwcX0T6KT271C4N24jCKn6ymKTqDAFpJjsG6LNpmIoTAz0xApIcqpHFl9dHOqlB2xdhdHwKYfSiELUp04E0Q==",
     directory: "packages/standards",
+    hasAttestations: false,
   },
   {
     name: "@egeria-systems/observability",
+    version: "0.2.0",
     integrity:
-      "sha512-eCTt6tNP0q2HA0wNpM1VJpZBFZqFpBDekKbno+UUKfWMG5I+KEg3bpt/fKdVO86JrKohlIM6Zo/7qzGDBpmh8g==",
+      "sha512-t0ulhalC7yc53PLABF4lu+jknR2jwdNJOLXd48Vtt5dw3KubGUTzSUU4Bn8jqvRonVn47vb0TexHOsxFoe1wDA==",
     directory: "packages/observability",
+    hasAttestations: true,
   },
 ];
 
@@ -79,9 +83,9 @@ async function runPnpm(arguments_, options) {
   });
 }
 
-async function fetchPackageManifest(packageName) {
+async function fetchPackageManifest(packageName, version) {
   const response = await fetch(
-    `${publicRegistry}${encodeURIComponent(packageName)}/0.1.0`,
+    `${publicRegistry}${encodeURIComponent(packageName)}/${version}`,
     { signal: AbortSignal.timeout(30_000) },
   );
   assert.equal(response.ok, true, `${packageName}: ${response.status}`);
@@ -123,9 +127,12 @@ test("public portfolio and site projects install, build, audit, and infer", asyn
 
   try {
     for (const expectedPackage of packages) {
-      const manifest = await fetchPackageManifest(expectedPackage.name);
+      const manifest = await fetchPackageManifest(
+        expectedPackage.name,
+        expectedPackage.version,
+      );
       assert.equal(manifest.name, expectedPackage.name);
-      assert.equal(manifest.version, "0.1.0");
+      assert.equal(manifest.version, expectedPackage.version);
       assert.equal(manifest.license, "Apache-2.0");
       assert.deepEqual(manifest.repository, {
         type: "git",
@@ -134,7 +141,10 @@ test("public portfolio and site projects install, build, audit, and infer", asyn
       });
       assert.equal(manifest.dist.integrity, expectedPackage.integrity);
       assert.ok(manifest.dist.signatures.length > 0);
-      assert.equal(manifest.dist.attestations, undefined);
+      assert.equal(
+        manifest.dist.attestations !== undefined,
+        expectedPackage.hasAttestations,
+      );
     }
 
     const catalog = assertSuccess(createVerifiedCapabilityCatalog());
@@ -157,7 +167,7 @@ test("public portfolio and site projects install, build, audit, and infer", asyn
       );
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 43 : 45,
+        profile === "portfolio" ? 78 : 80,
       );
 
       const lockfile = await readFile(join(destination, "pnpm-lock.yaml"));
