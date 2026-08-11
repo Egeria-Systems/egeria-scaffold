@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, lstat, mkdir, rm } from "node:fs/promises";
+import { access, lstat, mkdir, readFile, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -16,6 +16,14 @@ const repositoryRoot = resolve(
 const certificationScript = resolve(
   repositoryRoot,
   "scripts/certify-production-observability.mjs",
+);
+const certificationRegistryPath = resolve(
+  repositoryRoot,
+  "certifications/capabilities.json",
+);
+const certificationCheckScript = resolve(
+  repositoryRoot,
+  "scripts/check-capability-certification.mjs",
 );
 
 const fixedChecks = Object.freeze([
@@ -100,6 +108,66 @@ async function cleanupRetainedDirectory(path) {
     await rm(path, { recursive: true, force: true });
   }
 }
+
+async function runCertificationClosure(policy) {
+  try {
+    const result = await execFileAsync(
+      process.execPath,
+      [certificationCheckScript, "--closure", policy],
+      {
+        cwd: repositoryRoot,
+        encoding: "utf8",
+        env: { PATH: process.env.PATH },
+      },
+    );
+    return { exitCode: 0, stdout: result.stdout, stderr: result.stderr };
+  } catch (error) {
+    return {
+      exitCode: error.code,
+      stdout: error.stdout,
+      stderr: error.stderr,
+    };
+  }
+}
+
+test("the observability registry records only reviewed local fresh-scaffold evidence while remaining pending", async () => {
+  const registry = JSON.parse(
+    await readFile(certificationRegistryPath, "utf8"),
+  );
+  const record = registry.records.observability;
+  const subject = {
+    descriptorVersion: "0.2.0",
+    behaviorContractDigest:
+      "sha256:a4f15a132e08da307ab412673b02152fee8509c0cc1dabb4b60856abd61f5d97",
+  };
+
+  assert.deepEqual(record.subject, subject);
+  assert.equal(
+    record.taskPlan,
+    "docs/superpowers/plans/2026-08-10-production-observability-certification.md",
+  );
+  assert.equal(record.status, "pending");
+  assert.deepEqual(record.evidence, [
+    {
+      kind: "fresh-scaffold",
+      path: "docs/implementation-evidence/2026-08-11-production-observability-certification-verification.md",
+      outcome: "passed",
+      revision: "ef845b1e0551d3b43e17969cc00f21960c90769b",
+      subject,
+    },
+  ]);
+
+  for (const policy of ["legacy-backfill-exempt", "all-certified"]) {
+    const closure = await runCertificationClosure(policy);
+    assert.equal(closure.exitCode, 1);
+    assert.equal(closure.stderr, "");
+    assert.match(
+      closure.stdout,
+      /"path":\["records","observability","status"\]/u,
+    );
+    assert.match(closure.stdout, /"reason":"pending"/u);
+  }
+});
 
 test("observability production mutation keeps real owner identity while testing mocks commands and verification", async () => {
   const commands = [];
