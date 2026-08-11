@@ -268,11 +268,11 @@ The verified publication produced both public `0.2.0` artifacts, but public avai
 
 ## Task 7: Regenerate immutable fixtures from production output
 
-- [ ] Run the production CLI twice for every fixture identifier under approved registry access and compare exact byte snapshots before changing committed fixtures.
-- [ ] Replace fixture trees only with successful production output. Verify state is written last, installed capability versions/recipe versions match, all managed-surface fingerprints agree, inference is unambiguous, diagnostics are healthy, and diff is empty.
-- [ ] Run frozen install, audits, signatures, lint, typecheck, Next build, OpenNext build, Wrangler type generation, development browser suite, and workerd-preview browser suite through the existing fixed verifier.
-- [ ] Do not claim deployed, Better Stack, Workers Logs UI, visual, performance, human accessibility, production, or WCAG evidence.
-- [ ] Commit with message `Refresh observable portfolio fixtures`.
+- [x] Run the production CLI twice for every fixture identifier under approved registry access and compare exact byte snapshots before changing committed fixtures.
+- [x] Replace fixture trees only with successful production output. Verify state is written last, installed capability versions/recipe versions match, all managed-surface fingerprints agree, inference is unambiguous, diagnostics are healthy, and diff is empty.
+- [x] Run frozen install, audits, signatures, lint, typecheck, Next build, OpenNext build, Wrangler type generation, development browser suite, and workerd-preview browser suite through the existing fixed verifier.
+- [x] Do not claim deployed, Better Stack, Workers Logs UI, visual, performance, human accessibility, production, or WCAG evidence.
+- [x] Commit with message `Refresh observable portfolio fixtures`.
 
 ## Task 8: Reconcile canonical documentation
 

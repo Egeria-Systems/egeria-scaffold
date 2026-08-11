@@ -128,7 +128,7 @@ function assertPortablePublicLockfile(lockfile) {
   );
   assert.doesNotMatch(lockfile, /(?:^|[{,]\s*)tarball:/mu);
   assert.match(lockfile, /@egeria-systems\/standards@0\.1\.0/u);
-  assert.match(lockfile, /@egeria-systems\/observability@0\.1\.0/u);
+  assert.match(lockfile, /@egeria-systems\/observability@0\.2\.0/u);
   assert.match(lockfile, /@axe-core\/playwright@4\.12\.1/u);
   assert.match(lockfile, /@playwright\/test@1\.62\.1/u);
   assert.match(lockfile, /raw-loader@4\.0\.2/u);
@@ -188,6 +188,12 @@ test("compiled project generation matches every committed fixture identifier", a
         assert.equal(
           state.origin.recipeVersion,
           fixtureCase.expectedRecipeVersion,
+        );
+        assert.equal(
+          state.installedCapabilities.find(
+            ({ identifier }) => identifier === "observability",
+          )?.version,
+          fixtureCase.expectedObservabilityVersion,
         );
         assert.equal(
           state.installedCapabilities.find(

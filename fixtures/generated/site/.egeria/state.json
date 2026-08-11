@@ -53,7 +53,7 @@
         "repository-stateful",
         "external-stateful"
       ],
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
       "deliveryMode": "source-generated",
@@ -81,7 +81,7 @@
   },
   "managedSurfaces": [
     {
-      "fingerprint": "sha256:bd843e0cab3dd775ae9cee9e60476dfdef122682c15a6c4e1706d6a0562f6b12",
+      "fingerprint": "sha256:94254452da2d028a3c258a73dda9790ddace14eae944226956c5bc730aca4689",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -146,7 +146,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:992bcf566cddc0b8e4ea3c6e3a309705b620577250d139c43d24faeb3d774b08",
+      "fingerprint": "sha256:eb8a888a3f7153e628e7c9be304fc90d3213040976eba6a04206d9bb43e289a9",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -185,7 +185,7 @@
       "path": "AGENTS.md"
     },
     {
-      "fingerprint": "sha256:12bbf6b0ec96756dcab6c326e9d0980be78ef43cd1ae5727685b1b6c16ad8154",
+      "fingerprint": "sha256:dc909d1a1943e8374c5cb3f3144ecb7922f4a58c02b971e3ff9d7a2a465e2f93",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -518,7 +518,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:06d27b3aa870a2ec0de1d8ddc3a60c4c72291b714f1dcafa8b05a414d5680533",
+      "fingerprint": "sha256:f5999bce657b9fedc8d418705619db9fedaf84eef95cca7c8bd3bd6f11786478",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -688,7 +688,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:974bac413012924364529374e04b446644608abb0ca8f8791f7f94fbaf08e8d6",
+      "fingerprint": "sha256:b452dfcebdd9001adf5516178a5099b6bcf3105ec0d5f61dce3a5fd6db399722",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -717,7 +717,63 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:8e633b4f41f99d4c388915bc852f2143cf4e9f5eaad70c76a81d4f4aa629eec1",
+      "fingerprint": "sha256:2c87cc56f0278ee9b6c57bd693a0af03a4dc976ea157a0094f32230611c3e82c",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "observability-browser-ingest-route",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "observability",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/app/api/observability/route.ts"
+    },
+    {
+      "fingerprint": "sha256:3a43eded916707f38243f547e54c9d500a6029a4f436796ecc6adf43dba00269",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "observability-browser-instrumentation",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "observability",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/instrumentation-client.ts"
+    },
+    {
+      "fingerprint": "sha256:8c3b27c2ba503c71ce9dce7071ccdae62a3b620e7dabb3ed5cdeb3e313a4c22f",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "observability-browser-reporter",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "observability",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/infrastructure/observability/browser-reporter.ts"
+    },
+    {
+      "fingerprint": "sha256:d986d4cf7d8c859cad7f5a4ff1ed28093e0c1279846f3bb935fc59c90b2570f6",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "observability-cloudflare-context",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "observability",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/infrastructure/cloudflare/observability-context.ts"
+    },
+    {
+      "fingerprint": "sha256:08b8b986de3e69ac65cb590acf0b2b9bd12a97da05bc3c0551c2be86917fee91",
       "fingerprintTarget": {
         "kind": "json-value",
         "pointer": "/dependencies/@egeria-systems~1observability"
@@ -744,6 +800,48 @@
       },
       "ownership": "managed",
       "path": "apps/web/src/infrastructure/observability/installed-capability.ts"
+    },
+    {
+      "fingerprint": "sha256:3db4ffd003ccf0003b23844fb3c8d94533e2655e4c1847465c620d4e8434b6fc",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "observability-server-instrumentation",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "observability",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/instrumentation.ts"
+    },
+    {
+      "fingerprint": "sha256:8dfbff56d557bdb9314239fec04b5cac3032149aaf271602d3ee86b728c9c645",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "observability-server-reporter",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "observability",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/infrastructure/observability/server-reporter.ts"
+    },
+    {
+      "fingerprint": "sha256:992ca875960306c6d4df22af9fc2e2d9336745ca5ba3724b11d967c8a0d83f33",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "observability-web-vitals-reporter",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "observability",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx"
     },
     {
       "fingerprint": "sha256:f01825fbb5aa782f14f9c24ee6934fc8dcc9b6c1aab96864d651cc001ba28be2",
@@ -1109,7 +1207,7 @@
   ],
   "origin": {
     "profile": "site",
-    "recipeVersion": "0.5.0"
+    "recipeVersion": "0.6.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"
