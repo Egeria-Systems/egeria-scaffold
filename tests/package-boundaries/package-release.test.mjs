@@ -42,13 +42,13 @@ const packageRecords = [
     name: "@egeria-systems/observability",
     path: "packages/observability",
     private: false,
-    version: "0.1.0",
+    version: "0.2.0",
   },
   {
     name: "@egeria-systems/standards",
     path: "packages/standards",
     private: false,
-    version: "0.1.0",
+    version: "0.2.0",
   },
   {
     name: "@egeria-systems/nextjs-cloudflare-proof",
@@ -58,17 +58,17 @@ const packageRecords = [
   },
 ];
 
-const absentRegistryResults = [
+const unpublishedTargetRegistryResults = [
   {
     name: "@egeria-systems/observability",
-    version: "0.1.0",
-    packageStatus: "absent",
+    version: "0.2.0",
+    packageStatus: "present",
     status: "absent",
   },
   {
     name: "@egeria-systems/standards",
-    version: "0.1.0",
-    packageStatus: "absent",
+    version: "0.2.0",
+    packageStatus: "present",
     status: "absent",
   },
 ];
@@ -140,7 +140,7 @@ test("missing, extra, renamed, or private public records are rejected", () => {
         name: "@egeria-systems/extra",
         path: "packages/extra",
         private: false,
-        version: "0.1.0",
+        version: "0.2.0",
       },
     ],
     packageRecords.map((record) =>
@@ -167,7 +167,8 @@ test("invalid, zero, and wrong candidate versions are rejected", () => {
   for (const [version, code] of [
     ["invalid", "PUBLIC_PACKAGE_VERSION_INVALID"],
     ["0.0.0", "PUBLIC_PACKAGE_VERSION_INVALID"],
-    ["0.2.0", "PUBLIC_PACKAGE_VERSION_UNEXPECTED"],
+    ["0.1.0", "PUBLIC_PACKAGE_VERSION_UNEXPECTED"],
+    ["0.3.0", "PUBLIC_PACKAGE_VERSION_UNEXPECTED"],
   ]) {
     const packages = packageRecords.map((record) =>
       record.name === "@egeria-systems/standards"
@@ -194,18 +195,18 @@ test("pending release intent is rejected after version materialization", () => {
   );
 });
 
-test("release registry state accepts two absent versions", () => {
+test("release registry state accepts existing histories with absent target versions", () => {
   assert.deepEqual(
     checkRegistryState({
       packages: packageRecords,
       pendingChangesets: [],
-      registryResults: absentRegistryResults,
+      registryResults: unpublishedTargetRegistryResults,
     }),
     [],
   );
 });
 
-test("release registry state fails closed for every non-absent result", () => {
+test("release registry state fails closed for every non-absent target result", () => {
   for (const status of [
     "present",
     "redirect",
@@ -213,7 +214,7 @@ test("release registry state fails closed for every non-absent result", () => {
     "authentication-failed",
     "network-failed",
   ]) {
-    const registryResults = absentRegistryResults.map((result, index) =>
+    const registryResults = unpublishedTargetRegistryResults.map((result, index) =>
       index === 0
         ? {
             ...result,
@@ -241,7 +242,7 @@ test("registry validation rejects incomplete or mixed target results", () => {
       checkRegistryState({
         packages: packageRecords,
         pendingChangesets: [],
-        registryResults: absentRegistryResults.slice(0, 1),
+        registryResults: unpublishedTargetRegistryResults.slice(0, 1),
       }),
     ),
     ["REGISTRY_RESULT_SET_INVALID"],
@@ -251,7 +252,7 @@ test("registry validation rejects incomplete or mixed target results", () => {
       checkRegistryState({
         packages: packageRecords,
         pendingChangesets: [],
-        registryResults: absentRegistryResults.map((result, index) =>
+        registryResults: unpublishedTargetRegistryResults.map((result, index) =>
           index === 0 ? { ...result, status: "present" } : result,
         ),
       }),
@@ -260,9 +261,9 @@ test("registry validation rejects incomplete or mixed target results", () => {
   );
 });
 
-test("registry validation rejects unexpected package history", () => {
-  const registryResults = absentRegistryResults.map((result, index) =>
-    index === 0 ? { ...result, packageStatus: "present" } : result,
+test("registry validation rejects missing package history", () => {
+  const registryResults = unpublishedTargetRegistryResults.map((result, index) =>
+    index === 0 ? { ...result, packageStatus: "absent" } : result,
   );
 
   assert.deepEqual(
@@ -296,16 +297,16 @@ test("registry adapter checks package history and exact version", async () => {
   const requests = [];
   const result = await readRegistryPackageState({
     name: "@egeria-systems/standards",
-    version: "0.1.0",
+    version: "0.2.0",
     request: async (url, options) => {
       requests.push({ url, redirect: options.redirect });
-      return { status: url.endsWith("/0.1.0") ? 404 : 200 };
+      return { status: url.endsWith("/0.2.0") ? 404 : 200 };
     },
   });
 
   assert.deepEqual(result, {
     name: "@egeria-systems/standards",
-    version: "0.1.0",
+    version: "0.2.0",
     packageStatus: "present",
     status: "absent",
   });
@@ -317,7 +318,7 @@ test("registry adapter checks package history and exact version", async () => {
         redirect: "manual",
       },
       {
-        url: "https://registry.npmjs.org/%40egeria-systems%2Fstandards/0.1.0",
+        url: "https://registry.npmjs.org/%40egeria-systems%2Fstandards/0.2.0",
         redirect: "manual",
       },
     ],
@@ -327,7 +328,7 @@ test("registry adapter checks package history and exact version", async () => {
 test("registry adapter maps request failures without exposing details", async () => {
   const result = await readRegistryPackageState({
     name: "@egeria-systems/observability",
-    version: "0.1.0",
+    version: "0.2.0",
     request: async () => {
       throw new Error("credential-secret network detail");
     },
@@ -335,7 +336,7 @@ test("registry adapter maps request failures without exposing details", async ()
 
   assert.deepEqual(result, {
     name: "@egeria-systems/observability",
-    version: "0.1.0",
+    version: "0.2.0",
     packageStatus: "network-failed",
     status: "network-failed",
   });
@@ -395,6 +396,9 @@ function releaseWorkflowProblems(workflow) {
     )
   ) {
     problems.push("verification must not run under npm authentication");
+  }
+  if (workflow.includes("pnpm run changeset:status")) {
+    problems.push("a materialized release must not run raw Changesets status");
   }
   if (!/^        if: always\(\)$/m.test(workflow.slice(cleanupIndex))) {
     problems.push("authentication cleanup must be unconditional");
@@ -465,7 +469,7 @@ test("package release workflow is manual, exact-commit-bound, and least privileg
   assert.match(workflow, /test "\$\(pnpm exec npm --version\)" = "12\.0\.2"/);
   assert.match(workflow, /pnpm run check:package-release context/);
   assert.match(workflow, /pnpm run verify:package-release-candidate/);
-  assert.match(workflow, /pnpm run changeset:status/);
+  assert.doesNotMatch(workflow, /pnpm run changeset:status/);
   assert.match(workflow, /pnpm peers check/);
   assert.match(workflow, /pnpm audit --audit-level=moderate/);
   assert.equal(

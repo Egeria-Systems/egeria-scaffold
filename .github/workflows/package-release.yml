@@ -53,7 +53,6 @@ jobs:
       - name: Verify release candidate
         run: |
           pnpm run verify:package-release-candidate
-          pnpm run changeset:status
           pnpm peers check
           pnpm audit --audit-level=moderate
 

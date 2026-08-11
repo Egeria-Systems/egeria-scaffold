@@ -284,45 +284,20 @@ test("the release candidate materializes only the approved public versions", asy
   const changesetFiles = (await readdir(resolve(repositoryRoot, ".changeset")))
     .filter((file) => file.endsWith(".md") && file !== "README.md")
     .sort();
-  assert.deepEqual(changesetFiles, [
-    "add-production-observability.md",
-    "externalize-visible-copy.md",
-  ]);
-  assert.equal(
-    await readFile(
-      resolve(repositoryRoot, ".changeset/add-production-observability.md"),
-      "utf8",
-    ),
-    `---
-"@egeria-systems/observability": minor
----
+  assert.deepEqual(changesetFiles, []);
 
-Add privacy-safe operational event contracts, redaction, server and browser delivery boundaries, Better Stack protocol support, and test sinks.
-`,
-  );
-  assert.equal(
-    await readFile(
-      resolve(repositoryRoot, ".changeset/externalize-visible-copy.md"),
-      "utf8",
-    ),
-    `---
-"@egeria-systems/standards": minor
----
-
-Add a flat ESLint config that rejects static user-visible JSX, relevant attribute, and Next.js metadata copy outside validated content or localization sources.
-`,
-  );
-
-  for (const [manifestPath, changelogPath, packageName] of [
+  for (const [manifestPath, changelogPath, packageName, releaseSummary] of [
     [
       "packages/standards/package.json",
       "packages/standards/CHANGELOG.md",
       "@egeria-systems/standards",
+      "Add a flat ESLint config that rejects static user-visible JSX, relevant attribute, and Next.js metadata copy outside validated content or localization sources.",
     ],
     [
       "packages/observability/package.json",
       "packages/observability/CHANGELOG.md",
       "@egeria-systems/observability",
+      "Add privacy-safe operational event contracts, redaction, server and browser delivery boundaries, Better Stack protocol support, and test sinks.",
     ],
   ]) {
     const manifest = await readJson(manifestPath);
@@ -331,9 +306,11 @@ Add a flat ESLint config that rejects static user-visible JSX, relevant attribut
       "utf8",
     );
 
-    assert.equal(manifest.version, "0.1.0", manifestPath);
+    assert.equal(manifest.version, "0.2.0", manifestPath);
     assert.match(changelog, new RegExp(`^# ${packageName}$`, "m"));
+    assert.match(changelog, /^## 0\.2\.0$/m);
     assert.match(changelog, /^## 0\.1\.0$/m);
+    assert.ok(changelog.includes(releaseSummary), changelogPath);
     assert.match(
       changelog,
       /Establish the initial public package APIs, including strict type-aware ESLint configuration, and release safeguards\./,

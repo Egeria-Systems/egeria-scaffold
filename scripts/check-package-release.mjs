@@ -11,12 +11,12 @@ const expectedPublicPackages = Object.freeze([
   Object.freeze({
     name: "@egeria-systems/observability",
     path: "packages/observability",
-    version: "0.1.0",
+    version: "0.2.0",
   }),
   Object.freeze({
     name: "@egeria-systems/standards",
     path: "packages/standards",
-    version: "0.1.0",
+    version: "0.2.0",
   }),
 ]);
 
@@ -111,7 +111,7 @@ export function checkLocalCandidate({ packages, pendingChangesets }) {
       problems.push(
         createProblem(
           "PUBLIC_PACKAGE_VERSION_UNEXPECTED",
-          "The initial public package candidate must use the approved version.",
+          "The public package candidate must use the approved target version.",
         ),
       );
     }
@@ -165,13 +165,13 @@ export function checkRegistryState({
   if (
     registryResults.some(
       ({ packageStatus, status }) =>
-        packageStatus !== "absent" || status !== "absent",
+        packageStatus !== "present" || status !== "absent",
     )
   ) {
     return freezeProblems([
       createProblem(
         "REGISTRY_STATE_INVALID",
-        "Both public package names and exact target versions must be absent from the registry.",
+        "Both public package histories must exist and both exact target versions must be absent from the registry.",
       ),
     ]);
   }
