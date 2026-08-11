@@ -15,7 +15,7 @@ const compactTokenPattern =
   /^[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}$/u;
 const ipv4AddressPattern = /^(?:\d{1,3}\.){3}\d{1,3}$/u;
 const ipv6AddressPattern =
-  /^(?=[A-Fa-f0-9:]*:[A-Fa-f0-9:]*:)[A-Fa-f0-9:]+$/u;
+  /^(?=[A-Fa-f0-9:.]*:[A-Fa-f0-9:.]*:)[A-Fa-f0-9:.]+$/u;
 
 function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {

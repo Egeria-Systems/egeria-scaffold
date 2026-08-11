@@ -111,6 +111,16 @@ test("invalid event identity and context fail without echoing rejected values", 
         kind: "application.lifecycle",
         runtime: "server",
         severity: "info",
+        context: { correlationId: "2001:db8::192.0.2.1" },
+      },
+      "EVENT_CONTEXT_INVALID",
+    ],
+    [
+      {
+        name: "application.ready",
+        kind: "application.lifecycle",
+        runtime: "server",
+        severity: "info",
         context: {
           correlationId: "ray-123",
           releaseId: "sk_live_fictionalValue123",
@@ -182,6 +192,8 @@ test("private-data keys and secret-like string values are never admitted", () =>
     "2001:db8:1:2:3:4:5:6",
     "2001:db8::1",
     "::1",
+    "2001:db8::192.0.2.1",
+    "0:0:0:0:0:ffff:192.0.2.128",
   ]) {
     const result = createOperationalEvent(
       {
