@@ -46,6 +46,8 @@ If the runbook concludes that no human setup is required, the plan records the e
 
 The [approved source plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md) owns which capability deliveries require a separate certification task. This protocol owns how each task prepares, plans, obtains approval, and separates local proof from external outcomes.
 
+Manual stateless non-production journeys may use the repository's [shared test deployment](shared-test-deployment.md) only after its eligibility, protection, exclusive-lease, credential, cleanup, and recovery gates pass. That policy does not make the shared environment suitable for every future certification.
+
 The current private registry is [`certifications/capabilities.json`](../../certifications/capabilities.json); builder-core owns its strict schema and pure gate semantics. After building the private package, use these exact repository commands:
 
 ```sh

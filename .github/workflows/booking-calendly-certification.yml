@@ -16,8 +16,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: booking-calendly-certification
+  group: test-deploy
   cancel-in-progress: false
+  queue: max
 
 jobs:
   verify-and-deploy:
@@ -92,12 +93,12 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$CLOUDFLARE_API_TOKEN"
-          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec opennextjs-cloudflare deploy
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec opennextjs-cloudflare deploy --name test-deploy
 
       - name: Test deployed application behavior
         env:
           CERTIFICATION_ROOT: ${{ runner.temp }}/booking-calendly-certification/project
-          PLAYWRIGHT_DEPLOYED_URL: ${{ vars.BOOKING_CALENDLY_CERTIFICATION_URL }}
+          PLAYWRIGHT_DEPLOYED_URL: ${{ vars.DEPLOY_URL }}
         run: |
           test -n "$PLAYWRIGHT_DEPLOYED_URL"
           pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:e2e:deployed

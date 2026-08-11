@@ -10,6 +10,14 @@
 
 **Current local status (2026-08-11):** The approved Task 6 comparison remains `717c3bb0f048f4a4bc544100125ae42d818f09bc..45b57d2dc265ef6ba9ac805d7352a01db5f1081d`. The local fresh-scaffold journey passed at `ef845b1e0551d3b43e17969cc00f21960c90769b`; the manual protected-staging workflow, deployed exercise, and provider receipt path are prepared but have not been dispatched or executed. Tasks 1–7 local implementation and review are complete. `observability@0.2.0` remains `pending`, and every external action remains separately unauthorized.
 
+## Shared test-deployment amendment (2026-08-11)
+
+The user approved a current repository correction so the manual compatibility, Calendly certification, and observability certification workflows reuse the non-production `test-deploy` GitHub environment, `DEPLOY_URL`, and Cloudflare Worker `test-deploy`. The [shared test deployment policy](../../governance/shared-test-deployment.md) is the canonical owner of eligibility, protection, serialization, exclusive lease, provider-secret residue, clean-baseline cleanup, recovery, and legacy-environment deletion boundaries. This plan continues to own the observability-specific provider journey and evidence.
+
+The generated candidate remains `acme-portfolio-observability`, while every deployment, Worker secret, deployment-list, and Cloudflare identity-receipt command must explicitly target `test-deploy`. All three workflows use cross-workflow concurrency group `test-deploy`, do not cancel an in-progress run, and queue rather than replace pending runs. The shared environment may contain only `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `BETTER_STACK_INGESTING_HOST`, and `BETTER_STACK_SOURCE_TOKEN`; each workflow references only its needed names at its existing bounded step boundary.
+
+This amendment supersedes the original plan's dedicated environment and dedicated deployed-Worker instructions for future execution; historical implementation and review statements remain evidence of what was prepared at that time. It does not authorize GitHub setting changes, legacy-environment deletion, provider/source or credential mutation, workflow dispatch, deployment, telemetry, provider inspection, cleanup, evidence acceptance, registry transition, production action, or another task. Those remain separate checkpoints. The repository correction uses a focused RED/GREEN workflow contract, current primary documentation, pinned tools, independent read-only review, and a new review packet before the user-authorized push to `main`.
+
 ## Global constraints
 
 - Work only on clean branch `observability-certification` in the existing isolated worktree `.worktrees/production-observability`, based on approved Task 6 record commit `fb3af7fef7602764432f16940abff0ffc65a5b67`.

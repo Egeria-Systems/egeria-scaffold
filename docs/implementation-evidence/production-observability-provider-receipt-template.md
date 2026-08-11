@@ -2,6 +2,8 @@
 
 Use this template only after the separately authorized protected-staging and provider journey in the [preparation record](2026-08-11-production-observability-certification-preparation.md). Replace every bracketed prompt with content-safe evidence or `not executed`. Delete this instruction before review.
 
+Apply the [shared test deployment policy](../governance/shared-test-deployment.md) to the current run. Historical completed receipts keep the identities actually used and are not rewritten from this template.
+
 **Execution date:** [date and timezone]
 
 **Certification receipt status:** [replace with `complete` only after every section is resolved]
@@ -26,8 +28,11 @@ Use this template only after the separately authorized protected-staging and pro
 
 - Repository revision: [40-character Git commit]
 - Workflow run identifier and artifact digest: [content-safe identifiers; do not include a private URL]
-- Protected environment: `observability-certification`
-- Dedicated Worker: `acme-portfolio-observability`
+- Protected environment: `test-deploy`
+- Generated candidate: `acme-portfolio-observability`
+- Deployed Worker: `test-deploy`
+- Public route binding: [`DEPLOY_URL` matched the exact `test-deploy` Worker root / mismatch requiring stop]
+- Exclusive lease: [confirmed from preflight through cleanup / not confirmed — stop]
 - Deployment risk owner and provider reviewers: [public identities and roles]
 - Revision and default-branch checks: [pass / fail]
 - Bounded workflow receipt inventory: [local receipt, Node route-envelope receipt, actual browser-instrumentation receipt, and Cloudflare identity receipt; pass / fail, exact checks, route markers, and browser UUID only]
@@ -100,18 +105,19 @@ Use this template only after the separately authorized protected-staging and pro
 
 - GitHub environment and secret access disposition: [protections, owners, retained/removed state, and next review]
 - Cloudflare API credential disposition: [revoked / rotated / retained under named scope, expiry, and owner]
-- Cloudflare Worker secret disposition: [removed with Worker / rotated / retained under named owner and expiry]
+- Cloudflare Worker secret disposition: [removed before lease release / rotated / retained under named owner, expiry, privacy, cost, and recovery decision]
 - Better Stack source token disposition: [revoked or rotated when supported / retained under named owner and expiry; do not claim undocumented behavior]
 - Credential values recorded in workflow arguments, artifacts, or repository evidence: `none`
 
 ## Worker, source, and data cleanup
 
-- Selected route-removal cleanup: [delete the certification Worker / clean redeploy without the certification fixture; `not executed` means `cleanup-recovery` cannot pass]
-- Cloudflare Worker cleanup: [deleted certification Worker / clean replacement deployed without the certification fixture / not executed — cleanup-recovery fails]
+- Selected route-removal cleanup: [restore the clean compatibility baseline on retained Worker `test-deploy`; `not executed` means `cleanup-recovery` cannot pass]
+- Cloudflare Worker cleanup: [clean compatibility baseline deployed without the certification fixture / not executed — cleanup-recovery fails]
 - Better Stack source cleanup: [deleted / retained under explicit owner, expiry, and recovery decision]
 - Better Stack retained data cleanup: [deleted or expired / retained under explicit retention and owner]
-- Staging origin final state: [Worker unavailable after deletion / serves the clean replacement without the certification route]
-- Post-cleanup reachability verification for `/api/observability-certification-error`: [confirm the route is unreachable, then record the observed result as `404` after clean redeploy or Worker/origin unavailable after deletion; record no response body]
+- Staging origin final state: [retained Worker serves the clean compatibility baseline without the certification route]
+- Post-cleanup reachability verification for `/api/observability-certification-error`: [confirm the route is unreachable and record only the status; record no response body]
+- Clean compatibility route and deployment identity: [pass / fail and bounded identity]
 - Cleanup outcome gate: `cleanup-recovery` cannot pass when the route remains reachable or the reachability result is not verified.
 - Temporary generated candidate and certification-only route disposition: [runner-temporary project expired; route absent from builder templates and generated fixtures and retained only as the certification test fixture]
 - Recovery evidence for source, deployment, credentials, provider source, and retained data: [separate content-safe outcomes]

@@ -7,8 +7,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: compatibility-proof
+  group: test-deploy
   cancel-in-progress: false
+  queue: max
 
 jobs:
   verify-and-deploy:
@@ -45,9 +46,9 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$CLOUDFLARE_API_TOKEN"
-          pnpm --filter @egeria-systems/nextjs-cloudflare-proof run deploy
+          pnpm --filter @egeria-systems/nextjs-cloudflare-proof run deploy -- --name test-deploy
 
       - name: Test deployed compatibility proof
         env:
-          COMPATIBILITY_URL: ${{ vars.COMPATIBILITY_URL }}
+          COMPATIBILITY_URL: ${{ vars.DEPLOY_URL }}
         run: pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:e2e:deployed

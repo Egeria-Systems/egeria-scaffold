@@ -8,6 +8,12 @@
 
 **Toolchain:** Node.js `22.23.2`, pnpm `11.20.0`, TypeScript `6.0.3`, Zod `4.4.3`, YAML `2.9.0`, Next.js `16.3.0`, React `19.2.8`, OpenNext Cloudflare `1.20.2`, Wrangler `4.118.0`, Playwright `1.62.1`, axe Playwright `4.12.1`, Chromium, Node test runner, GitHub Actions, Cloudflare Workers, and Calendly Free-compatible behavior.
 
+## Current reusable-deployment amendment
+
+The original plan and completed receipt retain the environment and dedicated Worker identities actually used on 2026-08-10. Any future workflow execution follows the [shared test deployment policy](../../governance/shared-test-deployment.md): protected environment `test-deploy`, public variable `DEPLOY_URL`, explicit Worker target `test-deploy`, one cross-workflow serialized lease, and clean-compatibility-baseline recovery. The capability-specific generated candidate remains `acme-portfolio-calendly` and must not be mistaken for the deployed Worker identity.
+
+This reuse is valid only for the same stateless non-production account, protection, credential, quota, no-spend, and cleanup boundary. It does not authorize another dispatch or provider journey, does not rewrite completed Calendly evidence, and does not make the shared resource suitable for persistent, production, or differently privileged certifications. Deletion of legacy environments is a separate external checkpoint after a reference and evidence audit.
+
 ## Approved sole-developer execution amendment
 
 **Approval date:** 2026-08-10 (America/Toronto)

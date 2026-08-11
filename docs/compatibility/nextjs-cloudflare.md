@@ -28,8 +28,10 @@ The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](..
 | Playwright | `1.62.1` |
 | axe Playwright adapter | `4.12.1` |
 | Cloudflare compatibility date | `2026-08-04` |
-| GitHub environment | `compatibility` |
-| Cloudflare Worker | `egeria-scaffold-nextjs-cloudflare-proof` |
+| Historical deployed GitHub environment | `compatibility` |
+| Historical deployed Cloudflare Worker | `egeria-scaffold-nextjs-cloudflare-proof` |
+| Current shared GitHub environment | `test-deploy` |
+| Current shared Cloudflare Worker | `test-deploy` |
 | GitHub setup action | `pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c` |
 | Deployed Node.js | `22.23.0` |
 | Deployed implementation | `160b8ef261e69ec783ad93b7bfe69d932ba84541` |
@@ -70,13 +72,13 @@ The shared Playwright suite checks a selected axe ruleset, keyboard focus, 320 C
 
 ## Deployment boundary
 
-Deployment is manual GitHub Actions work against the non-production GitHub environment `compatibility` and Worker `egeria-scaffold-nextjs-cloudflare-proof`. GitHub Actions is the sole deployment authority.
+Deployment is manual GitHub Actions work. GitHub Actions is the sole deployment authority. The current workflow uses the non-production `test-deploy` environment, public `DEPLOY_URL` variable, and exact `test-deploy` Worker under the eligibility, protection, serialization, lease, cleanup, and recovery rules in the [shared test deployment policy](../governance/shared-test-deployment.md).
 
-The manual workflow at [`.github/workflows/compatibility-proof.yml`](../../.github/workflows/compatibility-proof.yml) is pushed on `main` and recognized by GitHub Actions. The `compatibility` environment has an explicit `main`-only deployment policy. [Run `30966212691`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/30966212691) completed successfully for exact commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`, deployed Worker version `fddba63e-c0e9-497e-98c4-4942461fb753` at `https://egeria-scaffold-nextjs-cloudflare-proof.bmarquiscom.workers.dev`, and passed the deployed smoke suite 4/4. An independent deployed rerun also passed 4/4.
+The historical deployment evidence is unchanged: the manual workflow at [`.github/workflows/compatibility-proof.yml`](../../.github/workflows/compatibility-proof.yml) ran from `main` through the earlier `compatibility` environment. [Run `30966212691`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/30966212691) completed successfully for exact commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`, deployed Worker version `fddba63e-c0e9-497e-98c4-4942461fb753` at the historical proof Worker, and passed the deployed smoke suite 4/4. An independent deployed rerun also passed 4/4. These historical identities are evidence facts, not the current deployment target.
 
-The environment contains `CLOUDFLARE_API_TOKEN` as an environment secret with the narrow Workers Scripts edit permission for the target account, `CLOUDFLARE_ACCOUNT_ID` as an environment secret, and `COMPATIBILITY_URL` as its sole environment variable. Values must never be committed or copied into logs or evidence. Secret access is restricted to the deploy-only step, which publishes the previously verified OpenNext artifact without rebuilding it; the URL variable is exposed only to the post-deployment test step. The workflow runs only from `main`, and environment reviewers or other protection rules should be enabled when the private repository's current GitHub plan exposes them.
+For a current run, the workflow references only `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, restricts them to the deploy-only step, publishes the previously verified OpenNext artifact to the explicit `test-deploy` target without rebuilding it under credentials, and maps `DEPLOY_URL` only to the post-deployment test interface. The shared environment may also hold the two source-specific Better Stack names allowed by the shared policy, but the compatibility workflow must not reference them. Values must never be committed or copied into logs or evidence. A run is blocked until the live environment's `main` restriction, available protection rules, bypass decision, URL-to-Worker match, credential scope and expiry, quota, and owners pass a fresh read-only preflight.
 
-Source recovery uses a revert commit. Cloudflare rollback or Worker deletion is a separate external action and requires explicit authorization. P0.2 has no persistent data to recover.
+Source recovery uses a revert commit. Cloudflare rollback, clean-baseline deployment, credential disposition, legacy-environment deletion, and any Worker deletion are separate external actions and require explicit authorization. The current cleanup target is a clean compatibility baseline on the retained shared Worker, not deletion of that reusable Worker. P0.2 has no persistent data to recover.
 
 ## Revalidation triggers
 

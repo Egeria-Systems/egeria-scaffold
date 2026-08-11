@@ -6,7 +6,7 @@ const maximumInputBytes = 65_536;
 const maximumDeploymentCount = 100;
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
-const workerName = "acme-portfolio-observability";
+const workerName = "test-deploy";
 const checks = Object.freeze([
   "git-revision-validated",
   "worker-validated",

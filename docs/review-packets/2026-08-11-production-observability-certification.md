@@ -12,6 +12,10 @@
 
 **Review-record commit:** the separate enclosing commit that adds this packet and closes the local plan checkboxes
 
+## Current deployment-target amendment
+
+This packet records the original dedicated-resource preparation and remains historical evidence for that reviewed comparison. The current undispatched workflow instead follows the [shared test deployment policy](../governance/shared-test-deployment.md) and the later [shared deployment review packet](2026-08-11-shared-test-deployment.md): environment `test-deploy`, variable `DEPLOY_URL`, deployed Worker `test-deploy`, cross-workflow serialized lease, and clean compatibility baseline recovery. The generated candidate remains `acme-portfolio-observability`. No completed evidence or certification status is changed by this amendment.
+
 ## Outcome
 
 The builder can now produce causal local `fresh-scaffold` certification evidence for `observability@0.2.0`, and the repository contains a statically verified, manual, exact-revision protected-staging path for a later separately authorized journey. The local runner generated a fresh portfolio through the compiled CLI, verified installed state, inference, diagnostics, exact diff, frozen install, dependency audit and signatures, lint, Cloudflare types, typecheck, Next/OpenNext builds, and development/preview browser behavior at evidence revision `ef845b1e0551d3b43e17969cc00f21960c90769b`.

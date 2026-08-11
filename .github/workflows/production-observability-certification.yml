@@ -12,8 +12,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: production-observability-certification
+  group: test-deploy
   cancel-in-progress: false
+  queue: max
 
 jobs:
   verify-and-deploy:
@@ -92,7 +93,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec opennextjs-cloudflare deploy
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec opennextjs-cloudflare deploy --name test-deploy
 
       - name: Install observability provider secrets
         env:
@@ -121,17 +122,17 @@ jobs:
             });
           '
           test "$(stat -c "%a" "$SECRET_FILE")" = "600"
-          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec wrangler secret bulk "$SECRET_FILE"
-          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec wrangler deployments list --name acme-portfolio-observability --json > "$DEPLOYMENTS_FILE"
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec wrangler secret bulk "$SECRET_FILE" --name test-deploy
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec wrangler deployments list --name test-deploy --json > "$DEPLOYMENTS_FILE"
           test "$(stat -c "%a" "$DEPLOYMENTS_FILE")" = "600"
-          node scripts/create-cloudflare-deployment-receipt.mjs --input "$DEPLOYMENTS_FILE" --revision "$GITHUB_SHA" --worker acme-portfolio-observability > "$DEPLOYMENT_RECEIPT"
+          node scripts/create-cloudflare-deployment-receipt.mjs --input "$DEPLOYMENTS_FILE" --revision "$GITHUB_SHA" --worker test-deploy > "$DEPLOYMENT_RECEIPT"
           test "$(wc -l < "$DEPLOYMENT_RECEIPT")" -eq 1
           test "$(wc -c < "$DEPLOYMENT_RECEIPT")" -le 1024
           test "$(stat -c "%a" "$DEPLOYMENT_RECEIPT")" = "600"
 
       - name: Exercise deployed observability
         env:
-          OBSERVABILITY_CERTIFICATION_URL: ${{ vars.OBSERVABILITY_CERTIFICATION_URL }}
+          OBSERVABILITY_CERTIFICATION_URL: ${{ vars.DEPLOY_URL }}
           EXPECTED_REVISION: ${{ inputs.expected_revision }}
         run: |
           node scripts/exercise-production-observability.mjs --base-url "$OBSERVABILITY_CERTIFICATION_URL" --revision "$EXPECTED_REVISION" > "$RUNNER_TEMP/production-observability-route-receipt.json"
@@ -141,7 +142,7 @@ jobs:
       - name: Test deployed application behavior
         env:
           CERTIFICATION_ROOT: ${{ runner.temp }}/production-observability-certification/project
-          PLAYWRIGHT_DEPLOYED_URL: ${{ vars.OBSERVABILITY_CERTIFICATION_URL }}
+          PLAYWRIGHT_DEPLOYED_URL: ${{ vars.DEPLOY_URL }}
           OBSERVABILITY_BROWSER_RECEIPT_PATH: ${{ runner.temp }}/production-observability-browser-receipt.json
         run: |
           pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:e2e:deployed

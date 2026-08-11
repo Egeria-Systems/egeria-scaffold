@@ -6,6 +6,12 @@
 
 **Increment:** P2 Task 5B — `booking-calendly` capability certification and the first reusable fresh-scaffold certification foundation
 
+## Current shared-deployment amendment
+
+The completed 2026-08-10 provider receipt remains historical evidence for its actual `compatibility` environment, dedicated Worker, and cleanup. A future recertification run uses the `test-deploy` GitHub environment, `DEPLOY_URL`, and retained `test-deploy` Worker only if the [shared test deployment policy](../governance/shared-test-deployment.md) passes its live eligibility and protection preflight. The generated candidate remains `acme-portfolio-calendly`; the deployment command overrides that generated name with the shared Worker target.
+
+This amendment does not authorize another booking or workflow run. Future cleanup cancels the bounded synthetic meeting, preserves the pre-existing event type, restores the clean compatibility baseline on the retained shared Worker, verifies every certification-only route is unreachable, and records credential and provider-state disposition. The legacy `compatibility` or `certification` environments and historical Worker records must not be deleted without a separate reference and evidence audit plus explicit deletion approval.
+
 ## Approval and repository freeze
 
 The user selected P2 Task 5B, preapproved necessary exact-file plan amendments, and authorized continuous local implementation through review of the implemented task. On 2026-08-10, the user confirmed that `CoveMB` is the sole developer and sole eligible human reviewer, accepted the sole-developer risk exception, and authorized designation of the existing free Calendly event type without a paid upgrade. The existing `30 Minute Meeting` one-on-one event was designated. Designation is the only authorized event-type action; no Calendly object was created or changed. That initial approval did not include verified-final-diff approval, push, pull request, merge, publication, workflow dispatch, deployment, GitHub environment, variable, or secret mutation, Cloudflare mutation, a synthetic booking, provider cleanup, spending, production action, or another external mutation.
@@ -148,7 +154,7 @@ Do not perform these steps without a new explicit authorization for the named ex
 - Add an always-green admission command and a separately invoked closure command that rejects the current pending record. Do not mislabel any pending or backfill record as certified.
 - Generalize the existing fixed-root verifier minimally so the exact checks can run against a fresh generated root under the existing `portfolio-calendly` contract.
 - Add a content-safe fresh-scaffold runner that compiles and invokes the actual CLI, generates an absent temporary portfolio with synthetic Calendly configuration, re-infers it, proves healthy doctor/exact diff/state agreement, runs the fixed-root checks, emits a bounded JSON receipt, and removes its mode-0700 owner.
-- Add a pinned manual GitHub workflow that reuses the protected `compatibility` environment, exact-revision checks, current toolchain, fresh generation, local certification, Cloudflare deployment, and deployed browser checks. Do not dispatch it.
+- Add a pinned manual GitHub workflow with exact-revision checks, current toolchain, fresh generation, local certification, Cloudflare deployment, and deployed browser checks. Its current reusable deployment target is governed by the shared-deployment amendment above. Do not dispatch it.
 - Add a human provider receipt template and update only direct canonical consumers of the new actual/pending foundation.
 
 ## Deferred outcomes and claim boundary

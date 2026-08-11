@@ -20,57 +20,59 @@ const { parse } = requireFromBuilderCore("yaml");
 const compactLabel = (...parts) => parts.join("");
 const namedLabel = (prefix, ordinal, separator = " ") =>
   [prefix, separator, ordinal].join("");
+const credentialBoundPackageCommandPattern =
+  /\b(?:pnpm|npm|yarn)\b[^\n]*(?:\bbuild|\btest)(?=[:\s]|$)/iu;
+
+function enumerateSecretReferences(value, path = "") {
+  if (typeof value === "string") {
+    return [...value.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)].flatMap(
+      ([, expression]) =>
+        [...expression.matchAll(/\bsecrets\b/gu)].map(
+          (secretContextMatch) => {
+            const referenceSuffix = expression.slice(secretContextMatch.index);
+            const approvedReference =
+              /^secrets\.([A-Za-z_][A-Za-z0-9_]*)\b/u.exec(referenceSuffix);
+
+            return {
+              path,
+              reference: approvedReference
+                ? `secrets.${approvedReference[1]}`
+                : "secrets",
+            };
+          },
+        ),
+    );
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) => {
+      const entryIdentifier =
+        entry && typeof entry === "object" && typeof entry.name === "string"
+          ? JSON.stringify(entry.name)
+          : index;
+
+      return enumerateSecretReferences(
+        entry,
+        `${path}[${entryIdentifier}]`,
+      );
+    });
+  }
+
+  if (value && typeof value === "object") {
+    return Object.entries(value).flatMap(([key, entry]) =>
+      enumerateSecretReferences(entry, path ? `${path}.${key}` : key),
+    );
+  }
+
+  return [];
+}
+
+function assertWorkflowSecretBoundary(workflow, expectedReferences) {
+  assert.deepEqual(enumerateSecretReferences(workflow), expectedReferences);
+}
 
 function assertObservabilityWorkflowSecretBoundary(workflow) {
-  const enumerateSecretReferences = (value, path = "") => {
-    if (typeof value === "string") {
-      return [...value.matchAll(/\$\{\{([\s\S]*?)\}\}/gu)].flatMap(
-        ([, expression]) =>
-          [...expression.matchAll(/\bsecrets\b/gu)].map(
-            (secretContextMatch) => {
-              const referenceSuffix = expression.slice(
-                secretContextMatch.index,
-              );
-              const approvedReference =
-                /^secrets\.([A-Za-z_][A-Za-z0-9_]*)\b/u.exec(
-                  referenceSuffix,
-                );
-
-              return {
-                path,
-                reference: approvedReference
-                  ? `secrets.${approvedReference[1]}`
-                  : "secrets",
-              };
-            },
-          ),
-      );
-    }
-
-    if (Array.isArray(value)) {
-      return value.flatMap((entry, index) => {
-        const entryIdentifier =
-          entry && typeof entry === "object" && typeof entry.name === "string"
-            ? JSON.stringify(entry.name)
-            : index;
-
-        return enumerateSecretReferences(
-          entry,
-          `${path}[${entryIdentifier}]`,
-        );
-      });
-    }
-
-    if (value && typeof value === "object") {
-      return Object.entries(value).flatMap(([key, entry]) =>
-        enumerateSecretReferences(entry, path ? `${path}.${key}` : key),
-      );
-    }
-
-    return [];
-  };
-
-  assert.deepEqual(enumerateSecretReferences(workflow), [
+  assertWorkflowSecretBoundary(workflow, [
     {
       path: 'jobs.verify-and-deploy.steps["Deploy certification Worker"].env.CLOUDFLARE_ACCOUNT_ID',
       reference: "secrets.CLOUDFLARE_ACCOUNT_ID",
@@ -482,10 +484,12 @@ function validateCompatibilityDeploymentCredentialBoundary(workflow) {
 
   if (
     !deployBlock.includes(
-      "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run deploy",
+      "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run deploy -- --name test-deploy",
     )
   ) {
-    problems.push("credential-bearing step must invoke the deploy-only script");
+    problems.push(
+      "credential-bearing step must invoke the deploy-only script for the shared Worker",
+    );
   }
 
   if (/(?:pnpm|opennextjs-cloudflare)[^\n]*\bbuild\b/.test(deployBlock)) {
@@ -501,13 +505,18 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
     readRepositoryFile("proofs/nextjs-cloudflare/package.json"),
   ]);
   const proofManifest = JSON.parse(proofManifestSource);
+  const parsedWorkflow = parse(workflow);
 
   assert.match(workflow, /^on:\n  workflow_dispatch:\n/m);
   assert.doesNotMatch(workflow, /^  (?:push|pull_request|schedule):/m);
   assert.match(workflow, /^permissions:\n  contents: read\n/m);
-  assert.match(workflow, /^  group: compatibility-proof\n  cancel-in-progress: false$/m);
+  assert.match(
+    workflow,
+    /^  group: test-deploy\n  cancel-in-progress: false\n  queue: max$/m,
+  );
   assert.match(workflow, /if: github\.ref == 'refs\/heads\/main'/);
-  assert.match(workflow, /^      name: compatibility$/m);
+  assert.match(workflow, /^      name: test-deploy$/m);
+  assert.match(workflow, /^      url: \$\{\{ vars\.DEPLOY_URL \}\}$/m);
   assert.match(
     workflow,
     /actions\/checkout@d23441a48e516b6c34aea4fa41551a30e30af803/,
@@ -525,6 +534,16 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   assert.match(workflow, /run: pnpm run verify:compatibility-proof/);
   assert.equal(proofManifest.scripts.deploy, "opennextjs-cloudflare deploy");
   assert.equal(validateCompatibilityDeploymentCredentialBoundary(workflow), "");
+  assertWorkflowSecretBoundary(parsedWorkflow, [
+    {
+      path: 'jobs.verify-and-deploy.steps["Deploy compatibility Worker"].env.CLOUDFLARE_ACCOUNT_ID',
+      reference: "secrets.CLOUDFLARE_ACCOUNT_ID",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Deploy compatibility Worker"].env.CLOUDFLARE_API_TOKEN',
+      reference: "secrets.CLOUDFLARE_API_TOKEN",
+    },
+  ]);
 
   const verifyIndex = workflow.indexOf("- name: Verify compatibility proof");
   const deployIndex = workflow.indexOf("- name: Deploy compatibility Worker");
@@ -545,7 +564,7 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   );
   assert.match(
     workflow.slice(deployedTestIndex),
-    /COMPATIBILITY_URL: \$\{\{ vars\.COMPATIBILITY_URL \}\}/,
+    /COMPATIBILITY_URL: \$\{\{ vars\.DEPLOY_URL \}\}/,
   );
   assert.doesNotMatch(workflow, /production/i);
 });
@@ -555,14 +574,114 @@ test("the deployment credential contract rejects build work in the secret-bearin
     ".github/workflows/compatibility-proof.yml",
   );
   const insecureWorkflow = workflow.replace(
-    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run deploy",
-    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof build:cloudflare\n          pnpm --filter @egeria-systems/nextjs-cloudflare-proof run deploy",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run deploy -- --name test-deploy",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof build:cloudflare\n          pnpm --filter @egeria-systems/nextjs-cloudflare-proof run deploy -- --name test-deploy",
   );
 
   assert.match(
     validateCompatibilityDeploymentCredentialBoundary(insecureWorkflow),
     /must not build under Cloudflare credentials/,
   );
+});
+
+test("credential-bearing steps reject package build or test commands at the end of a line", () => {
+  for (const command of ["pnpm run build", "pnpm test"]) {
+    assert.match(command, credentialBoundPackageCommandPattern);
+  }
+});
+
+test("stateless manual deployments share one serialized protected deployment boundary", async () => {
+  const [
+    compatibilitySource,
+    calendlySource,
+    observabilitySource,
+    policy,
+    compatibilityRecord,
+    calendlyPreparation,
+    observabilityPreparation,
+  ] = await Promise.all([
+    readRepositoryFile(".github/workflows/compatibility-proof.yml"),
+    readRepositoryFile(".github/workflows/booking-calendly-certification.yml"),
+    readRepositoryFile(
+      ".github/workflows/production-observability-certification.yml",
+    ),
+    readRepositoryFile("docs/governance/shared-test-deployment.md"),
+    readRepositoryFile("docs/compatibility/nextjs-cloudflare.md"),
+    readRepositoryFile(
+      "docs/implementation-evidence/2026-08-10-booking-calendly-certification-preparation.md",
+    ),
+    readRepositoryFile(
+      "docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md",
+    ),
+  ]);
+
+  for (const source of [
+    compatibilitySource,
+    calendlySource,
+    observabilitySource,
+  ]) {
+    const workflow = parse(source);
+    assert.deepEqual(workflow.concurrency, {
+      group: "test-deploy",
+      "cancel-in-progress": false,
+      queue: "max",
+    });
+    assert.deepEqual(workflow.jobs["verify-and-deploy"].environment, {
+      name: "test-deploy",
+      url: "${{ vars.DEPLOY_URL }}",
+    });
+    assert.doesNotMatch(
+      source,
+      /vars\.(?:COMPATIBILITY_URL|BOOKING_CALENDLY_CERTIFICATION_URL|OBSERVABILITY_CERTIFICATION_URL)/u,
+    );
+  }
+
+  assert.match(
+    compatibilitySource,
+    /run deploy -- --name test-deploy/u,
+  );
+  assert.match(
+    calendlySource,
+    /opennextjs-cloudflare deploy --name test-deploy/u,
+  );
+  assert.match(
+    observabilitySource,
+    /opennextjs-cloudflare deploy --name test-deploy/u,
+  );
+  assert.match(
+    observabilitySource,
+    /wrangler secret bulk "\$SECRET_FILE" --name test-deploy/u,
+  );
+
+  assert.match(
+    policy,
+    /stateless[\s\S]+non-production[\s\S]+same Cloudflare account[\s\S]+same protection boundary/iu,
+  );
+  assert.match(
+    policy,
+    /not eligible[\s\S]+production[\s\S]+persistent data/iu,
+  );
+  assert.match(policy, /not eligible[\s\S]+different provider permissions/iu);
+  assert.match(
+    policy,
+    /exclusive lease[\s\S]+preflight[\s\S]+cleanup/iu,
+  );
+  assert.match(
+    policy,
+    /ordinary code deployment preserves existing Worker secrets[\s\S]+provider-specific secrets[\s\S]+removed or explicitly retained/iu,
+  );
+  assert.match(
+    policy,
+    /clean compatibility baseline[\s\S]+certification-only route[\s\S]+unreachable/iu,
+  );
+
+  for (const document of [
+    compatibilityRecord,
+    calendlyPreparation,
+    observabilityPreparation,
+  ]) {
+    assert.match(document, /shared-test-deployment\.md/u);
+  }
 });
 
 test("Calendly certification deployment is manual, revision-bound, and secret-minimal", async () => {
@@ -601,16 +720,17 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   });
   assert.deepEqual(workflow.permissions, { contents: "read" });
   assert.deepEqual(workflow.concurrency, {
-    group: "booking-calendly-certification",
+    group: "test-deploy",
     "cancel-in-progress": false,
+    queue: "max",
   });
 
   const job = workflow.jobs["verify-and-deploy"];
   assert.equal(job.if, "github.ref == 'refs/heads/main'");
   assert.equal(job["runs-on"], "ubuntu-24.04");
   assert.deepEqual(job.environment, {
-    name: "compatibility",
-    url: "${{ vars.BOOKING_CALENDLY_CERTIFICATION_URL }}",
+    name: "test-deploy",
+    url: "${{ vars.DEPLOY_URL }}",
   });
   assert.doesNotMatch(JSON.stringify(job.env ?? {}), /\$\{\{\s*runner\./u);
 
@@ -670,12 +790,21 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
     CERTIFICATION_ROOT: certificationRoot,
   });
+  assertWorkflowSecretBoundary(workflow, [
+    {
+      path: 'jobs.verify-and-deploy.steps["Deploy certification Worker"].env.CLOUDFLARE_ACCOUNT_ID',
+      reference: "secrets.CLOUDFLARE_ACCOUNT_ID",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Deploy certification Worker"].env.CLOUDFLARE_API_TOKEN',
+      reference: "secrets.CLOUDFLARE_API_TOKEN",
+    },
+  ]);
   assert.deepEqual(
     stepsByName["Test deployed application behavior"].env,
     {
       CERTIFICATION_ROOT: certificationRoot,
-      PLAYWRIGHT_DEPLOYED_URL:
-        "${{ vars.BOOKING_CALENDLY_CERTIFICATION_URL }}",
+      PLAYWRIGHT_DEPLOYED_URL: "${{ vars.DEPLOY_URL }}",
     },
   );
 
@@ -688,7 +817,15 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   );
   assert.doesNotMatch(
     stepsByName["Deploy certification Worker"].run,
-    /pnpm\b[^\n]*(?:build|test)|calendly/iu,
+    credentialBoundPackageCommandPattern,
+  );
+  assert.doesNotMatch(
+    stepsByName["Deploy certification Worker"].run,
+    /calendly/iu,
+  );
+  assert.match(
+    stepsByName["Deploy certification Worker"].run,
+    /opennextjs-cloudflare deploy --name test-deploy/u,
   );
   assert.doesNotMatch(source, /^  (?:pull_request|push|schedule):/mu);
   assert.doesNotMatch(source, /wrangler delete|calendly\.com\/api|provider token/iu);
@@ -757,8 +894,9 @@ test("observability certification deployment is manual, exact-revision, and secr
   });
   assert.deepEqual(workflow.permissions, { contents: "read" });
   assert.deepEqual(workflow.concurrency, {
-    group: "production-observability-certification",
+    group: "test-deploy",
     "cancel-in-progress": false,
+    queue: "max",
   });
 
   const job = workflow.jobs["verify-and-deploy"];
@@ -766,8 +904,8 @@ test("observability certification deployment is manual, exact-revision, and secr
   assert.equal(job["runs-on"], "ubuntu-24.04");
   assert.equal(job["timeout-minutes"], 60);
   assert.deepEqual(job.environment, {
-    name: "observability-certification",
-    url: "${{ vars.OBSERVABILITY_CERTIFICATION_URL }}",
+    name: "test-deploy",
+    url: "${{ vars.DEPLOY_URL }}",
   });
   const stepsByName = Object.fromEntries(
     job.steps.map((step) => [step.name, step]),
@@ -893,11 +1031,15 @@ test("observability certification deployment is manual, exact-revision, and secr
   });
   assert.match(
     stepsByName["Deploy certification Worker"].run,
-    /pnpm --dir "\$CERTIFICATION_ROOT\/apps\/web" exec opennextjs-cloudflare deploy/u,
+    /pnpm --dir "\$CERTIFICATION_ROOT\/apps\/web" exec opennextjs-cloudflare deploy --name test-deploy/u,
   );
   assert.doesNotMatch(
     stepsByName["Deploy certification Worker"].run,
-    /\bbuild\b|\btest\b|better[_ -]?stack/iu,
+    credentialBoundPackageCommandPattern,
+  );
+  assert.doesNotMatch(
+    stepsByName["Deploy certification Worker"].run,
+    /better[_ -]?stack/iu,
   );
 
   const secretStep = stepsByName["Install observability provider secrets"];
@@ -925,15 +1067,15 @@ test("observability certification deployment is manual, exact-revision, and secr
   assert.match(secretStep.run, /stat -c "%a" "\$SECRET_FILE"/u);
   assert.match(
     secretStep.run,
-    /wrangler secret bulk "\$SECRET_FILE"/u,
+    /wrangler secret bulk "\$SECRET_FILE" --name test-deploy/u,
   );
   assert.match(
     secretStep.run,
-    /wrangler deployments list --name acme-portfolio-observability --json > "\$DEPLOYMENTS_FILE"/u,
+    /wrangler deployments list --name test-deploy --json > "\$DEPLOYMENTS_FILE"/u,
   );
   assert.match(
     secretStep.run,
-    /node scripts\/create-cloudflare-deployment-receipt\.mjs --input "\$DEPLOYMENTS_FILE" --revision "\$GITHUB_SHA" --worker acme-portfolio-observability > "\$DEPLOYMENT_RECEIPT"/u,
+    /node scripts\/create-cloudflare-deployment-receipt\.mjs --input "\$DEPLOYMENTS_FILE" --revision "\$GITHUB_SHA" --worker test-deploy > "\$DEPLOYMENT_RECEIPT"/u,
   );
   assert.match(
     secretStep.run,
@@ -961,7 +1103,7 @@ test("observability certification deployment is manual, exact-revision, and secr
 
   assert.deepEqual(stepsByName["Exercise deployed observability"].env, {
     OBSERVABILITY_CERTIFICATION_URL:
-      "${{ vars.OBSERVABILITY_CERTIFICATION_URL }}",
+      "${{ vars.DEPLOY_URL }}",
     EXPECTED_REVISION: "${{ inputs.expected_revision }}",
   });
   assert.match(
@@ -974,8 +1116,7 @@ test("observability certification deployment is manual, exact-revision, and secr
   );
   assert.deepEqual(stepsByName["Test deployed application behavior"].env, {
     CERTIFICATION_ROOT: certificationRoot,
-    PLAYWRIGHT_DEPLOYED_URL:
-      "${{ vars.OBSERVABILITY_CERTIFICATION_URL }}",
+    PLAYWRIGHT_DEPLOYED_URL: "${{ vars.DEPLOY_URL }}",
     OBSERVABILITY_BROWSER_RECEIPT_PATH: browserReceipt,
   });
   assert.match(
@@ -1146,7 +1287,7 @@ test("observability preparation provides the required step-by-step human prerequ
   );
   assert.match(
     runbook,
-    /`observability-certification`[\s\S]+`CLOUDFLARE_ACCOUNT_ID`[\s\S]+`CLOUDFLARE_API_TOKEN`[\s\S]+`BETTER_STACK_INGESTING_HOST`[\s\S]+`BETTER_STACK_SOURCE_TOKEN`[\s\S]+GitHub environment secrets/iu,
+    /`test-deploy`[\s\S]+`CLOUDFLARE_ACCOUNT_ID`[\s\S]+`CLOUDFLARE_API_TOKEN`[\s\S]+`BETTER_STACK_INGESTING_HOST`[\s\S]+`BETTER_STACK_SOURCE_TOKEN`[\s\S]+GitHub environment secrets/iu,
   );
   assert.match(
     runbook,
@@ -1158,7 +1299,7 @@ test("observability preparation provides the required step-by-step human prerequ
   );
   assert.match(
     runbook,
-    /public HTTPS staging origin[\s\S]+`OBSERVABILITY_CERTIFICATION_URL`[\s\S]+synthetic/iu,
+    /public HTTPS staging origin[\s\S]+`DEPLOY_URL`[\s\S]+synthetic/iu,
   );
   assert.match(
     runbook,
@@ -1192,11 +1333,11 @@ test("observability runbook keeps external actions gated and defines ordered cle
   );
   assert.match(
     runbook,
-    /cleanup order[\s\S]+certification-only route[\s\S]+Worker[\s\S]+Better Stack source[\s\S]+retained data[\s\S]+GitHub environment secrets[\s\S]+revoke or rotate/iu,
+    /cleanup order[\s\S]+provider-specific Worker secrets[\s\S]+clean compatibility baseline[\s\S]+certification-only route[\s\S]+Better Stack source[\s\S]+retained data[\s\S]+GitHub environment secrets[\s\S]+revoke or rotate/iu,
   );
   assert.match(
     runbook,
-    /source rollback[\s\S]+deployment rollback[\s\S]+provider recovery[\s\S]+credential recovery/iu,
+    /source rollback[\s\S]+deployment recovery[\s\S]+provider recovery[\s\S]+credential recovery/iu,
   );
   assert.match(runbook, /rerun triggers/iu);
   assert.match(
@@ -1395,11 +1536,11 @@ test("cleanup-recovery requires the certification error route to be unreachable 
   assert.ok(cleanupSection, "observability cleanup section is missing");
   assert.match(
     cleanupSection,
-    /delete the certification Worker[\s\S]+clean redeploy without the certification fixture/iu,
+    /restore the clean compatibility baseline[\s\S]+clean compatibility baseline deployed without the certification fixture/iu,
   );
   assert.match(
     cleanupSection,
-    /post-cleanup[\s\S]+`\/api\/observability-certification-error`[\s\S]+unreachable[\s\S]+observed result/iu,
+    /post-cleanup[\s\S]+`\/api\/observability-certification-error`[\s\S]+unreachable[\s\S]+record only the status/iu,
   );
   assert.match(
     cleanupSection,

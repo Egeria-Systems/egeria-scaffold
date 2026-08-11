@@ -2,6 +2,8 @@
 
 Use this template only after the separately authorized protected-staging and provider journey in the [preparation runbook](2026-08-10-booking-calendly-certification-preparation.md). Replace every bracketed prompt with content-safe evidence or `not executed`. Delete this instruction before review.
 
+For a new run, also apply the [shared test deployment policy](../governance/shared-test-deployment.md). Historical completed receipts keep the identities actually used and are not rewritten from this template.
+
 **Execution date:** [date and timezone]
 
 **Certification receipt status:** [replace with `complete` only after every section is resolved]
@@ -26,14 +28,15 @@ Use this template only after the separately authorized protected-staging and pro
 
 - Repository revision: [40-character Git commit]
 - Workflow run URL: [GitHub Actions run URL]
-- Protected environment: `compatibility`
+- Protected environment: `test-deploy`
 - Deployment risk owner: [public GitHub identity]
 - Independent human deployment reviewer: `none — sole-developer exception`
 - GitHub environment required-reviewer status: `none configured`
 - Administrator bypass: [enabled and accepted for this non-production risk exception / unexpected state requiring stop]
 - Local receipt artifact digest: [GitHub-reported artifact SHA-256]
-- Staging origin: [dedicated non-production origin; omit private query data]
-- Worker-name preflight for `acme-portfolio-calendly`: [absent before deployment / approved dedicated certification resource]
+- Staging origin: [`DEPLOY_URL` matched the public non-production `test-deploy` Worker root / mismatch requiring stop]
+- Generated candidate-name preflight for `acme-portfolio-calendly`: [exact generated candidate identity]
+- Shared Worker preflight for `test-deploy`: [exclusive lease, exact baseline/version, protection, route, and quota confirmed]
 - Action owners and roles: [GitHub repository administrator; workflow dispatcher; deployment risk owner; Cloudflare account administrator; Calendly certification operator; implemented-task reviewer; identify `CoveMB` in every role]
 - Credential disposition: [task token revoked / exposed or over-scoped token rotated / shared compatibility token unchanged under named rotation plan]
 
@@ -69,8 +72,10 @@ Use this template only after the separately authorized protected-staging and pro
 - Synthetic meeting cancellation status and timestamp: [status]
 - Event-type cleanup: `pre-existing designated event preserved; no event-type mutation`
 - Test calendar/inbox cleanup: [status]
-- Certification Worker rolled back or removed: [status]
-- Staging origin no longer serves the certification Worker: [verification]
+- Provider-specific Worker state disposition: [none / removed / explicitly retained under named owner and expiry]
+- Shared Worker recovery: [clean compatibility baseline deployed to retained `test-deploy` Worker / not executed]
+- Certification-only route reachability: [unreachable after cleanup / cleanup-recovery fails]
+- Compatibility baseline verification: [expected route and deployed identity / failure]
 - Production resources and persistent stores touched: `none`
 
 ## Privacy exclusions
