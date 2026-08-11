@@ -1,12 +1,51 @@
 # @egeria-systems/observability
 
-This is the intentionally empty public observability package shell for the Egeria Systems builder workspace.
+Privacy-safe operational event contracts and injected delivery boundaries for generated applications.
 
-The package establishes the package name, build contract, empty root API, and publication safeguards. Importing the built root module exposes no values. The package has no runtime dependencies and implements no events, redaction, transports, providers, analytics, or Cloudflare integration.
+The package has no runtime dependencies. It imports no framework, platform SDK, browser API, or Node.js runtime API. Applications inject clocks, structured-log writers, HTTP requests, and browser senders at their composition roots.
 
-Future behavior requires a separately approved stage and concrete consumers. Analytics remains an independent capability. The canonical ownership and stage boundary are recorded in [Package Ownership](../../docs/architecture/package-ownership.md).
+## API surfaces
 
-Run `pnpm run verify` in this package to build the declarations and JavaScript, test the empty public API, and type-check the source.
+- `@egeria-systems/observability` creates immutable allowlisted events, normalizes error categories without reading messages, and dispatches to every sink without letting telemetry failure escape.
+- `@egeria-systems/observability/server` provides injected structured-object logging and Better Stack HTTP protocol delivery.
+- `@egeria-systems/observability/browser` reconstructs a bounded browser envelope and sends it through an injected same-origin boundary.
+- `@egeria-systems/observability/testing` provides an in-memory sink and content-safe event assertions.
+
+```ts
+import {
+  createOperationalEvent,
+  dispatchOperationalEvent,
+} from "@egeria-systems/observability";
+import { createMemorySink } from "@egeria-systems/observability/testing";
+
+const created = createOperationalEvent(
+  {
+    name: "example.application.ready",
+    kind: "application.lifecycle",
+    runtime: "server",
+    severity: "info",
+    context: { correlationId: "example-correlation" },
+  },
+  { clock: { now: () => new Date() } },
+);
+
+if (created.ok) {
+  const memory = createMemorySink();
+  await dispatchOperationalEvent(created.value, [memory.sink]);
+}
+```
+
+## Privacy and failure contract
+
+Event names, context tokens, and string attributes use bounded token vocabularies. Attributes are flat scalar values admitted only through an explicit allowlist. Prohibited private-data keys, unsafe strings, nested values, non-finite numbers, raw errors, messages, stacks, causes, request data, and arbitrary objects are not emitted.
+
+The Better Stack boundary accepts only a validated `betterstackdata.com` ingestion host and a bounded server-held bearer token. It never exposes configuration, provider response content, request payloads, or thrown error content in results. The browser surface contains no token, storage, replay, behavioral capture, analytics, or console interception.
+
+Every sink returns a bounded delivery category. The dispatcher attempts every sink and contains thrown, rejected, or malformed results so observability cannot become an application failure path.
+
+Analytics remains an independent capability. Importing this package never enables Cloudflare Web Analytics or another visitor-analytics provider. The canonical ownership boundary is recorded in [Package Ownership](../../docs/architecture/package-ownership.md).
+
+Run `pnpm run verify` in this package to build declarations and JavaScript, lint the strict source, run behavior tests, and type-check the package.
 
 ## Source and license
 

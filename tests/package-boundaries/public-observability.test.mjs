@@ -41,7 +41,7 @@ async function listFiles(directory, baseDirectory = directory) {
   return files.sort();
 }
 
-test("observability exposes only its approved empty public API", async () => {
+test("observability exposes only its approved operational APIs", async () => {
   assert.equal(
     await pathExists("packages/observability/package.json"),
     true,
@@ -65,6 +65,18 @@ test("observability exposes only its approved empty public API", async () => {
       ".": {
         types: "./dist/index.d.ts",
         import: "./dist/index.js",
+      },
+      "./browser": {
+        types: "./dist/browser.d.ts",
+        import: "./dist/browser.js",
+      },
+      "./server": {
+        types: "./dist/server.d.ts",
+        import: "./dist/server.js",
+      },
+      "./testing": {
+        types: "./dist/testing.d.ts",
+        import: "./dist/testing.js",
       },
       "./package.json": "./package.json",
     },
@@ -109,18 +121,38 @@ test("observability compiles through the shared strict contract", async () => {
   });
 });
 
-test("observability has no runtime behavior or provider integration", async () => {
+test("observability keeps provider-neutral source and zero runtime dependencies", async () => {
   const sourceDirectory = resolve(repositoryRoot, "packages/observability/src");
 
   assert.equal(
     await pathExists("packages/observability/src"),
     true,
-    "the empty observability source shell must exist",
+    "the observability source boundary must exist",
   );
-  assert.deepEqual(await listFiles(sourceDirectory), ["index.ts"]);
-  assert.equal(
-    await readFile(resolve(sourceDirectory, "index.ts"), "utf8"),
-    "export {};\n",
+  assert.deepEqual(await listFiles(sourceDirectory), [
+    "browser.ts",
+    "contracts.ts",
+    "dispatch.ts",
+    "events.ts",
+    "index.ts",
+    "redaction.ts",
+    "server.ts",
+    "testing.ts",
+  ]);
+
+  const source = await Promise.all(
+    (await listFiles(sourceDirectory)).map((path) =>
+      readFile(resolve(sourceDirectory, path), "utf8"),
+    ),
+  );
+  const joinedSource = source.join("\n");
+  assert.doesNotMatch(
+    joinedSource,
+    /from ["'](?:node:|next|react|@opennextjs\/cloudflare|@logtail\/next|cloudflare)/u,
+  );
+  assert.doesNotMatch(
+    joinedSource,
+    /session.?replay|autocapture|web.?analytics|google.?analytics|clarity/iu,
   );
 
   for (const requiredDocument of [

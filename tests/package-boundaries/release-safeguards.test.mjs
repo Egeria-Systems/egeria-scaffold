@@ -126,6 +126,18 @@ test("public package manifests constrain exports and publication", async () => {
       types: "./dist/index.d.ts",
       import: "./dist/index.js",
     },
+    "./browser": {
+      types: "./dist/browser.d.ts",
+      import: "./dist/browser.js",
+    },
+    "./server": {
+      types: "./dist/server.d.ts",
+      import: "./dist/server.js",
+    },
+    "./testing": {
+      types: "./dist/testing.d.ts",
+      import: "./dist/testing.js",
+    },
     "./package.json": "./package.json",
   });
   assert.equal(
@@ -272,7 +284,22 @@ test("the release candidate materializes only the approved public versions", asy
   const changesetFiles = (await readdir(resolve(repositoryRoot, ".changeset")))
     .filter((file) => file.endsWith(".md") && file !== "README.md")
     .sort();
-  assert.deepEqual(changesetFiles, ["externalize-visible-copy.md"]);
+  assert.deepEqual(changesetFiles, [
+    "add-production-observability.md",
+    "externalize-visible-copy.md",
+  ]);
+  assert.equal(
+    await readFile(
+      resolve(repositoryRoot, ".changeset/add-production-observability.md"),
+      "utf8",
+    ),
+    `---
+"@egeria-systems/observability": minor
+---
+
+Add privacy-safe operational event contracts, redaction, server and browser delivery boundaries, Better Stack protocol support, and test sinks.
+`,
+  );
   assert.equal(
     await readFile(
       resolve(repositoryRoot, ".changeset/externalize-visible-copy.md"),
@@ -343,8 +370,22 @@ test("public package dry runs contain only approved files", async () => {
   assert.deepEqual(await listPackedFiles("@egeria-systems/observability"), [
     "LICENSE",
     "README.md",
+    "dist/browser.d.ts",
+    "dist/browser.js",
+    "dist/contracts.d.ts",
+    "dist/contracts.js",
+    "dist/dispatch.d.ts",
+    "dist/dispatch.js",
+    "dist/events.d.ts",
+    "dist/events.js",
     "dist/index.d.ts",
     "dist/index.js",
+    "dist/redaction.d.ts",
+    "dist/redaction.js",
+    "dist/server.d.ts",
+    "dist/server.js",
+    "dist/testing.d.ts",
+    "dist/testing.js",
     "package.json",
   ]);
 });
