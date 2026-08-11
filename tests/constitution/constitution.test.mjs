@@ -1475,6 +1475,86 @@ test("executable capability certification ownership is current", async () => {
   }
 });
 
+test("future execution plans enforce their direct predecessor before implementation", async () => {
+  const [reviewProtocol, implementationPlan, certificationPlan] =
+    await Promise.all([
+      readRepositoryFile("docs/governance/review-and-contribution.md"),
+      readRepositoryFile(
+        "docs/superpowers/plans/2026-08-10-generated-unit-component-testing.md",
+      ),
+      readRepositoryFile(
+        "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md",
+      ),
+    ]);
+  const implementationTask = namedLabel("Task", "6C");
+  const implementationPredecessor = namedLabel("Task", "6B");
+  const certificationTask = namedLabel("Task", "6D");
+  const portfolioPhase = compactLabel("P", "2");
+
+  assert.match(reviewProtocol, /^### Direct-predecessor gate$/mu);
+  assert.match(
+    reviewProtocol,
+    /every implementation or certification plan[^.]+direct predecessor[^.]+acceptance artifact/iu,
+  );
+  assert.match(
+    reviewProtocol,
+    /explicit approval[^.]+ancestor of `HEAD`[^.]+machine[^.]+admission or closure/iu,
+  );
+  assert.match(
+    reviewProtocol,
+    /missing, pending, unapproved, non-ancestor, or ambiguous[^.]+hard stop/iu,
+  );
+  assert.match(
+    reviewProtocol,
+    /never infer[^.]+incrementing[^.]+number/iu,
+  );
+
+  assert.match(
+    implementationPlan,
+    new RegExp(
+      `\\*\\*Direct predecessor:\\*\\* ${portfolioPhase} ${escapeRegularExpression(implementationPredecessor)} production-observability certification`,
+      "u",
+    ),
+  );
+  assert.match(
+    implementationPlan,
+    /approved exact committed comparison[^.]+merge-base --is-ancestor[^.]+ HEAD/iu,
+  );
+  assert.match(
+    implementationPlan,
+    /check-capability-certification\.mjs --closure legacy-backfill-exempt/u,
+  );
+  assert.match(
+    implementationPlan,
+    /`observability`[^.]+`certified`[^.]+evidence revisions[^.]+ancestors of `HEAD`/iu,
+  );
+
+  assert.match(
+    certificationPlan,
+    new RegExp(
+      `\\*\\*Direct predecessor:\\*\\* ${portfolioPhase} ${escapeRegularExpression(implementationTask)} generated unit and component testing implementation`,
+      "u",
+    ),
+  );
+  assert.match(
+    certificationPlan,
+    /approved exact committed comparison[^.]+merge-base --is-ancestor[^.]+ HEAD/iu,
+  );
+  assert.match(
+    certificationPlan,
+    /pnpm run check:capability-certification/u,
+  );
+  assert.match(
+    certificationPlan,
+    new RegExp(
+      "pending `standards` subject[^.]+" +
+        escapeRegularExpression(certificationTask) +
+        " plan",
+      "iu",
+    ),
+  );
+});
+
 test("accepted ADRs use the repository decision contract", async () => {
   const index = await readRepositoryFile("docs/adr/README.md");
   const rowPositions = [];

@@ -23,6 +23,10 @@ This plan creation does not authorize implementation. Task 6C must not begin unt
 - no separate worktree is modifying the Task 6C exact-file scope; and
 - the user explicitly selects Task 6C for implementation.
 
+**Direct predecessor:** P2 Task 6B production-observability certification.
+
+Before RED work, require its review packet to record the approved exact committed comparison and verify it with `git merge-base --is-ancestor <accepted-revision> HEAD`. Run `pnpm run check:capability-certification` and `node scripts/check-capability-certification.mjs --closure legacy-backfill-exempt`; require the exact `observability` record to be `certified` and all of its evidence revisions to be ancestors of `HEAD`. Any rejection is a hard stop.
+
 Do not rebase, merge, commit, push, publish, deploy, dispatch a workflow, mutate a provider, or alter another worktree under this planning approval.
 
 ## Global constraints

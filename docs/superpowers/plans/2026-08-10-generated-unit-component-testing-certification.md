@@ -20,6 +20,10 @@ Task 6D must not begin until:
 - no material descriptor or evidence-contract change occurred after the pending subject digest was computed; and
 - the user explicitly selects Task 6D.
 
+**Direct predecessor:** P2 Task 6C generated unit and component testing implementation.
+
+Before certification RED work, require its review packet to record the approved exact committed comparison and verify it with `git merge-base --is-ancestor <accepted-revision> HEAD`. Run `pnpm run check:capability-certification`; require the exact pending `standards` subject to match the descriptor digest and link to the Task 6D plan. Any rejection is a hard stop.
+
 No push, pull request, merge, publication, workflow dispatch, deployment, credential, provider, environment, persistent-data, permission, or production action is authorized.
 
 ## Certification outcomes

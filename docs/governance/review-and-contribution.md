@@ -12,6 +12,12 @@ Before implementation:
 4. Record dated evidence under `docs/implementation-evidence/`, distinguishing verified facts, assumptions, limitations, and deferred proof.
 5. Present direct contradictions and genuinely blocking uncertainties in one consolidated batch. Resolve ordinary details from official sources and accepted practice without expanding scope.
 
+### Direct-predecessor gate
+
+Every implementation or certification plan must name its direct predecessor, or `none` for the first item, and that predecessor's acceptance artifact. Before implementation, require the artifact to record explicit approval, verify its accepted revision is an ancestor of `HEAD`, and run every applicable machine admission or closure check.
+
+A missing, pending, unapproved, non-ancestor, or ambiguous predecessor is a hard stop even when the user requests a later item. Never infer the next item by incrementing a task number; resolve it from the approved source plan and current program roadmap.
+
 Gate 1 evidence is not permission to edit implementation files or take external action.
 
 ## Gate 2: implementation-plan approval
