@@ -25,6 +25,12 @@
 - Before every commit, verify branch and status, stage only named paths, inspect the cached diff, and run `git diff --cached --check`.
 - No file outside the exact inventory below is in scope without a dated, evidence-backed amendment recorded in this plan before the edit.
 
+### Preapproved execution amendment — fixed verifier identity (2026-08-11)
+
+The first registry-enabled real local journey reached `verifyGeneratedProject(root, "portfolio")` and failed with `GENERATED_PROJECT_VERIFICATION_FAILED`. Root-cause tracing confirmed that the fixed verifier's canonical `portfolio` contract requires project `acme-portfolio` and display name `Acme Portfolio`, while the original Task 2 text also required the staging-only identity `acme-portfolio-observability`. Broadening the verifier would weaken the immutable fixture contract and creating another check matrix is prohibited.
+
+Under the user's preapproved plan-amendment authority, the local runner uses the exact canonical `portfolio` identity `acme-portfolio` / `Acme Portfolio`. The manual protected-staging candidate remains the separately named dedicated Worker `acme-portfolio-observability`. A focused test must fail against the old local identity before production configuration changes. No generated template, fixture, verifier contract, provider surface, registry evidence, or external state changes under this amendment.
+
 ## Exact file structure
 
 Create local runner, deployed exercise, certification fixture, workflow, and tests:
@@ -101,7 +107,7 @@ Do not modify capability descriptors, certification schemas/runtime policy, publ
 - [ ] RED: add tests whose production mutation is a missing/wrong project identity, capability/version, CLI order, environment scrub, generated verifier identifier, cleanup, receipt, argument rejection, or preserved Calendly behavior. Use literal expected CLI arrays and receipts; mock only command execution and the expensive fixed verifier.
 - [ ] Run `node --test tests/capability-certification/production-observability.test.mjs tests/capability-certification/certification-runner.test.mjs`; capture the expected missing-module/export failure.
 - [ ] GREEN: extract only the identity-owned temporary root, sanitized compiled-CLI `create`/`infer`/`doctor`/`diff`, installed/confirmed capability validation, fixed verifier invocation, bounded receipt, and identity-checked cleanup into the private helper.
-- [ ] Keep the Calendly wrapper API, arguments, error type/codes, receipt, and tests byte-behavior compatible. Add the observability wrapper with project `acme-portfolio-observability`, display name `Acme Portfolio Observability`, base `portfolio`, exact default capability list, `observability@0.2.0`, verifier identifier `portfolio`, and no provider value or secret input.
+- [ ] Keep the Calendly wrapper API, arguments, error type/codes, receipt, and tests byte-behavior compatible. Add the observability wrapper with the canonical fixed-verifier project `acme-portfolio`, display name `Acme Portfolio`, base `portfolio`, exact default capability list, `observability@0.2.0`, verifier identifier `portfolio`, and no provider value or secret input. The later staging workflow retains dedicated Worker identity `acme-portfolio-observability`.
 - [ ] Add `verify:production-observability-certification` as `pnpm run build:builder && node scripts/certify-production-observability.mjs`.
 - [ ] Run the focused tests GREEN, then the complete capability-certification and generated-verifier tests.
 - [ ] Commit implementation and tests with message `Verify fresh observability scaffold`.
