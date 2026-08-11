@@ -44,6 +44,9 @@ jobs:
       - name: Test package boundaries
         run: pnpm run test:package-boundaries
 
+      - name: Build builder and packages
+        run: pnpm run build:builder
+
       - name: Test builder core
         run: pnpm run test:builder-core
 
@@ -61,9 +64,6 @@ jobs:
 
       - name: Lint builder and packages
         run: pnpm run lint:builder
-
-      - name: Build builder and packages
-        run: pnpm run build:builder
 
       - name: Typecheck builder and packages
         run: pnpm run typecheck:builder

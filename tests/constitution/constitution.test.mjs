@@ -309,6 +309,22 @@ test("ordinary repository quality CI covers every current local test boundary", 
   assert.doesNotMatch(commands, /\bdeploy\b|\bpublish\b|npm publish|wrangler deploy/iu);
   assert.doesNotMatch(source, /\bsecrets\b|id-token:\s*write|environment:/iu);
 
+  const builderSteps = workflow.jobs["builder-and-packages"].steps;
+  const buildIndex = builderSteps.findIndex(
+    ({ run }) => run === "pnpm run build:builder",
+  );
+  const packageTestIndex = builderSteps.findIndex(
+    ({ run }) => run === "pnpm run test:packages",
+  );
+  assert.ok(buildIndex >= 0 && buildIndex < packageTestIndex);
+
+  const rootManifest = JSON.parse(await readRepositoryFile("package.json"));
+  const kernelCommands = rootManifest.scripts["verify:builder-kernel"].split(" && ");
+  assert.ok(
+    kernelCommands.indexOf("pnpm run build:builder") <
+      kernelCommands.indexOf("pnpm run test:packages"),
+  );
+
   for (const job of Object.values(workflow.jobs)) {
     assert.equal(job["runs-on"], "ubuntu-24.04");
     assert.equal(typeof job["timeout-minutes"], "number");
@@ -526,7 +542,7 @@ test("package ownership documentation records the approved release boundary", as
   );
   assert.match(
     enforcementMap,
-    /INV-ACCESSIBILITY-AUTOMATION[^\n]+all three retained fixtures pass local development and workerd Playwright\/axe/i,
+    /INV-ACCESSIBILITY-AUTOMATION[^\n]+frozen pre-change base[^\n]+local development and workerd Playwright\/axe receipts[^\n]+current generated-testing candidate awaits its final fixed-root browser rerun/i,
   );
   assert.match(
     enforcementMap,
@@ -2622,7 +2638,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     {
       fixtures: "node --test tests/generated-fixtures/*.test.mjs",
       kernel:
-        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages && pnpm run test:capability-certification && pnpm run check:capability-certification && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run build:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run changeset:status",
+        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages && pnpm run test:capability-certification && pnpm run check:capability-certification && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run changeset:status",
       skeletons: "node scripts/verify-generated-skeletons.mjs",
     },
   );

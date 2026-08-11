@@ -242,19 +242,6 @@ test("compiled project generation matches every committed fixture identifier", a
           state.managedSurfaces.length,
           fixtureCase.expectedSurfaces,
         );
-        assert.deepEqual(state.verification.checks, [
-          "contracts",
-          "pre-state-inference",
-          "post-state-inference",
-          "lockfile",
-          "frozen-install",
-          "lint",
-          "typecheck",
-          "unit-tests",
-          "component-tests",
-          "next-build",
-          "opennext-build",
-        ]);
         const projectConfiguration = await readFile(
           join(destination, ".egeria/project.yaml"),
           "utf8",
@@ -285,6 +272,8 @@ test("compiled project generation matches every committed fixture identifier", a
           "frozen-install",
           "lint",
           "typecheck",
+          "unit-tests",
+          "component-tests",
           "next-build",
           "opennext-build",
           "post-state-inference",
