@@ -102,6 +102,16 @@ tests/package-boundaries/public-standards.test.mjs
 
 The three tests own exact public-manifest fixtures that must advance with the materialized package versions. The standards README is part of the published tarball and must describe the materialized copy API without claiming that external publication already occurred. The workflow's raw `changeset status` invocation is removed because Changesets correctly returns nonzero after it consumes the release files; the release-specific checker instead enforces the exact public package set, target versions, and absence of pending Changesets. The revoked bootstrap-token configuration path is removed so the release remains OIDC-only, while unconditional authentication cleanup is retained. The registry check must validate both exact prior version histories as well as target-version absence.
 
+#### Post-publication evidence amendment — 2026-08-11
+
+The user's instruction to continue after publication adds one dated evidence owner:
+
+```text
+docs/implementation-evidence/2026-08-11-production-observability-package-publication.md
+```
+
+The evidence reconciles the intervening fresh-checkout CI remediation, the exact successful publication commit and workflow attempt, both immutable registry histories, tarball inventory and integrity, provenance attestations, and fresh-consumer imports. The earlier release-candidate evidence and packet remain unchanged historical records.
+
 ### Generated capability integration after verified publication
 
 Create:
@@ -210,14 +220,14 @@ No other file is in scope without a documented evidence-backed amendment.
 
 ## Task 4: Materialize and publish exact public releases — external gate
 
-- [ ] Require explicit user authorization for the exact source-candidate integration, push, and trusted-publication actions. Plan approval alone is insufficient.
+- [x] Require explicit user authorization for the exact source-candidate integration, push, and trusted-publication actions. Plan approval alone is insufficient.
 - [x] Add focused failing release tests that replace initial-release assumptions with the exact approved standards and observability target versions, existing package histories, absent target versions, no unexpected public package, no pending Changeset after materialization, and sanitized network failures.
 - [x] Run `changeset version` once and inspect both resulting package versions, changelogs, Changeset removal, and lockfile diff. Do not hand-edit version artifacts.
 - [x] Update only the release checker/workflow behavior proven necessary for a subsequent two-package release; retain exact-main-commit dispatch, full verification, OIDC/provenance, least privilege, cleanup, and fail-closed registry checks.
 - [x] Independently review the exact release candidate and stop for its verified-final-diff approval before push/publication.
-- [ ] After explicit publication authority, integrate the exact reviewed commits to `main`, push only that branch, dispatch only the manual exact-commit release workflow, and wait for completion.
-- [ ] Verify both exact registry artifacts, integrity, provenance/attestations, exports, pack inventory, and fresh consumer imports. Record any absence of provenance honestly.
-- [ ] Stop on an existing target version, unexpected package history/version, non-exact commit, missing environment protection, permission drift, audit failure, signature failure, publish retry request, or partial release. Never republish an immutable version.
+- [x] After explicit publication authority, integrate the exact reviewed commits to `main`, push only that branch, dispatch only the manual exact-commit release workflow, and wait for completion.
+- [x] Verify both exact registry artifacts, integrity, provenance/attestations, exports, pack inventory, and fresh consumer imports. Record any absence of provenance honestly.
+- [x] Stop on an existing target version, unexpected package history/version, non-exact commit, missing environment protection, permission drift, audit failure, signature failure, publish retry request, or partial release. Never republish an immutable version.
 
 ## Task 5: Admit the material capability change before generated integration
 
