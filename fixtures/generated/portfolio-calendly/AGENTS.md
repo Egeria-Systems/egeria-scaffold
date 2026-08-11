@@ -9,3 +9,10 @@
 - Keep Cloudflare types and bindings in platform adapters, generated configuration, integration tests, and composition roots.
 - Keep operational telemetry stream-bounded and infrastructure-owned. Preserve disabled Cloudflare invocation logs. Do not add raw error/private fields, analytics, console interception, browser storage, or provider effects to presentation or application code.
 - Preserve application-owned files unless a reviewed change explicitly replaces them.
+
+## Test selection
+
+- Run `pnpm run test:unit` for pure parsing and domain behavior in Node.
+- Run `pnpm run test:component` for synchronous React presentation behavior in jsdom.
+- Run `pnpm --dir apps/web run test:e2e:dev` for real-browser development behavior and `pnpm --dir apps/web run test:e2e:preview` for the OpenNext/workerd preview boundary.
+- Use `pnpm run verify` for the complete static, unit, component, and build boundary. No automated result alone establishes deployment, production safety, visual quality, human usability, or WCAG conformance.

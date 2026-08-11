@@ -13,3 +13,5 @@
 - Keep Cloudflare bindings at configuration and composition boundaries; only the Cloudflare observability adapter may read the declared Better Stack secrets, version metadata, and execution context. Do not import Cloudflare types into domain, application, or presentation code.
 - Keep Cloudflare Web Analytics and every other analytics or browser-storage surface absent unless a separately selected analytics capability owns it.
 - Treat application-owned routes, content, presentation, styles, and guidance as project-maintained surfaces.
+- Keep unit tests in `tests/unit` under the named Node project and component tests in `tests/component` under the named jsdom project. Prefer semantic `getByRole` or `findByRole` queries and `userEvent.setup()` for interaction; preserve explicit component `cleanup` and avoid broad snapshots.
+- jsdom does not prove layout, visible focus, iframe/browser APIs, routing, async Server Components, workerd behavior, or accessibility conformance. Escalate those cases to the owning Playwright development or preview suite. Add Workers Vitest only when a selected capability owns concrete Workers bindings and its test contract.

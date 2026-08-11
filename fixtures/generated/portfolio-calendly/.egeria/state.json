@@ -15,7 +15,7 @@
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.2.0"
+      "version": "0.3.0"
     },
     {
       "deliveryMode": "source-generated",
@@ -73,6 +73,8 @@
       "frozen-install",
       "lint",
       "typecheck",
+      "unit-tests",
+      "component-tests",
       "next-build",
       "opennext-build",
       "post-state-inference"
@@ -151,7 +153,7 @@
       "path": "apps/web/src/integrations/booking-calendly/booking-settings.ts"
     },
     {
-      "fingerprint": "sha256:94254452da2d028a3c258a73dda9790ddace14eae944226956c5bc730aca4689",
+      "fingerprint": "sha256:932b3d7a9fafd7dd3b086cbcb2ebf575a15034be90b599939b1d2fcfbd6b3c8c",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -216,7 +218,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:e007074e59034688510191c62426eecab7f71a186f0b5f7e73feb921e67b6e83",
+      "fingerprint": "sha256:e6145ef0e5ebcb833958b9f7bcea6ac7c4e69f0a9714addb721c69a8826d3ede",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -229,7 +231,7 @@
       "path": ".egeria/project.yaml"
     },
     {
-      "fingerprint": "sha256:105951cf159cdef0d94e94df55d3c4d8ea63392d3bfd278b57962a746d903a8e",
+      "fingerprint": "sha256:b775379f58622e82d9e4ca1e809539f1db4b43e6e1d9e42d816a012b2c108c1a",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -242,7 +244,7 @@
       "path": "README.md"
     },
     {
-      "fingerprint": "sha256:bf0fbef9de83cbfde601437f9300fb687759d84de57bd2a0deb1e427629b660f",
+      "fingerprint": "sha256:5bf70aff1302bd761baee32b896478b16d7667c809a137d72bd0f81a6df06244",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -268,7 +270,7 @@
       "path": "apps/web/app/layout.tsx"
     },
     {
-      "fingerprint": "sha256:a3a35ab24bc29e64f8696584a77d6fe130bfe166d3d7bd5a144bf628dd76bd72",
+      "fingerprint": "sha256:f9f3eb37271d78eebfcd1ce15625dec1259e8b5236a2a69bff6fb3f176d0d601",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -337,7 +339,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:f08cf3f9e8bc6e2ec626f4c22edf8fd8284125eae675cc2e56a378e2be2219f8",
+      "fingerprint": "sha256:8f1ec850f6299ecf92bcb69d98e6320a2298fbf855e38c8bc84a529907645a01",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1074,6 +1076,64 @@
       "path": "apps/web/tests/e2e/site-quality.spec.ts"
     },
     {
+      "fingerprint": "sha256:985c9d4bb6507b74af1d223826891e92ca7c246c920db9792c202a65afb34f8f",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/test:component"
+      },
+      "identifier": "standards-component-test-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:c2ccf2417a8183a91935356b3d91c9aefc75b23abe2e72e335e671c12654f65d",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-component-test-setup",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/tests/setup/component.ts"
+    },
+    {
+      "fingerprint": "sha256:61b7e37fd0089ca940c8906999643db839ca0cc251b6792343cccb7b3539ad88",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-component-test-specification",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/component/content-page.test.tsx"
+    },
+    {
+      "fingerprint": "sha256:d56afc4fe48f520efc1039aaccb101e356f1238cb4b282ee61d9c2f82756cb49",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/test:component:watch"
+      },
+      "identifier": "standards-component-watch-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
       "fingerprint": "sha256:7c9757ae5f5a432943330ecf8d33be53b42ddf3ae4fb0e0c65ea074373699f4c",
       "fingerprintTarget": {
         "kind": "json-value",
@@ -1104,6 +1164,21 @@
       "path": "apps/web/package.json"
     },
     {
+      "fingerprint": "sha256:a31ad83ed6c54f39cac0e675158ff49669bb2c84bbdbcb618bc530d0404cb311",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/@testing-library~1dom"
+      },
+      "identifier": "standards-dom-testing-library-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
       "fingerprint": "sha256:d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
       "fingerprintTarget": {
         "kind": "file"
@@ -1116,6 +1191,36 @@
       },
       "ownership": "managed",
       "path": "apps/web/eslint.config.mjs"
+    },
+    {
+      "fingerprint": "sha256:40fd1d5c919218b162d4a288ed960001b1c4031f04e96a2fc9f665d368ecd6bf",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/@testing-library~1jest-dom"
+      },
+      "identifier": "standards-jest-dom-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:4fc133df2106052bebf94d0e09f8aaa02d9d2cda3782ae97ad5c3c4da89fdf21",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/jsdom"
+      },
+      "identifier": "standards-jsdom-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
     },
     {
       "fingerprint": "sha256:8e633b4f41f99d4c388915bc852f2143cf4e9f5eaad70c76a81d4f4aa629eec1",
@@ -1219,7 +1324,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:1a5e22595628876691491ae833d5411028ba0e6f7af1820f49598f2ef970c294",
+      "fingerprint": "sha256:e2b3b8cf5ad5b551a95c07a3d2d6f81b5c9a37d45349caaf0503060f8d228767",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1233,7 +1338,52 @@
       "path": ".github/workflows/quality.yml"
     },
     {
-      "fingerprint": "sha256:aeb79e3ce87f0e322a20f66896324c2dcb3ede4425c97b615c749911618350ee",
+      "fingerprint": "sha256:f4e846bb6efaf55da19cc06b9eebd94eec96ef4213e637e1524c48d9d8f46adb",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/@testing-library~1react"
+      },
+      "identifier": "standards-react-testing-library-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:8f1036543a0bc25aeefae4f8576b947b19a79dd5135d30e692a51bb3d20f6345",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/test"
+      },
+      "identifier": "standards-test-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:e7d8dc898b9979eff59dbfa3edbbd47b20378a0e33299da24fe1c93f84e88bbf",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/test:watch"
+      },
+      "identifier": "standards-test-watch-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:69f986f57d11c0d37e288d05805689d37f6caea3664a78d927fcf9e299a751be",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1245,11 +1395,114 @@
       },
       "ownership": "managed",
       "path": "apps/web/tsconfig.json"
+    },
+    {
+      "fingerprint": "sha256:bbca9b7e63231badcd542320d45c2380b404b9c6a34e2dd3de0b95ca2bb34b9d",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/test:unit"
+      },
+      "identifier": "standards-unit-test-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:f171b3f82123b2e01fab64edc7f065dd482fb9e6e8fbe642477c68501e8a06c8",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-unit-test-specification",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/unit/content-schema.test.ts"
+    },
+    {
+      "fingerprint": "sha256:7939c38a3400a7e5bde6ccb5b094276f671c7764759ca8438d538e2e6e59b785",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/test:unit:watch"
+      },
+      "identifier": "standards-unit-watch-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:c659ff0e3067837f4cb832327a80e418dd5b24485dc80cf121013b1c167e3788",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/@testing-library~1user-event"
+      },
+      "identifier": "standards-user-event-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:407c0a101a59d2b970f8a4ee46a82f521d5059c0da5415fffd68fc8576c967e1",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/@vitejs~1plugin-react"
+      },
+      "identifier": "standards-vite-react-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:a577adba8d5c6a881826d1934602c50da72f2bca82c3c35715a0b66e997a1f0e",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-vitest-configuration",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/vitest.config.ts"
+    },
+    {
+      "fingerprint": "sha256:cbb84a3868c92d45819f65514b9759aa915c523229e29af624ea51415a0ea10f",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/vitest"
+      },
+      "identifier": "standards-vitest-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
     }
   ],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.6.0"
+    "recipeVersion": "0.7.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

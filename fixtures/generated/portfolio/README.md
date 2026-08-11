@@ -4,6 +4,19 @@ Generated as a lightweight pnpm workspace with its web application in `apps/web`
 
 Use the root scripts for local development and verification. Review configuration and application-owned content before release.
 
+## Unit and component checks
+
+Install project dependencies with `pnpm install --frozen-lockfile`, then run the named projects independently:
+
+```sh
+pnpm run test:unit
+pnpm run test:component
+```
+
+`test:unit` runs parser and domain checks in Node. `test:component` runs synchronous React presentation checks in jsdom with semantic Testing Library queries. Run both with `pnpm run test`, or use the explicit `test:unit:watch`, `test:component:watch`, and `test:watch` commands only during interactive local development.
+
+jsdom does not exercise CSS layout, visible focus, iframe/browser APIs, routing, async Server Components, workerd, or deployment. Use the browser checks below for their owned boundaries.
+
 ## Browser quality checks
 
 Install project dependencies with `pnpm install --frozen-lockfile`, then explicitly install Chromium before the first browser run:
