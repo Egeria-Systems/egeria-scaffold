@@ -240,9 +240,9 @@ test("root release commands use the pinned Changesets boundary", async () => {
       typecheck:
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run typecheck",
       verify:
-        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:builder && pnpm run build:builder && pnpm run test:cli && pnpm run test:packages && pnpm run typecheck:builder && pnpm run changeset:status",
+        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run lint:builder && pnpm run test:cli && pnpm run test:packages && pnpm run typecheck:builder && pnpm run changeset:status",
       verifyQuality:
-        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run lint:builder && pnpm run build:builder && pnpm run test:packages && pnpm run typecheck:builder",
+        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run lint:builder && pnpm run test:packages && pnpm run typecheck:builder",
       verifyRelease:
         "pnpm run verify:builder-packages:quality && pnpm run check:package-release local",
       version: "changeset version",
@@ -254,6 +254,28 @@ test("root release commands use the pinned Changesets boundary", async () => {
       .filter(([, command]) => command.includes("publish")),
     [["release-packages", "changeset publish"]],
   );
+});
+
+test("public package verification builds workspace declarations before typed lint", async () => {
+  const rootManifest = await readJson("package.json");
+
+  for (const scriptName of [
+    "verify:builder-packages",
+    "verify:builder-packages:quality",
+  ]) {
+    const command = rootManifest.scripts?.[scriptName];
+
+    assert.equal(typeof command, "string", scriptName);
+    assert.ok(
+      command.indexOf("pnpm run build:builder") >= 0,
+      `${scriptName} must build workspace declarations`,
+    );
+    assert.ok(
+      command.indexOf("pnpm run build:builder") <
+        command.indexOf("pnpm run lint:builder"),
+      `${scriptName} must build workspace declarations before typed lint`,
+    );
+  }
 });
 
 test("Changesets keeps a restricted default and excludes private releases", async () => {
