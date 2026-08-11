@@ -63,12 +63,14 @@ const unpublishedTargetRegistryResults = [
     name: "@egeria-systems/observability",
     version: "0.2.0",
     packageStatus: "present",
+    versions: ["0.1.0"],
     status: "absent",
   },
   {
     name: "@egeria-systems/standards",
     version: "0.2.0",
     packageStatus: "present",
+    versions: ["0.1.0"],
     status: "absent",
   },
 ];
@@ -262,8 +264,11 @@ test("registry validation rejects incomplete or mixed target results", () => {
 });
 
 test("registry validation rejects missing package history", () => {
-  const registryResults = unpublishedTargetRegistryResults.map((result, index) =>
-    index === 0 ? { ...result, packageStatus: "absent" } : result,
+  const registryResults = unpublishedTargetRegistryResults.map(
+    (result, index) =>
+      index === 0
+        ? { ...result, packageStatus: "absent", versions: [] }
+        : result,
   );
 
   assert.deepEqual(
@@ -276,6 +281,25 @@ test("registry validation rejects missing package history", () => {
     ),
     ["REGISTRY_STATE_INVALID"],
   );
+});
+
+test("registry validation rejects unexpected package history versions", () => {
+  for (const versions of [["0.3.0"], ["0.1.0", "0.3.0"], []]) {
+    const registryResults = unpublishedTargetRegistryResults.map(
+      (result, index) => (index === 0 ? { ...result, versions } : result),
+    );
+
+    assert.deepEqual(
+      problemCodes(
+        checkRegistryState({
+          packages: packageRecords,
+          pendingChangesets: [],
+          registryResults,
+        }),
+      ),
+      ["REGISTRY_STATE_INVALID"],
+    );
+  }
 });
 
 test("registry response statuses are classified fail-closed", () => {
@@ -300,7 +324,12 @@ test("registry adapter checks package history and exact version", async () => {
     version: "0.2.0",
     request: async (url, options) => {
       requests.push({ url, redirect: options.redirect });
-      return { status: url.endsWith("/0.2.0") ? 404 : 200 };
+      return url.endsWith("/0.2.0")
+        ? { status: 404 }
+        : {
+            status: 200,
+            json: async () => ({ versions: { "0.1.0": {} } }),
+          };
     },
   });
 
@@ -308,6 +337,7 @@ test("registry adapter checks package history and exact version", async () => {
     name: "@egeria-systems/standards",
     version: "0.2.0",
     packageStatus: "present",
+    versions: ["0.1.0"],
     status: "absent",
   });
   assert.deepEqual(
@@ -338,9 +368,34 @@ test("registry adapter maps request failures without exposing details", async ()
     name: "@egeria-systems/observability",
     version: "0.2.0",
     packageStatus: "network-failed",
+    versions: [],
     status: "network-failed",
   });
   assert.equal(JSON.stringify(result).includes("credential-secret"), false);
+});
+
+test("registry adapter rejects invalid package metadata without exposing it", async () => {
+  const result = await readRegistryPackageState({
+    name: "@egeria-systems/standards",
+    version: "0.2.0",
+    request: async (url) =>
+      url.endsWith("/0.2.0")
+        ? { status: 404 }
+        : {
+            status: 200,
+            json: async () => ({ detail: "credential-secret response-body" }),
+          },
+  });
+
+  assert.deepEqual(result, {
+    name: "@egeria-systems/standards",
+    version: "0.2.0",
+    packageStatus: "invalid-response",
+    versions: [],
+    status: "absent",
+  });
+  assert.equal(JSON.stringify(result).includes("credential-secret"), false);
+  assert.equal(JSON.stringify(result).includes("response-body"), false);
 });
 
 function countMatches(source, pattern) {
@@ -353,14 +408,11 @@ function releaseWorkflowProblems(workflow) {
   const registryIndex = workflow.indexOf(
     "pnpm run check:package-release registry",
   );
-  const configureIndex = workflow.indexOf(
-    "- name: Configure temporary npm authentication",
-  );
   const publishIndex = workflow.indexOf("- name: Publish packages");
   const cleanupIndex = workflow.indexOf(
     "- name: Remove temporary npm authentication",
   );
-  const configureBlock = workflow.slice(configureIndex, publishIndex);
+  const beforePublishBlock = workflow.slice(0, publishIndex);
   const publishBlock = workflow.slice(publishIndex, cleanupIndex);
   const contextBlock = workflow.slice(contextIndex, candidateIndex);
   const problems = [];
@@ -374,14 +426,23 @@ function releaseWorkflowProblems(workflow) {
     }
   }
 
-  if (!(registryIndex >= 0 && registryIndex < configureIndex)) {
-    problems.push("registry validation must immediately precede authentication");
+  if (!(registryIndex >= 0 && registryIndex < publishIndex)) {
+    problems.push("registry validation must precede publication");
   }
-  if (!(configureIndex >= 0 && configureIndex < publishIndex)) {
-    problems.push("authentication must precede publication");
+  if (
+    /NPM_BOOTSTRAP_TOKEN|secrets\.|npm config set|:_authToken/.test(
+      beforePublishBlock,
+    )
+  ) {
+    problems.push("publication must use only trusted-publisher authentication");
   }
-  if (/NPM_BOOTSTRAP_TOKEN|secrets\./.test(publishBlock)) {
-    problems.push("publication must not receive a mapped secret");
+  if (/NPM_BOOTSTRAP_TOKEN|secrets\.|:_authToken/.test(publishBlock)) {
+    problems.push("publication must not receive configured authentication");
+  }
+  if (
+    !beforePublishBlock.includes("pnpm run verify:package-release-candidate")
+  ) {
+    problems.push("release candidate verification must precede publication");
   }
   if (
     !publishBlock.includes(
@@ -392,10 +453,10 @@ function releaseWorkflowProblems(workflow) {
   }
   if (
     /verify:package-release-candidate|pnpm peers check|pnpm audit/.test(
-      configureBlock,
+      publishBlock,
     )
   ) {
-    problems.push("verification must not run under npm authentication");
+    problems.push("verification must precede publication");
   }
   if (workflow.includes("pnpm run changeset:status")) {
     problems.push("a materialized release must not run raw Changesets status");
@@ -476,12 +537,8 @@ test("package release workflow is manual, exact-commit-bound, and least privileg
     countMatches(workflow, /pnpm run check:package-release registry/g),
     1,
   );
-  assert.match(
-    workflow,
-    /pnpm exec npm config set --location=user \/\/registry\.npmjs\.org\/:_authToken "\$NPM_BOOTSTRAP_TOKEN"/,
-  );
   assert.equal(countMatches(workflow, /pnpm run release-packages/g), 1);
-  assert.equal(countMatches(workflow, /secrets\.NPM_BOOTSTRAP_TOKEN/g), 1);
+  assert.doesNotMatch(workflow, /NPM_BOOTSTRAP_TOKEN|secrets\.|npm config set/);
   assert.doesNotMatch(
     workflow,
     /actions\/cache|actions\/setup-node|git push|gh release|wrangler|deploy/i,
@@ -514,18 +571,21 @@ test("package release workflow mutations cannot expose authentication, drop prov
         "          NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}\n" +
         "        run: pnpm run release-packages",
     ),
+    workflow.replace(
+      "      - name: Publish packages\n",
+      "      - name: Configure temporary npm authentication\n" +
+        "        env:\n" +
+        "          NPM_BOOTSTRAP_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}\n" +
+        "        run: pnpm exec npm config set --location=user //registry.npmjs.org/:_authToken \"$NPM_BOOTSTRAP_TOKEN\"\n\n" +
+        "      - name: Publish packages\n",
+    ),
     workflow.replace(provenanceEnvironment, "        env:\n"),
     workflow.replace(
       provenanceEnvironment,
       '        env:\n          NPM_CONFIG_PROVENANCE: "false"\n',
     ),
     workflow.replace("        if: always()\n", ""),
-    workflow
-      .replace("          pnpm run verify:package-release-candidate\n", "")
-      .replace(
-        "          if [ -n \"$NPM_BOOTSTRAP_TOKEN\" ]; then",
-        "          pnpm run verify:package-release-candidate\n          if [ -n \"$NPM_BOOTSTRAP_TOKEN\" ]; then",
-      ),
+    workflow.replace("          pnpm run verify:package-release-candidate\n", ""),
   ];
 
   for (const mutation of mutations) {

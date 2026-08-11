@@ -89,6 +89,19 @@ docs/review-packets/2026-08-10-production-observability-package-release.md
 
 Any release-tool amendment must preserve manual exact-main-commit dispatch, least privilege, trusted publishing/provenance, full verification, exact-version absence, cleanup, and both-package awareness.
 
+#### Publication checkpoint amendment — 2026-08-10
+
+The user's preapproved plan-amendment authority adds these direct release consumers after causal failures and independent review identified them:
+
+```text
+packages/standards/README.md
+tests/package-boundaries/private-packages.test.mjs
+tests/package-boundaries/public-observability.test.mjs
+tests/package-boundaries/public-standards.test.mjs
+```
+
+The three tests own exact public-manifest fixtures that must advance with the materialized package versions. The standards README is part of the published tarball and must describe the materialized copy API without claiming that external publication already occurred. The workflow's raw `changeset status` invocation is removed because Changesets correctly returns nonzero after it consumes the release files; the release-specific checker instead enforces the exact public package set, target versions, and absence of pending Changesets. The revoked bootstrap-token configuration path is removed so the release remains OIDC-only, while unconditional authentication cleanup is retained. The registry check must validate both exact prior version histories as well as target-version absence.
+
 ### Generated capability integration after verified publication
 
 Create:

@@ -13,7 +13,7 @@ The TypeScript ESLint factory requires an absolute `tsconfigRootDir`, enables `p
 
 The copy externalization factory accepts optional `files` and `invariantLiterals` arrays. It reports non-whitespace JSX text, static JSX child expressions, literal `aria-label`, `title`, `placeholder`, and `alt` values, and static visible fields in exported Next.js metadata. It does not autofix or perform data-flow, locale-key, parity, or semantic-content validation. Exact invariant literals are the only supported escape and must be configured centrally.
 
-This copy API is present in the repository source with a pending minor Changeset. The immutable published `0.1.0` package does not contain it; generated-project adoption requires a separately approved future publication and builder update.
+This copy API is included in version `0.2.0`. Publication and generated-project adoption remain separate explicitly approved steps.
 
 The package has no root export or runtime application code. Its manifest limits both the public API and package contents. Publication remains a separate explicitly approved external action.
 

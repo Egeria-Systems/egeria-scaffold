@@ -325,6 +325,16 @@ test("the release candidate materializes only the approved public versions", asy
   ]) {
     assert.equal((await readJson(manifestPath)).version, "0.0.0", manifestPath);
   }
+
+  const standardsReadme = await readFile(
+    resolve(repositoryRoot, "packages/standards/README.md"),
+    "utf8",
+  );
+  assert.match(standardsReadme, /copy API is included in version `0\.2\.0`/);
+  assert.doesNotMatch(
+    standardsReadme,
+    /pending minor Changeset|does not contain it/,
+  );
 });
 
 test("public package dry runs contain only approved files", async () => {

@@ -12,11 +12,13 @@ const expectedPublicPackages = Object.freeze([
     name: "@egeria-systems/observability",
     path: "packages/observability",
     version: "0.2.0",
+    publishedVersions: Object.freeze(["0.1.0"]),
   }),
   Object.freeze({
     name: "@egeria-systems/standards",
     path: "packages/standards",
     version: "0.2.0",
+    publishedVersions: Object.freeze(["0.1.0"]),
   }),
 ]);
 
@@ -162,16 +164,30 @@ export function checkRegistryState({
     ]);
   }
 
+  const expectedPackagesByName = new Map(
+    expectedPublicPackages.map((packageRecord) => [
+      packageRecord.name,
+      packageRecord,
+    ]),
+  );
   if (
-    registryResults.some(
-      ({ packageStatus, status }) =>
-        packageStatus !== "present" || status !== "absent",
-    )
+    registryResults.some(({ name, packageStatus, status, versions }) => {
+      const expectedVersions =
+        expectedPackagesByName.get(name)?.publishedVersions;
+
+      return (
+        packageStatus !== "present" ||
+        status !== "absent" ||
+        !Array.isArray(versions) ||
+        JSON.stringify([...versions].sort()) !==
+          JSON.stringify(expectedVersions)
+      );
+    })
   ) {
     return freezeProblems([
       createProblem(
         "REGISTRY_STATE_INVALID",
-        "Both public package histories must exist and both exact target versions must be absent from the registry.",
+        "Both public package histories must contain only the approved prior version and both exact target versions must be absent from the registry.",
       ),
     ]);
   }
@@ -242,18 +258,65 @@ async function requestRegistryStatus(url, request) {
   }
 }
 
+function readPublishedVersions(packument) {
+  if (
+    typeof packument !== "object" ||
+    packument === null ||
+    Array.isArray(packument)
+  ) {
+    return undefined;
+  }
+
+  const { versions } = packument;
+  if (
+    typeof versions !== "object" ||
+    versions === null ||
+    Array.isArray(versions)
+  ) {
+    return undefined;
+  }
+
+  const publishedVersions = Object.keys(versions).sort();
+
+  return publishedVersions.every((version) => semverPattern.test(version))
+    ? Object.freeze(publishedVersions)
+    : undefined;
+}
+
+async function requestRegistryHistory(url, request) {
+  try {
+    const response = await request(url, { redirect: "manual" });
+    const packageStatus = classifyRegistryResponseStatus(response.status);
+
+    if (packageStatus !== "present") {
+      return { packageStatus, versions: Object.freeze([]) };
+    }
+
+    const versions = readPublishedVersions(await response.json());
+
+    return versions
+      ? { packageStatus, versions }
+      : { packageStatus: "invalid-response", versions: Object.freeze([]) };
+  } catch {
+    return {
+      packageStatus: "network-failed",
+      versions: Object.freeze([]),
+    };
+  }
+}
+
 export async function readRegistryPackageState({
   name,
   version,
   request = fetch,
 }) {
   const packageUrl = `https://registry.npmjs.org/${encodeURIComponent(name)}`;
-  const [packageStatus, status] = await Promise.all([
-    requestRegistryStatus(packageUrl, request),
+  const [packageHistory, status] = await Promise.all([
+    requestRegistryHistory(packageUrl, request),
     requestRegistryStatus(`${packageUrl}/${version}`, request),
   ]);
 
-  return { name, version, packageStatus, status };
+  return { name, version, ...packageHistory, status };
 }
 
 async function loadRegistryResults() {
