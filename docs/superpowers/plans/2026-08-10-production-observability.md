@@ -211,10 +211,10 @@ No other file is in scope without a documented evidence-backed amendment.
 ## Task 4: Materialize and publish exact public releases — external gate
 
 - [ ] Require explicit user authorization for the exact source-candidate integration, push, and trusted-publication actions. Plan approval alone is insufficient.
-- [ ] Add focused failing release tests that replace initial-release assumptions with the exact approved standards and observability target versions, existing package histories, absent target versions, no unexpected public package, no pending Changeset after materialization, and sanitized network failures.
-- [ ] Run `changeset version` once and inspect both resulting package versions, changelogs, Changeset removal, and lockfile diff. Do not hand-edit version artifacts.
-- [ ] Update only the release checker/workflow behavior proven necessary for a subsequent two-package release; retain exact-main-commit dispatch, full verification, OIDC/provenance, least privilege, cleanup, and fail-closed registry checks.
-- [ ] Independently review the exact release candidate and stop for its verified-final-diff approval before push/publication.
+- [x] Add focused failing release tests that replace initial-release assumptions with the exact approved standards and observability target versions, existing package histories, absent target versions, no unexpected public package, no pending Changeset after materialization, and sanitized network failures.
+- [x] Run `changeset version` once and inspect both resulting package versions, changelogs, Changeset removal, and lockfile diff. Do not hand-edit version artifacts.
+- [x] Update only the release checker/workflow behavior proven necessary for a subsequent two-package release; retain exact-main-commit dispatch, full verification, OIDC/provenance, least privilege, cleanup, and fail-closed registry checks.
+- [x] Independently review the exact release candidate and stop for its verified-final-diff approval before push/publication.
 - [ ] After explicit publication authority, integrate the exact reviewed commits to `main`, push only that branch, dispatch only the manual exact-commit release workflow, and wait for completion.
 - [ ] Verify both exact registry artifacts, integrity, provenance/attestations, exports, pack inventory, and fresh consumer imports. Record any absence of provenance honestly.
 - [ ] Stop on an existing target version, unexpected package history/version, non-exact commit, missing environment protection, permission drift, audit failure, signature failure, publish retry request, or partial release. Never republish an immutable version.
