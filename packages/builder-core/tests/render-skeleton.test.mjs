@@ -106,7 +106,7 @@ const bookingCalendlyCopy = {
 
 const packageVersions = {
   standards: "0.1.0",
-  observability: "0.1.0",
+  observability: "0.2.0",
 };
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -686,7 +686,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.5.0",
+    recipeVersion: "0.6.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -750,7 +750,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       typecheck: "next typegen && tsc --noEmit",
     },
     dependencies: {
-      "@egeria-systems/observability": "0.1.0",
+      "@egeria-systems/observability": "0.2.0",
       "@opennextjs/cloudflare": "1.20.2",
       next: "16.3.0",
       react: "19.2.8",
@@ -796,7 +796,7 @@ test("rendering conditionally overlays the home route and materializes each Cale
     );
 
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, "0.5.0");
+    assert.equal(rendered.project.recipeVersion, "0.6.0");
     assert.equal(
       rendered.project.selectedCapabilities.at(-1),
       "booking-calendly",

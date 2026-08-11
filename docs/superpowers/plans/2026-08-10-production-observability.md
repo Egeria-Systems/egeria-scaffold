@@ -231,13 +231,17 @@ No other file is in scope without a documented evidence-backed amendment.
 
 ## Task 5: Admit the material capability change before generated integration
 
+### Installed standards version boundary amendment
+
+The verified publication produced both public `0.2.0` artifacts, but public availability does not itself authorize an installed-capability change. Advancing the generated standards pin here would change the exact frozen standards certification subject before the separately planned generated unit/component testing increment admits that capability change. This task therefore advances only the installed observability pin to `0.2.0`; generated repositories retain exact `@egeria-systems/standards@0.1.0` until the standards-owned increment changes its descriptor, registry subject, recipes, and fixtures together. Package ownership documentation records both available public versions and this deliberate installed-version distinction.
+
 **RED files:** builder-core catalog/resolution/render/inference/diagnostics/certification tests.
 
-- [ ] Add focused failing tests for the new exact public package pins, recipe versions, descriptor version, security metadata, managed/application ownership, Wrangler JSON probes, required source files, verification plan, and absence of analytics/browser-storage/console capture.
-- [ ] Add a failing certification test proving the changed observability subject cannot retain `backfill-pending` and must link an ordinary `pending` record to a present separate task plan.
-- [ ] Implement the descriptor/version/recipe/registry changes and exact certification plan. Keep the sibling plan execution unapproved.
-- [ ] Generate checked JSON Schemas through the canonical script; never hand-edit generated schema JSON.
-- [ ] Run contracts, catalog, resolution, inference, diagnostics, certification, schema, and admission checks GREEN before template work.
+- [x] Add focused failing tests for the exact installed public package pins, recipe versions, descriptor version, security metadata, managed/application ownership, Wrangler JSON probes, required source files, verification plan, and absence of analytics/browser-storage/console capture.
+- [x] Add a failing certification test proving the changed observability subject cannot retain `backfill-pending` and must link an ordinary `pending` record to a present separate task plan.
+- [x] Implement the descriptor/version/recipe/registry changes and exact certification plan. Keep the sibling plan execution unapproved.
+- [x] Generate checked JSON Schemas through the canonical script; never hand-edit generated schema JSON.
+- [x] Run contracts, catalog, resolution, inference, diagnostics, certification, schema, and admission checks GREEN before template work.
 - [ ] Commit with message `Admit production observability capability`.
 
 ## Task 6: Generate server, browser, and Cloudflare composition with TDD

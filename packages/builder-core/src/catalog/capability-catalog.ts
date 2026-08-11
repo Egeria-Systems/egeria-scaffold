@@ -80,12 +80,13 @@ function createPackageProbe(
 }
 
 function createJsonValueProbe(
+  path: string,
   pointer: string,
-  expected: string,
+  expected: string | boolean | number,
 ): InferenceProbe {
   return {
     kind: "json-value",
-    path: "apps/web/package.json",
+    path,
     pointer,
     expected,
   };
@@ -219,19 +220,23 @@ function createDescriptors(
           "4.12.1",
         ),
         createJsonValueProbe(
+          "apps/web/package.json",
           "/scripts/browser:install:ci",
           "playwright install --with-deps chromium",
         ),
         createJsonValueProbe(
+          "apps/web/package.json",
           "/scripts/browser:install",
           "playwright install chromium",
         ),
         createFileProbe("apps/web/tests/e2e/site-quality.spec.ts"),
         createJsonValueProbe(
+          "apps/web/package.json",
           "/scripts/test:e2e:deployed",
           "playwright test --config playwright.deployed.config.ts",
         ),
         createJsonValueProbe(
+          "apps/web/package.json",
           "/scripts/test:e2e:dev",
           "playwright test --config playwright.dev.config.ts",
         ),
@@ -251,6 +256,7 @@ function createDescriptors(
         createFileProbe("apps/web/playwright.preview.config.ts"),
         createFileProbe("apps/web/playwright.config.shared.ts"),
         createJsonValueProbe(
+          "apps/web/package.json",
           "/scripts/test:e2e:preview",
           "playwright test --config playwright.preview.config.ts",
         ),
@@ -486,7 +492,7 @@ function createDescriptors(
     },
     {
       identifier: "observability",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -494,8 +500,27 @@ function createDescriptors(
       ...sharedCapabilityMetadata,
       supportedProfiles: ["portfolio", "site"],
       requiredPackages: ["@egeria-systems/observability"],
-      platformResources: [],
-      adapterSemanticRequirements: [],
+      secrets: [
+        "BETTER_STACK_INGESTING_HOST",
+        "BETTER_STACK_SOURCE_TOKEN",
+      ],
+      platformResources: [
+        "better-stack-telemetry-source",
+        "cloudflare-workers-logs",
+      ],
+      externalDomains: ["*.betterstackdata.com"],
+      dataClassifications: ["bounded-operational-telemetry"],
+      retentionAssumptions: ["provider-controlled-operational-log-retention"],
+      privilegedOperations: [
+        "cloudflare-secret-configuration",
+        "provider-source-configuration",
+      ],
+      threatReviewLevel: "elevated",
+      adapterSemanticRequirements: [
+        "cloudflare-execution-context-lifetime",
+        "cloudflare-version-metadata",
+        "same-origin-browser-ingest",
+      ],
       managedSurfaces: [
         createPackageSurface(
           "observability-package",
@@ -503,10 +528,52 @@ function createDescriptors(
           "/dependencies/@egeria-systems~1observability",
         ),
         createFileSurface(
+          "observability-browser-ingest-route",
+          "observability",
+          "apps/web/app/api/observability/route.ts",
+          "application-owned",
+        ),
+        createFileSurface(
+          "observability-browser-instrumentation",
+          "observability",
+          "apps/web/instrumentation-client.ts",
+          "application-owned",
+        ),
+        createFileSurface(
+          "observability-browser-reporter",
+          "observability",
+          "apps/web/src/infrastructure/observability/browser-reporter.ts",
+          "application-owned",
+        ),
+        createFileSurface(
+          "observability-cloudflare-context",
+          "observability",
+          "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+          "application-owned",
+        ),
+        createFileSurface(
           "observability-registration",
           "observability",
           "apps/web/src/infrastructure/observability/installed-capability.ts",
           "managed",
+        ),
+        createFileSurface(
+          "observability-server-instrumentation",
+          "observability",
+          "apps/web/instrumentation.ts",
+          "application-owned",
+        ),
+        createFileSurface(
+          "observability-server-reporter",
+          "observability",
+          "apps/web/src/infrastructure/observability/server-reporter.ts",
+          "application-owned",
+        ),
+        createFileSurface(
+          "observability-web-vitals-reporter",
+          "observability",
+          "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
+          "application-owned",
         ),
       ],
       inferenceProbes: [
@@ -515,11 +582,51 @@ function createDescriptors(
           "@egeria-systems/observability",
           packageVersions.observability,
         ),
+        createFileProbe("apps/web/app/api/observability/route.ts"),
+        createFileProbe("apps/web/instrumentation-client.ts"),
+        createFileProbe("apps/web/instrumentation.ts"),
+        createFileProbe(
+          "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+        ),
+        createFileProbe(
+          "apps/web/src/infrastructure/observability/browser-reporter.ts",
+        ),
         createFileProbe(
           "apps/web/src/infrastructure/observability/installed-capability.ts",
         ),
+        createFileProbe(
+          "apps/web/src/infrastructure/observability/server-reporter.ts",
+        ),
+        createFileProbe(
+          "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
+        ),
+        createJsonValueProbe(
+          "apps/web/wrangler.jsonc",
+          "/observability/enabled",
+          true,
+        ),
+        createJsonValueProbe(
+          "apps/web/wrangler.jsonc",
+          "/observability/head_sampling_rate",
+          1,
+        ),
+        createJsonValueProbe(
+          "apps/web/wrangler.jsonc",
+          "/version_metadata/binding",
+          "CF_VERSION_METADATA",
+        ),
       ],
-      verificationPlan: ["package-resolution", "typecheck", "next-build"],
+      verificationPlan: [
+        "package-resolution",
+        "observability-contracts",
+        "lint",
+        "typecheck",
+        "next-build",
+        "opennext-build",
+        "wrangler-types",
+        "browser-development",
+        "browser-preview",
+      ],
       documentationEvidenceRequirements: [
         "public-package-version-and-provenance",
         "analytics-separation",
