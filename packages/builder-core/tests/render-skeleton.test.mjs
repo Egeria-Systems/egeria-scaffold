@@ -1040,6 +1040,7 @@ test("generated unit and component tests use distinct named environments", async
   const componentTest = files.get(
     "apps/web/tests/component/content-page.test.tsx",
   );
+  const webInstructions = files.get("apps/web/AGENTS.md");
   const typescript = parseGeneratedJson(rendered.files, "apps/web/tsconfig.json");
 
   assert.match(configuration, /name: "unit"[\s\S]+environment: "node"/u);
@@ -1069,6 +1070,11 @@ test("generated unit and component tests use distinct named environments", async
   assert.match(componentTest, /getByRole\("navigation"\)/u);
   assert.match(componentTest, /getByRole\("heading"/u);
   assert.doesNotMatch(componentTest, /snapshot|fireEvent/iu);
+  assert.match(webInstructions, /\[workspace guidance\]\(\.\.\/\.\.\/AGENTS\.md\)/u);
+  assert.match(webInstructions, /pnpm run test:unit/u);
+  assert.match(webInstructions, /pnpm run test:component/u);
+  assert.match(webInstructions, /focused failing test[\s\S]+RED[\s\S]+GREEN/u);
+  assert.match(webInstructions, /pnpm run verify/u);
   assert.ok(typescript.include.includes("tests/**/*.ts"));
   assert.ok(typescript.include.includes("tests/**/*.tsx"));
 });

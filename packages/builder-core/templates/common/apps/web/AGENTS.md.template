@@ -1,5 +1,6 @@
 # {{projectName}} web application guidance
 
+- Follow the canonical [workspace guidance](../../AGENTS.md); this file adds only the web application boundary.
 - Load validated locale content in routes and pass typed values into pure presentation components.
 - Add page sections through the typed source registry and preserve exact content validation, stable instance identifiers, and one enabled hero first among enabled sections per page.
 - Keep long-form Markdown as validated data and use only an explicitly reviewed renderer.
@@ -13,5 +14,6 @@
 - Keep Cloudflare bindings at configuration and composition boundaries; only the Cloudflare observability adapter may read the declared Better Stack secrets, version metadata, and execution context. Do not import Cloudflare types into domain, application, or presentation code.
 - Keep Cloudflare Web Analytics and every other analytics or browser-storage surface absent unless a separately selected analytics capability owns it.
 - Treat application-owned routes, content, presentation, styles, and guidance as project-maintained surfaces.
-- Keep unit tests in `tests/unit` under the named Node project and component tests in `tests/component` under the named jsdom project. Prefer semantic `getByRole` or `findByRole` queries and `userEvent.setup()` for interaction; preserve explicit component `cleanup` and avoid broad snapshots.
+- Keep unit tests in `tests/unit` under the named Node project and run them from the workspace root with `pnpm run test:unit`. Keep component tests in `tests/component` under the named jsdom project and run them with `pnpm run test:component`. Prefer semantic `getByRole` or `findByRole` queries and `userEvent.setup()` for interaction; preserve explicit component `cleanup` and avoid broad snapshots.
+- For application changes, add a focused failing test and run its exact semantic command to verify RED, implement the minimum change, rerun that command for GREEN, and run `pnpm run verify` once after the coherent batch.
 - jsdom does not prove layout, visible focus, iframe/browser APIs, routing, async Server Components, workerd behavior, or accessibility conformance. Escalate those cases to the owning Playwright development or preview suite. Add Workers Vitest only when a selected capability owns concrete Workers bindings and its test contract.

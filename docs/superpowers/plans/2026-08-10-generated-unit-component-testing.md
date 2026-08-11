@@ -144,10 +144,22 @@ packages/builder-core/tests/inference.test.mjs
 packages/builder-core/tests/diagnostics.test.mjs
 packages/builder-core/tests/state-ownership.test.mjs
 packages/builder-core/tests/certification.test.mjs
+apps/cli/tests/cli.test.mjs
 tests/capability-certification/certification-runner.test.mjs
+tests/capability-certification/production-observability.test.mjs
 tests/generated-fixtures/determinism.test.mjs
 tests/generated-fixtures/verification-script.test.mjs
 ```
+
+**2026-08-11 evidence-backed exact-file amendment:** `apps/cli/tests/cli.test.mjs`
+and `tests/capability-certification/production-observability.test.mjs` are direct
+consumers of the generation-verification receipt. Their existing assertions had
+to move atomically with the tuple extension so CLI output and the independently
+pending observability runner continue to recognize current generated state.
+Independent review also required a compatibility repair within the already
+listed state schema/tests and a parent-link plus exact-command repair within the
+already listed generated web guidance. These corrections add no capability,
+provider action, deployment behavior, or later-stage runtime scope.
 
 ### Regenerate immutable generated projects
 
