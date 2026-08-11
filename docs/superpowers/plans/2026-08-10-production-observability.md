@@ -294,20 +294,20 @@ The verified publication produced both public `0.2.0` artifacts, but public avai
 
 **Comparison:** exact post-publication implementation base through `HEAD`, recorded before dispatch.
 
-- [ ] Dispatch one read-only requirements reviewer for every Task 6 behavior, package release, profile/capability/state agreement, privacy exclusion, external boundary, and claim limit.
-- [ ] Dispatch one read-only architecture/anti-overengineering reviewer for functional-core/imperative-shell design, public/generated ownership, Cloudflare isolation, narrow ports, no overlap, no analytics, package replaceability, lifecycle, and low-churn scope.
-- [ ] Dispatch one read-only test-evidence reviewer for causal TDD, package/provider contract evidence, actual production generation, inference/state/diff, fixed installs/builds, browser behavior, negative privacy cases, and unsupported claims.
-- [ ] Add one security/privacy specialist because this increment handles public telemetry input and bearer credentials. Review secret placement, exfiltration, injection, origin/size/schema bounds, data minimization, error/response leakage, abuse/cost risk, and dependency/advisory evidence.
-- [ ] Prohibit edits and recursive fan-out; wait for every result; validate every finding against the current tree.
-- [ ] Repair only evidence-backed material defects using focused RED/GREEN cycles, rerun affected checks, and record every disposition.
-- [ ] Use no more than one bounded final recheck unless a repaired material defect directly requires it.
+- [x] Dispatch one read-only requirements reviewer for every Task 6 behavior, package release, profile/capability/state agreement, privacy exclusion, external boundary, and claim limit.
+- [x] Dispatch one read-only architecture/anti-overengineering reviewer for functional-core/imperative-shell design, public/generated ownership, Cloudflare isolation, narrow ports, no overlap, no analytics, package replaceability, lifecycle, and low-churn scope.
+- [x] Dispatch one read-only test-evidence reviewer for causal TDD, package/provider contract evidence, actual production generation, inference/state/diff, fixed installs/builds, browser behavior, negative privacy cases, and unsupported claims.
+- [x] Add one security/privacy specialist because this increment handles public telemetry input and bearer credentials. Review secret placement, exfiltration, injection, origin/size/schema bounds, data minimization, error/response leakage, abuse/cost risk, and dependency/advisory evidence.
+- [x] Prohibit edits and recursive fan-out; wait for every result; validate every finding against the current tree.
+- [x] Repair only evidence-backed material defects using focused RED/GREEN cycles, rerun affected checks, and record every disposition.
+- [x] Use no more than one bounded final recheck unless a repaired material defect directly requires it.
 
 ## Task 10: Final verification and implemented-task review packet
 
-- [ ] Run `git diff --check`, semantic naming, documentation/constitution, package boundaries, observability package verification, builder-core, CLI, certification admission, generated-fixture tests, builder lint/build/typecheck, fixed-root full generated verification, moderate root/production audits, registry signatures, and Changesets status on the settled tree.
-- [ ] Do not repeat an unchanged successful expensive check. Record exact command, exit, relevant count, duration where material, and bounded claim.
-- [ ] Verify branch/status, exact base/head comparison, changed-file inventory, ignored/untracked artifacts, public registry versions/integrity/provenance, registry subject/status, and no analytics/provider/deployment mutation beyond the separately authorized package release.
-- [ ] Record reviewer dispositions, known risks, deferred protected-staging/provider certification, source/package/provider/credential recovery domains, and no-WCAG/no-production claim.
-- [ ] Commit final verification and review packet with message `Record production observability review`.
-- [ ] Re-run only final-tree identity/status and documentation/semantic checks affected by the evidence commit.
-- [ ] Stop for explicit implemented-task review. Do not execute the sibling certification plan or begin the next P2 increment.
+- [x] Run `git diff --check`, semantic naming, documentation/constitution, package boundaries, observability package verification, builder-core, CLI, certification admission, generated-fixture tests, builder lint/build/typecheck, fixed-root full generated verification, moderate root/production audits, registry signatures, and Changesets status on the settled tree.
+- [x] Do not repeat an unchanged successful expensive check. Record exact command, exit, relevant count, duration where material, and bounded claim.
+- [x] Verify branch/status, exact base/head comparison, changed-file inventory, ignored/untracked artifacts, public registry versions/integrity/provenance, registry subject/status, and no analytics/provider/deployment mutation beyond the separately authorized package release.
+- [x] Record reviewer dispositions, known risks, deferred protected-staging/provider certification, source/package/provider/credential recovery domains, and no-WCAG/no-production claim.
+- [x] Commit final verification and review packet with message `Record production observability review`.
+- [x] Re-run only final-tree identity/status and documentation/semantic checks affected by the evidence commit.
+- [x] Stop for explicit implemented-task review. Do not execute the sibling certification plan or begin the next P2 increment.
