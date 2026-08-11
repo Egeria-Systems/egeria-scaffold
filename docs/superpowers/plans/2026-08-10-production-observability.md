@@ -156,44 +156,44 @@ No other file is in scope without a documented evidence-backed amendment.
 
 ## Task 1: Freeze preparation, design, and exact plan
 
-- [ ] Record branch/base/status, canonical sources, manifests, current descriptors/recipes/certification, prior packet conclusions, exact baseline behavior, official documentation, advisories, audits, contradictions, resolutions, authority boundary, and claim limits.
-- [ ] Record the selected architecture and rejected alternatives.
-- [ ] Record this exact-file plan, including the unavoidable public-package checkpoint and separate certification task.
-- [ ] Run documentation links/contracts, semantic naming, and `git diff --check`.
-- [ ] Commit only the preparation, design, and plan with message `Plan production observability`.
+- [x] Record branch/base/status, canonical sources, manifests, current descriptors/recipes/certification, prior packet conclusions, exact baseline behavior, official documentation, advisories, audits, contradictions, resolutions, authority boundary, and claim limits.
+- [x] Record the selected architecture and rejected alternatives.
+- [x] Record this exact-file plan, including the unavoidable public-package checkpoint and separate certification task.
+- [x] Run documentation links/contracts, semantic naming, and `git diff --check`.
+- [x] Commit only the preparation, design, and plan with message `Plan production observability`.
 
 ## Task 2: Implement the provider-neutral public contract with TDD
 
 **RED files:** package tests plus exact package-boundary tests named above.
 
-- [ ] Add failing literal behavior tests for event vocabulary, ISO time, context-token bounds, immutable results, attribute allowlisting, prohibited and nested-value rejection, secret-like values, normalized error categories, and absence of raw error content.
-- [ ] Add failing tests proving one thrown/rejected sink cannot suppress another or escape dispatch, and every failure result is content-safe.
-- [ ] Add failing server tests for structured-object output, Better Stack host/token/request shape, payload bounds, documented success, status/fetch failure classification, and zero response/token/payload echo.
-- [ ] Add failing browser tests for the exact bounded envelope, unknown-field rejection, no raw error fields, injected delivery, and failure isolation.
-- [ ] Add failing testing-surface tests for memory capture, immutable snapshots, positive assertions, and stable content-safe assertion failures.
-- [ ] Add failing package-boundary tests for exact exports, source inventory, zero runtime dependencies, pack inventory, and concrete public consumer imports.
-- [ ] Run each focused RED test against real package output and record the expected missing-export or old-empty-contract failure before production edits.
-- [ ] Implement the minimum strict TypeScript source. Keep all platform effects injected and all public values readonly/frozen.
-- [ ] Export root, `./server`, `./browser`, and `./testing` explicitly. Update package documentation with examples that use fictional identifiers and no secrets.
-- [ ] Add one observability minor Changeset. Do not version or publish.
-- [ ] Run package build, tests, lint, typecheck, package boundaries, pack dry run, and Changesets status GREEN.
-- [ ] Make a focused DRY pass only for repeated validated transformations or result construction whose extraction materially improves maintenance.
-- [ ] Commit with message `Add operational telemetry contracts`.
+- [x] Add failing literal behavior tests for event vocabulary, ISO time, context-token bounds, immutable results, attribute allowlisting, prohibited and nested-value rejection, secret-like values, normalized error categories, and absence of raw error content.
+- [x] Add failing tests proving one thrown/rejected sink cannot suppress another or escape dispatch, and every failure result is content-safe.
+- [x] Add failing server tests for structured-object output, Better Stack host/token/request shape, payload bounds, documented success, status/fetch failure classification, and zero response/token/payload echo.
+- [x] Add failing browser tests for the exact bounded envelope, unknown-field rejection, no raw error fields, injected delivery, and failure isolation.
+- [x] Add failing testing-surface tests for memory capture, immutable snapshots, positive assertions, and stable content-safe assertion failures.
+- [x] Add failing package-boundary tests for exact exports, source inventory, zero runtime dependencies, pack inventory, and concrete public consumer imports.
+- [x] Run each focused RED test against real package output and record the expected missing-export or old-empty-contract failure before production edits.
+- [x] Implement the minimum strict TypeScript source. Keep all platform effects injected and all public values readonly/frozen.
+- [x] Export root, `./server`, `./browser`, and `./testing` explicitly. Update package documentation with examples that use fictional identifiers and no secrets.
+- [x] Add one observability minor Changeset. Do not version or publish.
+- [x] Run package build, tests, lint, typecheck, package boundaries, pack dry run, and Changesets status GREEN.
+- [x] Make a focused DRY pass only for repeated validated transformations or result construction whose extraction materially improves maintenance.
+- [x] Commit with message `Add operational telemetry contracts`.
 
 ## Task 3: Review and verify the public-package source candidate
 
 **Comparison:** `c6617e5192e7e3a983a82d074791e451cfbe9bd7..HEAD`.
 
-- [ ] Dispatch one read-only requirements reviewer for the exact public-package obligations, privacy exclusions, zero dependency, release boundary, and unsupported claims.
-- [ ] Dispatch one read-only architecture/anti-overengineering reviewer for package/generated ownership, provider neutrality, API size, error/redaction model, runtime isolation, replacement, and analytics separation.
-- [ ] Dispatch one read-only test-evidence reviewer for causal RED/GREEN evidence, realistic mutations, public consumer/pack evidence, provider protocol boundaries, and claim calibration.
-- [ ] Prohibit edits and recursive fan-out; wait for every reviewer; validate findings against the current tree.
-- [ ] Repair only evidence-backed material defects through focused RED/GREEN cycles and rerun affected checks.
-- [ ] Run exact pinned package verification, root package boundaries, lint/build/typecheck, moderate dependency audits, registry signatures, Changesets status, semantic naming, docs links, and `git diff --check` once on the settled tree.
-- [ ] Record commands/results, changed files, reviewer dispositions, risks, deferred generated/provider behavior, and rollback in the package verification evidence and review packet.
-- [ ] Commit final package evidence with message `Record observability package review`.
-- [ ] Re-run only documentation/semantic/status checks affected by the evidence commit.
-- [ ] Stop for exact-diff approval and separate release authority. Do not begin Task 4 on an unpublished package.
+- [x] Dispatch one read-only requirements reviewer for the exact public-package obligations, privacy exclusions, zero dependency, release boundary, and unsupported claims.
+- [x] Dispatch one read-only architecture/anti-overengineering reviewer for package/generated ownership, provider neutrality, API size, error/redaction model, runtime isolation, replacement, and analytics separation.
+- [x] Dispatch one read-only test-evidence reviewer for causal RED/GREEN evidence, realistic mutations, public consumer/pack evidence, provider protocol boundaries, and claim calibration.
+- [x] Prohibit edits and recursive fan-out; wait for every reviewer; validate findings against the current tree.
+- [x] Repair only evidence-backed material defects through focused RED/GREEN cycles and rerun affected checks.
+- [x] Run exact pinned package verification, root package boundaries, lint/build/typecheck, moderate dependency audits, registry signatures, Changesets status, semantic naming, docs links, and `git diff --check` once on the settled tree.
+- [x] Record commands/results, changed files, reviewer dispositions, risks, deferred generated/provider behavior, and rollback in the package verification evidence and review packet.
+- [x] Commit final package evidence with message `Record observability package review`.
+- [x] Re-run only documentation/semantic/status checks affected by the evidence commit.
+- [x] Stop for exact-diff approval and separate release authority. Do not begin Task 4 on an unpublished package.
 
 ## Task 4: Materialize and publish exact public releases — external gate
 
