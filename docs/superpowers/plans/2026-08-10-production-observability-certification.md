@@ -8,7 +8,7 @@
 
 **Tech stack:** Node.js `22.23.2`, pnpm `11.20.0`, Node test runner, Next.js `16.3.0`, `@opennextjs/cloudflare@1.20.2`, Wrangler `4.118.0`, GitHub Actions, Cloudflare Workers Logs, and Better Stack HTTP ingestion.
 
-**Current local status (2026-08-11):** The approved Task 6 comparison remains `717c3bb0f048f4a4bc544100125ae42d818f09bc..45b57d2dc265ef6ba9ac805d7352a01db5f1081d`. The local fresh-scaffold journey passed at `ef845b1e0551d3b43e17969cc00f21960c90769b`; the manual protected-staging workflow, deployed exercise, and provider receipt path are prepared but have not been dispatched or executed. `observability@0.2.0` remains `pending`, and Tasks 6–7 plus every external action remain open.
+**Current local status (2026-08-11):** The approved Task 6 comparison remains `717c3bb0f048f4a4bc544100125ae42d818f09bc..45b57d2dc265ef6ba9ac805d7352a01db5f1081d`. The local fresh-scaffold journey passed at `ef845b1e0551d3b43e17969cc00f21960c90769b`; the manual protected-staging workflow, deployed exercise, and provider receipt path are prepared but have not been dispatched or executed. Tasks 1–7 local implementation and review are complete. `observability@0.2.0` remains `pending`, and every external action remains separately unauthorized.
 
 ## Global constraints
 
@@ -261,8 +261,8 @@ Do not modify capability descriptors, certification schemas/runtime policy, publ
 - Produces: reconciled read-only requirements, architecture/anti-overengineering, test-evidence, and security/privacy review dispositions.
 
 - [x] Dispatch independent read-only reviewers for requirements, architecture/anti-overengineering, and test evidence. Add one security/privacy specialist because the workflow handles deployment credentials and external telemetry. Prohibit edits and recursive fan-out; give each the exact range and current clean worktree. Requirements, test-evidence, and security/privacy review retained the four findings in the dated amendment above; architecture/anti-overengineering reported no material findings.
-- [ ] Validate every finding against the current tree. For each material defect, write or amend a focused test to show RED, implement the minimum repair, rerun the affected check, and obtain one bounded re-review. Record unsupported/preference-only findings without code churn.
-- [ ] Commit evidence-backed repairs with a message naming the actual correction.
+- [x] Validate every finding against the current tree. For each material defect, write or amend a focused test to show RED, implement the minimum repair, rerun the affected check, and obtain one bounded re-review. Record unsupported/preference-only findings without code churn.
+- [x] Commit evidence-backed repairs with a message naming the actual correction.
 
 ### Task 7: Final verification and implemented-task review packet
 
@@ -274,8 +274,8 @@ Do not modify capability descriptors, certification schemas/runtime policy, publ
 - Consumes: settled exact local Task 6B diff and every review disposition.
 - Produces: one implemented-task review packet and explicit external stop gate.
 
-- [ ] Run the settled focused suites, constitution/docs links, semantic naming, package boundaries, builder-core/CLI/public-package tests, admission, both closure policies, lint/build/typecheck, fresh `pnpm audit --audit-level=moderate`, signatures, fixed-root generated verification, changeset status, `git diff --check`, and exact branch/status/inventory checks. Do not repeat the unchanged real local journey.
-- [ ] Record exact commands, exits, counts/durations where material, bounded claims, changed files, commits, reviewer dispositions, risks, deferred external work, and source/deployment/credential/provider/data rollback and recovery separately.
-- [ ] State prominently that no workflow was dispatched, no provider or secret was mutated, no telemetry was transmitted, no cleanup was performed, no registry status changed, Task 6 remains unmerged/unpushed, and Task 6B is not certified.
-- [ ] Commit final evidence with message `Record observability certification review`.
-- [ ] Re-run only checks whose inputs changed in the evidence commit, then stop for explicit verified-final-diff approval. Do not merge, push, deploy, mutate providers, transition the registry, or begin a later task.
+- [x] Run the settled focused suites, constitution/docs links, semantic naming, package boundaries, builder-core/CLI/public-package tests, admission, both closure policies, lint/build/typecheck, fresh `pnpm audit --audit-level=moderate`, signatures, fixed-root generated verification, changeset status, `git diff --check`, and exact branch/status/inventory checks. Do not repeat the unchanged real local journey.
+- [x] Record exact commands, exits, counts/durations where material, bounded claims, changed files, commits, reviewer dispositions, risks, deferred external work, and source/deployment/credential/provider/data rollback and recovery separately.
+- [x] State prominently that no workflow was dispatched, no provider or secret was mutated, no telemetry was transmitted, no cleanup was performed, no registry status changed, Task 6 remains unmerged/unpushed, and Task 6B is not certified.
+- [x] Commit final evidence with message `Record observability certification review`.
+- [x] Re-run only checks whose inputs changed in the evidence commit, then stop for explicit verified-final-diff approval. Do not merge, push, deploy, mutate providers, transition the registry, or begin a later task.
