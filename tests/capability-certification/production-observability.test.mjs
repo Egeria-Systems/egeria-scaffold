@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, lstat, mkdir, readFile, rm } from "node:fs/promises";
+import {
+  access,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -29,11 +38,19 @@ const deployedExerciseScript = resolve(
   repositoryRoot,
   "scripts/exercise-production-observability.mjs",
 );
+const deploymentReceiptScript = resolve(
+  repositoryRoot,
+  "scripts/create-cloudflare-deployment-receipt.mjs",
+);
 
 const deployedBaseUrl = "https://observability-certification.example/";
 const deployedRevision = "0123456789abcdef0123456789abcdef01234567";
-const browserErrorMarker = `obs-cert-error-${deployedRevision}`;
-const webVitalMarker = `obs-cert-vital-${deployedRevision}`;
+const routeBrowserErrorMarker = `obs-cert-error-${deployedRevision}`;
+const routeWebVitalMarker = `obs-cert-vital-${deployedRevision}`;
+const cloudflareDeploymentId = "11111111-2222-4333-8444-555555555555";
+const cloudflareVersionId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+const olderCloudflareDeploymentId = "99999999-8888-4777-8666-555555555555";
+const olderCloudflareVersionId = "ffffffff-eeee-4ddd-8ccc-bbbbbbbbbbbb";
 
 const fixedChecks = Object.freeze([
   "pnpm-version",
@@ -141,6 +158,30 @@ async function runCertificationClosure(policy) {
 
 async function loadDeployedExercise() {
   return import(pathToFileURL(deployedExerciseScript).href);
+}
+
+async function loadDeploymentReceipt() {
+  return import(pathToFileURL(deploymentReceiptScript).href);
+}
+
+function cloudflareDeploymentsInput(overrides = {}) {
+  return [
+    {
+      id: olderCloudflareDeploymentId,
+      created_on: "2026-08-11T15:00:00.000Z",
+      versions: [
+        { version_id: olderCloudflareVersionId, percentage: 100 },
+      ],
+      author_email: "private@example.invalid",
+    },
+    {
+      id: cloudflareDeploymentId,
+      created_on: "2026-08-11T16:00:00.000Z",
+      versions: [{ version_id: cloudflareVersionId, percentage: 100 }],
+      source: "private-provider-field",
+      ...overrides,
+    },
+  ];
 }
 
 function responseWithoutReadableContent(status) {
@@ -474,7 +515,254 @@ test("the observability certification entry rejects unknown arguments without ec
   assert.doesNotMatch(result.stderr, /private-value/u);
 });
 
-test("the deployed observability exercise sends the fixed bounded journey and returns content-safe markers", async () => {
+test("the Cloudflare deployment sanitizer selects the unique latest full-traffic version and returns only bounded identity", async () => {
+  const { createCloudflareDeploymentReceiptForTesting } =
+    await loadDeploymentReceipt();
+  const rawInput = JSON.stringify(cloudflareDeploymentsInput());
+
+  const receipt = createCloudflareDeploymentReceiptForTesting({
+    rawInput,
+    revision: deployedRevision,
+    worker: "acme-portfolio-observability",
+  });
+
+  assert.deepEqual(receipt, {
+    ok: true,
+    capability: "observability",
+    version: "0.2.0",
+    worker: "acme-portfolio-observability",
+    gitRevision: deployedRevision,
+    cloudflareDeploymentId,
+    cloudflareVersionId,
+    checks: [
+      "git-revision-validated",
+      "worker-validated",
+      "latest-deployment-selected",
+      "single-version-100-percent",
+    ],
+  });
+  assert.doesNotMatch(JSON.stringify(receipt), /private|example\.invalid/iu);
+});
+
+test("the Cloudflare deployment sanitizer rejects ambiguous, malformed, and unsafe identity without exposing input", async () => {
+  const { createCloudflareDeploymentReceiptForTesting } =
+    await loadDeploymentReceipt();
+  const tiedLatest = cloudflareDeploymentsInput();
+  tiedLatest[0].created_on = tiedLatest[1].created_on;
+
+  const failures = [
+    [
+      {
+        rawInput: "private malformed provider response",
+        revision: deployedRevision,
+        worker: "acme-portfolio-observability",
+      },
+      "DEPLOYMENT_RECEIPT_JSON_INVALID",
+    ],
+    [
+      {
+        rawInput: "[]",
+        revision: deployedRevision,
+        worker: "acme-portfolio-observability",
+      },
+      "DEPLOYMENT_RECEIPT_DEPLOYMENTS_INVALID",
+    ],
+    [
+      {
+        rawInput: JSON.stringify(tiedLatest),
+        revision: deployedRevision,
+        worker: "acme-portfolio-observability",
+      },
+      "DEPLOYMENT_RECEIPT_LATEST_AMBIGUOUS",
+    ],
+    [
+      {
+        rawInput: JSON.stringify(
+          cloudflareDeploymentsInput({ id: "private-deployment-id" }),
+        ),
+        revision: deployedRevision,
+        worker: "acme-portfolio-observability",
+      },
+      "DEPLOYMENT_RECEIPT_IDENTITY_INVALID",
+    ],
+    [
+      {
+        rawInput: JSON.stringify(
+          cloudflareDeploymentsInput({
+            versions: [
+              { version_id: cloudflareVersionId, percentage: 99 },
+              { version_id: olderCloudflareVersionId, percentage: 1 },
+            ],
+          }),
+        ),
+        revision: deployedRevision,
+        worker: "acme-portfolio-observability",
+      },
+      "DEPLOYMENT_RECEIPT_IDENTITY_INVALID",
+    ],
+    [
+      {
+        rawInput: JSON.stringify(
+          cloudflareDeploymentsInput({
+            versions: [
+              { version_id: "private-version-id", percentage: 100 },
+            ],
+          }),
+        ),
+        revision: deployedRevision,
+        worker: "acme-portfolio-observability",
+      },
+      "DEPLOYMENT_RECEIPT_IDENTITY_INVALID",
+    ],
+    [
+      {
+        rawInput: JSON.stringify(cloudflareDeploymentsInput()),
+        revision: "PRIVATE_REVISION",
+        worker: "acme-portfolio-observability",
+      },
+      "DEPLOYMENT_RECEIPT_REVISION_INVALID",
+    ],
+    [
+      {
+        rawInput: JSON.stringify(cloudflareDeploymentsInput()),
+        revision: deployedRevision,
+        worker: "private-worker",
+      },
+      "DEPLOYMENT_RECEIPT_WORKER_INVALID",
+    ],
+  ];
+
+  for (const [input, expectedCode] of failures) {
+    assert.throws(
+      () => createCloudflareDeploymentReceiptForTesting(input),
+      (error) => {
+        assert.equal(error?.name, "CloudflareDeploymentReceiptError");
+        assert.equal(error?.code, expectedCode);
+        assert.doesNotMatch(
+          error.message,
+          /private|example\.invalid|012345|aaaaaaaa/iu,
+        );
+        return true;
+      },
+    );
+  }
+});
+
+test("the Cloudflare deployment receipt CLI reads a bounded file and emits exactly one sanitized line", async () => {
+  const temporaryRoot = await mkdtemp(
+    resolve(tmpdir(), "observability-deployment-receipt-"),
+  );
+  const inputPath = resolve(temporaryRoot, "private-provider-response.json");
+
+  try {
+    await writeFile(
+      inputPath,
+      JSON.stringify(cloudflareDeploymentsInput()),
+      "utf8",
+    );
+    const result = await execFileAsync(
+      process.execPath,
+      [
+        deploymentReceiptScript,
+        "--input",
+        inputPath,
+        "--revision",
+        deployedRevision,
+        "--worker",
+        "acme-portfolio-observability",
+      ],
+      {
+        cwd: repositoryRoot,
+        encoding: "utf8",
+        env: { PATH: process.env.PATH },
+      },
+    );
+
+    assert.equal(result.stderr, "");
+    assert.equal(result.stdout.split("\n").length, 2);
+    assert.deepEqual(JSON.parse(result.stdout), {
+      ok: true,
+      capability: "observability",
+      version: "0.2.0",
+      worker: "acme-portfolio-observability",
+      gitRevision: deployedRevision,
+      cloudflareDeploymentId,
+      cloudflareVersionId,
+      checks: [
+        "git-revision-validated",
+        "worker-validated",
+        "latest-deployment-selected",
+        "single-version-100-percent",
+      ],
+    });
+    assert.doesNotMatch(
+      result.stdout,
+      /private|provider-response|example\.invalid/iu,
+    );
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test("the Cloudflare deployment receipt CLI rejects oversized files and arguments with stable private-safe errors", async () => {
+  const temporaryRoot = await mkdtemp(
+    resolve(tmpdir(), "observability-deployment-receipt-"),
+  );
+  const oversizedPath = resolve(temporaryRoot, "private-oversized-response.json");
+
+  try {
+    await writeFile(oversizedPath, "x".repeat(65_537), "utf8");
+    const cases = [
+      {
+        arguments: [
+          deploymentReceiptScript,
+          "--input",
+          oversizedPath,
+          "--revision",
+          deployedRevision,
+          "--worker",
+          "acme-portfolio-observability",
+        ],
+        exitCode: 1,
+        code: "DEPLOYMENT_RECEIPT_INPUT_TOO_LARGE",
+      },
+      {
+        arguments: [deploymentReceiptScript, "--input", "private-path"],
+        exitCode: 2,
+        code: "DEPLOYMENT_RECEIPT_ARGUMENT_INVALID",
+      },
+    ];
+
+    for (const expected of cases) {
+      let failure;
+      try {
+        await execFileAsync(process.execPath, expected.arguments, {
+          cwd: repositoryRoot,
+          encoding: "utf8",
+          env: { PATH: process.env.PATH },
+        });
+        assert.fail("invalid deployment receipt input must fail");
+      } catch (error) {
+        failure = error;
+      }
+
+      assert.equal(failure.code, expected.exitCode);
+      assert.equal(failure.stdout, "");
+      assert.equal(
+        failure.stderr,
+        `${JSON.stringify({ ok: false, code: expected.code })}\n`,
+      );
+      assert.doesNotMatch(
+        failure.stderr,
+        /private|oversized|response|012345/iu,
+      );
+    }
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
+test("the deployed observability exercise sends the fixed bounded route-envelope journey and returns content-safe markers", async () => {
   const { exerciseProductionObservabilityForTesting } =
     await loadDeployedExercise();
   const expectedStatuses = [200, 500, 202, 202, 403, 415, 413, 400, 400, 400, 400];
@@ -504,14 +792,14 @@ test("the deployed observability exercise sends the fixed bounded journey and re
     version: "0.2.0",
     revision: deployedRevision,
     markers: {
-      browserError: browserErrorMarker,
-      webVital: webVitalMarker,
+      routeBrowserError: routeBrowserErrorMarker,
+      routeWebVital: routeWebVitalMarker,
     },
     checks: [
       "home-response",
       "certification-error-response",
-      "browser-error-accepted",
-      "web-vital-accepted",
+      "browser-error-envelope-accepted",
+      "web-vital-envelope-accepted",
       "cross-origin-rejected",
       "media-type-rejected",
       "oversize-rejected",
@@ -569,7 +857,7 @@ test("the deployed observability exercise sends the fixed bounded journey and re
       kind: "application.error",
       runtime: "browser",
       severity: "error",
-      context: { correlationId: browserErrorMarker },
+      context: { correlationId: routeBrowserErrorMarker },
       errorCategory: "unexpected",
       attributes: { source: "window-error" },
     },
@@ -581,7 +869,7 @@ test("the deployed observability exercise sends the fixed bounded journey and re
       kind: "web.vital",
       runtime: "browser",
       severity: "info",
-      context: { correlationId: webVitalMarker },
+      context: { correlationId: routeWebVitalMarker },
       attributes: {
         metricName: "LCP",
         value: 123.4,

@@ -7,8 +7,8 @@ const exactRevisionPattern = /^[0-9a-f]{40}$/u;
 const checkNames = Object.freeze([
   "home-response",
   "certification-error-response",
-  "browser-error-accepted",
-  "web-vital-accepted",
+  "browser-error-envelope-accepted",
+  "web-vital-envelope-accepted",
   "cross-origin-rejected",
   "media-type-rejected",
   "oversize-rejected",
@@ -147,12 +147,15 @@ function jsonRequest(origin, body) {
 function createRequests({ baseUrl, revision }) {
   const origin = new URL(baseUrl).origin;
   const observabilityUrl = `${baseUrl}api/observability`;
-  const browserErrorMarker = `obs-cert-error-${revision}`;
-  const webVitalMarker = `obs-cert-vital-${revision}`;
-  const browserError = browserErrorEnvelope(browserErrorMarker);
+  const routeBrowserErrorMarker = `obs-cert-error-${revision}`;
+  const routeWebVitalMarker = `obs-cert-vital-${revision}`;
+  const browserError = browserErrorEnvelope(routeBrowserErrorMarker);
 
   return Object.freeze({
-    markers: Object.freeze({ browserErrorMarker, webVitalMarker }),
+    markers: Object.freeze({
+      routeBrowserErrorMarker,
+      routeWebVitalMarker,
+    }),
     requests: Object.freeze([
       Object.freeze({
         url: baseUrl,
@@ -173,7 +176,7 @@ function createRequests({ baseUrl, revision }) {
         url: observabilityUrl,
         init: jsonRequest(
           origin,
-          JSON.stringify(webVitalEnvelope(webVitalMarker)),
+          JSON.stringify(webVitalEnvelope(routeWebVitalMarker)),
         ),
         expectedStatus: 202,
       }),
@@ -289,8 +292,8 @@ async function exerciseProductionObservabilityWithAdapters(input, adapters) {
     version: "0.2.0",
     revision: validatedInput.revision,
     markers: Object.freeze({
-      browserError: exercise.markers.browserErrorMarker,
-      webVital: exercise.markers.webVitalMarker,
+      routeBrowserError: exercise.markers.routeBrowserErrorMarker,
+      routeWebVital: exercise.markers.routeWebVitalMarker,
     }),
     checks: checkNames,
   });

@@ -764,6 +764,12 @@ test("observability certification deployment is manual, exact-revision, and secr
     "${{ runner.temp }}/production-observability-certification/project";
   const secretFile =
     "${{ runner.temp }}/production-observability-provider-secrets.json";
+  const deploymentsFile =
+    "${{ runner.temp }}/production-observability-cloudflare-deployments.json";
+  const deploymentReceipt =
+    "${{ runner.temp }}/production-observability-cloudflare-receipt.json";
+  const browserReceipt =
+    "${{ runner.temp }}/production-observability-browser-receipt.json";
 
   assert.equal(
     stepsByName["Check out repository"].uses,
@@ -816,6 +822,10 @@ test("observability certification deployment is manual, exact-revision, and secr
     stepsByName["Verify fresh local scaffold"].run,
     /node scripts\/certify-production-observability\.mjs > "\$RUNNER_TEMP\/production-observability-local-receipt\.json"/u,
   );
+  assert.match(
+    stepsByName["Verify fresh local scaffold"].run,
+    /wc -c < "\$RUNNER_TEMP\/production-observability-local-receipt\.json"\)" -le 2048/u,
+  );
 
   assert.deepEqual(stepsByName["Create deployment candidate"].env, {
     CERTIFICATION_ROOT: certificationRoot,
@@ -829,16 +839,24 @@ test("observability certification deployment is manual, exact-revision, and secr
     renderingSource,
     /workerName: projectResult\.value\.project\.name/u,
   );
-  assert.deepEqual(stepsByName["Add certification error route"].env, {
+  assert.deepEqual(stepsByName["Add certification fixtures"].env, {
     CERTIFICATION_ROOT: certificationRoot,
   });
   assert.match(
-    stepsByName["Add certification error route"].run,
+    stepsByName["Add certification fixtures"].run,
     /tests\/capability-certification\/fixtures\/observability-error-route\.ts/u,
   );
   assert.match(
-    stepsByName["Add certification error route"].run,
+    stepsByName["Add certification fixtures"].run,
     /apps\/web\/app\/api\/observability-certification-error\/route\.ts/u,
+  );
+  assert.match(
+    stepsByName["Add certification fixtures"].run,
+    /tests\/capability-certification\/fixtures\/observability-browser-error\.spec\.ts/u,
+  );
+  assert.match(
+    stepsByName["Add certification fixtures"].run,
+    /apps\/web\/tests\/e2e\/observability-browser-error\.spec\.ts/u,
   );
   assert.deepEqual(stepsByName["Prepare deployment candidate"].env, {
     CERTIFICATION_ROOT: certificationRoot,
@@ -874,6 +892,8 @@ test("observability certification deployment is manual, exact-revision, and secr
   assert.deepEqual(secretStep.env, {
     CERTIFICATION_ROOT: certificationRoot,
     SECRET_FILE: secretFile,
+    DEPLOYMENTS_FILE: deploymentsFile,
+    DEPLOYMENT_RECEIPT: deploymentReceipt,
     CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
     CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
     BETTER_STACK_INGESTING_HOST:
@@ -881,7 +901,11 @@ test("observability certification deployment is manual, exact-revision, and secr
     BETTER_STACK_SOURCE_TOKEN:
       "${{ secrets.BETTER_STACK_SOURCE_TOKEN }}",
   });
-  assert.match(secretStep.run, /trap 'rm -f "\$SECRET_FILE"' EXIT/u);
+  assert.match(secretStep.run, /^umask 077$/mu);
+  assert.match(
+    secretStep.run,
+    /trap 'rm -f "\$SECRET_FILE" "\$DEPLOYMENTS_FILE"' EXIT/u,
+  );
   assert.match(secretStep.run, /BETTER_STACK_INGESTING_HOST:\s*process\.env\.BETTER_STACK_INGESTING_HOST/u);
   assert.match(secretStep.run, /BETTER_STACK_SOURCE_TOKEN:\s*process\.env\.BETTER_STACK_SOURCE_TOKEN/u);
   assert.match(secretStep.run, /mode:\s*0o600/u);
@@ -890,6 +914,36 @@ test("observability certification deployment is manual, exact-revision, and secr
   assert.match(
     secretStep.run,
     /wrangler secret bulk "\$SECRET_FILE"/u,
+  );
+  assert.match(
+    secretStep.run,
+    /wrangler deployments list --name acme-portfolio-observability --json > "\$DEPLOYMENTS_FILE"/u,
+  );
+  assert.match(
+    secretStep.run,
+    /node scripts\/create-cloudflare-deployment-receipt\.mjs --input "\$DEPLOYMENTS_FILE" --revision "\$GITHUB_SHA" --worker acme-portfolio-observability > "\$DEPLOYMENT_RECEIPT"/u,
+  );
+  assert.match(
+    secretStep.run,
+    /test "\$\(wc -l < "\$DEPLOYMENT_RECEIPT"\)" -eq 1/u,
+  );
+  assert.match(
+    secretStep.run,
+    /test "\$\(wc -c < "\$DEPLOYMENT_RECEIPT"\)" -le 1024/u,
+  );
+  assert.match(
+    secretStep.run,
+    /stat -c "%a" "\$DEPLOYMENT_RECEIPT"/u,
+  );
+  assert.ok(
+    secretStep.run.indexOf('wrangler secret bulk "$SECRET_FILE"') <
+      secretStep.run.indexOf("wrangler deployments list"),
+  );
+  assert.ok(
+    secretStep.run.indexOf("wrangler deployments list") <
+      secretStep.run.indexOf(
+        "node scripts/create-cloudflare-deployment-receipt.mjs",
+      ),
   );
   assert.doesNotMatch(secretStep.run, /\$BETTER_STACK_|\$\{\{\s*secrets\./u);
 
@@ -900,16 +954,33 @@ test("observability certification deployment is manual, exact-revision, and secr
   });
   assert.match(
     stepsByName["Exercise deployed observability"].run,
-    /node scripts\/exercise-production-observability\.mjs --base-url "\$OBSERVABILITY_CERTIFICATION_URL" --revision "\$EXPECTED_REVISION" > "\$RUNNER_TEMP\/production-observability-deployed-receipt\.json"/u,
+    /node scripts\/exercise-production-observability\.mjs --base-url "\$OBSERVABILITY_CERTIFICATION_URL" --revision "\$EXPECTED_REVISION" > "\$RUNNER_TEMP\/production-observability-route-receipt\.json"/u,
+  );
+  assert.match(
+    stepsByName["Exercise deployed observability"].run,
+    /wc -c < "\$RUNNER_TEMP\/production-observability-route-receipt\.json"\)" -le 2048/u,
   );
   assert.deepEqual(stepsByName["Test deployed application behavior"].env, {
     CERTIFICATION_ROOT: certificationRoot,
     PLAYWRIGHT_DEPLOYED_URL:
       "${{ vars.OBSERVABILITY_CERTIFICATION_URL }}",
+    OBSERVABILITY_BROWSER_RECEIPT_PATH: browserReceipt,
   });
   assert.match(
     stepsByName["Test deployed application behavior"].run,
     /pnpm --dir "\$CERTIFICATION_ROOT\/apps\/web" run test:e2e:deployed/u,
+  );
+  assert.match(
+    stepsByName["Test deployed application behavior"].run,
+    /wc -l < "\$OBSERVABILITY_BROWSER_RECEIPT_PATH"\)" -eq 1/u,
+  );
+  assert.match(
+    stepsByName["Test deployed application behavior"].run,
+    /wc -c < "\$OBSERVABILITY_BROWSER_RECEIPT_PATH"\)" -le 1024/u,
+  );
+  assert.match(
+    stepsByName["Test deployed application behavior"].run,
+    /stat -c "%a" "\$OBSERVABILITY_BROWSER_RECEIPT_PATH"/u,
   );
 
   assertObservabilityWorkflowSecretBoundary(workflow);
@@ -943,10 +1014,14 @@ test("observability certification deployment is manual, exact-revision, and secr
   assert.deepEqual(uploadStep.with, {
     name: "production-observability-certification-receipts",
     path:
-      "${{ runner.temp }}/production-observability-local-receipt.json\n${{ runner.temp }}/production-observability-deployed-receipt.json\n",
+      "${{ runner.temp }}/production-observability-local-receipt.json\n${{ runner.temp }}/production-observability-route-receipt.json\n${{ runner.temp }}/production-observability-browser-receipt.json\n${{ runner.temp }}/production-observability-cloudflare-receipt.json\n",
     "if-no-files-found": "error",
     "retention-days": 7,
   });
+  assert.doesNotMatch(
+    uploadStep.with.path,
+    /deployments|provider-secrets/iu,
+  );
   assert.doesNotMatch(source, /^  (?:pull_request|push|schedule):/mu);
   assert.doesNotMatch(
     source,
@@ -1112,6 +1187,54 @@ test("the observability certification error fixture contains only the bounded th
   );
 });
 
+test("the deployed browser fixture exercises the generated global reporter and writes only a bounded UUID receipt", async () => {
+  const fixture = await readRepositoryFile(
+    "tests/capability-certification/fixtures/observability-browser-error.spec.ts",
+  );
+
+  assert.match(fixture, /page\.goto\("\/"\)/u);
+  assert.match(fixture, /context\(\)\.addCookies/u);
+  assert.match(fixture, /name: "observability-certification"/u);
+  assert.match(fixture, /value: "synthetic"/u);
+  assert.match(fixture, /page\.waitForResponse/u);
+  assert.match(fixture, /\/api\/observability/u);
+  assert.match(fixture, /browser\.window\.error/u);
+  assert.match(fixture, /new ErrorEvent\("error"\)/u);
+  assert.match(fixture, /globalThis\.dispatchEvent/u);
+  assert.ok(
+    fixture.indexOf("page.waitForResponse") <
+      fixture.indexOf('new ErrorEvent("error")'),
+  );
+  assert.doesNotMatch(fixture, /page\.route|route\.(?:abort|continue|fulfill)/u);
+  assert.match(fixture, /request\.allHeaders\(\)/u);
+  assert.match(fixture, /cookie/u);
+  assert.match(fixture, /referer/u);
+  for (const literal of [
+    'envelope.schemaVersion !== "1.0.0"',
+    'event.name !== "browser.window.error"',
+    'event.kind !== "application.error"',
+    'event.runtime !== "browser"',
+    'event.severity !== "error"',
+    'event.errorCategory !== "unexpected"',
+    'event.attributes.source !== "window-error"',
+  ]) {
+    assert.match(fixture, new RegExp(escapeRegularExpression(literal), "u"));
+  }
+  assert.match(fixture, /UUID|uuid/iu);
+  assert.match(fixture, /OBSERVABILITY_BROWSER_RECEIPT_PATH/u);
+  assert.match(fixture, /isAbsolute/u);
+  assert.match(fixture, /browserReporterCorrelationId/u);
+  assert.match(fixture, /flag: "wx"/u);
+  assert.match(fixture, /mode: 0o600/u);
+  assert.match(fixture, /trace: "off"/u);
+  assert.match(fixture, /screenshot: "off"/u);
+  assert.match(fixture, /video: "off"/u);
+  assert.doesNotMatch(
+    fixture,
+    /console\.|\.attach\(|writeFile\([^,]+,\s*(?:headers|requestEnvelope|body)/u,
+  );
+});
+
 test("the observability provider receipt separates custom, platform, provider, and cleanup evidence", async () => {
   const template = await readRepositoryFile(
     "docs/implementation-evidence/production-observability-provider-receipt-template.md",
@@ -1158,6 +1281,22 @@ test("the observability provider receipt separates custom, platform, provider, a
   assert.match(template, /Worker.*source.*retained data/isu);
   assert.match(template, /must not contain.*secret.*ingestion host.*private URL.*raw log.*stack.*request metadata.*client data/isu);
   assert.match(template, /does not establish.*durable delivery/iu);
+  assert.match(
+    template,
+    /local receipt[\s\S]+route-envelope receipt[\s\S]+browser-instrumentation receipt[\s\S]+Cloudflare identity receipt/iu,
+  );
+  assert.match(
+    template,
+    /checked Git SHA[\s\S]+secret installation[\s\S]+deployments list[\s\S]+Cloudflare deployment identifier[\s\S]+Cloudflare version identifier/iu,
+  );
+  assert.match(
+    template,
+    /`CF_VERSION_METADATA\.id`[\s\S]+Cloudflare version identifier[\s\S]+not the Git revision/iu,
+  );
+  assert.match(
+    template,
+    /every provider custom event[\s\S]+`release_id`[\s\S]+captured Cloudflare version identifier[\s\S]+never the Git SHA/iu,
+  );
 });
 
 test("the observability receipt reconciles every custom event class emitted after secret installation", async () => {
@@ -1184,15 +1323,19 @@ test("the observability receipt reconciles every custom event class emitted afte
   assert.ok(exerciseStepIndex < browserStepIndex);
   assert.match(
     template,
-    /`Exercise deployed observability`[\s\S]+`browser\.window\.error`[\s\S]+revision-derived correlation marker/iu,
+    /`Exercise deployed observability`[\s\S]+`browser\.window\.error`[\s\S]+route-envelope[\s\S]+revision-derived correlation marker/iu,
   );
   assert.match(
     template,
-    /`Exercise deployed observability`[\s\S]+`browser\.web\.vital`[\s\S]+revision-derived correlation marker/iu,
+    /`Exercise deployed observability`[\s\S]+`browser\.web\.vital`[\s\S]+route-envelope[\s\S]+revision-derived correlation marker/iu,
   );
   assert.match(
     template,
     /`Exercise deployed observability`[\s\S]+`server\.request\.error`[\s\S]+generated UUID[\s\S]+not a revision-derived marker/iu,
+  );
+  assert.match(
+    template,
+    /`Test deployed application behavior`[\s\S]+actual generated browser reporter[\s\S]+`browser\.window\.error`[\s\S]+UUID/iu,
   );
   assert.match(
     template,

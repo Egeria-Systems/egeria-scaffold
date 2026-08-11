@@ -56,6 +56,8 @@ The independent requirements, test-evidence, and security/privacy reviewers reta
 3. The constitution test inspects secret expressions only within workflow step objects. A secret expression at workflow, job, defaults, container, matrix, or run-string scope could escape the approved two step-level environment boundaries. Repair increment A must recursively enumerate every parsed `${{ secrets.* }}` expression and accept only the exact current secret names at their approved step `env` paths; focused mutations must prove disallowed top-level, job-level, defaults, container, matrix, and run-string references fail.
 4. The provider receipt asks for the Git revision through event `release_id`, but the generated runtime obtains `release_id` from `CF_VERSION_METADATA.id`, which is a Cloudflare version identifier. The bulk secret installation also creates the final version/deployment without capturing that identity. Repair increment B must capture `wrangler deployments list --json` after secret installation into a runner-temporary raw file, sanitize it through a tested repository script into a bounded Git revision plus Cloudflare deployment/version receipt, delete the raw file, upload only the bounded receipt, and require provider `release_id` to equal the captured Cloudflare version identifier rather than the Git revision.
 
+Increment B directly touches two APIs not covered by the original execution plan. The official [Wrangler Workers commands](https://developers.cloudflare.com/workers/wrangler/commands/workers/) and [Workers versions and deployments](https://developers.cloudflare.com/workers/versions-and-deployments/) documentation were revalidated on 2026-08-11 against pinned Wrangler `4.118.0`; the official [Playwright APIRequest](https://playwright.dev/docs/api/class-request) documentation was revalidated on the same date against pinned Playwright `1.62.1`. `deployments list --json` may identify the latest deployment and its percentage-assigned version after the secret-install step, but this sequencing binds the checked Git SHA only to the captured Cloudflare deployment/version identifiers; it does not make either provider identifier a Git revision or prove telemetry receipt, durability, retention, provider availability, or production readiness. Playwright `request.allHeaders()` can confirm that the generated browser request omitted `cookie` and `referer`, while the matched `202` confirms route acceptance only; request/header values are sensitive and must never be written or emitted. The final settled-tree verification must include a fresh `pnpm audit --audit-level=moderate` for the exact locked graph; its result is point-in-time advisory evidence only and is not authorization for any workflow, provider, credential, deployment, or telemetry action.
+
 The repair is split into two sequential exact-file increments. Increment A owns only:
 
 - `docs/superpowers/plans/2026-08-10-production-observability-certification.md`;
@@ -64,12 +66,15 @@ The repair is split into two sequential exact-file increments. Increment A owns 
 
 Increment B owns only:
 
+- `docs/superpowers/plans/2026-08-10-production-observability-certification.md`;
+- `docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md`;
 - `.github/workflows/production-observability-certification.yml`;
 - `docs/implementation-evidence/production-observability-provider-receipt-template.md`;
 - `scripts/exercise-production-observability.mjs`;
 - new `scripts/create-cloudflare-deployment-receipt.mjs`;
 - new `tests/capability-certification/fixtures/observability-browser-error.spec.ts`; and
-- `tests/capability-certification/production-observability.test.mjs`.
+- `tests/capability-certification/production-observability.test.mjs`; and
+- `tests/constitution/constitution.test.mjs`.
 
 No other file is authorized. Increment A must finish before increment B begins and must not modify the prepared workflow. Neither repair increment authorizes integration, push, workflow dispatch, provider/source or credential access, secret use, deployment, telemetry transmission, cleanup, registry mutation, publication, or another external action.
 
@@ -245,7 +250,7 @@ Do not modify capability descriptors, certification schemas/runtime policy, publ
 - Consumes: settled exact local Task 6B diff and every review disposition.
 - Produces: one implemented-task review packet and explicit external stop gate.
 
-- [ ] Run the settled focused suites, constitution/docs links, semantic naming, package boundaries, builder-core/CLI/public-package tests, admission, both closure policies, lint/build/typecheck, audit, signatures, fixed-root generated verification, changeset status, `git diff --check`, and exact branch/status/inventory checks. Do not repeat the unchanged real local journey.
+- [ ] Run the settled focused suites, constitution/docs links, semantic naming, package boundaries, builder-core/CLI/public-package tests, admission, both closure policies, lint/build/typecheck, fresh `pnpm audit --audit-level=moderate`, signatures, fixed-root generated verification, changeset status, `git diff --check`, and exact branch/status/inventory checks. Do not repeat the unchanged real local journey.
 - [ ] Record exact commands, exits, counts/durations where material, bounded claims, changed files, commits, reviewer dispositions, risks, deferred external work, and source/deployment/credential/provider/data rollback and recovery separately.
 - [ ] State prominently that no workflow was dispatched, no provider or secret was mutated, no telemetry was transmitted, no cleanup was performed, no registry status changed, Task 6 remains unmerged/unpushed, and Task 6B is not certified.
 - [ ] Commit final evidence with message `Record observability certification review`.
