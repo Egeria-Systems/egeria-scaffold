@@ -612,6 +612,11 @@ function createDescriptors(
         ),
         createJsonValueProbe(
           "apps/web/wrangler.jsonc",
+          "/observability/logs/invocation_logs",
+          false,
+        ),
+        createJsonValueProbe(
+          "apps/web/wrangler.jsonc",
           "/version_metadata/binding",
           "CF_VERSION_METADATA",
         ),
@@ -632,6 +637,12 @@ function createDescriptors(
         "analytics-separation",
       ],
       removalAndRecoveryRequirements: [
+        "review-deployment-observability-configuration-removal",
+        "review-generated-observability-source-removal",
+        "review-observability-credential-revocation-or-rotation",
+        "review-observability-provider-resource-removal",
+        "review-observability-retention-and-data-disposition",
+        "review-observability-source-provider-and-credential-recovery-separately",
         "review-package-and-registration-removal",
       ],
     },

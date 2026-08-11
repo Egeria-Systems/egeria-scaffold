@@ -935,6 +935,12 @@ test("the portfolio and site catalog declares the exact seven executable capabil
         {
           kind: "json-value",
           path: "apps/web/wrangler.jsonc",
+          pointer: "/observability/logs/invocation_logs",
+          expected: false,
+        },
+        {
+          kind: "json-value",
+          path: "apps/web/wrangler.jsonc",
           pointer: "/version_metadata/binding",
           expected: "CF_VERSION_METADATA",
         },
@@ -956,6 +962,12 @@ test("the portfolio and site catalog declares the exact seven executable capabil
         "analytics-separation",
       ],
       removalAndRecoveryRequirements: [
+        "review-deployment-observability-configuration-removal",
+        "review-generated-observability-source-removal",
+        "review-observability-credential-revocation-or-rotation",
+        "review-observability-provider-resource-removal",
+        "review-observability-retention-and-data-disposition",
+        "review-observability-source-provider-and-credential-recovery-separately",
         "review-package-and-registration-removal",
       ],
     },

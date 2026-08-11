@@ -30,7 +30,7 @@ const descriptorDigests = Object.freeze({
   "deployment-cloudflare":
     "sha256:846ae45d15ba9d8f256a9b7a1d8a4f3cda1b871a3b3f79f7656fd621050e8273",
   observability:
-    "sha256:92b4f128b5786882bb786448b643d03450b8d04d4ba9f0c491a9bd176c20534a",
+    "sha256:edbd86f5b77a4d2ae14dac314113876f256babe0c7c34568f7df04e48f34c35b",
   "section-composition":
     "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
   "site-routing":
@@ -53,6 +53,7 @@ const requiredEvidence = Object.freeze({
     "fresh-scaffold",
   ]),
   observability: Object.freeze([
+    "cleanup-recovery",
     "deployed-application",
     "fresh-scaffold",
   ]),
@@ -325,9 +326,13 @@ test("material observability requires an ordinary pending certification task", (
   assert.deepEqual(observabilityRecord, {
     subject: core.createCertificationSubject(
       observabilityDescriptor,
-      ["deployed-application", "fresh-scaffold"],
+      ["cleanup-recovery", "deployed-application", "fresh-scaffold"],
     ),
-    requiredEvidence: ["deployed-application", "fresh-scaffold"],
+    requiredEvidence: [
+      "cleanup-recovery",
+      "deployed-application",
+      "fresh-scaffold",
+    ],
     status: "pending",
     taskPlan: observabilityPlanPath,
     evidence: [],

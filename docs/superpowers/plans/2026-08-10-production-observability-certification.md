@@ -6,7 +6,7 @@
 
 **Architecture:** Reuse the compiled production CLI and the fixed-root generated-project verifier. Deploy one identity-bounded protected-staging Worker with synthetic operational events only. Verify Workers Logs, Better Stack delivery, browser-error reporting, web-vitals reporting, and cleanup as separate evidence outcomes bound to the exact descriptor subject and ancestor revision. Keep Cloudflare deployment, Better Stack source, credentials, and repository source recovery separate.
 
-**Required evidence:** `fresh-scaffold` and `deployed-application`. Provider receipt details support the deployed-application outcome but do not create a broader availability or production claim.
+**Required evidence:** `cleanup-recovery`, `deployed-application`, and `fresh-scaffold`. Provider receipt details support the deployed-application and cleanup-recovery outcomes but do not create a broader availability or production claim.
 
 ## Preconditions
 

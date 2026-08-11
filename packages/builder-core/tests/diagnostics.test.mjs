@@ -417,7 +417,11 @@ test("doctor and diff agree across the canonical portfolio composition", async (
     "apps/web/next.config.ts": "export default {};\n",
     "apps/web/open-next.config.ts": "export default {};\n",
     "apps/web/wrangler.jsonc": `${JSON.stringify({
-      observability: { enabled: true, head_sampling_rate: 1 },
+      observability: {
+        enabled: true,
+        head_sampling_rate: 1,
+        logs: { invocation_logs: false },
+      },
       version_metadata: { binding: "CF_VERSION_METADATA" },
     }, null, 2)}\n`,
     "apps/web/instrumentation-client.ts": "export {};\n",

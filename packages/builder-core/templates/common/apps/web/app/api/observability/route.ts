@@ -177,6 +177,49 @@ function emptyResponse(status: number): Response {
   return new Response(null, { status });
 }
 
+type BoundedBodyResult =
+  | { readonly ok: true; readonly source: string }
+  | { readonly ok: false; readonly reason: "invalid" | "too-large" };
+
+async function readBoundedBody(request: Request): Promise<BoundedBodyResult> {
+  if (request.body === null) return { ok: true, source: "" };
+
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let source = "";
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+
+      totalBytes += chunk.value.byteLength;
+      if (totalBytes > maximumPayloadBytes) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The bounded rejection is unchanged when cancellation fails.
+        }
+        return { ok: false, reason: "too-large" };
+      }
+      source += decoder.decode(chunk.value, { stream: true });
+    }
+
+    source += decoder.decode();
+    return { ok: true, source };
+  } catch {
+    try {
+      await reader.cancel();
+    } catch {
+      // The invalid-body response is unchanged when cancellation fails.
+    }
+    return { ok: false, reason: "invalid" };
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export async function POST(request: Request): Promise<Response> {
   const requestURL = new URL(request.url);
   if (request.headers.get("origin") !== requestURL.origin) {
@@ -198,19 +241,14 @@ export async function POST(request: Request): Promise<Response> {
     return emptyResponse(413);
   }
 
-  let source: string;
-  try {
-    source = await request.text();
-  } catch {
-    return emptyResponse(400);
-  }
-  if (new TextEncoder().encode(source).byteLength > maximumPayloadBytes) {
-    return emptyResponse(413);
+  const body = await readBoundedBody(request);
+  if (!body.ok) {
+    return emptyResponse(body.reason === "too-large" ? 413 : 400);
   }
 
   let report: BrowserOperationalInput | undefined;
   try {
-    report = readBrowserEvent(JSON.parse(source) as unknown);
+    report = readBrowserEvent(JSON.parse(body.source) as unknown);
   } catch {
     return emptyResponse(400);
   }

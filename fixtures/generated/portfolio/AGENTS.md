@@ -7,5 +7,5 @@
 - Keep presentation components pure and pass them typed data and callbacks.
 - Preserve the generated Tailwind CSS and PostCSS boundary, semantic design tokens, visible focus treatment, responsive wrapping, and reduced-motion protection.
 - Keep Cloudflare types and bindings in platform adapters, generated configuration, integration tests, and composition roots.
-- Keep operational telemetry bounded and infrastructure-owned. Do not add raw error/private fields, analytics, console interception, browser storage, or provider effects to presentation or application code.
+- Keep operational telemetry stream-bounded and infrastructure-owned. Preserve disabled Cloudflare invocation logs. Do not add raw error/private fields, analytics, console interception, browser storage, or provider effects to presentation or application code.
 - Preserve application-owned files unless a reviewed change explicitly replaces them.

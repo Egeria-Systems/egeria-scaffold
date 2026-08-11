@@ -942,6 +942,9 @@ test("production observability renders bounded Next and Cloudflare composition",
   assert.deepEqual(wrangler.observability, {
     enabled: true,
     head_sampling_rate: 1,
+    logs: {
+      invocation_logs: false,
+    },
   });
   assert.deepEqual(wrangler.version_metadata, {
     binding: "CF_VERSION_METADATA",
@@ -1076,6 +1079,38 @@ test("the browser route accepts only bounded same-origin operational envelopes",
     assert.equal((await loaded.module.POST(request)).status, status);
   }
   assert.equal(loaded.reports.length, 1);
+
+  let pullCount = 0;
+  let cancelled = false;
+  const oversizedStream = new ReadableStream(
+    {
+      pull(controller) {
+        pullCount += 1;
+        controller.enqueue(
+          new Uint8Array(pullCount === 1 ? 8_192 : 1),
+        );
+      },
+      cancel() {
+        cancelled = true;
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  assert.equal(
+    (
+      await loaded.module.POST({
+        body: oversizedStream,
+        headers: new Headers({
+          origin: "https://portfolio.example",
+          "content-type": "application/json",
+        }),
+        url: "https://portfolio.example/api/observability",
+      })
+    ).status,
+    413,
+  );
+  assert.equal(pullCount, 2);
+  assert.equal(cancelled, true);
 
   const failedTransport = await loadGeneratedObservabilityRoute(
     rendered.files,

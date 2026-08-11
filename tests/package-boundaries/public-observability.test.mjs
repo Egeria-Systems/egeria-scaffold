@@ -250,4 +250,13 @@ test("observability keeps provider-neutral source and zero runtime dependencies"
   ]) {
     assert.equal(await pathExists(requiredDocument), true);
   }
+
+  const packageInstructions = await readFile(
+    resolve(repositoryRoot, "packages/observability/AGENTS.md"),
+    "utf8",
+  );
+  assert.match(packageInstructions, /`0\.2\.0` provider-neutral API/u);
+  assert.match(packageInstructions, /zero runtime dependencies/u);
+  assert.match(packageInstructions, /Cloudflare types and bindings/u);
+  assert.doesNotMatch(packageInstructions, /intentionally empty|root API empty/u);
 });

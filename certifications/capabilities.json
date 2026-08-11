@@ -84,9 +84,13 @@
     "observability": {
       "subject": {
         "descriptorVersion": "0.2.0",
-        "behaviorContractDigest": "sha256:92b4f128b5786882bb786448b643d03450b8d04d4ba9f0c491a9bd176c20534a"
+        "behaviorContractDigest": "sha256:edbd86f5b77a4d2ae14dac314113876f256babe0c7c34568f7df04e48f34c35b"
       },
-      "requiredEvidence": ["deployed-application", "fresh-scaffold"],
+      "requiredEvidence": [
+        "cleanup-recovery",
+        "deployed-application",
+        "fresh-scaffold"
+      ],
       "status": "pending",
       "taskPlan": "docs/superpowers/plans/2026-08-10-production-observability-certification.md",
       "evidence": []

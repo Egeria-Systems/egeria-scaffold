@@ -608,7 +608,11 @@ test("observability inference requires source files and deployment-owned Wrangle
     dependencies: { "@egeria-systems/observability": "0.2.0" },
   })}\n`;
   files["apps/web/wrangler.jsonc"] = `${JSON.stringify({
-    observability: { enabled: true, head_sampling_rate: 1 },
+    observability: {
+      enabled: true,
+      head_sampling_rate: 1,
+      logs: { invocation_logs: false },
+    },
     version_metadata: { binding: "CF_VERSION_METADATA" },
   })}\n`;
   const state = createState({
@@ -635,7 +639,11 @@ test("observability inference requires source files and deployment-owned Wrangle
   );
 
   files["apps/web/wrangler.jsonc"] = `${JSON.stringify({
-    observability: { enabled: true, head_sampling_rate: 0 },
+    observability: {
+      enabled: true,
+      head_sampling_rate: 0,
+      logs: { invocation_logs: false },
+    },
     version_metadata: { binding: "CF_VERSION_METADATA" },
   })}\n`;
   const mismatched = await core.inferRepository({
