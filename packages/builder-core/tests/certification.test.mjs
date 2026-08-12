@@ -17,6 +17,10 @@ const observabilityPlanPath =
   "docs/superpowers/plans/2026-08-10-production-observability-certification.md";
 const standardsPlanPath =
   "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md";
+const standardsEvidencePath =
+  "docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-verification.md";
+const standardsEvidenceRevision =
+  "f9a962874d587e4594af341a1fe5f62db6d7672c";
 const committedRegistry = JSON.parse(
   readFileSync(
     new URL("../../../certifications/capabilities.json", import.meta.url),
@@ -378,7 +382,7 @@ test("material observability remains pending with only reviewed fresh-scaffold e
   );
 });
 
-test("material standards testing changes remain pending for separate certification", () => {
+test("material standards testing changes have exact reviewed certification evidence", () => {
   const standardsDescriptor = descriptorsByIdentifier.get("standards");
   assert.notEqual(standardsDescriptor, undefined);
 
@@ -388,9 +392,19 @@ test("material standards testing changes remain pending for separate certificati
       "fresh-scaffold",
     ]),
     requiredEvidence: ["fresh-scaffold"],
-    status: "pending",
+    status: "certified",
     taskPlan: standardsPlanPath,
-    evidence: [],
+    evidence: [
+      {
+        kind: "fresh-scaffold",
+        path: standardsEvidencePath,
+        outcome: "passed",
+        revision: standardsEvidenceRevision,
+        subject: core.createCertificationSubject(standardsDescriptor, [
+          "fresh-scaffold",
+        ]),
+      },
+    ],
   });
   assert.doesNotThrow(() =>
     readFileSync(new URL(`../../../${standardsPlanPath}`, import.meta.url)),

@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
+import { isPinnedGitHubActionReference } from "../helpers/github-actions.mjs";
+
 const execFileAsync = promisify(execFile);
 
 const repositoryRoot = resolve(
@@ -448,13 +450,13 @@ test("ordinary repository CI keeps core checks always-on and scopes deep checks 
         uses?.startsWith("pnpm/setup@"),
       );
       assert.equal(
-        checkout?.uses,
-        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        isPinnedGitHubActionReference(checkout?.uses, "actions/checkout"),
+        true,
       );
       assert.equal(checkout?.with?.["persist-credentials"], false);
       assert.equal(
-        setup?.uses,
-        "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
+        isPinnedGitHubActionReference(setup?.uses, "pnpm/setup"),
+        true,
       );
     }
   }
@@ -792,6 +794,12 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   ]);
   const proofManifest = JSON.parse(proofManifestSource);
   const parsedWorkflow = parse(workflow);
+  const stepsByName = Object.fromEntries(
+    parsedWorkflow.jobs["verify-and-deploy"].steps.map((step) => [
+      step.name,
+      step,
+    ]),
+  );
 
   assert.match(workflow, /^on:\n  workflow_dispatch:\n/m);
   assert.doesNotMatch(workflow, /^  (?:push|pull_request|schedule):/m);
@@ -803,13 +811,19 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   assert.match(workflow, /if: github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /^      name: test-deploy$/m);
   assert.match(workflow, /^      url: \$\{\{ vars\.DEPLOY_URL \}\}$/m);
-  assert.match(
-    workflow,
-    /actions\/checkout@d23441a48e516b6c34aea4fa41551a30e30af803/,
+  assert.equal(
+    isPinnedGitHubActionReference(
+      stepsByName["Check out repository"].uses,
+      "actions/checkout",
+    ),
+    true,
   );
-  assert.match(
-    workflow,
-    /pnpm\/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c/,
+  assert.equal(
+    isPinnedGitHubActionReference(
+      stepsByName["Set up pnpm and Node.js"].uses,
+      "pnpm/setup",
+    ),
+    true,
   );
   assert.doesNotMatch(workflow, /pnpm\/action-setup|actions\/setup-node/);
   assert.match(workflow, /^          version: 11\.20\.0$/m);
@@ -1033,8 +1047,11 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     CERTIFICATION_ROOT: certificationRoot,
   });
   assert.equal(
-    stepsByName["Check out repository"].uses,
-    "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+    isPinnedGitHubActionReference(
+      stepsByName["Check out repository"].uses,
+      "actions/checkout",
+    ),
+    true,
   );
   assert.deepEqual(stepsByName["Check out repository"].with, {
     "fetch-depth": 0,
@@ -1042,8 +1059,11 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     "persist-credentials": false,
   });
   assert.equal(
-    stepsByName["Set up pnpm and Node.js"].uses,
-    "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
+    isPinnedGitHubActionReference(
+      stepsByName["Set up pnpm and Node.js"].uses,
+      "pnpm/setup",
+    ),
+    true,
   );
   assert.deepEqual(stepsByName["Set up pnpm and Node.js"].with, {
     version: "11.20.0",
@@ -1052,8 +1072,11 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     install: false,
   });
   assert.equal(
-    stepsByName["Upload local certification receipt"].uses,
-    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    isPinnedGitHubActionReference(
+      stepsByName["Upload local certification receipt"].uses,
+      "actions/upload-artifact",
+    ),
+    true,
   );
   assert.equal(
     stepsByName["Upload local certification receipt"].with["retention-days"],
@@ -1223,8 +1246,11 @@ test("observability certification deployment is manual, exact-revision, and secr
     "${{ runner.temp }}/production-observability-browser-receipt.json";
 
   assert.equal(
-    stepsByName["Check out repository"].uses,
-    "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+    isPinnedGitHubActionReference(
+      stepsByName["Check out repository"].uses,
+      "actions/checkout",
+    ),
+    true,
   );
   assert.deepEqual(stepsByName["Check out repository"].with, {
     "fetch-depth": 0,
@@ -1232,8 +1258,11 @@ test("observability certification deployment is manual, exact-revision, and secr
     "persist-credentials": false,
   });
   assert.equal(
-    stepsByName["Set up pnpm and Node.js"].uses,
-    "pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c",
+    isPinnedGitHubActionReference(
+      stepsByName["Set up pnpm and Node.js"].uses,
+      "pnpm/setup",
+    ),
+    true,
   );
   assert.deepEqual(stepsByName["Set up pnpm and Node.js"].with, {
     version: "11.20.0",
@@ -1462,8 +1491,11 @@ test("observability certification deployment is manual, exact-revision, and secr
 
   const uploadStep = stepsByName["Upload certification receipts"];
   assert.equal(
-    uploadStep.uses,
-    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    isPinnedGitHubActionReference(
+      uploadStep.uses,
+      "actions/upload-artifact",
+    ),
+    true,
   );
   assert.deepEqual(uploadStep.with, {
     name: "production-observability-certification-receipts",
@@ -2441,7 +2473,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+four unchanged subjects[^\n]+backfill-pending[^\n]+observability@0\.2\.0[^\n]+standards@0\.3\.0[^\n]+pending/i,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+four unchanged subjects[^\n]+backfill-pending[^\n]+observability@0\.2\.0[^\n]+pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2567,6 +2599,7 @@ test("executable capability certification ownership is current", async () => {
     roadmap,
     builderCoreInstructions,
     builderCoreReadme,
+    packageOwnership,
     registrySource,
     providerReceipt,
   ] = await Promise.all([
@@ -2577,6 +2610,7 @@ test("executable capability certification ownership is current", async () => {
     readRepositoryFile("docs/roadmaps/program-roadmap.md"),
     readRepositoryFile("packages/builder-core/AGENTS.md"),
     readRepositoryFile("packages/builder-core/README.md"),
+    readRepositoryFile("docs/architecture/package-ownership.md"),
     readRepositoryFile("certifications/capabilities.json"),
     readRepositoryFile(
       "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
@@ -2595,7 +2629,13 @@ test("executable capability certification ownership is current", async () => {
   }
   const registry = JSON.parse(registrySource);
   const bookingRecord = registry.records["booking-calendly"];
+  const standardsRecord = registry.records.standards;
   assert.equal(bookingRecord.status, "certified");
+  assert.equal(standardsRecord.status, "certified");
+  assert.match(
+    packageOwnership,
+    /descriptor `standards@0\.3\.0` is certified from its exact local subject-bound receipt[^\n]+public `0\.2\.0` availability alone does not alter the installed public package/iu,
+  );
   assert.deepEqual(
     bookingRecord.evidence.map(({ kind }) => kind),
     [
@@ -2761,16 +2801,18 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   assert.match(
     sourcePlan,
     new RegExp(
-      `${escapeRegularExpression(independentStream)}[^.]+pending[^.]+unchanged|preserve(?:s)? ${escapeRegularExpression(independentStream)}'s pending`,
+      `${escapeRegularExpression(independentStream)}[^.]+pending[^.]+unchanged|preserv(?:e|es|ed) ${escapeRegularExpression(independentStream)}'s pending`,
       "iu",
     ),
   );
   assert.match(sourcePlan, /reconciliation[^.]+separate review/iu);
 
-  assert.match(roadmap, /2026-08-11[^.]+independent-work exception/iu);
   assert.match(
     roadmap,
-    /reconciled with `main@2a315aa0e7dce1bf1048b9a2c07e318add9241de`/iu,
+    new RegExp(
+      `${escapeRegularExpression(implementationTask)} is squash-integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\``,
+      "u",
+    ),
   );
   assert.match(
     roadmap,
@@ -2792,7 +2834,7 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   );
   assert.match(
     roadmap,
-    /Within those separate capability-certification tasks, protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, merge, and push remain unauthorized/iu,
+    /Within the remaining observability task, protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, merge, and push remain unauthorized/iu,
   );
 
   assert.match(
@@ -2833,6 +2875,10 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   assert.match(
     certificationPlan,
     /pnpm run check:capability-certification/u,
+  );
+  assert.match(
+    certificationPlan,
+    /admission[^.]+pass[\s\S]+legacy-backfill-exempt[^.]+reject[^.]+observability[\s\S]+all-certified[^.]+reject[^.]+four[^.]+backfill/iu,
   );
   assert.match(
     certificationPlan,
@@ -2996,7 +3042,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `Under the explicit 2026-08-11 independent-work exception, ${escapeRegularExpression(generatedTestingTask)} has an independently reviewed implementation candidate on merge request 2, reconciled with \`main@2a315aa0e7dce1bf1048b9a2c07e318add9241de\``,
+      `${escapeRegularExpression(generatedTestingTask)} is squash-integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\``,
       "u",
     ),
   );
@@ -3011,7 +3057,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} awaits verified-final-diff approval and one eligible repository approval`,
+      `${escapeRegularExpression(namedLabel("Task", "6D"))} now certifies the exact \`standards@0\.3\.0\` subject[\\s\\S]+exact final certification diff still requires verified-final-diff approval`,
       "u",
     ),
   );
@@ -3022,7 +3068,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} remains on its approved isolated merge-request branch/worktree and has reconciled accepted \`main@2a315aa0e7dce1bf1048b9a2c07e318add9241de\``,
+      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} executes its separate certification increment on the isolated \`standards-certification\` branch/worktree`,
       "u",
     ),
   );

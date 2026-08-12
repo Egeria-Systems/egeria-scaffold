@@ -7,7 +7,10 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
-import { loadPendingChangesets } from "../../scripts/check-package-release.mjs";
+import {
+  loadPendingChangesets,
+  selectPendingChangesets,
+} from "../../scripts/check-package-release.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(
@@ -298,6 +301,23 @@ test("Changesets keeps a restricted default and excludes private releases", asyn
       tag: false,
     },
   });
+});
+
+test("pending Changeset discovery selects every Markdown record in deterministic order", () => {
+  assert.deepEqual(
+    selectPendingChangesets([
+      "generated-testing-boundary.md",
+      "README.md",
+      "notes.txt",
+      "arbitrary-future.md",
+      "clarify-observability-boundary.md",
+    ]),
+    [
+      "arbitrary-future.md",
+      "clarify-observability-boundary.md",
+      "generated-testing-boundary.md",
+    ],
+  );
 });
 
 test("the release candidate materializes only the approved public versions", async () => {
