@@ -1308,7 +1308,7 @@ test("observability preparation provides the required step-by-step human prerequ
   assert.match(runbook, /readiness preflight/iu);
   assert.match(
     runbook,
-    /every 30 seconds[\s\S]+5-minute deadline[\s\S]+stop[\s\S]+fail/iu,
+    /every 30 seconds[\s\S]+10-minute deadline[\s\S]+stop[\s\S]+fail/iu,
   );
   assert.match(
     runbook,
