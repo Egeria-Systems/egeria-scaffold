@@ -140,6 +140,36 @@ git diff --check
 
 Commit: `test: make cleanup identity check portable`
 
+## Hosted-merge-ref amendment: bind release intent to the remote base
+
+### Files
+
+- Create `.changeset/generated-testing-boundary.md`.
+- Modify `.github/workflows/repository-quality.yml`.
+- Modify `tests/constitution/constitution.test.mjs`.
+
+### RED and cause
+
+- Hosted repository-quality run `31583053791` passed the repaired capability-certification suite and then failed `changeset status` because the pull-request checkout had complete history and `origin/main` but no local `main` branch.
+- Add a constitution RED requiring the release-intent step to name the fetched remote base explicitly.
+
+### GREEN
+
+- Run `pnpm exec changeset status --since origin/main` in the hosted repository workflow. Keep the local `changeset:status` script and complete builder-kernel aggregate unchanged.
+- Add one empty Changeset owned by this MR because its only changes beneath public-package roots are non-packed instruction files; record no package bump without borrowing the pre-existing empty Changeset from `main`.
+- Preserve full-history checkout, read-only permissions, disabled checkout credentials, and every other always-on check.
+
+### Verification and commit
+
+```sh
+pnpm run test:constitution
+pnpm exec changeset status --since origin/main
+pnpm run check:semantic-naming
+git diff --check
+```
+
+Commit: `ci: bind release intent to remote main`
+
 ## Final review, evidence, and recovery
 
 After the three increments are separately accepted:

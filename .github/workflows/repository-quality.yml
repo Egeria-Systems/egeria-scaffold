@@ -69,4 +69,4 @@ jobs:
         run: pnpm run typecheck:builder
 
       - name: Check release intent
-        run: pnpm run changeset:status
+        run: pnpm exec changeset status --since origin/main

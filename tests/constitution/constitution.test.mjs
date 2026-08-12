@@ -425,6 +425,10 @@ test("ordinary repository CI keeps core checks always-on and scopes deep checks 
     ({ run }) => run === "pnpm run test:packages",
   );
   assert.ok(buildIndex >= 0 && buildIndex < packageTestIndex);
+  assert.equal(
+    builderSteps.find(({ name }) => name === "Check release intent")?.run,
+    "pnpm exec changeset status --since origin/main",
+  );
 
   const rootManifest = JSON.parse(await readRepositoryFile("package.json"));
   const kernelCommands = rootManifest.scripts["verify:builder-kernel"].split(" && ");
