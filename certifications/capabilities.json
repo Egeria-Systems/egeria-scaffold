@@ -132,9 +132,20 @@
         "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
       },
       "requiredEvidence": ["fresh-scaffold"],
-      "status": "pending",
+      "status": "certified",
       "taskPlan": "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md",
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-verification.md",
+          "outcome": "passed",
+          "revision": "f9a962874d587e4594af341a1fe5f62db6d7672c",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
+          }
+        }
+      ]
     }
   }
 }

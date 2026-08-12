@@ -1,0 +1,141 @@
+{
+  "schemaVersion": "1.0.0",
+  "capability": "standards",
+  "subject": {
+    "descriptorVersion": "0.3.0",
+    "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
+  },
+  "evidenceRevision": "f9a962874d587e4594af341a1fe5f62db6d7672c",
+  "status": "complete",
+  "reviewDecision": "accepted",
+  "unresolvedPrompts": [],
+  "hostedRunClaim": {
+    "claimed": false,
+    "basis": "static-ci-contract-only"
+  },
+  "outcomes": [
+    {
+      "identifier": "fresh-scaffold",
+      "capability": "standards",
+      "subject": {
+        "descriptorVersion": "0.3.0",
+        "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
+      },
+      "evidenceRevision": "f9a962874d587e4594af341a1fe5f62db6d7672c",
+      "commands": [
+        "pnpm run verify:generated-testing-certification"
+      ],
+      "result": "passed",
+      "reviewDecision": "accepted",
+      "summary": "The compiled CLI generated a fresh portfolio and passed all 19 declared certification checks."
+    },
+    {
+      "identifier": "unit-tests",
+      "capability": "standards",
+      "subject": {
+        "descriptorVersion": "0.3.0",
+        "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
+      },
+      "evidenceRevision": "f9a962874d587e4594af341a1fe5f62db6d7672c",
+      "commands": [
+        "pnpm --dir apps/web run test:unit"
+      ],
+      "result": "passed",
+      "reviewDecision": "accepted",
+      "summary": "The fresh generated Node project passed 2 tests in 1 test file."
+    },
+    {
+      "identifier": "component-tests",
+      "capability": "standards",
+      "subject": {
+        "descriptorVersion": "0.3.0",
+        "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
+      },
+      "evidenceRevision": "f9a962874d587e4594af341a1fe5f62db6d7672c",
+      "commands": [
+        "pnpm --dir apps/web run test:component"
+      ],
+      "result": "passed",
+      "reviewDecision": "accepted",
+      "summary": "The fresh generated jsdom project passed 1 test in 1 test file."
+    },
+    {
+      "identifier": "state-agreement",
+      "capability": "standards",
+      "subject": {
+        "descriptorVersion": "0.3.0",
+        "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
+      },
+      "evidenceRevision": "f9a962874d587e4594af341a1fe5f62db6d7672c",
+      "commands": [
+        "node apps/cli/dist/index.js infer --directory GENERATED_PROJECT",
+        "node apps/cli/dist/index.js doctor --directory GENERATED_PROJECT",
+        "node apps/cli/dist/index.js diff --directory GENERATED_PROJECT"
+      ],
+      "result": "passed",
+      "reviewDecision": "accepted",
+      "summary": "Inference confirmed standards 0.3.0, diagnostics were healthy, and the exact diff was equal."
+    },
+    {
+      "identifier": "generated-project-builds",
+      "capability": "standards",
+      "subject": {
+        "descriptorVersion": "0.3.0",
+        "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
+      },
+      "evidenceRevision": "f9a962874d587e4594af341a1fe5f62db6d7672c",
+      "commands": [
+        "pnpm run verify:generated-testing-certification"
+      ],
+      "result": "passed",
+      "reviewDecision": "accepted",
+      "summary": "The fresh generated project passed lint, Cloudflare type generation, strict typecheck, Next.js build, and OpenNext build checks."
+    },
+    {
+      "identifier": "browser-regression",
+      "capability": "standards",
+      "subject": {
+        "descriptorVersion": "0.3.0",
+        "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
+      },
+      "evidenceRevision": "f9a962874d587e4594af341a1fe5f62db6d7672c",
+      "commands": [
+        "pnpm run verify:generated-testing-certification"
+      ],
+      "result": "passed",
+      "reviewDecision": "accepted",
+      "summary": "The content-agnostic Playwright and axe checks passed in local Next.js development and OpenNext workerd preview."
+    },
+    {
+      "identifier": "retained-fixture-matrix",
+      "capability": "standards",
+      "subject": {
+        "descriptorVersion": "0.3.0",
+        "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
+      },
+      "evidenceRevision": "f9a962874d587e4594af341a1fe5f62db6d7672c",
+      "commands": [
+        "pnpm run test:generated-fixtures",
+        "pnpm run verify:generated-skeletons"
+      ],
+      "result": "passed",
+      "reviewDecision": "accepted",
+      "summary": "All 8 fixture contracts passed, and the fixed verifier passed for portfolio, Calendly portfolio, and site."
+    },
+    {
+      "identifier": "ci-contract",
+      "capability": "standards",
+      "subject": {
+        "descriptorVersion": "0.3.0",
+        "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
+      },
+      "evidenceRevision": "f9a962874d587e4594af341a1fe5f62db6d7672c",
+      "commands": [
+        "pnpm run test:constitution"
+      ],
+      "result": "passed",
+      "reviewDecision": "accepted",
+      "summary": "Static workflow contracts passed with explicit unit and component lanes; no hosted workflow run is claimed."
+    }
+  ]
+}

@@ -307,7 +307,12 @@ export async function certifyFreshScaffoldForTesting(configuration, adapters) {
         configuration.verifierIdentifier,
       ]) ||
       !arraysEqual(generatedVerification.profiles, [configuration.profile]) ||
-      !Array.isArray(generatedVerification.checks)
+      !Array.isArray(generatedVerification.checks) ||
+      (configuration.expectedVerificationChecks !== undefined &&
+        !arraysEqual(
+          generatedVerification.checks,
+          configuration.expectedVerificationChecks,
+        ))
     ) {
       fail(configuration, "GENERATED_PROJECT_VERIFICATION_INVALID");
     }

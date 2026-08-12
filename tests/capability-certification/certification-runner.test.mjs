@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, lstat } from "node:fs/promises";
+import { access, lstat, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
 import { certifyBookingCalendlyForTesting } from "../../scripts/certify-booking-calendly.mjs";
+import { certifyGeneratedTestingForTesting } from "../../scripts/certify-generated-testing.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(
@@ -21,6 +22,49 @@ const certificationScript = resolve(
   repositoryRoot,
   "scripts/certify-booking-calendly.mjs",
 );
+const generatedTestingCertificationScript = resolve(
+  repositoryRoot,
+  "scripts/certify-generated-testing.mjs",
+);
+const generatedTestingReceiptPath = resolve(
+  repositoryRoot,
+  "docs/implementation-evidence/generated-unit-component-testing-certification-receipt.json",
+);
+const generatedTestingEvidenceRevision =
+  "f9a962874d587e4594af341a1fe5f62db6d7672c";
+const generatedTestingSubject = Object.freeze({
+  descriptorVersion: "0.3.0",
+  behaviorContractDigest:
+    "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb",
+});
+const generatedTestingOutcomeCommands = Object.freeze({
+  "fresh-scaffold": Object.freeze([
+    "pnpm run verify:generated-testing-certification",
+  ]),
+  "unit-tests": Object.freeze(["pnpm --dir apps/web run test:unit"]),
+  "component-tests": Object.freeze([
+    "pnpm --dir apps/web run test:component",
+  ]),
+  "state-agreement": Object.freeze([
+    "node apps/cli/dist/index.js infer --directory GENERATED_PROJECT",
+    "node apps/cli/dist/index.js doctor --directory GENERATED_PROJECT",
+    "node apps/cli/dist/index.js diff --directory GENERATED_PROJECT",
+  ]),
+  "generated-project-builds": Object.freeze([
+    "pnpm run verify:generated-testing-certification",
+  ]),
+  "browser-regression": Object.freeze([
+    "pnpm run verify:generated-testing-certification",
+  ]),
+  "retained-fixture-matrix": Object.freeze([
+    "pnpm run test:generated-fixtures",
+    "pnpm run verify:generated-skeletons",
+  ]),
+  "ci-contract": Object.freeze(["pnpm run test:constitution"]),
+});
+const generatedTestingOutcomeIdentifiers = Object.freeze(
+  Object.keys(generatedTestingOutcomeCommands),
+);
 
 const fixedChecks = Object.freeze([
   "pnpm-version",
@@ -29,6 +73,7 @@ const fixedChecks = Object.freeze([
   "dependency-audit",
   "registry-signatures",
   "lint",
+  "cloudflare-types",
   "typecheck",
   "unit-tests",
   "component-tests",
@@ -65,7 +110,73 @@ async function runCheck(arguments_) {
   }
 }
 
-test("the repository registry admits but remains open for observability and standards certification", async () => {
+function assertExactKeys(value, expectedKeys) {
+  assert.deepEqual(Object.keys(value).toSorted(), expectedKeys.toSorted());
+}
+
+function assertGeneratedTestingReceipt(receipt) {
+  assertExactKeys(receipt, [
+    "schemaVersion",
+    "capability",
+    "subject",
+    "evidenceRevision",
+    "status",
+    "reviewDecision",
+    "unresolvedPrompts",
+    "hostedRunClaim",
+    "outcomes",
+  ]);
+  assert.equal(receipt.schemaVersion, "1.0.0");
+  assert.equal(receipt.capability, "standards");
+  assert.deepEqual(receipt.subject, generatedTestingSubject);
+  assert.equal(receipt.evidenceRevision, generatedTestingEvidenceRevision);
+  assert.equal(receipt.status, "complete");
+  assert.equal(receipt.reviewDecision, "accepted");
+  assert.deepEqual(receipt.unresolvedPrompts, []);
+  assert.deepEqual(receipt.hostedRunClaim, {
+    claimed: false,
+    basis: "static-ci-contract-only",
+  });
+  assert.equal(receipt.outcomes.length, generatedTestingOutcomeIdentifiers.length);
+  assert.deepEqual(
+    receipt.outcomes.map(({ identifier }) => identifier),
+    generatedTestingOutcomeIdentifiers,
+  );
+  assert.equal(
+    new Set(receipt.outcomes.map(({ identifier }) => identifier)).size,
+    generatedTestingOutcomeIdentifiers.length,
+  );
+
+  for (const outcome of receipt.outcomes) {
+    assertExactKeys(outcome, [
+      "identifier",
+      "capability",
+      "subject",
+      "evidenceRevision",
+      "commands",
+      "result",
+      "reviewDecision",
+      "summary",
+    ]);
+    assert.equal(outcome.capability, "standards");
+    assert.deepEqual(outcome.subject, generatedTestingSubject);
+    assert.equal(outcome.evidenceRevision, generatedTestingEvidenceRevision);
+    assert.deepEqual(
+      outcome.commands,
+      generatedTestingOutcomeCommands[outcome.identifier],
+    );
+    assert.equal(outcome.result, "passed");
+    assert.equal(outcome.reviewDecision, "accepted");
+    assert.equal(typeof outcome.summary, "string");
+    assert.notEqual(outcome.summary.length, 0);
+    assert.doesNotMatch(
+      outcome.summary,
+      /PRIVATE_VALUE|\/private\/|\[replace|\bTBD\b/u,
+    );
+  }
+}
+
+test("the repository registry admits certified standards while remaining open for observability", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -90,11 +201,6 @@ test("the repository registry admits but remains open for observability and stan
           path: ["records", "observability", "status"],
           context: { reason: "pending" },
         },
-        {
-          code: "CAPABILITY_CERTIFICATION_PENDING",
-          path: ["records", "standards", "status"],
-          context: { reason: "pending" },
-        },
       ],
     })}\n`,
     stderr: "",
@@ -113,7 +219,6 @@ test("the repository registry admits but remains open for observability and stan
         ["observability", "pending"],
         ["section-composition", "backfill-pending"],
         ["site-routing", "backfill-pending"],
-        ["standards", "pending"],
       ].map(([capabilityIdentifier, reason]) => ({
         code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", capabilityIdentifier, "status"],
@@ -122,6 +227,311 @@ test("the repository registry admits but remains open for observability and stan
     })}\n`,
     stderr: "",
   });
+});
+
+test("the generated testing receipt binds all reviewed outcomes to the exact standards subject", async () => {
+  const receipt = JSON.parse(await readFile(generatedTestingReceiptPath, "utf8"));
+  assertGeneratedTestingReceipt(receipt);
+
+  const mutations = [
+    {
+      label: "missing outcome",
+      mutate(candidate) {
+        candidate.outcomes.pop();
+      },
+    },
+    {
+      label: "failed outcome",
+      mutate(candidate) {
+        candidate.outcomes[0].result = "failed";
+      },
+    },
+    {
+      label: "stale revision",
+      mutate(candidate) {
+        candidate.outcomes[0].evidenceRevision = "0".repeat(40);
+      },
+    },
+    {
+      label: "duplicated outcome",
+      mutate(candidate) {
+        candidate.outcomes[1] = structuredClone(candidate.outcomes[0]);
+      },
+    },
+    {
+      label: "extra outcome",
+      mutate(candidate) {
+        candidate.outcomes.push({
+          ...structuredClone(candidate.outcomes[0]),
+          identifier: "unexpected",
+        });
+      },
+    },
+    {
+      label: "wrong subject",
+      mutate(candidate) {
+        candidate.outcomes[0].subject.descriptorVersion = "0.2.0";
+      },
+    },
+    {
+      label: "unreviewed outcome",
+      mutate(candidate) {
+        candidate.outcomes[0].reviewDecision = "pending";
+      },
+    },
+    {
+      label: "unresolved prompt",
+      mutate(candidate) {
+        candidate.unresolvedPrompts.push("present");
+      },
+    },
+  ];
+
+  for (const { label, mutate } of mutations) {
+    const candidate = structuredClone(receipt);
+    mutate(candidate);
+    assert.throws(
+      () => assertGeneratedTestingReceipt(candidate),
+      undefined,
+      label,
+    );
+  }
+});
+
+test("generated testing certification binds a fresh portfolio to the exact standards subject", async () => {
+  const commands = [];
+  let ownedPath;
+  let projectRoot;
+  let verifiedRoot;
+  const previousToken = process.env.NPM_TOKEN;
+  process.env.NPM_TOKEN = "PRIVATE_VALUE";
+
+  try {
+    const result = await certifyGeneratedTestingForTesting({
+      async runCommand(input) {
+        commands.push(input);
+        assert.equal(input.executable, process.execPath);
+        assert.equal(input.environment.NPM_TOKEN, undefined);
+        assert.equal(input.environment.CLOUDFLARE_API_TOKEN, undefined);
+        assert.equal(input.environment.NODE_OPTIONS, undefined);
+        const command = input.arguments[1];
+
+        if (command === "create") {
+          projectRoot = input.arguments[
+            input.arguments.indexOf("--directory") + 1
+          ];
+          ownedPath = dirname(projectRoot);
+          assert.equal((await lstat(ownedPath)).mode & 0o777, 0o700);
+          return `${JSON.stringify({
+            ok: true,
+            command: "create",
+            destination: projectRoot,
+            profile: "portfolio",
+            capabilities: [
+              "standards",
+              "content-files",
+              "section-composition",
+              "deployment-cloudflare",
+              "observability",
+            ],
+          })}\n`;
+        }
+        if (command === "infer") {
+          return `${JSON.stringify({
+            ok: true,
+            command: "infer",
+            result: {
+              state: {
+                kind: "valid",
+                value: {
+                  installedCapabilities: [
+                    { identifier: "standards", version: "0.3.0" },
+                  ],
+                },
+              },
+              capabilities: [
+                { identifier: "standards", category: "confirmed" },
+              ],
+            },
+          })}\n`;
+        }
+        if (command === "doctor") {
+          return `${JSON.stringify({
+            ok: true,
+            command: "doctor",
+            result: { healthy: true, diagnostics: [] },
+          })}\n`;
+        }
+        if (command === "diff") {
+          return `${JSON.stringify({
+            ok: true,
+            command: "diff",
+            result: { equal: true, differences: [] },
+          })}\n`;
+        }
+        throw new Error("unexpected command");
+      },
+      async verifyProject(root, identifier) {
+        verifiedRoot = root;
+        assert.equal(identifier, "portfolio");
+        return {
+          ok: true,
+          fixtures: ["portfolio"],
+          profiles: ["portfolio"],
+          checks: fixedChecks,
+        };
+      },
+    });
+
+    assert.deepEqual(result, {
+      ok: true,
+      capability: "standards",
+      version: "0.3.0",
+      profile: "portfolio",
+      checks: [
+        "compiled-cli-create",
+        "state-inference",
+        "healthy-diagnostics",
+        "exact-diff",
+        ...fixedChecks,
+      ],
+    });
+    assert.deepEqual(
+      commands.map(({ arguments: arguments_ }) => arguments_.slice(1)),
+      [
+        [
+          "create",
+          "--profile",
+          "portfolio",
+          "--name",
+          "acme-portfolio",
+          "--display-name",
+          "Acme Portfolio",
+          "--directory",
+          projectRoot,
+        ],
+        ["infer", "--directory", projectRoot],
+        ["doctor", "--directory", projectRoot],
+        ["diff", "--directory", projectRoot],
+      ],
+    );
+    assert.equal(verifiedRoot, projectRoot);
+    assert.equal(await pathExists(ownedPath), false);
+    assert.doesNotMatch(JSON.stringify(result), /PRIVATE_VALUE/u);
+  } finally {
+    if (previousToken === undefined) {
+      delete process.env.NPM_TOKEN;
+    } else {
+      process.env.NPM_TOKEN = previousToken;
+    }
+  }
+});
+
+test("generated testing certification rejects incomplete, extra, or reordered verifier checks", async () => {
+  const commandOutput = (input) => {
+    const command = input.arguments[1];
+    if (command === "create") {
+      return `${JSON.stringify({
+        ok: true,
+        command,
+        profile: "portfolio",
+        capabilities: [
+          "standards",
+          "content-files",
+          "section-composition",
+          "deployment-cloudflare",
+          "observability",
+        ],
+      })}\n`;
+    }
+    if (command === "infer") {
+      return `${JSON.stringify({
+        ok: true,
+        command,
+        result: {
+          state: {
+            kind: "valid",
+            value: {
+              installedCapabilities: [
+                { identifier: "standards", version: "0.3.0" },
+              ],
+            },
+          },
+          capabilities: [
+            { identifier: "standards", category: "confirmed" },
+          ],
+        },
+      })}\n`;
+    }
+    if (command === "doctor") {
+      return `${JSON.stringify({
+        ok: true,
+        command,
+        result: { healthy: true, diagnostics: [] },
+      })}\n`;
+    }
+    if (command === "diff") {
+      return `${JSON.stringify({
+        ok: true,
+        command,
+        result: { equal: true, differences: [] },
+      })}\n`;
+    }
+    throw new Error("unexpected command");
+  };
+  const invalidChecks = [
+    fixedChecks.slice(0, -1),
+    [...fixedChecks, "unexpected"],
+    [...fixedChecks].reverse(),
+  ];
+
+  for (const checks of invalidChecks) {
+    await assert.rejects(
+      certifyGeneratedTestingForTesting({
+        runCommand: async (input) => commandOutput(input),
+        verifyProject: async () => ({
+          ok: true,
+          fixtures: ["portfolio"],
+          profiles: ["portfolio"],
+          checks,
+        }),
+      }),
+      (error) => {
+        assert.equal(error.name, "GeneratedTestingCertificationError");
+        assert.equal(error.code, "GENERATED_PROJECT_VERIFICATION_INVALID");
+        return true;
+      },
+    );
+  }
+});
+
+test("the generated testing certification entry rejects unknown arguments without echoing them", async () => {
+  let result;
+  try {
+    await execFileAsync(process.execPath, [
+      generatedTestingCertificationScript,
+      "--unknown",
+      "private-value",
+    ], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    });
+    assert.fail("invalid arguments must fail");
+  } catch (error) {
+    result = error;
+  }
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.equal(
+    result.stderr,
+    `${JSON.stringify({
+      ok: false,
+      code: "CERTIFICATION_ARGUMENT_INVALID",
+    })}\n`,
+  );
+  assert.doesNotMatch(result.stderr, /private-value/u);
 });
 
 test("the registry command rejects unknown arguments without registry content", async () => {

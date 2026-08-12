@@ -8,6 +8,8 @@
 
 **Toolchain:** The exact settled Task 6C Node.js, pnpm, TypeScript, Next.js, React, OpenNext, Wrangler, Vitest, Testing Library, jsdom, Playwright, and axe versions; Node test runner for certification contracts; compiled private CLI; local Next.js development and OpenNext/workerd preview.
 
+**2026-08-12 execution amendment:** The user selected Task 6D after Task 6C was squash-integrated as `main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c`. Execute on branch `standards-certification` in ignored isolated worktree `.worktrees/standards-certification`, based exactly on that commit. The integrated comparison is `25b9840c4ad0a6a27c5a1203e31261dfac848d4e..12ecc73a8337ab12ece9dd3a6b2aec03f940383c`. Historical Task 6C packets predate the squash integration; Task 6D preparation records the integrated commit as the accepted evidence-producing predecessor and reconciles stale status wording without rewriting historical comparisons.
+
 ## Approval and prerequisite boundary
 
 This plan is the separate certification sibling required by Task 6C. Its presence permits Task 6C descriptor admission; it does not authorize execution or certification.
@@ -46,18 +48,23 @@ The fresh-scaffold outcome certifies the smallest actual generated baseline. The
 Create during an authorized Task 6D run:
 
 ```text
-docs/implementation-evidence/2026-08-10-generated-unit-component-testing-certification-preparation.md
-docs/implementation-evidence/2026-08-10-generated-unit-component-testing-certification-verification.md
+docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-preparation.md
+docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-verification.md
 docs/implementation-evidence/generated-unit-component-testing-certification-receipt.json
-docs/review-packets/2026-08-10-generated-unit-component-testing-certification.md
+docs/review-packets/2026-08-12-generated-unit-component-testing-certification.md
+scripts/certify-generated-testing.mjs
 ```
 
 Modify only as required by focused RED tests:
 
 ```text
+package.json
 certifications/capabilities.json
 tests/capability-certification/certification-runner.test.mjs
 tests/constitution/constitution.test.mjs
+packages/builder-core/tests/certification.test.mjs
+packages/builder-core/AGENTS.md
+scripts/lib/certify-fresh-scaffold.mjs
 docs/architecture/overview.md
 docs/architecture/capability-model.md
 docs/architecture/enforcement-map.md
@@ -66,9 +73,10 @@ docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md
 README.md
 CONTRIBUTING.md
 packages/builder-core/README.md
+docs/architecture/package-ownership.md
 ```
 
-If implementation occurs on a later date, amend this plan before using consistently later-dated evidence and packet files. Do not modify generated application source, dependency versions, capability descriptors, recipes, managed surfaces, probes, schemas, tests, workflows, or fixtures during certification. Any such need invalidates the pending subject and returns work to a new implementation task and subject.
+This amendment authorizes the later-dated files above and one semantic root command, `verify:generated-testing-certification`, backed by the new thin script. The script must reuse `scripts/lib/certify-fresh-scaffold.mjs`; it must not duplicate the fresh-scaffold lifecycle or broaden its environment, cleanup, output, or authority. The independent test-evidence review also authorizes one optional shared-engine exact-check tuple validated only when a certification configuration supplies it, plus the package-ownership status correction and protective constitution contracts. Do not modify generated application source, dependency versions, capability descriptors, recipes, managed surfaces, probes, schemas, generated tests, workflows, or fixtures during certification. Any such need invalidates the pending subject and returns work to a new implementation task and subject.
 
 ## Task 1: Freeze the exact subject and evidence boundary
 
@@ -83,6 +91,7 @@ Stop if the version, digest, plan link, evidence requirements, generated depende
 
 ## Task 2: RED — require all subject-bound certification outcomes
 
+- [ ] Add a focused runner contract for an actual `standards@0.3.0` fresh portfolio that reuses the shared certification engine, rejects wrong subject inference, emits only bounded identity/check data, and accepts no arguments.
 - [ ] Add a focused certification contract requiring all eight outcome identifiers and rejecting missing, failed, stale, duplicated, extra, or wrong-subject evidence.
 - [ ] Require every outcome to bind capability identifier, descriptor version, behavior digest, evidence revision, exact command or static contract, passed result, and affirmative review.
 - [ ] Require the receipt to be repository-present, complete, content-safe, and free of unresolved prompt fields.
@@ -93,6 +102,7 @@ Stop if the version, digest, plan link, evidence requirements, generated depende
 ## Task 3: Execute fresh-scaffold and generated-project evidence
 
 - [ ] Build the private builder and CLI from the exact candidate revision.
+- [ ] Run `pnpm run verify:generated-testing-certification` from a clean evidence-producing commit and retain its one-line content-safe result.
 - [ ] Create a fresh absent-destination portfolio through the compiled CLI under a new mode-0700 temporary owner.
 - [ ] Require exact CLI JSON, installed standards version/digest, frozen install, portable lockfile, and the ordered verification receipt including unit/component tests.
 - [ ] Re-run the generated Node unit project and jsdom component project explicitly so each has an independent test count and result.
@@ -114,7 +124,7 @@ Stop if the version, digest, plan link, evidence requirements, generated depende
 - [ ] Write one strict machine-readable receipt containing all eight outcomes, exact subject/revision bindings, explicit passed status, per-outcome review, overall review, and no unresolved fields.
 - [ ] Add focused RED coverage proving the pending record cannot become certified when any receipt field or binding is wrong.
 - [ ] Change only the exact standards registry record from `pending` to `certified` with the repository receipt and evidence references.
-- [ ] Run descriptor admission and all-certified/P2 closure checks GREEN.
+- [ ] Require descriptor admission to pass; require `legacy-backfill-exempt` closure to reject only pending observability; require `all-certified` closure to reject pending observability and the four unchanged backfills.
 - [ ] Recompute the subject after the registry-only status change and require the descriptor digest remains unchanged.
 
 ## Task 6: Independent review and bounded repair
@@ -127,7 +137,7 @@ Stop if the version, digest, plan link, evidence requirements, generated depende
 
 ## Task 7: Final verification, documentation, and stop gate
 
-- [ ] Run `git diff --check`, semantic naming, constitution, capability certification tests, admission, all-certified/P2 closure, generated fixture contracts, and any documentation checks affected by certification files.
+- [ ] Run `git diff --check`, semantic naming, constitution, capability certification tests, admission, both expected-rejecting closure policies, generated fixture contracts, and any documentation checks affected by certification files.
 - [ ] Do not repeat the unchanged successful fixed-root verifier after a receipt-only change; bind and cite its exact producing revision instead.
 - [ ] Reconcile canonical status language from pending to certified without changing the implementation contract or claiming hosted CI/deployment.
 - [ ] Record exact comparison, files, commands/results, test counts, subject/digest, reviewer dispositions, risks, deferred P3/P5 work, claim limits, and recovery.
