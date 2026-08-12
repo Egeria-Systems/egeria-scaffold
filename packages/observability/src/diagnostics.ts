@@ -469,12 +469,14 @@ function reconstructDiagnostics(
         ? undefined
         : reconstructDiagnostics(value.cause, depth + 1);
     if (value.cause !== undefined && cause === undefined) return undefined;
-    const expectedFingerprint = createFingerprint({
-      exceptionType,
-      ...(stack.value === undefined ? {} : { exceptionStacktrace: stack.value }),
-      ...(exceptionDigest === undefined ? {} : { exceptionDigest }),
-    });
-    if (fingerprint !== expectedFingerprint) return undefined;
+    if (stack.value !== undefined) {
+      const expectedFingerprint = createFingerprint({
+        exceptionType,
+        exceptionStacktrace: stack.value,
+        ...(exceptionDigest === undefined ? {} : { exceptionDigest }),
+      });
+      if (fingerprint !== expectedFingerprint) return undefined;
+    }
     return Object.freeze({
       exceptionType,
       ...(message.value === undefined ? {} : { exceptionMessage: message.value }),

@@ -332,7 +332,11 @@ test("capture vocabularies, required fields, and canonical report identity fail 
 test("plain transport reports are reconstructed, re-sanitized, and rebranded", () => {
   const created = createOperationalErrorReport(
     createErrorEvent("browser"),
-    { name: "TypeError", message: "bounded failure" },
+    {
+      name: "TypeError",
+      message: "bounded failure",
+      stack: "TypeError: bounded failure\n    at render (app.js:10:2)",
+    },
     { mechanism: "browser-error-event", handled: false },
     {},
   );
