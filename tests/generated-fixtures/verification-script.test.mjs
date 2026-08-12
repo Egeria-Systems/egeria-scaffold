@@ -95,8 +95,8 @@ test("fixture inspection accepts only the exact portable generated trees", async
   );
 
   for (const contract of generatedFixtureContracts) {
-    assert.equal(contract.expectedRecipeVersion, "0.6.0");
-    assert.equal(contract.expectedStandardsVersion, "0.2.0");
+    assert.equal(contract.expectedRecipeVersion, "0.7.0");
+    assert.equal(contract.expectedStandardsVersion, "0.3.0");
     assert.equal(contract.expectedObservabilityVersion, "0.2.0");
     assert.equal(contract.expectedContentFilesVersion, "0.4.0");
     assert.equal(contract.expectedDeploymentCloudflareVersion, "0.2.0");
@@ -111,10 +111,10 @@ test("fixture inspection accepts only the exact portable generated trees", async
     assert.equal(
       contract.expectedSurfaces,
       contract.identifier === "portfolio-calendly"
-        ? 83
+        ? 100
         : contract.identifier === "portfolio"
-          ? 78
-          : 80,
+          ? 95
+          : 97,
     );
     const snapshot = await inspectGeneratedFixture(
       resolve(repositoryRoot, contract.relativeRoot),
@@ -136,11 +136,11 @@ test("fixture inspection accepts only the exact portable generated trees", async
   const site = generatedFixtureContracts.find(
     ({ identifier }) => identifier === "site",
   );
-  assert.equal(basePortfolio.expectedFiles.length, 43);
-  assert.equal(site.expectedFiles.length, 45);
+  assert.equal(basePortfolio.expectedFiles.length, 47);
+  assert.equal(site.expectedFiles.length, 49);
   assert.equal(
     calendlyPortfolio.expectedFiles.length,
-    43 - 1 + 6,
+    47 - 1 + 6,
     "six booking sources replace one common home destination and add five distinct paths",
   );
   assert.deepEqual(calendlyPortfolio.createArguments, [
@@ -408,6 +408,8 @@ test("single-root verification runs the exact fixed checks against caller output
         "lint",
         "cloudflare-types",
         "typecheck",
+        "unit-tests",
+        "component-tests",
         "next-build",
         "opennext-build",
         "browser-install",
@@ -415,7 +417,7 @@ test("single-root verification runs the exact fixed checks against caller output
         "browser-preview",
       ],
     });
-    assert.equal(commands.length, 13);
+    assert.equal(commands.length, 15);
     assert.equal(commands.every(({ cwd }) => cwd.startsWith(`${ownedPath}/`)), true);
     assert.equal(await pathExists(ownedPath), false);
     assert.deepEqual(
@@ -538,6 +540,8 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         "lint",
         "cloudflare-types",
         "typecheck",
+        "unit-tests",
+        "component-tests",
         "next-build",
         "opennext-build",
         "browser-install",
@@ -555,14 +559,14 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     }
   }
 
-  const commandsPerFixture = 13;
+  const commandsPerFixture = 15;
   const fixtureCommands = generatedFixtureContracts.map((_, index) =>
     commands.slice(
       index * commandsPerFixture,
       (index + 1) * commandsPerFixture,
     ),
   );
-  assert.equal(fixtureCommands.every((entries) => entries.length === 13), true);
+  assert.equal(fixtureCommands.every((entries) => entries.length === 15), true);
   const firstCommands = fixtureCommands.map(
     ([command]) => command,
   );
@@ -590,7 +594,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   );
 
   const argumentLists = commands.map(({ arguments: arguments_ }) => arguments_);
-  const perFixture = argumentLists.slice(0, 13).map((arguments_) =>
+  const perFixture = argumentLists.slice(0, 15).map((arguments_) =>
     arguments_.map((argument) =>
       ownedPath !== undefined && argument.startsWith(ownedPath)
         ? "<owned-path>"
@@ -618,6 +622,8 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     ["run", "lint"],
     ["--dir", "apps/web", "run", "cf-typegen"],
     ["run", "typecheck"],
+    ["run", "test:unit"],
+    ["run", "test:component"],
     ["run", "build"],
     ["run", "build:cloudflare"],
     ["--dir", "apps/web", "run", "browser:install"],

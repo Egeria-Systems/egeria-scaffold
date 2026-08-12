@@ -98,7 +98,7 @@ function createDescriptors(
   return [
     {
       identifier: "standards",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -109,6 +109,13 @@ function createDescriptors(
         "@axe-core/playwright",
         "@egeria-systems/standards",
         "@playwright/test",
+        "@testing-library/dom",
+        "@testing-library/jest-dom",
+        "@testing-library/react",
+        "@testing-library/user-event",
+        "@vitejs/plugin-react",
+        "jsdom",
+        "vitest",
       ],
       environmentVariables: ["PLAYWRIGHT_DEPLOYED_URL"],
       externalDomains: [
@@ -119,6 +126,7 @@ function createDescriptors(
       privilegedOperations: [
         "browser-binary-installation",
         "browser-process-execution",
+        "test-process-execution",
       ],
       threatReviewLevel: "elevated",
       platformResources: [],
@@ -139,6 +147,28 @@ function createDescriptors(
           "standards",
           "/scripts/browser:install",
         ),
+        createPackageSurface(
+          "standards-component-test-script",
+          "standards",
+          "/scripts/test:component",
+        ),
+        createFileSurface(
+          "standards-component-test-setup",
+          "standards",
+          "apps/web/tests/setup/component.ts",
+          "managed",
+        ),
+        createFileSurface(
+          "standards-component-test-specification",
+          "standards",
+          "apps/web/tests/component/content-page.test.tsx",
+          "application-owned",
+        ),
+        createPackageSurface(
+          "standards-component-watch-script",
+          "standards",
+          "/scripts/test:component:watch",
+        ),
         createFileSurface(
           "standards-browser-quality-specification",
           "standards",
@@ -155,11 +185,26 @@ function createDescriptors(
           "standards",
           "/scripts/test:e2e:dev",
         ),
+        createPackageSurface(
+          "standards-dom-testing-library-package",
+          "standards",
+          "/devDependencies/@testing-library~1dom",
+        ),
         createFileSurface(
           "standards-eslint-configuration",
           "standards",
           "apps/web/eslint.config.mjs",
           "managed",
+        ),
+        createPackageSurface(
+          "standards-jest-dom-package",
+          "standards",
+          "/devDependencies/@testing-library~1jest-dom",
+        ),
+        createPackageSurface(
+          "standards-jsdom-package",
+          "standards",
+          "/devDependencies/jsdom",
         ),
         createPackageSurface(
           "standards-package",
@@ -206,11 +251,63 @@ function createDescriptors(
           ".github/workflows/quality.yml",
           "managed",
         ),
+        createPackageSurface(
+          "standards-react-testing-library-package",
+          "standards",
+          "/devDependencies/@testing-library~1react",
+        ),
+        createPackageSurface(
+          "standards-test-script",
+          "standards",
+          "/scripts/test",
+        ),
+        createPackageSurface(
+          "standards-test-watch-script",
+          "standards",
+          "/scripts/test:watch",
+        ),
         createFileSurface(
           "standards-typescript-configuration",
           "standards",
           "apps/web/tsconfig.json",
           "managed",
+        ),
+        createPackageSurface(
+          "standards-unit-test-script",
+          "standards",
+          "/scripts/test:unit",
+        ),
+        createFileSurface(
+          "standards-unit-test-specification",
+          "standards",
+          "apps/web/tests/unit/content-schema.test.ts",
+          "application-owned",
+        ),
+        createPackageSurface(
+          "standards-unit-watch-script",
+          "standards",
+          "/scripts/test:unit:watch",
+        ),
+        createPackageSurface(
+          "standards-user-event-package",
+          "standards",
+          "/devDependencies/@testing-library~1user-event",
+        ),
+        createPackageSurface(
+          "standards-vite-react-package",
+          "standards",
+          "/devDependencies/@vitejs~1plugin-react",
+        ),
+        createFileSurface(
+          "standards-vitest-configuration",
+          "standards",
+          "apps/web/vitest.config.ts",
+          "managed",
+        ),
+        createPackageSurface(
+          "standards-vitest-package",
+          "standards",
+          "/devDependencies/vitest",
         ),
       ],
       inferenceProbes: [
@@ -229,6 +326,18 @@ function createDescriptors(
           "/scripts/browser:install",
           "playwright install chromium",
         ),
+        createJsonValueProbe(
+          "apps/web/package.json",
+          "/scripts/test:component",
+          "vitest run --project component",
+        ),
+        createFileProbe("apps/web/tests/setup/component.ts"),
+        createFileProbe("apps/web/tests/component/content-page.test.tsx"),
+        createJsonValueProbe(
+          "apps/web/package.json",
+          "/scripts/test:component:watch",
+          "vitest --project component",
+        ),
         createFileProbe("apps/web/tests/e2e/site-quality.spec.ts"),
         createJsonValueProbe(
           "apps/web/package.json",
@@ -240,7 +349,18 @@ function createDescriptors(
           "/scripts/test:e2e:dev",
           "playwright test --config playwright.dev.config.ts",
         ),
+        createPackageProbe(
+          "devDependencies",
+          "@testing-library/dom",
+          "10.4.1",
+        ),
         createFileProbe("apps/web/eslint.config.mjs"),
+        createPackageProbe(
+          "devDependencies",
+          "@testing-library/jest-dom",
+          "7.0.1",
+        ),
+        createPackageProbe("devDependencies", "jsdom", "30.0.1"),
         createPackageProbe(
           "devDependencies",
           "@egeria-systems/standards",
@@ -261,12 +381,52 @@ function createDescriptors(
           "playwright test --config playwright.preview.config.ts",
         ),
         createFileProbe(".github/workflows/quality.yml"),
+        createPackageProbe(
+          "devDependencies",
+          "@testing-library/react",
+          "16.3.2",
+        ),
+        createJsonValueProbe(
+          "apps/web/package.json",
+          "/scripts/test",
+          "vitest run",
+        ),
+        createJsonValueProbe(
+          "apps/web/package.json",
+          "/scripts/test:watch",
+          "vitest",
+        ),
         createFileProbe("apps/web/tsconfig.json"),
+        createJsonValueProbe(
+          "apps/web/package.json",
+          "/scripts/test:unit",
+          "vitest run --project unit",
+        ),
+        createFileProbe("apps/web/tests/unit/content-schema.test.ts"),
+        createJsonValueProbe(
+          "apps/web/package.json",
+          "/scripts/test:unit:watch",
+          "vitest --project unit",
+        ),
+        createPackageProbe(
+          "devDependencies",
+          "@testing-library/user-event",
+          "14.6.3",
+        ),
+        createPackageProbe(
+          "devDependencies",
+          "@vitejs/plugin-react",
+          "6.0.5",
+        ),
+        createFileProbe("apps/web/vitest.config.ts"),
+        createPackageProbe("devDependencies", "vitest", "4.1.10"),
       ],
       verificationPlan: [
         "package-resolution",
         "lint",
         "typecheck",
+        "unit-tests",
+        "component-tests",
         "browser-development",
         "browser-preview",
         "deployed-configuration",
@@ -274,10 +434,12 @@ function createDescriptors(
       ],
       documentationEvidenceRequirements: [
         "public-package-version-and-provenance",
+        "unit-and-component-testing-claim-boundaries",
         "browser-testing-claim-boundaries",
       ],
       removalAndRecoveryRequirements: [
         "review-package-and-configuration-removal",
+        "review-generated-test-surface-removal",
         "review-generated-quality-surface-removal",
       ],
     },

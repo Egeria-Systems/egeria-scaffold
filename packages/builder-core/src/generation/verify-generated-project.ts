@@ -45,17 +45,48 @@ type SourceEntry =
   | Readonly<{ kind: "directory" }>
   | Readonly<{ kind: "file"; fingerprint: string }>;
 
+type ExclusiveWriteResult =
+  | Readonly<{ ok: true }>
+  | Readonly<{ ok: false; sourceChanged: boolean }>;
+
+type ExclusiveFileOperations = Readonly<{
+  open(path: string, flags: "wx"): Promise<{
+    stat(options: { bigint: true }): Promise<{
+      isFile(): boolean;
+      isSymbolicLink(): boolean;
+      dev: bigint;
+      ino: bigint;
+    }>;
+    writeFile(content: Uint8Array): Promise<unknown>;
+    close(): Promise<unknown>;
+  }>;
+}>;
+
+type ExclusiveFileWriter = (
+  path: string,
+  content?: Uint8Array,
+) => Promise<ExclusiveWriteResult>;
+
 const execFileAsync = promisify(execFile);
 const maximumOutputBytes = 1024 * 1024;
 const versionTimeoutMilliseconds = 30 * 1000;
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const requiredPnpmVersion = "11.20.0";
 const publicRegistry = "https://registry.npmjs.org/";
+const recipeLockfile = new URL(
+  "../../lockfiles/web-recipe-0.7.0/pnpm-lock.yaml",
+  import.meta.url,
+);
+const exclusiveFileOperations: ExclusiveFileOperations = {
+  open,
+};
 export const verificationChecks = Object.freeze([
   "lockfile",
   "frozen-install",
   "lint",
   "typecheck",
+  "unit-tests",
+  "component-tests",
   "next-build",
   "opennext-build",
 ] as const);
@@ -128,12 +159,23 @@ async function cleanupOwnedDirectory(identity: PathIdentity): Promise<boolean> {
   }
 }
 
-async function writeEmptyExclusive(path: string): Promise<boolean> {
+export async function writeExclusive(
+  path: string,
+  content: Uint8Array = new Uint8Array(),
+  operations: ExclusiveFileOperations = exclusiveFileOperations,
+): Promise<ExclusiveWriteResult> {
   let handle;
+  let created = false;
   let failed = false;
 
   try {
-    handle = await open(path, "wx");
+    handle = await operations.open(path, "wx");
+    created = true;
+    const stats = await handle.stat({ bigint: true });
+    if (stats.isSymbolicLink() || !stats.isFile()) {
+      throw new Error("invalid-created-file");
+    }
+    await handle.writeFile(content);
   } catch {
     failed = true;
   } finally {
@@ -144,7 +186,18 @@ async function writeEmptyExclusive(path: string): Promise<boolean> {
     }
   }
 
-  return !failed;
+  if (!failed) {
+    return { ok: true };
+  }
+
+  if (!created) {
+    return { ok: false, sourceChanged: false };
+  }
+
+  // Node does not expose an identity-conditional unlink. A path-based remove
+  // could delete a replacement created after this handle was opened, so the
+  // caller must fail closed and let the identity-owned staging root clean up.
+  return { ok: false, sourceChanged: true };
 }
 
 async function createOwnedDirectory(
@@ -180,7 +233,7 @@ async function createSupportPaths(
     await mkdir(home, { mode: 0o700 });
     await mkdir(temporary, { mode: 0o700 });
     await mkdir(store, { mode: 0o700 });
-    if (!(await writeEmptyExclusive(userConfiguration))) {
+    if (!(await writeExclusive(userConfiguration)).ok) {
       return issue("VERIFIER_SETUP_FAILED", "user-configuration-failed");
     }
 
@@ -319,9 +372,9 @@ function snapshotsEqual(
   );
 }
 
-async function prepareLockfile(
-  executable: string,
+export async function prepareLockfile(
   root: string,
+  writer: ExclusiveFileWriter = writeExclusive,
 ): Promise<ValidationResult<void>> {
   const fixedRoot = resolve(root);
   const before = await snapshotSource(fixedRoot);
@@ -329,57 +382,30 @@ async function prepareLockfile(
     return issue("LOCKFILE_PREPARATION_FAILED", "source-invalid");
   }
 
-  const owner = await createOwnedDirectory(dirname(fixedRoot), ".egeria-pnpm-");
-  if (!owner.ok) {
-    return issue("LOCKFILE_PREPARATION_FAILED", "support-creation-failed");
-  }
-
-  let result: ValidationResult<void>;
+  let lockfileBytes: Uint8Array;
   try {
-    const support = await createSupportPaths(owner.value);
-    if (!support.ok) {
-      result = issue("LOCKFILE_PREPARATION_FAILED", "support-creation-failed");
-    } else {
-      const environment = createChildEnvironment(support.value);
-      const version = await requirePnpmVersion({
-        executable,
-        cwd: fixedRoot,
-        environment,
-      });
-
-      if (!version.ok) {
-        result = version;
-      } else {
-        const install = await runCommand({
-          executable,
-          arguments: [
-            "install",
-            "--lockfile-only",
-            "--ignore-scripts",
-            "--store-dir",
-            support.value.store,
-          ],
-          cwd: fixedRoot,
-          environment,
-          timeout: commandTimeoutMilliseconds,
-          failureCode: "LOCKFILE_PREPARATION_FAILED",
-        });
-        const after = await snapshotSource(fixedRoot);
-        result =
-          install.ok &&
-          after.ok &&
-          onlyLockfileWasAdded(before.value, after.value)
-            ? { ok: true, value: undefined }
-            : issue("LOCKFILE_PREPARATION_FAILED", "source-changed");
-      }
-    }
-  } finally {
-    if (!(await cleanupOwnedDirectory(owner.value))) {
-      result = issue("LOCKFILE_PREPARATION_FAILED", "support-cleanup-failed");
-    }
+    lockfileBytes = await readFile(recipeLockfile);
+  } catch {
+    return issue("LOCKFILE_PREPARATION_FAILED", "recipe-lockfile-unavailable");
   }
 
-  return result;
+  const writeResult = await writer(
+    join(fixedRoot, "pnpm-lock.yaml"),
+    lockfileBytes,
+  );
+  if (!writeResult.ok) {
+    return issue(
+      "LOCKFILE_PREPARATION_FAILED",
+      writeResult.sourceChanged
+        ? "lockfile-write-failed-source-changed"
+        : "lockfile-write-failed",
+    );
+  }
+
+  const after = await snapshotSource(fixedRoot);
+  return after.ok && onlyLockfileWasAdded(before.value, after.value)
+    ? { ok: true, value: undefined }
+    : issue("LOCKFILE_PREPARATION_FAILED", "source-changed");
 }
 
 async function verifyInIsolatedCopy(
@@ -446,6 +472,14 @@ async function verifyInIsolatedCopy(
             arguments: ["run", "typecheck"],
             failureCode: "TYPECHECK_FAILED",
           },
+          {
+            arguments: ["run", "test:unit"],
+            failureCode: "UNIT_TESTS_FAILED",
+          },
+          {
+            arguments: ["run", "test:component"],
+            failureCode: "COMPONENT_TESTS_FAILED",
+          },
           { arguments: ["run", "build"], failureCode: "NEXT_BUILD_FAILED" },
           {
             arguments: ["run", "build:cloudflare"],
@@ -493,9 +527,7 @@ export function createPnpmGeneratedProjectVerifier(input: Readonly<{
 
   return {
     prepareLockfile(root) {
-      return typeof executable === "string" && executable.length > 0
-        ? prepareLockfile(executable, root)
-        : Promise.resolve(issue("PNPM_VERSION_INVALID", "invalid-executable"));
+      return prepareLockfile(root);
     },
     verifyInIsolatedCopy(root) {
       return typeof executable === "string" && executable.length > 0

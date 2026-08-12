@@ -1,0 +1,237 @@
+# Generated Testing CI Repair Plan
+
+> **Execution contract:** Use `superpowers:executing-plans`, `superpowers:test-driven-development`, `superpowers:systematic-debugging` for any unexpected failure, and `superpowers:verification-before-completion`. Execute in the ignored isolated worktree `.worktrees/generated-unit-component-testing-repair` on the existing merge-request branch `agent/generated-unit-component-testing`. Commit one locally verified increment at a time and stop for explicit review before the next increment. Push and hosted-CI inspection require a separate explicit request; the later authority granted for this run is recorded below.
+
+**Goal:** Repair the reproduced generated-project hosted-CI defect and make expensive repository-quality lanes run only when their owned inputs change, without changing the generated application contract, capability subject, retained fixture bytes, deployment authority, or certification state.
+
+**Comparison:** `origin/main..agent/generated-unit-component-testing`, with repair commits added to the existing merge request.
+
+**Architecture:** Recipe `0.7.0` receives one builder-owned, checked lockfile artifact that is materialized byte-for-byte before the existing isolated frozen-install verification. Ordinary builder/package checks remain on every pull request; generated-project and compatibility-proof checks move to read-only workflows scoped to their actual inputs.
+
+**Current evidence basis (2026-08-11):** The hosted generated-project failure resolves `electron-to-chromium@1.5.404` after the repository maturity window, while the reviewed fixture lockfile contains `1.5.403`; recreating the lockfile with Node `22.23.2` and pnpm `11.20.0` reproduced the hosted fingerprint. Current official pnpm dependency-resolution and lockfile guidance and GitHub Actions path-filter guidance were revalidated during MR review. No provider or deployed runtime is changed.
+
+**Excluded concurrent scope:** The active observability-certification task owns observability certification, cleanup/recovery behavior and evidence, capability-registry transition, and any defect discovered by its certification checks. This repair plan must not modify those surfaces or treat their hosted status as an acceptance criterion.
+
+**Current external-action authority:** The original plan separated local implementation from push and hosted-CI inspection. The user subsequently authorized pushing this repair branch, inspecting its hosted checks, and merging the merge request only after accurate applicable CI passes and repository review rules are satisfied.
+
+## Increment 1: Materialize the checked recipe lockfile
+
+### Files
+
+- Create `packages/builder-core/lockfiles/web-recipe-0.7.0/pnpm-lock.yaml` from the reviewed retained-project lockfile bytes. The canonical lockfile basename is required so the semantic-naming gate treats generated integrity data as lockfile content rather than authored prose.
+- Modify `packages/builder-core/src/generation/verify-generated-project.ts`.
+- Modify `packages/builder-core/tests/generate-project.test.mjs`.
+- Modify `packages/builder-core/tests/generate-project.integration.mjs`.
+- Modify `packages/builder-core/AGENTS.md`.
+- Modify `docs/superpowers/plans/2026-08-10-generated-unit-component-testing.md`.
+
+### RED
+
+- Require production lockfile preparation to write the reviewed recipe bytes exactly.
+- Require lockfile preparation to invoke no package-manager or registry process.
+- Preserve focused failures for pre-existing or non-regular lockfile targets and preserve content-safe verification failure mapping.
+- Require live production generation to reject the stale `78`/`80` managed-surface expectations after generated testing expands the exact profile contracts to `95`/`97`.
+
+### GREEN
+
+- Read the builder-owned `0.7.0` recipe lockfile from the private builder-core package boundary.
+- Create `pnpm-lock.yaml` exclusively in the generated source and retain the existing before/after inventory guard.
+- Keep the existing isolated `pnpm --version`, frozen install, lint, typecheck, unit/component, Next, and OpenNext verification unchanged.
+- Update only the live production-generation expectations to the exact `portfolio`/`site` managed-surface counts `95`/`97` already owned by generation and retained-fixture contracts.
+- Do not alter templates, manifests, fixtures, fingerprints, schemas, capabilities, recipes, or state receipts.
+
+### Verification and commit
+
+```sh
+pnpm run build:builder
+pnpm run test:builder-core
+pnpm run test:generated-project
+pnpm run test:generated-fixtures
+```
+
+Commit: `fix: materialize recipe lockfile deterministically`
+
+Push the existing MR branch, inspect hosted checks, and stop for increment review.
+
+## Increment 2: Scope deep CI to relevant changes
+
+### Files
+
+- Create `.github/workflows/generated-project-quality.yml`.
+- Create `.github/workflows/compatibility-proof-quality.yml`.
+- Modify `.github/workflows/repository-quality.yml`.
+- Modify `tests/constitution/constitution.test.mjs`.
+- Modify the generated-testing design, implementation plan, enforcement map, and verification/review evidence that directly describe ordinary repository CI.
+
+### RED/GREEN
+
+- Keep builder/package governance, tests, lint, build, and typecheck on every pull request.
+- Move generated-project and compatibility-proof commands without weakening them into separate read-only workflows with exact path filters for their owned inputs.
+- Retain pinned actions, minimal permissions, bounded timeouts, no credentials, no deployment, no publication, and no provider mutation.
+- Keep manual certification and deployment workflows unchanged.
+- Record that current repository rules do not require skipped path-scoped checks; path filters must be revisited before any such status becomes required.
+
+### Verification and commit
+
+```sh
+pnpm run test:constitution
+pnpm run check:semantic-naming
+git diff --check
+```
+
+Commit: `ci: scope deep verification to relevant changes`
+
+Push the existing MR branch, inspect hosted checks, and stop for increment review.
+
+## Increment 3: Repair review-confirmed data-integrity defects
+
+### Files
+
+- Modify `packages/builder-core/src/contracts/json-schemas.ts`.
+- Regenerate `packages/builder-core/schemas/state.schema.json` through the canonical schema generator.
+- Modify `packages/builder-core/src/generation/verify-generated-project.ts`.
+- Modify `packages/builder-core/tests/contracts.test.mjs`.
+- Modify `packages/builder-core/tests/generate-project.test.mjs`.
+- Correct the three exact preparation, verification, and review-packet evidence inconsistencies identified during merge-request review.
+
+### RED/GREEN
+
+- Require every fixed JSON Schema tuple to emit `minItems` and `maxItems` equal to its `prefixItems` length.
+- Add tuple cardinality in the canonical JSON Schema artifact transformation and regenerate the committed artifact; do not hand-edit it.
+- Require a failed exclusive write or close never to unlink a path that could have been replaced concurrently.
+- Report post-creation failure as a source mutation through the content-safe lockfile-preparation failure reason, then let the generation transaction clean only its identity-owned staging directory.
+- Preserve no-overwrite for exclusive file creation and pre-existing-target checks.
+- Treat portable rename as a narrow commit boundary, not a hostile-concurrency no-clobber guarantee. A separately approved platform-specific no-replace operation would be required if that stronger guarantee becomes necessary.
+- Keep all failure output path- and content-safe.
+
+### Verification and commit
+
+```sh
+pnpm run build:builder
+pnpm run test:builder-core
+pnpm run check:semantic-naming
+git diff --check
+```
+
+Commit: `fix: preserve generated contract integrity`
+
+Push the existing MR branch and inspect hosted checks before final review.
+
+## Main-reconciliation amendment: make the incoming identity test portable
+
+**Approval:** The user preapproved plan amendments and directed this branch to merge current `main`, resolve the resulting fingerprint conflicts, repair accurate CI, push, and merge only after CI passes. This amendment was activated only after merging `main` commit `2a315aa0e7dce1bf1048b9a2c07e318add9241de` and observing the exact merged head on hosted CI.
+
+### File
+
+- Modify `tests/capability-certification/production-observability.test.mjs` only.
+
+### RED and cause
+
+- Hosted repository-quality run `31582711142` failed the incoming identity-replacement cleanup test because deleting and immediately recreating one pathname can reuse the original inode on Linux.
+- The same test passed locally on macOS, confirming that its inode-change assumption was filesystem-dependent rather than evidence of a production behavior difference.
+
+### GREEN
+
+- Create the replacement directory while the original still exists, record its distinct identity, remove the original, and rename the replacement into the retained path.
+- Assert the retained directory has the replacement identity. Keep the existing cleanup-failure expectation and change no production, provider, certification-state, or generated-project behavior.
+
+### Verification and commit
+
+```sh
+node --test --test-name-pattern='observability production mutation refuses identity-replacement cleanup' tests/capability-certification/production-observability.test.mjs
+pnpm run test:capability-certification
+pnpm exec eslint tests/capability-certification/production-observability.test.mjs --max-warnings 0
+git diff --check
+```
+
+Commit: `test: make cleanup identity check portable`
+
+## Hosted-merge-ref amendment: bind release intent to the remote base
+
+### Files
+
+- Create `.changeset/generated-testing-boundary.md`.
+- Modify `.github/workflows/repository-quality.yml`.
+- Modify `tests/constitution/constitution.test.mjs`.
+- Modify `tests/package-boundaries/release-safeguards.test.mjs`.
+
+### RED and cause
+
+- Hosted repository-quality run `31583053791` passed the repaired capability-certification suite and then failed `changeset status` because the pull-request checkout had complete history and `origin/main` but no local `main` branch.
+- Add a constitution RED requiring the release-intent step to name the fetched remote base explicitly.
+
+### GREEN
+
+- Run `pnpm exec changeset status --since origin/main` in the hosted repository workflow. Keep the local `changeset:status` script and complete builder-kernel aggregate unchanged.
+- Add one empty Changeset owned by this MR because its only changes beneath public-package roots are non-packed instruction files; record no package bump without borrowing the pre-existing empty Changeset from `main`.
+- Update the exact retained-Changeset inventory assertion to admit both reviewed empty no-release records while continuing to reject unreviewed release intent.
+- Preserve full-history checkout, read-only permissions, disabled checkout credentials, and every other always-on check.
+
+### Verification and commit
+
+```sh
+pnpm run test:constitution
+pnpm run test:package-boundaries
+pnpm exec changeset status --since origin/main
+pnpm run check:semantic-naming
+git diff --check
+```
+
+Commit: `ci: bind release intent to remote main`
+
+## Review-comment amendment: centralize pending Changeset discovery
+
+### Files
+
+- Modify `scripts/check-package-release.mjs`.
+- Modify `tests/package-boundaries/release-safeguards.test.mjs`.
+- Modify `docs/implementation-evidence/2026-08-12-generated-testing-ci-repair-verification.md`.
+- Modify `docs/review-packets/2026-08-12-generated-testing-ci-repair.md`.
+- Modify this plan.
+
+### RED and cause
+
+- Replace the safeguard's duplicate `.changeset` Markdown filter and sort with an import of the release validator's existing loader.
+- Before the production export, the focused safeguard must fail during module instantiation because `check-package-release.mjs` does not provide the named export.
+
+### GREEN
+
+- Export and reuse the release validator's sorted pending-Changeset loader so README exclusion and filename ordering have one implementation.
+- Retain the safeguard's literal two-file inventory and exact byte assertions, so an included `README.md`, changed order, extra record, missing record, or changed content still fails independently.
+- Keep the release validator's direct-execution guard and all local, registry, and publication behavior unchanged.
+
+### Verification and commit
+
+```sh
+node --test --test-name-pattern='the release candidate materializes only the approved public versions' tests/package-boundaries/release-safeguards.test.mjs
+pnpm run test:package-boundaries
+pnpm run test:constitution
+pnpm exec eslint scripts/check-package-release.mjs tests/package-boundaries/release-safeguards.test.mjs --max-warnings 0
+pnpm exec changeset status --since origin/main
+pnpm run check:package-release local # expected PENDING_CHANGESET while the two reviewed empty records remain unmaterialized
+pnpm run check:semantic-naming
+git diff --check
+```
+
+Commit: `refactor: centralize changeset discovery`
+
+## Final-review amendment: reconcile the canonical roadmap
+
+- Modify `docs/roadmaps/program-roadmap.md` after architecture review reproduced material drift between its one-unhosted-workflow statement and the implemented three-workflow hosted evidence.
+- Modify the final review packet with the exact finding and closure boundary, and update the constitution test that directly consumes the roadmap's historical and current reconciliation facts, CI ownership topology, and task-specific authority boundary.
+- Describe the always-on and path-scoped ownership, bind hosted evidence to content candidate `93e4e9f6ea944329de7c47c9e8bf34382774b1f8`, and retain pending exact-documentary-head checks and human approval.
+- Change no workflow, generated source, capability, package, state, provider, deployment, or production behavior.
+- Scope the roadmap's still-unauthorized merge/push statement to the separate capability-certification tasks so it does not contradict the conditional Task 6C merge authority.
+- Align the dated repair preparation and verification evidence with the same separately authorized, work-preserving recovery boundary as the final packet.
+
+## Final review, evidence, and recovery
+
+After the three increments are separately accepted:
+
+1. Run the complete relevant builder-kernel verification once against the settled tree.
+2. Dispatch read-only requirements, architecture/anti-overengineering, and test-evidence reviewers with the exact final comparison and no recursive fan-out.
+3. Reproduce and repair only validated material findings through focused RED/GREEN cycles.
+4. Record the final commands, results, hosted-CI boundary, changed files, reviewer dispositions, risks, deferred work, and rollback/recovery in dated implementation evidence and a review packet.
+5. Present the verified final diff for the user-authorized merge-request integration. Merge only when the exact head has accurate applicable green CI and satisfies repository review rules. Do not deploy, publish, dispatch certification workflows, mutate providers, or respond to review comments.
+
+If separately authorized before integration, repair-only recovery reverts, in displayed newest-first order, only the commits selected by `git log --first-parent --no-merges --format='%H' 29628f9..HEAD` in the isolated worktree. This excludes main-reconciliation merge `ac7d516` and every commit reachable only through its accepted-main second parent, including `2a315aa`; staged, unstaged, untracked, and unrelated committed user work remain preserved. It then regenerates the three fixtures and runs `pnpm run verify:builder-kernel`. Separately authorized full-MR withdrawal closes merge request 2 without merging and retains its branch/worktree evidence; it does not attempt a partial commit-list revert of the 114-path `2a315aa0...HEAD` comparison. After separately authorized squash integration, recovery reverts only the resulting single integration commit and repeats regeneration plus `pnpm run verify:builder-kernel`. The checked lockfile is repository source; no persistent data, provider state, deployment, credential, or production recovery is introduced by these repairs.

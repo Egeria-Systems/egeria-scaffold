@@ -6,6 +6,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const reviewedRecipeLockfile = resolve(
+  packageRoot,
+  "../../fixtures/generated/portfolio/pnpm-lock.yaml",
+);
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
 const verifierModule = await import(
   pathToFileURL(
@@ -18,6 +22,8 @@ const generatedChecks = [
   "frozen-install",
   "lint",
   "typecheck",
+  "unit-tests",
+  "component-tests",
   "next-build",
   "opennext-build",
 ];
@@ -62,8 +68,12 @@ const portfolioRenderedPaths = [
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/sections/section-registry.tsx",
+  "apps/web/tests/component/content-page.test.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
+  "apps/web/tests/setup/component.ts",
+  "apps/web/tests/unit/content-schema.test.ts",
   "apps/web/tsconfig.json",
+  "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
   "package.json",
   "pnpm-workspace.yaml",
@@ -201,8 +211,8 @@ async function createFakePnpmExecutable(owner) {
   const executable = join(owner, "fake-pnpm");
   const controlPath = join(owner, "fake-pnpm-control.json");
   const logPath = join(owner, "fake-pnpm-log.jsonl");
-  const source = `#!/usr/bin/env node
-import { appendFileSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+  const source = `#!${process.execPath}
+import { appendFileSync, readFileSync } from "node:fs";
 
 const control = JSON.parse(readFileSync(${JSON.stringify(controlPath)}, "utf8"));
 const arguments_ = process.argv.slice(2);
@@ -226,19 +236,6 @@ if (
 if (operation === "--version") {
   process.stdout.write((control.version ?? "11.20.0") + "\\n");
   process.exit(0);
-}
-if (operation.startsWith("install --lockfile-only")) {
-  if (control.lockfileMode === "changed-source") {
-    writeFileSync("package.json", "{}\\n");
-  }
-  if (control.lockfileMode === "extra-source") {
-    writeFileSync("unexpected", "unexpected");
-  }
-  if (control.lockfileMode === "symlink") {
-    symlinkSync("package.json", "pnpm-lock.yaml");
-  } else if (control.lockfileMode !== "missing") {
-    writeFileSync("pnpm-lock.yaml", "lockfileVersion: '9.0'\\n");
-  }
 }
 `;
 
@@ -304,7 +301,79 @@ test("the internal generated-project verification receipt is frozen", () => {
   );
 });
 
-test("the pnpm verifier uses exact commands, isolated copies, and an allowlisted environment", async () => {
+test("failed exclusive writes never delete a possibly replaced path", async () => {
+  for (const failureStage of ["write", "close"]) {
+    let removeAttempted = false;
+    const result = await verifierModule.writeExclusive(
+      "created-lockfile",
+      new Uint8Array([1]),
+      {
+        async open() {
+          return {
+            async stat() {
+              return {
+                isFile: () => true,
+                isSymbolicLink: () => false,
+                dev: 1n,
+                ino: 2n,
+              };
+            },
+            async writeFile() {
+              if (failureStage === "write") {
+                throw new Error("write failed");
+              }
+            },
+            async close() {
+              if (failureStage === "close") {
+                throw new Error("close failed");
+              }
+            },
+          };
+        },
+        async remove() {
+          removeAttempted = true;
+        },
+      },
+    );
+
+    assert.deepEqual(result, { ok: false, sourceChanged: true });
+    assert.equal(removeAttempted, false);
+  }
+
+  const openFailure = await verifierModule.writeExclusive(
+    "pre-existing-lockfile",
+    new Uint8Array(),
+    {
+      async open() {
+        throw new Error("exclusive creation failed");
+      },
+    },
+  );
+  assert.deepEqual(openFailure, { ok: false, sourceChanged: false });
+});
+
+test("lockfile preparation reports a failed exclusive-write source mutation", async () => {
+  await withTestRoot(async (owner) => {
+    const source = await createVerifierSource(owner);
+    const result = await verifierModule.prepareLockfile(source, async () => ({
+      ok: false,
+      sourceChanged: true,
+    }));
+
+    assert.deepEqual(result, {
+      ok: false,
+      issues: [
+        {
+          code: "LOCKFILE_PREPARATION_FAILED",
+          path: [],
+          context: { reason: "lockfile-write-failed-source-changed" },
+        },
+      ],
+    });
+  });
+});
+
+test("the pnpm verifier materializes reviewed recipe bytes before exact isolated commands", async () => {
   await withTestRoot(async (owner) => {
     const fakePnpm = await createFakePnpmExecutable(owner);
     const source = await createVerifierSource(owner);
@@ -314,6 +383,11 @@ test("the pnpm verifier uses exact commands, isolated copies, and an allowlisted
     });
 
     assertSuccess(await verifier.prepareLockfile(source));
+    assert.deepEqual(await fakePnpm.readCalls(), []);
+    assert.deepEqual(
+      await readFile(join(source, "pnpm-lock.yaml")),
+      await readFile(reviewedRecipeLockfile),
+    );
     const beforeVerification = await snapshotFileBytes(source);
     assert.deepEqual(assertSuccess(await verifier.verifyInIsolatedCopy(source)), {
       checks: generatedChecks,
@@ -327,29 +401,20 @@ test("the pnpm verifier uses exact commands, isolated copies, and an allowlisted
         ["--version"],
         [
           "install",
-          "--lockfile-only",
-          "--ignore-scripts",
+          "--frozen-lockfile",
           "--store-dir",
           calls[1].arguments.at(-1),
         ],
-        ["--version"],
-        [
-          "install",
-          "--frozen-lockfile",
-          "--store-dir",
-          calls[3].arguments.at(-1),
-        ],
         ["run", "lint"],
         ["run", "typecheck"],
+        ["run", "test:unit"],
+        ["run", "test:component"],
         ["run", "build"],
         ["run", "build:cloudflare"],
       ],
     );
-    assert.equal(calls[0].cwd, canonicalSource);
-    assert.equal(calls[1].cwd, canonicalSource);
-    assert.notEqual(calls[2].cwd, canonicalSource);
-    assert.ok(calls.slice(2).every(({ cwd }) => cwd === calls[2].cwd));
-    assert.notEqual(calls[1].arguments.at(-1), calls[3].arguments.at(-1));
+    assert.notEqual(calls[0].cwd, canonicalSource);
+    assert.ok(calls.every(({ cwd }) => cwd === calls[0].cwd));
 
     const forbiddenEnvironmentKeys = [
       "TOKEN",
@@ -402,18 +467,23 @@ test("the pnpm verifier uses exact commands, isolated copies, and an allowlisted
   });
 });
 
-test("the pnpm verifier rejects lockfile mutations and non-regular lockfiles", async () => {
+test("the pnpm verifier rejects pre-existing lockfile targets without invoking pnpm", async () => {
   await withTestRoot(async (owner) => {
     const fakePnpm = await createFakePnpmExecutable(owner);
 
-    for (const lockfileMode of [
-      "missing",
-      "changed-source",
-      "extra-source",
-      "symlink",
+    for (const scenario of [
+      {
+        name: "regular-lockfile",
+        create: (path) => writeFile(path, "keep-lockfile\n"),
+      },
+      { name: "directory-lockfile", create: (path) => mkdir(path) },
+      {
+        name: "symlink-lockfile",
+        create: (path) => symlink("package.json", path),
+      },
     ]) {
-      await fakePnpm.configure({ lockfileMode });
-      const source = await createVerifierSource(owner, lockfileMode);
+      const source = await createVerifierSource(owner, scenario.name);
+      await scenario.create(join(source, "pnpm-lock.yaml"));
       const verifier = core.createPnpmGeneratedProjectVerifier({
         pnpmExecutable: fakePnpm.executable,
       });
@@ -421,6 +491,7 @@ test("the pnpm verifier rejects lockfile mutations and non-regular lockfiles", a
         await verifier.prepareLockfile(source),
         "LOCKFILE_PREPARATION_FAILED",
       );
+      assert.deepEqual(await fakePnpm.readCalls(), []);
       assert.equal(await exists(source), true);
     }
   });
@@ -429,24 +500,21 @@ test("the pnpm verifier rejects lockfile mutations and non-regular lockfiles", a
 test("the pnpm verifier maps command failures without child output", async () => {
   await withTestRoot(async (owner) => {
     const cases = [
-      ["--version", "PNPM_VERSION_INVALID", "prepare"],
-      [
-        "install --lockfile-only --ignore-scripts --store-dir ignored",
-        "LOCKFILE_PREPARATION_FAILED",
-        "prepare-prefix",
-      ],
+      ["--version", "PNPM_VERSION_INVALID", "exact"],
       [
         "install --frozen-lockfile --store-dir ignored",
         "FROZEN_INSTALL_FAILED",
-        "verify-prefix",
+        "prefix",
       ],
-      ["run lint", "LINT_FAILED", "verify"],
-      ["run typecheck", "TYPECHECK_FAILED", "verify"],
-      ["run build", "NEXT_BUILD_FAILED", "verify"],
-      ["run build:cloudflare", "OPENNEXT_BUILD_FAILED", "verify"],
+      ["run lint", "LINT_FAILED", "exact"],
+      ["run typecheck", "TYPECHECK_FAILED", "exact"],
+      ["run test:unit", "UNIT_TESTS_FAILED", "exact"],
+      ["run test:component", "COMPONENT_TESTS_FAILED", "exact"],
+      ["run build", "NEXT_BUILD_FAILED", "exact"],
+      ["run build:cloudflare", "OPENNEXT_BUILD_FAILED", "exact"],
     ];
 
-    for (const [operation, code, stage] of cases) {
+    for (const [operation, code, match] of cases) {
       const caseOwner = await mkdtemp(join(owner, "failure-case-"));
       const fakePnpm = await createFakePnpmExecutable(caseOwner);
       const source = await createVerifierSource(caseOwner);
@@ -454,21 +522,14 @@ test("the pnpm verifier maps command failures without child output", async () =>
         pnpmExecutable: fakePnpm.executable,
       });
 
-      if (stage.startsWith("verify")) {
-        await writeFile(
-          join(source, "pnpm-lock.yaml"),
-          "lockfileVersion: '9.0'\n",
-        );
-      }
-      if (stage.endsWith("prefix")) {
+      assertSuccess(await verifier.prepareLockfile(source));
+      if (match === "prefix") {
         await fakePnpm.configure({ failureOperationPrefix: operation.split(" ignored")[0] });
       } else {
         await fakePnpm.configure({ failureOperation: operation });
       }
 
-      const result = stage.startsWith("verify")
-        ? await verifier.verifyInIsolatedCopy(source)
-        : await verifier.prepareLockfile(source);
+      const result = await verifier.verifyInIsolatedCopy(source);
       assertFailure(result, code);
       assert.doesNotMatch(JSON.stringify(result.issues), /sensitive-output|sensitive-error/);
       assert.equal(await exists(source), true);
@@ -477,26 +538,26 @@ test("the pnpm verifier maps command failures without child output", async () =>
     const overflowOwner = await mkdtemp(join(owner, "overflow-case-"));
     const overflowPnpm = await createFakePnpmExecutable(overflowOwner);
     const overflowSource = await createVerifierSource(overflowOwner);
+    const overflowVerifier = core.createPnpmGeneratedProjectVerifier({
+      pnpmExecutable: overflowPnpm.executable,
+    });
+    assertSuccess(await overflowVerifier.prepareLockfile(overflowSource));
     await overflowPnpm.configure({ overflowOperation: "--version" });
     assertFailure(
-      await core
-        .createPnpmGeneratedProjectVerifier({
-          pnpmExecutable: overflowPnpm.executable,
-        })
-        .prepareLockfile(overflowSource),
+      await overflowVerifier.verifyInIsolatedCopy(overflowSource),
       "PNPM_VERSION_INVALID",
     );
 
     const versionOwner = await mkdtemp(join(owner, "version-case-"));
     const versionPnpm = await createFakePnpmExecutable(versionOwner);
     const versionSource = await createVerifierSource(versionOwner);
+    const versionVerifier = core.createPnpmGeneratedProjectVerifier({
+      pnpmExecutable: versionPnpm.executable,
+    });
+    assertSuccess(await versionVerifier.prepareLockfile(versionSource));
     await versionPnpm.configure({ version: "11.19.0" });
     assertFailure(
-      await core
-        .createPnpmGeneratedProjectVerifier({
-          pnpmExecutable: versionPnpm.executable,
-        })
-        .prepareLockfile(versionSource),
+      await versionVerifier.verifyInIsolatedCopy(versionSource),
       "PNPM_VERSION_INVALID",
     );
   });
@@ -547,10 +608,10 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
-      assert.equal(generated.state.origin.recipeVersion, "0.6.0");
+      assert.equal(generated.state.origin.recipeVersion, "0.7.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 78 : 80,
+        profile === "portfolio" ? 95 : 97,
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -562,7 +623,7 @@ test("portfolio and site generation writes exact state-last repositories", async
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "standards",
         )?.version,
-        "0.2.0",
+        "0.3.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -663,6 +724,45 @@ test("portfolio and site generation writes exact state-last repositories", async
       assert.equal(
         webManifest.devDependencies["@playwright/test"],
         "1.62.1",
+      );
+      assert.deepEqual(
+        Object.fromEntries(
+          Object.entries(webManifest.devDependencies).filter(([name]) =>
+            [
+              "@testing-library/dom",
+              "@testing-library/jest-dom",
+              "@testing-library/react",
+              "@testing-library/user-event",
+              "@vitejs/plugin-react",
+              "jsdom",
+              "vitest",
+            ].includes(name),
+          ),
+        ),
+        {
+          "@testing-library/dom": "10.4.1",
+          "@testing-library/jest-dom": "7.0.1",
+          "@testing-library/react": "16.3.2",
+          "@testing-library/user-event": "14.6.3",
+          "@vitejs/plugin-react": "6.0.5",
+          jsdom: "30.0.1",
+          vitest: "4.1.10",
+        },
+      );
+      assert.deepEqual(
+        Object.fromEntries(
+          Object.entries(webManifest.scripts).filter(([name]) =>
+            /^test(?::(?:component|unit))?(?::watch)?$/u.test(name),
+          ),
+        ),
+        {
+          test: "vitest run",
+          "test:component": "vitest run --project component",
+          "test:component:watch": "vitest --project component",
+          "test:unit": "vitest run --project unit",
+          "test:unit:watch": "vitest --project unit",
+          "test:watch": "vitest",
+        },
       );
       assert.deepEqual(
         Object.fromEntries(
@@ -793,7 +893,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
       accepted.state.installedCapabilities,
       core.createInstalledManifest(resolved),
     );
-    assert.equal(accepted.state.managedSurfaces.length, 83);
+    assert.equal(accepted.state.managedSurfaces.length, 100);
     assert.equal(
       accepted.state.managedSurfaces.filter(
         ({ owner }) =>

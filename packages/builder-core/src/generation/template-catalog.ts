@@ -43,7 +43,11 @@ const commonTemplateSources = [
   "common/apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "common/apps/web/src/presentation/content-page.tsx",
   "common/apps/web/src/sections/section-registry.tsx",
+  "common/apps/web/tests/component/content-page.test.tsx",
   "common/apps/web/tests/e2e/site-quality.spec.ts",
+  "common/apps/web/tests/setup/component.ts",
+  "common/apps/web/tests/unit/content-schema.test.ts",
+  "common/apps/web/vitest.config.ts",
 ] as const;
 
 const portfolioTemplateSources = [

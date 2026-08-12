@@ -54,7 +54,33 @@ export const installedSurfaceSchema = z
   .superRefine(addMergeTargetIssue)
   .readonly();
 
-const verificationChecksSchema = z
+const legacyVerificationChecks = [
+  "contracts",
+  "pre-state-inference",
+  "lockfile",
+  "frozen-install",
+  "lint",
+  "typecheck",
+  "next-build",
+  "opennext-build",
+  "post-state-inference",
+] as const;
+
+const currentVerificationChecks = [
+  "contracts",
+  "pre-state-inference",
+  "lockfile",
+  "frozen-install",
+  "lint",
+  "typecheck",
+  "unit-tests",
+  "component-tests",
+  "next-build",
+  "opennext-build",
+  "post-state-inference",
+] as const;
+
+const legacyVerificationChecksSchema = z
   .tuple([
     z.literal("contracts"),
     z.literal("pre-state-inference"),
@@ -67,6 +93,36 @@ const verificationChecksSchema = z
     z.literal("post-state-inference"),
   ])
   .readonly();
+
+const currentVerificationChecksSchema = z
+  .tuple([
+    z.literal("contracts"),
+    z.literal("pre-state-inference"),
+    z.literal("lockfile"),
+    z.literal("frozen-install"),
+    z.literal("lint"),
+    z.literal("typecheck"),
+    z.literal("unit-tests"),
+    z.literal("component-tests"),
+    z.literal("next-build"),
+    z.literal("opennext-build"),
+    z.literal("post-state-inference"),
+  ])
+  .readonly();
+
+const verificationChecksSchema = z
+  .union([legacyVerificationChecksSchema, currentVerificationChecksSchema])
+  .readonly();
+
+function hasExactChecks(
+  actualChecks: readonly string[],
+  expectedChecks: readonly string[],
+): boolean {
+  return (
+    actualChecks.length === expectedChecks.length &&
+    actualChecks.every((check, index) => check === expectedChecks[index])
+  );
+}
 
 export const installedStateSchema = z
   .strictObject({
@@ -102,6 +158,20 @@ export const installedStateSchema = z
         checks: verificationChecksSchema,
       })
       .readonly(),
+  })
+  .superRefine((state, context) => {
+    const expectedChecks =
+      state.origin.recipeVersion === "0.7.0"
+        ? currentVerificationChecks
+        : legacyVerificationChecks;
+
+    if (!hasExactChecks(state.lastSuccessfulVerification.checks, expectedChecks)) {
+      context.addIssue({
+        code: "custom",
+        message: "verification checks must match the originating recipe version",
+        path: ["lastSuccessfulVerification", "checks"],
+      });
+    }
   })
   .readonly()
   .meta({

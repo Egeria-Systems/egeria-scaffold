@@ -33,8 +33,15 @@ function sortJsonValue(value: unknown): JsonValue {
     return value.map(sortJsonValue);
   }
 
+  const objectValue = value as Readonly<Record<string, unknown>>;
+  const prefixItems = objectValue.prefixItems;
+  const tupleBounds =
+    Array.isArray(prefixItems) && !("items" in objectValue)
+      ? { minItems: prefixItems.length, maxItems: prefixItems.length }
+      : {};
+
   return Object.fromEntries(
-    Object.entries(value as Readonly<Record<string, unknown>>)
+    Object.entries({ ...objectValue, ...tupleBounds })
       .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
       .map(([key, nestedValue]) => [key, sortJsonValue(nestedValue)]),
   );

@@ -167,7 +167,7 @@ test("public portfolio and site projects install, build, audit, and infer", asyn
       );
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 78 : 80,
+        profile === "portfolio" ? 95 : 97,
       );
 
       const lockfile = await readFile(join(destination, "pnpm-lock.yaml"));

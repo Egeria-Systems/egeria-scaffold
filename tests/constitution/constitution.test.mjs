@@ -184,6 +184,292 @@ test("the root workspace remains private and pins the compatibility-proof toolch
   );
 });
 
+test("each authored code context names its test runner, command, and evidence boundary", async () => {
+  const contracts = [
+    {
+      path: "AGENTS.md",
+      required: [
+        /node --test/u,
+        /Vitest/u,
+        /Playwright/u,
+        /createTestHarness\(\)/u,
+        /fast-check/u,
+        /Workers Vitest/u,
+        /test:capability-certification/u,
+      ],
+    },
+    {
+      path: "apps/cli/AGENTS.md",
+      required: [/node --test/u, /pnpm run test:cli/u, /subprocess/iu],
+    },
+    {
+      path: "packages/builder-core/AGENTS.md",
+      required: [
+        /node --test/u,
+        /pnpm run test:builder-core/u,
+        /test:generated-project/u,
+        /test:unit.*test:component/su,
+        /fast-check/u,
+      ],
+    },
+    {
+      path: "packages/standards/AGENTS.md",
+      required: [
+        /node --test/u,
+        /@egeria-systems\/standards run test/u,
+        /public Vitest preset/u,
+      ],
+    },
+    {
+      path: "packages/observability/AGENTS.md",
+      required: [
+        /node --test/u,
+        /@egeria-systems\/observability run test/u,
+        /redaction/u,
+        /failure/iu,
+      ],
+    },
+    {
+      path: "proofs/nextjs-cloudflare/AGENTS.md",
+      required: [
+        /test:unit/u,
+        /createTestHarness\(\)/u,
+        /test:e2e:dev/u,
+        /test:e2e:preview/u,
+        /product architecture/u,
+      ],
+    },
+    {
+      path: "packages/builder-core/templates/common/AGENTS.md.template",
+      required: [
+        /pnpm run test:unit/u,
+        /pnpm run test:component/u,
+        /pnpm --dir apps\/web run test:e2e:dev/u,
+        /pnpm --dir apps\/web run test:e2e:preview/u,
+      ],
+    },
+    {
+      path: "packages/builder-core/templates/common/apps/web/AGENTS.md.template",
+      required: [
+        /getByRole/u,
+        /userEvent/u,
+        /cleanup/u,
+        /jsdom/u,
+        /broad snapshots/u,
+        /WCAG conformance/u,
+        /Workers Vitest/u,
+      ],
+    },
+  ];
+
+  for (const contract of contracts) {
+    const source = await readFile(resolve(repositoryRoot, contract.path), "utf8");
+    for (const requirement of contract.required) {
+      assert.match(source, requirement, contract.path);
+    }
+  }
+});
+
+test("ordinary repository CI keeps core checks always-on and scopes deep checks to owned inputs", async () => {
+  const workflowPaths = {
+    repository: ".github/workflows/repository-quality.yml",
+    generated: ".github/workflows/generated-project-quality.yml",
+    compatibility: ".github/workflows/compatibility-proof-quality.yml",
+  };
+  const sources = Object.fromEntries(
+    await Promise.all(
+      Object.entries(workflowPaths).map(async ([identifier, path]) => [
+        identifier,
+        await readRepositoryFile(path),
+      ]),
+    ),
+  );
+  const workflows = Object.fromEntries(
+    Object.entries(sources).map(([identifier, source]) => [
+      identifier,
+      parse(source),
+    ]),
+  );
+  const expectedGeneratedPaths = [
+    ".github/workflows/generated-project-quality.yml",
+    ".gitattributes",
+    ".npmrc",
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "apps/cli/**",
+    "packages/builder-core/**",
+    "packages/observability/**",
+    "packages/standards/**",
+    "fixtures/generated/**",
+    "scripts/verify-generated-skeletons.mjs",
+    "tests/generated-fixtures/**",
+  ];
+  const expectedCompatibilityPaths = [
+    ".github/workflows/compatibility-proof-quality.yml",
+    ".npmrc",
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "packages/standards/**",
+    "proofs/nextjs-cloudflare/**",
+  ];
+
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(workflows).map(([identifier, workflow]) => [
+        identifier,
+        workflow.name,
+      ]),
+    ),
+    {
+      repository: "Repository quality",
+      generated: "Generated project quality",
+      compatibility: "Compatibility proof quality",
+    },
+  );
+  assert.deepEqual(workflows.repository.on, {
+    pull_request: null,
+    push: { branches: ["main"] },
+  });
+  for (const [workflow, expectedPaths] of [
+    [workflows.generated, expectedGeneratedPaths],
+    [workflows.compatibility, expectedCompatibilityPaths],
+  ]) {
+    assert.deepEqual(workflow.on, {
+      pull_request: { paths: expectedPaths },
+      push: { branches: ["main"], paths: expectedPaths },
+    });
+  }
+  assert.deepEqual(Object.keys(workflows.repository.jobs), [
+    "builder-and-packages",
+  ]);
+  assert.deepEqual(Object.keys(workflows.generated.jobs), ["generated-projects"]);
+  assert.deepEqual(Object.keys(workflows.compatibility.jobs), [
+    "compatibility-proof",
+  ]);
+
+  const commandsByWorkflow = Object.fromEntries(
+    Object.entries(workflows).map(([identifier, workflow]) => [
+      identifier,
+      Object.values(workflow.jobs)
+        .flatMap(({ steps }) => steps)
+        .flatMap(({ run }) => (typeof run === "string" ? [run] : [])),
+    ]),
+  );
+  const commands = Object.values(commandsByWorkflow).flat().join("\n");
+  const repositoryCommands = commandsByWorkflow.repository.join("\n");
+  const generatedCommands = commandsByWorkflow.generated.join("\n");
+  const compatibilityCommands = commandsByWorkflow.compatibility.join("\n");
+  for (const command of [
+    "pnpm run test:constitution",
+    "pnpm run check:semantic-naming",
+    "pnpm run test:package-boundaries",
+    "pnpm run test:builder-core",
+    "pnpm run test:cli",
+    "pnpm run test:packages",
+    "pnpm run test:capability-certification",
+    "pnpm run check:capability-certification",
+  ]) {
+    assert.match(
+      repositoryCommands,
+      new RegExp(command.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"),
+    );
+  }
+  assert.doesNotMatch(
+    repositoryCommands,
+    /test:generated-fixtures|verify:generated-skeletons|nextjs-cloudflare-proof/u,
+  );
+  for (const command of [
+    "pnpm run test:generated-fixtures",
+    "pnpm run verify:generated-skeletons",
+  ]) {
+    assert.match(
+      generatedCommands,
+      new RegExp(command.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"),
+    );
+  }
+  for (const command of [
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run lint",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run typecheck",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:unit",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run build",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run build:cloudflare",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run cf-typegen:check",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:integration:cloudflare",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec playwright install --with-deps chromium",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:e2e:dev",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:e2e:preview",
+  ]) {
+    assert.match(
+      compatibilityCommands,
+      new RegExp(command.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"),
+    );
+  }
+
+  assert.doesNotMatch(commands, /\bdeploy\b|\bpublish\b|npm publish|wrangler deploy/iu);
+  for (const [identifier, source] of Object.entries(sources)) {
+    assert.deepEqual(workflows[identifier].permissions, { contents: "read" });
+    assert.doesNotMatch(
+      source,
+      /\bsecrets\b|id-token:\s*write|environment:/iu,
+      workflowPaths[identifier],
+    );
+  }
+
+  const builderSteps = workflows.repository.jobs["builder-and-packages"].steps;
+  const buildIndex = builderSteps.findIndex(
+    ({ run }) => run === "pnpm run build:builder",
+  );
+  const packageTestIndex = builderSteps.findIndex(
+    ({ run }) => run === "pnpm run test:packages",
+  );
+  assert.ok(buildIndex >= 0 && buildIndex < packageTestIndex);
+  assert.equal(
+    builderSteps.find(({ name }) => name === "Check release intent")?.run,
+    "pnpm exec changeset status --since origin/main",
+  );
+
+  const rootManifest = JSON.parse(await readRepositoryFile("package.json"));
+  const kernelCommands = rootManifest.scripts["verify:builder-kernel"].split(" && ");
+  assert.ok(
+    kernelCommands.indexOf("pnpm run build:builder") <
+      kernelCommands.indexOf("pnpm run test:packages"),
+  );
+
+  for (const workflow of Object.values(workflows)) {
+    for (const job of Object.values(workflow.jobs)) {
+      assert.equal(job["runs-on"], "ubuntu-24.04");
+      assert.equal(typeof job["timeout-minutes"], "number");
+      const checkout = job.steps.find(({ uses }) =>
+        uses?.startsWith("actions/checkout@"),
+      );
+      const setup = job.steps.find(({ uses }) =>
+        uses?.startsWith("pnpm/setup@"),
+      );
+      assert.equal(
+        checkout?.uses,
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      );
+      assert.equal(checkout?.with?.["persist-credentials"], false);
+      assert.equal(
+        setup?.uses,
+        "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
+      );
+    }
+  }
+  const builderCheckout = workflows.repository.jobs["builder-and-packages"].steps.find(
+    ({ uses }) => uses?.startsWith("actions/checkout@"),
+  );
+  assert.equal(builderCheckout?.with?.["fetch-depth"], 0);
+
+  const bookingWorkflow = await readFile(
+    resolve(repositoryRoot, ".github/workflows/booking-calendly-certification.yml"),
+    "utf8",
+  );
+  assert.match(bookingWorkflow, /run test:unit[\s\S]+run test:component[\s\S]+Deploy certification Worker/u);
+});
+
 test("the workspace declares the approved proof root and install policy", async () => {
   const workspace = await readRepositoryFile("pnpm-workspace.yaml");
 
@@ -372,7 +658,7 @@ test("package ownership documentation records the approved release boundary", as
   );
   assert.match(
     enforcementMap,
-    /INV-ACCESSIBILITY-AUTOMATION[^\n]+all three retained fixtures pass local development and workerd Playwright\/axe/i,
+    /INV-ACCESSIBILITY-AUTOMATION[^\n]+all three current retained fixtures pass local development and workerd Playwright\/axe checks[^\n]+any conformance claim remain separate/i,
   );
   assert.match(
     enforcementMap,
@@ -743,12 +1029,12 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     CALENDLY_URL: "${{ inputs.calendly_url }}",
     CERTIFICATION_ROOT: certificationRoot,
   });
-  assert.deepEqual(stepsByName["Prepare deployment candidate"].env, {
+  assert.deepEqual(stepsByName["Build and prepare deployment candidate"].env, {
     CERTIFICATION_ROOT: certificationRoot,
   });
   assert.equal(
     stepsByName["Check out repository"].uses,
-    "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+    "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
   );
   assert.deepEqual(stepsByName["Check out repository"].with, {
     "fetch-depth": 0,
@@ -757,7 +1043,7 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   });
   assert.equal(
     stepsByName["Set up pnpm and Node.js"].uses,
-    "pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c",
+    "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
   );
   assert.deepEqual(stepsByName["Set up pnpm and Node.js"].with, {
     version: "11.20.0",
@@ -780,10 +1066,25 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   const deployIndex = job.steps.findIndex(
     ({ name }) => name === "Deploy certification Worker",
   );
+  const unitTestIndex = job.steps.findIndex(
+    ({ name }) => name === "Test deployment candidate unit behavior",
+  );
+  const componentTestIndex = job.steps.findIndex(
+    ({ name }) => name === "Test deployment candidate component behavior",
+  );
+  const buildIndex = job.steps.findIndex(
+    ({ name }) => name === "Build and prepare deployment candidate",
+  );
   const deployedTestIndex = job.steps.findIndex(
     ({ name }) => name === "Test deployed application behavior",
   );
-  assert.ok(revisionIndex > -1 && revisionIndex < deployIndex);
+  assert.ok(
+    revisionIndex > -1 &&
+      revisionIndex < unitTestIndex &&
+      unitTestIndex < componentTestIndex &&
+      componentTestIndex < buildIndex &&
+      buildIndex < deployIndex,
+  );
   assert.ok(deployIndex < deployedTestIndex);
   assert.deepEqual(stepsByName["Deploy certification Worker"].env, {
     CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
@@ -2140,7 +2441,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+five unchanged subjects[^\n]+backfill-pending[^\n]+observability@0\.2\.0[^\n]+pending/i,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+four unchanged subjects[^\n]+backfill-pending[^\n]+observability@0\.2\.0[^\n]+standards@0\.3\.0[^\n]+pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2388,10 +2689,20 @@ test("executable capability certification ownership is current", async () => {
   }
 });
 
-test("future execution plans enforce their direct predecessor before implementation", async () => {
-  const [reviewProtocol, implementationPlan, certificationPlan] =
+test("execution plans enforce direct predecessors and bounded independent-work exceptions", async () => {
+  const [
+    reviewProtocol,
+    sourcePlan,
+    roadmap,
+    implementationPlan,
+    certificationPlan,
+  ] =
     await Promise.all([
       readRepositoryFile("docs/governance/review-and-contribution.md"),
+      readRepositoryFile(
+        "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+      ),
+      readRepositoryFile("docs/roadmaps/program-roadmap.md"),
       readRepositoryFile(
         "docs/superpowers/plans/2026-08-10-generated-unit-component-testing.md",
       ),
@@ -2400,7 +2711,8 @@ test("future execution plans enforce their direct predecessor before implementat
       ),
     ]);
   const implementationTask = namedLabel("Task", "6C");
-  const implementationPredecessor = namedLabel("Task", "6B");
+  const implementationPredecessor = namedLabel("Task", "6");
+  const independentStream = namedLabel("Task", "6B");
   const certificationTask = namedLabel("Task", "6D");
   const portfolioPhase = compactLabel("P", "2");
 
@@ -2421,25 +2733,90 @@ test("future execution plans enforce their direct predecessor before implementat
     reviewProtocol,
     /never infer[^.]+incrementing[^.]+number/iu,
   );
+  assert.match(
+    reviewProtocol,
+    /bounded independent-work exception[^.]+explicit human approval[^.]+plan amendment/iu,
+  );
+  assert.match(
+    reviewProtocol,
+    /exact base and isolated worktree[^.]+non-overlapping scope[^.]+state that must remain unchanged[^.]+reconciliation boundary/iu,
+  );
+  assert.match(
+    reviewProtocol,
+    /does not approve[^.]+waive[^.]+final-diff gate[^.]+external mutation/iu,
+  );
+
+  assert.match(sourcePlan, /2026-08-11[^.]+independent-work exception/iu);
+  assert.match(
+    sourcePlan,
+    /main@f4f682d4c711dc86a0158ab7f05393d5c33f0160/iu,
+  );
+  assert.match(
+    sourcePlan,
+    new RegExp(
+      `${escapeRegularExpression(implementationPredecessor)}[^.]+direct predecessor|accepted ${escapeRegularExpression(implementationPredecessor)}`,
+      "iu",
+    ),
+  );
+  assert.match(
+    sourcePlan,
+    new RegExp(
+      `${escapeRegularExpression(independentStream)}[^.]+pending[^.]+unchanged|preserve(?:s)? ${escapeRegularExpression(independentStream)}'s pending`,
+      "iu",
+    ),
+  );
+  assert.match(sourcePlan, /reconciliation[^.]+separate review/iu);
+
+  assert.match(roadmap, /2026-08-11[^.]+independent-work exception/iu);
+  assert.match(
+    roadmap,
+    /reconciled with `main@2a315aa0e7dce1bf1048b9a2c07e318add9241de`/iu,
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${escapeRegularExpression(implementationPredecessor)}'s exact implementation diff[\\s\\S]+implementation task is complete`,
+      "iu",
+    ),
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `(?:${escapeRegularExpression(portfolioPhase)} )?${escapeRegularExpression(independentStream)} is the separate[\\s\\S]+?certification increment`,
+      "iu",
+    ),
+  );
+  assert.match(
+    roadmap,
+    /protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, deployment, publication, and production remain separate/iu,
+  );
+  assert.match(
+    roadmap,
+    /Within those separate capability-certification tasks, protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, merge, and push remain unauthorized/iu,
+  );
 
   assert.match(
     implementationPlan,
     new RegExp(
-      `\\*\\*Direct predecessor:\\*\\* ${portfolioPhase} ${escapeRegularExpression(implementationPredecessor)} production-observability certification`,
+      `\\*\\*Direct predecessor under the approved independent-work exception:\\*\\* ${portfolioPhase} ${escapeRegularExpression(implementationPredecessor)} production-observability implementation`,
       "u",
     ),
   );
   assert.match(
     implementationPlan,
-    /approved exact committed comparison[^.]+merge-base --is-ancestor[^.]+ HEAD/iu,
+    /approved exact committed comparison[^.]+45b57d2dc265ef6ba9ac805d7352a01db5f1081d[^.]+ancestor of `HEAD`/iu,
   );
   assert.match(
     implementationPlan,
-    /check-capability-certification\.mjs --closure legacy-backfill-exempt/u,
+    /pnpm run check:capability-certification/u,
   );
   assert.match(
     implementationPlan,
-    /`observability`[^.]+`certified`[^.]+evidence revisions[^.]+ancestors of `HEAD`/iu,
+    /`observability@0\.2\.0` record[^.]+`pending` subject/iu,
+  );
+  assert.match(
+    implementationPlan,
+    /unexpected observability status[^.]+hard stop/iu,
   );
 
   assert.match(
@@ -2530,7 +2907,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   const calendlyTask = namedLabel("Task", "5");
   const calendlyCertificationTask = namedLabel("Task", "5B");
   const observabilityTask = namedLabel("Task", "6");
-  const observabilityCertificationTask = namedLabel("Task", "6B");
+  const generatedTestingTask = namedLabel("Task", "6C");
 
   assert.deepEqual(
     {
@@ -2541,7 +2918,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     {
       fixtures: "node --test tests/generated-fixtures/*.test.mjs",
       kernel:
-        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:capability-certification && pnpm run check:capability-certification && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run build:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run changeset:status",
+        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages && pnpm run test:capability-certification && pnpm run check:capability-certification && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run changeset:status",
       skeletons: "node scripts/verify-generated-skeletons.mjs",
     },
   );
@@ -2609,9 +2986,44 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         escapeRegularExpression(calendlyCertificationTask) +
         "'s bounded provider certification evidence is complete[\\s\\S]+" +
         escapeRegularExpression(observabilityTask) +
-        "'s exact implementation diff `717c3bb0f048f4a4bc544100125ae42d818f09bc\\.\\.45b57d2dc265ef6ba9ac805d7352a01db5f1081d` is approved and the implementation task is complete[\\s\\S]+" +
-        escapeRegularExpression(observabilityCertificationTask) +
-        " local certification work is authorized and in progress with reviewed local fresh-scaffold evidence[\\s\\S]+Protected-staging, provider/source, credentials, telemetry transmission, cleanup, registry transition, merge, and push remain separately unauthorized[\\s\\S]+develops directly on clean local `main`",
+        "'s exact implementation diff `717c3bb0f048f4a4bc544100125ae42d818f09bc\\.\\.45b57d2dc265ef6ba9ac805d7352a01db5f1081d` is approved and the implementation task is complete",
+    ),
+  );
+  assert.match(
+    roadmap,
+    /The observability capability retains reviewed local fresh-scaffold evidence[^.]+certification outcomes remain separate/iu,
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `Under the explicit 2026-08-11 independent-work exception, ${escapeRegularExpression(generatedTestingTask)} has an independently reviewed implementation candidate on merge request 2, reconciled with \`main@2a315aa0e7dce1bf1048b9a2c07e318add9241de\``,
+      "u",
+    ),
+  );
+  assert.match(
+    roadmap,
+    /Content candidate `93e4e9f6ea944329de7c47c9e8bf34382774b1f8` passed local verification and all three applicable hosted workflows/iu,
+  );
+  assert.match(
+    roadmap,
+    /always-on read-only builder\/package workflow and the path-scoped generated-project and compatibility-proof workflows passed hosted runs `31583624246`, `31583624387`, and `31583624223`/iu,
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${escapeRegularExpression(generatedTestingTask)} awaits verified-final-diff approval and one eligible repository approval`,
+      "u",
+    ),
+  );
+  assert.match(
+    roadmap,
+    /Protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, deployment, publication, and production remain separate/iu,
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${escapeRegularExpression(generatedTestingTask)} remains on its approved isolated merge-request branch/worktree and has reconciled accepted \`main@2a315aa0e7dce1bf1048b9a2c07e318add9241de\``,
+      "u",
     ),
   );
   assert.match(
