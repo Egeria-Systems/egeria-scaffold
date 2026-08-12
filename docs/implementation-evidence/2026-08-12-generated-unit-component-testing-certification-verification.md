@@ -2,9 +2,13 @@
 
 **Date:** 2026-08-12 (America/Toronto)
 
-**Status:** All eight approved local certification outcomes passed for the exact standards subject
+**Status:** All eight approved local certification outcomes passed for the exact standards subject; the candidate is reconciled with accepted `main`
 
 **Planning base:** `12ecc73a8337ab12ece9dd3a6b2aec03f940383c`
+
+**Accepted main revision:** `2f45129e73b7fec9f353fb9c37314e190b5048a2`
+
+**Reconciliation merge:** `f9b6067951c8360b20d34e08f9ac2df4765f314e`
 
 **Certification capability:** `standards`
 
@@ -62,6 +66,25 @@ The bounded retained-fixture result was:
 The first direct unit/component commands were launched concurrently before the retained fresh project had dependencies. They began competing sandboxed installs and could not resolve the registry. Only those temporary-project processes were stopped; a single frozen install followed by sequential unit and component commands produced the recorded evidence.
 
 The first retained-fixture invocation lost its session handle, and the duplicate retry ran without network authority. Both invalid process trees were stopped, their exact mode-0700 temporary owners were verified and removed, and neither attempt was counted. The one registry-enabled retained-fixture run above is the recorded result. No generated project content was retained.
+
+## Accepted-main reconciliation
+
+After explicit approval of the reviewed certification candidate and authorization to bring current `main` into its branch, `origin/main` was freshly fetched at `2f45129e73b7fec9f353fb9c37314e190b5048a2` and merged into `standards-certification` as `f9b6067951c8360b20d34e08f9ac2df4765f314e`. The merge parents are the reviewed certification artifact `3b930c63d920b3c12c450c9598ff8ca36fdbcc01` and that accepted main revision.
+
+The only path changed by both streams was `tests/constitution/constitution.test.mjs`. Git's clean merge retained the standards certification ownership contract and the newer release-action contract. The candidate-only comparison against accepted main remains the same 21-file certification scope recorded in the review packet; no generated/runtime input, descriptor, recipe, dependency, schema, workflow, or fixture changed.
+
+Fresh reconciliation checks used Node.js `22.23.2`, pnpm `11.20.0`, `CI=true`, and the repository-required `rtk` prefix:
+
+- constitution passed 53 of 53 assertions;
+- package boundaries passed 46 of 46 tests, including the inherited pending-Changeset selection and release-action contracts;
+- capability certification passed 24 of 24 tests;
+- certification admission passed for all seven records;
+- `legacy-backfill-exempt` closure produced the required non-zero rejection for only pending observability;
+- `all-certified` closure produced the required non-zero rejection for pending observability and the four unchanged backfills;
+- semantic naming and both reconciliation/full-range diff checks passed; and
+- the clean worktree contained no conflict markers or uncommitted changes.
+
+The expensive generated-project matrix was not repeated because reconciliation changed none of its source, dependency, schema, workflow, or fixture inputs. One bounded read-only final reviewer verified the parent identities, candidate-only and main-only preservation, the shared constitution merge, and an empty remerge diff, then reported: `No material improvements recommended.`
 
 ## Claim limits and recovery
 

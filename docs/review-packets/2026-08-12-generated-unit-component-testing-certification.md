@@ -2,11 +2,17 @@
 
 **Date:** 2026-08-12 (America/Toronto)
 
-**Status:** Task 6D implementation, evidence, registry transition, and independent review are complete; awaiting explicit verified-final-diff approval
+**Status:** Task 6D implementation, evidence, registry transition, independent review, and accepted-main reconciliation are complete; awaiting explicit approval of the reconciled final comparison
 
-**Base:** `12ecc73a8337ab12ece9dd3a6b2aec03f940383c`
+**Accepted main base:** `2f45129e73b7fec9f353fb9c37314e190b5048a2`
+
+**Original certification base:** `12ecc73a8337ab12ece9dd3a6b2aec03f940383c`
 
 **Reviewed implementation/evidence head:** `c77e491857f2aeba1f0b8769ca9ad85375e61716`
+
+**Reviewed artifact head before reconciliation:** `3b930c63d920b3c12c450c9598ff8ca36fdbcc01`
+
+**Accepted-main reconciliation merge:** `f9b6067951c8360b20d34e08f9ac2df4765f314e`
 
 **Branch:** `standards-certification`
 
@@ -86,6 +92,16 @@ No capability descriptor, recipe, dependency version, schema, generated applicat
 | Independent subject recomputation | Exact version/digest match |
 
 The successful fixed-root verifier was not repeated after receipt, documentation, or exact-check-validator changes because no generated/runtime input changed. Its exact source-producing revision and result remain recorded in the verification evidence.
+
+## Accepted-main reconciliation
+
+The user approved the original certification candidate and authorized current `main` to be brought into `standards-certification`. A fresh fetch resolved accepted `origin/main` to `2f45129e73b7fec9f353fb9c37314e190b5048a2`. Merge commit `f9b6067951c8360b20d34e08f9ac2df4765f314e` preserves that revision as its second parent and the reviewed artifact `3b930c63d920b3c12c450c9598ff8ca36fdbcc01` as its first parent.
+
+Only `tests/constitution/constitution.test.mjs` changed in both streams. The clean automatic merge retained the standards certification assertions and current main's release-action assertions. Against accepted main, the branch still changes exactly the 21 certification files listed above; inherited main-only release files disappear from that comparison.
+
+Fresh post-merge verification passed constitution 53/53, package boundaries 46/46, capability certification 24/24, seven-record admission, semantic naming, and diff integrity. The two closure policies continued to reject exactly the expected pending observability and unchanged backfill records. The generated-project matrix was not repeated because none of its inputs changed.
+
+One bounded read-only final reviewer checked the merge parents, both exclusive path sets, the shared constitution file, and a clean remerge. It reported: `No material improvements recommended.` The final evidence-only commit that updates this packet cannot contain its own future hash; the handoff reports the exact final comparison.
 
 ## Setup-invalid attempts
 
