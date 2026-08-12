@@ -54,8 +54,9 @@ git diff --name-only 2a315aa0e7dce1bf1048b9a2c07e318add9241de...HEAD
 - `99b9d6e` — `docs: record generated testing CI verification`
 - `d829988` — `docs: reconcile generated testing roadmap`
 - `3f4ed20` — `docs: clarify generated testing authority`
+- `8888a8d` — `docs: harden generated testing recovery`
 
-The final documentation-safety commit containing this packet is identified by the exact head at handoff because a commit cannot embed its own immutable object ID.
+The final recovery-evidence closure commit containing this packet is identified by the exact head at handoff because a commit cannot embed its own immutable object ID.
 
 All branch commits contain SSH signatures. Local signature display cannot assign a signer because this checkout has no `gpg.ssh.allowedSignersFile`; GitHub signature status remains the remote policy boundary.
 
@@ -92,7 +93,7 @@ Final material results:
 | Requirements | Exclusive-write TOCTOU finding closed in `e9cb302`; main fingerprint resolution independently confirmed; stale final-evidence finding closed by this dated evidence and packet |
 | Architecture and anti-overengineering | Final review found the canonical roadmap still described one unhosted workflow, then closure review found an unscoped certification-stream merge prohibition and missing topology assertion; the roadmap and its constitution consumer now distinguish current Task 6C authority, the separate certification boundaries, always-on versus path-scoped ownership, the hosted content candidate, and the pending exact-documentary-head boundary; closure re-review follows on the repaired head |
 | Test evidence | Exclusive-write race closed with causal deletion trap; portable cleanup identity, release base, retained Changeset inventory, local suites, and hosted runs are included in the final exact comparison review |
-| Merge-request thread audit | Two unresolved plan-safety findings were validated: portable rename is now explicitly bounded rather than described as hostile-concurrency no-clobber, and source recovery now requires separate authorization and preserves unrelated user work; no GitHub reply or thread-resolution action was taken |
+| Merge-request thread audit | Two unresolved plan-safety findings were validated: portable rename is now explicitly bounded rather than described as hostile-concurrency no-clobber, and the plan, packet, and dated evidence now require separate recovery authorization and preserve unrelated user work; no GitHub reply or thread-resolution action was taken |
 
 Reviewers are read-only and do not recursively fan out. Final exact-head dispositions and any evidence-backed repairs are reported at handoff; this packet does not predeclare their result.
 

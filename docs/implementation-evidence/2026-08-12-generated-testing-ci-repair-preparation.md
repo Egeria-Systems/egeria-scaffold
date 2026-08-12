@@ -61,4 +61,4 @@ The constitution test must execute parsed workflow objects and fail when:
 
 Static parsing proves workflow structure only. Hosted runs after the push must separately prove that every applicable workflow starts, runs its real commands, and passes. No result establishes deployment, provider behavior, production readiness, visual quality, human accessibility, or WCAG conformance.
 
-Source recovery is a focused revert of the CI-scoping commit. It restores the single broad ordinary workflow but requires no provider, deployment, credential, persistent-data, or production recovery.
+If separately authorized, source recovery reverts only the focused CI-scoping commit in the isolated worktree while preserving staged, unstaged, untracked, and unrelated committed user work. It restores the single broad ordinary workflow but requires no provider, deployment, credential, persistent-data, or production recovery.

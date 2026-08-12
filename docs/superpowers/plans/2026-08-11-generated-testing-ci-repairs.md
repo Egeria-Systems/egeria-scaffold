@@ -182,6 +182,7 @@ Commit: `ci: bind release intent to remote main`
 - Describe the always-on and path-scoped ownership, bind hosted evidence to content candidate `93e4e9f6ea944329de7c47c9e8bf34382774b1f8`, and retain pending exact-documentary-head checks and human approval.
 - Change no workflow, generated source, capability, package, state, provider, deployment, or production behavior.
 - Scope the roadmap's still-unauthorized merge/push statement to the separate capability-certification tasks so it does not contradict the conditional Task 6C merge authority.
+- Align the dated repair preparation and verification evidence with the same separately authorized, work-preserving recovery boundary as the final packet.
 
 ## Final review, evidence, and recovery
 

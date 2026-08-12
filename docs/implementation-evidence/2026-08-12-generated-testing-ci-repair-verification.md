@@ -88,8 +88,8 @@ The checked action commits and public advisory queries remain recorded in the [r
 - `standards@0.3.0` and `observability@0.2.0` remain separate pending certification subjects.
 - Path-scoped workflows are not configured as required status contexts. Repository rules must be revalidated before making them required.
 - Registry availability, audits, signatures, dependency installation, and browser installation remain point-in-time external inputs.
-- A documentation-only final artifact commit follows this verified content and receives its own lightweight local checks plus hosted exact-head checks before merge.
+- Documentation-only closure commits following this verified content receive their own lightweight local checks plus hosted exact-head checks before merge.
 
-After integration, source recovery is an ordinary revert of the merge-request integration commit followed by regeneration and `pnpm run verify:builder-kernel`. Before integration, focused repair commits can be reverted newest-first: `93e4e9f`, `24ec499`, `5c4c036`, `e9cb302`, `d5668ab`, `f8af04c`, `bfba450`, and `6f2e558`. Do not revert the `main` reconciliation merely to remove this branch's repairs.
+If separately authorized after integration, source recovery reverts only the merge-request integration commit through ordinary Git history, then regenerates all three fixtures and runs `pnpm run verify:builder-kernel`. Before integration, separately authorized recovery reverts only the focused repair and final-documentary commits named in the review packet, newest-first in the isolated worktree, while preserving staged, unstaged, untracked, and unrelated committed user work. Retain the `main` reconciliation unless independently reverting the already-accepted main work.
 
 No persistent-data, provider, deployment, credential, package-publication, or production recovery applies.
