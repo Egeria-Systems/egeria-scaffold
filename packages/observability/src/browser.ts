@@ -161,16 +161,16 @@ function truncateOptionalText(
     report: OperationalErrorReport,
     value: string | undefined,
   ) => OperationalErrorReport | undefined,
+  minimumFallback: "omit" | "preserve",
 ): OperationalErrorReport | undefined {
   const maximumBytes = utf8ByteLength(value) - 1;
   const minimumCandidate = replace(
     report,
     truncateUtf8(value, minimumBytes).value,
   );
-  if (
-    minimumCandidate === undefined ||
-    envelopeByteLength(minimumCandidate) > maximumBrowserEnvelopeBytes
-  ) {
+  if (minimumCandidate === undefined) return undefined;
+  if (envelopeByteLength(minimumCandidate) > maximumBrowserEnvelopeBytes) {
+    if (minimumFallback === "preserve") return minimumCandidate;
     return replace(report, undefined);
   }
 
@@ -217,6 +217,7 @@ function fitBrowserErrorReport(
       stack,
       minimumStackPrefixBytes(stack),
       replaceDiagnosticStack,
+      "preserve",
     );
     if (stackBounded === undefined) return undefined;
     candidate = stackBounded;
@@ -232,6 +233,7 @@ function fitBrowserErrorReport(
       message,
       utf8ByteLength(exceptionRedactionMarkers.truncated),
       replaceDiagnosticMessage,
+      "omit",
     );
     if (messageBounded === undefined) return undefined;
     candidate = messageBounded;

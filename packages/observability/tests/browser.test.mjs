@@ -332,6 +332,38 @@ test("browser error envelopes remove causes before truncating stacks and message
   );
 });
 
+test("browser error envelopes preserve minimum stack evidence before shrinking the message", () => {
+  const topFrame = `    at render (${"f".repeat(6_200)}:10:2)`;
+  const report = createReport({
+    name: "TypeError",
+    message: "m".repeat(2_048),
+    stack:
+      `TypeError: bounded failure\n${topFrame}\n` +
+      "\u0000".repeat(8_000),
+  });
+  assert.equal(rawErrorEnvelopeSize(report) > 8_192, true);
+
+  const envelope = createBrowserErrorEnvelope(report);
+  assert.equal(envelope.ok, true);
+  assert.equal(
+    envelope.value.report.diagnostics.exceptionStacktrace,
+    `TypeError: bounded failure\n${topFrame}\n[TRUNCATED]`,
+  );
+  assert.match(
+    envelope.value.report.diagnostics.exceptionMessage,
+    /\[TRUNCATED\]$/u,
+  );
+  assert.equal(
+    envelope.value.report.diagnostics.exceptionMessage.length <
+      report.diagnostics.exceptionMessage.length,
+    true,
+  );
+  assert.equal(
+    Buffer.byteLength(JSON.stringify(envelope.value), "utf8") <= 8_192,
+    true,
+  );
+});
+
 test("browser error envelopes enforce exact 8192 and 8193 byte boundaries with escaped multibyte input", () => {
   const exact = createReportWithRawEnvelopeSize(8_192);
   const exactEnvelope = createBrowserErrorEnvelope(exact);
