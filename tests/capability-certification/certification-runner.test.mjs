@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 
 import { certifyBookingCalendlyForTesting } from "../../scripts/certify-booking-calendly.mjs";
+import { certifyGeneratedTestingForTesting } from "../../scripts/certify-generated-testing.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(
@@ -20,6 +21,10 @@ const checkScript = resolve(
 const certificationScript = resolve(
   repositoryRoot,
   "scripts/certify-booking-calendly.mjs",
+);
+const generatedTestingCertificationScript = resolve(
+  repositoryRoot,
+  "scripts/certify-generated-testing.mjs",
 );
 
 const fixedChecks = Object.freeze([
@@ -122,6 +127,164 @@ test("the repository registry admits but remains open for observability and stan
     })}\n`,
     stderr: "",
   });
+});
+
+test("generated testing certification binds a fresh portfolio to the exact standards subject", async () => {
+  const commands = [];
+  let ownedPath;
+  let projectRoot;
+  let verifiedRoot;
+  const previousToken = process.env.NPM_TOKEN;
+  process.env.NPM_TOKEN = "PRIVATE_VALUE";
+
+  try {
+    const result = await certifyGeneratedTestingForTesting({
+      async runCommand(input) {
+        commands.push(input);
+        assert.equal(input.executable, process.execPath);
+        assert.equal(input.environment.NPM_TOKEN, undefined);
+        assert.equal(input.environment.CLOUDFLARE_API_TOKEN, undefined);
+        assert.equal(input.environment.NODE_OPTIONS, undefined);
+        const command = input.arguments[1];
+
+        if (command === "create") {
+          projectRoot = input.arguments[
+            input.arguments.indexOf("--directory") + 1
+          ];
+          ownedPath = dirname(projectRoot);
+          assert.equal((await lstat(ownedPath)).mode & 0o777, 0o700);
+          return `${JSON.stringify({
+            ok: true,
+            command: "create",
+            destination: projectRoot,
+            profile: "portfolio",
+            capabilities: [
+              "standards",
+              "content-files",
+              "section-composition",
+              "deployment-cloudflare",
+              "observability",
+            ],
+          })}\n`;
+        }
+        if (command === "infer") {
+          return `${JSON.stringify({
+            ok: true,
+            command: "infer",
+            result: {
+              state: {
+                kind: "valid",
+                value: {
+                  installedCapabilities: [
+                    { identifier: "standards", version: "0.3.0" },
+                  ],
+                },
+              },
+              capabilities: [
+                { identifier: "standards", category: "confirmed" },
+              ],
+            },
+          })}\n`;
+        }
+        if (command === "doctor") {
+          return `${JSON.stringify({
+            ok: true,
+            command: "doctor",
+            result: { healthy: true, diagnostics: [] },
+          })}\n`;
+        }
+        if (command === "diff") {
+          return `${JSON.stringify({
+            ok: true,
+            command: "diff",
+            result: { equal: true, differences: [] },
+          })}\n`;
+        }
+        throw new Error("unexpected command");
+      },
+      async verifyProject(root, identifier) {
+        verifiedRoot = root;
+        assert.equal(identifier, "portfolio");
+        return {
+          ok: true,
+          fixtures: ["portfolio"],
+          profiles: ["portfolio"],
+          checks: fixedChecks,
+        };
+      },
+    });
+
+    assert.deepEqual(result, {
+      ok: true,
+      capability: "standards",
+      version: "0.3.0",
+      profile: "portfolio",
+      checks: [
+        "compiled-cli-create",
+        "state-inference",
+        "healthy-diagnostics",
+        "exact-diff",
+        ...fixedChecks,
+      ],
+    });
+    assert.deepEqual(
+      commands.map(({ arguments: arguments_ }) => arguments_.slice(1)),
+      [
+        [
+          "create",
+          "--profile",
+          "portfolio",
+          "--name",
+          "acme-portfolio",
+          "--display-name",
+          "Acme Portfolio",
+          "--directory",
+          projectRoot,
+        ],
+        ["infer", "--directory", projectRoot],
+        ["doctor", "--directory", projectRoot],
+        ["diff", "--directory", projectRoot],
+      ],
+    );
+    assert.equal(verifiedRoot, projectRoot);
+    assert.equal(await pathExists(ownedPath), false);
+    assert.doesNotMatch(JSON.stringify(result), /PRIVATE_VALUE/u);
+  } finally {
+    if (previousToken === undefined) {
+      delete process.env.NPM_TOKEN;
+    } else {
+      process.env.NPM_TOKEN = previousToken;
+    }
+  }
+});
+
+test("the generated testing certification entry rejects unknown arguments without echoing them", async () => {
+  let result;
+  try {
+    await execFileAsync(process.execPath, [
+      generatedTestingCertificationScript,
+      "--unknown",
+      "private-value",
+    ], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    });
+    assert.fail("invalid arguments must fail");
+  } catch (error) {
+    result = error;
+  }
+
+  assert.equal(result.code, 2);
+  assert.equal(result.stdout, "");
+  assert.equal(
+    result.stderr,
+    `${JSON.stringify({
+      ok: false,
+      code: "CERTIFICATION_ARGUMENT_INVALID",
+    })}\n`,
+  );
+  assert.doesNotMatch(result.stderr, /private-value/u);
 });
 
 test("the registry command rejects unknown arguments without registry content", async () => {
