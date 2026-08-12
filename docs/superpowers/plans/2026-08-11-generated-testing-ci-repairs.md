@@ -173,6 +173,13 @@ git diff --check
 
 Commit: `ci: bind release intent to remote main`
 
+## Final-review amendment: reconcile the canonical roadmap
+
+- Modify `docs/roadmaps/program-roadmap.md` after architecture review reproduced material drift between its one-unhosted-workflow statement and the implemented three-workflow hosted evidence.
+- Modify the final review packet with the exact finding and closure boundary, and update the constitution test that directly consumes the roadmap's historical and current reconciliation facts.
+- Describe the always-on and path-scoped ownership, bind hosted evidence to content candidate `93e4e9f6ea944329de7c47c9e8bf34382774b1f8`, and retain pending exact-documentary-head checks and human approval.
+- Change no workflow, generated source, capability, package, state, provider, deployment, or production behavior.
+
 ## Final review, evidence, and recovery
 
 After the three increments are separately accepted:

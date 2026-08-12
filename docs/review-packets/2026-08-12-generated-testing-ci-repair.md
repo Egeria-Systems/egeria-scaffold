@@ -85,7 +85,7 @@ Final material results:
 | Review | Disposition |
 | --- | --- |
 | Requirements | Exclusive-write TOCTOU finding closed in `e9cb302`; main fingerprint resolution independently confirmed; stale final-evidence finding closed by this dated evidence and packet |
-| Architecture and anti-overengineering | Legacy receipt repair previously found no remaining defect; final exact documentary comparison is reissued after this packet commits |
+| Architecture and anti-overengineering | Final review found the canonical roadmap still described one unhosted workflow; this direct owner and its constitution consumer now record the three-workflow topology, hosted content candidate, and pending exact-documentary-head boundary; closure re-review follows on the repaired head |
 | Test evidence | Exclusive-write race closed with causal deletion trap; portable cleanup identity, release base, retained Changeset inventory, local suites, and hosted runs are included in the final exact comparison review |
 
 Reviewers are read-only and do not recursively fan out. Final exact-head dispositions and any evidence-backed repairs are reported at handoff; this packet does not predeclare their result.

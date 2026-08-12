@@ -2746,28 +2746,50 @@ test("execution plans enforce direct predecessors and bounded independent-work e
     /does not approve[^.]+waive[^.]+final-diff gate[^.]+external mutation/iu,
   );
 
-  for (const canonicalDocument of [sourcePlan, roadmap]) {
-    assert.match(canonicalDocument, /2026-08-11[^.]+independent-work exception/iu);
-    assert.match(
-      canonicalDocument,
-      /main@f4f682d4c711dc86a0158ab7f05393d5c33f0160/iu,
-    );
-    assert.match(
-      canonicalDocument,
-      new RegExp(
-        `${escapeRegularExpression(implementationPredecessor)}[^.]+direct predecessor|accepted ${escapeRegularExpression(implementationPredecessor)}`,
-        "iu",
-      ),
-    );
-    assert.match(
-      canonicalDocument,
-      new RegExp(
-        `${escapeRegularExpression(independentStream)}[^.]+pending[^.]+unchanged|preserve(?:s)? ${escapeRegularExpression(independentStream)}'s pending`,
-        "iu",
-      ),
-    );
-    assert.match(canonicalDocument, /reconciliation[^.]+separate review/iu);
-  }
+  assert.match(sourcePlan, /2026-08-11[^.]+independent-work exception/iu);
+  assert.match(
+    sourcePlan,
+    /main@f4f682d4c711dc86a0158ab7f05393d5c33f0160/iu,
+  );
+  assert.match(
+    sourcePlan,
+    new RegExp(
+      `${escapeRegularExpression(implementationPredecessor)}[^.]+direct predecessor|accepted ${escapeRegularExpression(implementationPredecessor)}`,
+      "iu",
+    ),
+  );
+  assert.match(
+    sourcePlan,
+    new RegExp(
+      `${escapeRegularExpression(independentStream)}[^.]+pending[^.]+unchanged|preserve(?:s)? ${escapeRegularExpression(independentStream)}'s pending`,
+      "iu",
+    ),
+  );
+  assert.match(sourcePlan, /reconciliation[^.]+separate review/iu);
+
+  assert.match(roadmap, /2026-08-11[^.]+independent-work exception/iu);
+  assert.match(
+    roadmap,
+    /reconciled with `main@2a315aa0e7dce1bf1048b9a2c07e318add9241de`/iu,
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${escapeRegularExpression(implementationPredecessor)}'s exact implementation diff[\\s\\S]+implementation task is complete`,
+      "iu",
+    ),
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `(?:${escapeRegularExpression(portfolioPhase)} )?${escapeRegularExpression(independentStream)} is the separate[\\s\\S]+?certification increment`,
+      "iu",
+    ),
+  );
+  assert.match(
+    roadmap,
+    /protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, deployment, publication, and production remain separate/iu,
+  );
 
   assert.match(
     implementationPlan,
@@ -2881,7 +2903,6 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   const calendlyTask = namedLabel("Task", "5");
   const calendlyCertificationTask = namedLabel("Task", "5B");
   const observabilityTask = namedLabel("Task", "6");
-  const observabilityCertificationTask = namedLabel("Task", "6B");
   const generatedTestingTask = namedLabel("Task", "6C");
 
   assert.deepEqual(
@@ -2961,15 +2982,40 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         escapeRegularExpression(calendlyCertificationTask) +
         "'s bounded provider certification evidence is complete[\\s\\S]+" +
         escapeRegularExpression(observabilityTask) +
-        "'s exact implementation diff `717c3bb0f048f4a4bc544100125ae42d818f09bc\\.\\.45b57d2dc265ef6ba9ac805d7352a01db5f1081d` is approved and the implementation task is complete[\\s\\S]+" +
-        escapeRegularExpression(observabilityCertificationTask) +
-        " local certification work is authorized and in progress with reviewed local fresh-scaffold evidence[\\s\\S]+Under the explicit 2026-08-11 independent-work exception, " +
-        escapeRegularExpression(generatedTestingTask) +
-        " has an independently reviewed and locally verified implementation candidate[\\s\\S]+preserves " +
-        escapeRegularExpression(observabilityCertificationTask) +
-        "'s pending observability subject[\\s\\S]+Protected-staging, provider/source, credentials, telemetry transmission, cleanup, certification transition, merge, and push remain separately unauthorized[\\s\\S]+" +
-        escapeRegularExpression(generatedTestingTask) +
-        " develops only on the approved isolated branch/worktree",
+        "'s exact implementation diff `717c3bb0f048f4a4bc544100125ae42d818f09bc\\.\\.45b57d2dc265ef6ba9ac805d7352a01db5f1081d` is approved and the implementation task is complete",
+    ),
+  );
+  assert.match(
+    roadmap,
+    /The observability capability retains reviewed local fresh-scaffold evidence[^.]+certification outcomes remain separate/iu,
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `Under the explicit 2026-08-11 independent-work exception, ${escapeRegularExpression(generatedTestingTask)} has an independently reviewed implementation candidate on merge request 2, reconciled with \`main@2a315aa0e7dce1bf1048b9a2c07e318add9241de\``,
+      "u",
+    ),
+  );
+  assert.match(
+    roadmap,
+    /Content candidate `93e4e9f6ea944329de7c47c9e8bf34382774b1f8` passed local verification and all three applicable hosted workflows/iu,
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${escapeRegularExpression(generatedTestingTask)} awaits verified-final-diff approval and one eligible repository approval`,
+      "u",
+    ),
+  );
+  assert.match(
+    roadmap,
+    /Protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, deployment, publication, and production remain separate/iu,
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${escapeRegularExpression(generatedTestingTask)} remains on its approved isolated merge-request branch/worktree and has reconciled accepted \`main@2a315aa0e7dce1bf1048b9a2c07e318add9241de\``,
+      "u",
     ),
   );
   assert.match(
