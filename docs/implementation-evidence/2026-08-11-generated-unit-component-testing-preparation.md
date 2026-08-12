@@ -70,9 +70,9 @@ Registry metadata was queried on 2026-08-11. Every selected artifact is MIT lice
 
 | Package | Exact version | Relevant engine/peer contract | SHA-512 registry integrity |
 | --- | --- | --- | --- |
-| `vitest` | `4.1.10` | Node `^20 || ^22 || >=24`; Vite `^6 || ^7 || ^8` | `sha512-R9jUTe5S4Qb0HCd4TNqpC7oGcrMssMRGXLW80ubjWsW9VH5GF8y1Y0SFLY9AbqSk6nt0PnOx4H4WNJYZ13GUPw==` |
-| `@vitejs/plugin-react` | `6.0.5` | Node `^20.19 || >=22.12`; Vite `^8` | `sha512-BOVzne/NL162sMdResB25mUv+vWMF5NoAjNf09TeGlE7ZpszZWSD3winycicLJw72yeVsoCn/2kOhEuCvEShMA==` |
-| `jsdom` | `30.0.1` | Node `^22.22.2 || ^24.15 || >=26`; optional canvas only | `sha512-52v7mUVUfNQVYYqE1lcdaymWL0njO7lTLUog6ZvW2U5KsbiLk/GnZlVJ+qx0xfNJZ6Gn+KSpPNE52vurbxZwrA==` |
+| `vitest` | `4.1.10` | Node `^20 \|\| ^22 \|\| >=24`; Vite `^6 \|\| ^7 \|\| ^8` | `sha512-R9jUTe5S4Qb0HCd4TNqpC7oGcrMssMRGXLW80ubjWsW9VH5GF8y1Y0SFLY9AbqSk6nt0PnOx4H4WNJYZ13GUPw==` |
+| `@vitejs/plugin-react` | `6.0.5` | Node `^20.19 \|\| >=22.12`; Vite `^8` | `sha512-BOVzne/NL162sMdResB25mUv+vWMF5NoAjNf09TeGlE7ZpszZWSD3winycicLJw72yeVsoCn/2kOhEuCvEShMA==` |
+| `jsdom` | `30.0.1` | Node `^22.22.2 \|\| ^24.15 \|\| >=26`; optional canvas only | `sha512-52v7mUVUfNQVYYqE1lcdaymWL0njO7lTLUog6ZvW2U5KsbiLk/GnZlVJ+qx0xfNJZ6Gn+KSpPNE52vurbxZwrA==` |
 | `@testing-library/react` | `16.3.2` | React/React DOM 18 or 19; DOM `^10`; Node `>=18` | `sha512-XU5/SytQM+ykqMnAnvB2umaJNIOsLF3PVv//1Ew4CTcpz0/BRyy/af40qqrt7SjKpDdT1saBMc42CUok5gaw+g==` |
 | `@testing-library/dom` | `10.4.1` | Node `>=18` | `sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==` |
 | `@testing-library/user-event` | `14.6.3` | DOM `>=7.21.4`; Node `>=12` | `sha512-6dBq67jT8lE+JTE8Exm02Kt6ze43hz1jdiSpSJwtTZiT1xQQ6b7nZYTTQ9njdArdU8XklOwaDp/AbT/eYSKF4g==` |

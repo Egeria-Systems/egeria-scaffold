@@ -8,7 +8,7 @@
 
 **Verified implementation content:** committed as `df7bbe9`
 
-The separate final artifact commit reconciles bounded documentation claims, completes the implementation-plan checklist, and adds this evidence plus the review packet. It changes no template, schema, fixture, dependency, workflow, package, capability, recipe, state, or verification behavior; its exact hash is reported at handoff.
+The separate final artifact commit reconciles bounded documentation claims, completes the implementation-plan checklist, and adds this evidence plus the review packet. It changes no template, schema, fixture, dependency, workflow, package, capability, recipe, state, or runtime verification behavior. It does update the enforcement-map constitution assertion described below and reruns `test:constitution`; its exact hash is reported at handoff.
 
 ## Result
 

@@ -24,7 +24,7 @@ Automated jsdom and Playwright/axe results are bounded evidence. This packet mak
 
 ## Changed files
 
-The final comparison changes these 104 files:
+The final comparison list below contains 101 files:
 
 ```text
 .github/workflows/booking-calendly-certification.yml

@@ -132,6 +132,8 @@
         "checks": {
           "anyOf": [
             {
+              "maxItems": 9,
+              "minItems": 9,
               "prefixItems": [
                 {
                   "const": "contracts",
@@ -174,6 +176,8 @@
               "type": "array"
             },
             {
+              "maxItems": 11,
+              "minItems": 11,
               "prefixItems": [
                 {
                   "const": "contracts",

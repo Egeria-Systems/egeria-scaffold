@@ -734,6 +734,13 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
     generated["certification-registry.schema.json"].title,
     "Egeria capability certification coverage registry",
   );
+  const verificationCheckTuples =
+    generated["state.schema.json"].properties.lastSuccessfulVerification
+      .properties.checks.anyOf;
+  for (const tuple of verificationCheckTuples) {
+    assert.equal(tuple.minItems, tuple.prefixItems.length);
+    assert.equal(tuple.maxItems, tuple.prefixItems.length);
+  }
   const displayNamePattern = /^(?=.{1,120}$)(?=.*\S)[^\p{Cc}]+$/u;
   const projectDisplayNamePattern =
     generated["project.schema.json"].properties.project.properties.displayName

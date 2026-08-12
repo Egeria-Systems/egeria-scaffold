@@ -45,6 +45,29 @@ type SourceEntry =
   | Readonly<{ kind: "directory" }>
   | Readonly<{ kind: "file"; fingerprint: string }>;
 
+type ExclusiveWriteResult =
+  | Readonly<{ ok: true }>
+  | Readonly<{ ok: false; sourceChanged: boolean }>;
+
+type ExclusiveFileOperations = Readonly<{
+  open(path: string, flags: "wx"): Promise<{
+    stat(options: { bigint: true }): Promise<{
+      isFile(): boolean;
+      isSymbolicLink(): boolean;
+      dev: bigint;
+      ino: bigint;
+    }>;
+    writeFile(content: Uint8Array): Promise<unknown>;
+    close(): Promise<unknown>;
+  }>;
+  remove(identity: PathIdentity): Promise<boolean>;
+}>;
+
+type ExclusiveFileWriter = (
+  path: string,
+  content?: Uint8Array,
+) => Promise<ExclusiveWriteResult>;
+
 const execFileAsync = promisify(execFile);
 const maximumOutputBytes = 1024 * 1024;
 const versionTimeoutMilliseconds = 30 * 1000;
@@ -55,6 +78,10 @@ const recipeLockfile = new URL(
   "../../lockfiles/web-recipe-0.7.0/pnpm-lock.yaml",
   import.meta.url,
 );
+const exclusiveFileOperations: ExclusiveFileOperations = {
+  open,
+  remove: cleanupOwnedFile,
+};
 export const verificationChecks = Object.freeze([
   "lockfile",
   "frozen-install",
@@ -121,6 +148,33 @@ async function sourceIdentityMatches(identity: PathIdentity): Promise<boolean> {
   }
 }
 
+async function fileIdentityMatches(identity: PathIdentity): Promise<boolean> {
+  try {
+    const stats = await lstat(identity.path, { bigint: true });
+    return (
+      !stats.isSymbolicLink() &&
+      stats.isFile() &&
+      stats.dev === identity.device &&
+      stats.ino === identity.inode
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function cleanupOwnedFile(identity: PathIdentity): Promise<boolean> {
+  if (!(await fileIdentityMatches(identity))) {
+    return false;
+  }
+
+  try {
+    await rm(identity.path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function cleanupOwnedDirectory(identity: PathIdentity): Promise<boolean> {
   if (!(await sourceIdentityMatches(identity))) {
     return false;
@@ -134,15 +188,24 @@ async function cleanupOwnedDirectory(identity: PathIdentity): Promise<boolean> {
   }
 }
 
-async function writeExclusive(
+export async function writeExclusive(
   path: string,
   content: Uint8Array = new Uint8Array(),
-): Promise<boolean> {
+  operations: ExclusiveFileOperations = exclusiveFileOperations,
+): Promise<ExclusiveWriteResult> {
   let handle;
+  let created = false;
+  let identity: PathIdentity | undefined;
   let failed = false;
 
   try {
-    handle = await open(path, "wx");
+    handle = await operations.open(path, "wx");
+    created = true;
+    const stats = await handle.stat({ bigint: true });
+    if (stats.isSymbolicLink() || !stats.isFile()) {
+      throw new Error("invalid-created-file");
+    }
+    identity = { path, device: stats.dev, inode: stats.ino };
     await handle.writeFile(content);
   } catch {
     failed = true;
@@ -154,7 +217,19 @@ async function writeExclusive(
     }
   }
 
-  return !failed;
+  if (!failed) {
+    return { ok: true };
+  }
+
+  if (!created) {
+    return { ok: false, sourceChanged: false };
+  }
+
+  if (identity === undefined || !(await operations.remove(identity))) {
+    return { ok: false, sourceChanged: true };
+  }
+
+  return { ok: false, sourceChanged: false };
 }
 
 async function createOwnedDirectory(
@@ -190,7 +265,7 @@ async function createSupportPaths(
     await mkdir(home, { mode: 0o700 });
     await mkdir(temporary, { mode: 0o700 });
     await mkdir(store, { mode: 0o700 });
-    if (!(await writeExclusive(userConfiguration))) {
+    if (!(await writeExclusive(userConfiguration)).ok) {
       return issue("VERIFIER_SETUP_FAILED", "user-configuration-failed");
     }
 
@@ -329,8 +404,9 @@ function snapshotsEqual(
   );
 }
 
-async function prepareLockfile(
+export async function prepareLockfile(
   root: string,
+  writer: ExclusiveFileWriter = writeExclusive,
 ): Promise<ValidationResult<void>> {
   const fixedRoot = resolve(root);
   const before = await snapshotSource(fixedRoot);
@@ -345,10 +421,17 @@ async function prepareLockfile(
     return issue("LOCKFILE_PREPARATION_FAILED", "recipe-lockfile-unavailable");
   }
 
-  if (
-    !(await writeExclusive(join(fixedRoot, "pnpm-lock.yaml"), lockfileBytes))
-  ) {
-    return issue("LOCKFILE_PREPARATION_FAILED", "lockfile-write-failed");
+  const writeResult = await writer(
+    join(fixedRoot, "pnpm-lock.yaml"),
+    lockfileBytes,
+  );
+  if (!writeResult.ok) {
+    return issue(
+      "LOCKFILE_PREPARATION_FAILED",
+      writeResult.sourceChanged
+        ? "lockfile-write-failed-source-changed"
+        : "lockfile-write-failed",
+    );
   }
 
   const after = await snapshotSource(fixedRoot);

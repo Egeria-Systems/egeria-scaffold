@@ -12,6 +12,8 @@
 
 **Excluded concurrent scope:** The active observability-certification task owns observability certification, cleanup/recovery behavior and evidence, capability-registry transition, and any defect discovered by its certification checks. This repair plan must not modify those surfaces or treat their hosted status as an acceptance criterion.
 
+**Current external-action authority:** The original plan separated local implementation from push and hosted-CI inspection. The user subsequently authorized pushing this repair branch, inspecting its hosted checks, and merging the merge request only after accurate applicable CI passes and repository review rules are satisfied.
+
 ## Increment 1: Materialize the checked recipe lockfile
 
 ### Files
@@ -77,14 +79,46 @@ Commit: `ci: scope deep verification to relevant changes`
 
 Push the existing MR branch, inspect hosted checks, and stop for increment review.
 
+## Increment 3: Repair review-confirmed data-integrity defects
+
+### Files
+
+- Modify `packages/builder-core/src/contracts/json-schemas.ts`.
+- Regenerate `packages/builder-core/schemas/state.schema.json` through the canonical schema generator.
+- Modify `packages/builder-core/src/generation/verify-generated-project.ts`.
+- Modify `packages/builder-core/tests/contracts.test.mjs`.
+- Modify `packages/builder-core/tests/generate-project.test.mjs`.
+- Correct the three exact preparation, verification, and review-packet evidence inconsistencies identified during merge-request review.
+
+### RED/GREEN
+
+- Require every fixed JSON Schema tuple to emit `minItems` and `maxItems` equal to its `prefixItems` length.
+- Add tuple cardinality in the canonical JSON Schema artifact transformation and regenerate the committed artifact; do not hand-edit it.
+- Require a failed exclusive write or close to remove only the path created by that call.
+- Require a failed rollback to remain distinguishable through the content-safe lockfile-preparation failure reason.
+- Preserve the no-overwrite guarantee for any pre-existing target and keep all failure output path- and content-safe.
+
+### Verification and commit
+
+```sh
+pnpm run build:builder
+pnpm run test:builder-core
+pnpm run check:semantic-naming
+git diff --check
+```
+
+Commit: `fix: preserve generated contract integrity`
+
+Push the existing MR branch and inspect hosted checks before final review.
+
 ## Final review, evidence, and recovery
 
-After both increments are separately accepted:
+After the three increments are separately accepted:
 
 1. Run the complete relevant builder-kernel verification once against the settled tree.
 2. Dispatch read-only requirements, architecture/anti-overengineering, and test-evidence reviewers with the exact final comparison and no recursive fan-out.
 3. Reproduce and repair only validated material findings through focused RED/GREEN cycles.
 4. Record the final commands, results, hosted-CI boundary, changed files, reviewer dispositions, risks, deferred work, and rollback/recovery in dated implementation evidence and a review packet.
-5. Present the verified final diff and stop for explicit approval. Do not merge, deploy, publish, dispatch certification workflows, mutate providers, or respond to review comments.
+5. Present the verified final diff for the user-authorized merge-request integration. Merge only when the exact head has accurate applicable green CI and satisfies repository review rules. Do not deploy, publish, dispatch certification workflows, mutate providers, or respond to review comments.
 
 Source recovery is a newest-first revert of the focused repair commits followed by regeneration and `pnpm run verify:builder-kernel`. The checked lockfile is repository source; no persistent data, provider state, deployment, credential, or production recovery is introduced by these repairs.
