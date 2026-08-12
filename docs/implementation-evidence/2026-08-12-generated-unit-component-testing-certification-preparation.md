@@ -134,3 +134,36 @@ PASS; computed subject exactly equals the registry subject
 Local certification can establish only the exact generated standards subject, local Node/jsdom behavior, local Chromium development/workerd checks, local build/type/lint results, deterministic retained fixtures, state/inference agreement, and static CI structure. It cannot establish hosted CI for the certification candidate, deployment, provider behavior, production safety, visual approval, assistive-technology behavior, human usability, security completeness, ongoing availability, or WCAG conformance.
 
 Source recovery is a separately authorized, focused newest-first `git revert` of Task 6D commits. It returns the exact standards record to `pending`, removes only Task 6D evidence/status changes and the thin runner, and reruns certification admission plus the affected tests. It never resets or cleans user work and never revives a stale subject. No deployment, provider, credential, persistent-data, publication, or production recovery applies.
+
+## Accepted-main evidence-ancestry repair preparation
+
+The accepted integration exposed one Task 6D-owned evidence-identity defect. Fresh preflight established:
+
+```text
+accepted origin/main: c9294e9dc59d4b7bafed406846af3b43a10733d3
+clean standards-certification head: a3f9c01c989fd7b033fbadd1a159b56925848b79
+accepted-main tree: 0c7af5f591aea43c90d06c155bd28f69b0e4a6d1
+source-branch tree: 0c7af5f591aea43c90d06c155bd28f69b0e4a6d1
+recorded evidence revision: f9a962874d587e4594af341a1fe5f62db6d7672c
+f9a9628 ancestor of source branch: yes
+f9a9628 ancestor of accepted main: no
+```
+
+The worktree was clean, remained on `standards-certification`, and no other worktree was changed. In particular, `.worktrees/ci-efficiency-security` and branch `ci-efficiency-security` remain preserved and outside this repair.
+
+An identity-bounded local shared clone checked out detached accepted main at `c9294e9dc59d4b7bafed406846af3b43a10733d3`. Its tracked diff was empty and its tree was `0c7af5f591aea43c90d06c155bd28f69b0e4a6d1`. After compiling builder-core with the pinned Node.js `22.23.2` toolchain, direct execution of `scripts/check-capability-certification.mjs` reproduced:
+
+```json
+{"ok":false,"gate":"artifacts","issues":[{"code":"CERTIFICATION_EVIDENCE_REVISION_UNKNOWN","path":["records","standards","evidence",0,"revision"],"context":{"reason":"not-in-checked-history"}}]}
+```
+
+Two attempts were setup-invalid and are not evidence: the app runtime first supplied Node.js `24.19.0` with pnpm `11.19.0`, then a pinned-pnpm attempt tried to populate the dependency tree under restricted networking. Neither reached the validator, modified tracked bytes, or contributes to the reproduced result above.
+
+The root cause is the integration topology rather than the validator or content tree. Accepted main is a single-parent squash commit whose tree equals the reviewed source branch, so the source-branch evidence commit exists in the object database but is not reachable through accepted-main parent history. Git documents `merge-base --is-ancestor` as a parent-reachability check with exit `0` for an ancestor and `1` otherwise. GitHub documents that squash integration combines branch commits into one new commit on the base branch instead of preserving the individual branch commits. The repository validator therefore behaves correctly and must remain unchanged:
+
+- [Git `merge-base --is-ancestor`](https://git-scm.com/docs/git-merge-base.html)
+- [GitHub pull-request merge methods](https://docs.github.com/en/pull-requests/reference/pull-request-merges)
+
+The confirmed repair hypothesis is to rerun every receipt-bound outcome on accepted main itself, then bind the receipt and registry to `c9294e9dc59d4b7bafed406846af3b43a10733d3`. That revision is already the accepted integration base and will remain an ancestor under squash, rebase, or merge-commit integration of the repair. Relabeling the old receipt without rerunning is prohibited. Requiring a non-squash merge was rejected because it conflicts with the repository's observed integration method and would make correctness depend on a future merge choice.
+
+The focused RED contracts now fail only because the committed standards registry, strict receipt, and roadmap still name the pre-squash revision. The exact repair and verification steps are recorded in the accepted-main amendment to the Task 6D plan.

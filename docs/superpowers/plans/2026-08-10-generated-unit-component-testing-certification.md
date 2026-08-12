@@ -145,6 +145,40 @@ Stop if the version, digest, plan link, evidence requirements, generated depende
 - [ ] In an authorized run, commit focused certification evidence and present the exact committed comparison.
 - [ ] Stop for explicit verified-final-diff approval. Do not begin later P2 work, add fast-check, add Workers Vitest, push, create a pull request, deploy, publish, dispatch CI, or mutate an external system.
 
+## 2026-08-12 accepted-main evidence-ancestry repair amendment
+
+Task 6D was subsequently squash-integrated as accepted `origin/main@c9294e9dc59d4b7bafed406846af3b43a10733d3`. The clean source branch at `a3f9c01c989fd7b033fbadd1a159b56925848b79` has the identical tree `0c7af5f591aea43c90d06c155bd28f69b0e4a6d1`, but the original evidence revision `f9a962874d587e4594af341a1fe5f62db6d7672c` is not an ancestor of the squash commit. Admission therefore correctly rejects accepted main with `CERTIFICATION_EVIDENCE_REVISION_UNKNOWN`.
+
+The repair must preserve the ancestry validator unchanged. Because the repository's observed integration method squashes the branch commits, history-preserving integration is not a reliable remedy. Rerun every receipt-bound Task 6D outcome from an identity-bounded temporary checkout of accepted main itself, then bind the receipt, registry, evidence, tests, and current-status documentation to `c9294e9dc59d4b7bafed406846af3b43a10733d3`. That accepted revision is the integration base and remains an ancestor whether the repair is squash-merged, rebased, or merged with a merge commit. Before integration, reverify that accepted main is still an ancestor of the integration candidate; otherwise stop and reconcile before approval.
+
+This amendment adds no runtime behavior, capability surface, dependency, workflow, fixture, schema, provider action, hosted result, or certification outcome. It authorizes changes only to:
+
+```text
+certifications/capabilities.json
+docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-preparation.md
+docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-verification.md
+docs/implementation-evidence/generated-unit-component-testing-certification-receipt.json
+docs/review-packets/2026-08-12-generated-unit-component-testing-certification.md
+docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md
+docs/roadmaps/program-roadmap.md
+docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md
+README.md
+packages/builder-core/tests/certification.test.mjs
+tests/capability-certification/certification-runner.test.mjs
+tests/constitution/constitution.test.mjs
+```
+
+### Repair execution
+
+- [x] Reverify the exact branch, clean state, worktree inventory, accepted `origin/main`, source-branch head, ancestry failure, and identical trees. Do not modify the stale local `main` checkout or the `ci-efficiency-security` worktree/branch.
+- [x] Reproduce the exact admission failure from an identity-bounded temporary checkout of accepted main using the pinned Node.js `22.23.2` and pnpm `11.20.0` toolchain. Record setup-invalid attempts separately.
+- [x] Add focused RED contracts that require the accepted-main evidence revision in the strict receipt, registry record, verification evidence, and current roadmap status.
+- [x] From a fresh clean identity-bounded checkout of `c9294e9dc59d4b7bafed406846af3b43a10733d3`, rerun `verify:generated-testing-certification`, independent unit/component counts and state agreement, `test:generated-fixtures`, `verify:generated-skeletons`, and `test:constitution`. Do not relabel any outcome that was not rerun at that revision.
+- [x] Update only the evidence-revision bindings and direct documentary consumers. Recompute the subject and require the descriptor version/digest to remain unchanged.
+- [x] Run focused Task 6D tests, admission, both expected-rejecting closure policies, applicable P2 closure contracts, constitution, semantic naming, and `git diff --check`.
+- [x] Dispatch one bounded independent read-only reviewer covering requirements, architecture/anti-overengineering, test evidence, ancestry proof, squash-safe integration, claims, and recovery. Repair only validated material findings with focused RED/GREEN evidence.
+- [x] Update the exact review packet with the accepted-main comparison, commands/results, ancestry proof, integration constraint, risks, review dispositions, and recovery; commit the coherent repair and stop for explicit verified-final-diff/integration approval.
+
 ## Certification claim boundary
 
 Passing Task 6D certifies that the exact standards subject generates and verifies the approved unit/component foundation across its risk-based local generated-project matrix. It does not establish:
