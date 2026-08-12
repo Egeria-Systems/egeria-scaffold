@@ -59,9 +59,9 @@ Apply the [shared test deployment policy](../governance/shared-test-deployment.m
 - Complete observed custom-event inventory in Cloudflare Workers Logs and Better Stack: [for every predeclared class above, record the workflow source step, event name/kind/runtime/severity, content-safe correlation classification, allowed attribute names and vocabulary, deployed `release_id` match, and provider-specific observed count, including zero]
 - Deterministic exercise reconciliation: [the Node route-envelope revision-marker browser error, Node route-envelope revision-marker web vital, and generated-UUID server request error are each present as expected in both providers / stop and reject]
 - Actual browser-reporter reconciliation: [the browser-instrumentation receipt UUID identifies exactly one generated-listener `browser.window.error` in each provider / stop and reject]
-- Playwright navigation reconciliation: [record the complete observed `browser.web.vital` metric-name set and count in each provider without claiming an exact expected marker or count]
+- Playwright navigation reconciliation: [record the complete observed `browser.web.vital` `metric_name` and `navigation_type` vocabulary plus count in each provider without claiming an exact expected marker or count]
 - Additional custom event reconciliation: [reject the receipt unless every additional custom event is predeclared, bounded by the workflow step and generated vocabulary, and reconciled in the complete inventory]
-- Application/custom event fields observed: [`schema_version`, `dt`, `event_name`, `event_kind`, `runtime`, `severity`, `correlation_id`, `release_id`, `error_category` when applicable, and allowlisted `attributes`; record field names and bounded expected values only]
+- Application/custom event fields observed: [`schema_version`, `dt`, `event_name`, `event_kind`, `runtime`, `severity`, `correlation_id`, `release_id`, `error_category` when applicable, and allowlisted `attributes`; web-vital attributes are exactly `delta`, `metric_name`, `navigation_type`, `rating`, and `value`; record field names and bounded expected values only]
 - Release identity reconciliation: [every provider custom event has `release_id` equal to the captured Cloudflare version identifier; it must never equal or be interpreted as the Git SHA]
 - Unexpected or private fields observed: [none / stop and reject]
 
@@ -79,9 +79,9 @@ Apply the [shared test deployment policy](../governance/shared-test-deployment.m
 - Source, region, tier, quota, and retention: [content-safe source label; region; plan tier; quota before/after; retention; no ingestion host or private provider URL]
 - Node route-envelope browser-error record receipt: [`schema_version`, `dt`, `event_name`, `event_kind`, `runtime`, `severity`, revision-derived `correlation_id`, captured Cloudflare-version `release_id`, `error_category`, and `attributes` matched to the expected bounded values]
 - Actual browser-reporter error record receipt: [`schema_version`, `dt`, `event_name`, `event_kind`, `runtime`, `severity`, browser-receipt UUID `correlation_id`, captured Cloudflare-version `release_id`, `error_category`, and `attributes` matched to the expected bounded values]
-- Node route-envelope web-vital record receipt: [`schema_version`, `dt`, `event_name`, `event_kind`, `runtime`, `severity`, revision-derived `correlation_id`, captured Cloudflare-version `release_id`, and `attributes` matched to the expected bounded values]
+- Node route-envelope web-vital record receipt: [`schema_version`, `dt`, `event_name`, `event_kind`, `runtime`, `severity`, revision-derived `correlation_id`, captured Cloudflare-version `release_id`, and exact `delta`, `metric_name`, `navigation_type`, `rating`, and `value` attributes matched to the expected bounded values]
 - Server-request-error record receipt: [`server.request.error` with bounded server/error vocabulary, generated UUID correlation identifier, deployed `release_id`, empty `attributes`, and no raw error content]
-- Playwright-navigation web-vital inventory: [complete observed metric-name set and count with bounded browser/info vocabulary; do not assign an exact expected marker or count]
+- Playwright-navigation web-vital inventory: [complete observed `metric_name` and `navigation_type` vocabulary plus count with bounded browser/info vocabulary; do not assign an exact expected marker or count]
 - Every provider custom event uses captured Cloudflare version identity: [`release_id` equals the captured Cloudflare version identifier and never the Git SHA; yes / no]
 - Unexpected fields or events and post-run quota/spend result: [none and bounded result / stop and reject]
 

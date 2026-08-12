@@ -8,7 +8,7 @@
 
 **Tech stack:** Node.js `22.23.2`, pnpm `11.20.0`, Node test runner, Next.js `16.3.0`, `@opennextjs/cloudflare@1.20.2`, Wrangler `4.118.0`, GitHub Actions, Cloudflare Workers Logs, and Better Stack HTTP ingestion.
 
-**Current local status (2026-08-11):** The approved Task 6 comparison remains `717c3bb0f048f4a4bc544100125ae42d818f09bc..45b57d2dc265ef6ba9ac805d7352a01db5f1081d`. The local fresh-scaffold journey passed at `ef845b1e0551d3b43e17969cc00f21960c90769b`; the manual protected-staging workflow, deployed exercise, and provider receipt path are prepared but have not been dispatched or executed. Tasks 1–7 local implementation and review are complete. `observability@0.2.0` remains `pending`, and every external action remains separately unauthorized.
+**Current local status (2026-08-12):** The local fresh-scaffold journey passed at `ef845b1e0551d3b43e17969cc00f21960c90769b`. One exact-revision protected-staging run at `2c7533edf96de6d95f45406abe65ba4432c43d4e` produced the four bounded receipts but failed certification because neither provider received a web-vital event within the approved deadline. Clean compatibility recovery passed. The deterministic snake-case repair and the same-origin development-browser correction are under local verification before one finite retry governed by the dated amendment below. `observability@0.2.0` remains `pending`; no live receipt, evidence acceptance, registry transition, production action, merge, or push is implied.
 
 ## Shared test-deployment amendment (2026-08-11)
 
@@ -109,6 +109,42 @@ The already-failing builder-core test is the focused RED case. The minimum repai
 - `packages/builder-core/tests/certification.test.mjs`.
 
 It does not modify the registry, evidence receipt, runtime, workflow, generated project, provider, credentials, deployment, telemetry, cleanup, publication, integration, or push. After focused GREEN, the complete final gate must restart because the earlier builder-kernel run stopped before its remaining commands.
+
+### Protected-staging failure repair and one bounded retry (2026-08-11)
+
+The user later directed this lifecycle to use the latest clean `main` directly. The fetched default branch, local `main`, and `origin/main` were all `2c7533edf96de6d95f45406abe65ba4432c43d4e` immediately before the first live dispatch. This dated amendment supersedes the historical branch/worktree restriction only for the sequential repair on that clean, aligned `main`; it does not authorize touching, integrating, rebasing, merging, cherry-picking, or publishing the unrelated Task 6C preparation stream.
+
+Exactly one manual observability workflow run, GitHub run `31555136425`, deployed the checked revision and completed successfully. Its four bounded receipts identified Cloudflare deployment `d0ebc6de-d2c6-414b-ba0e-c6e831b10751`, Cloudflare version `d67f2513-25e0-4ebf-96ad-0cd6b567e362`, the two expected revision-derived route markers, and the actual generated browser UUID. Certification nevertheless failed because the complete expected custom-event inventory did not arrive within the approved provider window. A separately approved compatibility recovery run, GitHub run `31556831190`, then restored clean Worker version `4ba01d1e` as the sole active version; the compatibility route returned `200` and the certification-only error route returned `404` without reading either response body.
+
+After the missed deadline, content-bounded aggregate diagnostics were used only to identify the repair and are not certification evidence. Cloudflare Workers Logs and Better Stack each contained exactly two `browser.window.error` events and one `server.request.error` event for version `d67f2513-25e0-4ebf-96ad-0cd6b567e362`, with no `browser.web.vital`. Exact local reproduction passed the generated web-vital input to `@egeria-systems/observability@0.2.0` and returned `EVENT_ATTRIBUTE_POLICY_INVALID`: the generated browser reporter and route-envelope exercise use `metricName` and `navigationType`, while the existing package contract accepts only lower snake-case attribute identifiers. This defect blocks both the actual browser reporter before its request and the route's server reporter after returning `202`; retrying the unchanged revision would reproduce the failure.
+
+The minimum repair retains the public package and descriptor at `0.2.0`, keeps the Next.js adapter input property `navigationType`, and changes only the operational-event attributes and route envelope to `metric_name` and `navigation_type`. Focused tests must first fail against the camelCase reporter, route, and exercise. The generated reporter test must apply the package attribute-name policy so a rejected event cannot be mistaken for a delivered request. The committed portfolio, portfolio-Calendly, and site fixtures and their managed-surface fingerprints must then be reconciled byte-for-byte with the repaired templates. No capability digest, registry outcome, workflow credential boundary, provider configuration, package release, or unrelated generated behavior changes.
+
+The first exact-toolchain fixture-determinism run reached fresh generation and then found current lockfile-only output differed from the committed generated lockfiles by exactly two time-resolved browser-data transitives: `electron-to-chromium` advanced from `1.5.403` to `1.5.404`, and `update-browserslist-db` advanced from `1.3.0` to `1.3.1`. No direct dependency, declared version, package manifest, toolchain pin, install policy, or root lockfile changes. Because committed fixtures must equal fresh exact-toolchain output, this evidence-backed amendment also permits only those generated-lockfile lines and the resulting `builder-dependency-lockfile` fingerprints in the three already inventoried fixture state files. It does not authorize dependency upgrades outside generator-selected lockfile output.
+
+The settled-tree fixed-root verifier then exposed a second local browser-path defect that the invalid camel-case event had previously hidden. Once the web-vital event passed the package policy, Next.js development delivered the browser POST with a canonical `Origin` and matching `Host`, but reconstructed `request.url` with a different internal loopback hostname; the route therefore returned `403` before bounded parsing. A diagnostic copy classified only response status and equality outcomes and confirmed the exact Origin-host/Host match; no raw console message, request metadata, trace, provider data, private URL, or real traffic content was opened or retained. The minimum correction keeps direct `Origin === new URL(request.url).origin` as the normal path and permits the development/proxy fallback only when the Origin is canonical HTTP(S), its host exactly matches the network `Host`, its protocol matches `request.url`, and the browser-controlled `Sec-Fetch-Site` value is exactly `same-origin`. Missing, opaque, malformed, non-HTTP(S), cross-origin, and fallback requests without that fetch-metadata assertion remain rejected. This follows the current [MDN Origin contract](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Origin), [MDN origin definition](https://developer.mozilla.org/en-US/docs/Glossary/Origin), [MDN Sec-Fetch-Site contract](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Sec-Fetch-Site), and [Next.js Route Handler request-header contract](https://nextjs.org/docs/app/getting-started/route-handlers).
+
+The user approved an extended retry window. The amended bound is exactly ten minutes, with polling no faster than every 30 seconds. It remains a hard deadline: no unbounded or windowless inspection, automatic rerun, indefinite retry, or unchanged-revision retry is permitted. After the repair is locally tested, reviewed, approved as an exact final diff, pushed, and revalidated at its new exact default-branch revision, at most one fresh observability workflow run may be dispatched. The failed run and historical aggregate diagnostics cannot satisfy any certification outcome. A later run still stops immediately on revision drift, unexpected event or field, private or real content, authentication/authorization failure, provider error, or quota, tier, retention, residency, or spend change.
+
+This repair amendment owns exactly:
+
+- `docs/superpowers/plans/2026-08-10-production-observability-certification.md`;
+- `docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md`;
+- `docs/implementation-evidence/production-observability-provider-receipt-template.md`;
+- `tests/constitution/constitution.test.mjs`;
+- `packages/builder-core/tests/render-skeleton.test.mjs`;
+- `packages/builder-core/templates/common/apps/web/app/api/observability/route.ts`;
+- `packages/builder-core/templates/common/apps/web/src/infrastructure/observability/browser-reporter.ts`;
+- `scripts/exercise-production-observability.mjs`;
+- `tests/capability-certification/production-observability.test.mjs`;
+- the matching route and browser-reporter files under `fixtures/generated/portfolio`, `fixtures/generated/portfolio-calendly`, and `fixtures/generated/site`;
+- the matching `pnpm-lock.yaml` files under those same three generated fixtures;
+- the matching route, browser-reporter, and generated-lockfile managed-surface fingerprints in each fixture's `.egeria/state.json`;
+- new local repair review packet `docs/review-packets/2026-08-12-production-observability-certification-retry-repair.md`;
+- new content-safe live receipt `docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md`; and
+- new lifecycle review packet `docs/review-packets/2026-08-12-production-observability-certification-lifecycle.md`.
+
+The two live evidence files may be created only after a new run and cleanup produce the evidence they describe. `certifications/capabilities.json` is deliberately excluded: `observability@0.2.0` remains `pending` until deployed-application and cleanup-recovery are both affirmatively reviewed, and any pending-to-certified transition remains a separate local, tested diff requiring verified-final-diff approval before merge or push.
 
 ## Exact file structure
 

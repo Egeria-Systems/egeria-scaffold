@@ -510,16 +510,39 @@ function browserErrorEnvelope(overrides = {}) {
   };
 }
 
-function observabilityRequest(body, overrides = {}) {
-  return new Request("https://portfolio.example/api/observability", {
-    method: "POST",
-    headers: {
-      origin: "https://portfolio.example",
-      "content-type": "application/json",
-      ...overrides.headers,
+function webVitalEnvelope() {
+  return {
+    schemaVersion: "1.0.0",
+    event: {
+      name: "browser.web.vital",
+      kind: "web.vital",
+      runtime: "browser",
+      severity: "info",
+      context: { correlationId: "browser-vital-123" },
+      attributes: {
+        metric_name: "LCP",
+        value: 1_234.5,
+        delta: 10.25,
+        rating: "good",
+        navigation_type: "navigate",
+      },
     },
-    body: typeof body === "string" ? body : JSON.stringify(body),
-  });
+  };
+}
+
+function observabilityRequest(body, overrides = {}) {
+  return new Request(
+    overrides.url ?? "https://portfolio.example/api/observability",
+    {
+      method: "POST",
+      headers: {
+        origin: "https://portfolio.example",
+        "content-type": "application/json",
+        ...overrides.headers,
+      },
+      body: typeof body === "string" ? body : JSON.stringify(body),
+    },
+  );
 }
 
 let browserReporterLoad = 0;
@@ -542,7 +565,7 @@ async function loadGeneratedBrowserReporter(files) {
   globalThis[eventKey] = [];
   const rootModule = `data:text/javascript;base64,${Buffer.from(
     [
-      `export function createOperationalEvent(input) { globalThis[${JSON.stringify(eventKey)}].push(input); return { ok: true, value: Object.freeze(input) }; }`,
+      `export function createOperationalEvent(input, options) { globalThis[${JSON.stringify(eventKey)}].push(input); const allowed = new Set(options.allowedAttributeNames); const invalid = Object.keys(input.attributes).some((name) => !/^[a-z][a-z0-9_]{0,63}$/.test(name) || !allowed.has(name)); return invalid ? { ok: false } : { ok: true, value: Object.freeze(input) }; }`,
       "export async function dispatchOperationalEvent(event, sinks) {",
       "return Promise.all(sinks.map(async (sink) => {",
       "try { await sink.emit(event); return { ok: true }; } catch { return { ok: false }; }",
@@ -1222,11 +1245,11 @@ test("the browser reporter emits exact credential-free bounded envelopes", async
       severity: "info",
       context: { correlationId: webVital.event.context.correlationId },
       attributes: {
-        metricName: "LCP",
+        metric_name: "LCP",
         value: 1_234.5,
         delta: 10.25,
         rating: "good",
-        navigationType: "navigate",
+        navigation_type: "navigate",
       },
     },
   });
@@ -1265,6 +1288,45 @@ test("the browser route accepts only bounded same-origin operational envelopes",
       .status,
     202,
   );
+  assert.equal(
+    (await loaded.module.POST(observabilityRequest(webVitalEnvelope()))).status,
+    202,
+  );
+  assert.equal(
+    (
+      await loaded.module.POST(
+        observabilityRequest(webVitalEnvelope(), {
+          url: "http://127.0.0.1:3100/api/observability",
+          headers: {
+            host: "portfolio.example:3100",
+            origin: "http://portfolio.example:3100",
+            "sec-fetch-site": "same-origin",
+          },
+        }),
+      )
+    ).status,
+    202,
+  );
+  const expectedWebVitalReport = {
+    name: "browser.web.vital",
+    kind: "web.vital",
+    severity: "info",
+    correlationId: "browser-vital-123",
+    attributes: {
+      metric_name: "LCP",
+      value: 1_234.5,
+      delta: 10.25,
+      rating: "good",
+      navigation_type: "navigate",
+    },
+    allowedAttributeNames: [
+      "delta",
+      "metric_name",
+      "navigation_type",
+      "rating",
+      "value",
+    ],
+  };
   assert.deepEqual(loaded.reports, [
     {
       name: "browser.window.error",
@@ -1275,12 +1337,59 @@ test("the browser route accepts only bounded same-origin operational envelopes",
       attributes: { source: "window-error" },
       allowedAttributeNames: ["source"],
     },
+    expectedWebVitalReport,
+    expectedWebVitalReport,
   ]);
 
   const invalidRequests = [
     [
       observabilityRequest(browserErrorEnvelope(), {
         headers: { origin: "https://cross-origin.example" },
+      }),
+      403,
+    ],
+    [
+      observabilityRequest(browserErrorEnvelope(), {
+        headers: { origin: "not-an-origin" },
+      }),
+      403,
+    ],
+    [
+      observabilityRequest(browserErrorEnvelope(), {
+        url: "ftp://portfolio.example/api/observability",
+        headers: { origin: "ftp://portfolio.example" },
+      }),
+      403,
+    ],
+    [
+      observabilityRequest(browserErrorEnvelope(), {
+        url: "http://127.0.0.1:3100/api/observability",
+        headers: {
+          host: "portfolio.example:3100",
+          origin: "http://portfolio.example:3100",
+        },
+      }),
+      403,
+    ],
+    [
+      observabilityRequest(browserErrorEnvelope(), {
+        url: "http://127.0.0.1:3100/api/observability",
+        headers: {
+          host: "different.example:3100",
+          origin: "http://portfolio.example:3100",
+          "sec-fetch-site": "same-origin",
+        },
+      }),
+      403,
+    ],
+    [
+      observabilityRequest(browserErrorEnvelope(), {
+        url: "https://127.0.0.1:3100/api/observability",
+        headers: {
+          host: "portfolio.example:3100",
+          origin: "http://portfolio.example:3100",
+          "sec-fetch-site": "same-origin",
+        },
       }),
       403,
     ],
@@ -1342,7 +1451,7 @@ test("the browser route accepts only bounded same-origin operational envelopes",
   for (const [request, status] of invalidRequests) {
     assert.equal((await loaded.module.POST(request)).status, status);
   }
-  assert.equal(loaded.reports.length, 1);
+  assert.equal(loaded.reports.length, 3);
 
   let pullCount = 0;
   let cancelled = false;

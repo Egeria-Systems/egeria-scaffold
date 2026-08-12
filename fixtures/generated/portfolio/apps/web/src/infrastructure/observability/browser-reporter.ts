@@ -91,13 +91,13 @@ export function reportWebVital(metric: WebVitalInput): void {
       severity: "info",
       context: { correlationId: createCorrelationId() },
       attributes: {
-        metricName: metric.name,
+        metric_name: metric.name,
         value: metric.value,
         delta: metric.delta,
         rating: metric.rating,
-        navigationType: metric.navigationType,
+        navigation_type: metric.navigationType,
       },
     },
-    ["delta", "metricName", "navigationType", "rating", "value"],
+    ["delta", "metric_name", "navigation_type", "rating", "value"],
   );
 }

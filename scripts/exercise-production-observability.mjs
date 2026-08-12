@@ -123,11 +123,11 @@ function webVitalEnvelope(correlationId) {
       severity: "info",
       context: { correlationId },
       attributes: {
-        metricName: "LCP",
+        metric_name: "LCP",
         value: 123.4,
         delta: 12.3,
         rating: "good",
-        navigationType: "navigate",
+        navigation_type: "navigate",
       },
     },
   };

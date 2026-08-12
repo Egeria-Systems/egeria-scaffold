@@ -118,12 +118,12 @@ function readWebVitalEvent(
     !isRecord(event.attributes) ||
     !hasExactKeys(event.attributes, [
       "delta",
-      "metricName",
-      "navigationType",
+      "metric_name",
+      "navigation_type",
       "rating",
       "value",
     ]) ||
-    !includes(webVitalNames, event.attributes.metricName) ||
+    !includes(webVitalNames, event.attributes.metric_name) ||
     typeof event.attributes.value !== "number" ||
     !Number.isFinite(event.attributes.value) ||
     Math.abs(event.attributes.value) > 1_000_000_000 ||
@@ -131,7 +131,7 @@ function readWebVitalEvent(
     !Number.isFinite(event.attributes.delta) ||
     Math.abs(event.attributes.delta) > 1_000_000_000 ||
     !includes(webVitalRatings, event.attributes.rating) ||
-    !includes(navigationTypes, event.attributes.navigationType)
+    !includes(navigationTypes, event.attributes.navigation_type)
   ) {
     return undefined;
   }
@@ -141,16 +141,16 @@ function readWebVitalEvent(
     severity: "info",
     correlationId,
     attributes: Object.freeze({
-      metricName: event.attributes.metricName,
+      metric_name: event.attributes.metric_name,
       value: event.attributes.value,
       delta: event.attributes.delta,
       rating: event.attributes.rating,
-      navigationType: event.attributes.navigationType,
+      navigation_type: event.attributes.navigation_type,
     }),
     allowedAttributeNames: Object.freeze([
       "delta",
-      "metricName",
-      "navigationType",
+      "metric_name",
+      "navigation_type",
       "rating",
       "value",
     ]),
@@ -175,6 +175,35 @@ function readBrowserEvent(value: unknown): BrowserOperationalInput | undefined {
 
 function emptyResponse(status: number): Response {
   return new Response(null, { status });
+}
+
+function hasSameOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (origin === null) return false;
+
+  let originURL: URL;
+  try {
+    originURL = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (
+    (originURL.protocol !== "http:" && originURL.protocol !== "https:") ||
+    origin !== originURL.origin
+  ) {
+    return false;
+  }
+
+  const requestURL = new URL(request.url);
+  if (originURL.origin === requestURL.origin) return true;
+
+  const host = request.headers.get("host");
+  return (
+    host !== null &&
+    request.headers.get("sec-fetch-site") === "same-origin" &&
+    originURL.protocol === requestURL.protocol &&
+    originURL.host === host.toLowerCase()
+  );
 }
 
 type BoundedBodyResult =
@@ -221,8 +250,7 @@ async function readBoundedBody(request: Request): Promise<BoundedBodyResult> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const requestURL = new URL(request.url);
-  if (request.headers.get("origin") !== requestURL.origin) {
+  if (!hasSameOrigin(request)) {
     return emptyResponse(403);
   }
   if (

@@ -710,7 +710,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:8bf36126c704a431e4c24adb56c051eb0fa0b2bb86f13174046c47db6ba6e431",
+      "fingerprint": "sha256:75e6c5d88e9d89c43e44cc3db79f38805771d1e7f723bd0c88410ab3518bec67",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -738,7 +738,7 @@
       "path": "apps/web/instrumentation-client.ts"
     },
     {
-      "fingerprint": "sha256:a36c88c7f7a3f1a33265fbc92e375b07b3542b011601c28c5280af29e0ee924b",
+      "fingerprint": "sha256:972e69ce65b09a5d18ea64a17f3448f96d31c4fcdc68d83619bcb3307edb499d",
       "fingerprintTarget": {
         "kind": "file"
       },
