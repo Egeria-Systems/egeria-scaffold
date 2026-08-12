@@ -18,9 +18,9 @@
 
 **Certification evidence revision:** `f9a962874d587e4594af341a1fe5f62db6d7672c`
 
-**Passed certification outcomes:** `fresh-scaffold`
+**Passed certification outcomes:** `fresh-scaffold, unit-tests, component-tests, state-agreement, generated-project-builds, browser-regression, retained-fixture-matrix, ci-contract`
 
-**Reviewed certification outcomes:** `fresh-scaffold`
+**Reviewed certification outcomes:** `fresh-scaffold, unit-tests, component-tests, state-agreement, generated-project-builds, browser-regression, retained-fixture-matrix, ci-contract`
 
 **Certification receipt status:** `complete`
 

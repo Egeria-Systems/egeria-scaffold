@@ -12,8 +12,8 @@ No human provider prerequisite exists. The standards behavior being certified is
 
 ## Repository identity and isolation
 
-- Source checkout: `/Users/CoveMB/Code/CoveMB/egeria-scaffold`.
-- Isolated worktree: `/Users/CoveMB/Code/CoveMB/egeria-scaffold/.worktrees/standards-certification`.
+- Source checkout: repository root.
+- Isolated worktree: repository-relative `.worktrees/standards-certification`.
 - Branch: `standards-certification`.
 - Exact base: `main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c`.
 - Base comparison: `25b9840c4ad0a6a27c5a1203e31261dfac848d4e..12ecc73a8337ab12ece9dd3a6b2aec03f940383c`.
