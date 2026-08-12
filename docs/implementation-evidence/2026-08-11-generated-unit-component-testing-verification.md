@@ -1,5 +1,7 @@
 # Generated Unit and Component Testing Verification Evidence
 
+> **Historical evidence:** This records the 2026-08-11 implementation comparison only. The [2026-08-12 CI repair verification](2026-08-12-generated-testing-ci-repair-verification.md) owns the current merged-main, hosted-CI, repair, and recovery evidence for merge request 2.
+
 **Verification date:** 2026-08-11 (America/Toronto)
 
 **Status:** Implemented, independently reviewed, and ready for verified-final-diff approval

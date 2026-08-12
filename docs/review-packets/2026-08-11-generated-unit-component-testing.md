@@ -1,5 +1,7 @@
 # Generated Unit and Component Testing Review Packet
 
+> **Historical packet:** This records the 2026-08-11 implementation comparison only. The [2026-08-12 CI repair packet](2026-08-12-generated-testing-ci-repair.md) supersedes its readiness, workflow-topology, hosted-CI, changed-file, and recovery claims for merge request 2.
+
 **Verification date:** 2026-08-11 (America/Toronto)
 
 **Outcome:** READY FOR VERIFIED-FINAL-DIFF APPROVAL after evidence-backed review repairs
