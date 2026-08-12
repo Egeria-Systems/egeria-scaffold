@@ -298,6 +298,7 @@ export function createBetterStackDiagnosticSink(
   if (configuration === undefined) return configurationFailure();
   const value: DiagnosticSink = Object.freeze({
     identifier: "better-stack",
+    replacesOperationalSinkIdentifier: "better-stack",
     writeReport: async (report): Promise<SinkWriteResult> => {
       if (!isOperationalErrorReport(report)) {
         return Object.freeze({ status: "failed", reason: "invalid-event" });

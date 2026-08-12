@@ -25,12 +25,18 @@ const exceptionJwtPattern =
   /\b[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/gu;
 const exceptionBearerPattern = /\bBearer\s+[A-Za-z0-9._~+/-]{4,}/giu;
 const exceptionSecretAssignmentPattern =
-  /\b(authorization|cookie|password|secret|token|api[_-]?key)\s*[:=]\s*[^\s,;)}]+/giu;
+  /\b([A-Za-z0-9_-]*(?:authorization|cookie|credential|password|secret|token|api[_-]?key)[A-Za-z0-9_-]*)\s*[:=]\s*[^\s,;)}]+/giu;
+const exceptionKnownSecretPattern =
+  /\b(?:gh[opsu]_|github_pat_|xox[baprs]-|AIza|(?:pk|sk)_(?:live|test)_)[A-Za-z0-9._~-]+\b/gu;
+const uriUserInfoPattern =
+  /\b([a-z][a-z0-9+.-]*:\/\/)[^@\s/?#]+@/giu;
 const urlDetailsPattern = /([a-z][a-z0-9+.-]*:\/\/[^\s?#)]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/giu;
 const unixAbsolutePathPattern =
-  /(?<![A-Za-z0-9:+./-])(?:file:\/\/)?\/(?:[^/\s()?#]+\/)+([^/\s()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
+  /(?<![A-Za-z0-9:+./-])(?:file:\/\/)?\/(?:[^/\s()?#]+\/)*([^/\s()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
 const windowsAbsolutePathPattern =
-  /\b[A-Za-z]:\\(?:[^\\\s()?#]+\\)+([^\\\s()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
+  /\b[A-Za-z]:\\(?:[^\\\s()?#]+\\)*([^\\\s()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
+const uncAbsolutePathPattern =
+  /\\\\(?:[^\\\s()?#]+\\)+([^\\\s()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
 
 export const exceptionRedactionMarkers = Object.freeze({
   email: "[REDACTED_EMAIL]",
@@ -95,6 +101,11 @@ export function redactExceptionText(
     exceptionSecretAssignmentPattern,
     (_match, key) => `${key}=${exceptionRedactionMarkers.secret}`,
   );
+  replace(exceptionKnownSecretPattern, exceptionRedactionMarkers.secret);
+  replace(
+    uriUserInfoPattern,
+    (_match, scheme) => `${scheme}${exceptionRedactionMarkers.secret}@`,
+  );
   replace(exceptionJwtPattern, exceptionRedactionMarkers.secret);
   replace(exceptionEmailPattern, exceptionRedactionMarkers.email);
   replace(exceptionIpv4Pattern, exceptionRedactionMarkers.ip);
@@ -105,6 +116,10 @@ export function redactExceptionText(
       : candidate;
   });
   replace(urlDetailsPattern, (_match, base) => base);
+  replace(
+    uncAbsolutePathPattern,
+    (_match, file) => `${exceptionRedactionMarkers.path}\\${file}`,
+  );
   replace(
     windowsAbsolutePathPattern,
     (_match, file) => `${exceptionRedactionMarkers.path}\\${file}`,

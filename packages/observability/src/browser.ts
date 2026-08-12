@@ -6,6 +6,7 @@ import type {
   SinkWriteResult,
 } from "./contracts.js";
 import {
+  createDiagnosticFingerprint,
   isOperationalErrorReport,
   reconstructOperationalErrorReport,
 } from "./diagnostics.js";
@@ -82,10 +83,19 @@ function reconstructWithDiagnostics(
   report: OperationalErrorReport,
   diagnostics: Readonly<Record<string, unknown>>,
 ): OperationalErrorReport | undefined {
+  const exceptionType = diagnostics.exceptionType;
+  if (typeof exceptionType !== "string") return undefined;
+  const exceptionStacktrace = diagnostics.exceptionStacktrace;
+  const exceptionDigest = diagnostics.exceptionDigest;
+  const fingerprint = createDiagnosticFingerprint({
+    exceptionType,
+    ...(typeof exceptionStacktrace === "string" ? { exceptionStacktrace } : {}),
+    ...(typeof exceptionDigest === "string" ? { exceptionDigest } : {}),
+  });
   const reconstructed = reconstructOperationalErrorReport({
     event: report.event,
     capture: report.capture,
-    diagnostics,
+    diagnostics: { ...diagnostics, fingerprint },
   });
   return reconstructed.ok ? reconstructed.value : undefined;
 }

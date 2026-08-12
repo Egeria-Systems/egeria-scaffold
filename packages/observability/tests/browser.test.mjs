@@ -263,6 +263,29 @@ test("browser error envelopes accept approved mechanisms and reject server or st
 });
 
 test("browser error envelopes remove causes before truncating stacks and messages", () => {
+  const causeOnly = createReport({
+    name: "TypeError",
+    message: "root message remains",
+    stack: "TypeError: root\n    at render (https://example.com/app.js:10:2)",
+    cause: {
+      name: "CauseError",
+      message: "\u0000".repeat(2_048),
+      stack: "\u0000".repeat(16_384),
+    },
+  });
+  assert.equal(rawErrorEnvelopeSize(causeOnly) > 8_192, true);
+  const causeEnvelope = createBrowserErrorEnvelope(causeOnly);
+  assert.equal(causeEnvelope.ok, true);
+  assert.equal(causeEnvelope.value.report.diagnostics.cause, undefined);
+  assert.equal(
+    causeEnvelope.value.report.diagnostics.exceptionMessage,
+    causeOnly.diagnostics.exceptionMessage,
+  );
+  assert.equal(
+    causeEnvelope.value.report.diagnostics.exceptionStacktrace,
+    causeOnly.diagnostics.exceptionStacktrace,
+  );
+
   const stackHeavy = createReport({
     name: "TypeError",
     message: "message remains",
@@ -270,11 +293,10 @@ test("browser error envelopes remove causes before truncating stacks and message
       "TypeError: bounded failure\n" +
       "    at render (https://example.com/app.js:10:2)\n" +
       "\u0000".repeat(16_000),
-    cause: { name: "CauseError", message: "cause removed" },
   });
   const stackEnvelope = createBrowserErrorEnvelope(stackHeavy);
   assert.equal(stackEnvelope.ok, true);
-  assert.equal(stackEnvelope.value.report.diagnostics.cause, undefined);
+  assert.equal(stackHeavy.diagnostics.cause, undefined);
   assert.equal(
     stackEnvelope.value.report.diagnostics.exceptionMessage,
     "message remains",

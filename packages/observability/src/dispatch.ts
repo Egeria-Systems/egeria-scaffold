@@ -65,6 +65,24 @@ function readSinkIdentifier(value: unknown): string | undefined {
   }
 }
 
+function readReplacementIdentifier(value: unknown): string | undefined {
+  try {
+    if (typeof value !== "object" || value === null) return undefined;
+    const identifier = Reflect.get(
+      value,
+      "replacesOperationalSinkIdentifier",
+    ) as unknown;
+    return typeof identifier === "string" &&
+      identifier.length <= 64 &&
+      sinkIdentifierPattern.test(identifier) &&
+      !isPrivateDataLikeString(identifier)
+      ? identifier
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function hasSinkMethod(value: unknown, method: "write" | "writeReport"): boolean {
   try {
     return (
@@ -158,11 +176,11 @@ export async function dispatchOperationalErrorReport(
       return Object.freeze([]);
     }
 
-    const approvedDiagnosticIdentifiers = valid
+    const replacedOperationalIdentifiers = valid
       ? new Set(
           diagnosticSinks
             .filter((sink) => hasSinkMethod(sink, "writeReport"))
-            .map(readSinkIdentifier)
+            .map(readReplacementIdentifier)
             .filter((identifier): identifier is string => identifier !== undefined),
         )
       : new Set<string>();
@@ -170,7 +188,7 @@ export async function dispatchOperationalErrorReport(
       const identifier = readSinkIdentifier(sink);
       return (
         identifier === undefined ||
-        !approvedDiagnosticIdentifiers.has(identifier)
+        !replacedOperationalIdentifiers.has(identifier)
       );
     });
 

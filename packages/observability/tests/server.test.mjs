@@ -287,6 +287,20 @@ test("Better Stack diagnostic records enrich one safe event with bounded excepti
     serialized,
     /token=abc|#fragment|provider response|source-token-123456/u,
   );
+
+  const sensitiveReport = createReport({
+    name: "SecurityError",
+    message:
+      "credential=synthetic-credential client_secret=synthetic-client " +
+      "access_token=synthetic-access ghp_0123456789abcdefghijklmnopqrstuvwxyz " +
+      "postgres://dbuser:dbpass@localhost/private",
+  });
+  const sensitiveSerialized = serializeDiagnosticRecord(sensitiveReport);
+  assert.match(sensitiveSerialized, /\[REDACTED_SECRET\]/u);
+  assert.doesNotMatch(
+    sensitiveSerialized,
+    /synthetic-credential|synthetic-client|synthetic-access|ghp_|dbuser|dbpass/u,
+  );
 });
 
 test("Better Stack diagnostic delivery accepts only exact 202 and contains provider content", async () => {

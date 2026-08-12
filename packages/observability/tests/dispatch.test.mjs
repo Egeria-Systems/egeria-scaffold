@@ -219,6 +219,7 @@ test("error dispatch preserves safe and diagnostic tiers while containing every 
     diagnosticSinks: [
       {
         identifier: "better-stack",
+        replacesOperationalSinkIdentifier: "better-stack",
         writeReport: async (received) => {
           diagnosticCalls.push(received);
           return { status: "delivered" };
@@ -256,6 +257,37 @@ test("error dispatch preserves safe and diagnostic tiers while containing every 
   assert.equal(results.every(Object.isFrozen), true);
   assert.doesNotMatch(JSON.stringify(safeCalls), /diagnostics|exception|message|stack/u);
   assert.doesNotMatch(JSON.stringify(results), /credential-secret|provider response/u);
+});
+
+test("diagnostic identifier collisions do not suppress unrelated safe delivery", async () => {
+  const report = createErrorReport();
+  const calls = [];
+  const results = await dispatchOperationalErrorReport(report, {
+    operationalSinks: [
+      {
+        identifier: "workers-logs",
+        write: () => {
+          calls.push("safe");
+          return { status: "delivered" };
+        },
+      },
+    ],
+    diagnosticSinks: [
+      {
+        identifier: "workers-logs",
+        writeReport: () => {
+          calls.push("diagnostic");
+          return { status: "delivered" };
+        },
+      },
+    ],
+  });
+
+  assert.deepEqual(calls, ["safe", "diagnostic"]);
+  assert.deepEqual(results, [
+    { sink: "workers-logs", status: "delivered" },
+    { sink: "workers-logs", status: "delivered" },
+  ]);
 });
 
 test("error dispatch rejects unbranded reports before any sink is called", async () => {

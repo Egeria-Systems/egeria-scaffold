@@ -188,6 +188,7 @@ export type OperationalErrorReport = Readonly<{
 
 export type DiagnosticSink = Readonly<{
   identifier: string;
+  replacesOperationalSinkIdentifier?: string;
   writeReport: (
     report: OperationalErrorReport,
   ) => SinkWriteResult | Promise<SinkWriteResult>;

@@ -105,6 +105,17 @@ function hasOnlyKeys(
   }
 }
 
+function hasAllKeys(
+  value: Readonly<Record<string, unknown>>,
+  required: readonly string[],
+): boolean {
+  try {
+    return required.every((key) => key in value);
+  } catch {
+    return false;
+  }
+}
+
 function readField(value: unknown, key: string): unknown {
   if (typeof value !== "object" || value === null) return undefined;
   try {
@@ -241,7 +252,7 @@ function findTopFrame(stack: string | undefined): string | undefined {
     .find((line) => line.startsWith("at "));
 }
 
-function createFingerprint(input: Readonly<{
+export function createDiagnosticFingerprint(input: Readonly<{
   exceptionType: string;
   exceptionStacktrace?: string;
   exceptionDigest?: string;
@@ -302,7 +313,7 @@ function createExceptionDiagnostics(
       const exceptionType = "CyclicCause";
       return Object.freeze({
         exceptionType,
-        fingerprint: createFingerprint({ exceptionType }),
+        fingerprint: createDiagnosticFingerprint({ exceptionType }),
         truncated: true,
       });
     }
@@ -332,7 +343,7 @@ function createExceptionDiagnostics(
     causeValue === undefined || causeOmitted
       ? undefined
       : createExceptionDiagnostics(causeValue, depth + 1, seen);
-  const fingerprint = createFingerprint({
+  const fingerprint = createDiagnosticFingerprint({
     exceptionType,
     ...(stack.value === undefined ? {} : { exceptionStacktrace: stack.value }),
     ...(exceptionDigest === undefined ? {} : { exceptionDigest }),
@@ -469,14 +480,12 @@ function reconstructDiagnostics(
         ? undefined
         : reconstructDiagnostics(value.cause, depth + 1);
     if (value.cause !== undefined && cause === undefined) return undefined;
-    if (stack.value !== undefined) {
-      const expectedFingerprint = createFingerprint({
-        exceptionType,
-        exceptionStacktrace: stack.value,
-        ...(exceptionDigest === undefined ? {} : { exceptionDigest }),
-      });
-      if (fingerprint !== expectedFingerprint) return undefined;
-    }
+    const expectedFingerprint = createDiagnosticFingerprint({
+      exceptionType,
+      ...(stack.value === undefined ? {} : { exceptionStacktrace: stack.value }),
+      ...(exceptionDigest === undefined ? {} : { exceptionDigest }),
+    });
+    if (fingerprint !== expectedFingerprint) return undefined;
     return Object.freeze({
       exceptionType,
       ...(message.value === undefined ? {} : { exceptionMessage: message.value }),
@@ -498,26 +507,30 @@ export function reconstructOperationalErrorReport(
   if (
     !isPlainRecord(value) ||
     !hasOnlyKeys(value, reportKeys) ||
-    reportKeys.some((key) => !(key in value))
+    !hasAllKeys(value, reportKeys)
   ) {
     return resultFailure("ERROR_REPORT_INPUT_INVALID");
   }
-  const event = reconstructEvent(value.event);
-  if (event?.kind !== "application.error") {
-    return resultFailure("ERROR_REPORT_EVENT_INVALID");
+  try {
+    const event = reconstructEvent(value.event);
+    if (event?.kind !== "application.error") {
+      return resultFailure("ERROR_REPORT_EVENT_INVALID");
+    }
+    const capture = createCaptureContext(value.capture, event);
+    if (capture === undefined) {
+      return resultFailure("ERROR_REPORT_CAPTURE_INVALID");
+    }
+    const diagnostics = reconstructDiagnostics(value.diagnostics, 0);
+    if (diagnostics === undefined) {
+      return resultFailure("ERROR_REPORT_DIAGNOSTICS_INVALID");
+    }
+    return Object.freeze({
+      ok: true,
+      value: createReport(event, capture, diagnostics),
+    });
+  } catch {
+    return resultFailure("ERROR_REPORT_INPUT_INVALID");
   }
-  const capture = createCaptureContext(value.capture, event);
-  if (capture === undefined) {
-    return resultFailure("ERROR_REPORT_CAPTURE_INVALID");
-  }
-  const diagnostics = reconstructDiagnostics(value.diagnostics, 0);
-  if (diagnostics === undefined) {
-    return resultFailure("ERROR_REPORT_DIAGNOSTICS_INVALID");
-  }
-  return Object.freeze({
-    ok: true,
-    value: createReport(event, capture, diagnostics),
-  });
 }
 
 export function isOperationalErrorReport(
