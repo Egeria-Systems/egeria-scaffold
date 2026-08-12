@@ -184,11 +184,11 @@ Expected: stable job names always appear for pull requests; deep work is skipped
 
 ## Task 8: Complete local verification once
 
-- [ ] Run `pnpm run verify:builder-kernel` once on the settled unchanged tree. This includes public registry reads, clean temporary installs, Chromium, local servers, browser execution, and the three retained fixtures; obtain any required network approval before starting.
-- [ ] Run `pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec playwright install --with-deps chromium`, then `pnpm run verify:compatibility-proof` once on the settled tree. The builder-kernel aggregate does not own this proof matrix.
-- [ ] Run `git diff --check`, `pnpm run check:semantic-naming`, and `pnpm run changeset:status` if not already included against the final tree.
-- [ ] Record exact commands, versions, duration, exit results, fixture identities, generated test counts, browser boundaries, and any skipped external evidence in verification evidence.
-- [ ] Do not claim hosted GitHub, dependency-review, deployment, provider, visual, human-usability, assistive-technology, or WCAG outcomes from local results.
+- [x] Run `pnpm run verify:builder-kernel` once on the settled unchanged tree. This includes public registry reads, clean temporary installs, Chromium, local servers, browser execution, and the three retained fixtures; obtain any required network approval before starting.
+- [x] Run `pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec playwright install --with-deps chromium`, then `pnpm run verify:compatibility-proof` once on the settled tree. The builder-kernel aggregate does not own this proof matrix.
+- [x] Run `git diff --check`, `pnpm run check:semantic-naming`, and `pnpm run changeset:status` if not already included against the final tree.
+- [x] Record exact commands, versions, duration, exit results, fixture identities, generated test counts, browser boundaries, and any skipped external evidence in verification evidence.
+- [x] Do not claim hosted GitHub, dependency-review, deployment, provider, visual, human-usability, assistive-technology, or WCAG outcomes from local results.
 
 ## Task 9: Independent review, bounded repair, and stop gate
 
