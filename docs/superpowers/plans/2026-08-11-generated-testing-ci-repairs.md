@@ -21,6 +21,7 @@
 - Create `packages/builder-core/lockfiles/web-recipe-0.7.0/pnpm-lock.yaml` from the reviewed retained-project lockfile bytes. The canonical lockfile basename is required so the semantic-naming gate treats generated integrity data as lockfile content rather than authored prose.
 - Modify `packages/builder-core/src/generation/verify-generated-project.ts`.
 - Modify `packages/builder-core/tests/generate-project.test.mjs`.
+- Modify `packages/builder-core/tests/generate-project.integration.mjs`.
 - Modify `packages/builder-core/AGENTS.md`.
 - Modify `docs/superpowers/plans/2026-08-10-generated-unit-component-testing.md`.
 
@@ -29,12 +30,14 @@
 - Require production lockfile preparation to write the reviewed recipe bytes exactly.
 - Require lockfile preparation to invoke no package-manager or registry process.
 - Preserve focused failures for pre-existing or non-regular lockfile targets and preserve content-safe verification failure mapping.
+- Require live production generation to reject the stale `78`/`80` managed-surface expectations after generated testing expands the exact profile contracts to `95`/`97`.
 
 ### GREEN
 
 - Read the builder-owned `0.7.0` recipe lockfile from the private builder-core package boundary.
 - Create `pnpm-lock.yaml` exclusively in the generated source and retain the existing before/after inventory guard.
 - Keep the existing isolated `pnpm --version`, frozen install, lint, typecheck, unit/component, Next, and OpenNext verification unchanged.
+- Update only the live production-generation expectations to the exact `portfolio`/`site` managed-surface counts `95`/`97` already owned by generation and retained-fixture contracts.
 - Do not alter templates, manifests, fixtures, fingerprints, schemas, capabilities, recipes, or state receipts.
 
 ### Verification and commit
@@ -42,6 +45,7 @@
 ```sh
 pnpm run build:builder
 pnpm run test:builder-core
+pnpm run test:generated-project
 pnpm run test:generated-fixtures
 ```
 
