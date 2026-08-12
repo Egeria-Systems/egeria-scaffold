@@ -19,7 +19,7 @@
     "test:e2e:dev": "playwright test --config=playwright.dev.config.ts",
     "test:e2e:preview": "playwright test --config=playwright.preview.config.ts",
     "test:e2e:deployed": "playwright test --config=playwright.deployed.config.ts",
-    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test:unit && pnpm run build && pnpm run build:cloudflare && pnpm run cf-typegen:check && pnpm run test:integration:cloudflare && pnpm run test:e2e:dev && pnpm run test:e2e:preview"
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test:unit && pnpm run build && pnpm exec opennextjs-cloudflare build --skipNextBuild && pnpm run cf-typegen:check && pnpm run test:integration:cloudflare && pnpm run test:e2e:dev && pnpm run test:e2e:preview"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "1.20.2",

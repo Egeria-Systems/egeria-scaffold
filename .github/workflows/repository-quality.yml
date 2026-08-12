@@ -261,7 +261,7 @@ jobs:
         run: pnpm --filter @egeria-systems/nextjs-cloudflare-proof run build
 
       - name: Build OpenNext compatibility proof
-        run: pnpm --filter @egeria-systems/nextjs-cloudflare-proof run build:cloudflare
+        run: pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec opennextjs-cloudflare build --skipNextBuild
 
       - name: Check Cloudflare generated types
         run: pnpm --filter @egeria-systems/nextjs-cloudflare-proof run cf-typegen:check

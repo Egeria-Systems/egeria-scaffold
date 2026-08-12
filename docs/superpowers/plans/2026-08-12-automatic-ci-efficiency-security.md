@@ -151,17 +151,17 @@ Expected: stable job names always appear for pull requests; deep work is skipped
 
 **Files:** proof package/Next/Playwright configuration and instructions; generated templates including Next configuration; `packages/builder-core/src/generation/verify-generated-project.ts`; `scripts/verify-generated-skeletons.mjs`.
 
-- [ ] Change proof `verify` so `pnpm run build` is followed by `pnpm exec opennextjs-cloudflare build --skipNextBuild`; do not change proof `build:cloudflare`, `preview`, or `deploy` scripts.
-- [ ] Configure proof and generated Next builds to emit standalone output with the workspace root as `outputFileTracingRoot`; this is the prepared artifact required by `--skipNextBuild` and preserves the public build scripts.
-- [ ] Change proof preview Playwright `webServer.command` to direct `pnpm exec opennextjs-cloudflare preview -- --ip 127.0.0.1 --port 3101`.
-- [ ] Change generated root `verify` to call `pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild` after its root Next build; preserve root/web standalone build and preview scripts.
-- [ ] Change generated preview Playwright to direct `pnpm exec opennextjs-cloudflare preview -- --ip 127.0.0.1 --port 3101`.
-- [ ] Change the generated workflow's OpenNext step to the direct `--skipNextBuild` command and set pnpm setup to `cache: false`.
-- [ ] Change compiled-generator verification's OpenNext command array to `--dir`, `apps/web`, `exec`, `opennextjs-cloudflare`, `build`, `--skipNextBuild`; preserve state-last ordering, failure code, bounded output, and verification receipt identifier.
-- [ ] Change the fixed-root verifier's OpenNext command array to `--dir`, `apps/web`, `exec`, `opennextjs-cloudflare`, `build`, `--skipNextBuild`; keep the existing bounded execution, isolated homes/stores/caches, failure normalization, and single execution per fixture.
-- [ ] Update proof/generated instructions and READMEs with the prepared-output prerequisite and evidence boundary.
-- [ ] Run the three focused test commands from Task 4 and require GREEN.
-- [ ] Commit the implementation as `perf: reuse prepared OpenNext builds`.
+- [x] Change proof `verify` so `pnpm run build` is followed by `pnpm exec opennextjs-cloudflare build --skipNextBuild`; do not change proof `build:cloudflare`, `preview`, or `deploy` scripts.
+- [x] Configure proof and generated Next builds to emit standalone output with the workspace root as `outputFileTracingRoot`; this is the prepared artifact required by `--skipNextBuild` and preserves the public build scripts.
+- [x] Change proof preview Playwright `webServer.command` to direct `pnpm exec opennextjs-cloudflare preview -- --ip 127.0.0.1 --port 3101`.
+- [x] Change generated root `verify` to call `pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild` after its root Next build; preserve root/web standalone build and preview scripts.
+- [x] Change generated preview Playwright to direct `pnpm exec opennextjs-cloudflare preview -- --ip 127.0.0.1 --port 3101`.
+- [x] Change the generated workflow's OpenNext step to the direct `--skipNextBuild` command and set pnpm setup to `cache: false`.
+- [x] Change compiled-generator verification's OpenNext command array to `--dir`, `apps/web`, `exec`, `opennextjs-cloudflare`, `build`, `--skipNextBuild`; preserve state-last ordering, failure code, bounded output, and verification receipt identifier.
+- [x] Change the fixed-root verifier's OpenNext command array to `--dir`, `apps/web`, `exec`, `opennextjs-cloudflare`, `build`, `--skipNextBuild`; keep the existing bounded execution, isolated homes/stores/caches, failure normalization, and single execution per fixture.
+- [x] Update proof/generated instructions and READMEs with the prepared-output prerequisite and evidence boundary.
+- [x] Require `test:constitution` and `test:builder-core` GREEN. Before fixture replacement, require `test:generated-fixtures` to complete two byte-identical production generations and fail only because committed template-derived fixtures are stale; Task 6 must restore the complete fixture suite to GREEN.
+- [x] Commit the implementation as `perf: reuse prepared OpenNext builds`.
 
 ## Task 6: Regenerate retained fixtures from production output
 

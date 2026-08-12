@@ -308,7 +308,7 @@ function expectedRootManifest(projectName) {
       "test:watch": "pnpm --dir apps/web run test:watch",
       typecheck: "pnpm --dir apps/web run typecheck",
       verify:
-        "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run build:cloudflare",
+        "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild",
     },
     engines: { node: "22.23.2", pnpm: "11.20.0" },
     packageManager: "pnpm@11.20.0",
@@ -802,7 +802,14 @@ async function verifySourcesWithAdapters(adapters, sourcesBefore) {
         },
         { arguments: ["run", "build"], failureCode: "NEXT_BUILD_FAILED" },
         {
-          arguments: ["run", "build:cloudflare"],
+          arguments: [
+            "--dir",
+            "apps/web",
+            "exec",
+            "opennextjs-cloudflare",
+            "build",
+            "--skipNextBuild",
+          ],
           failureCode: "OPENNEXT_BUILD_FAILED",
         },
         {

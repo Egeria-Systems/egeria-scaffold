@@ -482,7 +482,14 @@ async function verifyInIsolatedCopy(
           },
           { arguments: ["run", "build"], failureCode: "NEXT_BUILD_FAILED" },
           {
-            arguments: ["run", "build:cloudflare"],
+            arguments: [
+              "--dir",
+              "apps/web",
+              "exec",
+              "opennextjs-cloudflare",
+              "build",
+              "--skipNextBuild",
+            ],
             failureCode: "OPENNEXT_BUILD_FAILED",
           },
         ] as const;
