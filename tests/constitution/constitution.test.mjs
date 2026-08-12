@@ -356,7 +356,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   );
   assert.match(
     scopeRun,
-    /generated_projects="true"[\s\S]+compatibility_proof="true"/u,
+    /set -euo pipefail\s+generated_projects="true"\s+compatibility_proof="true"/u,
   );
   assert.match(
     scopeRun,

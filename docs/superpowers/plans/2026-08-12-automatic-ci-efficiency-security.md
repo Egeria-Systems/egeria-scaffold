@@ -120,17 +120,17 @@ Expected: a settled preflight showing no unaccounted overlapping work and either
 
 **Files:** `.github/workflows/repository-quality.yml`; delete the two scoped workflow files.
 
-- [ ] Keep workflow-level `permissions: contents: read` and `repository-quality-${{ github.ref }}` cancellation.
-- [ ] Implement `scope` with full-history credential-free checkout. Pass the event-specific revisions through `env`, validate and resolve them as commit objects before diffing, handle `git diff --quiet` status `0`, `1`, and error distinctly, and write only literal `true`/`false` outputs.
-- [ ] Preserve the current generated path ownership: `.gitattributes`, `.npmrc`, root workspace manifests/lockfile, `apps/cli/**`, builder/observability/standards packages, retained fixtures, verifier, and generated-fixture tests. Treat any `.github/workflows/**` change as applicable to both deep lanes.
-- [ ] Preserve the current proof path ownership: `.npmrc`, root workspace manifests/lockfile, `packages/standards/**`, and the proof tree. Treat any `.github/workflows/**` change as applicable to both deep lanes.
-- [ ] Keep `builder-and-packages` always-on with its existing explicit command order and change pnpm setup to `cache: false`.
-- [ ] Move `generated-projects` and `compatibility-proof` intact behind their job-level conditions, set checkout `fetch-depth: 0` only where required, and change pnpm setup to `cache: false`.
-- [ ] Add pull-request-only dependency review at the initially reviewed commit `a1d282b36b6f3519aa1f3fc636f609c47dddb294`, with no checkout, install, secrets, or additional permission; record that exact initial binding in preparation evidence.
-- [ ] Delete the two superseded workflow files only after the consolidated contract contains their checks.
-- [ ] Run `pnpm run test:constitution` and require GREEN.
-- [ ] Run `git diff --check` and inspect the YAML diff for expression/shell quoting and least privilege.
-- [ ] Commit the workflow implementation as `ci: consolidate repository quality checks`.
+- [x] Keep workflow-level `permissions: contents: read` and `repository-quality-${{ github.ref }}` cancellation.
+- [x] Implement `scope` with full-history credential-free checkout. Pass the event-specific revisions through `env`, validate and resolve them as commit objects before diffing, handle `git diff --quiet` status `0`, `1`, and error distinctly, and write only literal `true`/`false` outputs.
+- [x] Preserve the current generated path ownership: `.gitattributes`, `.npmrc`, root workspace manifests/lockfile, `apps/cli/**`, builder/observability/standards packages, retained fixtures, verifier, and generated-fixture tests. Treat any `.github/workflows/**` change as applicable to both deep lanes.
+- [x] Preserve the current proof path ownership: `.npmrc`, root workspace manifests/lockfile, `packages/standards/**`, and the proof tree. Treat any `.github/workflows/**` change as applicable to both deep lanes.
+- [x] Keep `builder-and-packages` always-on with its existing explicit command order and change pnpm setup to `cache: false`.
+- [x] Move `generated-projects` and `compatibility-proof` intact behind their job-level conditions, set checkout `fetch-depth: 0` only where required, and change pnpm setup to `cache: false`.
+- [x] Add pull-request-only dependency review at the initially reviewed commit `a1d282b36b6f3519aa1f3fc636f609c47dddb294`, with no checkout, install, secrets, or additional permission; record that exact initial binding in preparation evidence.
+- [x] Delete the two superseded workflow files only after the consolidated contract contains their checks.
+- [x] Run `pnpm run test:constitution` and require GREEN.
+- [x] Run `git diff --check` and inspect the YAML diff for expression/shell quoting and least privilege.
+- [x] Commit the workflow implementation as `ci: consolidate repository quality checks`.
 
 Expected: stable job names always appear for pull requests; deep work is skipped at the job level only when the validated diff says it is irrelevant.
 
