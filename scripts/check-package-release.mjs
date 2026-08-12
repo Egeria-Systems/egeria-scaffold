@@ -231,7 +231,7 @@ async function loadPackageRecords() {
   );
 }
 
-async function loadPendingChangesets() {
+export async function loadPendingChangesets() {
   return (await readdir(join(repositoryRoot, ".changeset")))
     .filter((file) => file.endsWith(".md") && file !== "README.md")
     .sort();

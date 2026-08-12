@@ -15,6 +15,8 @@ const evidenceDocumentSource = readFileSync(
 );
 const observabilityPlanPath =
   "docs/superpowers/plans/2026-08-10-production-observability-certification.md";
+const standardsPlanPath =
+  "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md";
 const committedRegistry = JSON.parse(
   readFileSync(
     new URL("../../../certifications/capabilities.json", import.meta.url),
@@ -36,7 +38,7 @@ const descriptorDigests = Object.freeze({
   "site-routing":
     "sha256:d716a1c93f8f40db33e54612c85d521fbd6ba13cd142d35ab0c39fa9c4b9647e",
   standards:
-    "sha256:a3a020b778c1ccfa24e0bfc951fcdf5eb74b50728f69e960124c6bae6a757311",
+    "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb",
 });
 
 const requiredEvidence = Object.freeze({
@@ -81,6 +83,8 @@ function createRecord(identifier) {
       ? planPath
       : identifier === "observability"
         ? observabilityPlanPath
+        : identifier === "standards"
+          ? standardsPlanPath
         : null;
 
   return {
@@ -90,7 +94,9 @@ function createRecord(identifier) {
     },
     requiredEvidence: requiredEvidence[identifier],
     status:
-      identifier === "booking-calendly" || identifier === "observability"
+      identifier === "booking-calendly" ||
+      identifier === "observability" ||
+      identifier === "standards"
         ? "pending"
         : "backfill-pending",
     taskPlan,
@@ -286,6 +292,8 @@ test("descriptor admission rejects incomplete, stale, extra, and false-legacy co
     changedStandards,
     changedLegacy.records.standards.requiredEvidence,
   );
+  changedLegacy.records.standards.status = "backfill-pending";
+  changedLegacy.records.standards.taskPlan = null;
   assert.deepEqual(
     core.validateCertificationAdmission({
       catalog: changedLegacyCatalog,
@@ -370,6 +378,25 @@ test("material observability remains pending with only reviewed fresh-scaffold e
   );
 });
 
+test("material standards testing changes remain pending for separate certification", () => {
+  const standardsDescriptor = descriptorsByIdentifier.get("standards");
+  assert.notEqual(standardsDescriptor, undefined);
+
+  assert.equal(standardsDescriptor.version, "0.3.0");
+  assert.deepEqual(committedRegistry.records.standards, {
+    subject: core.createCertificationSubject(standardsDescriptor, [
+      "fresh-scaffold",
+    ]),
+    requiredEvidence: ["fresh-scaffold"],
+    status: "pending",
+    taskPlan: standardsPlanPath,
+    evidence: [],
+  });
+  assert.doesNotThrow(() =>
+    readFileSync(new URL(`../../../${standardsPlanPath}`, import.meta.url)),
+  );
+});
+
 test("repository artifacts bind successful evidence to capability, subject, revision, and outcome", () => {
   const recorded = cloneRegistry();
   const booking = recorded.records["booking-calendly"];
@@ -381,6 +408,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
       artifacts: {
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
+        [standardsPlanPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
       },
       validRevisions: [evidenceRevision],
@@ -393,6 +421,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
       registry: recorded,
       artifacts: {
         [observabilityPlanPath]: "# approved plan",
+        [standardsPlanPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
       },
       validRevisions: [evidenceRevision],
@@ -417,6 +446,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
       artifacts: {
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
+        [standardsPlanPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
       },
       validRevisions: [evidenceRevision],
@@ -455,6 +485,7 @@ test("repository artifacts reject revisions outside the checked Git history", ()
       artifacts: {
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
+        [standardsPlanPath]: "# approved plan",
         [evidencePath]: nonexistentRevisionDocument,
       },
       validRevisions: [evidenceRevision],
@@ -503,6 +534,7 @@ test("repository artifacts reject incomplete or unresolved reviewer receipts", (
       artifacts: {
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
+        [standardsPlanPath]: "# approved plan",
         [evidencePath]: incompleteReceipt,
       },
       validRevisions: [evidenceRevision],
@@ -559,6 +591,7 @@ test("repository artifacts require affirmative review of every claimed outcome",
       artifacts: {
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
+        [standardsPlanPath]: "# approved plan",
         [evidencePath]: mismatchedReview,
       },
       validRevisions: [evidenceRevision],
@@ -590,6 +623,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
         path: ["records", "observability", "status"],
         context: { reason: "pending" },
       },
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "standards", "status"],
+        context: { reason: "pending" },
+      },
     ],
   );
   assert.equal(
@@ -611,8 +649,14 @@ test("closure distinguishes the bounded legacy transition from full certificatio
     core.validateCertificationClosure({
       registry: currentCertified,
       policy: "legacy-backfill-exempt",
-    }),
-    { ok: true, value: undefined },
+    }).issues,
+    [
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "standards", "status"],
+        context: { reason: "pending" },
+      },
+    ],
   );
   assert.equal(
     core.validateCertificationClosure({

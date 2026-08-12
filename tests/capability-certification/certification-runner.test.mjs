@@ -30,6 +30,8 @@ const fixedChecks = Object.freeze([
   "registry-signatures",
   "lint",
   "typecheck",
+  "unit-tests",
+  "component-tests",
   "next-build",
   "opennext-build",
   "browser-install",
@@ -63,7 +65,7 @@ async function runCheck(arguments_) {
   }
 }
 
-test("the repository registry admits but remains open for observability certification", async () => {
+test("the repository registry admits but remains open for observability and standards certification", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -88,6 +90,11 @@ test("the repository registry admits but remains open for observability certific
           path: ["records", "observability", "status"],
           context: { reason: "pending" },
         },
+        {
+          code: "CAPABILITY_CERTIFICATION_PENDING",
+          path: ["records", "standards", "status"],
+          context: { reason: "pending" },
+        },
       ],
     })}\n`,
     stderr: "",
@@ -106,7 +113,7 @@ test("the repository registry admits but remains open for observability certific
         ["observability", "pending"],
         ["section-composition", "backfill-pending"],
         ["site-routing", "backfill-pending"],
-        ["standards", "backfill-pending"],
+        ["standards", "pending"],
       ].map(([capabilityIdentifier, reason]) => ({
         code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", capabilityIdentifier, "status"],

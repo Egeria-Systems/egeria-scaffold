@@ -131,6 +131,13 @@ function assertPortablePublicLockfile(lockfile) {
   assert.match(lockfile, /@egeria-systems\/observability@0\.2\.0/u);
   assert.match(lockfile, /@axe-core\/playwright@4\.12\.1/u);
   assert.match(lockfile, /@playwright\/test@1\.62\.1/u);
+  assert.match(lockfile, /@testing-library\/dom@10\.4\.1/u);
+  assert.match(lockfile, /@testing-library\/jest-dom@7\.0\.1/u);
+  assert.match(lockfile, /@testing-library\/react@16\.3\.2/u);
+  assert.match(lockfile, /@testing-library\/user-event@14\.6\.3/u);
+  assert.match(lockfile, /@vitejs\/plugin-react@6\.0\.5/u);
+  assert.match(lockfile, /jsdom@30\.0\.1/u);
+  assert.match(lockfile, /vitest@4\.1\.10/u);
   assert.match(lockfile, /raw-loader@4\.0\.2/u);
   assert.match(lockfile, /@tailwindcss\/postcss@4\.3\.3/u);
   assert.match(lockfile, /postcss@8\.5\.26/u);
@@ -265,6 +272,8 @@ test("compiled project generation matches every committed fixture identifier", a
           "frozen-install",
           "lint",
           "typecheck",
+          "unit-tests",
+          "component-tests",
           "next-build",
           "opennext-build",
           "post-state-inference",
