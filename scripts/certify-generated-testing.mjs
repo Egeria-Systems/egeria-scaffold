@@ -13,6 +13,23 @@ const expectedCapabilities = Object.freeze([
   "deployment-cloudflare",
   "observability",
 ]);
+const expectedVerificationChecks = Object.freeze([
+  "pnpm-version",
+  "frozen-install",
+  "peer-dependencies",
+  "dependency-audit",
+  "registry-signatures",
+  "lint",
+  "cloudflare-types",
+  "typecheck",
+  "unit-tests",
+  "component-tests",
+  "next-build",
+  "opennext-build",
+  "browser-install",
+  "browser-development",
+  "browser-preview",
+]);
 
 export class GeneratedTestingCertificationError extends Error {
   constructor(code) {
@@ -31,6 +48,7 @@ const configuration = Object.freeze({
   capabilityIdentifier: "standards",
   capabilityVersion: "0.3.0",
   verifierIdentifier: "portfolio",
+  expectedVerificationChecks,
   receipt: Object.freeze({}),
   createError: (code) => new GeneratedTestingCertificationError(code),
   isCertificationError: (error) =>

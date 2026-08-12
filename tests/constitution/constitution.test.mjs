@@ -2567,6 +2567,7 @@ test("executable capability certification ownership is current", async () => {
     roadmap,
     builderCoreInstructions,
     builderCoreReadme,
+    packageOwnership,
     registrySource,
     providerReceipt,
   ] = await Promise.all([
@@ -2577,6 +2578,7 @@ test("executable capability certification ownership is current", async () => {
     readRepositoryFile("docs/roadmaps/program-roadmap.md"),
     readRepositoryFile("packages/builder-core/AGENTS.md"),
     readRepositoryFile("packages/builder-core/README.md"),
+    readRepositoryFile("docs/architecture/package-ownership.md"),
     readRepositoryFile("certifications/capabilities.json"),
     readRepositoryFile(
       "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
@@ -2595,7 +2597,13 @@ test("executable capability certification ownership is current", async () => {
   }
   const registry = JSON.parse(registrySource);
   const bookingRecord = registry.records["booking-calendly"];
+  const standardsRecord = registry.records.standards;
   assert.equal(bookingRecord.status, "certified");
+  assert.equal(standardsRecord.status, "certified");
+  assert.match(
+    packageOwnership,
+    /descriptor `standards@0\.3\.0` is certified from its exact local subject-bound receipt[^\n]+public `0\.2\.0` availability alone does not alter the installed public package/iu,
+  );
   assert.deepEqual(
     bookingRecord.evidence.map(({ kind }) => kind),
     [
@@ -2835,6 +2843,10 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   assert.match(
     certificationPlan,
     /pnpm run check:capability-certification/u,
+  );
+  assert.match(
+    certificationPlan,
+    /admission[^.]+pass[\s\S]+legacy-backfill-exempt[^.]+reject[^.]+observability[\s\S]+all-certified[^.]+reject[^.]+four[^.]+backfill/iu,
   );
   assert.match(
     certificationPlan,

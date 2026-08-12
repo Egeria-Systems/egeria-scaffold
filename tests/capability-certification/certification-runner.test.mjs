@@ -73,6 +73,7 @@ const fixedChecks = Object.freeze([
   "dependency-audit",
   "registry-signatures",
   "lint",
+  "cloudflare-types",
   "typecheck",
   "unit-tests",
   "component-tests",
@@ -423,6 +424,84 @@ test("generated testing certification binds a fresh portfolio to the exact stand
     } else {
       process.env.NPM_TOKEN = previousToken;
     }
+  }
+});
+
+test("generated testing certification rejects incomplete, extra, or reordered verifier checks", async () => {
+  const commandOutput = (input) => {
+    const command = input.arguments[1];
+    if (command === "create") {
+      return `${JSON.stringify({
+        ok: true,
+        command,
+        profile: "portfolio",
+        capabilities: [
+          "standards",
+          "content-files",
+          "section-composition",
+          "deployment-cloudflare",
+          "observability",
+        ],
+      })}\n`;
+    }
+    if (command === "infer") {
+      return `${JSON.stringify({
+        ok: true,
+        command,
+        result: {
+          state: {
+            kind: "valid",
+            value: {
+              installedCapabilities: [
+                { identifier: "standards", version: "0.3.0" },
+              ],
+            },
+          },
+          capabilities: [
+            { identifier: "standards", category: "confirmed" },
+          ],
+        },
+      })}\n`;
+    }
+    if (command === "doctor") {
+      return `${JSON.stringify({
+        ok: true,
+        command,
+        result: { healthy: true, diagnostics: [] },
+      })}\n`;
+    }
+    if (command === "diff") {
+      return `${JSON.stringify({
+        ok: true,
+        command,
+        result: { equal: true, differences: [] },
+      })}\n`;
+    }
+    throw new Error("unexpected command");
+  };
+  const invalidChecks = [
+    fixedChecks.slice(0, -1),
+    [...fixedChecks, "unexpected"],
+    [...fixedChecks].reverse(),
+  ];
+
+  for (const checks of invalidChecks) {
+    await assert.rejects(
+      certifyGeneratedTestingForTesting({
+        runCommand: async (input) => commandOutput(input),
+        verifyProject: async () => ({
+          ok: true,
+          fixtures: ["portfolio"],
+          profiles: ["portfolio"],
+          checks,
+        }),
+      }),
+      (error) => {
+        assert.equal(error.name, "GeneratedTestingCertificationError");
+        assert.equal(error.code, "GENERATED_PROJECT_VERIFICATION_INVALID");
+        return true;
+      },
+    );
   }
 });
 

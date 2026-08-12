@@ -64,6 +64,7 @@ tests/capability-certification/certification-runner.test.mjs
 tests/constitution/constitution.test.mjs
 packages/builder-core/tests/certification.test.mjs
 packages/builder-core/AGENTS.md
+scripts/lib/certify-fresh-scaffold.mjs
 docs/architecture/overview.md
 docs/architecture/capability-model.md
 docs/architecture/enforcement-map.md
@@ -72,9 +73,10 @@ docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md
 README.md
 CONTRIBUTING.md
 packages/builder-core/README.md
+docs/architecture/package-ownership.md
 ```
 
-This amendment authorizes the later-dated files above and one semantic root command, `verify:generated-testing-certification`, backed by the new thin script. The script must reuse `scripts/lib/certify-fresh-scaffold.mjs`; it must not duplicate the fresh-scaffold lifecycle or broaden its environment, cleanup, output, or authority. Do not modify generated application source, dependency versions, capability descriptors, recipes, managed surfaces, probes, schemas, generated tests, workflows, or fixtures during certification. Any such need invalidates the pending subject and returns work to a new implementation task and subject.
+This amendment authorizes the later-dated files above and one semantic root command, `verify:generated-testing-certification`, backed by the new thin script. The script must reuse `scripts/lib/certify-fresh-scaffold.mjs`; it must not duplicate the fresh-scaffold lifecycle or broaden its environment, cleanup, output, or authority. The independent test-evidence review also authorizes one optional shared-engine exact-check tuple validated only when a certification configuration supplies it, plus the package-ownership status correction and protective constitution contracts. Do not modify generated application source, dependency versions, capability descriptors, recipes, managed surfaces, probes, schemas, generated tests, workflows, or fixtures during certification. Any such need invalidates the pending subject and returns work to a new implementation task and subject.
 
 ## Task 1: Freeze the exact subject and evidence boundary
 
@@ -122,7 +124,7 @@ Stop if the version, digest, plan link, evidence requirements, generated depende
 - [ ] Write one strict machine-readable receipt containing all eight outcomes, exact subject/revision bindings, explicit passed status, per-outcome review, overall review, and no unresolved fields.
 - [ ] Add focused RED coverage proving the pending record cannot become certified when any receipt field or binding is wrong.
 - [ ] Change only the exact standards registry record from `pending` to `certified` with the repository receipt and evidence references.
-- [ ] Run descriptor admission and all-certified/P2 closure checks GREEN.
+- [ ] Require descriptor admission to pass; require `legacy-backfill-exempt` closure to reject only pending observability; require `all-certified` closure to reject pending observability and the four unchanged backfills.
 - [ ] Recompute the subject after the registry-only status change and require the descriptor digest remains unchanged.
 
 ## Task 6: Independent review and bounded repair
@@ -135,7 +137,7 @@ Stop if the version, digest, plan link, evidence requirements, generated depende
 
 ## Task 7: Final verification, documentation, and stop gate
 
-- [ ] Run `git diff --check`, semantic naming, constitution, capability certification tests, admission, all-certified/P2 closure, generated fixture contracts, and any documentation checks affected by certification files.
+- [ ] Run `git diff --check`, semantic naming, constitution, capability certification tests, admission, both expected-rejecting closure policies, generated fixture contracts, and any documentation checks affected by certification files.
 - [ ] Do not repeat the unchanged successful fixed-root verifier after a receipt-only change; bind and cite its exact producing revision instead.
 - [ ] Reconcile canonical status language from pending to certified without changing the implementation contract or claiming hosted CI/deployment.
 - [ ] Record exact comparison, files, commands/results, test counts, subject/digest, reviewer dispositions, risks, deferred P3/P5 work, claim limits, and recovery.
