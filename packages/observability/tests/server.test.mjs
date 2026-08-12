@@ -293,13 +293,25 @@ test("Better Stack diagnostic records enrich one safe event with bounded excepti
     message:
       "credential=synthetic-credential client_secret=synthetic-client " +
       "access_token=synthetic-access ghp_0123456789abcdefghijklmnopqrstuvwxyz " +
-      "postgres://dbuser:dbpass@localhost/private",
+      "postgres://dbuser:dbpass@localhost/private\n" +
+      '{"access_token":"synthetic-json-token"}\n' +
+      '{"password":"synthetic-before\\\"synthetic-after"}\n' +
+      "Authorization: Basic dXNlcjpwYXNz\n" +
+      'password="synthetic quoted value"\n' +
+      "Cookie: session=secret-session; csrf=secret-csrf",
+    stack:
+      "SecurityError: restricted diagnostics\n" +
+      "    at spaced (/Users/Alice Smith/private/project.ts:10:2)\n" +
+      "    at parenthesized (/Users/Alice Smith (Admin)/private/project.ts:10:2)\n" +
+      "    at windows (C:\\Program Files (Admin)\\private\\project.ts:10:2)\n" +
+      "    at network (\\\\server\\shared folder (Admin)\\private\\project.ts:10:2)",
   });
   const sensitiveSerialized = serializeDiagnosticRecord(sensitiveReport);
   assert.match(sensitiveSerialized, /\[REDACTED_SECRET\]/u);
+  assert.match(sensitiveSerialized, /\[REDACTED_PATH\]/u);
   assert.doesNotMatch(
     sensitiveSerialized,
-    /synthetic-credential|synthetic-client|synthetic-access|ghp_|dbuser|dbpass/u,
+    /synthetic-credential|synthetic-client|synthetic-access|synthetic-json-token|synthetic-before|synthetic-after|dXNlcjpwYXNz|synthetic quoted value|secret-session|secret-csrf|ghp_|dbuser|dbpass|Alice Smith|Program Files|shared folder|\(Admin\)/u,
   );
 });
 

@@ -24,19 +24,23 @@ const exceptionIpv6Pattern =
 const exceptionJwtPattern =
   /\b[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/gu;
 const exceptionBearerPattern = /\bBearer\s+[A-Za-z0-9._~+/-]{4,}/giu;
+const exceptionAuthorizationHeaderPattern =
+  /\b(authorization)\s*[:=]\s*(?:Basic|Bearer|Digest)\s+[^\r\n]+/giu;
+const exceptionCookieHeaderPattern =
+  /\b((?:set-)?cookie)\s*:\s*[^\r\n]+/giu;
 const exceptionSecretAssignmentPattern =
-  /\b([A-Za-z0-9_-]*(?:authorization|cookie|credential|password|secret|token|api[_-]?key)[A-Za-z0-9_-]*)\s*[:=]\s*[^\s,;)}]+/giu;
+  /\b([A-Za-z0-9_-]*(?:authorization|cookie|credential|password|secret|token|api[_-]?key)[A-Za-z0-9_-]*)["']?\s*[:=]\s*(?:"(?:\\[^\r\n]|[^"\\\r\n])*"|'(?:\\[^\r\n]|[^'\\\r\n])*'|[^\s,;)}]+)/giu;
 const exceptionKnownSecretPattern =
   /\b(?:gh[opsu]_|github_pat_|xox[baprs]-|AIza|(?:pk|sk)_(?:live|test)_)[A-Za-z0-9._~-]+\b/gu;
 const uriUserInfoPattern =
   /\b([a-z][a-z0-9+.-]*:\/\/)[^@\s/?#]+@/giu;
 const urlDetailsPattern = /([a-z][a-z0-9+.-]*:\/\/[^\s?#)]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/giu;
 const unixAbsolutePathPattern =
-  /(?<![A-Za-z0-9:+./-])(?:file:\/\/)?\/(?:[^/\s()?#]+\/)*([^/\s()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
+  /(?<![A-Za-z0-9:+./-])(?:file:\/\/)?\/(?:[^/\r\n?#]+\/)*([^/\r\n()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
 const windowsAbsolutePathPattern =
-  /\b[A-Za-z]:\\(?:[^\\\s()?#]+\\)*([^\\\s()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
+  /\b[A-Za-z]:\\(?:[^\\\r\n?#]+\\)*([^\\\r\n()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
 const uncAbsolutePathPattern =
-  /\\\\(?:[^\\\s()?#]+\\)+([^\\\s()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
+  /\\\\(?:[^\\\r\n?#]+\\)+([^\\\r\n()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
 
 export const exceptionRedactionMarkers = Object.freeze({
   email: "[REDACTED_EMAIL]",
@@ -96,6 +100,14 @@ export function redactExceptionText(
     value = next;
   };
 
+  replace(
+    exceptionAuthorizationHeaderPattern,
+    (_match, key) => `${key}=${exceptionRedactionMarkers.secret}`,
+  );
+  replace(
+    exceptionCookieHeaderPattern,
+    (_match, key) => `${key}=${exceptionRedactionMarkers.secret}`,
+  );
   replace(exceptionBearerPattern, exceptionRedactionMarkers.secret);
   replace(
     exceptionSecretAssignmentPattern,

@@ -245,8 +245,14 @@ test("diagnostics redact private shapes, paths, URL details, and enforce byte an
       "TypeError: password=credential-secret",
       "    at render (/Users/alice/private/project/src/render.ts?token=abc#fragment:10:2)",
       "    at root (/private.ts:10:2)",
+      "    at spaced (/Users/Alice Smith/private/project.ts:10:2)",
+      "    at parenthesized (/Users/Alice Smith (Admin)/private/project.ts:10:2)",
       "    at windows (C:\\private.ts:10:2)",
+      "    at windowsSpaced (C:\\Program Files\\private\\project.ts:10:2)",
+      "    at windowsParenthesized (C:\\Program Files (Admin)\\private\\project.ts:10:2)",
       "    at network (\\\\server\\share\\private.ts:10:2)",
+      "    at networkSpaced (\\\\server\\shared folder\\private\\project.ts:10:2)",
+      "    at networkParenthesized (\\\\server\\shared folder (Admin)\\private\\project.ts:10:2)",
       "    at fetch (https://example.com/app.js?secret=abc#fragment:20:3)",
       ...Array.from(
         { length: 80 },
@@ -280,10 +286,65 @@ test("diagnostics redact private shapes, paths, URL details, and enforce byte an
   );
   assert.doesNotMatch(
     JSON.stringify(diagnostics),
-    /alice@example\.com|192\.0\.2\.1|aaaabbbb\.ccccdddd\.eeeeffff|credential-secret|token=abc|secret=abc|\/Users\/alice|\/private\/build|#fragment/u,
+    /alice@example\.com|192\.0\.2\.1|aaaabbbb\.ccccdddd\.eeeeffff|credential-secret|token=abc|secret=abc|\/Users\/alice|Alice Smith|Program Files|shared folder|\(Admin\)|\/private\/build|#fragment/u,
   );
   assert.equal(diagnostics.exceptionCode, "ERR_RENDER");
   assert.equal(diagnostics.exceptionDigest, "digest-123");
+});
+
+test("restricted diagnostics redact quoted and multi-token credential values completely", () => {
+  const cases = [
+    {
+      name: "quoted JSON access token",
+      source: '{"access_token":"synthetic-json-token"}',
+      forbidden: ["synthetic-json-token"],
+    },
+    {
+      name: "quoted JSON password with an escaped quote",
+      source: '{"password":"synthetic-before\\\"synthetic-after"}',
+      forbidden: ["synthetic-before", "synthetic-after"],
+    },
+    {
+      name: "Basic authorization header",
+      source: "Authorization: Basic dXNlcjpwYXNz",
+      forbidden: ["dXNlcjpwYXNz"],
+    },
+    {
+      name: "quoted secret containing spaces",
+      source: 'password="synthetic quoted value"',
+      forbidden: ["synthetic", "quoted value"],
+    },
+    {
+      name: "multi-value Cookie header",
+      source: "Cookie: session=secret-session; csrf=secret-csrf",
+      forbidden: ["secret-session", "secret-csrf"],
+    },
+  ];
+
+  for (const credentialCase of cases) {
+    const report = createOperationalErrorReport(
+      createErrorEvent(),
+      {
+        name: "SecurityError",
+        message: `benign-control ${credentialCase.source}`,
+        stack: `SecurityError: benign-control ${credentialCase.source}`,
+      },
+      selectedCatch,
+      {},
+    );
+    assert.equal(report.ok, true, credentialCase.name);
+    const serialized = JSON.stringify(report.value.diagnostics);
+
+    assert.match(serialized, /benign-control/u, credentialCase.name);
+    assert.match(serialized, /\[REDACTED_SECRET\]/u, credentialCase.name);
+    for (const forbiddenValue of credentialCase.forbidden) {
+      assert.equal(
+        serialized.includes(forbiddenValue),
+        false,
+        `${credentialCase.name}: ${forbiddenValue}`,
+      );
+    }
+  }
 });
 
 test("restricted diagnostics redact the declared sensitive-shape matrix without altering benign neighbors", () => {
