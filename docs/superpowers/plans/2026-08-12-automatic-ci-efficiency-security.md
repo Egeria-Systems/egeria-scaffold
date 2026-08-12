@@ -20,7 +20,7 @@ Implementation authorization for this plan permits only local repository edits, 
 
 The accepted tree's `standards@0.3.0` subject remains pending. A separate clean Task 6D candidate exists at `standards-certification@3b930c63d920b3c12c450c9598ff8ca36fdbcc01`, based on Task 6C revision `12ecc73a8337ab12ece9dd3a6b2aec03f940383c`. It has reached its own verified-final-diff stop gate but is neither approved nor integrated, and it does not contain accepted `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`. Freeze that branch and worktree: Plan A must not modify, rebase, copy, discard, certify, approve, or integrate it.
 
-This optimization changes managed workflow and preview configuration bytes but adds no managed surface, inference probe, evidence kind, dependency, environment variable, provider, or generated application behavior. Task 1 must nevertheless re-evaluate materiality against the current descriptor and certification contract. If a descriptor version or canonical behavior-contract digest must change, stop and amend the capability/certification plan before editing executable files. If Plan A is later approved and integrated first, reconciliation of the frozen Task 6D candidate belongs to a resumed Task 6D preflight: its evidence-producing revision must descend from the accepted Plan A revision, the affected build, browser, fixture, state, and CI-contract outcomes must be rerun against the optimized topology, and the subject/digest must be recomputed. Plan A may amend that future requirement but must not perform the reconciliation or certification transition. Both final diffs retain separate approval gates.
+This optimization changes managed workflow, preview, and Next configuration bytes but adds no managed surface, inference probe, evidence kind, dependency, environment variable, provider, or generated application behavior. Task 1 must nevertheless re-evaluate materiality against the current `standards` and `deployment-cloudflare` descriptors and certification contracts. If either descriptor version or canonical behavior-contract digest must change, stop and amend the capability/certification plan before editing executable files. If Plan A is later approved and integrated first, reconciliation of the frozen Task 6D candidate belongs to a resumed Task 6D preflight: its evidence-producing revision must descend from the accepted Plan A revision, the affected build, browser, fixture, state, and CI-contract outcomes must be rerun against the optimized topology, and the subject/digest must be recomputed. Plan A may amend that future requirement but must not perform the reconciliation or certification transition. Both final diffs retain separate approval gates.
 
 ## Exact file scope
 
@@ -37,11 +37,13 @@ Modify:
 ```text
 .github/workflows/repository-quality.yml
 proofs/nextjs-cloudflare/AGENTS.md
+proofs/nextjs-cloudflare/next.config.ts
 proofs/nextjs-cloudflare/package.json
 proofs/nextjs-cloudflare/playwright.preview.config.ts
 packages/builder-core/templates/common/.github/workflows/quality.yml.template
 packages/builder-core/templates/common/AGENTS.md.template
 packages/builder-core/templates/common/README.md.template
+packages/builder-core/templates/common/apps/web/next.config.ts
 packages/builder-core/templates/common/apps/web/playwright.preview.config.ts
 packages/builder-core/templates/common/package.json.template
 packages/builder-core/src/generation/verify-generated-project.ts
@@ -53,18 +55,21 @@ packages/builder-core/tests/generate-project.test.mjs
 fixtures/generated/portfolio/.github/workflows/quality.yml
 fixtures/generated/portfolio/AGENTS.md
 fixtures/generated/portfolio/README.md
+fixtures/generated/portfolio/apps/web/next.config.ts
 fixtures/generated/portfolio/apps/web/playwright.preview.config.ts
 fixtures/generated/portfolio/package.json
 fixtures/generated/portfolio/.egeria/state.json
 fixtures/generated/portfolio-calendly/.github/workflows/quality.yml
 fixtures/generated/portfolio-calendly/AGENTS.md
 fixtures/generated/portfolio-calendly/README.md
+fixtures/generated/portfolio-calendly/apps/web/next.config.ts
 fixtures/generated/portfolio-calendly/apps/web/playwright.preview.config.ts
 fixtures/generated/portfolio-calendly/package.json
 fixtures/generated/portfolio-calendly/.egeria/state.json
 fixtures/generated/site/.github/workflows/quality.yml
 fixtures/generated/site/AGENTS.md
 fixtures/generated/site/README.md
+fixtures/generated/site/apps/web/next.config.ts
 fixtures/generated/site/apps/web/playwright.preview.config.ts
 fixtures/generated/site/package.json
 fixtures/generated/site/.egeria/state.json
@@ -93,10 +98,10 @@ The fixture list is derived scope, not permission to hand-edit. Use production g
 
 - [x] Verify branch, status, worktrees, `git rev-parse HEAD`, `git rev-parse origin/main`, and `git merge-base --is-ancestor 4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e HEAD`.
 - [x] Update the named predecessor packet with its post-integration acceptance outcome and require explicit approval, accepted revision `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`, signed/rules-compliant integration, and local/remote-main reconciliation before any executable edit.
-- [x] Read root and applicable nested instructions, accepted ADRs, architecture overview, capability model, enforcement map, approved source plan, roadmap, compatibility record, current standards descriptor/registry, generated-testing implementation evidence, and Task 6D certification plan.
+- [x] Read root and applicable nested instructions, accepted ADRs, architecture overview, capability model, enforcement map, approved source plan, roadmap, compatibility record, current standards and deployment-cloudflare descriptors/registry, generated-testing implementation evidence, and Task 6D certification plan.
 - [x] Record the three current automatic workflows, their exact triggers/jobs/path ownership, the generated workflow/template contract, proof verification order, current action pins, hosted-run evidence, and current cache settings.
 - [x] Run `pnpm run check:capability-certification` and `pnpm run test:capability-certification`; require the existing pending standards record to be internally valid.
-- [x] Decide explicitly whether the operational-only command changes alter the standards descriptor or canonical behavior-contract digest. Record the evidence and stop if the answer requires a new subject.
+- [x] Decide explicitly whether the operational-only command and configuration changes alter either the standards or deployment-cloudflare descriptor or canonical behavior-contract digest. Record the evidence and stop if the answer requires a new subject.
 - [x] Write the preparation evidence with the exact comparison, authority boundary, recovery route, primary-source decisions, expected RED failures, and claim limits.
 
 Expected: a settled preflight showing no unaccounted overlapping work and either a justified unchanged pending subject or a hard stop before executable edits.
@@ -192,8 +197,8 @@ Expected: stable job names always appear for pull requests; deep work is skipped
 
 ## Task 9: Independent review, bounded repair, and stop gate
 
-- [ ] Dispatch one bounded independent read-only reviewer over the exact base-to-candidate comparison. Require three separately labeled, non-overlapping reports: requirements; architecture and anti-overengineering; and test evidence. Across those reports cover job-skip fail safety, shell/ref injection, permissions/pins/cache, complete command coverage, build-order correctness, fixture derivation, certification materiality, documentation, tests, claims, and recovery. Prohibit edits and recursive fan-out.
-- [ ] Validate every finding against the current tree. For each material defect, add a focused failing regression test, implement the minimum repair, and rerun only affected checks.
+- [x] Dispatch one bounded independent read-only reviewer over the exact base-to-candidate comparison. Require three separately labeled, non-overlapping reports: requirements; architecture and anti-overengineering; and test evidence. Across those reports cover job-skip fail safety, shell/ref injection, permissions/pins/cache, complete command coverage, build-order correctness, fixture derivation, certification materiality, documentation, tests, claims, and recovery. Prohibit edits and recursive fan-out.
+- [x] Validate every finding against the current tree. For each material defect, add a focused failing regression test, implement the minimum repair, and rerun only affected checks.
 - [ ] Create the review packet with exact comparison, changed files, commits, commands/results, reviewer dispositions, remaining risks, deferred hosted/settings work, claims, and recovery.
 - [ ] Verify status, untracked files, worktree identities, commit history, and exact diff. Stop for verified-final-diff approval.
 

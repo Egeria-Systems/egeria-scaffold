@@ -59,6 +59,8 @@ Current generated root verification runs `pnpm run build` and then `pnpm run bui
 
 OpenNext documents that its ordinary `build` command first invokes the project's Next build and supports `build --skipNextBuild` when prepared `.next` output already exists. Plan A therefore preserves standalone `build:cloudflare` and `preview` commands but changes only ordered verification paths to one Next build, one direct OpenNext `--skipNextBuild` transform, and direct preview from prepared `.open-next` output.
 
+The first direct proof transform established that OpenNext's ordinary combined build privately enables standalone output and workspace-root tracing before invoking Next, while `--skipNextBuild` requires the caller's preceding Next build to have emitted that same prepared artifact. Plan A therefore added explicit standalone workspace-root tracing to the canonical proof and generated Next configuration. The exact newly required source paths are `proofs/nextjs-cloudflare/next.config.ts` and `packages/builder-core/templates/common/apps/web/next.config.ts`; production regeneration derived the matching `apps/web/next.config.ts` bytes and state fingerprints in the portfolio, portfolio-with-Calendly, and site fixtures. These five paths are directly caused by the approved one-build transform and are now included in the plan inventory.
+
 ## Existing hosted evidence
 
 - Task 6C merge revision `12ecc73a8337ab12ece9dd3a6b2aec03f940383c`: repository run `31593552115`, generated-project run `31593552026`, and compatibility-proof run `31593552166` all passed.
@@ -66,7 +68,7 @@ OpenNext documents that its ordinary `build` command first invokes the project's
 
 These historical runs prove their exact hosted revisions and old workflow topology only. Plan A does not dispatch hosted CI, and local checks will not prove the consolidated workflow executed on GitHub.
 
-## Standards subject materiality
+## Capability subject materiality
 
 Accepted `main` records:
 
@@ -80,6 +82,8 @@ status: pending
 The standards descriptor declares the generated quality workflow and preview configuration as managed file surfaces and checks their presence through file probes. It does not hash workflow/configuration bytes into the descriptor, encode pnpm cache settings, or encode the OpenNext/preview command strings changed by Plan A. The descriptor's package properties, probes, dependencies, environment variables, privileged operations, verification-plan identifiers, and required evidence remain unchanged.
 
 Decision: Plan A is an operational optimization of already declared managed surfaces, not a material capability-definition change. Descriptor version `0.3.0`, required evidence `fresh-scaffold`, and behavior-contract digest `sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb` remain unchanged. Generated fingerprints and the evidence produced from those bytes do change, so the frozen Task 6D candidate must be reconciled and its affected evidence renewed later; that need does not create a new standards subject.
+
+Accepted `main` also records `deployment-cloudflare@0.2.0` with required evidence `cleanup-recovery`, `deployed-application`, and `fresh-scaffold`, behavior-contract digest `sha256:846ae45d15ba9d8f256a9b7a1d8a4f3cda1b871a3b3f79f7656fd621050e8273`, and status `backfill-pending`. That capability canonically owns `apps/web/next.config.ts` and its Next/OpenNext verification plan. The explicit `output: "standalone"` and workspace-root `outputFileTracingRoot` make the caller-prepared Next artifact equivalent to the standalone/tracing preparation OpenNext's combined command already applies internally; they add no managed path, dependency, platform resource, adapter semantic, inference probe, verification identifier, evidence kind, provider, binding, environment variable, or deployment authority. The descriptor, required evidence, and their computed canonical subject are therefore unchanged. Decision: this is a non-material preparation-order repair for the existing deployment capability, so its accepted legacy backfill subject remains exact and no new certification task or status transition is created. The local proof and fixed-root matrices validate the changed build order but do not certify or deploy `deployment-cloudflare`.
 
 ## Preparation checks
 
