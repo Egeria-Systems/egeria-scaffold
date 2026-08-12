@@ -11,6 +11,7 @@ import {
   classifyRegistryResponseStatus,
   readRegistryPackageState,
 } from "../../scripts/check-package-release.mjs";
+import { isPinnedGitHubActionReference } from "../helpers/github-actions.mjs";
 
 const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
@@ -503,9 +504,15 @@ test("package release workflow is manual, exact-commit-bound, and least privileg
   assert.match(workflow, /^    if: github\.ref == 'refs\/heads\/main'$/m);
   assert.match(workflow, /^    runs-on: ubuntu-24\.04$/m);
   assert.match(workflow, /^      name: npm-release$/m);
-  assert.match(
-    workflow,
-    /^        uses: actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1$/m,
+  const checkoutReference = workflow.match(
+    /^        uses: (actions\/checkout@\S+)$/m,
+  )?.[1];
+  const setupReference = workflow.match(
+    /^        uses: (pnpm\/setup@\S+)$/m,
+  )?.[1];
+  assert.equal(
+    isPinnedGitHubActionReference(checkoutReference, "actions/checkout"),
+    true,
   );
   assert.match(workflow, /^          persist-credentials: false$/m);
   assert.match(workflow, /^          fetch-depth: 0$/m);
@@ -518,9 +525,9 @@ test("package release workflow is manual, exact-commit-bound, and least privileg
     workflow,
     /test "\$\(git rev-parse refs\/heads\/main\)" = "\$RELEASE_COMMIT"/,
   );
-  assert.match(
-    workflow,
-    /^        uses: pnpm\/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c$/m,
+  assert.equal(
+    isPinnedGitHubActionReference(setupReference, "pnpm/setup"),
+    true,
   );
   assert.match(workflow, /^          version: 11\.20\.0$/m);
   assert.match(workflow, /^          runtime: node@22\.23\.2$/m);
