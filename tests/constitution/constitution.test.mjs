@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import {
   access,
+  chmod,
   mkdir,
   mkdtemp,
   readFile,
@@ -33,8 +34,57 @@ const namedLabel = (prefix, ordinal, separator = " ") =>
 const credentialBoundPackageCommandPattern =
   /\b(?:pnpm|npm|yarn)\b[^\n]*(?:\bbuild|\btest)(?=[:\s]|$)/iu;
 
-async function runRepositoryQualityScopeClassifier() {
-  throw new Error("scope classifier harness not implemented");
+async function runRepositoryQualityScopeClassifier(input) {
+  const executionRoot = await mkdtemp(
+    join(tmpdir(), "egeria-quality-scope-execution-"),
+  );
+  const outputPath = join(executionRoot, "github-output");
+
+  try {
+    let executablePath = process.env.PATH ?? "";
+    if (input.forceDiffFailure) {
+      const gitPath = (
+        await execFileAsync("which", ["git"], { encoding: "utf8" })
+      ).stdout.trim();
+      const wrapperRoot = join(executionRoot, "bin");
+      const wrapperPath = join(wrapperRoot, "git");
+      await mkdir(wrapperRoot, { recursive: true });
+      await writeFile(
+        wrapperPath,
+        `#!/bin/bash\nif [[ "$1" == "diff" ]]; then\n  exit 2\nfi\nexec ${JSON.stringify(gitPath)} "$@"\n`,
+        "utf8",
+      );
+      await chmod(wrapperPath, 0o755);
+      executablePath = `${wrapperRoot}:${executablePath}`;
+    }
+
+    await execFileAsync("bash", ["-c", input.scopeRun], {
+      cwd: input.repositoryRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: executablePath,
+        EVENT_NAME: input.eventName,
+        PULL_REQUEST_BASE_SHA: input.pullRequestBaseSha,
+        PULL_REQUEST_HEAD_SHA: input.pullRequestHeadSha,
+        PUSH_BASE_SHA: input.pushBaseSha,
+        PUSH_HEAD_SHA: input.pushHeadSha,
+        GITHUB_OUTPUT: outputPath,
+      },
+    });
+
+    const entries = (await readFile(outputPath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => line.split("="));
+    assert.deepEqual(
+      entries.map(([name]) => name).toSorted(),
+      ["compatibility-proof", "generated-projects"],
+    );
+    return Object.fromEntries(entries);
+  } finally {
+    await rm(executionRoot, { recursive: true, force: true });
+  }
 }
 
 function enumerateSecretReferences(value, path = "") {
