@@ -105,16 +105,16 @@ Expected: a settled preflight showing no unaccounted overlapping work and either
 
 **Files:** `tests/constitution/constitution.test.mjs`
 
-- [ ] Replace the three-workflow expectation with one `.github/workflows/repository-quality.yml` contract triggered for every pull request and push to `main`, with no workflow-level `paths`, `paths-ignore`, secrets, environments, write permission, deploy, or publish command.
-- [ ] Require exactly the stable job identifiers `scope`, `builder-and-packages`, `generated-projects`, `compatibility-proof`, and `dependency-review`.
-- [ ] Require the exact expected action repositories plus immutable full lowercase 40-hex SHAs through the shared `isPinnedGitHubActionReference` policy, `persist-credentials: false`, fixed runner/Node/pnpm, frozen installation, `cache: false`, bounded timeouts, and cancel-in-progress concurrency for every applicable job. Do not encode one release-specific SHA in live-workflow policy tests; retain the exact reviewed initial SHAs in the workflow implementation and preparation evidence.
-- [ ] Require `scope` to read pull-request base/head from `github.event.pull_request.base.sha`/`github.event.pull_request.head.sha` and push base/head from `github.event.before`/`github.sha`, validate nonzero lowercase 40-hex values, resolve both as local commit objects, use Git pathspecs for the current generated/proof ownership sets, activate both deep jobs for workflow changes, and enable both deep jobs on zero/malformed/missing/unavailable/unresolvable revisions or any Git error.
-- [ ] Require each diff probe to distinguish status `0` (definitively unchanged) from `1` (changed). Any other status enables both deep jobs; no error may be interpreted as unchanged.
-- [ ] Require deep jobs to use job-level `if` expressions driven by the scope outputs and retain all current generated/proof checks.
-- [ ] Require pull-request dependency review from the exact `actions/dependency-review-action` repository through `isPinnedGitHubActionReference`, with `fail-on-severity: moderate` and both `runtime` and `development` scopes. Do not freeze one release-specific dependency-review SHA in the live-workflow policy test.
-- [ ] Add negative cases that reject unsafe interpolation of event revisions into shell source, workflow path filters, `cache: true`, a skipped fail-safe, extra authority, or removed coverage.
-- [ ] Run `pnpm run test:constitution` and confirm RED only for the old three-workflow topology and absent new controls.
-- [ ] Commit the focused RED contract as `test: define consolidated CI contract`.
+- [x] Replace the three-workflow expectation with one `.github/workflows/repository-quality.yml` contract triggered for every pull request and push to `main`, with no workflow-level `paths`, `paths-ignore`, secrets, environments, write permission, deploy, or publish command.
+- [x] Require exactly the stable job identifiers `scope`, `builder-and-packages`, `generated-projects`, `compatibility-proof`, and `dependency-review`.
+- [x] Require the exact expected action repositories plus immutable full lowercase 40-hex SHAs through the shared `isPinnedGitHubActionReference` policy, `persist-credentials: false`, fixed runner/Node/pnpm, frozen installation, `cache: false`, bounded timeouts, and cancel-in-progress concurrency for every applicable job. Do not encode one release-specific SHA in live-workflow policy tests; retain the exact reviewed initial SHAs in the workflow implementation and preparation evidence.
+- [x] Require `scope` to read pull-request base/head from `github.event.pull_request.base.sha`/`github.event.pull_request.head.sha` and push base/head from `github.event.before`/`github.sha`, validate nonzero lowercase 40-hex values, resolve both as local commit objects, use Git pathspecs for the current generated/proof ownership sets, activate both deep jobs for workflow changes, and enable both deep jobs on zero/malformed/missing/unavailable/unresolvable revisions or any Git error.
+- [x] Require each diff probe to distinguish status `0` (definitively unchanged) from `1` (changed). Any other status enables both deep jobs; no error may be interpreted as unchanged.
+- [x] Require deep jobs to use job-level `if` expressions driven by the scope outputs and retain all current generated/proof checks.
+- [x] Require pull-request dependency review from the exact `actions/dependency-review-action` repository through `isPinnedGitHubActionReference`, with `fail-on-severity: moderate` and both `runtime` and `development` scopes. Do not freeze one release-specific dependency-review SHA in the live-workflow policy test.
+- [x] Add negative cases that reject unsafe interpolation of event revisions into shell source, workflow path filters, `cache: true`, a skipped fail-safe, extra authority, or removed coverage.
+- [x] Run `pnpm run test:constitution` and confirm RED only for the old three-workflow topology and absent new controls.
+- [x] Commit the focused RED contract as `test: define consolidated CI contract`.
 
 ## Task 3: GREEN — consolidate ordinary repository CI
 
