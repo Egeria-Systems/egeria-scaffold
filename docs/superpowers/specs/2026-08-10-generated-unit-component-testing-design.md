@@ -142,7 +142,7 @@ The workflow keeps read-only permissions, pinned action SHAs, disabled credentia
 
 ### Builder repository
 
-A new ordinary repository-quality workflow covers pull requests and pushes to `main`. It has separate, inspectable jobs or steps for:
+Three ordinary read-only workflows cover pull requests and pushes to `main`. The always-on repository workflow owns builder/package governance and tests. Separate generated-project and compatibility-proof workflows retain their complete deep command sequences but run only when their exact owned inputs change. Together they provide inspectable jobs or steps for:
 
 - constitution and semantic-governance tests;
 - package-boundary and release-safeguard tests;
@@ -155,7 +155,7 @@ A new ordinary repository-quality workflow covers pull requests and pushes to `m
 - full fixed-root generated-project verification, including both Vitest projects and both Playwright environments; and
 - local compatibility-proof unit, Cloudflare harness integration, build/type checks, and development/workerd browser tests.
 
-The workflow uses no deployment environment, credentials, publication command, provider operation, or production action. Existing manual package-release, compatibility deployment, and Calendly certification workflows keep their distinct external authority. Package release continues to run package-specific tests. Calendly certification additionally executes the generated unit and component projects against its hosted fresh-scaffold candidate before deployment.
+The workflows use no deployment environment, credentials, publication command, provider operation, or production action. Their path filters include each workflow plus every root, workspace, package, proof, fixture, verifier, and contract input consumed by its commands. Existing manual package-release, compatibility deployment, and Calendly certification workflows keep their distinct external authority. Package release continues to run package-specific tests. Calendly certification additionally executes the generated unit and component projects against its hosted fresh-scaffold candidate before deployment.
 
 ## `AGENTS.md` ownership and instructions
 

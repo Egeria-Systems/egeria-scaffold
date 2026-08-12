@@ -4,7 +4,7 @@
 
 **Goal:** Deliver P2 Task 6C by generating a complete Vitest Node and React Testing Library/jsdom component-testing foundation, executing every repository and generated-project test boundary in appropriate CI, and recording later `fast-check` and Workers Vitest placement without implementing those later runtimes.
 
-**Architecture:** Advance the existing hybrid `standards` capability rather than creating a testing capability or package. Generate one Vitest configuration with named Node and jsdom projects, real starter specifications, explicit scripts, root/scoped guidance, and quality-workflow steps. Expand ordinary generated-project verification with fast unit/component checks while retaining browser checks only in fixed-root certification. Add a read-only repository-quality workflow that executes builder, CLI, packages, capability, generated-project, and compatibility-proof lanes. Admit the material standards change against a separate pending Task 6D certification plan.
+**Architecture:** Advance the existing hybrid `standards` capability rather than creating a testing capability or package. Generate one Vitest configuration with named Node and jsdom projects, real starter specifications, explicit scripts, root/scoped guidance, and quality-workflow steps. Expand ordinary generated-project verification with fast unit/component checks while retaining browser checks only in fixed-root certification. Keep builder, CLI, package, and capability checks in the always-on read-only repository workflow; execute the complete generated-project and compatibility-proof lanes in separate read-only workflows scoped to their owned inputs. Admit the material standards change against a separate pending Task 6D certification plan.
 
 **Toolchain:** Node.js `22.23.2`, pnpm `11.20.0`, Vitest `4.1.10`, `@vitejs/plugin-react@6.0.5`, jsdom `30.0.1`, `@testing-library/react@16.3.2`, `@testing-library/dom@10.4.1`, `@testing-library/user-event@14.6.3`, and `@testing-library/jest-dom@7.0.1`, together with Vite 8's native `resolve.tsconfigPaths` support and the settled exact Next.js, React, TypeScript, OpenNext, Wrangler, Playwright, and axe pins already present at the frozen base. CI uses `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1`, `pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2`, and `actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` where applicable.
 
@@ -60,6 +60,8 @@ docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification
 
 ```text
 .github/workflows/repository-quality.yml
+.github/workflows/generated-project-quality.yml
+.github/workflows/compatibility-proof-quality.yml
 docs/implementation-evidence/2026-08-11-generated-unit-component-testing-preparation.md
 packages/builder-core/templates/common/apps/web/vitest.config.ts
 packages/builder-core/templates/common/apps/web/tests/setup/component.ts
@@ -301,12 +303,14 @@ Expected: every authored code context tells an agent which runner to use, when t
 - [x] Preserve exact action SHAs, frozen install, read-only permissions, disabled credential persistence, concurrency cancellation, timeout, fixed Node/pnpm, and seven-day failure artifacts.
 - [x] Make root `verify` include unit/component testing for local completeness while allowing CI to call distinct semantic commands without duplicate execution.
 
-### Builder repository workflow
+### Builder repository workflows
 
-- [x] Add RED constitution tests for a new ordinary pull-request/push workflow with read-only permissions, pinned actions, no environment, no credentials, no deployment/publication/provider commands, cancellation, and bounded timeouts.
+- [x] Add RED constitution tests for ordinary pull-request/push workflows with read-only permissions, pinned actions, no environment, no credentials, no deployment/publication/provider commands, cancellation, and bounded timeouts.
 - [x] Add a builder/packages lane covering constitution, semantic naming, package boundaries, builder-core, CLI, standards, observability, capability certification/admission, lint, build, and typecheck.
 - [x] Add a generated-project lane covering deterministic fixture tests and the full fixed-root verifier, which now runs both Vitest projects and both Playwright environments for every retained fixture.
 - [x] Add a compatibility-proof local lane covering proof lint/typecheck, Vitest unit, builds/type generation, `createTestHarness()` Cloudflare integration, and Playwright development/preview tests without deployment.
+- [x] Keep the builder/packages lane always-on and move the unchanged generated-project and compatibility-proof lanes into separate workflows with exact owned-input path filters.
+- [x] Record that current repository rules require no status checks and must be revisited before a path-scoped workflow status becomes required.
 - [x] Use explicit commands/step names so a future missing lane cannot hide behind an ambiguous aggregate.
 - [x] Strengthen `verify:builder-kernel` to include public package tests if the settled command still omits them.
 - [x] Preserve package-release's package-specific verification and manual authority.

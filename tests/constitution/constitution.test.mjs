@@ -270,26 +270,97 @@ test("each authored code context names its test runner, command, and evidence bo
   }
 });
 
-test("ordinary repository quality CI covers every current local test boundary", async () => {
-  const workflowPath = resolve(
-    repositoryRoot,
-    ".github/workflows/repository-quality.yml",
+test("ordinary repository CI keeps core checks always-on and scopes deep checks to owned inputs", async () => {
+  const workflowPaths = {
+    repository: ".github/workflows/repository-quality.yml",
+    generated: ".github/workflows/generated-project-quality.yml",
+    compatibility: ".github/workflows/compatibility-proof-quality.yml",
+  };
+  const sources = Object.fromEntries(
+    await Promise.all(
+      Object.entries(workflowPaths).map(async ([identifier, path]) => [
+        identifier,
+        await readRepositoryFile(path),
+      ]),
+    ),
   );
-  const source = await readFile(workflowPath, "utf8");
-  const workflow = parse(source);
+  const workflows = Object.fromEntries(
+    Object.entries(sources).map(([identifier, source]) => [
+      identifier,
+      parse(source),
+    ]),
+  );
+  const expectedGeneratedPaths = [
+    ".github/workflows/generated-project-quality.yml",
+    ".gitattributes",
+    ".npmrc",
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "apps/cli/**",
+    "packages/builder-core/**",
+    "packages/observability/**",
+    "packages/standards/**",
+    "fixtures/generated/**",
+    "scripts/verify-generated-skeletons.mjs",
+    "tests/generated-fixtures/**",
+  ];
+  const expectedCompatibilityPaths = [
+    ".github/workflows/compatibility-proof-quality.yml",
+    ".npmrc",
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "packages/standards/**",
+    "proofs/nextjs-cloudflare/**",
+  ];
 
-  assert.equal(workflow.name, "Repository quality");
-  assert.deepEqual(workflow.permissions, { contents: "read" });
-  assert.deepEqual(Object.keys(workflow.jobs).toSorted(), [
+  assert.deepEqual(
+    Object.fromEntries(
+      Object.entries(workflows).map(([identifier, workflow]) => [
+        identifier,
+        workflow.name,
+      ]),
+    ),
+    {
+      repository: "Repository quality",
+      generated: "Generated project quality",
+      compatibility: "Compatibility proof quality",
+    },
+  );
+  assert.deepEqual(workflows.repository.on, {
+    pull_request: null,
+    push: { branches: ["main"] },
+  });
+  for (const [workflow, expectedPaths] of [
+    [workflows.generated, expectedGeneratedPaths],
+    [workflows.compatibility, expectedCompatibilityPaths],
+  ]) {
+    assert.deepEqual(workflow.on, {
+      pull_request: { paths: expectedPaths },
+      push: { branches: ["main"], paths: expectedPaths },
+    });
+  }
+  assert.deepEqual(Object.keys(workflows.repository.jobs), [
     "builder-and-packages",
+  ]);
+  assert.deepEqual(Object.keys(workflows.generated.jobs), ["generated-projects"]);
+  assert.deepEqual(Object.keys(workflows.compatibility.jobs), [
     "compatibility-proof",
-    "generated-projects",
   ]);
 
-  const commands = Object.values(workflow.jobs)
-    .flatMap(({ steps }) => steps)
-    .flatMap(({ run }) => (typeof run === "string" ? [run] : []))
-    .join("\n");
+  const commandsByWorkflow = Object.fromEntries(
+    Object.entries(workflows).map(([identifier, workflow]) => [
+      identifier,
+      Object.values(workflow.jobs)
+        .flatMap(({ steps }) => steps)
+        .flatMap(({ run }) => (typeof run === "string" ? [run] : [])),
+    ]),
+  );
+  const commands = Object.values(commandsByWorkflow).flat().join("\n");
+  const repositoryCommands = commandsByWorkflow.repository.join("\n");
+  const generatedCommands = commandsByWorkflow.generated.join("\n");
+  const compatibilityCommands = commandsByWorkflow.compatibility.join("\n");
   for (const command of [
     "pnpm run test:constitution",
     "pnpm run check:semantic-naming",
@@ -299,19 +370,54 @@ test("ordinary repository quality CI covers every current local test boundary", 
     "pnpm run test:packages",
     "pnpm run test:capability-certification",
     "pnpm run check:capability-certification",
+  ]) {
+    assert.match(
+      repositoryCommands,
+      new RegExp(command.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"),
+    );
+  }
+  assert.doesNotMatch(
+    repositoryCommands,
+    /test:generated-fixtures|verify:generated-skeletons|nextjs-cloudflare-proof/u,
+  );
+  for (const command of [
     "pnpm run test:generated-fixtures",
     "pnpm run verify:generated-skeletons",
+  ]) {
+    assert.match(
+      generatedCommands,
+      new RegExp(command.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"),
+    );
+  }
+  for (const command of [
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run lint",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run typecheck",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:unit",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run build",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run build:cloudflare",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run cf-typegen:check",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:integration:cloudflare",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec playwright install --with-deps chromium",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:e2e:dev",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:e2e:preview",
   ]) {
-    assert.match(commands, new RegExp(command.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
+    assert.match(
+      compatibilityCommands,
+      new RegExp(command.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"),
+    );
   }
-  assert.doesNotMatch(commands, /\bdeploy\b|\bpublish\b|npm publish|wrangler deploy/iu);
-  assert.doesNotMatch(source, /\bsecrets\b|id-token:\s*write|environment:/iu);
 
-  const builderSteps = workflow.jobs["builder-and-packages"].steps;
+  assert.doesNotMatch(commands, /\bdeploy\b|\bpublish\b|npm publish|wrangler deploy/iu);
+  for (const [identifier, source] of Object.entries(sources)) {
+    assert.deepEqual(workflows[identifier].permissions, { contents: "read" });
+    assert.doesNotMatch(
+      source,
+      /\bsecrets\b|id-token:\s*write|environment:/iu,
+      workflowPaths[identifier],
+    );
+  }
+
+  const builderSteps = workflows.repository.jobs["builder-and-packages"].steps;
   const buildIndex = builderSteps.findIndex(
     ({ run }) => run === "pnpm run build:builder",
   );
@@ -327,24 +433,28 @@ test("ordinary repository quality CI covers every current local test boundary", 
       kernelCommands.indexOf("pnpm run test:packages"),
   );
 
-  for (const job of Object.values(workflow.jobs)) {
-    assert.equal(job["runs-on"], "ubuntu-24.04");
-    assert.equal(typeof job["timeout-minutes"], "number");
-    const checkout = job.steps.find(({ uses }) =>
-      uses?.startsWith("actions/checkout@"),
-    );
-    const setup = job.steps.find(({ uses }) => uses?.startsWith("pnpm/setup@"));
-    assert.equal(
-      checkout?.uses,
-      "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
-    );
-    assert.equal(checkout?.with?.["persist-credentials"], false);
-    assert.equal(
-      setup?.uses,
-      "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
-    );
+  for (const workflow of Object.values(workflows)) {
+    for (const job of Object.values(workflow.jobs)) {
+      assert.equal(job["runs-on"], "ubuntu-24.04");
+      assert.equal(typeof job["timeout-minutes"], "number");
+      const checkout = job.steps.find(({ uses }) =>
+        uses?.startsWith("actions/checkout@"),
+      );
+      const setup = job.steps.find(({ uses }) =>
+        uses?.startsWith("pnpm/setup@"),
+      );
+      assert.equal(
+        checkout?.uses,
+        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      );
+      assert.equal(checkout?.with?.["persist-credentials"], false);
+      assert.equal(
+        setup?.uses,
+        "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
+      );
+    }
   }
-  const builderCheckout = workflow.jobs["builder-and-packages"].steps.find(
+  const builderCheckout = workflows.repository.jobs["builder-and-packages"].steps.find(
     ({ uses }) => uses?.startsWith("actions/checkout@"),
   );
   assert.equal(builderCheckout?.with?.["fetch-depth"], 0);
