@@ -40,14 +40,14 @@ The exact comparison is reproducible with:
 git diff --name-only 2a315aa0e7dce1bf1048b9a2c07e318add9241de...HEAD
 ```
 
-## Focused repair commits
+## Focused repair and reconciliation commits
 
 - `6f2e558` — `fix: materialize recipe lockfile deterministically`
 - `bfba450` — `docs: exclude concurrent certification work`
 - `f8af04c` — `ci: scope deep verification to relevant changes`
 - `d5668ab` — `fix: preserve generated contract integrity`
 - `e9cb302` — `fix: fail closed on exclusive write errors`
-- `ac7d516` — `Merge main into generated testing branch`
+- `ac7d516` — `Merge main into generated testing branch` (main reconciliation; not a repair-only revert candidate)
 - `5c4c036` — `test: make cleanup identity check portable`
 - `24ec499` — `ci: bind release intent to remote main`
 - `93e4e9f` — `test: record generated no-release intent`
@@ -55,8 +55,11 @@ git diff --name-only 2a315aa0e7dce1bf1048b9a2c07e318add9241de...HEAD
 - `d829988` — `docs: reconcile generated testing roadmap`
 - `3f4ed20` — `docs: clarify generated testing authority`
 - `8888a8d` — `docs: harden generated testing recovery`
+- `592b706` — `docs: align generated testing recovery evidence`
 
 The final recovery-evidence closure commit containing this packet is identified by the exact head at handoff because a commit cannot embed its own immutable object ID.
+
+The historical packet owns the original implementation commits through merge `29628f9`. Repair-only recovery is the non-merge ancestry range `29628f9..HEAD`, excluding reconciliation merge `ac7d516`; full-MR withdrawal is the complete `2a315aa0...HEAD` comparison and does not use a partial commit-revert list.
 
 All branch commits contain SSH signatures. Local signature display cannot assign a signer because this checkout has no `gpg.ssh.allowedSignersFile`; GitHub signature status remains the remote policy boundary.
 
@@ -90,7 +93,7 @@ Final material results:
 
 | Review | Disposition |
 | --- | --- |
-| Requirements | Exclusive-write TOCTOU finding closed in `e9cb302`; main fingerprint resolution independently confirmed; stale final-evidence finding closed by this dated evidence and packet |
+| Requirements | Exclusive-write TOCTOU finding closed in `e9cb302`; main fingerprint resolution independently confirmed; stale final evidence closed by this dated evidence and packet; final recovery review split repair-only, full-MR withdrawal, and post-squash recovery without treating `ac7d516` as a repair revert |
 | Architecture and anti-overengineering | Final review found the canonical roadmap still described one unhosted workflow, then closure review found an unscoped certification-stream merge prohibition and missing topology assertion; the roadmap and its constitution consumer now distinguish current Task 6C authority, the separate certification boundaries, always-on versus path-scoped ownership, the hosted content candidate, and the pending exact-documentary-head boundary; closure re-review follows on the repaired head |
 | Test evidence | Exclusive-write race closed with causal deletion trap; portable cleanup identity, release base, retained Changeset inventory, local suites, and hosted runs are included in the final exact comparison review |
 | Merge-request thread audit | Two unresolved plan-safety findings were validated: portable rename is now explicitly bounded rather than described as hostile-concurrency no-clobber, and the plan, packet, and dated evidence now require separate recovery authorization and preserve unrelated user work; no GitHub reply or thread-resolution action was taken |
@@ -108,7 +111,11 @@ Reviewers are read-only and do not recursively fan out. Final exact-head disposi
 
 ## Rollback and recovery
 
-If separately authorized after integration, revert only the merge-request integration commit through ordinary Git history, regenerate all three fixtures, and run `pnpm run verify:builder-kernel`. Before integration, separately authorized source recovery reverts only the focused repair and final-documentary commits named above, newest-first in the isolated worktree, while preserving staged, unstaged, untracked, and unrelated committed user work. Retain the `main` reconciliation unless independently reverting the already-accepted main work.
+If separately authorized after squash integration, revert only the resulting single integration commit through ordinary Git history, regenerate all three fixtures, and run `pnpm run verify:builder-kernel`.
+
+Before integration, separately authorized repair-only recovery reverts the non-merge commits in ancestry range `29628f9..HEAD`, newest-first in the isolated worktree, while explicitly excluding `ac7d516` and preserving staged, unstaged, untracked, and unrelated committed user work. This leaves the original implementation plus accepted `main` reconciliation for inspection and re-verification.
+
+Separately authorized full-MR withdrawal closes merge request 2 without merging and retains the branch/worktree as evidence; it reverts no branch commits and therefore cannot partially remove the 112-path `2a315aa0...HEAD` comparison or disturb accepted `main`. Any later disposal of that retained evidence is a separate action.
 
 Never leave recipe lockfile bytes, fixture lockfiles, managed fingerprints, schemas, templates, state receipts, workflows, or release intent out of agreement. No persistent-data, provider, deployment, credential, publication, or production recovery applies.
 
