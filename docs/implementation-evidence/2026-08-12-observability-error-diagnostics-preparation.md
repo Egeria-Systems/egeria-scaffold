@@ -108,6 +108,21 @@ Completed on the planning comparison with Node.js `22.23.2`:
 
 The constitution result includes documentation-link and semantic-naming coverage. It does not establish package implementation, browser/runtime behavior, provider receipt, diagnostic privacy, source-map behavior, deployment, cleanup, or certification.
 
+## Gate A implementation-entry preflight
+
+Revalidated on 2026-08-12 before package-source RED work:
+
+- the user explicitly authorized the latest integrated `main` state as the starting point;
+- the exact clean target is branch `observability-error-diagnostics` at merge commit `80d85cc2a45a5c0f7e0dc6ec57311538f62aa7df`, whose parents are planning commit `ab42a280e953b0dfb5d837290de323c5afd0c56b` and `main`/`origin/main` commit `12ecc73a8337ab12ece9dd3a6b2aec03f940383c`;
+- planning base `2a315aa0e7dce1bf1048b9a2c07e318add9241de` and accepted predecessor revision `45b57d2dc265ef6ba9ac805d7352a01db5f1081d` are both ancestors of the target;
+- the predecessor review packet records explicit verified-final-diff approval for `717c3bb0f048f4a4bc544100125ae42d818f09bc..45b57d2dc265ef6ba9ac805d7352a01db5f1081d` and states that the implementation task is complete;
+- capability-certification admission passed with `{"ok":true,"gate":"admission","records":7}`; the ordinary pending observability and standards subjects remain open as expected;
+- active linked implementation worktrees were clean, no other agent was active in this task, and no uncommitted write overlapped the Gate A package source/tests. The primary checkout's unrelated untracked CI design remained untouched;
+- the constitution suite passed 52/52 assertions, the focused public-observability and release-safeguard boundary suite passed 12/12 tests, and the unchanged observability package verification passed 23/23 tests plus build, lint, and typecheck; and
+- the isolated worktree still cannot install independently without registry access. The first attempt stopped on unavailable registry DNS. The successful bounded baseline temporarily reused the primary checkout's installed root, builder-core, and observability dependency directories; all target-worktree links were removed afterward, the target's prior ignored `node_modules` directory was restored, and the tracked target remained clean before this evidence edit. pnpm refreshed only the primary checkout's ignored dependency installation while resolving the already-locked graph; no source, lockfile, manifest, registry, provider, credential, or certification state changed.
+
+The current primary-source refresh reconfirmed Better Stack's exact HTTP `202` success, `dt` event-time field, and recommendation to keep records below 100 KiB, and OpenTelemetry's stable exception type/message/stack field names plus its warning that exception messages may contain sensitive information. These sources support the package protocol and privacy boundaries only; they do not prove provider receipt or production behavior.
+
 ## Stop gate
 
 After the independent disposition recheck, focused checks, and planning commit, stop. The handoff prompt may authorize another agent to begin only the Gate A package-candidate tasks. That agent must stop at Gate A before publication or generated integration.

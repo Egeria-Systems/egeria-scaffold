@@ -301,19 +301,36 @@ test("Changesets keeps a restricted default and excludes private releases", asyn
 });
 
 test("the release candidate materializes only the approved public versions", async () => {
+  const diagnosticChangeset = "add-observability-error-diagnostics.md";
   const releaseEvidenceChangeset = "clarify-observability-boundary.md";
   const generatedTestingChangeset = "generated-testing-boundary.md";
   const changesetFiles = await loadPendingChangesets();
   assert.deepEqual(changesetFiles, [
+    diagnosticChangeset,
     releaseEvidenceChangeset,
     generatedTestingChangeset,
   ]);
-  for (const changesetFile of changesetFiles) {
+  for (const changesetFile of [
+    releaseEvidenceChangeset,
+    generatedTestingChangeset,
+  ]) {
     assert.deepEqual(
       await readFile(resolve(repositoryRoot, ".changeset", changesetFile)),
       Buffer.from("---\n---\n"),
     );
   }
+  const diagnosticIntent = await readFile(
+    resolve(repositoryRoot, ".changeset", diagnosticChangeset),
+    "utf8",
+  );
+  assert.match(
+    diagnosticIntent,
+    /^---\n"@egeria-systems\/observability": minor\n---\n/u,
+  );
+  assert.match(diagnosticIntent, /restricted diagnostic/u);
+  assert.match(diagnosticIntent, /schema `2\.0\.0`/u);
+  assert.match(diagnosticIntent, /zero runtime dependencies/u);
+  assert.match(diagnosticIntent, /not backward compatible/u);
 
   for (const [manifestPath, changelogPath, packageName, releaseSummary] of [
     [
@@ -379,7 +396,13 @@ test("public package dry runs contain only approved files", async () => {
 
   await execFileAsync(
     "pnpm",
-    ["--filter", "@egeria-systems/observability", "run", "build"],
+    [
+      "--config.verify-deps-before-run=warn",
+      "--filter",
+      "@egeria-systems/observability",
+      "run",
+      "build",
+    ],
     { cwd: repositoryRoot, encoding: "utf8" },
   );
 
@@ -390,6 +413,8 @@ test("public package dry runs contain only approved files", async () => {
     "dist/browser.js",
     "dist/contracts.d.ts",
     "dist/contracts.js",
+    "dist/diagnostics.d.ts",
+    "dist/diagnostics.js",
     "dist/dispatch.d.ts",
     "dist/dispatch.js",
     "dist/events.d.ts",
