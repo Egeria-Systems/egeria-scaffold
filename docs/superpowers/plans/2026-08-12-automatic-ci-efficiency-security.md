@@ -18,7 +18,9 @@ This plan is based on `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`. Before im
 
 Implementation authorization for this plan permits only local repository edits, focused commits, deterministic local checks, one independent read-only review, and review-backed repairs. It does not authorize push, pull request, merge, workflow dispatch, deployment, certification transition, publication, provider access, credential access, GitHub settings changes, production action, or responses to review comments.
 
-The existing `standards@0.3.0` subject remains pending. This optimization changes managed workflow and preview configuration bytes but adds no managed surface, inference probe, evidence kind, dependency, environment variable, provider, or generated application behavior. Task 1 must nevertheless re-evaluate materiality against the current descriptor and certification contract. If a descriptor version or canonical behavior-contract digest must change, stop and amend the capability/certification plan before editing executable files.
+The accepted tree's `standards@0.3.0` subject remains pending. A separate clean Task 6D candidate exists at `standards-certification@3b930c63d920b3c12c450c9598ff8ca36fdbcc01`, based on Task 6C revision `12ecc73a8337ab12ece9dd3a6b2aec03f940383c`. It has reached its own verified-final-diff stop gate but is neither approved nor integrated, and it does not contain accepted `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`. Freeze that branch and worktree: Plan A must not modify, rebase, copy, discard, certify, approve, or integrate it.
+
+This optimization changes managed workflow and preview configuration bytes but adds no managed surface, inference probe, evidence kind, dependency, environment variable, provider, or generated application behavior. Task 1 must nevertheless re-evaluate materiality against the current descriptor and certification contract. If a descriptor version or canonical behavior-contract digest must change, stop and amend the capability/certification plan before editing executable files. If Plan A is later approved and integrated first, reconciliation of the frozen Task 6D candidate belongs to a resumed Task 6D preflight: its evidence-producing revision must descend from the accepted Plan A revision, the affected build, browser, fixture, state, and CI-contract outcomes must be rerun against the optimized topology, and the subject/digest must be recomputed. Plan A may amend that future requirement but must not perform the reconciliation or certification transition. Both final diffs retain separate approval gates.
 
 ## Exact file scope
 
@@ -74,6 +76,7 @@ docs/compatibility/nextjs-cloudflare.md
 docs/roadmaps/program-roadmap.md
 docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md
 docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md
+docs/superpowers/plans/2026-08-12-automatic-ci-efficiency-security.md
 docs/review-packets/2026-08-12-dependabot-compatible-action-pin-tests.md
 ```
 
@@ -88,15 +91,15 @@ The fixture list is derived scope, not permission to hand-edit. Use production g
 
 ## Task 1: Freeze the current contract and materiality decision
 
-- [ ] Verify branch, status, worktrees, `git rev-parse HEAD`, `git rev-parse origin/main`, and `git merge-base --is-ancestor 4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e HEAD`.
-- [ ] Update the named predecessor packet with its post-integration acceptance outcome and require explicit approval, accepted revision `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`, signed/rules-compliant integration, and local/remote-main reconciliation before any executable edit.
-- [ ] Read root and applicable nested instructions, accepted ADRs, architecture overview, capability model, enforcement map, approved source plan, roadmap, compatibility record, current standards descriptor/registry, generated-testing implementation evidence, and Task 6D certification plan.
-- [ ] Record the three current automatic workflows, their exact triggers/jobs/path ownership, the generated workflow/template contract, proof verification order, current action pins, hosted-run evidence, and current cache settings.
-- [ ] Run `pnpm run check:capability-certification` and `pnpm run test:capability-certification`; require the existing pending standards record to be internally valid.
-- [ ] Decide explicitly whether the operational-only command changes alter the standards descriptor or canonical behavior-contract digest. Record the evidence and stop if the answer requires a new subject.
-- [ ] Write the preparation evidence with the exact comparison, authority boundary, recovery route, primary-source decisions, expected RED failures, and claim limits.
+- [x] Verify branch, status, worktrees, `git rev-parse HEAD`, `git rev-parse origin/main`, and `git merge-base --is-ancestor 4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e HEAD`.
+- [x] Update the named predecessor packet with its post-integration acceptance outcome and require explicit approval, accepted revision `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`, signed/rules-compliant integration, and local/remote-main reconciliation before any executable edit.
+- [x] Read root and applicable nested instructions, accepted ADRs, architecture overview, capability model, enforcement map, approved source plan, roadmap, compatibility record, current standards descriptor/registry, generated-testing implementation evidence, and Task 6D certification plan.
+- [x] Record the three current automatic workflows, their exact triggers/jobs/path ownership, the generated workflow/template contract, proof verification order, current action pins, hosted-run evidence, and current cache settings.
+- [x] Run `pnpm run check:capability-certification` and `pnpm run test:capability-certification`; require the existing pending standards record to be internally valid.
+- [x] Decide explicitly whether the operational-only command changes alter the standards descriptor or canonical behavior-contract digest. Record the evidence and stop if the answer requires a new subject.
+- [x] Write the preparation evidence with the exact comparison, authority boundary, recovery route, primary-source decisions, expected RED failures, and claim limits.
 
-Expected: a settled preflight showing no overlapping work and either a justified unchanged pending subject or a hard stop before executable edits.
+Expected: a settled preflight showing no unaccounted overlapping work and either a justified unchanged pending subject or a hard stop before executable edits.
 
 ## Task 2: RED — specify one stable automatic workflow
 

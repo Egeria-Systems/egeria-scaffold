@@ -28,6 +28,12 @@ Before certification RED work, require its review packet to record the approved 
 
 No push, pull request, merge, publication, workflow dispatch, deployment, credential, provider, environment, persistent-data, permission, or production action is authorized.
 
+### Plan A reconciliation boundary
+
+A clean Task 6D candidate reached its own verified-final-diff stop gate at `standards-certification@3b930c63d920b3c12c450c9598ff8ca36fdbcc01`, based on accepted Task 6C revision `12ecc73a8337ab12ece9dd3a6b2aec03f940383c`. It is not approved or integrated, does not contain later accepted `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`, and predates the approved automatic-CI Plan A. Plan A freezes that candidate and may not modify, rebase, integrate, or certify it.
+
+If Plan A is approved and integrated before Task 6D resumes, Task 6D must begin again at this plan's Task 1 preflight on a revision descending from the accepted Plan A integration. Reconcile the frozen certification work onto that revision, recompute the exact standards subject/digest, and rerun every outcome affected by Plan A's workflow, build-order, preview, verifier, fixture, fingerprint, instruction, or static-contract changes. At minimum this includes `state-agreement`, `generated-project-builds`, `browser-regression`, `retained-fixture-matrix`, and `ci-contract`; rerun `fresh-scaffold`, `unit-tests`, or `component-tests` too whenever the reconciled runner or evidence binding can no longer prove them from the new descendant. The resulting receipt, evidence revision, reviews, and final comparison must be current descendants of Plan A and receive a separate Task 6D verified-final-diff approval. This reconciliation occurs during resumed Task 6D, not during Plan A.
+
 ## Certification outcomes
 
 The exact standards subject requires these causal outcomes:
@@ -36,10 +42,10 @@ The exact standards subject requires these causal outcomes:
 2. `unit-tests`: the generated Vitest Node project discovers and passes its real starter unit specification;
 3. `component-tests`: the generated jsdom/React Testing Library project discovers and passes its real starter component specification;
 4. `state-agreement`: manifest, desired state, installed state, managed surfaces, probes, fingerprints, inference, doctor, and exact diff agree after verification;
-5. `generated-project-builds`: lint, strict typecheck, Next.js build, and OpenNext build pass from frozen portable dependencies;
-6. `browser-regression`: the existing content-agnostic Playwright/axe suite passes in Next.js development and OpenNext/workerd preview for the certified baseline;
-7. `retained-fixture-matrix`: portfolio, site, and portfolio-with-Calendly retained fixtures remain byte-deterministic and pass both Vitest projects plus their applicable browser suites; and
-8. `ci-contract`: generated and repository workflows contain the approved read-only explicit test lanes with no deployment or secret authority.
+5. `generated-project-builds`: lint, strict typecheck, one Next.js build, and the immediately following OpenNext `--skipNextBuild` transform pass from frozen portable dependencies;
+6. `browser-regression`: the existing content-agnostic Playwright/axe suite passes in Next.js development and direct OpenNext/workerd preview from already prepared `.open-next` output for the certified baseline;
+7. `retained-fixture-matrix`: portfolio, site, and portfolio-with-Calendly retained fixtures remain byte-deterministic and pass both Vitest projects plus their applicable one-build browser suites; and
+8. `ci-contract`: generated and repository workflows contain the approved read-only explicit test lanes, use `cache: false`, preserve stable job identities through job-level scoping, and add no deployment or secret authority.
 
 The fresh-scaffold outcome certifies the smallest actual generated baseline. The retained fixture matrix supplies risk-based regression evidence and does not turn certification into a capability/profile Cartesian rule.
 
