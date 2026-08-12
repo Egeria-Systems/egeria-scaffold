@@ -175,12 +175,12 @@ Expected: stable job names always appear for pull requests; deep work is skipped
 
 ## Task 7: Reconcile canonical documentation and pending certification plan
 
-- [ ] Update the architecture overview, source plan, program roadmap, enforcement map, README, contribution guide, and compatibility record to describe one automatic workflow, stable job-level scoping, dependency review, no reusable caches, and one-build prepared-output verification.
-- [ ] Amend the Task 6D standards certification plan so `ci-contract`, `generated-project-builds`, `browser-regression`, and `retained-fixture-matrix` require the exact `cache: false` and `--skipNextBuild`/direct-preview behavior now present.
-- [ ] Preserve historical evidence and run identifiers as historical; do not rewrite them to describe the new topology.
-- [ ] State that static/local checks do not prove hosted execution and that required-check configuration is a later separately authorized action.
-- [ ] Run `pnpm run check:semantic-naming`, `pnpm run test:constitution`, and `git diff --check`.
-- [ ] Commit the reconciliation as `docs: align CI optimization contracts`.
+- [x] Update the architecture overview, source plan, program roadmap, enforcement map, README, contribution guide, and compatibility record to describe one automatic workflow, stable job-level scoping, dependency review, no reusable caches, and one-build prepared-output verification.
+- [x] Amend the Task 6D standards certification plan so `ci-contract`, `generated-project-builds`, `browser-regression`, and `retained-fixture-matrix` require the exact `cache: false` and `--skipNextBuild`/direct-preview behavior now present.
+- [x] Preserve historical evidence and run identifiers as historical; do not rewrite them to describe the new topology.
+- [x] State that static/local checks do not prove hosted execution and that required-check configuration is a later separately authorized action.
+- [x] Run `pnpm run check:semantic-naming`, `pnpm run test:constitution`, and `git diff --check`.
+- [x] Commit the reconciliation as `docs: align CI optimization contracts`.
 
 ## Task 8: Complete local verification once
 

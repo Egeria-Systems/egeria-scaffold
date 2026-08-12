@@ -45,7 +45,7 @@ The exact standards subject requires these causal outcomes:
 5. `generated-project-builds`: lint, strict typecheck, one Next.js build, and the immediately following OpenNext `--skipNextBuild` transform pass from frozen portable dependencies;
 6. `browser-regression`: the existing content-agnostic Playwright/axe suite passes in Next.js development and direct OpenNext/workerd preview from already prepared `.open-next` output for the certified baseline;
 7. `retained-fixture-matrix`: portfolio, site, and portfolio-with-Calendly retained fixtures remain byte-deterministic and pass both Vitest projects plus their applicable one-build browser suites; and
-8. `ci-contract`: generated and repository workflows contain the approved read-only explicit test lanes, use `cache: false`, preserve stable job identities through job-level scoping, and add no deployment or secret authority.
+8. `ci-contract`: the generated workflow and consolidated repository workflow contain the approved read-only explicit test lanes, use `cache: false`, preserve exact `scope`, `builder-and-packages`, `generated-projects`, `compatibility-proof`, and `dependency-review` job identities through job-level scoping, bind pull-request dependency review to the expected repository and exact revisions, and add no deployment or secret authority.
 
 The fresh-scaffold outcome certifies the smallest actual generated baseline. The retained fixture matrix supplies risk-based regression evidence and does not turn certification into a capability/profile Cartesian rule.
 
@@ -121,7 +121,7 @@ Stop if the version, digest, plan link, evidence requirements, generated depende
 
 - [ ] Run deterministic fixture tests against portfolio, site, and portfolio-with-Calendly.
 - [ ] Run the fixed-root verifier once on the unchanged candidate, requiring unit, component, build, development browser, and preview browser outcomes for every retained fixture.
-- [ ] Validate generated workflow steps, root repository-quality lanes, action pins, permissions, cancellation, timeouts, frozen installation, explicit test commands, and absence of external authority.
+- [ ] Validate generated workflow steps; the consolidated root workflow's exact five job identities and fail-safe scope outputs; pull-request dependency-review repository/revision/severity policy; `cache: false`; action pins; permissions; cancellation; timeouts; frozen installation; one standalone Next build followed by direct OpenNext `--skipNextBuild`; direct prepared-output preview; explicit test commands; and absence of external authority.
 - [ ] Confirm every generated fixture AGENT file derives from the approved template and names the correct runner/escalation boundary.
 - [ ] Do not dispatch either workflow under this local certification plan.
 
