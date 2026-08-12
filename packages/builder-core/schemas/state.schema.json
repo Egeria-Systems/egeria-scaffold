@@ -130,46 +130,101 @@
       "additionalProperties": false,
       "properties": {
         "checks": {
-          "prefixItems": [
+          "anyOf": [
             {
-              "const": "contracts",
-              "type": "string"
+              "prefixItems": [
+                {
+                  "const": "contracts",
+                  "type": "string"
+                },
+                {
+                  "const": "pre-state-inference",
+                  "type": "string"
+                },
+                {
+                  "const": "lockfile",
+                  "type": "string"
+                },
+                {
+                  "const": "frozen-install",
+                  "type": "string"
+                },
+                {
+                  "const": "lint",
+                  "type": "string"
+                },
+                {
+                  "const": "typecheck",
+                  "type": "string"
+                },
+                {
+                  "const": "next-build",
+                  "type": "string"
+                },
+                {
+                  "const": "opennext-build",
+                  "type": "string"
+                },
+                {
+                  "const": "post-state-inference",
+                  "type": "string"
+                }
+              ],
+              "readOnly": true,
+              "type": "array"
             },
             {
-              "const": "pre-state-inference",
-              "type": "string"
-            },
-            {
-              "const": "lockfile",
-              "type": "string"
-            },
-            {
-              "const": "frozen-install",
-              "type": "string"
-            },
-            {
-              "const": "lint",
-              "type": "string"
-            },
-            {
-              "const": "typecheck",
-              "type": "string"
-            },
-            {
-              "const": "next-build",
-              "type": "string"
-            },
-            {
-              "const": "opennext-build",
-              "type": "string"
-            },
-            {
-              "const": "post-state-inference",
-              "type": "string"
+              "prefixItems": [
+                {
+                  "const": "contracts",
+                  "type": "string"
+                },
+                {
+                  "const": "pre-state-inference",
+                  "type": "string"
+                },
+                {
+                  "const": "lockfile",
+                  "type": "string"
+                },
+                {
+                  "const": "frozen-install",
+                  "type": "string"
+                },
+                {
+                  "const": "lint",
+                  "type": "string"
+                },
+                {
+                  "const": "typecheck",
+                  "type": "string"
+                },
+                {
+                  "const": "unit-tests",
+                  "type": "string"
+                },
+                {
+                  "const": "component-tests",
+                  "type": "string"
+                },
+                {
+                  "const": "next-build",
+                  "type": "string"
+                },
+                {
+                  "const": "opennext-build",
+                  "type": "string"
+                },
+                {
+                  "const": "post-state-inference",
+                  "type": "string"
+                }
+              ],
+              "readOnly": true,
+              "type": "array"
             }
           ],
-          "readOnly": true,
-          "type": "array"
+          "readOnly": true
         },
         "kind": {
           "const": "generation",
@@ -315,7 +370,8 @@
             "0.3.0",
             "0.4.0",
             "0.5.0",
-            "0.6.0"
+            "0.6.0",
+            "0.7.0"
           ],
           "type": "string"
         }

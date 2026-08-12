@@ -31,6 +31,8 @@ const generatedChecks = [
   "frozen-install",
   "lint",
   "typecheck",
+  "unit-tests",
+  "component-tests",
   "next-build",
   "opennext-build",
 ];

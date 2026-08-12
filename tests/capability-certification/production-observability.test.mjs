@@ -60,6 +60,8 @@ const fixedChecks = Object.freeze([
   "registry-signatures",
   "lint",
   "typecheck",
+  "unit-tests",
+  "component-tests",
   "next-build",
   "opennext-build",
   "browser-install",

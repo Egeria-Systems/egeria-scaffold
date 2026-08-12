@@ -64,9 +64,13 @@ Operational observability and selectable analytics are separate. Cloudflare Web 
 ## Testing and review
 
 - Use test-driven development: add a focused failing test, verify the expected RED state, implement the minimum change, and verify GREEN.
+- Use Node's test runner (`node --test`) for root governance, builder-core, CLI, standards, observability, capability-certification, and generated-fixture contracts. Run the owning package script, such as `pnpm run test:builder-core`, `pnpm run test:cli`, `pnpm run test:packages`, or `pnpm run test:capability-certification`, before the broader aggregate.
+- Generated client unit and component behavior belongs to the generated Vitest projects: `pnpm --dir apps/web run test:unit` uses Node and `pnpm --dir apps/web run test:component` uses jsdom. Use Playwright only for real-browser development, OpenNext/workerd preview, or separately authorized deployed journeys.
+- The compatibility proof uses Vitest for its unit boundary, `createTestHarness()` for Workers-runtime integration, and Playwright for development and preview browser behavior. It is evidence, not product architecture.
+- `fast-check` is planned only with the later state/migration invariants that justify property testing. Workers Vitest is planned only when a capability owns concrete Workers bindings; do not introduce either runtime early.
 - Run the smallest deterministic check during each cycle and the full relevant suite once after a coherent change batch. Do not repeat a successful expensive check against an unchanged tree.
 - Use `pnpm run verify:builder-kernel` for the complete current builder-kernel candidate. Its committed portfolio/site fixtures are immutable inputs; the fixed-root verifier installs and builds only identity-bounded temporary copies.
-- Do not claim that static checks prove runtime, workerd, deployment, visual, translation, accessibility-conformance, production-safety, or security properties they do not exercise.
+- Do not claim that Node, Vitest/jsdom, static, or build checks prove real-browser, workerd, deployment, visual, translation, accessibility-conformance, production-safety, or security properties they do not exercise.
 - Before an increment is complete, dispatch independent read-only requirements, architecture and anti-overengineering, and test-evidence reviewers. Add a specialist only when the changed scope materially requires it.
 - Validate every finding against the current tree. Repair only evidence-backed material defects, rerun affected verification, and record all dispositions.
 - Produce a review packet listing the comparison, changed files, commands and results, reviewer dispositions, risks, deferred work, and rollback/recovery. Then stop for explicit user approval.

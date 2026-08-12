@@ -386,19 +386,32 @@ test("doctor and diff agree across the canonical portfolio composition", async (
         "@egeria-systems/standards": "1.2.3",
         "@playwright/test": "1.62.1",
         "@tailwindcss/postcss": "4.3.3",
+        "@testing-library/dom": "10.4.1",
+        "@testing-library/jest-dom": "7.0.1",
+        "@testing-library/react": "16.3.2",
+        "@testing-library/user-event": "14.6.3",
+        "@vitejs/plugin-react": "6.0.5",
+        jsdom: "30.0.1",
         postcss: "8.5.26",
         "raw-loader": "4.0.2",
         tailwindcss: "4.3.3",
+        vitest: "4.1.10",
         wrangler: "4.118.0",
       },
       scripts: {
         "browser:install": "playwright install chromium",
         "browser:install:ci": "playwright install --with-deps chromium",
+        test: "vitest run",
+        "test:component": "vitest run --project component",
+        "test:component:watch": "vitest --project component",
         "test:e2e:deployed":
           "playwright test --config playwright.deployed.config.ts",
         "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
         "test:e2e:preview":
           "playwright test --config playwright.preview.config.ts",
+        "test:unit": "vitest run --project unit",
+        "test:unit:watch": "vitest --project unit",
+        "test:watch": "vitest",
       },
     }, null, 2)}\n`,
     "apps/web/tsconfig.json": "{}\n",
@@ -443,6 +456,10 @@ test("doctor and diff agree across the canonical portfolio composition", async (
     "apps/web/playwright.dev.config.ts": "export {};\n",
     "apps/web/playwright.preview.config.ts": "export {};\n",
     "apps/web/tests/e2e/site-quality.spec.ts": "export {};\n",
+    "apps/web/tests/component/content-page.test.tsx": "export {};\n",
+    "apps/web/tests/setup/component.ts": "export {};\n",
+    "apps/web/tests/unit/content-schema.test.ts": "export {};\n",
+    "apps/web/vitest.config.ts": "export {};\n",
   };
   const surfaceResult = core.materializeInstalledSurfaces({
     files: new Map(

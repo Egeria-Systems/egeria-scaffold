@@ -39,18 +39,25 @@ function resolveRequest(
   return core.resolveCapabilities(request, catalog, profiles);
 }
 
-test("standards hybrid ownership declares generated browser quality", () => {
+test("standards hybrid ownership declares generated unit, component, and browser quality", () => {
   const standards = createCatalog().find(
     ({ identifier }) => identifier === "standards",
   );
 
   assert.notEqual(standards, undefined);
-  assert.equal(standards.version, "0.2.0");
+  assert.equal(standards.version, "0.3.0");
   assert.equal(standards.deliveryMode, "hybrid");
   assert.deepEqual(standards.requiredPackages, [
     "@axe-core/playwright",
     "@egeria-systems/standards",
     "@playwright/test",
+    "@testing-library/dom",
+    "@testing-library/jest-dom",
+    "@testing-library/react",
+    "@testing-library/user-event",
+    "@vitejs/plugin-react",
+    "jsdom",
+    "vitest",
   ]);
   assert.deepEqual(standards.environmentVariables, [
     "PLAYWRIGHT_DEPLOYED_URL",
@@ -66,6 +73,7 @@ test("standards hybrid ownership declares generated browser quality", () => {
   assert.deepEqual(standards.privilegedOperations, [
     "browser-binary-installation",
     "browser-process-execution",
+    "test-process-execution",
   ]);
   assert.equal(standards.threatReviewLevel, "elevated");
   assert.deepEqual(
@@ -75,9 +83,16 @@ test("standards hybrid ownership declares generated browser quality", () => {
       "standards-browser-install-ci-script",
       "standards-browser-install-script",
       "standards-browser-quality-specification",
+      "standards-component-test-script",
+      "standards-component-test-setup",
+      "standards-component-test-specification",
+      "standards-component-watch-script",
       "standards-deployed-browser-test-script",
       "standards-development-browser-test-script",
+      "standards-dom-testing-library-package",
       "standards-eslint-configuration",
+      "standards-jest-dom-package",
+      "standards-jsdom-package",
       "standards-playwright-deployed-configuration",
       "standards-playwright-development-configuration",
       "standards-playwright-package",
@@ -86,14 +101,26 @@ test("standards hybrid ownership declares generated browser quality", () => {
       "standards-preview-browser-test-script",
       "standards-package",
       "standards-quality-workflow",
+      "standards-react-testing-library-package",
+      "standards-test-script",
+      "standards-test-watch-script",
       "standards-typescript-configuration",
+      "standards-unit-test-script",
+      "standards-unit-test-specification",
+      "standards-unit-watch-script",
+      "standards-user-event-package",
+      "standards-vite-react-package",
+      "standards-vitest-configuration",
+      "standards-vitest-package",
     ].toSorted(),
   );
-  assert.equal(standards.inferenceProbes.length, 16);
+  assert.equal(standards.inferenceProbes.length, 33);
   assert.deepEqual(standards.verificationPlan, [
     "package-resolution",
     "lint",
     "typecheck",
+    "unit-tests",
+    "component-tests",
     "browser-development",
     "browser-preview",
     "deployed-configuration",
@@ -101,10 +128,12 @@ test("standards hybrid ownership declares generated browser quality", () => {
   ]);
   assert.deepEqual(standards.documentationEvidenceRequirements, [
     "public-package-version-and-provenance",
+    "unit-and-component-testing-claim-boundaries",
     "browser-testing-claim-boundaries",
   ]);
   assert.deepEqual(standards.removalAndRecoveryRequirements, [
     "review-package-and-configuration-removal",
+    "review-generated-test-surface-removal",
     "review-generated-quality-surface-removal",
   ]);
 });
@@ -137,273 +166,7 @@ test("the portfolio and site catalog declares the exact seven executable capabil
     "frame-src https://calendly.com https://www.calendly.com",
   ]);
 
-  assert.deepEqual(catalog, [
-    {
-      identifier: "standards",
-      version: "0.2.0",
-      deliveryMode: "hybrid",
-      stateClassifications: ["repository-stateful"],
-      removalPolicy: "reviewed",
-      dependencies: [],
-      optionalIntegrations: [],
-      conflicts: [],
-      supportedProfiles: ["portfolio", "site"],
-      requiredPackages: [
-        "@axe-core/playwright",
-        "@egeria-systems/standards",
-        "@playwright/test",
-      ],
-      environmentVariables: ["PLAYWRIGHT_DEPLOYED_URL"],
-      secrets: [],
-      platformResources: [],
-      externalDomains: [
-        "cdn.playwright.dev",
-        "playwright.download.prss.microsoft.com",
-      ],
-      contentSecurityPolicyContributions: [],
-      browserStorage: [],
-      dataClassifications: [],
-      retentionAssumptions: ["ci-failure-artifacts-seven-days"],
-      privilegedOperations: [
-        "browser-binary-installation",
-        "browser-process-execution",
-      ],
-      threatReviewLevel: "elevated",
-      adapterSemanticRequirements: [],
-      managedSurfaces: [
-        {
-          identifier: "standards-axe-playwright-package",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/devDependencies/@axe-core~1playwright",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "standards-browser-install-ci-script",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/scripts/browser:install:ci",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "standards-browser-install-script",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/scripts/browser:install",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "standards-browser-quality-specification",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/tests/e2e/site-quality.spec.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "standards-deployed-browser-test-script",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/scripts/test:e2e:deployed",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "standards-development-browser-test-script",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/scripts/test:e2e:dev",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "standards-eslint-configuration",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/eslint.config.mjs",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "standards-package",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/devDependencies/@egeria-systems~1standards",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "standards-playwright-deployed-configuration",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/playwright.deployed.config.ts",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "standards-playwright-development-configuration",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/playwright.dev.config.ts",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "standards-playwright-package",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/devDependencies/@playwright~1test",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "standards-playwright-preview-configuration",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/playwright.preview.config.ts",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "standards-playwright-shared-configuration",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/playwright.config.shared.ts",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "standards-preview-browser-test-script",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/scripts/test:e2e:preview",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "standards-quality-workflow",
-          owner: { kind: "capability", identifier: "standards" },
-          path: ".github/workflows/quality.yml",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "standards-typescript-configuration",
-          owner: { kind: "capability", identifier: "standards" },
-          path: "apps/web/tsconfig.json",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-      ],
-      inferenceProbes: [
-        {
-          kind: "package",
-          path: "apps/web/package.json",
-          section: "devDependencies",
-          packageName: "@axe-core/playwright",
-          version: "4.12.1",
-        },
-        {
-          kind: "json-value",
-          path: "apps/web/package.json",
-          pointer: "/scripts/browser:install:ci",
-          expected: "playwright install --with-deps chromium",
-        },
-        {
-          kind: "json-value",
-          path: "apps/web/package.json",
-          pointer: "/scripts/browser:install",
-          expected: "playwright install chromium",
-        },
-        { kind: "file", path: "apps/web/tests/e2e/site-quality.spec.ts" },
-        {
-          kind: "json-value",
-          path: "apps/web/package.json",
-          pointer: "/scripts/test:e2e:deployed",
-          expected: "playwright test --config playwright.deployed.config.ts",
-        },
-        {
-          kind: "json-value",
-          path: "apps/web/package.json",
-          pointer: "/scripts/test:e2e:dev",
-          expected: "playwright test --config playwright.dev.config.ts",
-        },
-        { kind: "file", path: "apps/web/eslint.config.mjs" },
-        {
-          kind: "package",
-          path: "apps/web/package.json",
-          section: "devDependencies",
-          packageName: "@egeria-systems/standards",
-          version: "1.2.3",
-        },
-        { kind: "file", path: "apps/web/playwright.deployed.config.ts" },
-        { kind: "file", path: "apps/web/playwright.dev.config.ts" },
-        {
-          kind: "package",
-          path: "apps/web/package.json",
-          section: "devDependencies",
-          packageName: "@playwright/test",
-          version: "1.62.1",
-        },
-        { kind: "file", path: "apps/web/playwright.preview.config.ts" },
-        { kind: "file", path: "apps/web/playwright.config.shared.ts" },
-        {
-          kind: "json-value",
-          path: "apps/web/package.json",
-          pointer: "/scripts/test:e2e:preview",
-          expected: "playwright test --config playwright.preview.config.ts",
-        },
-        { kind: "file", path: ".github/workflows/quality.yml" },
-        { kind: "file", path: "apps/web/tsconfig.json" },
-      ],
-      migrationPlanners: [],
-      verificationPlan: [
-        "package-resolution",
-        "lint",
-        "typecheck",
-        "browser-development",
-        "browser-preview",
-        "deployed-configuration",
-        "workflow-contracts",
-      ],
-      documentationEvidenceRequirements: [
-        "public-package-version-and-provenance",
-        "browser-testing-claim-boundaries",
-      ],
-      removalAndRecoveryRequirements: [
-        "review-package-and-configuration-removal",
-        "review-generated-quality-surface-removal",
-      ],
-    },
+  assert.deepEqual(catalog.slice(1), [
     {
       identifier: "content-files",
       version: "0.4.0",
@@ -1260,7 +1023,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.6.0",
+      recipeVersion: "0.7.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1272,7 +1035,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.6.0",
+      recipeVersion: "0.7.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1303,7 +1066,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.6.0");
+  assert.equal(portfolio.recipeVersion, "0.7.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1337,7 +1100,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
       ({ identifier }) => identifier,
     );
 
-    assert.equal(selected.recipeVersion, "0.6.0");
+    assert.equal(selected.recipeVersion, "0.7.0");
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
         selectedIdentifiers.indexOf("booking-calendly"),
@@ -1356,7 +1119,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   assert.deepEqual(core.createInstalledManifest(site), [
     {
       identifier: "standards",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",

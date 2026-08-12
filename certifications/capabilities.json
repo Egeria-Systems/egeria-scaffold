@@ -128,12 +128,12 @@
     },
     "standards": {
       "subject": {
-        "descriptorVersion": "0.2.0",
-        "behaviorContractDigest": "sha256:a3a020b778c1ccfa24e0bfc951fcdf5eb74b50728f69e960124c6bae6a757311"
+        "descriptorVersion": "0.3.0",
+        "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
       },
       "requiredEvidence": ["fresh-scaffold"],
-      "status": "backfill-pending",
-      "taskPlan": null,
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md",
       "evidence": []
     }
   }

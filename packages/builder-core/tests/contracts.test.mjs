@@ -97,11 +97,37 @@ const validInstalledSurface = {
   fingerprint: `sha256:${"a".repeat(64)}`,
 };
 
+const legacyVerificationChecks = [
+  "contracts",
+  "pre-state-inference",
+  "lockfile",
+  "frozen-install",
+  "lint",
+  "typecheck",
+  "next-build",
+  "opennext-build",
+  "post-state-inference",
+];
+
+const currentVerificationChecks = [
+  "contracts",
+  "pre-state-inference",
+  "lockfile",
+  "frozen-install",
+  "lint",
+  "typecheck",
+  "unit-tests",
+  "component-tests",
+  "next-build",
+  "opennext-build",
+  "post-state-inference",
+];
+
 const validState = {
   schemaVersion: "1.0.0",
   builderVersion: "0.0.0",
   projectSchemaVersion: "1.0.0",
-  origin: { profile: "portfolio", recipeVersion: "0.1.0" },
+  origin: { profile: "portfolio", recipeVersion: "0.7.0" },
   installedCapabilities: [
     {
       identifier: "standards",
@@ -121,17 +147,7 @@ const validState = {
   },
   lastSuccessfulVerification: {
     kind: "generation",
-    checks: [
-      "contracts",
-      "pre-state-inference",
-      "lockfile",
-      "frozen-install",
-      "lint",
-      "typecheck",
-      "next-build",
-      "opennext-build",
-      "post-state-inference",
-    ],
+    checks: currentVerificationChecks,
   },
 };
 
@@ -398,6 +414,14 @@ test("project configuration is strict and materializes safe capability identifie
     ...validProfile,
     recipeVersion: "0.6.0",
   });
+  assertAccepts(contracts.projectConfigurationSchema, {
+    ...validProject,
+    recipeVersion: "0.7.0",
+  });
+  assertAccepts(contracts.profileRecipeSchema, {
+    ...validProfile,
+    recipeVersion: "0.7.0",
+  });
 
   assertRejects(contracts.projectConfigurationSchema, {
     ...validProject,
@@ -421,11 +445,11 @@ test("project configuration is strict and materializes safe capability identifie
   });
   assertRejects(contracts.projectConfigurationSchema, {
     ...validProject,
-    recipeVersion: "0.7.0",
+    recipeVersion: "0.8.0",
   });
   assertRejects(contracts.profileRecipeSchema, {
     ...validProfile,
-    recipeVersion: "0.7.0",
+    recipeVersion: "0.8.0",
   });
 });
 
@@ -589,25 +613,26 @@ test("project display names preserve Unicode while rejecting controls and whites
 
 test("installed state is strict and records the exact successful generation checks", () => {
   assertAccepts(contracts.installedStateSchema, validState);
-  assertAccepts(contracts.installedStateSchema, {
-    ...validState,
-    origin: { ...validState.origin, recipeVersion: "0.2.0" },
-  });
-  assertAccepts(contracts.installedStateSchema, {
-    ...validState,
-    origin: { ...validState.origin, recipeVersion: "0.3.0" },
-  });
-  assertAccepts(contracts.installedStateSchema, {
-    ...validState,
-    origin: { ...validState.origin, recipeVersion: "0.4.0" },
-  });
-  assertAccepts(contracts.installedStateSchema, {
-    ...validState,
-    origin: { ...validState.origin, recipeVersion: "0.5.0" },
-  });
-  assertAccepts(contracts.installedStateSchema, {
+  for (const recipeVersion of ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0"]) {
+    assertAccepts(contracts.installedStateSchema, {
+      ...validState,
+      origin: { ...validState.origin, recipeVersion },
+      lastSuccessfulVerification: {
+        kind: "generation",
+        checks: legacyVerificationChecks,
+      },
+    });
+  }
+  assertRejects(contracts.installedStateSchema, {
     ...validState,
     origin: { ...validState.origin, recipeVersion: "0.6.0" },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...validState,
+    lastSuccessfulVerification: {
+      kind: "generation",
+      checks: legacyVerificationChecks,
+    },
   });
   for (const surface of [
     { ...validInstalledSurface, mergeStrategy: "json-property" },
@@ -652,7 +677,7 @@ test("installed state is strict and records the exact successful generation chec
   });
   assertRejects(contracts.installedStateSchema, {
     ...validState,
-    origin: { ...validState.origin, recipeVersion: "0.7.0" },
+    origin: { ...validState.origin, recipeVersion: "0.8.0" },
   });
 });
 

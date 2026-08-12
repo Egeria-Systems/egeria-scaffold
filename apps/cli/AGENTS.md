@@ -8,5 +8,6 @@ Read the repository [`AGENTS.md`](../../AGENTS.md), the canonical [package owner
 - Keep command input/output thin. Builder decisions, repository transformations, schemas, profile recipes, state, inference, and diagnostics belong to `packages/builder-core`.
 - `create` may call only builder-core's approved new-directory generation boundary. It does not add overwrite, interactive prompt, Git, deployment, publication, provider, or existing-repository mutation behavior.
 - `infer`, `doctor`, and `diff` remain read-only and must not install dependencies or change repository bytes.
+- Test this adapter with Node's test runner (`node --test`) through `pnpm run test:cli`. Cover argument parsing and process/output contracts with focused unit and subprocess tests; keep generated-project behavior in builder-core. Passing CLI tests do not prove dependency installation, generated application runtime, browser, workerd, deployment, or provider behavior.
 - Do not expose this application as a public package.
 - Follow the currently approved increment and stop at its review gate before expanding this boundary.
