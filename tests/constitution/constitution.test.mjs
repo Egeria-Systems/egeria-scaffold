@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { createRequire } from "node:module";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
@@ -24,6 +32,10 @@ const namedLabel = (prefix, ordinal, separator = " ") =>
   [prefix, separator, ordinal].join("");
 const credentialBoundPackageCommandPattern =
   /\b(?:pnpm|npm|yarn)\b[^\n]*(?:\bbuild|\btest)(?=[:\s]|$)/iu;
+
+async function runRepositoryQualityScopeClassifier() {
+  throw new Error("scope classifier harness not implemented");
+}
 
 function enumerateSecretReferences(value, path = "") {
   if (typeof value === "string") {
@@ -609,6 +621,182 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
     "utf8",
   );
   assert.match(bookingWorkflow, /run test:unit[\s\S]+run test:component[\s\S]+Deploy certification Worker/u);
+});
+
+test("repository quality scope classification executes fail-safe Git behavior", async (context) => {
+  const fixtureRoot = await mkdtemp(join(tmpdir(), "egeria-quality-scope-"));
+  context.after(async () => {
+    await rm(fixtureRoot, { recursive: true, force: true });
+  });
+
+  const git = async (...arguments_) =>
+    execFileAsync("git", arguments_, {
+      cwd: fixtureRoot,
+      encoding: "utf8",
+    });
+  await git("init", "--quiet");
+  await git("config", "user.name", "Repository quality contract");
+  await git("config", "user.email", "quality-contract@example.invalid");
+  await git("config", "commit.gpgsign", "false");
+
+  const commitFile = async (relativePath, content, message) => {
+    const absolutePath = resolve(fixtureRoot, relativePath);
+    await mkdir(dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, content, "utf8");
+    await git("add", "--", relativePath);
+    await git("commit", "--quiet", "-m", message);
+    return (await git("rev-parse", "HEAD")).stdout.trim();
+  };
+
+  const baseRevision = await commitFile("README.md", "base\n", "base");
+  const documentationRevision = await commitFile(
+    "docs/note.md",
+    "unrelated\n",
+    "documentation",
+  );
+  const generatedRevision = await commitFile(
+    "apps/cli/scoped.txt",
+    "generated\n",
+    "generated",
+  );
+  const proofRevision = await commitFile(
+    "proofs/nextjs-cloudflare/scoped.txt",
+    "proof\n",
+    "proof",
+  );
+  const workflowRevision = await commitFile(
+    ".github/workflows/scoped.yml",
+    "name: scoped\n",
+    "workflow",
+  );
+
+  const workflowSource = await readRepositoryFile(
+    ".github/workflows/repository-quality.yml",
+  );
+  const workflow = parse(workflowSource);
+  const scopeRun = workflow.jobs.scope.steps.find(
+    ({ id }) => id === "classify",
+  )?.run;
+  assert.equal(typeof scopeRun, "string");
+
+  const bothEnabled = {
+    "generated-projects": "true",
+    "compatibility-proof": "true",
+  };
+  const scenarios = [
+    {
+      name: "unchanged revision",
+      pushBaseSha: baseRevision,
+      pushHeadSha: baseRevision,
+      expected: {
+        "generated-projects": "false",
+        "compatibility-proof": "false",
+      },
+    },
+    {
+      name: "unrelated documentation",
+      pushBaseSha: baseRevision,
+      pushHeadSha: documentationRevision,
+      expected: {
+        "generated-projects": "false",
+        "compatibility-proof": "false",
+      },
+    },
+    {
+      name: "generated-only change",
+      pushBaseSha: documentationRevision,
+      pushHeadSha: generatedRevision,
+      expected: {
+        "generated-projects": "true",
+        "compatibility-proof": "false",
+      },
+    },
+    {
+      name: "proof-only change",
+      pushBaseSha: generatedRevision,
+      pushHeadSha: proofRevision,
+      expected: {
+        "generated-projects": "false",
+        "compatibility-proof": "true",
+      },
+    },
+    {
+      name: "workflow change",
+      pushBaseSha: proofRevision,
+      pushHeadSha: workflowRevision,
+      expected: bothEnabled,
+    },
+    {
+      name: "malformed revision",
+      pushBaseSha: "not-a-revision",
+      pushHeadSha: baseRevision,
+      expected: bothEnabled,
+    },
+    {
+      name: "missing revision",
+      pushBaseSha: "",
+      pushHeadSha: baseRevision,
+      expected: bothEnabled,
+    },
+    {
+      name: "zero revision",
+      pushBaseSha: "0".repeat(40),
+      pushHeadSha: baseRevision,
+      expected: bothEnabled,
+    },
+    {
+      name: "unresolvable revision",
+      pushBaseSha: "f".repeat(40),
+      pushHeadSha: baseRevision,
+      expected: bothEnabled,
+    },
+    {
+      name: "unsupported event",
+      eventName: "workflow_dispatch",
+      pushBaseSha: baseRevision,
+      pushHeadSha: documentationRevision,
+      expected: bothEnabled,
+    },
+    {
+      name: "Git diff error",
+      pushBaseSha: baseRevision,
+      pushHeadSha: documentationRevision,
+      forceDiffFailure: true,
+      expected: bothEnabled,
+    },
+  ];
+
+  for (const scenario of scenarios) {
+    const actual = await runRepositoryQualityScopeClassifier({
+      scopeRun,
+      repositoryRoot: fixtureRoot,
+      eventName: scenario.eventName ?? "push",
+      pullRequestBaseSha: "",
+      pullRequestHeadSha: "",
+      pushBaseSha: scenario.pushBaseSha,
+      pushHeadSha: scenario.pushHeadSha,
+      forceDiffFailure: scenario.forceDiffFailure ?? false,
+    });
+    assert.deepEqual(actual, scenario.expected, scenario.name);
+  }
+
+  assert.deepEqual(
+    await runRepositoryQualityScopeClassifier({
+      scopeRun,
+      repositoryRoot: fixtureRoot,
+      eventName: "pull_request",
+      pullRequestBaseSha: documentationRevision,
+      pullRequestHeadSha: generatedRevision,
+      pushBaseSha: "not-used",
+      pushHeadSha: "not-used",
+      forceDiffFailure: false,
+    }),
+    {
+      "generated-projects": "true",
+      "compatibility-proof": "false",
+    },
+    "pull-request revisions",
+  );
 });
 
 test("the workspace declares the approved proof root and install policy", async () => {
