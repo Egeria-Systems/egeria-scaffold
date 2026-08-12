@@ -13,7 +13,11 @@ function createEvent() {
       kind: "application.lifecycle",
       runtime: "server",
       severity: "info",
-      context: { correlationId: "correlation-1" },
+      context: {
+        eventId: "event-1",
+        correlationId: "correlation-1",
+        service: "web",
+      },
     },
     {
       clock: {

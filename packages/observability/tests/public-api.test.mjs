@@ -13,12 +13,16 @@ test("the public root API exposes only the approved operational contract", async
   const publicApi = await import("@egeria-systems/observability");
 
   assert.deepEqual(Object.keys(publicApi).sort(), [
+    "createOperationalErrorReport",
     "createOperationalEvent",
     "dispatchOperationalEvent",
+    "isOperationalErrorReport",
     "normalizeErrorCategory",
+    "operationalCaptureMechanisms",
     "operationalErrorCategories",
     "operationalEventKinds",
     "operationalRuntimes",
     "operationalSeverities",
+    "reconstructOperationalErrorReport",
   ]);
 });

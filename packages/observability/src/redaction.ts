@@ -16,6 +16,106 @@ const compactTokenPattern =
 const ipv4AddressPattern = /^(?:\d{1,3}\.){3}\d{1,3}$/u;
 const ipv6AddressPattern =
   /^(?=[A-Fa-f0-9:.]*:[A-Fa-f0-9:.]*:)[A-Fa-f0-9:.]+$/u;
+const exceptionEmailPattern =
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/giu;
+const exceptionIpv4Pattern = /\b(?:\d{1,3}\.){3}\d{1,3}\b/gu;
+const exceptionIpv6Pattern =
+  /(?<![A-Fa-f0-9:.])[A-Fa-f0-9:.]*:[A-Fa-f0-9:.]*:[A-Fa-f0-9:.]*(?![A-Fa-f0-9:.])/gu;
+const exceptionJwtPattern =
+  /\b[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/gu;
+const exceptionBearerPattern = /\bBearer\s+[A-Za-z0-9._~+/-]{4,}/giu;
+const exceptionSecretAssignmentPattern =
+  /\b(authorization|cookie|password|secret|token|api[_-]?key)\s*[:=]\s*[^\s,;)}]+/giu;
+const urlDetailsPattern = /([a-z][a-z0-9+.-]*:\/\/[^\s?#)]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/giu;
+const unixAbsolutePathPattern =
+  /(?<![A-Za-z0-9:+./-])(?:file:\/\/)?\/(?:[^/\s()?#]+\/)+([^/\s()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
+const windowsAbsolutePathPattern =
+  /\b[A-Za-z]:\\(?:[^\\\s()?#]+\\)+([^\\\s()?#]+)(?:\?[^\s#)]*)?(?:#[^\s)]*)?/gu;
+
+export const exceptionRedactionMarkers = Object.freeze({
+  email: "[REDACTED_EMAIL]",
+  ip: "[REDACTED_IP]",
+  path: "[REDACTED_PATH]",
+  secret: "[REDACTED_SECRET]",
+  truncated: "[TRUNCATED]",
+});
+
+export function utf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    bytes +=
+      codePoint <= 0x7f
+        ? 1
+        : codePoint <= 0x7ff
+          ? 2
+          : codePoint <= 0xffff
+            ? 3
+            : 4;
+  }
+  return bytes;
+}
+
+export function truncateUtf8(
+  value: string,
+  maximumBytes: number,
+): Readonly<{ value: string; truncated: boolean }> {
+  if (utf8ByteLength(value) <= maximumBytes) {
+    return Object.freeze({ value, truncated: false });
+  }
+
+  const marker = exceptionRedactionMarkers.truncated;
+  const availableBytes = Math.max(0, maximumBytes - utf8ByteLength(marker));
+  let prefix = "";
+  let prefixBytes = 0;
+  for (const character of value) {
+    const characterBytes = utf8ByteLength(character);
+    if (prefixBytes + characterBytes > availableBytes) break;
+    prefix += character;
+    prefixBytes += characterBytes;
+  }
+  return Object.freeze({ value: `${prefix}${marker}`, truncated: true });
+}
+
+export function redactExceptionText(
+  value: string,
+): Readonly<{ value: string; redacted: boolean }> {
+  let redacted = false;
+  const replace = (
+    pattern: RegExp,
+    replacement: string | ((...values: string[]) => string),
+  ): void => {
+    const next = value.replace(pattern, replacement as never);
+    if (next !== value) redacted = true;
+    value = next;
+  };
+
+  replace(exceptionBearerPattern, exceptionRedactionMarkers.secret);
+  replace(
+    exceptionSecretAssignmentPattern,
+    (_match, key) => `${key}=${exceptionRedactionMarkers.secret}`,
+  );
+  replace(exceptionJwtPattern, exceptionRedactionMarkers.secret);
+  replace(exceptionEmailPattern, exceptionRedactionMarkers.email);
+  replace(exceptionIpv4Pattern, exceptionRedactionMarkers.ip);
+  replace(exceptionIpv6Pattern, (candidate) => {
+    const colonCount = candidate.match(/:/gu)?.length ?? 0;
+    return candidate.includes("::") || colonCount >= 3
+      ? exceptionRedactionMarkers.ip
+      : candidate;
+  });
+  replace(urlDetailsPattern, (_match, base) => base);
+  replace(
+    windowsAbsolutePathPattern,
+    (_match, file) => `${exceptionRedactionMarkers.path}\\${file}`,
+  );
+  replace(
+    unixAbsolutePathPattern,
+    (_match, file) => `${exceptionRedactionMarkers.path}/${file}`,
+  );
+
+  return Object.freeze({ value, redacted });
+}
 
 function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {

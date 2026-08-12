@@ -11,14 +11,17 @@ const betterStackHostPattern =
 const sourceTokenPattern = /^[A-Za-z0-9._~-]{16,512}$/u;
 
 export type OperationalRecord = Readonly<{
-  schema_version: "1.0.0";
+  schema_version: "2.0.0";
   dt: string;
   event_name: string;
   event_kind: OperationalEvent["kind"];
   runtime: OperationalEvent["runtime"];
   severity: OperationalEvent["severity"];
-  correlation_id: string;
+  event_id: string;
+  correlation_id?: string;
   release_id?: string;
+  service: string;
+  environment?: string;
   error_category?: NonNullable<OperationalEvent["errorCategory"]>;
   attributes: OperationalEvent["attributes"];
 }>;
@@ -99,16 +102,23 @@ function createOperationalRecord(event: OperationalEvent): OperationalRecord {
     throw new TypeError("OPERATIONAL_EVENT_INVALID");
   }
   return Object.freeze({
-    schema_version: "1.0.0" as const,
+    schema_version: "2.0.0" as const,
     dt: event.occurredAt,
     event_name: event.name,
     event_kind: event.kind,
     runtime: event.runtime,
     severity: event.severity,
-    correlation_id: event.context.correlationId,
+    event_id: event.context.eventId,
+    ...(event.context.correlationId === undefined
+      ? {}
+      : { correlation_id: event.context.correlationId }),
     ...(event.context.releaseId === undefined
       ? {}
       : { release_id: event.context.releaseId }),
+    service: event.context.service,
+    ...(event.context.environment === undefined
+      ? {}
+      : { environment: event.context.environment }),
     ...(event.errorCategory === undefined
       ? {}
       : { error_category: event.errorCategory }),

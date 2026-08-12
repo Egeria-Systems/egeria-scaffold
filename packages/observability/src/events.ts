@@ -18,7 +18,15 @@ import {
 
 const eventNamePattern = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/u;
 const contextTokenPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const semanticContextTokenPattern = /^[a-z][a-z0-9-]{0,63}$/u;
 const maximumEventNameLength = 64;
+const contextKeys = Object.freeze([
+  "correlationId",
+  "environment",
+  "eventId",
+  "releaseId",
+  "service",
+]);
 const createdOperationalEvents = new WeakSet();
 
 function includes<const Value extends string>(
@@ -35,23 +43,43 @@ function createContext(value: unknown): OperationalContext | undefined {
 
   try {
     const record = value as Readonly<Record<string, unknown>>;
+    if (Object.keys(record).some((key) => !contextKeys.includes(key))) {
+      return undefined;
+    }
+    const eventId = record.eventId;
     const correlationId = record.correlationId;
     const releaseId = record.releaseId;
+    const service = record.service;
+    const environment = record.environment;
     if (
-      typeof correlationId !== "string" ||
-      !contextTokenPattern.test(correlationId) ||
-      isPrivateDataLikeString(correlationId) ||
+      typeof eventId !== "string" ||
+      !contextTokenPattern.test(eventId) ||
+      isPrivateDataLikeString(eventId) ||
+      typeof service !== "string" ||
+      !semanticContextTokenPattern.test(service) ||
+      isPrivateDataLikeString(service) ||
+      (correlationId !== undefined &&
+        (typeof correlationId !== "string" ||
+          !contextTokenPattern.test(correlationId) ||
+          isPrivateDataLikeString(correlationId))) ||
       (releaseId !== undefined &&
         (typeof releaseId !== "string" ||
           !contextTokenPattern.test(releaseId) ||
-          isPrivateDataLikeString(releaseId)))
+          isPrivateDataLikeString(releaseId))) ||
+      (environment !== undefined &&
+        (typeof environment !== "string" ||
+          !semanticContextTokenPattern.test(environment) ||
+          isPrivateDataLikeString(environment)))
     ) {
       return undefined;
     }
 
     return Object.freeze({
-      correlationId,
+      eventId,
+      ...(typeof correlationId === "string" ? { correlationId } : {}),
       ...(typeof releaseId === "string" ? { releaseId } : {}),
+      service,
+      ...(typeof environment === "string" ? { environment } : {}),
     });
   } catch {
     return undefined;
@@ -69,7 +97,7 @@ function createFrozenEvent(input: Readonly<{
   attributes: OperationalEvent["attributes"];
 }>): OperationalEvent {
   const event = Object.freeze({
-    schemaVersion: "1.0.0" as const,
+    schemaVersion: "2.0.0" as const,
     occurredAt: input.occurredAt,
     name: input.name,
     kind: input.kind,

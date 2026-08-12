@@ -14,7 +14,11 @@ function createEvent(runtime = "browser") {
       kind: "application.error",
       runtime,
       severity: "error",
-      context: { correlationId: "browser-123" },
+      context: {
+        eventId: "event-browser-123",
+        correlationId: "browser-123",
+        service: "web",
+      },
       errorCategory: "unexpected",
       attributes: { source: "window-error" },
     },

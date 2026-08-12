@@ -16,8 +16,10 @@ function createEvent() {
       runtime: "server",
       severity: "error",
       context: {
+        eventId: "event-123",
         correlationId: "ray-123",
         releaseId: "release-5",
+        service: "web",
       },
       errorCategory: "network",
       attributes: { route_kind: "app-router" },
@@ -35,14 +37,16 @@ function createEvent() {
 }
 
 const expectedRecord = {
-  schema_version: "1.0.0",
+  schema_version: "2.0.0",
   dt: "2026-08-10T18:00:00.000Z",
   event_name: "next.request.error",
   event_kind: "application.error",
   runtime: "server",
   severity: "error",
+  event_id: "event-123",
   correlation_id: "ray-123",
   release_id: "release-5",
+  service: "web",
   error_category: "network",
   attributes: { route_kind: "app-router" },
 };
