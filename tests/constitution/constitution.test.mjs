@@ -2441,7 +2441,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+four unchanged subjects[^\n]+backfill-pending[^\n]+observability@0\.2\.0[^\n]+standards@0\.3\.0[^\n]+pending/i,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+four unchanged subjects[^\n]+backfill-pending[^\n]+observability@0\.2\.0[^\n]+pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2761,16 +2761,18 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   assert.match(
     sourcePlan,
     new RegExp(
-      `${escapeRegularExpression(independentStream)}[^.]+pending[^.]+unchanged|preserve(?:s)? ${escapeRegularExpression(independentStream)}'s pending`,
+      `${escapeRegularExpression(independentStream)}[^.]+pending[^.]+unchanged|preserv(?:e|es|ed) ${escapeRegularExpression(independentStream)}'s pending`,
       "iu",
     ),
   );
   assert.match(sourcePlan, /reconciliation[^.]+separate review/iu);
 
-  assert.match(roadmap, /2026-08-11[^.]+independent-work exception/iu);
   assert.match(
     roadmap,
-    /reconciled with `main@2a315aa0e7dce1bf1048b9a2c07e318add9241de`/iu,
+    new RegExp(
+      `${escapeRegularExpression(implementationTask)} is squash-integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\``,
+      "u",
+    ),
   );
   assert.match(
     roadmap,
@@ -2792,7 +2794,7 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   );
   assert.match(
     roadmap,
-    /Within those separate capability-certification tasks, protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, merge, and push remain unauthorized/iu,
+    /Within the remaining observability task, protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, merge, and push remain unauthorized/iu,
   );
 
   assert.match(
@@ -2996,7 +2998,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `Under the explicit 2026-08-11 independent-work exception, ${escapeRegularExpression(generatedTestingTask)} has an independently reviewed implementation candidate on merge request 2, reconciled with \`main@2a315aa0e7dce1bf1048b9a2c07e318add9241de\``,
+      `${escapeRegularExpression(generatedTestingTask)} is squash-integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\``,
       "u",
     ),
   );
@@ -3011,7 +3013,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} awaits verified-final-diff approval and one eligible repository approval`,
+      `${escapeRegularExpression(namedLabel("Task", "6D"))} now certifies the exact \`standards@0\.3\.0\` subject[\\s\\S]+exact final certification diff still requires verified-final-diff approval`,
       "u",
     ),
   );
@@ -3022,7 +3024,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} remains on its approved isolated merge-request branch/worktree and has reconciled accepted \`main@2a315aa0e7dce1bf1048b9a2c07e318add9241de\``,
+      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} executes its separate certification increment on the isolated \`standards-certification\` branch/worktree`,
       "u",
     ),
   );

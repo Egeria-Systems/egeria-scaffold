@@ -62,6 +62,8 @@ package.json
 certifications/capabilities.json
 tests/capability-certification/certification-runner.test.mjs
 tests/constitution/constitution.test.mjs
+packages/builder-core/tests/certification.test.mjs
+packages/builder-core/AGENTS.md
 docs/architecture/overview.md
 docs/architecture/capability-model.md
 docs/architecture/enforcement-map.md
