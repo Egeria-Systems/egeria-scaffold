@@ -3,9 +3,9 @@ import { execFile } from "node:child_process";
 import {
   access,
   lstat,
-  mkdir,
   mkdtemp,
   readFile,
+  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -435,6 +435,7 @@ test("observability production mutation rejects an unconfirmed inference categor
 
 test("observability production mutation refuses identity-replacement cleanup", async () => {
   let retainedOwner;
+  let replacementIdentity;
 
   try {
     await assert.rejects(
@@ -447,9 +448,19 @@ test("observability production mutation refuses identity-replacement cleanup", a
             ];
             if (command === "create") {
               retainedOwner = dirname(projectRoot);
-              assert.equal((await lstat(retainedOwner)).mode & 0o777, 0o700);
+              const originalIdentity = await lstat(retainedOwner, {
+                bigint: true,
+              });
+              assert.equal(originalIdentity.mode & 0o777n, 0o700n);
+              const replacementPath = await mkdtemp(
+                `${retainedOwner}-replacement-`,
+              );
+              replacementIdentity = await lstat(replacementPath, {
+                bigint: true,
+              });
+              assert.notEqual(replacementIdentity.ino, originalIdentity.ino);
               await rm(retainedOwner, { recursive: true });
-              await mkdir(retainedOwner, { mode: 0o700 });
+              await rename(replacementPath, retainedOwner);
             }
             return `${JSON.stringify(observabilityCommandOutput(command))}\n`;
           },
@@ -470,6 +481,9 @@ test("observability production mutation refuses identity-replacement cleanup", a
       },
     );
     assert.equal(await pathExists(retainedOwner), true);
+    const retainedIdentity = await lstat(retainedOwner, { bigint: true });
+    assert.equal(retainedIdentity.dev, replacementIdentity.dev);
+    assert.equal(retainedIdentity.ino, replacementIdentity.ino);
   } finally {
     await cleanupRetainedDirectory(retainedOwner);
   }

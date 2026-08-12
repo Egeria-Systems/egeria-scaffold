@@ -111,6 +111,35 @@ Commit: `fix: preserve generated contract integrity`
 
 Push the existing MR branch and inspect hosted checks before final review.
 
+## Main-reconciliation amendment: make the incoming identity test portable
+
+**Approval:** The user preapproved plan amendments and directed this branch to merge current `main`, resolve the resulting fingerprint conflicts, repair accurate CI, push, and merge only after CI passes. This amendment was activated only after merging `main` commit `2a315aa0e7dce1bf1048b9a2c07e318add9241de` and observing the exact merged head on hosted CI.
+
+### File
+
+- Modify `tests/capability-certification/production-observability.test.mjs` only.
+
+### RED and cause
+
+- Hosted repository-quality run `31582711142` failed the incoming identity-replacement cleanup test because deleting and immediately recreating one pathname can reuse the original inode on Linux.
+- The same test passed locally on macOS, confirming that its inode-change assumption was filesystem-dependent rather than evidence of a production behavior difference.
+
+### GREEN
+
+- Create the replacement directory while the original still exists, record its distinct identity, remove the original, and rename the replacement into the retained path.
+- Assert the retained directory has the replacement identity. Keep the existing cleanup-failure expectation and change no production, provider, certification-state, or generated-project behavior.
+
+### Verification and commit
+
+```sh
+node --test --test-name-pattern='observability production mutation refuses identity-replacement cleanup' tests/capability-certification/production-observability.test.mjs
+pnpm run test:capability-certification
+pnpm exec eslint tests/capability-certification/production-observability.test.mjs --max-warnings 0
+git diff --check
+```
+
+Commit: `test: make cleanup identity check portable`
+
 ## Final review, evidence, and recovery
 
 After the three increments are separately accepted:
