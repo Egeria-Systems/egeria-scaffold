@@ -149,9 +149,10 @@ Expected: stable job names always appear for pull requests; deep work is skipped
 
 ## Task 5: GREEN — deduplicate generated and proof verification
 
-**Files:** proof package/config/instructions; generated templates; `packages/builder-core/src/generation/verify-generated-project.ts`; `scripts/verify-generated-skeletons.mjs`.
+**Files:** proof package/Next/Playwright configuration and instructions; generated templates including Next configuration; `packages/builder-core/src/generation/verify-generated-project.ts`; `scripts/verify-generated-skeletons.mjs`.
 
 - [ ] Change proof `verify` so `pnpm run build` is followed by `pnpm exec opennextjs-cloudflare build --skipNextBuild`; do not change proof `build:cloudflare`, `preview`, or `deploy` scripts.
+- [ ] Configure proof and generated Next builds to emit standalone output with the workspace root as `outputFileTracingRoot`; this is the prepared artifact required by `--skipNextBuild` and preserves the public build scripts.
 - [ ] Change proof preview Playwright `webServer.command` to direct `pnpm exec opennextjs-cloudflare preview -- --ip 127.0.0.1 --port 3101`.
 - [ ] Change generated root `verify` to call `pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild` after its root Next build; preserve root/web standalone build and preview scripts.
 - [ ] Change generated preview Playwright to direct `pnpm exec opennextjs-cloudflare preview -- --ip 127.0.0.1 --port 3101`.

@@ -621,13 +621,18 @@ test("the workspace declares the approved proof root and install policy", async 
 });
 
 test("the compatibility proof has a private non-app workspace boundary", async () => {
-  const [proofManifestSource, previewConfiguration, proofInstructions] =
-    await Promise.all([
+  const [
+    proofManifestSource,
+    previewConfiguration,
+    proofInstructions,
+    nextConfiguration,
+  ] = await Promise.all([
       readRepositoryFile("proofs/nextjs-cloudflare/package.json"),
       readRepositoryFile(
         "proofs/nextjs-cloudflare/playwright.preview.config.ts",
       ),
       readRepositoryFile("proofs/nextjs-cloudflare/AGENTS.md"),
+      readRepositoryFile("proofs/nextjs-cloudflare/next.config.ts"),
     ]);
   const proofManifest = JSON.parse(proofManifestSource);
 
@@ -659,6 +664,11 @@ test("the compatibility proof has a private non-app workspace boundary", async (
   assert.doesNotMatch(previewConfiguration, /pnpm preview/u);
   assert.match(proofInstructions, /already prepared `.open-next` output/iu);
   assert.match(proofInstructions, /--skipNextBuild/u);
+  assert.match(nextConfiguration, /output: "standalone"/u);
+  assert.match(
+    nextConfiguration,
+    /outputFileTracingRoot: fileURLToPath\(new URL\("\.\.\/\.\.\/", import\.meta\.url\)\)/u,
+  );
   await assert.rejects(readRepositoryFile("apps/web/package.json"));
   await assert.rejects(readRepositoryFile("apps/compatibility/package.json"));
   await assert.rejects(

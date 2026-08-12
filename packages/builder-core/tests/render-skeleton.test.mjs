@@ -2044,6 +2044,7 @@ test("generated browser quality is environment-specific and content-agnostic", a
   const development = files.get("apps/web/playwright.dev.config.ts");
   const preview = files.get("apps/web/playwright.preview.config.ts");
   const deployed = files.get("apps/web/playwright.deployed.config.ts");
+  const nextConfiguration = files.get("apps/web/next.config.ts");
   const specification = files.get("apps/web/tests/e2e/site-quality.spec.ts");
   const workflow = files.get(".github/workflows/quality.yml");
   const workflowConfiguration = parseGeneratedYaml(
@@ -2072,6 +2073,11 @@ test("generated browser quality is environment-specific and content-agnostic", a
   );
   assert.doesNotMatch(preview, /pnpm run preview/u);
   assert.match(preview, /reuseExistingServer: false/u);
+  assert.match(nextConfiguration, /output: "standalone"/u);
+  assert.match(
+    nextConfiguration,
+    /outputFileTracingRoot: fileURLToPath\(new URL\("\.\.\/\.\.\/", import\.meta\.url\)\)/u,
+  );
 
   assert.match(deployed, /PLAYWRIGHT_DEPLOYED_URL/u);
   assert.match(deployed, /protocol !== "https:"/u);
