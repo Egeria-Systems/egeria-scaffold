@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createOperationalErrorReport,
   createOperationalEvent,
+  dispatchOperationalErrorReport,
 } from "@egeria-systems/observability";
 import {
   createBetterStackDiagnosticSink,
@@ -365,6 +366,49 @@ test("Better Stack diagnostic delivery accepts only exact 202 and contains provi
     assert.deepEqual(result, { status: "failed", reason });
     assert.doesNotMatch(JSON.stringify(result), /credential-secret|response/u);
   }
+});
+
+test("Better Stack diagnostic delivery replaces only its matching safe adapter", async () => {
+  const requests = [];
+  const request = async (value) => {
+    requests.push(value);
+    return { status: 202 };
+  };
+  const operational = createBetterStackSink({
+    ingestingHost: "s123.eu-nbg-2.betterstackdata.com",
+    sourceToken: "source-token-123456",
+    request,
+  });
+  const diagnostic = createBetterStackDiagnosticSink({
+    ingestingHost: "s123.eu-nbg-2.betterstackdata.com",
+    sourceToken: "source-token-123456",
+    request,
+  });
+  assert.equal(operational.ok, true);
+  assert.equal(diagnostic.ok, true);
+
+  let workersCalls = 0;
+  const results = await dispatchOperationalErrorReport(createReport(), {
+    operationalSinks: [
+      {
+        identifier: "workers-logs",
+        write: () => {
+          workersCalls += 1;
+          return { status: "delivered" };
+        },
+      },
+      operational.value,
+    ],
+    diagnosticSinks: [diagnostic.value],
+  });
+
+  assert.equal(workersCalls, 1);
+  assert.equal(requests.length, 1);
+  assert.match(requests[0].body, /"exception\.fingerprint"/u);
+  assert.deepEqual(results, [
+    { sink: "workers-logs", status: "delivered" },
+    { sink: "better-stack", status: "delivered" },
+  ]);
 });
 
 test("Better Stack diagnostic delivery rejects structural reports and oversized JSON before HTTP", async () => {

@@ -1,4 +1,5 @@
 import {
+  readDiagnosticSinkOperationalReplacement,
   sinkFailureReasons,
   type DiagnosticSink,
   type DispatchResult,
@@ -54,24 +55,6 @@ function readSinkIdentifier(value: unknown): string | undefined {
   try {
     if (typeof value !== "object" || value === null) return undefined;
     const identifier = Reflect.get(value, "identifier") as unknown;
-    return typeof identifier === "string" &&
-      identifier.length <= 64 &&
-      sinkIdentifierPattern.test(identifier) &&
-      !isPrivateDataLikeString(identifier)
-      ? identifier
-      : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function readReplacementIdentifier(value: unknown): string | undefined {
-  try {
-    if (typeof value !== "object" || value === null) return undefined;
-    const identifier = Reflect.get(
-      value,
-      "replacesOperationalSinkIdentifier",
-    ) as unknown;
     return typeof identifier === "string" &&
       identifier.length <= 64 &&
       sinkIdentifierPattern.test(identifier) &&
@@ -180,7 +163,7 @@ export async function dispatchOperationalErrorReport(
       ? new Set(
           diagnosticSinks
             .filter((sink) => hasSinkMethod(sink, "writeReport"))
-            .map(readReplacementIdentifier)
+            .map(readDiagnosticSinkOperationalReplacement)
             .filter((identifier): identifier is string => identifier !== undefined),
         )
       : new Set<string>();

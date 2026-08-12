@@ -146,12 +146,20 @@ declare const event: OperationalEvent;
 declare const operationalSink: OperationalSink;
 declare const report: OperationalErrorReport;
 
+const customDiagnosticSink: DiagnosticSink = {
+  identifier: "custom-diagnostics",
+  // @ts-expect-error operational replacement metadata is package-private
+  replacesOperationalSinkIdentifier: "workers-logs",
+  writeReport: () => ({ status: "delivered" }),
+};
+
 void operationalSink.write(event);
 // @ts-expect-error restricted reports must not compile against safe sinks
 void operationalSink.write(report);
 void diagnosticSink.writeReport(report);
 // @ts-expect-error safe events must not compile against diagnostic sinks
 void diagnosticSink.writeReport(event);
+void customDiagnosticSink;
 `,
       "utf8",
     );

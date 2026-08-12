@@ -188,11 +188,27 @@ export type OperationalErrorReport = Readonly<{
 
 export type DiagnosticSink = Readonly<{
   identifier: string;
-  replacesOperationalSinkIdentifier?: string;
   writeReport: (
     report: OperationalErrorReport,
   ) => SinkWriteResult | Promise<SinkWriteResult>;
 }>;
+
+const operationalReplacementByDiagnosticSink = new WeakMap<object, string>();
+
+export function registerDiagnosticSinkOperationalReplacement(
+  sink: DiagnosticSink,
+  operationalSinkIdentifier: string,
+): void {
+  operationalReplacementByDiagnosticSink.set(sink, operationalSinkIdentifier);
+}
+
+export function readDiagnosticSinkOperationalReplacement(
+  sink: unknown,
+): string | undefined {
+  return typeof sink === "object" && sink !== null
+    ? operationalReplacementByDiagnosticSink.get(sink)
+    : undefined;
+}
 
 export type CreateOperationalErrorReportOptions = Readonly<
   Record<string, never>

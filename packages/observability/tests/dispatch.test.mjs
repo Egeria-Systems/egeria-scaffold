@@ -219,7 +219,6 @@ test("error dispatch preserves safe and diagnostic tiers while containing every 
     diagnosticSinks: [
       {
         identifier: "better-stack",
-        replacesOperationalSinkIdentifier: "better-stack",
         writeReport: async (received) => {
           diagnosticCalls.push(received);
           return { status: "delivered" };
@@ -241,10 +240,11 @@ test("error dispatch preserves safe and diagnostic tiers while containing every 
     ],
   });
 
-  assert.deepEqual(safeCalls, [report.event]);
+  assert.deepEqual(safeCalls, [report.event, report.event]);
   assert.deepEqual(diagnosticCalls, [report]);
   assert.deepEqual(results, [
     { sink: "workers-logs", status: "delivered" },
+    { sink: "better-stack", status: "delivered" },
     { sink: "better-stack", status: "delivered" },
     { sink: "diagnostic-throws", status: "failed", reason: "sink-threw" },
     {
@@ -275,6 +275,7 @@ test("diagnostic identifier collisions do not suppress unrelated safe delivery",
     diagnosticSinks: [
       {
         identifier: "workers-logs",
+        replacesOperationalSinkIdentifier: "workers-logs",
         writeReport: () => {
           calls.push("diagnostic");
           return { status: "delivered" };

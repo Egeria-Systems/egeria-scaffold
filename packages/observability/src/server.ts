@@ -1,11 +1,12 @@
-import type {
-  DiagnosticSink,
-  ErrorCaptureContext,
-  ExceptionDiagnostics,
-  OperationalErrorReport,
-  OperationalEvent,
-  OperationalSink,
-  SinkWriteResult,
+import {
+  registerDiagnosticSinkOperationalReplacement,
+  type DiagnosticSink,
+  type ErrorCaptureContext,
+  type ExceptionDiagnostics,
+  type OperationalErrorReport,
+  type OperationalEvent,
+  type OperationalSink,
+  type SinkWriteResult,
 } from "./contracts.js";
 import { isOperationalErrorReport } from "./diagnostics.js";
 import { isOperationalEvent } from "./events.js";
@@ -298,7 +299,6 @@ export function createBetterStackDiagnosticSink(
   if (configuration === undefined) return configurationFailure();
   const value: DiagnosticSink = Object.freeze({
     identifier: "better-stack",
-    replacesOperationalSinkIdentifier: "better-stack",
     writeReport: async (report): Promise<SinkWriteResult> => {
       if (!isOperationalErrorReport(report)) {
         return Object.freeze({ status: "failed", reason: "invalid-event" });
@@ -312,5 +312,6 @@ export function createBetterStackDiagnosticSink(
       return writeBetterStackBody(configuration, body);
     },
   });
+  registerDiagnosticSinkOperationalReplacement(value, "better-stack");
   return Object.freeze({ ok: true, value });
 }
