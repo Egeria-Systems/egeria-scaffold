@@ -165,13 +165,13 @@ Expected: stable job names always appear for pull requests; deep work is skipped
 
 ## Task 6: Regenerate retained fixtures from production output
 
-- [ ] Build the production builder and CLI with `pnpm run build:builder`.
-- [ ] Generate each `generatedFixtureContracts` case twice into absent directories under one new mode-0700 temporary owner, using the compiled CLI and the exact production `createArguments` from `scripts/verify-generated-skeletons.mjs`.
-- [ ] Run `pnpm run test:generated-fixtures` before replacement and require the two generated copies to be byte-identical with exact inventories, state, inference, and portable lockfiles.
-- [ ] Replace committed fixture roots only from one validated production output per identifier. Do not hand-edit fixture workflow, package, README, AGENTS, preview configuration, or state fingerprints.
-- [ ] Re-run `pnpm run test:generated-fixtures`; require committed fixtures to equal fresh production generation exactly.
-- [ ] Review the derived diff. Require it to contain only the approved template-derived paths and their direct state fingerprints; investigate any other byte.
-- [ ] Commit derived outputs as `test: regenerate optimized CI fixtures`.
+- [x] Build the production builder and CLI with `pnpm run build:builder`.
+- [x] Generate each `generatedFixtureContracts` case twice into absent directories under one new mode-0700 temporary owner, using the compiled CLI and the exact production `createArguments` from `scripts/verify-generated-skeletons.mjs`.
+- [x] Run `pnpm run test:generated-fixtures` before replacement and require the two generated copies to be byte-identical with exact inventories, state, inference, and portable lockfiles.
+- [x] Replace committed fixture roots only from one validated production output per identifier. Do not hand-edit fixture workflow, package, README, AGENTS, preview configuration, or state fingerprints.
+- [x] Re-run `pnpm run test:generated-fixtures`; require committed fixtures to equal fresh production generation exactly.
+- [x] Review the derived diff. Require it to contain only the approved template-derived paths and their direct state fingerprints; investigate any other byte.
+- [x] Commit derived outputs as `test: regenerate optimized CI fixtures`.
 
 ## Task 7: Reconcile canonical documentation and pending certification plan
 

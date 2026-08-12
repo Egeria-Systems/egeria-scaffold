@@ -161,7 +161,7 @@
       "path": ".egeria/project.yaml"
     },
     {
-      "fingerprint": "sha256:0eaf0fddbdfc093d3434cb288693e09d9f3ccbdce117c55f6acbc4dca28a6ade",
+      "fingerprint": "sha256:5e744506e7baaabfab79e9c8ccae688f885021a3a3ef809b894fb80cb0aa424b",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -174,7 +174,7 @@
       "path": "README.md"
     },
     {
-      "fingerprint": "sha256:ff88f5160244d0ff4c74985a74c6c9dcd9bd187e0a55b6618f5ab46cc724a76d",
+      "fingerprint": "sha256:0ba8b71ca289d6e62da70c7b4f94a79268d40d90168f002b02c0bda1eb5d9da5",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -200,7 +200,7 @@
       "path": "apps/web/app/layout.tsx"
     },
     {
-      "fingerprint": "sha256:e41339383a7b8ad17e5986f5d53d29e3d724b056f9f196b3437fec5639ef1560",
+      "fingerprint": "sha256:fd03bb14cd8156b1f7027c0a2541de37163aa9da2d9e42e229f0f9937ed1caba",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -647,7 +647,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:68ef8ef5525ea171ba75791fd11d0af5a431f21e3dd6f646c2066366cde0090d",
+      "fingerprint": "sha256:9a7e515381b029b4f2bafdd1feec366a17f2664bdfd2929ed9571090009e4d80",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1239,7 +1239,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:4420710ab5b1c93549ec7668ee57f77de473f52d2e55f75cc00ab9ceb9ea1c78",
+      "fingerprint": "sha256:50b63c0cc129988305244717db0bf7f7a44c3aa2f960930af6934487381636df",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1282,7 +1282,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:e2b3b8cf5ad5b551a95c07a3d2d6f81b5c9a37d45349caaf0503060f8d228767",
+      "fingerprint": "sha256:d8e3fe18d1a4d989ae8bc12805ed29d34ba8e5f011ed75e5021cc9f3deb0f437",
       "fingerprintTarget": {
         "kind": "file"
       },
