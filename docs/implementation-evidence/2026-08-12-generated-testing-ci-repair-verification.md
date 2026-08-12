@@ -4,11 +4,13 @@
 
 **Base:** `origin/main@2a315aa0e7dce1bf1048b9a2c07e318add9241de`
 
-**Verified implementation and CI content:** `93e4e9f6ea944329de7c47c9e8bf34382774b1f8`
+**Most recent hosted-green content:** `0ce8c0db3a14242aa287a530672e8742b00e521a`
+
+**Current locally verified content:** `80b9b614c455bdf6de78fc79eded6b3a078f87c9`
 
 **Merge request:** [Egeria-Systems/egeria-scaffold#2](https://github.com/Egeria-Systems/egeria-scaffold/pull/2)
 
-**Result:** The generated-testing repair and current `main` reconciliation are locally verified and passed all three applicable read-only GitHub Actions workflows. Final documentary artifacts, independent exact-diff review, repository approval, and merge remain separate.
+**Result:** The generated-testing repair and current `main` reconciliation are locally verified. Content `0ce8c0d` passed all three applicable read-only GitHub Actions workflows; the later shared-loader repair is locally verified at `80b9b61` and still requires exact-head hosted checks. Final documentary artifacts, repository approval, and merge remain separate.
 
 ## Implemented repair
 
@@ -17,6 +19,8 @@
 - Fixed JSON Schema tuples emit exact `minItems` and `maxItems` bounds.
 - Builder/package checks remain always-on. Generated-project and compatibility-proof matrices run in separate path-scoped, read-only workflows with their complete commands unchanged.
 - Pull-request release intent compares explicitly with `origin/main`; this MR owns an empty Changeset because its public-package-root changes are non-packed instruction files and require no package bump.
+- Live production generation asserts the expanded `95`/`97` managed-surface receipts rather than the stale `78`/`80` counts.
+- The release validator owns the sole sorted, `README.md`-excluding pending-Changeset loader. Its safeguard reuses that loader while retaining literal filename and exact-byte assertions.
 
 No generated application capability, package version, provider, deployment, credential, persistent data, production state, or certification status changed through these repairs.
 
@@ -51,8 +55,13 @@ The pinned runtime was Node `22.23.2` with pnpm `11.20.0`.
 | `93e4e9f` | package boundaries | PASS; 45/45, including packed-file and retained-Changeset safeguards |
 | `93e4e9f` | `changeset status --since origin/main` | PASS; no package bump at any level |
 | `93e4e9f` | constitution, semantic naming, staged/unstaged diff checks | PASS; 52/52 and no findings |
+| `0ce8c0d` | `pnpm run test:generated-project` | PASS; 1/1 live production generation, including `95`/`97` managed-surface receipts |
+| `0ce8c0d` | builder-core, constitution, schema, semantic naming, and diff checks | PASS; 140/140 builder-core and 52/52 constitution tests |
+| `80b9b61` | pending-Changeset loader focused RED/GREEN | RED before the production export; PASS 1/1 after the export |
+| `80b9b61` | package boundaries, constitution, focused ESLint, Changesets, semantic naming, and diff checks | PASS; 45/45 package boundaries, 52/52 constitution tests, and no package bump |
+| `80b9b61` | `pnpm run check:package-release local` | Expected refusal: `PENDING_CHANGESET` while the two reviewed empty records remain unmaterialized |
 
-The complete aggregate was not repeated after `ac7d516` because later changes affect only tests, workflow release-intent comparison, an empty Changeset, plans, and evidence. The affected full suites and exact hosted workflow were run instead.
+The complete aggregate was not repeated after `ac7d516` because later changes affect tests, workflow release-intent comparison, an empty Changeset, one repository-internal release loader export, plans, and evidence. The affected full suites, live production-generation boundary, and exact hosted workflows were run instead.
 
 ## Hosted RED/GREEN evidence
 
@@ -62,13 +71,13 @@ Three Linux-specific failures were reproduced and repaired without weakening a g
 2. Run `31583053791` passed that repair and failed only because Changesets looked for an absent local `main` in the pull-request merge checkout. The workflow now uses the official `status --since origin/main` boundary.
 3. Run `31583485523` then failed the exact retained-Changeset inventory because the new empty record had no direct-consumer update. The safeguard now admits both reviewed empty records and continues to reject unreviewed release intent.
 
-Exact candidate `93e4e9f6ea944329de7c47c9e8bf34382774b1f8` passed:
+The later production-generation assertion repair also passed all applicable workflows at exact candidate `0ce8c0db3a14242aa287a530672e8742b00e521a`:
 
 | Workflow | Run | Result |
 | --- | ---: | --- |
-| Repository quality / `builder-and-packages` | [`31583624246`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/31583624246) | PASS; 1m42s; every step including release intent |
-| Compatibility proof quality / `compatibility-proof` | [`31583624223`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/31583624223) | PASS; 2m00s; unit, build, integration, and development/preview browser checks |
-| Generated project quality / `generated-projects` | [`31583624387`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/31583624387) | PASS; 13m13s; determinism and complete retained-project matrix |
+| Repository quality / `builder-and-packages` | [`31591250486`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/31591250486) | PASS |
+| Compatibility proof quality / `compatibility-proof` | [`31591250469`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/31591250469) | PASS |
+| Generated project quality / `generated-projects` | [`31591250506`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/31591250506) | PASS |
 
 These hosted runs prove the checked workflows executed successfully on GitHub's Ubuntu runner for that exact candidate. They do not prove deployment, provider behavior, production safety, performance, visual quality, human accessibility, or WCAG conformance.
 
@@ -88,8 +97,8 @@ The checked action commits and public advisory queries remain recorded in the [r
 - `standards@0.3.0` and `observability@0.2.0` remain separate pending certification subjects.
 - Path-scoped workflows are not configured as required status contexts. Repository rules must be revalidated before making them required.
 - Registry availability, audits, signatures, dependency installation, and browser installation remain point-in-time external inputs.
-- Documentation-only closure commits following this verified content receive their own lightweight local checks plus hosted exact-head checks before merge.
+- The `80b9b61` shared-loader repair and its documentary closure receive their own applicable hosted exact-head checks before merge.
 
-If separately authorized after squash integration, source recovery reverts only the resulting single integration commit through ordinary Git history, then regenerates all three fixtures and runs `pnpm run verify:builder-kernel`. Before integration, the review packet separately defines repair-only recovery as the first-parent, non-merge commits selected by `git log --first-parent --no-merges 29628f9..HEAD`, which excludes reconciliation merge `ac7d516` and its accepted-main second-parent history including `2a315aa`, and full-MR withdrawal as closing merge request 2 without merging while retaining its branch/worktree evidence. Both require separate authorization and preserve staged, unstaged, untracked, and unrelated committed user work; neither partially reverts the full 112-path comparison or discards accepted `main`.
+If separately authorized after squash integration, source recovery reverts only the resulting single integration commit through ordinary Git history, then regenerates all three fixtures and runs `pnpm run verify:builder-kernel`. Before integration, the review packet separately defines repair-only recovery as the first-parent, non-merge commits selected by `git log --first-parent --no-merges 29628f9..HEAD`, which excludes reconciliation merge `ac7d516` and its accepted-main second-parent history including `2a315aa`, and full-MR withdrawal as closing merge request 2 without merging while retaining its branch/worktree evidence. Both require separate authorization and preserve staged, unstaged, untracked, and unrelated committed user work; neither partially reverts the full 114-path comparison or discards accepted `main`.
 
 No persistent-data, provider, deployment, credential, package-publication, or production recovery applies.

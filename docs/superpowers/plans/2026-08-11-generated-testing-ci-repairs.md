@@ -152,7 +152,6 @@ Commit: `test: make cleanup identity check portable`
 
 - Create `.changeset/generated-testing-boundary.md`.
 - Modify `.github/workflows/repository-quality.yml`.
-- Modify `scripts/check-package-release.mjs`.
 - Modify `tests/constitution/constitution.test.mjs`.
 - Modify `tests/package-boundaries/release-safeguards.test.mjs`.
 
@@ -166,7 +165,6 @@ Commit: `test: make cleanup identity check portable`
 - Run `pnpm exec changeset status --since origin/main` in the hosted repository workflow. Keep the local `changeset:status` script and complete builder-kernel aggregate unchanged.
 - Add one empty Changeset owned by this MR because its only changes beneath public-package roots are non-packed instruction files; record no package bump without borrowing the pre-existing empty Changeset from `main`.
 - Update the exact retained-Changeset inventory assertion to admit both reviewed empty no-release records while continuing to reject unreviewed release intent.
-- Export and reuse the release validator's sorted pending-Changeset loader so README exclusion and filename ordering have one implementation while the safeguard retains literal inventory and byte assertions.
 - Preserve full-history checkout, read-only permissions, disabled checkout credentials, and every other always-on check.
 
 ### Verification and commit
@@ -180,6 +178,42 @@ git diff --check
 ```
 
 Commit: `ci: bind release intent to remote main`
+
+## Review-comment amendment: centralize pending Changeset discovery
+
+### Files
+
+- Modify `scripts/check-package-release.mjs`.
+- Modify `tests/package-boundaries/release-safeguards.test.mjs`.
+- Modify `docs/implementation-evidence/2026-08-12-generated-testing-ci-repair-verification.md`.
+- Modify `docs/review-packets/2026-08-12-generated-testing-ci-repair.md`.
+- Modify this plan.
+
+### RED and cause
+
+- Replace the safeguard's duplicate `.changeset` Markdown filter and sort with an import of the release validator's existing loader.
+- Before the production export, the focused safeguard must fail during module instantiation because `check-package-release.mjs` does not provide the named export.
+
+### GREEN
+
+- Export and reuse the release validator's sorted pending-Changeset loader so README exclusion and filename ordering have one implementation.
+- Retain the safeguard's literal two-file inventory and exact byte assertions, so an included `README.md`, changed order, extra record, missing record, or changed content still fails independently.
+- Keep the release validator's direct-execution guard and all local, registry, and publication behavior unchanged.
+
+### Verification and commit
+
+```sh
+node --test --test-name-pattern='the release candidate materializes only the approved public versions' tests/package-boundaries/release-safeguards.test.mjs
+pnpm run test:package-boundaries
+pnpm run test:constitution
+pnpm exec eslint scripts/check-package-release.mjs tests/package-boundaries/release-safeguards.test.mjs --max-warnings 0
+pnpm exec changeset status --since origin/main
+pnpm run check:package-release local # expected PENDING_CHANGESET while the two reviewed empty records remain unmaterialized
+pnpm run check:semantic-naming
+git diff --check
+```
+
+Commit: `refactor: centralize changeset discovery`
 
 ## Final-review amendment: reconcile the canonical roadmap
 
@@ -200,4 +234,4 @@ After the three increments are separately accepted:
 4. Record the final commands, results, hosted-CI boundary, changed files, reviewer dispositions, risks, deferred work, and rollback/recovery in dated implementation evidence and a review packet.
 5. Present the verified final diff for the user-authorized merge-request integration. Merge only when the exact head has accurate applicable green CI and satisfies repository review rules. Do not deploy, publish, dispatch certification workflows, mutate providers, or respond to review comments.
 
-If separately authorized before integration, repair-only recovery reverts, in displayed newest-first order, only the commits selected by `git log --first-parent --no-merges --format='%H' 29628f9..HEAD` in the isolated worktree. This excludes main-reconciliation merge `ac7d516` and every commit reachable only through its accepted-main second parent, including `2a315aa`; staged, unstaged, untracked, and unrelated committed user work remain preserved. It then regenerates the three fixtures and runs `pnpm run verify:builder-kernel`. Separately authorized full-MR withdrawal closes merge request 2 without merging and retains its branch/worktree evidence; it does not attempt a partial commit-list revert of the 112-path `2a315aa0...HEAD` comparison. After separately authorized squash integration, recovery reverts only the resulting single integration commit and repeats regeneration plus `pnpm run verify:builder-kernel`. The checked lockfile is repository source; no persistent data, provider state, deployment, credential, or production recovery is introduced by these repairs.
+If separately authorized before integration, repair-only recovery reverts, in displayed newest-first order, only the commits selected by `git log --first-parent --no-merges --format='%H' 29628f9..HEAD` in the isolated worktree. This excludes main-reconciliation merge `ac7d516` and every commit reachable only through its accepted-main second parent, including `2a315aa`; staged, unstaged, untracked, and unrelated committed user work remain preserved. It then regenerates the three fixtures and runs `pnpm run verify:builder-kernel`. Separately authorized full-MR withdrawal closes merge request 2 without merging and retains its branch/worktree evidence; it does not attempt a partial commit-list revert of the 114-path `2a315aa0...HEAD` comparison. After separately authorized squash integration, recovery reverts only the resulting single integration commit and repeats regeneration plus `pnpm run verify:builder-kernel`. The checked lockfile is repository source; no persistent data, provider state, deployment, credential, or production recovery is introduced by these repairs.
