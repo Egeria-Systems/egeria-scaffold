@@ -2790,6 +2790,10 @@ test("execution plans enforce direct predecessors and bounded independent-work e
     roadmap,
     /protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, deployment, publication, and production remain separate/iu,
   );
+  assert.match(
+    roadmap,
+    /Within those separate capability-certification tasks, protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, merge, and push remain unauthorized/iu,
+  );
 
   assert.match(
     implementationPlan,
@@ -2999,6 +3003,10 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     /Content candidate `93e4e9f6ea944329de7c47c9e8bf34382774b1f8` passed local verification and all three applicable hosted workflows/iu,
+  );
+  assert.match(
+    roadmap,
+    /always-on read-only builder\/package workflow and the path-scoped generated-project and compatibility-proof workflows passed hosted runs `31583624246`, `31583624387`, and `31583624223`/iu,
   );
   assert.match(
     roadmap,
