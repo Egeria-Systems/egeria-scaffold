@@ -1,9 +1,15 @@
 import type {
+  DiagnosticSink,
+  ErrorCaptureContext,
+  ExceptionDiagnostics,
+  OperationalErrorReport,
   OperationalEvent,
   OperationalSink,
   SinkWriteResult,
 } from "./contracts.js";
+import { isOperationalErrorReport } from "./diagnostics.js";
 import { isOperationalEvent } from "./events.js";
+import { utf8ByteLength } from "./redaction.js";
 
 const maximumPayloadBytes = 96_000;
 const betterStackHostPattern =
@@ -47,6 +53,26 @@ export type BetterStackConfigurationResult =
       code: "BETTER_STACK_CONFIGURATION_INVALID";
     }>;
 
+export type BetterStackDiagnosticConfigurationResult =
+  | Readonly<{ ok: true; value: DiagnosticSink }>
+  | Readonly<{
+      ok: false;
+      code: "BETTER_STACK_CONFIGURATION_INVALID";
+    }>;
+
+export type DiagnosticRecord = OperationalRecord &
+  Readonly<{
+    capture: ErrorCaptureContext;
+    "exception.type": string;
+    "exception.message"?: string;
+    "exception.stacktrace"?: string;
+    "exception.code"?: string;
+    "exception.digest"?: string;
+    "exception.fingerprint": string;
+    "exception.cause"?: ExceptionDiagnostics;
+    "exception.truncated": boolean;
+  }>;
+
 type BetterStackConfiguration = Readonly<{
   ingestingHost: string;
   sourceToken: string;
@@ -54,7 +80,10 @@ type BetterStackConfiguration = Readonly<{
   timeoutMilliseconds: number;
 }>;
 
-function configurationFailure(): BetterStackConfigurationResult {
+function configurationFailure(): Readonly<{
+  ok: false;
+  code: "BETTER_STACK_CONFIGURATION_INVALID";
+}> {
   return Object.freeze({
     ok: false,
     code: "BETTER_STACK_CONFIGURATION_INVALID",
@@ -130,20 +159,79 @@ export function serializeOperationalRecord(event: OperationalEvent): string {
   return JSON.stringify(createOperationalRecord(event));
 }
 
-function utf8ByteLength(value: string): number {
-  let bytes = 0;
-  for (const character of value) {
-    const codePoint = character.codePointAt(0) ?? 0;
-    bytes +=
-      codePoint <= 0x7f
-        ? 1
-        : codePoint <= 0x7ff
-          ? 2
-          : codePoint <= 0xffff
-            ? 3
-            : 4;
+function createDiagnosticRecord(
+  report: OperationalErrorReport,
+): DiagnosticRecord {
+  if (!isOperationalErrorReport(report)) {
+    throw new TypeError("OPERATIONAL_ERROR_REPORT_INVALID");
   }
-  return bytes;
+  const diagnostics = report.diagnostics;
+  return Object.freeze({
+    ...createOperationalRecord(report.event),
+    capture: report.capture,
+    "exception.type": diagnostics.exceptionType,
+    ...(diagnostics.exceptionMessage === undefined
+      ? {}
+      : { "exception.message": diagnostics.exceptionMessage }),
+    ...(diagnostics.exceptionStacktrace === undefined
+      ? {}
+      : { "exception.stacktrace": diagnostics.exceptionStacktrace }),
+    ...(diagnostics.exceptionCode === undefined
+      ? {}
+      : { "exception.code": diagnostics.exceptionCode }),
+    ...(diagnostics.exceptionDigest === undefined
+      ? {}
+      : { "exception.digest": diagnostics.exceptionDigest }),
+    "exception.fingerprint": diagnostics.fingerprint,
+    ...(diagnostics.cause === undefined
+      ? {}
+      : { "exception.cause": diagnostics.cause }),
+    "exception.truncated": diagnostics.truncated,
+  });
+}
+
+export function serializeDiagnosticRecord(
+  report: OperationalErrorReport,
+): string {
+  return JSON.stringify(createDiagnosticRecord(report));
+}
+
+async function writeBetterStackBody(
+  configuration: BetterStackConfiguration,
+  body: string,
+): Promise<SinkWriteResult> {
+  if (utf8ByteLength(body) > maximumPayloadBytes) {
+    return Object.freeze({
+      status: "failed",
+      reason: "payload-too-large",
+    });
+  }
+
+  try {
+    const response = await configuration.request(
+      Object.freeze({
+        url: `https://${configuration.ingestingHost}`,
+        method: "POST",
+        headers: Object.freeze({
+          Authorization: `Bearer ${configuration.sourceToken}`,
+          "Content-Type": "application/json",
+        }),
+        body,
+        timeoutMilliseconds: configuration.timeoutMilliseconds,
+      }),
+    );
+    return response.status === 202
+      ? Object.freeze({ status: "delivered" })
+      : Object.freeze({
+          status: "failed",
+          reason: "provider-rejected",
+        });
+  } catch {
+    return Object.freeze({
+      status: "failed",
+      reason: "network-failure",
+    });
+  }
 }
 
 export function createStructuredLogSink(input: Readonly<{
@@ -191,41 +279,37 @@ export function createBetterStackSink(
           reason: "payload-invalid",
         });
       }
-      if (utf8ByteLength(body) > maximumPayloadBytes) {
-        return Object.freeze({
-          status: "failed",
-          reason: "payload-too-large",
-        });
-      }
-
-      try {
-        const response = await configuration.request(
-          Object.freeze({
-            url: `https://${configuration.ingestingHost}`,
-            method: "POST",
-            headers: Object.freeze({
-              Authorization: `Bearer ${configuration.sourceToken}`,
-              "Content-Type": "application/json",
-            }),
-            body,
-            timeoutMilliseconds: configuration.timeoutMilliseconds,
-          }),
-        );
-
-        return response.status === 202
-          ? Object.freeze({ status: "delivered" })
-          : Object.freeze({
-              status: "failed",
-              reason: "provider-rejected",
-            });
-      } catch {
-        return Object.freeze({
-          status: "failed",
-          reason: "network-failure",
-        });
-      }
+      return writeBetterStackBody(configuration, body);
     },
   });
 
+  return Object.freeze({ ok: true, value });
+}
+
+export function createBetterStackDiagnosticSink(
+  input: Readonly<{
+    ingestingHost: string;
+    sourceToken: string;
+    request: BetterStackRequest;
+    timeoutMilliseconds?: number;
+  }>,
+): BetterStackDiagnosticConfigurationResult {
+  const configuration = readBetterStackConfiguration(input);
+  if (configuration === undefined) return configurationFailure();
+  const value: DiagnosticSink = Object.freeze({
+    identifier: "better-stack",
+    writeReport: async (report): Promise<SinkWriteResult> => {
+      if (!isOperationalErrorReport(report)) {
+        return Object.freeze({ status: "failed", reason: "invalid-event" });
+      }
+      let body: string;
+      try {
+        body = serializeDiagnosticRecord(report);
+      } catch {
+        return Object.freeze({ status: "failed", reason: "payload-invalid" });
+      }
+      return writeBetterStackBody(configuration, body);
+    },
+  });
   return Object.freeze({ ok: true, value });
 }

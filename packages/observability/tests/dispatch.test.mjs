@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createOperationalErrorReport,
   createOperationalEvent,
+  dispatchOperationalErrorReport,
   dispatchOperationalEvent,
 } from "@egeria-systems/observability";
 
@@ -28,6 +30,33 @@ function createEvent() {
 
   assert.equal(result.ok, true);
   return result.value;
+}
+
+function createErrorReport() {
+  const eventResult = createOperationalEvent(
+    {
+      name: "application.unexpected.error",
+      kind: "application.error",
+      runtime: "server",
+      severity: "error",
+      context: { eventId: "event-error-1", service: "web" },
+      errorCategory: "unexpected",
+    },
+    {
+      clock: {
+        now: () => new Date("2026-08-10T18:00:00.000Z"),
+      },
+    },
+  );
+  assert.equal(eventResult.ok, true);
+  const reportResult = createOperationalErrorReport(
+    eventResult.value,
+    { name: "TypeError", message: "bounded failure" },
+    { mechanism: "selected-catch", handled: true, operation: "load-page" },
+    {},
+  );
+  assert.equal(reportResult.ok, true);
+  return reportResult.value;
 }
 
 test("dispatch attempts every sink and contains invalid or thrown results", async () => {
@@ -164,4 +193,101 @@ test("dispatch contains mutation attempts before the next sink observes them", a
   assert.equal(observedEvent.context.correlationId, "correlation-1");
   assert.equal(Object.isFrozen(observedEvent), true);
   assert.equal(Object.isFrozen(observedEvent.context), true);
+});
+
+test("error dispatch preserves safe and diagnostic tiers while containing every sink failure", async () => {
+  const report = createErrorReport();
+  const safeCalls = [];
+  const diagnosticCalls = [];
+  const results = await dispatchOperationalErrorReport(report, {
+    operationalSinks: [
+      {
+        identifier: "workers-logs",
+        write: async (event) => {
+          safeCalls.push(event);
+          return { status: "delivered" };
+        },
+      },
+      {
+        identifier: "better-stack",
+        write: async (event) => {
+          safeCalls.push(event);
+          return { status: "delivered" };
+        },
+      },
+    ],
+    diagnosticSinks: [
+      {
+        identifier: "better-stack",
+        writeReport: async (received) => {
+          diagnosticCalls.push(received);
+          return { status: "delivered" };
+        },
+      },
+      {
+        identifier: "diagnostic-throws",
+        writeReport: async () => {
+          throw new Error("credential-secret provider response");
+        },
+      },
+      {
+        identifier: "diagnostic-invalid",
+        writeReport: async () => ({
+          status: "failed",
+          reason: "credential-secret",
+        }),
+      },
+    ],
+  });
+
+  assert.deepEqual(safeCalls, [report.event]);
+  assert.deepEqual(diagnosticCalls, [report]);
+  assert.deepEqual(results, [
+    { sink: "workers-logs", status: "delivered" },
+    { sink: "better-stack", status: "delivered" },
+    { sink: "diagnostic-throws", status: "failed", reason: "sink-threw" },
+    {
+      sink: "diagnostic-invalid",
+      status: "failed",
+      reason: "invalid-result",
+    },
+  ]);
+  assert.equal(Object.isFrozen(results), true);
+  assert.equal(results.every(Object.isFrozen), true);
+  assert.doesNotMatch(JSON.stringify(safeCalls), /diagnostics|exception|message|stack/u);
+  assert.doesNotMatch(JSON.stringify(results), /credential-secret|provider response/u);
+});
+
+test("error dispatch rejects unbranded reports before any sink is called", async () => {
+  const report = createErrorReport();
+  let calls = 0;
+  const results = await dispatchOperationalErrorReport(
+    { ...report },
+    {
+      operationalSinks: [
+        {
+          identifier: "workers-logs",
+          write: () => {
+            calls += 1;
+            return { status: "delivered" };
+          },
+        },
+      ],
+      diagnosticSinks: [
+        {
+          identifier: "better-stack",
+          writeReport: () => {
+            calls += 1;
+            return { status: "delivered" };
+          },
+        },
+      ],
+    },
+  );
+
+  assert.deepEqual(results, [
+    { sink: "workers-logs", status: "failed", reason: "invalid-event" },
+    { sink: "better-stack", status: "failed", reason: "invalid-event" },
+  ]);
+  assert.equal(calls, 0);
 });

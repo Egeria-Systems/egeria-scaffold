@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createOperationalEvent } from "@egeria-systems/observability";
 import {
+  createOperationalErrorReport,
+  createOperationalEvent,
+} from "@egeria-systems/observability";
+import {
+  createBetterStackDiagnosticSink,
   createBetterStackSink,
   createStructuredLogSink,
+  serializeDiagnosticRecord,
   serializeOperationalRecord,
 } from "@egeria-systems/observability/server";
 
@@ -34,6 +39,36 @@ function createEvent() {
 
   assert.equal(result.ok, true);
   return result.value;
+}
+
+function createReport(error = {
+  name: "TypeError",
+  message: "bounded request failure",
+  stack:
+    "TypeError: bounded request failure\n" +
+    "    at request (https://example.com/app.js?token=abc#fragment:10:2)",
+  code: "ERR_REQUEST",
+  digest: "next-digest-1",
+  cause: { name: "NetworkError", message: "connection failed" },
+}) {
+  const report = createOperationalErrorReport(
+    createEvent(),
+    error,
+    {
+      mechanism: "next-request-error",
+      handled: false,
+      routerKind: "app-router",
+      routeType: "render",
+      renderSource: "server-rendering",
+      renderType: "dynamic",
+      revalidateReason: "stale",
+      requestMethod: "GET",
+      routeIdentifier: "products/[product-id]",
+    },
+    {},
+  );
+  assert.equal(report.ok, true);
+  return report.value;
 }
 
 const expectedRecord = {
@@ -228,4 +263,114 @@ test("server effects reject structural event bypasses before delivery", async ()
   assert.throws(() => serializeOperationalRecord(invalidEvent), {
     message: "OPERATIONAL_EVENT_INVALID",
   });
+});
+
+test("Better Stack diagnostic records enrich one safe event with bounded exception and capture fields", async () => {
+  const report = createReport();
+  const serialized = serializeDiagnosticRecord(report);
+  const record = JSON.parse(serialized);
+
+  assert.deepEqual(record, {
+    ...expectedRecord,
+    capture: report.capture,
+    "exception.type": report.diagnostics.exceptionType,
+    "exception.message": report.diagnostics.exceptionMessage,
+    "exception.stacktrace": report.diagnostics.exceptionStacktrace,
+    "exception.code": report.diagnostics.exceptionCode,
+    "exception.digest": report.diagnostics.exceptionDigest,
+    "exception.fingerprint": report.diagnostics.fingerprint,
+    "exception.cause": report.diagnostics.cause,
+    "exception.truncated": report.diagnostics.truncated,
+  });
+  assert.equal(Object.isFrozen(report), true);
+  assert.doesNotMatch(
+    serialized,
+    /token=abc|#fragment|provider response|source-token-123456/u,
+  );
+});
+
+test("Better Stack diagnostic delivery accepts only exact 202 and contains provider content", async () => {
+  const requests = [];
+  const configured = createBetterStackDiagnosticSink({
+    ingestingHost: "s123.eu-nbg-2.betterstackdata.com",
+    sourceToken: "source-token-123456",
+    timeoutMilliseconds: 1_500,
+    request: async (request) => {
+      requests.push(request);
+      return { status: 202, body: "credential-secret provider response" };
+    },
+  });
+  assert.equal(configured.ok, true);
+
+  const report = createReport();
+  assert.deepEqual(await configured.value.writeReport(report), {
+    status: "delivered",
+  });
+  assert.deepEqual(requests, [
+    {
+      url: "https://s123.eu-nbg-2.betterstackdata.com",
+      method: "POST",
+      headers: {
+        Authorization: "Bearer source-token-123456",
+        "Content-Type": "application/json",
+      },
+      body: serializeDiagnosticRecord(report),
+      timeoutMilliseconds: 1_500,
+    },
+  ]);
+
+  for (const [request, reason] of [
+    [async () => ({ status: 200, body: "credential-secret" }), "provider-rejected"],
+    [async () => ({ status: 204, body: "credential-secret" }), "provider-rejected"],
+    [
+      async () => {
+        throw new Error("credential-secret timeout response");
+      },
+      "network-failure",
+    ],
+  ]) {
+    const failing = createBetterStackDiagnosticSink({
+      ingestingHost: "s123.eu-nbg-2.betterstackdata.com",
+      sourceToken: "source-token-123456",
+      request,
+    });
+    assert.equal(failing.ok, true);
+    const result = await failing.value.writeReport(report);
+    assert.deepEqual(result, { status: "failed", reason });
+    assert.doesNotMatch(JSON.stringify(result), /credential-secret|response/u);
+  }
+});
+
+test("Better Stack diagnostic delivery rejects structural reports and oversized JSON before HTTP", async () => {
+  let requests = 0;
+  const configured = createBetterStackDiagnosticSink({
+    ingestingHost: "s123.eu-nbg-2.betterstackdata.com",
+    sourceToken: "source-token-123456",
+    request: async () => {
+      requests += 1;
+      return { status: 202 };
+    },
+  });
+  assert.equal(configured.ok, true);
+
+  assert.deepEqual(await configured.value.writeReport({ ...createReport() }), {
+    status: "failed",
+    reason: "invalid-event",
+  });
+
+  const oversized = createReport({
+    name: "TypeError",
+    message: "\u0000".repeat(2_048),
+    stack: "\u0000".repeat(16_384),
+    cause: {
+      name: "CauseOne",
+      stack: "\u0000".repeat(16_384),
+      cause: { name: "CauseTwo", stack: "\u0000".repeat(16_384) },
+    },
+  });
+  assert.deepEqual(await configured.value.writeReport(oversized), {
+    status: "failed",
+    reason: "payload-too-large",
+  });
+  assert.equal(requests, 0);
 });

@@ -34,7 +34,10 @@ export {
   isOperationalErrorReport,
   reconstructOperationalErrorReport,
 } from "./diagnostics.js";
-export { dispatchOperationalEvent } from "./dispatch.js";
+export {
+  dispatchOperationalErrorReport,
+  dispatchOperationalEvent,
+} from "./dispatch.js";
 export {
   createOperationalEvent,
   normalizeErrorCategory,

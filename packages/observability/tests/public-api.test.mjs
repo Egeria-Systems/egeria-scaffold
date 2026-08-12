@@ -15,6 +15,7 @@ test("the public root API exposes only the approved operational contract", async
   assert.deepEqual(Object.keys(publicApi).sort(), [
     "createOperationalErrorReport",
     "createOperationalEvent",
+    "dispatchOperationalErrorReport",
     "dispatchOperationalEvent",
     "isOperationalErrorReport",
     "normalizeErrorCategory",
