@@ -147,6 +147,7 @@ Commit: `test: make cleanup identity check portable`
 - Create `.changeset/generated-testing-boundary.md`.
 - Modify `.github/workflows/repository-quality.yml`.
 - Modify `tests/constitution/constitution.test.mjs`.
+- Modify `tests/package-boundaries/release-safeguards.test.mjs`.
 
 ### RED and cause
 
@@ -157,12 +158,14 @@ Commit: `test: make cleanup identity check portable`
 
 - Run `pnpm exec changeset status --since origin/main` in the hosted repository workflow. Keep the local `changeset:status` script and complete builder-kernel aggregate unchanged.
 - Add one empty Changeset owned by this MR because its only changes beneath public-package roots are non-packed instruction files; record no package bump without borrowing the pre-existing empty Changeset from `main`.
+- Update the exact retained-Changeset inventory assertion to admit both reviewed empty no-release records while continuing to reject unreviewed release intent.
 - Preserve full-history checkout, read-only permissions, disabled checkout credentials, and every other always-on check.
 
 ### Verification and commit
 
 ```sh
 pnpm run test:constitution
+pnpm run test:package-boundaries
 pnpm exec changeset status --since origin/main
 pnpm run check:semantic-naming
 git diff --check
