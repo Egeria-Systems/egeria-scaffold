@@ -231,10 +231,16 @@ async function loadPackageRecords() {
   );
 }
 
-export async function loadPendingChangesets() {
-  return (await readdir(join(repositoryRoot, ".changeset")))
+export function selectPendingChangesets(fileNames) {
+  return fileNames
     .filter((file) => file.endsWith(".md") && file !== "README.md")
     .sort();
+}
+
+export async function loadPendingChangesets() {
+  return selectPendingChangesets(
+    await readdir(join(repositoryRoot, ".changeset")),
+  );
 }
 
 export function classifyRegistryResponseStatus(statusCode) {

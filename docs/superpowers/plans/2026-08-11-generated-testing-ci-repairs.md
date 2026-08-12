@@ -197,7 +197,7 @@ Commit: `ci: bind release intent to remote main`
 ### GREEN
 
 - Export and reuse the release validator's sorted pending-Changeset loader so README exclusion and filename ordering have one implementation.
-- Retain the safeguard's literal two-file inventory and exact byte assertions, so an included `README.md`, changed order, extra record, missing record, or changed content still fails independently.
+- Retain the safeguard's literal two-file inventory and exact byte assertions, so a record reported by the loader but not approved, a missing current record, or changed content still fails independently. This ambient fixture does not independently prove sorting or complete discovery when the loader itself omits a record; the post-merge amendment below adds that causal boundary.
 - Keep the release validator's direct-execution guard and all local, registry, and publication behavior unchanged.
 
 ### Verification and commit
@@ -214,6 +214,42 @@ git diff --check
 ```
 
 Commit: `refactor: centralize changeset discovery`
+
+## Post-merge amendment: causally verify pending Changeset selection
+
+MR #2 was squash-merged as `main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c`. The follow-up repair uses a new branch from current `origin/main`; it does not reopen or rewrite the merged MR history.
+
+### Files
+
+- Modify `scripts/check-package-release.mjs`.
+- Modify `tests/package-boundaries/release-safeguards.test.mjs`.
+- Modify this plan.
+- Create `docs/implementation-evidence/2026-08-12-pending-changeset-selection-repair.md`.
+- Create `docs/review-packets/2026-08-12-pending-changeset-selection-repair.md`.
+
+### RED and cause
+
+- Import a planned repository-internal `selectPendingChangesets` function and exercise it with deliberately unordered filenames containing `README.md`, a non-Markdown entry, both current records, and an arbitrary future Markdown record.
+- Before the production export, the focused test must fail during module instantiation. The prior ambient assertion cannot distinguish removal of sorting or a loader restricted to today's two names because its qualifying directory entries are already ordered and contain no arbitrary third Markdown record.
+
+### GREEN
+
+- Extract the existing README-excluding, all-other-Markdown-including, sorted transformation into the pure selector in `scripts/check-package-release.mjs` and make `loadPendingChangesets` consume it.
+- Retain `loadPendingChangesets` as the sole filesystem loader for local and registry validation, the live two-file inventory and exact-byte assertions, the direct-execution guard, and every release decision.
+- Add no package API, workflow, Changeset, version, publication, provider, deployment, or production change.
+
+### Verification and integration
+
+```sh
+node --test --test-name-pattern='pending Changeset discovery selects every Markdown record in deterministic order' tests/package-boundaries/release-safeguards.test.mjs
+pnpm run test:package-boundaries
+pnpm run test:constitution
+pnpm exec eslint scripts/check-package-release.mjs tests/package-boundaries/release-safeguards.test.mjs --max-warnings 0
+pnpm run check:semantic-naming
+git diff --check
+```
+
+After bounded post-fix verification, create one focused repair commit, transfer only that commit onto `release-changeset-selection` from freshly fetched `origin/main`, rerun the approved checks against that final tree, independently verify the exact `main...HEAD` diff, and push the clean branch. MR creation remains a separate explicit action.
 
 ## Final-review amendment: reconcile the canonical roadmap
 
