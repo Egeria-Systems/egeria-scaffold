@@ -51,6 +51,11 @@ git diff --name-only 2a315aa0e7dce1bf1048b9a2c07e318add9241de...HEAD
 - `5c4c036` — `test: make cleanup identity check portable`
 - `24ec499` — `ci: bind release intent to remote main`
 - `93e4e9f` — `test: record generated no-release intent`
+- `99b9d6e` — `docs: record generated testing CI verification`
+- `d829988` — `docs: reconcile generated testing roadmap`
+- `3f4ed20` — `docs: clarify generated testing authority`
+
+The final documentation-safety commit containing this packet is identified by the exact head at handoff because a commit cannot embed its own immutable object ID.
 
 All branch commits contain SSH signatures. Local signature display cannot assign a signer because this checkout has no `gpg.ssh.allowedSignersFile`; GitHub signature status remains the remote policy boundary.
 
@@ -87,6 +92,7 @@ Final material results:
 | Requirements | Exclusive-write TOCTOU finding closed in `e9cb302`; main fingerprint resolution independently confirmed; stale final-evidence finding closed by this dated evidence and packet |
 | Architecture and anti-overengineering | Final review found the canonical roadmap still described one unhosted workflow, then closure review found an unscoped certification-stream merge prohibition and missing topology assertion; the roadmap and its constitution consumer now distinguish current Task 6C authority, the separate certification boundaries, always-on versus path-scoped ownership, the hosted content candidate, and the pending exact-documentary-head boundary; closure re-review follows on the repaired head |
 | Test evidence | Exclusive-write race closed with causal deletion trap; portable cleanup identity, release base, retained Changeset inventory, local suites, and hosted runs are included in the final exact comparison review |
+| Merge-request thread audit | Two unresolved plan-safety findings were validated: portable rename is now explicitly bounded rather than described as hostile-concurrency no-clobber, and source recovery now requires separate authorization and preserves unrelated user work; no GitHub reply or thread-resolution action was taken |
 
 Reviewers are read-only and do not recursively fan out. Final exact-head dispositions and any evidence-backed repairs are reported at handoff; this packet does not predeclare their result.
 
@@ -101,7 +107,7 @@ Reviewers are read-only and do not recursively fan out. Final exact-head disposi
 
 ## Rollback and recovery
 
-After integration, revert the merge-request integration commit through ordinary Git history, regenerate all three fixtures, and run `pnpm run verify:builder-kernel`. Before integration, the repair commits may be reverted newest-first: `93e4e9f`, `24ec499`, `5c4c036`, `e9cb302`, `d5668ab`, `f8af04c`, `bfba450`, and `6f2e558`. Retain the `main` reconciliation unless independently reverting the already-accepted main work.
+If separately authorized after integration, revert only the merge-request integration commit through ordinary Git history, regenerate all three fixtures, and run `pnpm run verify:builder-kernel`. Before integration, separately authorized source recovery reverts only the focused repair and final-documentary commits named above, newest-first in the isolated worktree, while preserving staged, unstaged, untracked, and unrelated committed user work. Retain the `main` reconciliation unless independently reverting the already-accepted main work.
 
 Never leave recipe lockfile bytes, fixture lockfiles, managed fingerprints, schemas, templates, state receipts, workflows, or release intent out of agreement. No persistent-data, provider, deployment, credential, publication, or production recovery applies.
 

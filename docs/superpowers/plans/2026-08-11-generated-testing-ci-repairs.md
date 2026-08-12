@@ -96,7 +96,9 @@ Push the existing MR branch, inspect hosted checks, and stop for increment revie
 - Add tuple cardinality in the canonical JSON Schema artifact transformation and regenerate the committed artifact; do not hand-edit it.
 - Require a failed exclusive write or close never to unlink a path that could have been replaced concurrently.
 - Report post-creation failure as a source mutation through the content-safe lockfile-preparation failure reason, then let the generation transaction clean only its identity-owned staging directory.
-- Preserve the no-overwrite guarantee for every pre-existing or replacement target and keep all failure output path- and content-safe.
+- Preserve no-overwrite for exclusive file creation and pre-existing-target checks.
+- Treat portable rename as a narrow commit boundary, not a hostile-concurrency no-clobber guarantee. A separately approved platform-specific no-replace operation would be required if that stronger guarantee becomes necessary.
+- Keep all failure output path- and content-safe.
 
 ### Verification and commit
 
@@ -191,4 +193,4 @@ After the three increments are separately accepted:
 4. Record the final commands, results, hosted-CI boundary, changed files, reviewer dispositions, risks, deferred work, and rollback/recovery in dated implementation evidence and a review packet.
 5. Present the verified final diff for the user-authorized merge-request integration. Merge only when the exact head has accurate applicable green CI and satisfies repository review rules. Do not deploy, publish, dispatch certification workflows, mutate providers, or respond to review comments.
 
-Source recovery is a newest-first revert of the focused repair commits followed by regeneration and `pnpm run verify:builder-kernel`. The checked lockfile is repository source; no persistent data, provider state, deployment, credential, or production recovery is introduced by these repairs.
+If separately authorized, source recovery reverts only the focused repair commits named in the dated review packet, newest-first in the isolated worktree, while preserving staged, unstaged, untracked, and unrelated committed user work. It then regenerates the three fixtures and runs `pnpm run verify:builder-kernel`. The checked lockfile is repository source; no persistent data, provider state, deployment, credential, or production recovery is introduced by these repairs.
