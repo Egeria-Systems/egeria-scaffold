@@ -161,6 +161,19 @@ listed state schema/tests and a parent-link plus exact-command repair within the
 already listed generated web guidance. These corrections add no capability,
 provider action, deployment behavior, or later-stage runtime scope.
 
+**2026-08-11 hosted-CI repair amendment:** MR review reproduced time-dependent
+lockfile resolution: the generator's registry-backed `--lockfile-only` step
+selected a newly mature transitive release and changed the installed-state
+fingerprint without any recipe change. The separately approved
+[`2026-08-11-generated-testing-ci-repairs.md`](2026-08-11-generated-testing-ci-repairs.md)
+plan adds `packages/builder-core/lockfiles/web-recipe-0.7.0/pnpm-lock.yaml`, changes
+`packages/builder-core/src/generation/verify-generated-project.ts` to materialize
+those reviewed bytes before the existing frozen-install verification, updates
+`packages/builder-core/tests/generate-project.test.mjs`, and records the invariant
+in `packages/builder-core/AGENTS.md`. It intentionally leaves templates,
+manifests, fixtures, fingerprints, schemas, capabilities, recipes, and state
+receipts unchanged.
+
 ### Regenerate immutable generated projects
 
 Regenerate the complete owned contents, state, and lockfiles beneath:

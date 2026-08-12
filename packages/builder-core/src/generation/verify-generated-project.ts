@@ -51,6 +51,10 @@ const versionTimeoutMilliseconds = 30 * 1000;
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const requiredPnpmVersion = "11.20.0";
 const publicRegistry = "https://registry.npmjs.org/";
+const recipeLockfile = new URL(
+  "../../lockfiles/web-recipe-0.7.0/pnpm-lock.yaml",
+  import.meta.url,
+);
 export const verificationChecks = Object.freeze([
   "lockfile",
   "frozen-install",
@@ -130,12 +134,16 @@ async function cleanupOwnedDirectory(identity: PathIdentity): Promise<boolean> {
   }
 }
 
-async function writeEmptyExclusive(path: string): Promise<boolean> {
+async function writeExclusive(
+  path: string,
+  content: Uint8Array = new Uint8Array(),
+): Promise<boolean> {
   let handle;
   let failed = false;
 
   try {
     handle = await open(path, "wx");
+    await handle.writeFile(content);
   } catch {
     failed = true;
   } finally {
@@ -182,7 +190,7 @@ async function createSupportPaths(
     await mkdir(home, { mode: 0o700 });
     await mkdir(temporary, { mode: 0o700 });
     await mkdir(store, { mode: 0o700 });
-    if (!(await writeEmptyExclusive(userConfiguration))) {
+    if (!(await writeExclusive(userConfiguration))) {
       return issue("VERIFIER_SETUP_FAILED", "user-configuration-failed");
     }
 
@@ -322,7 +330,6 @@ function snapshotsEqual(
 }
 
 async function prepareLockfile(
-  executable: string,
   root: string,
 ): Promise<ValidationResult<void>> {
   const fixedRoot = resolve(root);
@@ -331,57 +338,23 @@ async function prepareLockfile(
     return issue("LOCKFILE_PREPARATION_FAILED", "source-invalid");
   }
 
-  const owner = await createOwnedDirectory(dirname(fixedRoot), ".egeria-pnpm-");
-  if (!owner.ok) {
-    return issue("LOCKFILE_PREPARATION_FAILED", "support-creation-failed");
-  }
-
-  let result: ValidationResult<void>;
+  let lockfileBytes: Uint8Array;
   try {
-    const support = await createSupportPaths(owner.value);
-    if (!support.ok) {
-      result = issue("LOCKFILE_PREPARATION_FAILED", "support-creation-failed");
-    } else {
-      const environment = createChildEnvironment(support.value);
-      const version = await requirePnpmVersion({
-        executable,
-        cwd: fixedRoot,
-        environment,
-      });
-
-      if (!version.ok) {
-        result = version;
-      } else {
-        const install = await runCommand({
-          executable,
-          arguments: [
-            "install",
-            "--lockfile-only",
-            "--ignore-scripts",
-            "--store-dir",
-            support.value.store,
-          ],
-          cwd: fixedRoot,
-          environment,
-          timeout: commandTimeoutMilliseconds,
-          failureCode: "LOCKFILE_PREPARATION_FAILED",
-        });
-        const after = await snapshotSource(fixedRoot);
-        result =
-          install.ok &&
-          after.ok &&
-          onlyLockfileWasAdded(before.value, after.value)
-            ? { ok: true, value: undefined }
-            : issue("LOCKFILE_PREPARATION_FAILED", "source-changed");
-      }
-    }
-  } finally {
-    if (!(await cleanupOwnedDirectory(owner.value))) {
-      result = issue("LOCKFILE_PREPARATION_FAILED", "support-cleanup-failed");
-    }
+    lockfileBytes = await readFile(recipeLockfile);
+  } catch {
+    return issue("LOCKFILE_PREPARATION_FAILED", "recipe-lockfile-unavailable");
   }
 
-  return result;
+  if (
+    !(await writeExclusive(join(fixedRoot, "pnpm-lock.yaml"), lockfileBytes))
+  ) {
+    return issue("LOCKFILE_PREPARATION_FAILED", "lockfile-write-failed");
+  }
+
+  const after = await snapshotSource(fixedRoot);
+  return after.ok && onlyLockfileWasAdded(before.value, after.value)
+    ? { ok: true, value: undefined }
+    : issue("LOCKFILE_PREPARATION_FAILED", "source-changed");
 }
 
 async function verifyInIsolatedCopy(
@@ -503,9 +476,7 @@ export function createPnpmGeneratedProjectVerifier(input: Readonly<{
 
   return {
     prepareLockfile(root) {
-      return typeof executable === "string" && executable.length > 0
-        ? prepareLockfile(executable, root)
-        : Promise.resolve(issue("PNPM_VERSION_INVALID", "invalid-executable"));
+      return prepareLockfile(root);
     },
     verifyInIsolatedCopy(root) {
       return typeof executable === "string" && executable.length > 0
