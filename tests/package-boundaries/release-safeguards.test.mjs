@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import {
-  access,
-  readFile,
-  readdir,
-} from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
+
+import { loadPendingChangesets } from "../../scripts/check-package-release.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(
@@ -305,9 +303,7 @@ test("Changesets keeps a restricted default and excludes private releases", asyn
 test("the release candidate materializes only the approved public versions", async () => {
   const releaseEvidenceChangeset = "clarify-observability-boundary.md";
   const generatedTestingChangeset = "generated-testing-boundary.md";
-  const changesetFiles = (await readdir(resolve(repositoryRoot, ".changeset")))
-    .filter((file) => file.endsWith(".md") && file !== "README.md")
-    .sort();
+  const changesetFiles = await loadPendingChangesets();
   assert.deepEqual(changesetFiles, [
     releaseEvidenceChangeset,
     generatedTestingChangeset,
