@@ -1,6 +1,6 @@
 # Generated Testing CI Repair Plan
 
-> **Execution contract:** Use `superpowers:executing-plans`, `superpowers:test-driven-development`, `superpowers:systematic-debugging` for any unexpected failure, and `superpowers:verification-before-completion`. Execute in the ignored isolated worktree `.worktrees/generated-unit-component-testing-repair` on the existing merge-request branch `agent/generated-unit-component-testing`. Commit and push one increment at a time, inspect hosted CI, and stop for explicit review before the next increment.
+> **Execution contract:** Use `superpowers:executing-plans`, `superpowers:test-driven-development`, `superpowers:systematic-debugging` for any unexpected failure, and `superpowers:verification-before-completion`. Execute in the ignored isolated worktree `.worktrees/generated-unit-component-testing-repair` on the existing merge-request branch `agent/generated-unit-component-testing`. Commit one locally verified increment at a time and stop for explicit review before the next increment. Push and hosted-CI inspection require a separate explicit request; the later authority granted for this run is recorded below.
 
 **Goal:** Repair the reproduced generated-project hosted-CI defect and make expensive repository-quality lanes run only when their owned inputs change, without changing the generated application contract, capability subject, retained fixture bytes, deployment authority, or certification state.
 
@@ -94,9 +94,9 @@ Push the existing MR branch, inspect hosted checks, and stop for increment revie
 
 - Require every fixed JSON Schema tuple to emit `minItems` and `maxItems` equal to its `prefixItems` length.
 - Add tuple cardinality in the canonical JSON Schema artifact transformation and regenerate the committed artifact; do not hand-edit it.
-- Require a failed exclusive write or close to remove only the path created by that call.
-- Require a failed rollback to remain distinguishable through the content-safe lockfile-preparation failure reason.
-- Preserve the no-overwrite guarantee for any pre-existing target and keep all failure output path- and content-safe.
+- Require a failed exclusive write or close never to unlink a path that could have been replaced concurrently.
+- Report post-creation failure as a source mutation through the content-safe lockfile-preparation failure reason, then let the generation transaction clean only its identity-owned staging directory.
+- Preserve the no-overwrite guarantee for every pre-existing or replacement target and keep all failure output path- and content-safe.
 
 ### Verification and commit
 

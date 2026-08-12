@@ -60,7 +60,6 @@ type ExclusiveFileOperations = Readonly<{
     writeFile(content: Uint8Array): Promise<unknown>;
     close(): Promise<unknown>;
   }>;
-  remove(identity: PathIdentity): Promise<boolean>;
 }>;
 
 type ExclusiveFileWriter = (
@@ -80,7 +79,6 @@ const recipeLockfile = new URL(
 );
 const exclusiveFileOperations: ExclusiveFileOperations = {
   open,
-  remove: cleanupOwnedFile,
 };
 export const verificationChecks = Object.freeze([
   "lockfile",
@@ -148,33 +146,6 @@ async function sourceIdentityMatches(identity: PathIdentity): Promise<boolean> {
   }
 }
 
-async function fileIdentityMatches(identity: PathIdentity): Promise<boolean> {
-  try {
-    const stats = await lstat(identity.path, { bigint: true });
-    return (
-      !stats.isSymbolicLink() &&
-      stats.isFile() &&
-      stats.dev === identity.device &&
-      stats.ino === identity.inode
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function cleanupOwnedFile(identity: PathIdentity): Promise<boolean> {
-  if (!(await fileIdentityMatches(identity))) {
-    return false;
-  }
-
-  try {
-    await rm(identity.path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function cleanupOwnedDirectory(identity: PathIdentity): Promise<boolean> {
   if (!(await sourceIdentityMatches(identity))) {
     return false;
@@ -195,7 +166,6 @@ export async function writeExclusive(
 ): Promise<ExclusiveWriteResult> {
   let handle;
   let created = false;
-  let identity: PathIdentity | undefined;
   let failed = false;
 
   try {
@@ -205,7 +175,6 @@ export async function writeExclusive(
     if (stats.isSymbolicLink() || !stats.isFile()) {
       throw new Error("invalid-created-file");
     }
-    identity = { path, device: stats.dev, inode: stats.ino };
     await handle.writeFile(content);
   } catch {
     failed = true;
@@ -225,11 +194,10 @@ export async function writeExclusive(
     return { ok: false, sourceChanged: false };
   }
 
-  if (identity === undefined || !(await operations.remove(identity))) {
-    return { ok: false, sourceChanged: true };
-  }
-
-  return { ok: false, sourceChanged: false };
+  // Node does not expose an identity-conditional unlink. A path-based remove
+  // could delete a replacement created after this handle was opened, so the
+  // caller must fail closed and let the identity-owned staging root clean up.
+  return { ok: false, sourceChanged: true };
 }
 
 async function createOwnedDirectory(

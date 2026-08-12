@@ -301,9 +301,9 @@ test("the internal generated-project verification receipt is frozen", () => {
   );
 });
 
-test("exclusive writes roll back only paths created by failed writes", async () => {
+test("failed exclusive writes never delete a possibly replaced path", async () => {
   for (const failureStage of ["write", "close"]) {
-    const removedPaths = [];
+    let removeAttempted = false;
     const result = await verifierModule.writeExclusive(
       "created-lockfile",
       new Uint8Array([1]),
@@ -330,18 +330,16 @@ test("exclusive writes roll back only paths created by failed writes", async () 
             },
           };
         },
-        async remove(identity) {
-          removedPaths.push(identity.path);
-          return true;
+        async remove() {
+          removeAttempted = true;
         },
       },
     );
 
-    assert.deepEqual(result, { ok: false, sourceChanged: false });
-    assert.deepEqual(removedPaths, ["created-lockfile"]);
+    assert.deepEqual(result, { ok: false, sourceChanged: true });
+    assert.equal(removeAttempted, false);
   }
 
-  let removeAttempted = false;
   const openFailure = await verifierModule.writeExclusive(
     "pre-existing-lockfile",
     new Uint8Array(),
@@ -349,44 +347,12 @@ test("exclusive writes roll back only paths created by failed writes", async () 
       async open() {
         throw new Error("exclusive creation failed");
       },
-      async remove() {
-        removeAttempted = true;
-        return true;
-      },
     },
   );
   assert.deepEqual(openFailure, { ok: false, sourceChanged: false });
-  assert.equal(removeAttempted, false);
-
-  const rollbackFailure = await verifierModule.writeExclusive(
-    "created-lockfile",
-    new Uint8Array(),
-    {
-      async open() {
-        return {
-          async stat() {
-            return {
-              isFile: () => true,
-              isSymbolicLink: () => false,
-              dev: 1n,
-              ino: 2n,
-            };
-          },
-          async writeFile() {
-            throw new Error("write failed");
-          },
-          async close() {},
-        };
-      },
-      async remove() {
-        return false;
-      },
-    },
-  );
-  assert.deepEqual(rollbackFailure, { ok: false, sourceChanged: true });
 });
 
-test("lockfile preparation reports a failed exclusive-write rollback", async () => {
+test("lockfile preparation reports a failed exclusive-write source mutation", async () => {
   await withTestRoot(async (owner) => {
     const source = await createVerifierSource(owner);
     const result = await verifierModule.prepareLockfile(source, async () => ({
