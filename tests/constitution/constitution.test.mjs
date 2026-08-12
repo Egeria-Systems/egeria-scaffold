@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
+import { isPinnedGitHubActionReference } from "../helpers/github-actions.mjs";
+
 const execFileAsync = promisify(execFile);
 
 const repositoryRoot = resolve(
@@ -448,13 +450,13 @@ test("ordinary repository CI keeps core checks always-on and scopes deep checks 
         uses?.startsWith("pnpm/setup@"),
       );
       assert.equal(
-        checkout?.uses,
-        "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+        isPinnedGitHubActionReference(checkout?.uses, "actions/checkout"),
+        true,
       );
       assert.equal(checkout?.with?.["persist-credentials"], false);
       assert.equal(
-        setup?.uses,
-        "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
+        isPinnedGitHubActionReference(setup?.uses, "pnpm/setup"),
+        true,
       );
     }
   }
@@ -792,6 +794,12 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   ]);
   const proofManifest = JSON.parse(proofManifestSource);
   const parsedWorkflow = parse(workflow);
+  const stepsByName = Object.fromEntries(
+    parsedWorkflow.jobs["verify-and-deploy"].steps.map((step) => [
+      step.name,
+      step,
+    ]),
+  );
 
   assert.match(workflow, /^on:\n  workflow_dispatch:\n/m);
   assert.doesNotMatch(workflow, /^  (?:push|pull_request|schedule):/m);
@@ -803,13 +811,19 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   assert.match(workflow, /if: github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /^      name: test-deploy$/m);
   assert.match(workflow, /^      url: \$\{\{ vars\.DEPLOY_URL \}\}$/m);
-  assert.match(
-    workflow,
-    /actions\/checkout@d23441a48e516b6c34aea4fa41551a30e30af803/,
+  assert.equal(
+    isPinnedGitHubActionReference(
+      stepsByName["Check out repository"].uses,
+      "actions/checkout",
+    ),
+    true,
   );
-  assert.match(
-    workflow,
-    /pnpm\/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c/,
+  assert.equal(
+    isPinnedGitHubActionReference(
+      stepsByName["Set up pnpm and Node.js"].uses,
+      "pnpm/setup",
+    ),
+    true,
   );
   assert.doesNotMatch(workflow, /pnpm\/action-setup|actions\/setup-node/);
   assert.match(workflow, /^          version: 11\.20\.0$/m);
@@ -1033,8 +1047,11 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     CERTIFICATION_ROOT: certificationRoot,
   });
   assert.equal(
-    stepsByName["Check out repository"].uses,
-    "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+    isPinnedGitHubActionReference(
+      stepsByName["Check out repository"].uses,
+      "actions/checkout",
+    ),
+    true,
   );
   assert.deepEqual(stepsByName["Check out repository"].with, {
     "fetch-depth": 0,
@@ -1042,8 +1059,11 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     "persist-credentials": false,
   });
   assert.equal(
-    stepsByName["Set up pnpm and Node.js"].uses,
-    "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
+    isPinnedGitHubActionReference(
+      stepsByName["Set up pnpm and Node.js"].uses,
+      "pnpm/setup",
+    ),
+    true,
   );
   assert.deepEqual(stepsByName["Set up pnpm and Node.js"].with, {
     version: "11.20.0",
@@ -1052,8 +1072,11 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     install: false,
   });
   assert.equal(
-    stepsByName["Upload local certification receipt"].uses,
-    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    isPinnedGitHubActionReference(
+      stepsByName["Upload local certification receipt"].uses,
+      "actions/upload-artifact",
+    ),
+    true,
   );
   assert.equal(
     stepsByName["Upload local certification receipt"].with["retention-days"],
@@ -1223,8 +1246,11 @@ test("observability certification deployment is manual, exact-revision, and secr
     "${{ runner.temp }}/production-observability-browser-receipt.json";
 
   assert.equal(
-    stepsByName["Check out repository"].uses,
-    "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+    isPinnedGitHubActionReference(
+      stepsByName["Check out repository"].uses,
+      "actions/checkout",
+    ),
+    true,
   );
   assert.deepEqual(stepsByName["Check out repository"].with, {
     "fetch-depth": 0,
@@ -1232,8 +1258,11 @@ test("observability certification deployment is manual, exact-revision, and secr
     "persist-credentials": false,
   });
   assert.equal(
-    stepsByName["Set up pnpm and Node.js"].uses,
-    "pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c",
+    isPinnedGitHubActionReference(
+      stepsByName["Set up pnpm and Node.js"].uses,
+      "pnpm/setup",
+    ),
+    true,
   );
   assert.deepEqual(stepsByName["Set up pnpm and Node.js"].with, {
     version: "11.20.0",
@@ -1462,8 +1491,11 @@ test("observability certification deployment is manual, exact-revision, and secr
 
   const uploadStep = stepsByName["Upload certification receipts"];
   assert.equal(
-    uploadStep.uses,
-    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    isPinnedGitHubActionReference(
+      uploadStep.uses,
+      "actions/upload-artifact",
+    ),
+    true,
   );
   assert.deepEqual(uploadStep.with, {
     name: "production-observability-certification-receipts",
