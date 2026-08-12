@@ -410,7 +410,14 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
         ["run", "test:unit"],
         ["run", "test:component"],
         ["run", "build"],
-        ["run", "build:cloudflare"],
+        [
+          "--dir",
+          "apps/web",
+          "exec",
+          "opennextjs-cloudflare",
+          "build",
+          "--skipNextBuild",
+        ],
       ],
     );
     assert.notEqual(calls[0].cwd, canonicalSource);
@@ -511,7 +518,11 @@ test("the pnpm verifier maps command failures without child output", async () =>
       ["run test:unit", "UNIT_TESTS_FAILED", "exact"],
       ["run test:component", "COMPONENT_TESTS_FAILED", "exact"],
       ["run build", "NEXT_BUILD_FAILED", "exact"],
-      ["run build:cloudflare", "OPENNEXT_BUILD_FAILED", "exact"],
+      [
+        "--dir apps/web exec opennextjs-cloudflare build --skipNextBuild",
+        "OPENNEXT_BUILD_FAILED",
+        "exact",
+      ],
     ];
 
     for (const [operation, code, match] of cases) {

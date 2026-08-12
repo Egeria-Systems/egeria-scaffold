@@ -439,7 +439,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run typecheck",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:unit",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run build",
-    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run build:cloudflare",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec opennextjs-cloudflare build --skipNextBuild",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run cf-typegen:check",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:integration:cloudflare",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec playwright install --with-deps chromium",
@@ -621,15 +621,44 @@ test("the workspace declares the approved proof root and install policy", async 
 });
 
 test("the compatibility proof has a private non-app workspace boundary", async () => {
-  const proofManifest = JSON.parse(
-    await readRepositoryFile("proofs/nextjs-cloudflare/package.json"),
-  );
+  const [proofManifestSource, previewConfiguration, proofInstructions] =
+    await Promise.all([
+      readRepositoryFile("proofs/nextjs-cloudflare/package.json"),
+      readRepositoryFile(
+        "proofs/nextjs-cloudflare/playwright.preview.config.ts",
+      ),
+      readRepositoryFile("proofs/nextjs-cloudflare/AGENTS.md"),
+    ]);
+  const proofManifest = JSON.parse(proofManifestSource);
 
   assert.equal(
     proofManifest.name,
     "@egeria-systems/nextjs-cloudflare-proof",
   );
   assert.equal(proofManifest.private, true);
+  assert.equal(
+    proofManifest.scripts["build:cloudflare"],
+    "opennextjs-cloudflare build",
+  );
+  assert.equal(
+    proofManifest.scripts.preview,
+    "opennextjs-cloudflare build && opennextjs-cloudflare preview -- --ip 127.0.0.1 --port 3101",
+  );
+  assert.equal(proofManifest.scripts.deploy, "opennextjs-cloudflare deploy");
+  const verificationCommands = proofManifest.scripts.verify.split(" && ");
+  const nextBuildIndex = verificationCommands.indexOf("pnpm run build");
+  const openNextBuildIndex = verificationCommands.indexOf(
+    "pnpm exec opennextjs-cloudflare build --skipNextBuild",
+  );
+  assert.ok(nextBuildIndex >= 0 && openNextBuildIndex === nextBuildIndex + 1);
+  assert.equal(verificationCommands.includes("pnpm run build:cloudflare"), false);
+  assert.match(
+    previewConfiguration,
+    /pnpm exec opennextjs-cloudflare preview -- --ip 127\.0\.0\.1 --port 3101/u,
+  );
+  assert.doesNotMatch(previewConfiguration, /pnpm preview/u);
+  assert.match(proofInstructions, /already prepared `.open-next` output/iu);
+  assert.match(proofInstructions, /--skipNextBuild/u);
   await assert.rejects(readRepositoryFile("apps/web/package.json"));
   await assert.rejects(readRepositoryFile("apps/compatibility/package.json"));
   await assert.rejects(

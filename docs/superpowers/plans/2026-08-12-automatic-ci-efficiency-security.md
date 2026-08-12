@@ -138,14 +138,14 @@ Expected: stable job names always appear for pull requests; deep work is skipped
 
 **Files:** `tests/constitution/constitution.test.mjs`, `tests/generated-fixtures/verification-script.test.mjs`, `packages/builder-core/tests/render-skeleton.test.mjs`, `packages/builder-core/tests/generate-project.test.mjs`
 
-- [ ] Require proof `verify` to contain one Next build followed by `opennextjs-cloudflare build --skipNextBuild`, with preview Playwright starting `opennextjs-cloudflare preview` directly.
-- [ ] Require compiled-generator verification, generated root `verify`, generated workflow, and fixed-root verifier to use the same prepared-output order and never invoke `build:cloudflare` after a successful Next build.
-- [ ] Preserve generated/proof standalone `build:cloudflare` and `preview` package scripts byte-for-byte as public convenience commands.
-- [ ] Update the fixed-root command sequence/count and failure-code expectations for direct `pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild`.
-- [ ] Require instructions and README templates to state that preview E2E consumes already prepared `.open-next` output and must follow the build/transform step.
-- [ ] Require the generated workflow to keep lint, typecheck, unit, component, Next, OpenNext, Chromium, development-browser, preview-browser, and failure-artifact boundaries while using `cache: false`.
-- [ ] Run `pnpm run test:constitution`, `pnpm run test:builder-core`, and `pnpm run test:generated-fixtures`; confirm RED only for the obsolete duplicate-build commands/documentation/cache flag.
-- [ ] Commit the focused RED contracts as `test: require prepared OpenNext output reuse`.
+- [x] Require proof `verify` to contain one Next build followed by `opennextjs-cloudflare build --skipNextBuild`, with preview Playwright starting `opennextjs-cloudflare preview` directly.
+- [x] Require compiled-generator verification, generated root `verify`, generated workflow, and fixed-root verifier to use the same prepared-output order and never invoke `build:cloudflare` after a successful Next build.
+- [x] Preserve generated/proof standalone `build:cloudflare` and `preview` package scripts byte-for-byte as public convenience commands.
+- [x] Update the fixed-root command sequence/count and failure-code expectations for direct `pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild`.
+- [x] Require instructions and README templates to state that preview E2E consumes already prepared `.open-next` output and must follow the build/transform step.
+- [x] Require the generated workflow to keep lint, typecheck, unit, component, Next, OpenNext, Chromium, development-browser, preview-browser, and failure-artifact boundaries while using `cache: false`.
+- [x] Run `pnpm run test:constitution`, `pnpm run test:builder-core`, and `pnpm run test:generated-fixtures`; confirm RED only for the obsolete duplicate-build commands/documentation/cache flag.
+- [x] Commit the focused RED contracts as `test: require prepared OpenNext output reuse`.
 
 ## Task 5: GREEN — deduplicate generated and proof verification
 
