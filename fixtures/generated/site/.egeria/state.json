@@ -269,7 +269,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:6b328e48a168482ab468ee3026dad5526b83167df9e3070673f0a1cc443aeb75",
+      "fingerprint": "sha256:b88381bcff0da2481b4ca5262dd964ea3b3fd798874ec531bfd3d10693fb358c",
       "fingerprintTarget": {
         "kind": "file"
       },
