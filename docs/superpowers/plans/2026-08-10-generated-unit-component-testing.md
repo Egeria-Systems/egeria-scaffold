@@ -320,9 +320,9 @@ Expected: CI covers every current test-owning component, but external workflows 
 - [x] Require byte equality, exact file inventories, exact dependency/script/config/test/guidance/workflow contents, portable lockfiles, state/manifest/inference agreement, and an empty exact diff.
 - [x] Replace committed fixture roots only from the validated production output. Never hand-edit derived fixture files.
 - [x] Run unit and component tests for all three fixtures.
-- [ ] Run lint, typecheck, Next build, OpenNext build, development Playwright/axe, and preview Playwright/axe for all three fixtures through the fixed verifier.
-- [ ] Record exact test counts and environment boundaries without claiming hosted CI, deployment, visual quality, human usability, or WCAG conformance.
-- [ ] Run deterministic fixture tests and read-only infer/doctor/diff against the settled fixtures.
+- [x] Run lint, typecheck, Next build, OpenNext build, development Playwright/axe, and preview Playwright/axe for all three fixtures through the fixed verifier.
+- [x] Record exact test counts and environment boundaries without claiming hosted CI, deployment, visual quality, human usability, or WCAG conformance.
+- [x] Run deterministic fixture tests and read-only infer/doctor/diff against the settled fixtures.
 
 ## Task 8: Reconcile canonical owners and later-phase testing decisions
 
@@ -349,24 +349,24 @@ Expected: CI covers every current test-owning component, but external workflows 
 
 **Comparison:** exact integrated Task 6C base through settled Task 6C candidate; exclude separate worktrees and Task 6D execution.
 
-- [ ] Dispatch one read-only requirements reviewer for the approved UI testing, all-component CI, all-context AGENT instructions, task sequencing, exclusions, and certification separation.
-- [ ] Dispatch one read-only architecture/anti-overengineering reviewer for standards ownership, no testing capability/package, Node/Vitest separation, no premature Workers pool, state/version changes, and future P3/P4/P5 placement.
-- [ ] Dispatch one read-only test-evidence reviewer for causal RED/GREEN proof, test discovery, receipt ordering, every CI lane, all retained fixtures, environment isolation, and claim limits.
-- [ ] Add one Cloudflare/platform specialist only if Task 6C changes proof/harness behavior beyond CI invocation.
-- [ ] Prohibit reviewer edits and recursive fan-out; wait for every result and validate each finding against the current tree.
-- [ ] For each material validated defect, add a focused failing regression test, implement the minimum repair, rerun only affected checks, and record disposition.
-- [ ] Reject unsupported, preference-only, duplicated, future-only, or churn-heavy findings.
+- [x] Dispatch one read-only requirements reviewer for the approved UI testing, all-component CI, all-context AGENT instructions, task sequencing, exclusions, and certification separation.
+- [x] Dispatch one read-only architecture/anti-overengineering reviewer for standards ownership, no testing capability/package, Node/Vitest separation, no premature Workers pool, state/version changes, and future P3/P4/P5 placement.
+- [x] Dispatch one read-only test-evidence reviewer for causal RED/GREEN proof, test discovery, receipt ordering, every CI lane, all retained fixtures, environment isolation, and claim limits.
+- [x] Add one Cloudflare/platform specialist only if Task 6C changes proof/harness behavior beyond CI invocation; no specialist was needed because the proof harness was invoked but not changed.
+- [x] Prohibit reviewer edits and recursive fan-out; wait for every result and validate each finding against the current tree.
+- [x] For each material validated defect, add a focused failing regression test, implement the minimum repair, rerun only affected checks, and record disposition.
+- [x] Reject unsupported, preference-only, duplicated, future-only, or churn-heavy findings.
 
 ## Task 11: Final verification, packet, and stop gate
 
-- [ ] Run `git diff --check`, semantic naming, constitution, package boundaries, builder-core, CLI, standards, observability, capability certification/admission, generated fixture tests, builder lint/build/typecheck, and the full fixed-root generated verifier.
-- [ ] Run the complete compatibility-proof local matrix only if Task 6C or its CI contract changed relevant proof inputs; otherwise cite the unchanged settled receipt and run its static workflow contract.
-- [ ] Validate the new repository workflow structurally and, if a separately authorized hosted run exists, record it separately from local evidence. Never imply a hosted run occurred from source inspection.
-- [ ] Verify exact generated unit/component test counts for portfolio, site, and Calendly portfolio, plus unchanged development/preview browser outcomes.
-- [ ] Verify clean branch scope, changed-file inventory, ignored/untracked artifacts, current worktree identities, and no mutation in separate worktrees.
-- [ ] Record dependency versions and provenance, commands/results, CI matrix, AGENT coverage, reviewer dispositions, risks, deferred P3/P5 work, claim limits, and recovery.
-- [ ] Create the Task 6C review packet and final verification evidence.
-- [ ] In an authorized implementation run, commit focused evidence and present the exact committed comparison.
+- [x] Run `git diff --check`, semantic naming, constitution, package boundaries, builder-core, CLI, standards, observability, capability certification/admission, generated fixture tests, builder lint/build/typecheck, and the full fixed-root generated verifier.
+- [x] Run the complete compatibility-proof local matrix only if Task 6C or its CI contract changed relevant proof inputs; otherwise cite the unchanged settled receipt and run its static workflow contract.
+- [x] Validate the new repository workflow structurally and, if a separately authorized hosted run exists, record it separately from local evidence. Never imply a hosted run occurred from source inspection.
+- [x] Verify exact generated unit/component test counts for portfolio, site, and Calendly portfolio, plus unchanged development/preview browser outcomes.
+- [x] Verify clean branch scope, changed-file inventory, ignored/untracked artifacts, current worktree identities, and no mutation in separate worktrees.
+- [x] Record dependency versions and provenance, commands/results, CI matrix, AGENT coverage, reviewer dispositions, risks, deferred P3/P5 work, claim limits, and recovery.
+- [x] Create the Task 6C review packet and final verification evidence.
+- [x] In an authorized implementation run, commit focused evidence and present the exact committed comparison.
 - [ ] Stop for explicit verified-final-diff approval. Do not execute Task 6D, begin later P2 work, add fast-check, add Workers Vitest, push, create a pull request, deploy, publish, or mutate an external system.
 
 ## Expected completion boundary

@@ -542,7 +542,7 @@ test("package ownership documentation records the approved release boundary", as
   );
   assert.match(
     enforcementMap,
-    /INV-ACCESSIBILITY-AUTOMATION[^\n]+frozen pre-change base[^\n]+local development and workerd Playwright\/axe receipts[^\n]+current generated-testing candidate awaits its final fixed-root browser rerun/i,
+    /INV-ACCESSIBILITY-AUTOMATION[^\n]+all three current retained fixtures pass local development and workerd Playwright\/axe checks[^\n]+any conformance claim remain separate/i,
   );
   assert.match(
     enforcementMap,
@@ -2507,7 +2507,7 @@ test("execution plans enforce direct predecessors and bounded independent-work e
     assert.match(
       canonicalDocument,
       new RegExp(
-        `${escapeRegularExpression(independentStream)}[^.]+pending[^.]+unchanged|preserve ${escapeRegularExpression(independentStream)}'s pending`,
+        `${escapeRegularExpression(independentStream)}[^.]+pending[^.]+unchanged|preserve(?:s)? ${escapeRegularExpression(independentStream)}'s pending`,
         "iu",
       ),
     );
@@ -2710,7 +2710,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
         escapeRegularExpression(observabilityCertificationTask) +
         " local certification work is authorized and in progress with reviewed local fresh-scaffold evidence[\\s\\S]+Under the explicit 2026-08-11 independent-work exception, " +
         escapeRegularExpression(generatedTestingTask) +
-        " has an implementation candidate[\\s\\S]+must preserve " +
+        " has an independently reviewed and locally verified implementation candidate[\\s\\S]+preserves " +
         escapeRegularExpression(observabilityCertificationTask) +
         "'s pending observability subject[\\s\\S]+Protected-staging, provider/source, credentials, telemetry transmission, cleanup, certification transition, merge, and push remain separately unauthorized[\\s\\S]+" +
         escapeRegularExpression(generatedTestingTask) +
