@@ -3226,7 +3226,14 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(implementationTask)} is squash-integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\``,
+      `${escapeRegularExpression(implementationTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\``,
+      "u",
+    ),
+  );
+  assert.match(
+    sourcePlan,
+    new RegExp(
+      `${escapeRegularExpression(certificationTask)} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Plan A proceeds from that accepted repair revision`,
       "u",
     ),
   );
@@ -3458,7 +3465,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} is squash-integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\``,
+      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\``,
       "u",
     ),
   );
@@ -3473,7 +3480,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+all eight local outcomes were rerun at that accepted-main revision[\\s\\S]+evidence-ancestry repair's exact final diff requires verified-final-diff and integration approval`,
+      `${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\` binds the reviewed rerun receipt to accepted-main evidence revision`,
       "u",
     ),
   );
@@ -3488,7 +3495,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+evidence-ancestry repair executes on the isolated \`standards-certification\` branch/worktree`,
+      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Plan A proceeds from that accepted repair revision`,
       "u",
     ),
   );

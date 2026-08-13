@@ -10,7 +10,7 @@
 
 ## Approval and authority boundary
 
-This plan is based on `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`. Before implementation, refresh `origin/main`, require the approved base to remain an ancestor, and reconcile any overlapping change.
+This plan was approved from `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`. After Task 6D and its evidence-ancestry repair were separately integrated, Plan A was rebased onto accepted `main@ee1e1df10fa2be2f09333efecd86de7f7a131d49`. The direct predecessor remains an ancestor. The exact final comparison is that accepted main revision to the Plan A candidate.
 
 **Direct predecessor:** Dependabot-compatible live-workflow action-pin tests, integrated as `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e` after the pending-Changeset selection repair at `2b0624c3448d569d68bad93edd8821c48fb432cb`.
 
@@ -18,9 +18,9 @@ This plan is based on `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`. Before im
 
 Implementation authorization for this plan permits only local repository edits, focused commits, deterministic local checks, one independent read-only review, and review-backed repairs. It does not authorize push, pull request, merge, workflow dispatch, deployment, certification transition, publication, provider access, credential access, GitHub settings changes, production action, or responses to review comments.
 
-The accepted tree's `standards@0.3.0` subject remains pending. A separate clean Task 6D candidate exists at `standards-certification@3b930c63d920b3c12c450c9598ff8ca36fdbcc01`, based on Task 6C revision `12ecc73a8337ab12ece9dd3a6b2aec03f940383c`. It has reached its own verified-final-diff stop gate but is neither approved nor integrated, and it does not contain accepted `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`. Freeze that branch and worktree: Plan A must not modify, rebase, copy, discard, certify, approve, or integrate it.
+Accepted `main@ee1e1df10fa2be2f09333efecd86de7f7a131d49` records `standards@0.3.0` as certified from Task 6D's reviewed local eight-outcome receipt rerun at accepted-main evidence revision `c9294e9dc59d4b7bafed406846af3b43a10733d3`. Task 6D and its evidence-ancestry repairs were developed on separate streams and integrated before Plan A reconciliation. Plan A must not modify, rebase, copy, discard, certify, approve, or integrate the stopped `standards-certification` branch.
 
-This optimization changes managed workflow, preview, and Next configuration bytes but adds no managed surface, inference probe, evidence kind, dependency, environment variable, provider, or generated application behavior. Task 1 must nevertheless re-evaluate materiality against the current `standards` and `deployment-cloudflare` descriptors and certification contracts. If either descriptor version or canonical behavior-contract digest must change, stop and amend the capability/certification plan before editing executable files. If Plan A is later approved and integrated first, reconciliation of the frozen Task 6D candidate belongs to a resumed Task 6D preflight: its evidence-producing revision must descend from the accepted Plan A revision, the affected build, browser, fixture, state, and CI-contract outcomes must be rerun against the optimized topology, and the subject/digest must be recomputed. Plan A may amend that future requirement but must not perform the reconciliation or certification transition. Both final diffs retain separate approval gates.
+This optimization changes managed workflow, preview, and Next configuration bytes but adds no managed surface, inference probe, evidence kind, dependency, environment variable, provider, or generated application behavior. Task 1 nevertheless re-evaluates materiality against the current `standards` and `deployment-cloudflare` descriptors and certification contracts. Neither descriptor version nor canonical behavior-contract digest changes. If Plan A is later approved and integrated, renewal of Task 6D's affected evidence belongs to a separately resumed Task 6D preflight: its evidence-producing revision must descend from the accepted Plan A revision, the affected build, browser, fixture, state, and CI-contract outcomes must be rerun against the optimized topology, and the unchanged subject/digest must be recomputed. Plan A may record that future requirement but must not perform the evidence renewal or any certification transition. Both final diffs retain separate approval gates.
 
 ## Exact file scope
 
@@ -100,11 +100,11 @@ The fixture list is derived scope, not permission to hand-edit. Use production g
 - [x] Update the named predecessor packet with its post-integration acceptance outcome and require explicit approval, accepted revision `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`, signed/rules-compliant integration, and local/remote-main reconciliation before any executable edit.
 - [x] Read root and applicable nested instructions, accepted ADRs, architecture overview, capability model, enforcement map, approved source plan, roadmap, compatibility record, current standards and deployment-cloudflare descriptors/registry, generated-testing implementation evidence, and Task 6D certification plan.
 - [x] Record the three current automatic workflows, their exact triggers/jobs/path ownership, the generated workflow/template contract, proof verification order, current action pins, hosted-run evidence, and current cache settings.
-- [x] Run `pnpm run check:capability-certification` and `pnpm run test:capability-certification`; require the existing pending standards record to be internally valid.
+- [x] Run `pnpm run check:capability-certification` and `pnpm run test:capability-certification`; require the standards record current at each checked baseline to be internally valid.
 - [x] Decide explicitly whether the operational-only command and configuration changes alter either the standards or deployment-cloudflare descriptor or canonical behavior-contract digest. Record the evidence and stop if the answer requires a new subject.
 - [x] Write the preparation evidence with the exact comparison, authority boundary, recovery route, primary-source decisions, expected RED failures, and claim limits.
 
-Expected: a settled preflight showing no unaccounted overlapping work and either a justified unchanged pending subject or a hard stop before executable edits.
+Expected: a settled preflight showing no unaccounted overlapping work and either a justified unchanged subject or a hard stop before executable edits.
 
 ## Task 2: RED — specify one stable automatic workflow
 
@@ -178,7 +178,7 @@ Expected: stable job names always appear for pull requests; deep work is skipped
 - [x] Review the derived diff. Require it to contain only the approved template-derived paths and their direct state fingerprints; investigate any other byte.
 - [x] Commit derived outputs as `test: regenerate optimized CI fixtures`.
 
-## Task 7: Reconcile canonical documentation and pending certification plan
+## Task 7: Reconcile canonical documentation and the standards evidence-renewal plan
 
 - [x] Update the architecture overview, source plan, program roadmap, enforcement map, README, contribution guide, and compatibility record to describe one automatic workflow, stable job-level scoping, dependency review, no reusable caches, and one-build prepared-output verification.
 - [x] Amend the Task 6D standards certification plan so `ci-contract`, `generated-project-builds`, `browser-regression`, and `retained-fixture-matrix` require the exact `cache: false` and `--skipNextBuild`/direct-preview behavior now present.
@@ -211,9 +211,9 @@ Do not push, open a pull request, dispatch CI, change required checks, begin Pla
 - Ordinary CI is read-only, pinned, credential-free, frozen, bounded, cancelling, and cache-free.
 - Dependency review blocks newly introduced moderate-or-higher runtime/development vulnerabilities on pull requests.
 - Compiled-generator, generated, and proof verification paths perform one Next build and one OpenNext transform per candidate, while public standalone scripts remain compatible.
-- Templates, production-generated fixtures, state fingerprints, fixed verifier, pending certification plan, and canonical docs agree.
+- Templates, production-generated fixtures, state fingerprints, fixed verifier, future Task 6D evidence-renewal amendment, and canonical docs agree.
 - Focused and complete local checks pass; hosted/external evidence and final-diff approval remain separate.
 
 ## Recovery
 
-Use focused newest-first reverts. Restore the two path-scoped workflow files together with the old root workflow contract; restore previous verification commands and regenerate all fixtures from the reverted templates; restore documentation and the pending certification plan to their prior exact subject. External settings require their own separately authorized recovery and are not changed by this plan.
+Use focused newest-first reverts. Restore the two path-scoped workflow files together with the old root workflow contract; restore previous verification commands and regenerate all fixtures from the reverted templates; restore Plan A documentation while preserving the accepted Task 6D receipt, registry entry, and certified subject. External settings require their own separately authorized recovery and are not changed by this plan.

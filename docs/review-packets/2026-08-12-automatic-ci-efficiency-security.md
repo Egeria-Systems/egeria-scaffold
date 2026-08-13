@@ -4,17 +4,15 @@
 
 **Status:** Plan A local implementation, bounded independent review, repairs, and verification are complete; awaiting explicit verified-final-diff approval
 
-**Approved Plan A base:** `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`
+**Accepted Plan A base after reconciliation:** `ee1e1df10fa2be2f09333efecd86de7f7a131d49`
 
-**Current remote main, outside this comparison:** `34e6c32160ca2b748dba46d8f6e7205202204925`
-
-**Reviewed implementation candidate before this packet:** `ad6d3f7bf63c0b9e329faaaaa2703552588cd7fa`
+**Reviewed implementation candidate before this packet:** `5c1b53974924649190ed393dde0a96ca91f35ecd`
 
 **Branch:** `ci-efficiency-security`
 
 **Isolated worktree:** `.worktrees/ci-efficiency-security`
 
-**Exact comparison:** approved Plan A base `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e` to the final committed Plan A candidate. The final handoff reports the final head because this packet cannot contain the hash of the commit that contains itself.
+**Exact comparison:** accepted base `ee1e1df10fa2be2f09333efecd86de7f7a131d49` to the final committed Plan A candidate. The final handoff reports the final head because this packet cannot contain the hash of the commit that contains itself.
 
 ## Outcome
 
@@ -22,7 +20,7 @@ Plan A replaces three overlapping automatic workflows with one read-only `Reposi
 
 Generated-project and compatibility-proof verification now build standalone Next output once, transform that prepared output once through OpenNext `--skipNextBuild`, and run preview directly from the prepared `.open-next` output. Public standalone build and preview commands remain available. The three retained fixtures were regenerated only through the production generator and match their canonical templates and state fingerprints.
 
-The Plan A baseline's pending `standards@0.3.0` subject and its `deployment-cloudflare@0.2.0` backfill subject retain their exact behavior-contract digests. Plan A changes no certification registry entry or status. Task 6D subsequently advanced on a separate stream and its current evidence-ancestry repair remains on `standards-certification`; neither that integration nor its repair is copied into this comparison. After Plan A is approved and integrated, a separately resumed Task 6D stream must reconcile and renew the affected evidence. That work is not part of Plan A.
+Accepted base `ee1e1df10fa2be2f09333efecd86de7f7a131d49` records `standards@0.3.0` as certified and binds its reviewed eight-outcome receipt to accepted-main evidence revision `c9294e9dc59d4b7bafed406846af3b43a10733d3`. Its `deployment-cloudflare@0.2.0` backfill subject retains the exact behavior-contract digest. Plan A changes no certification registry entry or status. After Plan A is approved and integrated, a separately resumed Task 6D stream must renew affected operational evidence on a descendant. That work is not part of Plan A.
 
 ## Exact changed files
 
@@ -102,19 +100,20 @@ The protected-workflow-hardening document was authored with the approved two-pla
 
 The Plan A sequence after its approved base is:
 
-- `424c3fc3de15081b6d0d8c6f81790e4c11fdb30d` — `docs: plan secure CI optimization`
-- `fa4d5874536c27f0026db694d285f6af73641b6d` — `docs: prepare automatic CI implementation`
-- `c6bdc57a901ce0b4504b9383a7c0469557fc686d` — `test: define consolidated CI contract`
-- `141d48cc8264d55fc0edf8c2e2f32c701e81ff4e` — `ci: consolidate repository quality checks`
-- `f9d2ad7d448c86734c119ef092e69231bdf94056` — `test: require prepared OpenNext output reuse`
-- `ee2aef7062fe78835935d7d1e3a30a1307680c1e` — `test: require standalone prepared Next output`
-- `78cd6cdd4b49f49cdf70e52cd8bf400a7e41ba22` — `perf: reuse prepared OpenNext builds`
-- `eebe3e5ea79d2bc43d1d385debbdf5048424462a` — `test: regenerate optimized CI fixtures`
-- `94db8677f5e8a9c4df0a107ad88ddea05f294f7f` — `docs: align CI optimization contracts`
-- `f7e8d5ddfdaf9cf198baf83134b125678a0e3c3a` — `docs: record CI optimization verification`
-- `b02279a0900b8aa9cfd1ec1cdff595e089d9ac87` — `test: execute CI scope classification`
-- `f1828f0e42f02a5559baef8bfca62e84604f885c` — `test: exercise CI scope fail-safes`
-- `ad6d3f7bf63c0b9e329faaaaa2703552588cd7fa` — `docs: close CI optimization review findings`
+- `493c85b3ff5260ff901e497a824c110a5c7f5df4` — `docs: plan secure CI optimization`
+- `62f355af8a6572c3d63dd3d3905685f3fea600a8` — `docs: prepare automatic CI implementation`
+- `a98f69d39c2dd6b6ff281149e15325ac5126a503` — `test: define consolidated CI contract`
+- `5f58bf7d1c40e0a6407d57f9ce54613192549b98` — `ci: consolidate repository quality checks`
+- `773eda0edda894643480fefbc0074dff3cca6016` — `test: require prepared OpenNext output reuse`
+- `4e4d9e419954738ebb1adcc8dc86169f5ef9a1c4` — `test: require standalone prepared Next output`
+- `87c50705284464dcb292758cd4cc79436d641f63` — `perf: reuse prepared OpenNext builds`
+- `43f277be30eb38faccc81159a29aa64f730bf9c9` — `test: regenerate optimized CI fixtures`
+- `c08963f10e1075bce8de9ccbac8d78e70435851f` — `docs: align CI optimization contracts`
+- `5a3e1eed6a8086e58fa9cdbdb43c5006651ba520` — `docs: record CI optimization verification`
+- `3a5b08bcacdb7088f4ed1a22c13c3b80f10e7d49` — `test: execute CI scope classification`
+- `bbbb0dabb4a595f325cc079876c04684a9543c3d` — `test: exercise CI scope fail-safes`
+- `5c1b53974924649190ed393dde0a96ca91f35ecd` — `docs: close CI optimization review findings`
+- `1d1abde4e3a2d681f7a5b3354602e57cae3a9e16` — `docs: complete Plan A review packet`
 
 The final packet commit is reported in the handoff.
 
@@ -141,14 +140,14 @@ Node.js `22.23.2` and pnpm `11.20.0` were used for applicable pnpm checks.
 | Post-review scope behavior | Passed 1/1 focused test with 12 actual classifier executions |
 | Final-candidate `test:constitution` | Passed 54/54 |
 | Final-candidate `test:builder-core` | Passed 140/140 |
-| Final-candidate `test:capability-certification` | Passed 20/20 |
+| Final-candidate `test:capability-certification` | Passed 24/24 |
 | Final-candidate `check:capability-certification` | Passed admission for all 7 records |
 | Final-candidate `test:package-boundaries` | Passed 46/46 |
 | Final-candidate `check:semantic-naming` | Passed |
 | Final-candidate `changeset:status` | No package bump at patch, minor, or major |
 | `git diff --check` | Passed |
 
-The final tracked tree before this packet is byte-identical to the independently reviewed and fully verified pre-reconciliation Plan A candidate `a88f704a8e149bd61e9c59bfe9263d6460df14ba`. The expensive complete matrices were therefore not repeated. Focused certification, builder-core, package, semantic, Changesets, constitution, ancestry, and diff checks were rerun on this exact candidate.
+The Plan A workflow, generator, production-template, proof, fixed-root-verifier, and retained-fixture behavior paths are byte-identical to the independently reviewed and fully verified pre-reconciliation Plan A candidate `a88f704bb65404dd218da908418c92cdd626ca7d`. The expensive complete matrices were therefore not repeated. Focused certification, builder-core, package, semantic, Changesets, constitution, ancestry, and diff checks were rerun after rebasing the documentary candidate onto the accepted repair. The first constitution reconciliation was RED at 52/54 for stale sequencing assertions; focused TDD made that boundary GREEN 2/2 and the full suite GREEN 54/54.
 
 ## Independent review dispositions
 
@@ -166,18 +165,18 @@ The reviewer found no other material defect. Controller verification confirmed e
 - No push, pull request, merge, repository setting, environment, secret, permission, deployment, provider, publication, certification transition, production action, or external message occurred.
 - Local Next.js, OpenNext/workerd, Playwright, and axe evidence does not establish deployed behavior, performance, visual quality, human usability, assistive-technology compatibility, or WCAG conformance.
 - The consolidated workflow uses reviewed immutable action SHAs, but future action updates still require ordinary dependency review and hosted validation.
-- Remote `main` advanced after Plan A implementation and currently points to `34e6c32160ca2b748dba46d8f6e7205202204925`. Task 6D's substantive evidence-ancestry repair remains on the separate `standards-certification` stream. Before any Plan A integration, revalidate current `main`, preserve the separate repair lineage, and require capability admission to pass; do not import that repair into this Plan A approval comparison.
+- Accepted base `ee1e1df10fa2be2f09333efecd86de7f7a131d49` includes Task 6D and its evidence-ancestry repair. Before any Plan A integration, revalidate current `main` and require capability admission to pass.
 - Renewing Task 6D evidence for Plan A's changed operational bytes remains a separate Task 6D responsibility only after an accepted Plan A revision exists.
 - Plan B remains unstarted. Its pre-existing plan document has no checked execution task and grants no implementation or external authority.
 
 ## Recovery
 
-Use focused newest-first reverts after approved base `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`:
+Use focused newest-first reverts after accepted base `ee1e1df10fa2be2f09333efecd86de7f7a131d49`:
 
 1. Restore all three predecessor automatic workflows together.
 2. Restore the prior generated/proof verification commands and Next/preview configuration.
 3. Regenerate all three retained fixtures from the reverted production templates; do not hand-edit derived output.
-4. Restore Plan A's canonical documentation and pending Task 6D future-reconciliation amendment. Task 6D artifacts remain outside this comparison.
+4. Restore Plan A's canonical documentation and future Task 6D evidence-renewal amendment. Preserve the accepted Task 6D receipt, registry entry, and certification status.
 
 No external recovery applies because Plan A changed no external system.
 

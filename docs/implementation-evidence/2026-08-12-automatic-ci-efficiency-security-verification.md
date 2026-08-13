@@ -2,9 +2,11 @@
 
 **Verification date:** 2026-08-12 (America/Toronto)
 
-**Accepted base:** `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`
+**Accepted base after reconciliation:** `main@ee1e1df10fa2be2f09333efecd86de7f7a131d49`
 
-**Verified implementation candidate:** `ci-efficiency-security@0e7d4fb8dcef8647df0f78fa1ab091b78d43c7cf`
+**Complete-matrix implementation candidate before review:** `ci-efficiency-security@0e7d4fb8dcef8647df0f78fa1ab091b78d43c7cf`
+
+**Independently reviewed behavior candidate before accepted-main reconciliation:** `ci-efficiency-security@a88f704bb65404dd218da908418c92cdd626ca7d`
 
 **Result:** Plan A's consolidated workflow, prepared-output verification paths, production-derived fixtures, and canonical documentation passed the complete authorized local verification. Hosted execution, dependency-review service behavior, repository settings, deployment, certification, publication, provider behavior, and production remain unexecuted and unclaimed.
 
@@ -26,6 +28,24 @@ The checks used Node.js `22.23.2` and pnpm `11.20.0`. The root verification comm
 The initial concurrent documentation-command attempts exited before their scripts because pnpm attempted an automatic dependency install, the sandbox blocked the registry request, and the non-interactive purge guard refused the rewrite. Those attempts are environment preflight failures, not RED test results. The later serial commands above are the applicable results.
 
 After independent review, the focused scope-classifier contract failed RED only because its hermetic execution harness was intentionally absent, then passed GREEN 1/1 across 12 actual shell executions after the minimum test-harness implementation. The post-repair full constitution passed 54/54 in 1.635 seconds, capability admission passed all 7 exact records in 2.604 seconds, semantic naming passed in 0.370 seconds, and `git diff --check` reported no error. The repair changed test and documentary evidence only; the already successful builder-kernel and compatibility-proof matrices were not repeated against unchanged workflow, product, template, fixture, dependency, or runtime inputs.
+
+## Accepted-main reconciliation verification
+
+After accepted repair `ee1e1df10fa2be2f09333efecd86de7f7a131d49`, Plan A was rebased onto that exact revision. The first full constitution run was RED at 52/54 because two documentary contracts still expected the pre-integration Task 6C/6D wording. A focused two-test run remained RED only for the stale source-plan sequencing paragraph. Updating the test expectations first and then the canonical source-plan, roadmap, design, preparation, verification, and review-packet consumers made the focused boundary GREEN 2/2 and the full suite GREEN 54/54.
+
+Fresh checks on the reconciled candidate passed:
+
+| Command or proof | Result |
+| --- | --- |
+| `pnpm run test:constitution` | Passed 54/54 |
+| `pnpm run test:builder-core` | Passed 140/140 |
+| `pnpm run test:capability-certification` | Passed 24/24 |
+| `pnpm run check:capability-certification` | Passed admission for all 7 records |
+| `pnpm run test:package-boundaries` | Passed 46/46 |
+| `pnpm run check:semantic-naming` | Passed |
+| `pnpm run changeset:status` | No package bump at patch, minor, or major |
+
+The workflow, generator, production templates, compatibility proof, fixed-root verifier, and retained-fixture paths are byte-identical to the reviewed behavior candidate `a88f704bb65404dd218da908418c92cdd626ca7d`. The current scope-classifier test still executes the exact workflow shell across its 12 fail-safe scenarios. Because no workflow, product, template, fixture, dependency, or runtime input changed during accepted-main reconciliation, the successful 551.041-second builder-kernel and 30.001-second compatibility-proof matrices were not repeated.
 
 ## Builder-kernel evidence
 
@@ -70,8 +90,8 @@ No GitHub workflow was dispatched. No push, pull request, merge, repository sett
 
 The local results do not establish hosted Ubuntu execution of the consolidated topology, dependency-review availability or findings, deployed runtime behavior, provider behavior, production safety, performance, visual quality, human usability, assistive-technology compatibility, or WCAG conformance. Historical hosted runs remain evidence only for their exact predecessor revisions and workflow topology.
 
-`standards@0.3.0` remains pending with unchanged behavior-contract digest `sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb`. The frozen Task 6D candidate remains untouched at `standards-certification@3b930c63d920b3c12c450c9598ff8ca36fdbcc01`. If Plan A is later approved and integrated first, resumed Task 6D must reconcile onto a descendant of that accepted revision and renew affected build, browser, fixture, state, and CI-contract evidence before its separate approval gate.
+`standards@0.3.0` is certified on the reconciled base with unchanged behavior-contract digest `sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb`. Accepted repair `ee1e1df10fa2be2f09333efecd86de7f7a131d49` binds its reviewed rerun receipt to evidence revision `c9294e9dc59d4b7bafed406846af3b43a10733d3`. Plan A did not modify its registry entry, receipt, or source branch. Because its managed operational bytes postdate the accepted receipt, the separately resumed Task 6D stream must renew affected build, browser, fixture, state, and CI-contract evidence on a descendant after Plan A is approved and integrated.
 
 `deployment-cloudflare@0.2.0` remains `backfill-pending` with unchanged behavior-contract digest `sha256:846ae45d15ba9d8f256a9b7a1d8a4f3cda1b871a3b3f79f7656fd621050e8273`. The standalone/tracing preparation repair changes no descriptor or required-evidence input to that canonical subject, creates no certification result, and adds no provider or deployment authority.
 
-Before integration, recovery uses focused newest-first reverts after `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`: restore all three predecessor workflow files together, restore the previous verification commands, regenerate all fixtures from the reverted production templates, and restore the canonical documentation and pending certification plan. External settings have no Plan A recovery because Plan A did not change them.
+Before integration, recovery uses focused newest-first reverts after `ee1e1df10fa2be2f09333efecd86de7f7a131d49`: restore all three predecessor workflow files together, restore the previous verification commands, regenerate all fixtures from the reverted production templates, and restore Plan A's canonical documentation amendments. Preserve the accepted Task 6D certification artifacts. External settings have no Plan A recovery because Plan A did not change them.

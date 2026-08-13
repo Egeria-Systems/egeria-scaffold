@@ -2,9 +2,11 @@
 
 **Date:** 2026-08-12 (America/Toronto)
 
-**Status:** Design approved and revalidated against current `main`; implementation and external actions remain unauthorized
+**Status:** Design approved; Plan A is locally implemented and awaits verified-final-diff approval; Plan B and external actions remain unauthorized
 
-**Revalidated baseline:** `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`
+**Initial revalidated baseline:** `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`
+
+**Reconciled Plan A baseline:** `ee1e1df10fa2be2f09333efecd86de7f7a131d49`
 
 ## Goal
 
@@ -90,7 +92,7 @@ The compiled generator's project verifier, generated root `verify` script, fixed
 4. development browser checks; and
 5. workerd preview against the prepared output.
 
-The workflow and preview configuration are already managed `standards` surfaces. No new capability surface, public package API, dependency, environment variable, or evidence kind is introduced. `standards@0.3.0` remains pending its already separate certification, whose plan is amended to require the exact optimized commands and no-cache contract. If implementation preflight finds that the canonical behavior-contract digest must change, implementation stops for a descriptor/certification plan amendment rather than inheriting the old subject.
+The workflow and preview configuration are already managed `standards` surfaces. No new capability surface, public package API, dependency, environment variable, or evidence kind is introduced. Accepted `main@ee1e1df10fa2be2f09333efecd86de7f7a131d49` records `standards@0.3.0` as certified through the reviewed eight-outcome receipt rerun at accepted-main evidence revision `c9294e9dc59d4b7bafed406846af3b43a10733d3`. Plan A does not change that subject, digest, receipt, registry entry, or status. If Plan A is accepted and integrated, the separate standards-certification stream must renew affected operational evidence on a descendant using the optimized commands and no-cache contract. If implementation preflight finds that the canonical behavior-contract digest must change, implementation stops for a descriptor/certification plan amendment rather than inheriting the old subject.
 
 ## Compatibility proof verification
 
@@ -158,7 +160,7 @@ Cache removal, action-pin alignment, exact-revision validation, and timeouts do 
 
 ### Plan A — automatic CI and build deduplication
 
-Plan A owns the consolidated automatic workflow, dependency review, generated/proof prepared-output commands, retained fixture regeneration, current-state documentation, and the pending standards certification plan amendment.
+Plan A owns the consolidated automatic workflow, dependency review, generated/proof prepared-output commands, retained fixture regeneration, current-state documentation, and the future standards evidence-renewal amendment. It does not own the renewal execution or any certification transition.
 
 It uses focused RED/GREEN workflow and command-graph contracts, production fixture generation, the complete builder-kernel verifier once, and hosted automatic workflow validation only after separate push authority.
 
@@ -203,7 +205,7 @@ Static workflow inspection does not prove hosted execution. Local execution does
 Recovery uses focused newest-first reverts:
 
 - revert the consolidated automatic workflow and restore the two scoped workflow files with their direct contracts;
-- revert prepared-output commands, regenerate all retained fixtures through production generation, and restore the exact still-valid pending standards subject;
+- revert prepared-output commands, regenerate all retained fixtures through production generation, and preserve the exact certified standards subject and accepted receipt;
 - revert protected workflow metadata and direct tests without dispatching or changing external state; and
 - reverse branch protection, environments, credentials, deployments, providers, or publication only through separately authorized external recovery.
 

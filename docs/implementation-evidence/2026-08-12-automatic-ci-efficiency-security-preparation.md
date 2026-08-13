@@ -2,19 +2,19 @@
 
 **Date:** 2026-08-12 (America/Toronto)
 
-**Status:** Gate 1 complete; executable TDD work may begin under the approved Plan A boundary
+**Status:** Gate 1 complete; later accepted-main reconciliation completed without broadening Plan A
 
 ## Exact comparison and repository state
 
 - Worktree: `.worktrees/ci-efficiency-security`
 - Branch: `ci-efficiency-security`
 - Plan commit at preflight entry: `7dd35b4447edb70d57587730af8ab6deadd73c6a`
-- Accepted implementation base: `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`
-- Refreshed `origin/main`: `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`
-- Local `main`: `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`
-- Planned final comparison: `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e...<Plan-A-candidate>`
+- Initial accepted implementation base: `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`
+- Initial refreshed `origin/main`: `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`
+- Reconciled accepted base: `origin/main@ee1e1df10fa2be2f09333efecd86de7f7a131d49`
+- Final comparison: `ee1e1df10fa2be2f09333efecd86de7f7a131d49...<Plan-A-candidate>`
 
-The worktree was clean before preparation edits. `git merge-base --is-ancestor 4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e HEAD` passed before and after refreshing `origin/main`. The worktree inventory showed no second checkout of `ci-efficiency-security` and no unaccounted writer in this worktree.
+The worktree was clean before preparation edits. `git merge-base --is-ancestor 4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e HEAD` passed before and after the initial refresh. Task 6D was later squash-integrated at `c9294e9dc59d4b7bafed406846af3b43a10733d3`; accepted repair `ee1e1df10fa2be2f09333efecd86de7f7a131d49` then bound the reviewed rerun receipt to that accepted-main evidence revision. Admission and all 24 capability-certification tests pass on the reconciled Plan A candidate. Plan A was rebased onto that accepted revision with documentary conflict reconciliation only, and it is now an ancestor of the candidate. The worktree inventory showed no second checkout of `ci-efficiency-security` and no unaccounted writer in this worktree.
 
 ## Authority and stop boundaries
 
@@ -22,7 +22,7 @@ Authorized: Plan A local repository edits, focused commits, deterministic local 
 
 Not authorized: Plan B, push, pull request, merge, workflow dispatch, deployment, publication, certification transition, provider or credential access, GitHub settings changes, production action, external messages, or review-comment responses.
 
-The current Plan A baseline keeps `standards@0.3.0` pending. The separate clean Task 6D candidate is frozen at `standards-certification@3b930c63d920b3c12c450c9598ff8ca36fdbcc01`. It descends from Task 6C revision `12ecc73a8337ab12ece9dd3a6b2aec03f940383c`, but accepted `main@4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e` is not its ancestor. Task 6D reached its own final-diff stop gate but remains unapproved and unintegrated. Plan A will not modify, rebase, copy, approve, integrate, or certify that candidate. If Plan A integrates first, reconciliation and renewed affected evidence occur only during resumed Task 6D on a descendant of the accepted Plan A revision.
+The initial Plan A baseline kept `standards@0.3.0` pending and observed a separate Task 6D candidate. Task 6D subsequently completed its reviewed local evidence and was squash-integrated as `main@c9294e9dc59d4b7bafed406846af3b43a10733d3`. Accepted repair `ee1e1df10fa2be2f09333efecd86de7f7a131d49` binds the reviewed rerun receipt to that accepted-main evidence revision, where the exact unchanged standards subject is certified and admission passes. Plan A has not modified the stopped Task 6D branch, certification registry, receipt, or status. If Plan A is later approved and integrated, the separately resumed Task 6D stream must renew affected evidence on a descendant of the accepted Plan A revision.
 
 ## Direct-predecessor acceptance
 
@@ -76,12 +76,12 @@ Accepted `main` records:
 standards descriptor: 0.3.0
 behavior-contract digest: sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb
 required evidence: fresh-scaffold
-status: pending
+status at reconciled base: certified
 ```
 
 The standards descriptor declares the generated quality workflow and preview configuration as managed file surfaces and checks their presence through file probes. It does not hash workflow/configuration bytes into the descriptor, encode pnpm cache settings, or encode the OpenNext/preview command strings changed by Plan A. The descriptor's package properties, probes, dependencies, environment variables, privileged operations, verification-plan identifiers, and required evidence remain unchanged.
 
-Decision: Plan A is an operational optimization of already declared managed surfaces, not a material capability-definition change. Descriptor version `0.3.0`, required evidence `fresh-scaffold`, and behavior-contract digest `sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb` remain unchanged. Generated fingerprints and the evidence produced from those bytes do change, so the frozen Task 6D candidate must be reconciled and its affected evidence renewed later; that need does not create a new standards subject.
+Decision: Plan A is an operational optimization of already declared managed surfaces, not a material capability-definition change. Descriptor version `0.3.0`, required evidence `fresh-scaffold`, behavior-contract digest `sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb`, and the accepted certification status remain unchanged by Plan A. Generated fingerprints and evidence-producing operational bytes do change, so the separately resumed Task 6D stream must renew affected evidence after Plan A integration; that need does not create a new standards subject or authorize Plan A to change certification status.
 
 Accepted `main` also records `deployment-cloudflare@0.2.0` with required evidence `cleanup-recovery`, `deployed-application`, and `fresh-scaffold`, behavior-contract digest `sha256:846ae45d15ba9d8f256a9b7a1d8a4f3cda1b871a3b3f79f7656fd621050e8273`, and status `backfill-pending`. That capability canonically owns `apps/web/next.config.ts` and its Next/OpenNext verification plan. The explicit `output: "standalone"` and workspace-root `outputFileTracingRoot` make the caller-prepared Next artifact equivalent to the standalone/tracing preparation OpenNext's combined command already applies internally; they add no managed path, dependency, platform resource, adapter semantic, inference probe, verification identifier, evidence kind, provider, binding, environment variable, or deployment authority. The descriptor, required evidence, and their computed canonical subject are therefore unchanged. Decision: this is a non-material preparation-order repair for the existing deployment capability, so its accepted legacy backfill subject remains exact and no new certification task or status transition is created. The local proof and fixed-root matrices validate the changed build order but do not certify or deploy `deployment-cloudflare`.
 
@@ -118,6 +118,6 @@ Task 4's focused runs must fail because the proof, generated root verification, 
 
 ## Recovery and claim limits
 
-Before integration, recovery is focused newest-first reversion of Plan A commits after `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`. Restore the two path-scoped workflow files together with the previous repository workflow; restore previous proof/generated verification commands; regenerate all retained fixtures from reverted production templates; restore the pending certification plan and canonical documentation. Do not use, mutate, or discard the frozen Task 6D branch as a recovery mechanism.
+Before integration, recovery is focused newest-first reversion of Plan A commits after `ee1e1df10fa2be2f09333efecd86de7f7a131d49`. Restore the two path-scoped workflow files together with the previous repository workflow; restore previous proof/generated verification commands; regenerate all retained fixtures from reverted production templates; restore Plan A's canonical documentation amendments while preserving the accepted Task 6D certification artifacts. Do not use, mutate, or discard the stopped Task 6D branch as a recovery mechanism.
 
 Local static, Node, build, workerd, and Chromium checks cannot prove GitHub-hosted execution, repository required-check configuration, dependency-review service availability, deployment, provider behavior, production safety, performance, visual quality, human usability, assistive-technology compatibility, or WCAG conformance. Those remain separate evidence and authority domains.
