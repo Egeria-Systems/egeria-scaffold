@@ -67,7 +67,7 @@ jobs:
           }
 
           generated_paths=(
-            ".github/workflows/**"
+            ".github/workflows/repository-quality.yml"
             ".gitattributes"
             ".npmrc"
             "package.json"
@@ -82,7 +82,7 @@ jobs:
             "tests/generated-fixtures/**"
           )
           compatibility_paths=(
-            ".github/workflows/**"
+            ".github/workflows/repository-quality.yml"
             ".npmrc"
             "package.json"
             "pnpm-lock.yaml"
