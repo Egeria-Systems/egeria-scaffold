@@ -36,6 +36,12 @@ If Plan A is approved and integrated, Task 6D must resume through an evidence-re
 
 A single post-Plan A evidence revision must bind all eight outcomes in the renewed receipt: `fresh-scaffold`, `unit-tests`, `component-tests`, `state-agreement`, `generated-project-builds`, `browser-regression`, `retained-fixture-matrix`, and `ci-contract`. Rerun all eight on that exact descendant rather than carrying an earlier outcome forward. The renewed receipt, registry evidence binding, verification evidence, reviews, and final comparison must be current descendants of Plan A and receive a separate Task 6D verified-final-diff approval. Preserve the certified registry status throughout this evidence renewal. This renewal occurs during resumed Task 6D, not during Plan A.
 
+### 2026-08-13 renewal execution
+
+Accepted Plan A is `368b9491fd2f813f83f1e456823d8c7546f6762c`. The preserved Task 6D head `66ca1dfe60ee361ceadac58ab37992549a67a5e6` was reconciled without discarding history through merge revision `d7c63b0aaa9bebd56c075f16f1e5d86519853698`. That revision descends from both the preserved Task 6D head and accepted Plan A, and its tree is byte-identical to accepted/source tree `e61d32866ab7c3df286b4de32b8a8eb9653dd229`.
+
+All eight renewal outcomes passed at `d7c63b0aaa9bebd56c075f16f1e5d86519853698`. The subject, digest, `certified` status, plan attribution, receipt link, and evidence-ancestry validator remain unchanged. The registry and receipt now bind the renewed evidence revision. One bounded independent final review reported `No material improvements recommended` with verdict `READY`. Stop after final verification for separate verified-final-diff and publication-strategy approval. Plan B remains outside scope.
+
 ## Certification outcomes
 
 The exact standards subject requires these causal outcomes:
@@ -202,4 +208,6 @@ Passing Task 6D certifies that the exact standards subject generates and verifie
 
 ## Recovery
 
-Certification recovery reverts only the registry status, receipt, certification evidence, review packet, and status documentation in newest-first focused changes, then reruns subject/admission/closure checks. If the exact Task 6C subject remains valid, it returns to `pending`; it never revives a stale frozen subject. No source, dependency, deployment, provider, persistent-data, credential, or production recovery applies.
+Original certification-transition recovery reverts only the registry status, receipt, certification evidence, review packet, and status documentation in newest-first focused changes, then reruns subject/admission/closure checks. If the exact Task 6C subject remains valid, it returns to `pending`; it never revives a stale frozen subject.
+
+Post-Plan-A evidence-renewal recovery is narrower: revert the renewed evidence binding and its direct evidence, review, test, and current-status consumers, restoring accepted-main evidence revision `c9294e9dc59d4b7bafed406846af3b43a10733d3` while preserving the exact certified subject, digest, status, plan, receipt link, review attribution, and ancestry validator. No source, dependency, deployment, provider, persistent-data, credential, or production recovery applies.
