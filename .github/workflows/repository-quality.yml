@@ -193,7 +193,7 @@ jobs:
         run: pnpm run typecheck:builder
 
       - name: Check release intent
-        run: pnpm exec changeset status --since origin/main
+        run: pnpm run check:package-release pull-request origin/main || pnpm exec changeset status --since origin/main
 
   generated-projects:
     needs: [scope]

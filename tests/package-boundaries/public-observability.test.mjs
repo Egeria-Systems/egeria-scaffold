@@ -76,6 +76,23 @@ test("the packed observability package loads every exact public surface in isola
       { cwd: consumerRoot, encoding: "utf8" },
     );
 
+    const packedManifest = JSON.parse(
+      await readFile(resolve(packageRoot, "package.json"), "utf8"),
+    );
+    const packedReadme = await readFile(
+      resolve(packageRoot, "README.md"),
+      "utf8",
+    );
+    assert.equal(packedManifest.version, "0.3.0");
+    assert.match(
+      packedReadme,
+      /materialized[\s\S]+`0\.3\.0` release candidate/u,
+    );
+    assert.match(
+      packedReadme,
+      /version materialization does not authorize publication/iu,
+    );
+
     const consumerPath = resolve(consumerRoot, "consumer.mjs");
     await writeFile(
       consumerPath,
@@ -239,7 +256,7 @@ test("observability exposes only its approved operational APIs", async () => {
 
   assert.deepEqual(manifest, {
     name: "@egeria-systems/observability",
-    version: "0.2.0",
+    version: "0.3.0",
     type: "module",
     license: "Apache-2.0",
     repository: {

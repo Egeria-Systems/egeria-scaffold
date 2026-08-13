@@ -2,7 +2,7 @@
 
 Read the repository [`AGENTS.md`](../../AGENTS.md), the canonical [package ownership](../../docs/architecture/package-ownership.md), and the [review and contribution protocol](../../docs/governance/review-and-contribution.md) before editing this surface.
 
-`@egeria-systems/observability` is a public, replaceable package. The current source candidate targets `0.3.0` while its manifest remains `0.2.0` until the separate release gate. It owns immutable bounded operational events, restricted error diagnostics, context and error normalization, redaction, distinct non-throwing dispatch tiers, Better Stack protocol encoding, server/browser transports, and test assertions with zero runtime dependencies.
+`@egeria-systems/observability` is a public, replaceable package. The current source candidate targets `0.3.0` and is materialized in its manifest at that version, while publication remains a separate release gate. It owns immutable bounded operational events, restricted error diagnostics, context and error normalization, redaction, distinct non-throwing dispatch tiers, Better Stack protocol encoding, server/browser transports, and test assertions with zero runtime dependencies.
 
 - Keep the exact root, `./server`, `./browser`, and `./testing` exports provider-neutral and framework-neutral. Public API changes require an approved Changeset and separately authorized publication.
 - Keep `OperationalSink` and operational serialization safe-only. Messages, stacks, bounded causes, and fingerprints may enter only through `createOperationalErrorReport`, `DiagnosticSink`, and explicit diagnostic serializers/transports after guarded reading, redaction, and bounding. Never place restricted diagnostics in generic operational attributes.
