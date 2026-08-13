@@ -30,6 +30,10 @@ const certificationRegistryPath = resolve(
   repositoryRoot,
   "certifications/capabilities.json",
 );
+const providerReceiptPath = resolve(
+  repositoryRoot,
+  "docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md",
+);
 const certificationCheckScript = resolve(
   repositoryRoot,
   "scripts/check-capability-certification.mjs",
@@ -205,7 +209,7 @@ function responseWithoutReadableContent(status) {
   );
 }
 
-test("the observability registry records only reviewed local fresh-scaffold evidence while remaining pending", async () => {
+test("the observability registry records reviewed deployed and fresh-scaffold evidence without claiming cleanup", async () => {
   const registry = JSON.parse(
     await readFile(certificationRegistryPath, "utf8"),
   );
@@ -213,7 +217,7 @@ test("the observability registry records only reviewed local fresh-scaffold evid
   const subject = {
     descriptorVersion: "0.2.0",
     behaviorContractDigest:
-      "sha256:a4f15a132e08da307ab412673b02152fee8509c0cc1dabb4b60856abd61f5d97",
+      "sha256:937a3dcad0c96b45ae9f4acb977bd65e46e2caa50bd3fc6dfb29561a1ab637b9",
   };
 
   assert.deepEqual(record.subject, subject);
@@ -221,27 +225,57 @@ test("the observability registry records only reviewed local fresh-scaffold evid
     record.taskPlan,
     "docs/superpowers/plans/2026-08-10-production-observability-certification.md",
   );
-  assert.equal(record.status, "pending");
+  assert.deepEqual(record.requiredEvidence, [
+    "deployed-application",
+    "fresh-scaffold",
+  ]);
+  assert.equal(record.status, "certified");
   assert.deepEqual(record.evidence, [
     {
-      kind: "fresh-scaffold",
-      path: "docs/implementation-evidence/2026-08-11-production-observability-certification-verification.md",
+      kind: "deployed-application",
+      path: "docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md",
       outcome: "passed",
-      revision: "ef845b1e0551d3b43e17969cc00f21960c90769b",
+      revision: "ee1e1df10fa2be2f09333efecd86de7f7a131d49",
+      subject,
+    },
+    {
+      kind: "fresh-scaffold",
+      path: "docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md",
+      outcome: "passed",
+      revision: "ee1e1df10fa2be2f09333efecd86de7f7a131d49",
       subject,
     },
   ]);
 
-  for (const policy of ["legacy-backfill-exempt", "all-certified"]) {
-    const closure = await runCertificationClosure(policy);
-    assert.equal(closure.exitCode, 1);
-    assert.equal(closure.stderr, "");
-    assert.match(
-      closure.stdout,
-      /"path":\["records","observability","status"\]/u,
-    );
-    assert.match(closure.stdout, /"reason":"pending"/u);
-  }
+  const providerReceipt = await readFile(providerReceiptPath, "utf8");
+  assert.match(
+    providerReceipt,
+    /^\*\*Passed certification outcomes:\*\* `deployed-application, fresh-scaffold`$/mu,
+  );
+  assert.match(
+    providerReceipt,
+    /^\*\*Reviewed certification outcomes:\*\* `deployed-application, fresh-scaffold`$/mu,
+  );
+  assert.match(
+    providerReceipt,
+    /Cleanup was not executed or validated, `cleanup-recovery` is not a passed or reviewed outcome, and no cleanup or recovery claim is made\./u,
+  );
+  assert.match(
+    providerReceipt,
+    /Cleanup\/recovery evidence accepted: `not claimed and not evaluated`\./u,
+  );
+
+  const transitionClosure = await runCertificationClosure(
+    "legacy-backfill-exempt",
+  );
+  assert.equal(transitionClosure.exitCode, 0);
+  assert.equal(transitionClosure.stderr, "");
+  assert.doesNotMatch(transitionClosure.stdout, /observability/u);
+
+  const fullClosure = await runCertificationClosure("all-certified");
+  assert.equal(fullClosure.exitCode, 1);
+  assert.equal(fullClosure.stderr, "");
+  assert.doesNotMatch(fullClosure.stdout, /observability/u);
 });
 
 test("observability production mutation keeps real owner identity while testing mocks commands and verification", async () => {

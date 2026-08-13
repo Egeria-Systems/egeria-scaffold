@@ -65,6 +65,8 @@ Tasks 5 onward require all of the following without altering the currently appro
 
 If any predecessor is pending, the source plan has not selected this integration, or the user chooses to abandon `0.2.0` without an approved lifecycle amendment, stop and report the exact blocker. Do not overwrite any predecessor task plan or evidence.
 
+**Gate B amendment (2026-08-13):** For condition 1 only, the user's explicit retained-resource certification decision supersedes the cleanup/recovery requirement for the exact `observability@0.2.0` subject. Gate B accepts the amended certified subject only after its `deployed-application` and `fresh-scaffold` evidence, explicit retained provider-resource/credential/data disposition, review, and registry transition are integrated into accepted `main`. No `cleanup-recovery` outcome is claimed. Conditions 2 through 8 remain unchanged, including accepted-main integration, diagnostics selection, branch reconciliation, exact-diff approval, separate publication authority, and registry verification.
+
 ### Gate C — implemented capability review
 
 Tasks 6–10 are local generated-capability implementation. They stop after a complete review packet and verified final diff. The new diagnostics certification plan is created but not executed.

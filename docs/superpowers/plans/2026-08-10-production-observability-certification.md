@@ -2,13 +2,45 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Produce the local fresh-scaffold evidence and the exact protected-staging/provider certification path for `observability@0.2.0`, while retaining `pending` status until separately authorized live deployment, provider receipt, cleanup, review, and registry closure all succeed.
+**Goal:** Produce local fresh-scaffold and exact protected-staging/provider evidence for `observability@0.2.0`, then transition only under a separately authorized evidence contract, review, and registry closure. The 2026-08-13 amendment records the approved two-outcome transition without claiming cleanup-recovery.
 
 **Architecture:** Reuse one private fresh-scaffold harness for the existing Calendly and new observability wrappers, then exercise a generated `portfolio` through the compiled CLI and fixed-root verifier. Prepare one manual, exact-revision GitHub Actions workflow that creates a temporary generated project, adds one certification-only error route outside retained templates and fixtures, deploys one dedicated non-production Worker, installs the two declared Better Stack secrets, and emits content-safe receipts. Provider inspection, source/credential/data disposition, cleanup, and a later `certified` transition remain human-reviewed external outcomes.
 
 **Tech stack:** Node.js `22.23.2`, pnpm `11.20.0`, Node test runner, Next.js `16.3.0`, `@opennextjs/cloudflare@1.20.2`, Wrangler `4.118.0`, GitHub Actions, Cloudflare Workers Logs, and Better Stack HTTP ingestion.
 
-**Current local status (2026-08-12):** The local fresh-scaffold journey passed at `ef845b1e0551d3b43e17969cc00f21960c90769b`. One exact-revision protected-staging run at `2c7533edf96de6d95f45406abe65ba4432c43d4e` produced the four bounded receipts but failed certification because neither provider received a web-vital event within the approved deadline. Clean compatibility recovery passed. The deterministic snake-case repair and the same-origin development-browser correction are under local verification before one finite retry governed by the dated amendment below. `observability@0.2.0` remains `pending`; no live receipt, evidence acceptance, registry transition, production action, merge, or push is implied.
+**Current local status (2026-08-13):** Exact-revision workflow run `31664542523` succeeded at `ee1e1df10fa2be2f09333efecd86de7f7a131d49`; its bounded local, deployed-browser, route, and Cloudflare identity receipts passed, and content-safe provider reconciliation was accepted. The local transition candidate certifies the amended subject from `deployed-application` and `fresh-scaffold`. Cleanup-recovery is not claimed, and selected resources remain intentionally retained under the user's explicit operational disposition. Push, merge, publication, another workflow or deployment, provider mutation, cleanup, and production action remain unauthorized.
+
+## Explicit retained-resource certification amendment (2026-08-13)
+
+The user explicitly approved certifying `observability@0.2.0` after the successful bounded retry while intentionally retaining selected provider, credential, deployment, and data resources. The user directed that retained-resource cleanup not be validated and that `cleanup-recovery` not be marked. This is an evidence-contract decision, not cleanup evidence and not an inference that cleanup occurred.
+
+For this exact descriptor version, the active certification subject therefore requires only sorted outcomes `deployed-application` and `fresh-scaffold`. Its behavior-contract digest changes from `sha256:a4f15a132e08da307ab412673b02152fee8509c0cc1dabb4b60856abd61f5d97` to `sha256:937a3dcad0c96b45ae9f4acb977bd65e46e2caa50bd3fc6dfb29561a1ab637b9`. The earlier subject and local receipt remain immutable historical evidence; the successful retry receipt binds both active outcomes to deployed and evidence-producing revision `ee1e1df10fa2be2f09333efecd86de7f7a131d49` under the amended subject.
+
+The lifecycle receipt must state that cleanup was not executed or validated, no `cleanup-recovery` outcome passed, retained resources remain under the user's ownership, and their continued configuration, cost, retention, privacy, rotation, removal, and recovery were not certified. This amendment does not weaken the general cleanup/recovery requirements for other capability subjects or a future materially changed observability subject.
+
+This approval authorizes only the local, tested certification transition, content-safe receipt and review packet, direct current-status reconciliation, one focused commit, and read-only review in the existing `observability-error-diagnostics` worktree. It does not authorize push, merge, package publication, another workflow, deployment, provider mutation, cleanup, production action, or diagnostics Task 5. Those checkpoints remain separate.
+
+This amendment adds exactly these files to the transition scope:
+
+- `certifications/capabilities.json`;
+- `docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md`;
+- `docs/review-packets/2026-08-12-production-observability-certification-lifecycle.md`;
+- `docs/superpowers/plans/2026-08-10-production-observability-certification.md`;
+- `docs/superpowers/plans/2026-08-12-observability-error-diagnostics.md`;
+- `README.md`;
+- `packages/builder-core/AGENTS.md`;
+- `packages/builder-core/README.md`;
+- `docs/architecture/capability-model.md`;
+- `docs/architecture/enforcement-map.md`;
+- `docs/architecture/overview.md`;
+- `docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md`;
+- `docs/roadmaps/program-roadmap.md`;
+- `packages/builder-core/tests/certification.test.mjs`;
+- `tests/capability-certification/certification-runner.test.mjs`;
+- `tests/capability-certification/production-observability.test.mjs`; and
+- `tests/constitution/constitution.test.mjs`.
+
+No certification schema, validator, capability descriptor, generated source, retained fixture, package source, workflow, provider, credential, or external resource is changed.
 
 ## Shared test-deployment amendment (2026-08-11)
 
@@ -23,7 +55,7 @@ This amendment supersedes the original plan's dedicated environment and dedicate
 - Work only on clean branch `observability-certification` in the existing isolated worktree `.worktrees/production-observability`, based on approved Task 6 record commit `fb3af7fef7602764432f16940abff0ffc65a5b67`.
 - The user preapproved exact-file plan amendments and continuation through implemented-task review. That authorizes bounded local files, tests, focused commits, and read-only reviews only.
 - Do not merge, push, dispatch a workflow, create or change a GitHub environment or secret, deploy, create or change a Better Stack source, use a credential, transmit telemetry, inspect provider data, spend money, clean up a provider resource, publish a package, or change certification status without new exact authority.
-- Retain `observability@0.2.0` as `pending`. Record only passed local `fresh-scaffold` evidence in this increment; `deployed-application` and `cleanup-recovery` remain absent until a separately authorized live run and affirmative evidence review.
+- Historical local-preparation boundary: retain `observability@0.2.0` as `pending` and record only passed local `fresh-scaffold` evidence until a separately authorized live run and affirmative evidence review. The 2026-08-13 amendment supersedes this boundary for the reviewed transition and deliberately does not claim `cleanup-recovery`.
 - Keep source, deployment, GitHub secret, Cloudflare deployment secret, Cloudflare API credential, Better Stack source/token, retained Workers Logs, retained Better Stack data, and recovery/disposition decisions separate.
 - Use only synthetic bounded values. Never retain or transmit real client content, URLs, request data, headers, cookies, user agents, email addresses, form values, provider responses, tokens, or secrets.
 - Cloudflare platform/framework error records are provider-controlled and are not the bounded custom event schema. Inventory their actual fields and retention separately before any certification or production claim.
@@ -144,7 +176,7 @@ This repair amendment owns exactly:
 - new content-safe live receipt `docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md`; and
 - new lifecycle review packet `docs/review-packets/2026-08-12-production-observability-certification-lifecycle.md`.
 
-The two live evidence files may be created only after a new run and cleanup produce the evidence they describe. `certifications/capabilities.json` is deliberately excluded: `observability@0.2.0` remains `pending` until deployed-application and cleanup-recovery are both affirmatively reviewed, and any pending-to-certified transition remains a separate local, tested diff requiring verified-final-diff approval before merge or push.
+Under the original retry-repair scope, the two live evidence files could be created only after a new run and cleanup produced the evidence they described, and `certifications/capabilities.json` was deliberately excluded. The 2026-08-13 amendment supersedes that original transition condition after the successful run: it permits the content-safe receipt and local tested registry transition under the explicit retained-resource disposition, without creating or claiming `cleanup-recovery` evidence. Verified-final-diff approval and any merge or push remain separate.
 
 ## Exact file structure
 
