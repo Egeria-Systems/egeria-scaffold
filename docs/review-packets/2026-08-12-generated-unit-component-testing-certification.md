@@ -1,26 +1,24 @@
 # Generated Unit and Component Testing Certification Review Packet
 
-**Date:** 2026-08-12 (America/Toronto)
+**Date:** 2026-08-12; evidence renewal prepared 2026-08-13 (America/Toronto)
 
-**Status:** Accepted-main evidence-ancestry repair, bounded independent review, and final integration-candidate verification are complete; awaiting explicit verified-final-diff/integration approval
+**Status:** Post-Plan-A evidence renewal, bounded independent review, and final verification are complete; verified-final-diff and publication-strategy approval remain pending
 
-**Accepted main and evidence base:** `c9294e9dc59d4b7bafed406846af3b43a10733d3`
+**Accepted Plan A revision:** `368b9491fd2f813f83f1e456823d8c7546f6762c`
 
-**Repair source head:** `a3f9c01c989fd7b033fbadd1a159b56925848b79`
+**Evidence revision:** `d7c63b0aaa9bebd56c075f16f1e5d86519853698`
 
-**Shared pre-repair tree:** `0c7af5f591aea43c90d06c155bd28f69b0e4a6d1`
+**Accepted/evidence tree:** `e61d32866ab7c3df286b4de32b8a8eb9653dd229`
 
 **Branch:** `standards-certification`
 
 **Isolated worktree:** `.worktrees/standards-certification`
 
-**Review comparison:** accepted main `c9294e9dc59d4b7bafed406846af3b43a10733d3` to the final committed `standards-certification` candidate; the handoff records the final head because this packet cannot contain the hash of the commit that contains itself
+**Review comparison:** accepted Plan A `368b9491fd2f813f83f1e456823d8c7546f6762c` through reconciliation merge `d7c63b0aaa9bebd56c075f16f1e5d86519853698`, plus the current Task 6D evidence-renewal working-tree diff
 
 ## Outcome
 
-The original receipt named `f9a962874d587e4594af341a1fe5f62db6d7672c`. That revision was an ancestor of the Task 6D source branch but not of accepted main after squash integration. An identity-bounded accepted-main checkout therefore rejected the standards record with `CERTIFICATION_EVIDENCE_REVISION_UNKNOWN` at `records.standards.evidence[0].revision`.
-
-The repair does not weaken the ancestry validator and does not relabel historical evidence. All eight approved outcomes were rerun at accepted main itself. The exact `standards@0.3.0` subject is now bound to evidence-producing revision `c9294e9dc59d4b7bafed406846af3b43a10733d3`:
+The exact `standards@0.3.0` subject remains certified:
 
 ```text
 descriptor version: 0.3.0
@@ -29,11 +27,11 @@ required registry evidence: fresh-scaffold
 status: certified
 ```
 
-Because the evidence revision is accepted main rather than a source-branch-only revision, it remains in the ancestry of a squash integration based on accepted main or any descendant. The final admission and closure checks are run against an integration-shaped temporary commit parented by accepted main; no repository branch is merged or rewritten to create that proof.
+Accepted Plan A changed managed workflow, prepared-preview, verifier, fixture/fingerprint, instruction, and build-order bytes without changing the certification subject. The preserved Task 6D branch did not descend from the accepted squash commit. A two-parent merge preserved both histories and produced a byte-identical accepted tree. All eight receipt outcomes then ran at that one descendant revision. No previous outcome was relabelled or carried forward conditionally, and no second pending-to-certified transition occurred.
 
-## Repair changed files
+## Changed files
 
-Registry, receipt, and evidence:
+Evidence binding and preparation:
 
 - `certifications/capabilities.json`
 - `docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-preparation.md`
@@ -43,11 +41,14 @@ Registry, receipt, and evidence:
 Current-status and planning owners:
 
 - `README.md`
+- `docs/architecture/enforcement-map.md`
+- `docs/architecture/overview.md`
 - `docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md`
 - `docs/roadmaps/program-roadmap.md`
 - `docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md`
+- `packages/builder-core/README.md`
 
-Focused regression contracts:
+Focused contracts:
 
 - `packages/builder-core/tests/certification.test.mjs`
 - `tests/capability-certification/certification-runner.test.mjs`
@@ -57,87 +58,91 @@ Handoff:
 
 - `docs/review-packets/2026-08-12-generated-unit-component-testing-certification.md`
 
-No validator, capability descriptor, recipe, dependency, schema, generated application, generated test, workflow, retained fixture, provider, or deployment surface changed.
+No validator, descriptor, digest, certified status, dependency, runtime source, schema, workflow, generated application, retained fixture, provider, deployment, or production surface changed.
+
+## Reconciliation evidence
+
+| Check | Result |
+| --- | --- |
+| Fresh branch/worktree identity | Expected registered worktree; branch `standards-certification`; clean at `66ca1dfe60ee361ceadac58ab37992549a67a5e6`; one ahead of its remote |
+| Accepted integration identity | Local, tracking, and remote `main` at `368b9491fd2f813f83f1e456823d8c7546f6762c`; accepted parent `ee1e1df10fa2be2f09333efecd86de7f7a131d49` |
+| Plan A source/tree identity | Reviewed source `c012046b7aa9ecac48a1b0346ca2492ea8ce9875` and accepted squash share tree `e61d32866ab7c3df286b4de32b8a8eb9653dd229` |
+| Merge preflight | Only expected documentary overlap; no unexpected conflict or drift |
+| Reconciliation | Merge `d7c63b0aaa9bebd56c075f16f1e5d86519853698`, parents `66ca1dfe...` and `368b949...`, tree `e61d328...` |
+| Ancestry | Both preserved Task 6D and accepted Plan A are ancestors of the evidence revision |
+| Accepted-tree equality | `368b949...` and `d7c63b0...` have an empty tree diff |
+
+The evidence-ancestry validator remains strict and unchanged.
 
 ## TDD record
 
-The receipt/registry revision assertions and current-status constitution assertions were changed first. The RED run used the pinned Node.js compiler and test runner:
+The receipt/registry revision constants and direct-current-status expectations changed first. The focused RED results were:
 
-- builder-core certification plus receipt runner: 20 tests, exactly 2 expected failures because the registry and receipt still named `f9a9628`;
-- constitution: 45 tests, exactly 1 expected failure because the roadmap still described the superseded reconciliation.
+- builder-core certification plus strict receipt runner: 20 tests, 18 passed and exactly 2 failed because the registry and receipt still named `c9294e9dc59d4b7bafed406846af3b43a10733d3`;
+- constitution: 47 tests, 46 passed and exactly 1 failed because README still named the pre-Plan-A receipt binding.
 
-The minimum implementation changed the receipt, registry, and direct documentary consumers to the accepted-main evidence revision. No ancestry rule or acceptance condition changed.
+The minimum implementation changes only the renewed evidence binding, outcome summaries, evidence records, review packet, and direct current-status consumers. Receipt review decisions were held at `pending` until the bounded reviewer disposition was recorded; the accepted disposition then unblocked the GREEN admission path.
 
-## Accepted-main evidence and verification
+## Eight-outcome evidence
 
 | Command or check | Result |
 | --- | --- |
-| Fresh preflight | Branch `standards-certification` at `a3f9c01`; clean; accepted main `c9294e9`; equal trees; `f9a9628` absent from accepted-main ancestry |
-| Identity-bounded accepted-main admission | Reproduced exact `CERTIFICATION_EVIDENCE_REVISION_UNKNOWN` failure |
 | Node.js and pnpm pins | `22.23.2`; `11.20.0` |
-| Frozen accepted-main install | Passed; 720 packages; 719 reused, 0 downloaded |
+| Root frozen install | Passed offline and unchanged after `CI=true` supplied the non-interactive contract |
 | `pnpm run verify:generated-testing-certification` | Passed; exact `standards@0.3.0`; all 19 declared checks |
-| Fresh generated `pnpm --dir apps/web run test:unit` | Passed; 1 file, 2 tests |
-| Fresh generated `pnpm --dir apps/web run test:component` | Passed; 1 file, 1 test |
-| Fresh generated compiled-CLI `infer`, `doctor`, `diff` | Passed; valid/confirmed standards, zero diagnostics, exact equality |
-| `pnpm run test:generated-fixtures` | Passed; 8 of 8; 47/52/49 byte-stable files |
-| `pnpm run verify:generated-skeletons` | Passed for portfolio, Calendly portfolio, and site; all 15 fixed verifier checks |
-| Accepted-main `pnpm run test:constitution` | Passed; 53 of 53 |
-| Accepted-main cleanup | Detached checkout remained at `c9294e9`; diff and status clean; all temporary evidence roots removed |
+| Independent fresh generated `pnpm run test:unit` | Passed; 1 file, 2 tests |
+| Independent fresh generated `pnpm run test:component` | Passed; 1 file, 1 test |
+| Independent compiled-CLI `infer`, `doctor`, `diff` | Passed; valid state, confirmed/application-owned surfaces, zero diagnostics, exact equality |
+| Generated build order | One standalone Next build followed by OpenNext `--skipNextBuild`; passed |
+| Development and preview browser checks | Playwright/axe passed against Next development and prepared direct-workerd preview |
+| `pnpm run test:generated-fixtures` | Passed; 9 of 9; 47/52/49 byte-stable files |
+| `pnpm run verify:generated-skeletons` | Passed portfolio, portfolio-calendly, and site; all 15 fixed verifier checks |
+| Evidence-revision `pnpm run test:constitution` | Passed; 55 of 55 |
+| Evidence-revision capability-certification tests | Passed; 24 of 24 |
+| Evidence-revision admission | Passed all 7 records before the review-pending artifact update; provisional review metadata then produced only the two expected review-gate issues |
+| Closure policies | Expected rejections only: observability for transition closure; observability plus four unchanged backfills for all-certified closure |
 
-The fresh-scaffold and retained-fixture verifier result objects are preserved in the verification evidence. No hosted workflow run is claimed.
+The verification evidence preserves the two bounded verifier result objects and the setup-invalid attempts. The sandbox-blocked fixture run and offline-cache miss are not counted; both passed after execution authority matched the command's registry boundary. All explicit temporary evidence roots were removed.
 
-## Final candidate verification
+## Independent review disposition
 
-The candidate diff was applied to a fresh shared clone detached at accepted main and committed there with accepted main as its sole parent. The exact final synthetic commit identity is reported in the handoff because this packet cannot contain the hash of the commit whose tree includes itself.
+One bounded read-only reviewer covered requirements and truthful evidence binding, architecture and anti-overengineering, test evidence and ancestry, claim limits, and recovery. It reported `No material improvements recommended` and returned verdict `READY`. No material defect required repair, and no second reviewer was dispatched.
+
+### Preserved accepted-main review
+
+The prior accepted-main ancestry repair received one bounded independent read-only review across the same three lenses. It found no material requirements, architecture/anti-overengineering, or test-evidence defect and returned `No material improvements recommended.` The reviewer required the evidence revision to remain in accepted ancestry and admission to run against the exact integration candidate. That disposition remains historical attribution for the prior `c9294e9dc59d4b7bafed406846af3b43a10733d3` receipt; it is not reused as acceptance of the renewed `d7c63b0aaa9bebd56c075f16f1e5d86519853698` outcomes.
+
+## Final verification
+
+After recording the renewal review as accepted:
 
 | Command or check | Result |
 | --- | --- |
-| `git merge-base --is-ancestor c9294e9... INTEGRATION_CANDIDATE` | Passed; accepted main is the direct parent |
-| Source-branch admission | Expected rejection; only `CERTIFICATION_EVIDENCE_REVISION_UNKNOWN` for standards, proving the branch does not mask the pre-squash topology |
-| `pnpm --filter @egeria-systems/builder-core run build && node --test packages/builder-core/tests/certification.test.mjs tests/capability-certification/certification-runner.test.mjs` at `b8ac2bc37455c33735065397211e62123d7223da` | Passed; 20 of 20: 10 builder-core certification-contract tests and 10 certification-runner/receipt tests |
-| `pnpm run test:capability-certification` at `b8ac2bc37455c33735065397211e62123d7223da` | Passed; 24 of 24 across every `tests/capability-certification/*.test.mjs` file after building builder-core |
-| Integration-candidate `check:capability-certification` | Passed; admission; 7 records |
-| `legacy-backfill-exempt` closure | Expected rejection; only observability remains `pending` |
-| `all-certified` closure | Expected rejection; observability plus the four unchanged backfills |
-| `pnpm run test:constitution` | Passed; 53 of 53 |
+| Focused builder-core certification and strict receipt tests | Passed; 20 of 20 |
+| `pnpm run test:capability-certification` | Passed; 24 of 24 |
+| `pnpm run check:capability-certification` | Passed; admission; 7 records |
+| `legacy-backfill-exempt` closure | Expected rejection; only ordinary pending observability |
+| `all-certified` closure | Expected rejection; observability plus content-files, deployment-cloudflare, section-composition, and site-routing backfills |
+| `pnpm run test:constitution` | Passed; 55 of 55 |
 | `pnpm run check:semantic-naming` | Passed |
-| `git diff --check c9294e9... INTEGRATION_CANDIDATE` | Passed |
-| Integration-candidate status | Clean |
+| `pnpm run changeset:status` | Passed; no package bump at patch, minor, or major |
+| Reviewer | `No material improvements recommended`; `READY` |
 
-The final post-packet run repeats these fast deterministic checks against the exact handoff tree. Generated-project evidence is not repeated after evidence-only packet edits because every generated/runtime input remains identical to the accepted-main revision on which the complete matrix passed.
-
-## Setup-invalid attempts
-
-Two initial accepted-main attempts used an unpinned toolchain or lacked required network authority. A direct create later entered sandbox registry retries because it invoked the fixed verifier, and the first fixture-matrix run lost its session handle. Their exact process trees and temporary roots were removed and none was counted. The recorded runs used the pinned toolchain and required network authority.
-
-## Integration constraint
-
-The actual integration must be based on `c9294e9dc59d4b7bafed406846af3b43a10733d3` or a descendant that retains it in ancestry. Squash integration is supported because the evidence revision is the retained base. Before integration, rerun `git merge-base --is-ancestor c9294e9dc59d4b7bafed406846af3b43a10733d3 INTEGRATION_CANDIDATE` and admission against that exact candidate. If it fails, stop; do not relabel the receipt or bypass the validator.
-
-## Independent review dispositions
-
-One bounded independent read-only reviewer assessed the exact 12-file repair under all three required lenses:
-
-- Requirements and truthful evidence binding: no material finding. The reviewer confirmed the identical accepted/source trees, the original ancestry defect, the itemized rerun of all eight outcomes at accepted main, and the bounded claims.
-- Architecture and anti-overengineering: no material finding. No validator, runtime, descriptor, workflow, dependency, schema, fixture, or generated source changed.
-- Test evidence: no material finding. The reviewer confirmed that branch-local admission must continue to fail, while a final-tree temporary commit parented by accepted main faithfully models the relevant squash-integration ancestry.
-
-Final verdict: `No material improvements recommended.` The reviewer required preserving the exact integration constraint below and stopping on either ancestry or admission failure.
+Generated-project and browser verification was not repeated after evidence-only receipt, review, test-expectation, and documentation edits because no generator, workflow, verifier, fixture, dependency, runtime, or generated-project input changed. The eight outcome results remain bound to their exact evidence-producing revision.
 
 ## Claim limits and residual risks
 
-- The source branch alone does not contain accepted main in its ancestry, so branch-local admission is expected to reproduce the ancestry error. The meaningful gate is the integration-shaped candidate parented by accepted main, matching the repository's squash integration method.
-- If integration uses an older or unrelated base, the repair does not hold. The explicit ancestry preflight is mandatory.
-- Task 6D did not dispatch GitHub Actions. Static workflow contracts and earlier hosted runs are distinct evidence.
-- Local Next.js development and OpenNext/workerd Playwright/axe checks do not establish deployment, visual quality, human usability, assistive-technology compatibility, or WCAG conformance.
-- Observability remains pending. Four unchanged records remain `backfill-pending`. This repair does not close P2 or start later work.
-- No external provider, deployment, credential, environment, permission, production, publication, pull request, push, workflow, or GitHub setting was mutated.
+- The evidence revision is a descendant of accepted Plan A, but the artifact renewal remains an unapproved working-tree diff until the verified-final-diff gate.
+- The provisional review-pending receipt correctly failed artifact admission. Final admission may pass only against the accepted overall and per-outcome review metadata on the exact final tree.
+- No hosted Task 6D renewal workflow ran. Accepted Plan A workflow run `31704445688` is integration evidence, not renewal evidence.
+- Local Node/jsdom, Next/OpenNext build, workerd, Chromium, and axe checks do not establish deployment behavior, visual quality, human usability, assistive-technology compatibility, production safety, or WCAG conformance.
+- Observability remains pending. Four unchanged records remain `backfill-pending`. This renewal does not close the portfolio stage or start Plan B.
+- No push, pull request, merge to main, workflow dispatch, deployment, publication, provider, credential, permission, GitHub setting, persistent-data, or production mutation occurred.
 
 ## Recovery
 
-Revert the registry binding, JSON receipt, evidence, current-status documentation, regression assertions, and this packet in newest-first focused changes. If the descriptor version and digest still match, return only the standards record to `pending` and rerun admission and both closure checks. No source, dependency, schema, fixture, workflow, provider, deployment, persistent-data, credential, or production recovery applies.
+Revert the renewal registry binding, JSON receipt, evidence, packet, tests, and current-status documentation in newest-first focused changes. Restore evidence revision `c9294e9dc59d4b7bafed406846af3b43a10733d3` while preserving the exact certified subject, digest, status, task plan, receipt link, reviews, attribution, and ancestry validator. No source, dependency, fixture, workflow, provider, deployment, persistent-data, credential, or production recovery applies.
 
 ## Stop gate
 
-Stop for explicit verified-final-diff and integration approval. Do not push, create a pull request, merge, deploy, publish, dispatch a workflow, begin Plan A or Plan B, or mutate an external system.
+After independent review and final verification, stop for explicit verified-final-diff and publication-strategy approval. Do not push, create or replace a pull request, merge, dispatch a workflow, deploy, publish, begin Plan B, or mutate an external system.

@@ -3604,7 +3604,14 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     readme,
-    /standards@0\.3\.0[^\n]+\[accepted-main eight-outcome receipt\]\(docs\/implementation-evidence\/generated-unit-component-testing-certification-receipt\.json\)[^\n]+c9294e9dc59d4b7bafed406846af3b43a10733d3/iu,
+    /standards@0\.3\.0[^\n]+\[renewed eight-outcome receipt\]\(docs\/implementation-evidence\/generated-unit-component-testing-certification-receipt\.json\)[^\n]+d7c63b0aaa9bebd56c075f16f1e5d86519853698/iu,
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${escapeRegularExpression(namedLabel("Task", "6D"))} evidence renewal[^\\n]+d7c63b0aaa9bebd56c075f16f1e5d86519853698[^\\n]+all eight outcomes`,
+      "iu",
+    ),
   );
   assert.match(
     roadmap,
@@ -3613,7 +3620,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Plan A proceeds from that accepted repair revision`,
+      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Plan A is accepted at \`main@368b9491fd2f813f83f1e456823d8c7546f6762c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} evidence renewal`,
       "u",
     ),
   );
