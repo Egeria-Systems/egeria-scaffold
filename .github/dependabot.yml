@@ -13,3 +13,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      action-updates:
+        applies-to: "version-updates"
+        patterns:
+          - "*"

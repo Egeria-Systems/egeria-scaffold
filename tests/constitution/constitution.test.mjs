@@ -353,7 +353,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "dependency-review",
   ];
   const generatedPaths = [
-    ".github/workflows/**",
+    ".github/workflows/repository-quality.yml",
     ".gitattributes",
     ".npmrc",
     "package.json",
@@ -368,7 +368,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "tests/generated-fixtures/**",
   ];
   const compatibilityPaths = [
-    ".github/workflows/**",
+    ".github/workflows/repository-quality.yml",
     ".npmrc",
     "package.json",
     "pnpm-lock.yaml",
@@ -388,6 +388,14 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "cancel-in-progress": true,
   });
   assert.deepEqual(Object.keys(workflow.jobs), expectedJobIdentifiers);
+  assert.equal(
+    Object.hasOwn(workflow.jobs["builder-and-packages"], "if"),
+    false,
+  );
+  assert.equal(
+    Object.hasOwn(workflow.jobs["builder-and-packages"], "needs"),
+    false,
+  );
   assert.doesNotMatch(
     source,
     /\bpaths(?:-ignore)?:|\bsecrets\b|id-token:\s*write|environment:|pull_request_target|workflow_run/iu,
@@ -605,6 +613,25 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   });
 }
 
+test("Dependabot groups weekly GitHub Actions version updates", async () => {
+  const configuration = parse(
+    await readRepositoryFile(".github/dependabot.yml"),
+  );
+  const actionUpdates = configuration.updates.filter(
+    (update) => update["package-ecosystem"] === "github-actions",
+  );
+
+  assert.equal(actionUpdates.length, 1);
+  assert.equal(actionUpdates[0].directory, "/");
+  assert.deepEqual(actionUpdates[0].schedule, { interval: "weekly" });
+  assert.deepEqual(actionUpdates[0].groups, {
+    "action-updates": {
+      "applies-to": "version-updates",
+      patterns: ["*"],
+    },
+  });
+});
+
 test("ordinary repository CI exposes stable fail-safe quality jobs", async () => {
   for (const path of [
     ".github/workflows/generated-project-quality.yml",
@@ -653,6 +680,19 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
         candidate.jobs["builder-and-packages"].steps.find(({ uses }) =>
           uses?.startsWith("pnpm/setup@"),
         ).with.cache = true;
+      },
+    },
+    {
+      name: "conditioned builder policy lane",
+      mutateWorkflow(candidate) {
+        candidate.jobs["builder-and-packages"].if =
+          "github.actor != 'dependabot[bot]'";
+      },
+    },
+    {
+      name: "dependent builder policy lane",
+      mutateWorkflow(candidate) {
+        candidate.jobs["builder-and-packages"].needs = ["scope"];
       },
     },
     {
@@ -763,10 +803,15 @@ test("repository quality scope classification executes fail-safe Git behavior", 
     "proof\n",
     "proof",
   );
-  const workflowRevision = await commitFile(
-    ".github/workflows/scoped.yml",
-    "name: scoped\n",
-    "workflow",
+  const manualWorkflowRevision = await commitFile(
+    ".github/workflows/package-release.yml",
+    "name: package release\n",
+    "manual workflow",
+  );
+  const repositoryQualityWorkflowRevision = await commitFile(
+    ".github/workflows/repository-quality.yml",
+    "name: repository quality\n",
+    "repository quality workflow",
   );
 
   const workflowSource = await readRepositoryFile(
@@ -820,9 +865,18 @@ test("repository quality scope classification executes fail-safe Git behavior", 
       },
     },
     {
-      name: "workflow change",
+      name: "manual workflow change",
       pushBaseSha: proofRevision,
-      pushHeadSha: workflowRevision,
+      pushHeadSha: manualWorkflowRevision,
+      expected: {
+        "generated-projects": "false",
+        "compatibility-proof": "false",
+      },
+    },
+    {
+      name: "repository quality workflow change",
+      pushBaseSha: manualWorkflowRevision,
+      pushHeadSha: repositoryQualityWorkflowRevision,
       expected: bothEnabled,
     },
     {
