@@ -2,7 +2,7 @@
 
 **Status:** Controlling package and API ownership through the approved builder kernel, generated validated content, responsive portfolio presentation, generated unit/component/browser quality, Calendly initial scaffolding, bounded production observability, committed golden fixtures, and the public `0.1.0`/`0.2.0` releases, with repository changes proceeding through verified new-directory generation
 
-**Sources:** [ADR-0005](../adr/0005-evidence-driven-package-extraction.md), [architecture overview](overview.md), the [approved P0.3 plan](../superpowers/plans/2026-08-04-p0-3-lean-builder-monorepo.md), the [approved P1 plan](../superpowers/plans/2026-08-05-p1-builder-kernel.md), the [approved atomic project-generation plan](../superpowers/plans/2026-08-06-atomic-project-generation.md), the [approved Calendly initial-scaffolding plan](../superpowers/plans/2026-08-10-calendly-initial-scaffolding.md), and the [approved public-package release plan](../superpowers/plans/2026-08-06-public-package-release.md)
+**Sources:** [ADR-0005](../adr/0005-evidence-driven-package-extraction.md), [architecture overview](overview.md), the approved private implementation plans for the lean builder, builder kernel, atomic project generation, Calendly initial scaffolding, and public-package release
 
 This document owns the builder repository's package visibility, current API surface, responsibility, consumers, and publication boundary. The [review and contribution protocol](../governance/review-and-contribution.md) owns implementation and approval gates.
 

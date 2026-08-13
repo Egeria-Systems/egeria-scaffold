@@ -9,7 +9,7 @@ Before implementation:
 1. Freeze the approved increment, comparison, expected behavior, tests, and completion criteria.
 2. Verify the current branch, status, local and relevant remote refs, recent commits, manifests, tests, architecture sources, `.egeria` schemas, accepted ADRs, applicable instructions, and prior review packets.
 3. Revalidate current official documentation and security advisories for every tool or provider the increment will execute or configure.
-4. Record dated evidence under `docs/implementation-evidence/`, distinguishing verified facts, assumptions, limitations, and deferred proof.
+4. Record dated evidence under the Git-ignored private local `docs/implementation-evidence/` directory, distinguishing verified facts, assumptions, limitations, and deferred proof.
 5. Present direct contradictions and genuinely blocking uncertainties in one consolidated batch. Resolve ordinary details from official sources and accepted practice without expanding scope.
 
 ### Direct-predecessor gate
@@ -24,7 +24,7 @@ Gate 1 evidence is not permission to edit implementation files or take external 
 
 ## Gate 2: implementation-plan approval
 
-Write an exact-file, test-driven plan under `docs/superpowers/plans/`. It must define interfaces, RED/GREEN checks, focused commit boundaries, reviewers, final verification, review-packet contents, deferred work, and recovery.
+Write an exact-file, test-driven plan under the Git-ignored private local `docs/superpowers/plans/` directory. It must define interfaces, RED/GREEN checks, focused commit boundaries, reviewers, final verification, review-packet contents, deferred work, and recovery.
 
 Stop for explicit approval. Plan approval authorizes only the bounded local implementation and commits described by the approved plan. It does not authorize a different increment, push, pull request, merge, deployment, publication, provider mutation, production action, permission change, or external message.
 
@@ -50,16 +50,17 @@ The [approved source plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-bes
 
 Manual stateless non-production journeys may use the repository's [shared test deployment](shared-test-deployment.md) only after its eligibility, protection, exclusive-lease, credential, cleanup, and recovery gates pass. That policy does not make the shared environment suitable for every future certification.
 
-The current private registry is [`certifications/capabilities.json`](../../certifications/capabilities.json); builder-core owns its strict schema and pure gate semantics. After building the private package, use these exact repository commands:
+The tracked registry is [`certifications/capabilities.json`](../../certifications/capabilities.json); builder-core owns its strict schema and pure gate semantics. After building the private package, use these exact repository commands:
 
 ```sh
 pnpm run check:capability-certification
+pnpm run check:private-capability-certification
 node scripts/check-capability-certification.mjs --closure legacy-backfill-exempt
 node scripts/check-capability-certification.mjs --closure all-certified
 pnpm run verify:booking-calendly-certification
 ```
 
-Admission must pass for a builder candidate. It validates the registry plus every referenced repository plan/evidence artifact; passed evidence metadata must match its capability, descriptor subject, evidence-producing revision, and explicit outcome. The revision must resolve to an ancestor commit of the checked candidate. Each receipt must declare completed status, no unresolved prompt fields, an affirmative overall reviewer decision, and affirmative review of the recorded outcome. Hosted consumers therefore need full Git history. Run the closure policy required by the named phase or release and treat its rejecting exit as a stop, not a warning. The local Calendly command and receipt declare only fresh-scaffold evidence; relabeling or incompletely reviewing them cannot prove protected-staging, provider, cancellation, cleanup, or recovery outcomes.
+Admission must pass for a builder candidate. The clean-checkout command validates the tracked registry, descriptor subjects, required evidence kinds, status transitions, and the selected closure policy. Private local plan and evidence receipts remain required workflow inputs but are not repository or CI inputs; before updating the tracked registry, certification work must run `check:private-capability-certification` in the workspace that holds those ignored artifacts. That explicit local gate validates artifact presence and receipt content through builder-core and verifies evidence-producing revisions against the checked Git ancestry. Passed evidence metadata must match its capability, descriptor subject, evidence-producing revision, and explicit outcome. Each receipt must declare completed status, no unresolved prompt fields, an affirmative overall reviewer decision, and affirmative review of the recorded outcome. Run the closure policy required by the named phase or release and treat its rejecting exit as a stop, not a warning. The local Calendly command and receipt declare only fresh-scaffold evidence; relabeling or incompletely reviewing them cannot prove protected-staging, provider, cancellation, cleanup, or recovery outcomes.
 
 ## Builder-repository development boundary
 
@@ -124,7 +125,9 @@ After all relevant inputs settle:
 2. Inspect the final status, comparison diff, changed-file list, and commit range.
 3. Confirm no unrelated or premature surface was created.
 4. Record exact commands, versions, results, known limitations, and unproven properties.
-5. Create a review packet under `docs/review-packets/` with scope, comparison, changed files, reviewer dispositions, verification, risks, deferred work, and rollback/recovery.
+5. Create a review packet under the Git-ignored private local `docs/review-packets/` directory with scope, comparison, changed files, reviewer dispositions, verification, risks, deferred work, and rollback/recovery.
+
+Private workflow artifacts must not be force-added. Keep secrets, personal information, exact home-directory paths, machine-specific tool paths, private URLs, and raw provider output out of tracked documentation. Preserve any private artifacts through a separately managed local backup when their loss would matter; Git no longer supplies recovery for them.
 
 ## Gate 3: verified-final-diff approval
 

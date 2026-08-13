@@ -168,25 +168,22 @@ function assertObservabilityWorkflowSecretBoundary(workflow) {
   ]);
 }
 
-function extractObservabilityHumanPrerequisiteRunbook(document) {
-  return document
-    .split("## Human prerequisite runbook\n", 2)[1]
-    ?.split("\n## Consolidated contradictions and live-run blockers", 1)[0];
-}
-
 async function readRepositoryFile(relativePath) {
   return readFile(resolve(repositoryRoot, relativePath), "utf8");
 }
 
-async function listRepositoryMarkdownFiles() {
+async function listRepositoryPaths() {
   const { stdout } = await execFileAsync(
     "git",
     ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
     { cwd: repositoryRoot, encoding: "utf8" },
   );
 
-  return stdout
-    .split("\0")
+  return stdout.split("\0").filter(Boolean);
+}
+
+function listRepositoryMarkdownFiles(repositoryPaths) {
+  return repositoryPaths
     .filter((path) => path.endsWith(".md"))
     .map((path) => resolve(repositoryRoot, path));
 }
@@ -1110,8 +1107,6 @@ test("canonical Cloudflare boundaries permit provider-specific generated templat
 test("package ownership documentation records the approved release boundary", async () => {
   const builderFoundationPhase = compactLabel("P", "0", ".", "3");
   const builderKernelPhase = compactLabel("P", "1");
-  const approvalGate = namedLabel("Gate", "3");
-  const historicalPathToken = compactLabel("p", "0", "-", "3");
   const [
     rootInstructions,
     readme,
@@ -1120,8 +1115,6 @@ test("package ownership documentation records the approved release boundary", as
     overview,
     enforcementMap,
     roadmap,
-    verification,
-    reviewPacket,
   ] = await Promise.all([
     readRepositoryFile("AGENTS.md"),
     readRepositoryFile("README.md"),
@@ -1130,12 +1123,6 @@ test("package ownership documentation records the approved release boundary", as
     readRepositoryFile("docs/architecture/overview.md"),
     readRepositoryFile("docs/architecture/enforcement-map.md"),
     readRepositoryFile("docs/roadmaps/program-roadmap.md"),
-    readRepositoryFile(
-      `docs/implementation-evidence/2026-08-04-${historicalPathToken}-lean-builder-monorepo-verification.md`,
-    ),
-    readRepositoryFile(
-      `docs/review-packets/2026-08-04-${historicalPathToken}-lean-builder-monorepo.md`,
-    ),
   ]);
 
   for (const nestedInstructions of [
@@ -1270,20 +1257,6 @@ test("package ownership documentation records the approved release boundary", as
   assert.match(
     readme,
     /lean package and tooling boundaries.*verified-final-diff approval/i,
-  );
-  assert.match(
-    verification,
-    new RegExp(
-      `${escapeRegularExpression(approvalGate)} APPROVED[^\\n]+40604eb5b8a3ade0175c16dd945a1bafee15ae04\\.\\.da74a5baab12d19fa5a5007008f960f495721b8e`,
-      "i",
-    ),
-  );
-  assert.match(
-    reviewPacket,
-    new RegExp(
-      `${escapeRegularExpression(approvalGate)} outcome:\\*\\* APPROVED[^\\n]+40604eb5b8a3ade0175c16dd945a1bafee15ae04\\.\\.da74a5baab12d19fa5a5007008f960f495721b8e`,
-      "i",
-    ),
   );
 });
 
@@ -1466,8 +1439,6 @@ test("stateless manual deployments share one serialized protected deployment bou
     observabilitySource,
     policy,
     compatibilityRecord,
-    calendlyPreparation,
-    observabilityPreparation,
   ] = await Promise.all([
     readRepositoryFile(".github/workflows/compatibility-proof.yml"),
     readRepositoryFile(".github/workflows/booking-calendly-certification.yml"),
@@ -1476,12 +1447,6 @@ test("stateless manual deployments share one serialized protected deployment bou
     ),
     readRepositoryFile("docs/governance/shared-test-deployment.md"),
     readRepositoryFile("docs/compatibility/nextjs-cloudflare.md"),
-    readRepositoryFile(
-      "docs/implementation-evidence/2026-08-10-booking-calendly-certification-preparation.md",
-    ),
-    readRepositoryFile(
-      "docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md",
-    ),
   ]);
 
   for (const source of [
@@ -1544,26 +1509,14 @@ test("stateless manual deployments share one serialized protected deployment bou
     /clean compatibility baseline[\s\S]+certification-only route[\s\S]+unreachable/iu,
   );
 
-  for (const document of [
-    compatibilityRecord,
-    calendlyPreparation,
-    observabilityPreparation,
-  ]) {
-    assert.match(document, /shared-test-deployment\.md/u);
-  }
+  assert.match(compatibilityRecord, /shared-test-deployment\.md/u);
 });
 
 test("Calendly certification deployment is manual, revision-bound, and secret-minimal", async () => {
-  const [source, runbook, receipt, wranglerTemplate, renderingSource] =
+  const [source, wranglerTemplate, renderingSource] =
     await Promise.all([
       readRepositoryFile(
         ".github/workflows/booking-calendly-certification.yml",
-      ),
-      readRepositoryFile(
-        "docs/implementation-evidence/2026-08-10-booking-calendly-certification-preparation.md",
-      ),
-      readRepositoryFile(
-        "docs/implementation-evidence/booking-calendly-provider-receipt-template.md",
       ),
       readRepositoryFile(
         "packages/builder-core/templates/common/apps/web/wrangler.jsonc.template",
@@ -1745,34 +1698,6 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     renderingSource,
     /workerName: projectResult\.value\.project\.name/u,
   );
-  assert.match(runbook, new RegExp("Worker name `" + projectName + "`"));
-  assert.match(receipt, new RegExp("preflight for `" + projectName + "`"));
-  assert.doesNotMatch(runbook, /acme-portfolio-calendly-web/u);
-  assert.doesNotMatch(receipt, /acme-portfolio-calendly-web/u);
-});
-
-test("the provider receipt template separates application, provider, and cleanup evidence", async () => {
-  const template = await readRepositoryFile(
-    "docs/implementation-evidence/booking-calendly-provider-receipt-template.md",
-  );
-
-  for (const heading of [
-    "Workflow and revision identity",
-    "Synthetic-data declaration",
-    "Deployed application evidence",
-    "Provider-confirmed evidence",
-    "Cancellation and cleanup evidence",
-    "Privacy exclusions",
-    "Claim boundary",
-  ]) {
-    assert.match(template, new RegExp(`^## ${heading}$`, "mu"));
-  }
-  assert.match(template, /synthetic host and invitee/iu);
-  assert.match(template, /meeting status/iu);
-  assert.match(template, /acme-portfolio-calendly/u);
-  assert.match(template, /Worker.*removed|removed.*Worker/iu);
-  assert.match(template, /must not contain.*email address/iu);
-  assert.match(template, /does not establish WCAG conformance/iu);
 });
 
 test("observability certification deployment is manual, exact-revision, and secret-isolated", async () => {
@@ -2179,91 +2104,6 @@ test("observability workflow secrets are rejected outside exact approved step en
   }
 });
 
-test("observability preparation provides the required step-by-step human prerequisite runbook", async () => {
-  const [preparation, plan] = await Promise.all([
-    readRepositoryFile(
-      "docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md",
-    ),
-    readRepositoryFile(
-      "docs/superpowers/plans/2026-08-10-production-observability-certification.md",
-    ),
-  ]);
-  const runbook = extractObservabilityHumanPrerequisiteRunbook(preparation);
-
-  assert.ok(runbook, "observability human-prerequisite runbook is missing");
-  assert.match(
-    runbook,
-    /account owner[\s\S]+account type[\s\S]+subscription tier[\s\S]+sandbox or test environment[\s\S]+eligibility[\s\S]+waiting period/iu,
-  );
-  assert.match(
-    runbook,
-    /GitHub repository administrator[\s\S]+Cloudflare account administrator[\s\S]+Better Stack operator[\s\S]+privacy and cost owner[\s\S]+cleanup owner[\s\S]+evidence reviewer/iu,
-  );
-  assert.match(
-    runbook,
-    /`test-deploy`[\s\S]+`CLOUDFLARE_ACCOUNT_ID`[\s\S]+`CLOUDFLARE_API_TOKEN`[\s\S]+`BETTER_STACK_INGESTING_HOST`[\s\S]+`BETTER_STACK_SOURCE_TOKEN`[\s\S]+GitHub environment secrets/iu,
-  );
-  assert.match(
-    runbook,
-    /`Workers Scripts Write`[\s\S]+human[\s\S]+approve[\s\S]+exact command/iu,
-  );
-  assert.match(
-    runbook,
-    /credential[\s\S]+scope[\s\S]+lifetime[\s\S]+expir[\s\S]+rotat/iu,
-  );
-  assert.match(
-    runbook,
-    /public HTTPS staging origin[\s\S]+`DEPLOY_URL`[\s\S]+synthetic/iu,
-  );
-  assert.match(
-    runbook,
-    /no callback, webhook, redirect, or allowlist[\s\S]+no synthetic human identity/iu,
-  );
-  assert.match(runbook, /readiness preflight/iu);
-  assert.match(
-    runbook,
-    /every 30 seconds[\s\S]+10-minute deadline[\s\S]+stop[\s\S]+fail/iu,
-  );
-  assert.match(
-    runbook,
-    /rate limit[\s\S]+quota[\s\S]+no paid upgrade[\s\S]+retention/iu,
-  );
-  assert.match(
-    plan,
-    /- \[x\] Add the governance-required step-by-step human-prerequisite runbook/u,
-  );
-});
-
-test("observability runbook keeps external actions gated and defines ordered cleanup and recovery", async () => {
-  const preparation = await readRepositoryFile(
-    "docs/implementation-evidence/2026-08-11-production-observability-certification-preparation.md",
-  );
-  const runbook = extractObservabilityHumanPrerequisiteRunbook(preparation);
-
-  assert.ok(runbook, "observability human-prerequisite runbook is missing");
-  assert.match(
-    runbook,
-    /explicit approval checkpoint[\s\S]+integration and push[\s\S]+environment[\s\S]+provider source[\s\S]+credential[\s\S]+workflow dispatch[\s\S]+telemetry[\s\S]+provider inspection[\s\S]+cleanup/iu,
-  );
-  assert.match(
-    runbook,
-    /cleanup order[\s\S]+provider-specific Worker secrets[\s\S]+clean compatibility baseline[\s\S]+certification-only route[\s\S]+Better Stack source[\s\S]+retained data[\s\S]+GitHub environment secrets[\s\S]+revoke or rotate/iu,
-  );
-  assert.match(
-    runbook,
-    /source rollback[\s\S]+deployment recovery[\s\S]+provider recovery[\s\S]+credential recovery/iu,
-  );
-  assert.match(runbook, /rerun triggers/iu);
-  assert.match(
-    runbook,
-    /Every external action remains separately unauthorized/iu,
-  );
-  assert.match(
-    runbook,
-    /content-safe placeholder[\s\S]+must not contain[\s\S]+secret[\s\S]+private URL[\s\S]+raw log/iu,
-  );
-});
-
 test("the observability certification error fixture contains only the bounded throwing GET handler", async () => {
   const fixture = await readRepositoryFile(
     "tests/capability-certification/fixtures/observability-error-route.ts",
@@ -2323,79 +2163,10 @@ test("the deployed browser fixture exercises the generated global reporter and w
   );
 });
 
-test("the observability provider receipt separates custom, platform, provider, and cleanup evidence", async () => {
-  const template = await readRepositoryFile(
-    "docs/implementation-evidence/production-observability-provider-receipt-template.md",
+test("the observability workflow exercises events only after installing provider secrets", async () => {
+  const workflowSource = await readRepositoryFile(
+    ".github/workflows/production-observability-certification.yml",
   );
-
-  for (const heading of [
-    "Workflow and revision identity",
-    "Synthetic-data declaration",
-    "Deployed application and custom-event evidence",
-    "Cloudflare platform and framework log evidence",
-    "Better Stack evidence",
-    "Provider-failure containment test basis",
-    "Unauthenticated route abuse and cost decision",
-    "Credential disposition",
-    "Worker, source, and data cleanup",
-    "Privacy exclusions",
-    "Claim boundary",
-    "Reviewer decision",
-  ]) {
-    assert.match(template, new RegExp(`^## ${heading}$`, "mu"));
-  }
-  assert.match(template, /observability-certification/iu);
-  assert.match(template, /acme-portfolio-observability/u);
-  assert.match(template, /cleanup-recovery, deployed-application/u);
-  assert.match(template, /application\/custom event/iu);
-  assert.match(template, /Workers Logs.*platform\/framework/iu);
-  assert.match(template, /source.*region.*tier.*quota.*retention/isu);
-  for (const field of [
-    "schema_version",
-    "dt",
-    "event_name",
-    "event_kind",
-    "runtime",
-    "severity",
-    "correlation_id",
-    "release_id",
-    "error_category",
-    "attributes",
-  ]) {
-    assert.match(template, new RegExp(`\\b${field}\\b`, "u"));
-  }
-  assert.match(template, /provider rejection.*timeout.*unreachable.*containment/isu);
-  assert.match(template, /GitHub.*Cloudflare.*Better Stack/isu);
-  assert.match(template, /Worker.*source.*retained data/isu);
-  assert.match(template, /must not contain.*secret.*ingestion host.*private URL.*raw log.*stack.*request metadata.*client data/isu);
-  assert.match(template, /does not establish.*durable delivery/iu);
-  assert.match(
-    template,
-    /local receipt[\s\S]+route-envelope receipt[\s\S]+browser-instrumentation receipt[\s\S]+Cloudflare identity receipt/iu,
-  );
-  assert.match(
-    template,
-    /checked Git SHA[\s\S]+secret installation[\s\S]+deployments list[\s\S]+Cloudflare deployment identifier[\s\S]+Cloudflare version identifier/iu,
-  );
-  assert.match(
-    template,
-    /`CF_VERSION_METADATA\.id`[\s\S]+Cloudflare version identifier[\s\S]+not the Git revision/iu,
-  );
-  assert.match(
-    template,
-    /every provider custom event[\s\S]+`release_id`[\s\S]+captured Cloudflare version identifier[\s\S]+never the Git SHA/iu,
-  );
-});
-
-test("the observability receipt reconciles every custom event class emitted after secret installation", async () => {
-  const [workflowSource, template] = await Promise.all([
-    readRepositoryFile(
-      ".github/workflows/production-observability-certification.yml",
-    ),
-    readRepositoryFile(
-      "docs/implementation-evidence/production-observability-provider-receipt-template.md",
-    ),
-  ]);
   const job = parse(workflowSource).jobs["verify-and-deploy"];
   const secretStepIndex = job.steps.findIndex(
     ({ name }) => name === "Install observability provider secrets",
@@ -2409,157 +2180,11 @@ test("the observability receipt reconciles every custom event class emitted afte
 
   assert.ok(secretStepIndex > -1 && secretStepIndex < exerciseStepIndex);
   assert.ok(exerciseStepIndex < browserStepIndex);
-  assert.match(
-    template,
-    /`Exercise deployed observability`[\s\S]+`browser\.window\.error`[\s\S]+route-envelope[\s\S]+revision-derived correlation marker/iu,
-  );
-  assert.match(
-    template,
-    /`Exercise deployed observability`[\s\S]+`browser\.web\.vital`[\s\S]+route-envelope[\s\S]+revision-derived correlation marker/iu,
-  );
-  assert.match(
-    template,
-    /`Exercise deployed observability`[\s\S]+`server\.request\.error`[\s\S]+generated UUID[\s\S]+not a revision-derived marker/iu,
-  );
-  assert.match(
-    template,
-    /`Test deployed application behavior`[\s\S]+actual generated browser reporter[\s\S]+`browser\.window\.error`[\s\S]+UUID/iu,
-  );
-  assert.match(
-    template,
-    /`Test deployed application behavior`[\s\S]+`browser\.web\.vital`[\s\S]+non-deterministic[\s\S]+must not predeclare an exact marker or count/iu,
-  );
-  assert.match(
-    template,
-    /complete observed custom-event inventory[\s\S]+Cloudflare Workers Logs[\s\S]+Better Stack/iu,
-  );
-  assert.match(
-    template,
-    /additional custom event[\s\S]+reject[\s\S]+predeclared[\s\S]+bounded[\s\S]+reconciled/iu,
-  );
-});
-
-test("cleanup-recovery requires the certification error route to be unreachable after cleanup", async () => {
-  const template = await readRepositoryFile(
-    "docs/implementation-evidence/production-observability-provider-receipt-template.md",
-  );
-  const cleanupSection = template
-    .split("## Worker, source, and data cleanup\n", 2)[1]
-    .split("## Privacy exclusions", 1)[0];
-
-  assert.ok(cleanupSection, "observability cleanup section is missing");
-  assert.match(
-    cleanupSection,
-    /restore the clean compatibility baseline[\s\S]+clean compatibility baseline deployed without the certification fixture/iu,
-  );
-  assert.match(
-    cleanupSection,
-    /post-cleanup[\s\S]+`\/api\/observability-certification-error`[\s\S]+unreachable[\s\S]+record only the status/iu,
-  );
-  assert.match(
-    cleanupSection,
-    /cleanup-recovery[\s\S]+cannot pass[\s\S]+route remains reachable or the reachability result is not verified/iu,
-  );
-  assert.doesNotMatch(
-    cleanupSection,
-    /Cloudflare Worker cleanup: \[[^\]]*retained/iu,
-  );
-  assert.match(
-    template,
-    /Certification-only error-route unreachability accepted: \[yes \/ no and reason\]/u,
-  );
-});
-
-test("provider preparation defines the external safety envelope", async () => {
-  const [preparation, plan, receipt] = await Promise.all([
-    readRepositoryFile(
-      "docs/implementation-evidence/2026-08-10-booking-calendly-certification-preparation.md",
-    ),
-    readRepositoryFile(
-      "docs/superpowers/plans/2026-08-10-booking-calendly-certification.md",
-    ),
-    readRepositoryFile(
-      "docs/implementation-evidence/booking-calendly-provider-receipt-template.md",
-    ),
-  ]);
-
-  for (const document of [preparation, plan]) {
-    assert.match(document, /GitHub repository administrator/iu);
-    assert.match(document, /workflow dispatcher/iu);
-    assert.match(document, /Calendly certification operator/iu);
-    assert.match(document, /Cloudflare account administrator/iu);
-    assert.match(document, /Workers Scripts Write/u);
-    assert.match(document, /every 30 seconds[^.]+5 minutes/iu);
-    assert.match(document, /exactly one synthetic booking/iu);
-    assert.match(document, /no paid upgrade/iu);
-    assert.match(document, /seven days/iu);
-    assert.match(document, /credential[^.]+revoke[^.]+rotate/iu);
-    assert.match(document, /rerun trigger/iu);
-  }
-  assert.match(receipt, /action owners and roles/iu);
-  assert.match(receipt, /polling result/iu);
-  assert.match(receipt, /quota and spend/iu);
-  assert.match(receipt, /credential disposition/iu);
-  assert.match(receipt, /rerun trigger/iu);
-});
-
-test("provider execution remains truthful and Free-compatible for a sole developer", async () => {
-  const [preparation, plan, receipt] = await Promise.all([
-    readRepositoryFile(
-      "docs/implementation-evidence/2026-08-10-booking-calendly-certification-preparation.md",
-    ),
-    readRepositoryFile(
-      "docs/superpowers/plans/2026-08-10-booking-calendly-certification.md",
-    ),
-    readRepositoryFile(
-      "docs/implementation-evidence/booking-calendly-provider-receipt-template.md",
-    ),
-  ]);
-
-  for (const document of [preparation, plan]) {
-    assert.match(document, /sole developer/iu);
-    assert.match(document, /no independent human deployment (?:approval|review)/iu);
-    assert.match(document, /administrator bypass[^.]+accepted limitation/iu);
-    assert.match(document, /remain usable after the trial expires without payment/iu);
-    assert.match(document, /trial-only or paid/iu);
-    assert.match(document, /pre-existing designated event/iu);
-    assert.match(document, /preserve[s]? the event type/iu);
-    assert.match(document, /designation is the only authorized event-type action/iu);
-    assert.doesNotMatch(
-      document,
-      /authorized (?:creation or designation|creating or designating)/iu,
-    );
-    assert.doesNotMatch(
-      document,
-      /event-type (?:creation|change|disabling|deletion)[^.]+separate(?:ly)? (?:authorized|approv(?:al|ed))/iu,
-    );
-  }
-
-  assert.match(
-    receipt,
-    /Independent human deployment reviewer: `none — sole-developer exception`/u,
-  );
-  assert.match(
-    receipt,
-    /GitHub environment required-reviewer status: `none configured`/u,
-  );
-  assert.match(
-    receipt,
-    /Administrator bypass: \[enabled and accepted for this non-production risk exception \/ unexpected state requiring stop\]/u,
-  );
-  assert.match(receipt, /identify `CoveMB` in every role/u);
-  assert.match(receipt, /Free-compatible during and after trial/iu);
-  assert.match(receipt, /pre-existing designated/iu);
-  assert.match(receipt, /event-?type[^.]+preserved/iu);
-  assert.doesNotMatch(receipt, /certification-created|disabled or deleted/iu);
-  assert.doesNotMatch(
-    receipt,
-    /event-type (?:creation|change|disabling|deletion)[^.]+separate(?:ly)? (?:authorized|approv(?:al|ed))/iu,
-  );
 });
 
 test("repository documentation has no broken local Markdown links", async () => {
-  const markdownFiles = await listRepositoryMarkdownFiles();
+  const repositoryPaths = await listRepositoryPaths();
+  const markdownFiles = listRepositoryMarkdownFiles(repositoryPaths);
   const brokenLinks = [];
 
   for (const markdownFile of markdownFiles) {
@@ -2582,6 +2207,19 @@ test("repository documentation has no broken local Markdown links", async () => 
       if (!isInsideRepository(target)) {
         brokenLinks.push(
           `${markdownFile.slice(repositoryRoot.length + 1)} -> ${destination} (outside repository)`,
+        );
+        continue;
+      }
+
+      const relativeTarget = relative(repositoryRoot, target);
+      const targetIsTracked = repositoryPaths.some(
+        (repositoryPath) =>
+          repositoryPath === relativeTarget ||
+          repositoryPath.startsWith(`${relativeTarget}/`),
+      );
+      if (!targetIsTracked) {
+        brokenLinks.push(
+          `${markdownFile.slice(repositoryRoot.length + 1)} -> ${destination} (not tracked)`,
         );
         continue;
       }
@@ -2868,13 +2506,7 @@ test("the documented capability catalog uses the normalized contract", async () 
 });
 
 test("capability delivery requires a separately planned certification task", async () => {
-  const [
-    sourcePlan,
-    programRoadmap,
-    reviewProtocol,
-    enforcementMap,
-    design,
-  ] =
+  const [sourcePlan, programRoadmap, reviewProtocol, enforcementMap] =
     await Promise.all([
       readRepositoryFile(
         "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
@@ -2882,9 +2514,6 @@ test("capability delivery requires a separately planned certification task", asy
       readRepositoryFile("docs/roadmaps/program-roadmap.md"),
       readRepositoryFile("docs/governance/review-and-contribution.md"),
       readRepositoryFile("docs/architecture/enforcement-map.md"),
-      readRepositoryFile(
-        "docs/superpowers/specs/2026-08-10-capability-certification-task-pair-design.md",
-      ),
     ]);
   const clientReadyPhase = compactLabel("P", "2");
   const lifecyclePhase = compactLabel("P", "3");
@@ -3068,14 +2697,6 @@ test("capability delivery requires a separately planned certification task", asy
     enforcementMap,
     /descriptor admission and transition closure pass[^\n]+all-certified closure rejects the four frozen backfills/i,
   );
-  assert.match(
-    design,
-    /introduces no new provider-specific outcome scenario[\s\S]+existing canonical outcome boundaries remain controlling/i,
-  );
-  assert.match(
-    design,
-    /descriptor version or behavior-contract digest[\s\S]+material change[\s\S]+new task-linked pending record/i,
-  );
 });
 
 test("client-required public-site work is relocated after lifecycle without requirement loss", async () => {
@@ -3186,7 +2807,6 @@ test("executable capability certification ownership is current", async () => {
     builderCoreReadme,
     packageOwnership,
     registrySource,
-    providerReceipt,
   ] = await Promise.all([
     readRepositoryFile("docs/architecture/overview.md"),
     readRepositoryFile("docs/architecture/capability-model.md"),
@@ -3197,9 +2817,6 @@ test("executable capability certification ownership is current", async () => {
     readRepositoryFile("packages/builder-core/README.md"),
     readRepositoryFile("docs/architecture/package-ownership.md"),
     readRepositoryFile("certifications/capabilities.json"),
-    readRepositoryFile(
-      "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
-    ),
   ]);
 
   for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
@@ -3254,42 +2871,6 @@ test("executable capability certification ownership is current", async () => {
     })),
   );
   assert.match(
-    providerReceipt,
-    /Certification receipt status:\*\* `complete`/u,
-  );
-  assert.match(
-    providerReceipt,
-    /Certification reviewer decision:\*\* `accepted`/u,
-  );
-  assert.match(
-    providerReceipt,
-    /Passed certification outcomes:\*\* `cleanup-recovery, deployed-application, provider-confirmed`/u,
-  );
-  assert.match(providerReceipt, /HTTP `404`/u);
-  assert.match(providerReceipt, /pre-existing designated event; preserved/u);
-  assert.match(providerReceipt, /no WCAG conformance/iu);
-  assert.match(providerReceipt, /^## Privacy exclusions$/mu);
-  assert.match(
-    providerReceipt,
-    /invitee[^.]+address[^.]+omitted[\s\S]+confirmation[^.]+content[^.]+not copied or retained[\s\S]+provider[^.]+identifiers[^.]+not copied or retained/iu,
-  );
-  assert.doesNotMatch(providerReceipt, /:\s*\[[^\]\n]+\]\s*$/mu);
-  assert.doesNotMatch(
-    providerReceipt,
-    /(?:[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\bcf(?:at|ut)_[A-Za-z0-9_-]+\b|\bgh[pousr]_[A-Za-z0-9_]+\b|\bgithub_pat_[A-Za-z0-9_]+\b)/iu,
-  );
-  const privateCalendlyUrlPattern =
-    /https:\/\/(?:www\.)?calendly\.com\/(?!help(?:\/|\b))[^\s)`]+/iu;
-  assert.match(
-    "https://calendly.com/synthetic-host/private-meeting",
-    privateCalendlyUrlPattern,
-  );
-  assert.doesNotMatch(
-    "https://calendly.com/help/how-to-cancel-a-meeting",
-    privateCalendlyUrlPattern,
-  );
-  assert.doesNotMatch(providerReceipt, privateCalendlyUrlPattern);
-  assert.match(
     enforcementMap,
     /descriptor admission and transition closure pass[^\n]+all-certified closure rejects the four frozen backfills/iu,
   );
@@ -3325,38 +2906,17 @@ test("executable capability certification ownership is current", async () => {
 });
 
 test("execution plans enforce direct predecessors and bounded independent-work exceptions", async () => {
-  const [
-    reviewProtocol,
-    sourcePlan,
-    roadmap,
-    implementationPlan,
-    certificationPlan,
-    planAReviewPacket,
-    protectedWorkflowPlan,
-  ] =
+  const [reviewProtocol, sourcePlan, roadmap] =
     await Promise.all([
       readRepositoryFile("docs/governance/review-and-contribution.md"),
       readRepositoryFile(
         "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
       ),
       readRepositoryFile("docs/roadmaps/program-roadmap.md"),
-      readRepositoryFile(
-        "docs/superpowers/plans/2026-08-10-generated-unit-component-testing.md",
-      ),
-      readRepositoryFile(
-        "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md",
-      ),
-      readRepositoryFile(
-        "docs/review-packets/2026-08-12-automatic-ci-efficiency-security.md",
-      ),
-      readRepositoryFile(
-        "docs/superpowers/plans/2026-08-12-protected-workflow-hardening.md",
-      ),
     ]);
   const implementationTask = namedLabel("Task", "6C");
   const implementationPredecessor = namedLabel("Task", "6");
   const independentStream = namedLabel("Task", "6B");
-  const certificationTask = namedLabel("Task", "6D");
   const diagnosticsReleaseTask = namedLabel("Task", "5");
   const portfolioPhase = compactLabel("P", "2");
 
@@ -3390,19 +2950,6 @@ test("execution plans enforce direct predecessors and bounded independent-work e
     /does not approve[^.]+waive[^.]+final-diff gate[^.]+external mutation/iu,
   );
 
-  assert.match(
-    protectedWorkflowPlan,
-    /Acceptance artifact:[^\n]+2026-08-12-automatic-ci-efficiency-security\.md[\s\S]+explicit verified-final-diff approval and an exact accepted revision/iu,
-  );
-  assert.match(
-    planAReviewPacket,
-    /\*\*Verified-final-diff approval:\*\* `approved`/u,
-  );
-  assert.match(
-    planAReviewPacket,
-    /\*\*Accepted Plan A revision:\*\* `368b9491fd2f813f83f1e456823d8c7546f6762c`/u,
-  );
-
   assert.match(sourcePlan, /2026-08-11[^.]+independent-work exception/iu);
   assert.match(
     sourcePlan,
@@ -3432,13 +2979,6 @@ test("execution plans enforce direct predecessors and bounded independent-work e
     ),
   );
   assert.match(
-    certificationPlan,
-    new RegExp(
-      `${escapeRegularExpression(certificationTask)} was implemented[^.]+and squash-integrated as \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+Accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Plan A is rebased onto that accepted revision`,
-      "u",
-    ),
-  );
-  assert.match(
     roadmap,
     new RegExp(
       `${escapeRegularExpression(implementationPredecessor)}'s exact implementation diff[\\s\\S]+implementation task is complete`,
@@ -3464,121 +3004,6 @@ test("execution plans enforce direct predecessors and bounded independent-work e
     ),
   );
 
-  assert.match(
-    implementationPlan,
-    new RegExp(
-      `\\*\\*Direct predecessor under the approved independent-work exception:\\*\\* ${portfolioPhase} ${escapeRegularExpression(implementationPredecessor)} production-observability implementation`,
-      "u",
-    ),
-  );
-  assert.match(
-    implementationPlan,
-    /approved exact committed comparison[^.]+45b57d2dc265ef6ba9ac805d7352a01db5f1081d[^.]+ancestor of `HEAD`/iu,
-  );
-  assert.match(
-    implementationPlan,
-    /pnpm run check:capability-certification/u,
-  );
-  assert.match(
-    implementationPlan,
-    /`observability@0\.2\.0` record[^.]+`pending` subject/iu,
-  );
-  assert.match(
-    implementationPlan,
-    /unexpected observability status[^.]+hard stop/iu,
-  );
-
-  assert.match(
-    certificationPlan,
-    new RegExp(
-      `\\*\\*Direct predecessor:\\*\\* ${portfolioPhase} ${escapeRegularExpression(implementationTask)} generated unit and component testing implementation`,
-      "u",
-    ),
-  );
-  assert.match(
-    certificationPlan,
-    /approved exact committed comparison[^.]+merge-base --is-ancestor[^.]+ HEAD/iu,
-  );
-  assert.match(
-    certificationPlan,
-    /pnpm run check:capability-certification/u,
-  );
-  assert.match(
-    certificationPlan,
-    /admission[^.]+pass[\s\S]+legacy-backfill-exempt[^.]+reject[^.]+observability[\s\S]+all-certified[^.]+reject[^.]+four[^.]+backfill/iu,
-  );
-  assert.match(
-    certificationPlan,
-    new RegExp(
-      "pending `standards` subject[^.]+" +
-        escapeRegularExpression(certificationTask) +
-        " plan",
-      "iu",
-    ),
-  );
-});
-
-test("already-certified standards renewal uses one descendant evidence revision", async () => {
-  const certificationPlan = await readRepositoryFile(
-    "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md",
-  );
-  const renewalBoundary = certificationPlan
-    .split("### Plan A reconciliation boundary\n", 2)[1]
-    ?.split("\n## Certification outcomes", 1)[0];
-  const originalPreflight = namedLabel("Task", "1");
-  const certificationTask = namedLabel("Task", "6D");
-
-  assert.equal(typeof renewalBoundary, "string");
-  assert.match(
-    renewalBoundary,
-    /already-certified `standards@0\.3\.0` subject/iu,
-  );
-  assert.match(
-    renewalBoundary,
-    /This is evidence renewal for the already-certified `standards@0\.3\.0` subject, not a second pending-to-certified transition/iu,
-  );
-  assert.match(
-    renewalBoundary,
-    /single post-Plan A evidence revision[^.]+all eight outcomes/iu,
-  );
-  assert.equal(
-    renewalBoundary.includes(
-      `do not reapply ${originalPreflight}'s original pending-subject prerequisite`,
-    ),
-    true,
-  );
-  assert.match(
-    renewalBoundary,
-    /Rerun all eight on that exact descendant rather than carrying an earlier outcome forward/iu,
-  );
-  assert.match(
-    renewalBoundary,
-    /Preserve the certified registry status throughout this evidence renewal/iu,
-  );
-  assert.equal(
-    renewalBoundary.includes(
-      `may not modify the stopped ${certificationTask} branch, its receipt, registry entry, evidence, or certification status`,
-    ),
-    true,
-  );
-  for (const outcome of [
-    "fresh-scaffold",
-    "unit-tests",
-    "component-tests",
-    "state-agreement",
-    "generated-project-builds",
-    "browser-regression",
-    "retained-fixture-matrix",
-    "ci-contract",
-  ]) {
-    assert.equal(renewalBoundary.includes(`\`${outcome}\``), true, outcome);
-  }
-  assert.equal(
-    renewalBoundary.includes(
-      `resume at this plan's ${originalPreflight} preflight`,
-    ),
-    false,
-  );
 });
 
 test("accepted ADRs use the repository decision contract", async () => {
@@ -3754,7 +3179,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     readme,
-    /standards@0\.3\.0[^\n]+\[renewed eight-outcome receipt\]\(docs\/implementation-evidence\/generated-unit-component-testing-certification-receipt\.json\)[^\n]+d7c63b0aaa9bebd56c075f16f1e5d86519853698/iu,
+    /standards@0\.3\.0[^\n]+renewed eight-outcome private receipt[^\n]+d7c63b0aaa9bebd56c075f16f1e5d86519853698/iu,
   );
   assert.match(
     roadmap,
@@ -3776,7 +3201,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     contributing,
-    /The executable builder currently has seven capability descriptors.*retains exact `portfolio`, `portfolio-calendly`, and `site` fixtures.*all three fixtures are certified locally.*recurring Calendly browser proof.*separate exact-revision provider receipt certifies.*protected-staging.*confirmation.*cancellation.*cleanup/isu,
+    /The executable builder currently has seven capability descriptors.*retains exact `portfolio`, `portfolio-calendly`, and `site` fixtures.*all three fixtures are certified locally.*recurring Calendly browser proof.*separate private exact-revision provider receipt certifies.*protected-staging.*confirmation.*cancellation.*cleanup/isu,
   );
   assert.match(
     packageOwnership,

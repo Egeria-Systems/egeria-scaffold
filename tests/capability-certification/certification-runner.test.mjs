@@ -1,7 +1,18 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, lstat, readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import {
+  access,
+  chmod,
+  cp,
+  copyFile,
+  lstat,
+  mkdir,
+  mkdtemp,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
@@ -18,6 +29,27 @@ const checkScript = resolve(
   repositoryRoot,
   "scripts/check-capability-certification.mjs",
 );
+const certificationRegistryPath = resolve(
+  repositoryRoot,
+  "certifications/capabilities.json",
+);
+const builderCoreDistPath = resolve(
+  repositoryRoot,
+  "packages/builder-core/dist",
+);
+const builderCoreNodeModulesPath = resolve(
+  repositoryRoot,
+  "packages/builder-core/node_modules",
+);
+const privatePlanPath =
+  "docs/superpowers/plans/private-certification-validation.md";
+const privateEvidencePath =
+  "docs/implementation-evidence/private-certification-validation.md";
+const privateSubject = Object.freeze({
+  descriptorVersion: "0.1.0",
+  behaviorContractDigest:
+    "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab",
+});
 const certificationScript = resolve(
   repositoryRoot,
   "scripts/certify-booking-calendly.mjs",
@@ -25,45 +57,6 @@ const certificationScript = resolve(
 const generatedTestingCertificationScript = resolve(
   repositoryRoot,
   "scripts/certify-generated-testing.mjs",
-);
-const generatedTestingReceiptPath = resolve(
-  repositoryRoot,
-  "docs/implementation-evidence/generated-unit-component-testing-certification-receipt.json",
-);
-const generatedTestingEvidenceRevision =
-  "d7c63b0aaa9bebd56c075f16f1e5d86519853698";
-const generatedTestingSubject = Object.freeze({
-  descriptorVersion: "0.3.0",
-  behaviorContractDigest:
-    "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb",
-});
-const generatedTestingOutcomeCommands = Object.freeze({
-  "fresh-scaffold": Object.freeze([
-    "pnpm run verify:generated-testing-certification",
-  ]),
-  "unit-tests": Object.freeze(["pnpm --dir apps/web run test:unit"]),
-  "component-tests": Object.freeze([
-    "pnpm --dir apps/web run test:component",
-  ]),
-  "state-agreement": Object.freeze([
-    "node apps/cli/dist/index.js infer --directory GENERATED_PROJECT",
-    "node apps/cli/dist/index.js doctor --directory GENERATED_PROJECT",
-    "node apps/cli/dist/index.js diff --directory GENERATED_PROJECT",
-  ]),
-  "generated-project-builds": Object.freeze([
-    "pnpm run verify:generated-testing-certification",
-  ]),
-  "browser-regression": Object.freeze([
-    "pnpm run verify:generated-testing-certification",
-  ]),
-  "retained-fixture-matrix": Object.freeze([
-    "pnpm run test:generated-fixtures",
-    "pnpm run verify:generated-skeletons",
-  ]),
-  "ci-contract": Object.freeze(["pnpm run test:constitution"]),
-});
-const generatedTestingOutcomeIdentifiers = Object.freeze(
-  Object.keys(generatedTestingOutcomeCommands),
 );
 
 const fixedChecks = Object.freeze([
@@ -93,10 +86,103 @@ async function pathExists(path) {
   }
 }
 
-async function runCheck(arguments_) {
+async function copyCertificationRuntime(cleanRoot) {
+  await chmod(cleanRoot, 0o700);
+  await mkdir(join(cleanRoot, "scripts"), { recursive: true });
+  await mkdir(join(cleanRoot, "certifications"), { recursive: true });
+  await mkdir(join(cleanRoot, "packages/builder-core"), { recursive: true });
+  await mkdir(join(cleanRoot, "node_modules"), { recursive: true });
+  const cleanCheckScript = join(
+    cleanRoot,
+    "scripts/check-capability-certification.mjs",
+  );
+  await copyFile(checkScript, cleanCheckScript);
+  await cp(builderCoreDistPath, join(cleanRoot, "packages/builder-core/dist"), {
+    recursive: true,
+  });
+  for (const dependency of ["yaml", "zod"]) {
+    await cp(
+      join(builderCoreNodeModulesPath, dependency),
+      join(cleanRoot, "node_modules", dependency),
+      { dereference: true, recursive: true },
+    );
+  }
+  return cleanCheckScript;
+}
+
+function createPrivateRegistry(revision) {
+  return {
+    schemaVersion: "1.0.0",
+    records: {
+      "booking-calendly": {
+        subject: privateSubject,
+        requiredEvidence: ["fresh-scaffold"],
+        status: "certified",
+        taskPlan: privatePlanPath,
+        evidence: [
+          {
+            kind: "fresh-scaffold",
+            path: privateEvidencePath,
+            outcome: "passed",
+            revision,
+            subject: privateSubject,
+          },
+        ],
+      },
+    },
+  };
+}
+
+function createPrivateEvidence(revision, decision = "accepted") {
+  return [
+    "**Certification capability:** `booking-calendly`",
+    "**Certification descriptor version:** `0.1.0`",
+    `**Certification behavior-contract digest:** \`${privateSubject.behaviorContractDigest}\``,
+    `**Certification evidence revision:** \`${revision}\``,
+    "**Passed certification outcomes:** `fresh-scaffold`",
+    "**Reviewed certification outcomes:** `fresh-scaffold`",
+    "**Certification receipt status:** `complete`",
+    `**Certification reviewer decision:** \`${decision}\``,
+    "**Certification unresolved prompts:** `none`",
+  ].join("\n");
+}
+
+async function writePrivateValidationFixture(
+  cleanRoot,
+  revision,
+  decision = "accepted",
+) {
+  await mkdir(dirname(join(cleanRoot, privatePlanPath)), { recursive: true });
+  await mkdir(dirname(join(cleanRoot, privateEvidencePath)), { recursive: true });
+  await writeFile(join(cleanRoot, privatePlanPath), "# Private plan\n", "utf8");
+  await writeFile(
+    join(cleanRoot, privateEvidencePath),
+    createPrivateEvidence(revision, decision),
+    "utf8",
+  );
+  await writeFile(
+    join(cleanRoot, "certifications/capabilities.json"),
+    `${JSON.stringify(createPrivateRegistry(revision), null, 2)}\n`,
+    "utf8",
+  );
+}
+
+function assertArtifactIssue(result, code) {
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.stderr, "");
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.ok, false);
+  assert.equal(report.gate, "artifacts");
+  assert.equal(report.issues.some((issue) => issue.code === code), true);
+}
+
+async function runCheck(
+  arguments_,
+  { cwd = repositoryRoot, script = checkScript } = {},
+) {
   try {
-    const result = await execFileAsync(process.execPath, [checkScript, ...arguments_], {
-      cwd: repositoryRoot,
+    const result = await execFileAsync(process.execPath, [script, ...arguments_], {
+      cwd,
       encoding: "utf8",
       env: { PATH: process.env.PATH },
     });
@@ -107,72 +193,6 @@ async function runCheck(arguments_) {
       stdout: error.stdout,
       stderr: error.stderr,
     };
-  }
-}
-
-function assertExactKeys(value, expectedKeys) {
-  assert.deepEqual(Object.keys(value).toSorted(), expectedKeys.toSorted());
-}
-
-function assertGeneratedTestingReceipt(receipt) {
-  assertExactKeys(receipt, [
-    "schemaVersion",
-    "capability",
-    "subject",
-    "evidenceRevision",
-    "status",
-    "reviewDecision",
-    "unresolvedPrompts",
-    "hostedRunClaim",
-    "outcomes",
-  ]);
-  assert.equal(receipt.schemaVersion, "1.0.0");
-  assert.equal(receipt.capability, "standards");
-  assert.deepEqual(receipt.subject, generatedTestingSubject);
-  assert.equal(receipt.evidenceRevision, generatedTestingEvidenceRevision);
-  assert.equal(receipt.status, "complete");
-  assert.equal(receipt.reviewDecision, "accepted");
-  assert.deepEqual(receipt.unresolvedPrompts, []);
-  assert.deepEqual(receipt.hostedRunClaim, {
-    claimed: false,
-    basis: "static-ci-contract-only",
-  });
-  assert.equal(receipt.outcomes.length, generatedTestingOutcomeIdentifiers.length);
-  assert.deepEqual(
-    receipt.outcomes.map(({ identifier }) => identifier),
-    generatedTestingOutcomeIdentifiers,
-  );
-  assert.equal(
-    new Set(receipt.outcomes.map(({ identifier }) => identifier)).size,
-    generatedTestingOutcomeIdentifiers.length,
-  );
-
-  for (const outcome of receipt.outcomes) {
-    assertExactKeys(outcome, [
-      "identifier",
-      "capability",
-      "subject",
-      "evidenceRevision",
-      "commands",
-      "result",
-      "reviewDecision",
-      "summary",
-    ]);
-    assert.equal(outcome.capability, "standards");
-    assert.deepEqual(outcome.subject, generatedTestingSubject);
-    assert.equal(outcome.evidenceRevision, generatedTestingEvidenceRevision);
-    assert.deepEqual(
-      outcome.commands,
-      generatedTestingOutcomeCommands[outcome.identifier],
-    );
-    assert.equal(outcome.result, "passed");
-    assert.equal(outcome.reviewDecision, "accepted");
-    assert.equal(typeof outcome.summary, "string");
-    assert.notEqual(outcome.summary.length, 0);
-    assert.doesNotMatch(
-      outcome.summary,
-      /PRIVATE_VALUE|\/private\/|\[replace|\bTBD\b/u,
-    );
   }
 }
 
@@ -221,72 +241,112 @@ test("the repository registry closes the legacy-backfill-exempt transition after
   });
 });
 
-test("the generated testing receipt binds all reviewed outcomes to the exact standards subject", async () => {
-  const receipt = JSON.parse(await readFile(generatedTestingReceiptPath, "utf8"));
-  assertGeneratedTestingReceipt(receipt);
+test("the ordinary certification gate does not require private workflow artifacts", async () => {
+  const cleanRoot = await mkdtemp(
+    join(tmpdir(), "egeria-certification-clean-checkout-"),
+  );
 
-  const mutations = [
-    {
-      label: "missing outcome",
-      mutate(candidate) {
-        candidate.outcomes.pop();
-      },
-    },
-    {
-      label: "failed outcome",
-      mutate(candidate) {
-        candidate.outcomes[0].result = "failed";
-      },
-    },
-    {
-      label: "stale revision",
-      mutate(candidate) {
-        candidate.outcomes[0].evidenceRevision = "0".repeat(40);
-      },
-    },
-    {
-      label: "duplicated outcome",
-      mutate(candidate) {
-        candidate.outcomes[1] = structuredClone(candidate.outcomes[0]);
-      },
-    },
-    {
-      label: "extra outcome",
-      mutate(candidate) {
-        candidate.outcomes.push({
-          ...structuredClone(candidate.outcomes[0]),
-          identifier: "unexpected",
-        });
-      },
-    },
-    {
-      label: "wrong subject",
-      mutate(candidate) {
-        candidate.outcomes[0].subject.descriptorVersion = "0.2.0";
-      },
-    },
-    {
-      label: "unreviewed outcome",
-      mutate(candidate) {
-        candidate.outcomes[0].reviewDecision = "pending";
-      },
-    },
-    {
-      label: "unresolved prompt",
-      mutate(candidate) {
-        candidate.unresolvedPrompts.push("present");
-      },
-    },
-  ];
-
-  for (const { label, mutate } of mutations) {
-    const candidate = structuredClone(receipt);
-    mutate(candidate);
-    assert.throws(
-      () => assertGeneratedTestingReceipt(candidate),
-      undefined,
-      label,
+  try {
+    const cleanCheckScript = await copyCertificationRuntime(cleanRoot);
+    await copyFile(
+      certificationRegistryPath,
+      join(cleanRoot, "certifications/capabilities.json"),
     );
+
+    const result = await runCheck([], {
+      cwd: cleanRoot,
+      script: cleanCheckScript,
+    });
+
+    assert.deepEqual(result, {
+      exitCode: 0,
+      stdout: `${JSON.stringify({
+        ok: true,
+        gate: "admission",
+        records: 7,
+      })}\n`,
+      stderr: "",
+    });
+  } finally {
+    await rm(cleanRoot, { recursive: true, force: true });
+  }
+});
+
+test("private certification validation rejects missing, rejected, and non-ancestor evidence", async () => {
+  const cleanRoot = await mkdtemp(
+    join(tmpdir(), "egeria-private-certification-validation-"),
+  );
+
+  try {
+    const cleanCheckScript = await copyCertificationRuntime(cleanRoot);
+    await writeFile(join(cleanRoot, "baseline.txt"), "baseline\n", "utf8");
+    await execFileAsync("git", ["init", "--quiet"], { cwd: cleanRoot });
+    await execFileAsync("git", ["add", "baseline.txt"], { cwd: cleanRoot });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Certification Test",
+        "-c",
+        "user.email=certification@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "baseline",
+      ],
+      { cwd: cleanRoot },
+    );
+    const { stdout: revisionOutput } = await execFileAsync(
+      "git",
+      ["rev-parse", "HEAD"],
+      { cwd: cleanRoot, encoding: "utf8" },
+    );
+    const revision = revisionOutput.trim();
+    await writePrivateValidationFixture(cleanRoot, revision);
+
+    const accepted = await runCheck(["--artifacts"], {
+      cwd: cleanRoot,
+      script: cleanCheckScript,
+    });
+    assert.deepEqual(accepted, {
+      exitCode: 0,
+      stdout: `${JSON.stringify({
+        ok: true,
+        gate: "artifacts",
+        records: 1,
+      })}\n`,
+      stderr: "",
+    });
+
+    await rm(join(cleanRoot, privateEvidencePath));
+    assertArtifactIssue(
+      await runCheck(["--artifacts"], {
+        cwd: cleanRoot,
+        script: cleanCheckScript,
+      }),
+      "CERTIFICATION_EVIDENCE_MISSING",
+    );
+
+    await writePrivateValidationFixture(cleanRoot, revision, "rejected");
+    assertArtifactIssue(
+      await runCheck(["--artifacts"], {
+        cwd: cleanRoot,
+        script: cleanCheckScript,
+      }),
+      "CERTIFICATION_EVIDENCE_REVIEW_REJECTED",
+    );
+
+    const nonAncestorRevision = "0".repeat(40);
+    await writePrivateValidationFixture(cleanRoot, nonAncestorRevision);
+    assertArtifactIssue(
+      await runCheck(["--artifacts"], {
+        cwd: cleanRoot,
+        script: cleanCheckScript,
+      }),
+      "CERTIFICATION_EVIDENCE_REVISION_UNKNOWN",
+    );
+  } finally {
+    await rm(cleanRoot, { recursive: true, force: true });
   }
 });
 

@@ -6,6 +6,7 @@
   "scripts": {
     "build:builder": "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run build",
     "check:capability-certification": "pnpm --filter @egeria-systems/builder-core run build && node scripts/check-capability-certification.mjs",
+    "check:private-capability-certification": "pnpm --filter @egeria-systems/builder-core run build && node scripts/check-capability-certification.mjs --artifacts",
     "check:package-release": "node scripts/check-package-release.mjs",
     "check:copy-externalization": "eslint \"packages/builder-core/templates/**/app/**/*.tsx\" \"packages/builder-core/templates/**/src/integrations/**/*.tsx\" \"packages/builder-core/templates/**/src/presentation/**/*.tsx\" \"packages/builder-core/templates/**/src/sections/**/*.tsx\" --config eslint.config.mjs --max-warnings 0",
     "check:semantic-naming": "node scripts/check-semantic-naming.mjs",

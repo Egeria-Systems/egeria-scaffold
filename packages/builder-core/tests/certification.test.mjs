@@ -9,10 +9,6 @@ const planPath =
 const evidencePath =
   "docs/implementation-evidence/2026-08-10-booking-calendly-certification-verification.md";
 const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
-const evidenceDocumentSource = readFileSync(
-  new URL(`../../../${evidencePath}`, import.meta.url),
-  "utf8",
-);
 const observabilityPlanPath =
   "docs/superpowers/plans/2026-08-10-production-observability-certification.md";
 const standardsPlanPath =
@@ -44,6 +40,34 @@ const descriptorDigests = Object.freeze({
   standards:
     "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb",
 });
+
+function createEvidenceDocument({
+  capability = "booking-calendly",
+  descriptorVersion = "0.1.0",
+  behaviorContractDigest = descriptorDigests["booking-calendly"],
+  revision = evidenceRevision,
+  passed = "fresh-scaffold",
+  reviewed = "fresh-scaffold",
+  status = "complete",
+  decision = "accepted",
+  unresolvedPrompts = "none",
+  additionalLines = [],
+} = {}) {
+  return [
+    `**Certification capability:** \`${capability}\``,
+    `**Certification descriptor version:** \`${descriptorVersion}\``,
+    `**Certification behavior-contract digest:** \`${behaviorContractDigest}\``,
+    `**Certification evidence revision:** \`${revision}\``,
+    `**Passed certification outcomes:** \`${passed}\``,
+    `**Reviewed certification outcomes:** \`${reviewed}\``,
+    `**Certification receipt status:** \`${status}\``,
+    `**Certification reviewer decision:** \`${decision}\``,
+    `**Certification unresolved prompts:** \`${unresolvedPrompts}\``,
+    ...additionalLines,
+  ].join("\n");
+}
+
+const evidenceDocumentSource = createEvidenceDocument();
 
 const requiredEvidence = Object.freeze({
   "booking-calendly": Object.freeze([
@@ -365,10 +389,6 @@ test("material observability is certified from reviewed deployed and fresh-scaff
       },
     ],
   });
-  assert.doesNotThrow(() =>
-    readFileSync(new URL(`../../../${observabilityPlanPath}`, import.meta.url)),
-  );
-
   const falseLegacy = structuredClone(committedRegistry);
   falseLegacy.records.observability.status = "backfill-pending";
   falseLegacy.records.observability.taskPlan = null;
@@ -411,9 +431,6 @@ test("material standards testing changes have exact reviewed certification evide
       },
     ],
   });
-  assert.doesNotThrow(() =>
-    readFileSync(new URL(`../../../${standardsPlanPath}`, import.meta.url)),
-  );
 });
 
 test("repository artifacts bind successful evidence to capability, subject, revision, and outcome", () => {
@@ -523,29 +540,12 @@ test("repository artifacts reject incomplete or unresolved reviewer receipts", (
   const recorded = cloneRegistry();
   const booking = recorded.records["booking-calendly"];
   booking.evidence = evidenceFor(booking, ["fresh-scaffold"]);
-  const incompleteReceipt = [
-    "# Incomplete receipt",
-    "",
-    "**Certification capability:** `booking-calendly`",
-    "",
-    "**Certification descriptor version:** `0.1.0`",
-    "",
-    `**Certification behavior-contract digest:** \`${descriptorDigests["booking-calendly"]}\``,
-    "",
-    `**Certification evidence revision:** \`${evidenceRevision}\``,
-    "",
-    "**Passed certification outcomes:** `fresh-scaffold`",
-    "",
-    "**Reviewed certification outcomes:** `fresh-scaffold`",
-    "",
-    "**Certification receipt status:** `incomplete`",
-    "",
-    "**Certification reviewer decision:** `rejected`",
-    "",
-    "**Certification unresolved prompts:** `present`",
-    "",
-    "- Remaining evidence: [replace before review]",
-  ].join("\n");
+  const incompleteReceipt = createEvidenceDocument({
+    status: "incomplete",
+    decision: "rejected",
+    unresolvedPrompts: "present",
+    additionalLines: ["- Remaining evidence: [replace before review]"],
+  });
 
   assert.deepEqual(
     core.validateCertificationArtifacts({
@@ -582,27 +582,9 @@ test("repository artifacts require affirmative review of every claimed outcome",
   const recorded = cloneRegistry();
   const booking = recorded.records["booking-calendly"];
   booking.evidence = evidenceFor(booking, ["fresh-scaffold"]);
-  const mismatchedReview = [
-    "# Mismatched review",
-    "",
-    "**Certification capability:** `booking-calendly`",
-    "",
-    "**Certification descriptor version:** `0.1.0`",
-    "",
-    `**Certification behavior-contract digest:** \`${descriptorDigests["booking-calendly"]}\``,
-    "",
-    `**Certification evidence revision:** \`${evidenceRevision}\``,
-    "",
-    "**Passed certification outcomes:** `fresh-scaffold`",
-    "",
-    "**Reviewed certification outcomes:** `deployed-application`",
-    "",
-    "**Certification receipt status:** `complete`",
-    "",
-    "**Certification reviewer decision:** `accepted`",
-    "",
-    "**Certification unresolved prompts:** `none`",
-  ].join("\n");
+  const mismatchedReview = createEvidenceDocument({
+    reviewed: "deployed-application",
+  });
 
   assert.deepEqual(
     core.validateCertificationArtifacts({
