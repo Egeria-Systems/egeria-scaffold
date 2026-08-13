@@ -1,15 +1,24 @@
 export {
+  operationalCaptureMechanisms,
   operationalErrorCategories,
   operationalEventKinds,
   operationalRuntimes,
   operationalSeverities,
+  type CreateOperationalErrorReportOptions,
   type CreateOperationalEventOptions,
+  type DiagnosticSink,
   type DispatchResult,
+  type ErrorCaptureContext,
   type EventClock,
+  type ExceptionDiagnostics,
   type OperationalAttributeValue,
   type OperationalAttributes,
+  type OperationalCaptureMechanism,
   type OperationalContext,
   type OperationalErrorCategory,
+  type OperationalErrorReport,
+  type OperationalErrorReportResult,
+  type OperationalErrorReportValidationCode,
   type OperationalEvent,
   type OperationalEventInput,
   type OperationalEventKind,
@@ -20,7 +29,15 @@ export {
   type SinkFailureReason,
   type SinkWriteResult,
 } from "./contracts.js";
-export { dispatchOperationalEvent } from "./dispatch.js";
+export {
+  createOperationalErrorReport,
+  isOperationalErrorReport,
+  reconstructOperationalErrorReport,
+} from "./diagnostics.js";
+export {
+  dispatchOperationalErrorReport,
+  dispatchOperationalEvent,
+} from "./dispatch.js";
 export {
   createOperationalEvent,
   normalizeErrorCategory,

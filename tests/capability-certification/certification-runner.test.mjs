@@ -176,7 +176,7 @@ function assertGeneratedTestingReceipt(receipt) {
   }
 }
 
-test("the repository registry admits certified standards while remaining open for observability", async () => {
+test("the repository registry closes the legacy-backfill-exempt transition after observability certification", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -190,18 +190,11 @@ test("the repository registry admits certified standards while remaining open fo
 
   const closure = await runCheck(["--closure", "legacy-backfill-exempt"]);
   assert.deepEqual(closure, {
-    exitCode: 1,
+    exitCode: 0,
     stdout: `${JSON.stringify({
-      ok: false,
+      ok: true,
       gate: "closure",
       policy: "legacy-backfill-exempt",
-      issues: [
-        {
-          code: "CAPABILITY_CERTIFICATION_PENDING",
-          path: ["records", "observability", "status"],
-          context: { reason: "pending" },
-        },
-      ],
     })}\n`,
     stderr: "",
   });
@@ -216,7 +209,6 @@ test("the repository registry admits certified standards while remaining open fo
       issues: [
         ["content-files", "backfill-pending"],
         ["deployment-cloudflare", "backfill-pending"],
-        ["observability", "pending"],
         ["section-composition", "backfill-pending"],
         ["site-routing", "backfill-pending"],
       ].map(([capabilityIdentifier, reason]) => ({

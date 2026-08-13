@@ -36,7 +36,7 @@ const descriptorDigests = Object.freeze({
   "deployment-cloudflare":
     "sha256:846ae45d15ba9d8f256a9b7a1d8a4f3cda1b871a3b3f79f7656fd621050e8273",
   observability:
-    "sha256:a4f15a132e08da307ab412673b02152fee8509c0cc1dabb4b60856abd61f5d97",
+    "sha256:937a3dcad0c96b45ae9f4acb977bd65e46e2caa50bd3fc6dfb29561a1ab637b9",
   "section-composition":
     "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
   "site-routing":
@@ -59,7 +59,6 @@ const requiredEvidence = Object.freeze({
     "fresh-scaffold",
   ]),
   observability: Object.freeze([
-    "cleanup-recovery",
     "deployed-application",
     "fresh-scaffold",
   ]),
@@ -329,7 +328,7 @@ test("descriptor admission rejects incomplete, stale, extra, and false-legacy co
   );
 });
 
-test("material observability remains pending with only reviewed fresh-scaffold evidence", () => {
+test("material observability is certified from reviewed deployed and fresh-scaffold evidence", () => {
   const observabilityDescriptor = descriptorsByIdentifier.get("observability");
   assert.notEqual(observabilityDescriptor, undefined);
   const observabilityRecord = committedRegistry.records.observability;
@@ -338,24 +337,30 @@ test("material observability remains pending with only reviewed fresh-scaffold e
   assert.deepEqual(observabilityRecord, {
     subject: core.createCertificationSubject(
       observabilityDescriptor,
-      ["cleanup-recovery", "deployed-application", "fresh-scaffold"],
+      ["deployed-application", "fresh-scaffold"],
     ),
-    requiredEvidence: [
-      "cleanup-recovery",
-      "deployed-application",
-      "fresh-scaffold",
-    ],
-    status: "pending",
+    requiredEvidence: ["deployed-application", "fresh-scaffold"],
+    status: "certified",
     taskPlan: observabilityPlanPath,
     evidence: [
       {
-        kind: "fresh-scaffold",
-        path: "docs/implementation-evidence/2026-08-11-production-observability-certification-verification.md",
+        kind: "deployed-application",
+        path: "docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md",
         outcome: "passed",
-        revision: "ef845b1e0551d3b43e17969cc00f21960c90769b",
+        revision: "ee1e1df10fa2be2f09333efecd86de7f7a131d49",
         subject: core.createCertificationSubject(
           observabilityDescriptor,
-          ["cleanup-recovery", "deployed-application", "fresh-scaffold"],
+          ["deployed-application", "fresh-scaffold"],
+        ),
+      },
+      {
+        kind: "fresh-scaffold",
+        path: "docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md",
+        outcome: "passed",
+        revision: "ee1e1df10fa2be2f09333efecd86de7f7a131d49",
+        subject: core.createCertificationSubject(
+          observabilityDescriptor,
+          ["deployed-application", "fresh-scaffold"],
         ),
       },
     ],

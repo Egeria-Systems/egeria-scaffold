@@ -24,6 +24,42 @@ export const operationalErrorCategories = Object.freeze([
   "unexpected",
 ] as const);
 
+export const operationalCaptureMechanisms = Object.freeze([
+  "browser-error-event",
+  "browser-unhandled-rejection",
+  "react-error-boundary",
+  "next-request-error",
+  "selected-catch",
+] as const);
+
+export const operationalRouterKinds = Object.freeze([
+  "app-router",
+  "pages-router",
+] as const);
+
+export const operationalRouteTypes = Object.freeze([
+  "action",
+  "proxy",
+  "render",
+  "route",
+] as const);
+
+export const operationalRenderSources = Object.freeze([
+  "react-server-components",
+  "react-server-components-payload",
+  "server-rendering",
+] as const);
+
+export const operationalRenderTypes = Object.freeze([
+  "dynamic",
+  "dynamic-resume",
+] as const);
+
+export const operationalRevalidateReasons = Object.freeze([
+  "on-demand",
+  "stale",
+] as const);
+
 export const sinkFailureReasons = Object.freeze([
   "invalid-event",
   "invalid-result",
@@ -40,6 +76,8 @@ export type OperationalRuntime = (typeof operationalRuntimes)[number];
 export type OperationalEventKind = (typeof operationalEventKinds)[number];
 export type OperationalErrorCategory =
   (typeof operationalErrorCategories)[number];
+export type OperationalCaptureMechanism =
+  (typeof operationalCaptureMechanisms)[number];
 export type SinkFailureReason = (typeof sinkFailureReasons)[number];
 
 export type OperationalAttributeValue = boolean | number | string;
@@ -48,12 +86,15 @@ export type OperationalAttributes = Readonly<
 >;
 
 export type OperationalContext = Readonly<{
-  correlationId: string;
+  eventId: string;
+  correlationId?: string;
   releaseId?: string;
+  service: string;
+  environment?: string;
 }>;
 
 export type OperationalEvent = Readonly<{
-  schemaVersion: "1.0.0";
+  schemaVersion: "2.0.0";
   occurredAt: string;
   name: string;
   kind: OperationalEventKind;
@@ -70,8 +111,11 @@ export type OperationalEventInput = Readonly<{
   runtime: OperationalRuntime;
   severity: OperationalSeverity;
   context: Readonly<{
-    correlationId: string;
+    eventId: string;
+    correlationId?: string;
     releaseId?: string;
+    service: string;
+    environment?: string;
   }>;
   errorCategory?: OperationalErrorCategory;
   attributes?: Readonly<Record<string, unknown>>;
@@ -111,6 +155,77 @@ export type OperationalSink = Readonly<{
     event: OperationalEvent,
   ) => SinkWriteResult | Promise<SinkWriteResult>;
 }>;
+
+export type ErrorCaptureContext = Readonly<{
+  mechanism: OperationalCaptureMechanism;
+  handled: boolean;
+  operation?: string;
+  routerKind?: (typeof operationalRouterKinds)[number];
+  routeType?: (typeof operationalRouteTypes)[number];
+  renderSource?: (typeof operationalRenderSources)[number];
+  renderType?: (typeof operationalRenderTypes)[number];
+  revalidateReason?: (typeof operationalRevalidateReasons)[number];
+  requestMethod?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "HEAD" | "OPTIONS";
+  routeIdentifier?: string;
+}>;
+
+export type ExceptionDiagnostics = Readonly<{
+  exceptionType: string;
+  exceptionMessage?: string;
+  exceptionStacktrace?: string;
+  exceptionCode?: string;
+  exceptionDigest?: string;
+  fingerprint: string;
+  cause?: ExceptionDiagnostics;
+  truncated: boolean;
+}>;
+
+export type OperationalErrorReport = Readonly<{
+  event: OperationalEvent;
+  capture: ErrorCaptureContext;
+  diagnostics: ExceptionDiagnostics;
+}>;
+
+export type DiagnosticSink = Readonly<{
+  identifier: string;
+  writeReport: (
+    report: OperationalErrorReport,
+  ) => SinkWriteResult | Promise<SinkWriteResult>;
+}>;
+
+const operationalReplacementByDiagnosticSink = new WeakMap<object, string>();
+
+export function registerDiagnosticSinkOperationalReplacement(
+  sink: DiagnosticSink,
+  operationalSinkIdentifier: string,
+): void {
+  operationalReplacementByDiagnosticSink.set(sink, operationalSinkIdentifier);
+}
+
+export function readDiagnosticSinkOperationalReplacement(
+  sink: unknown,
+): string | undefined {
+  return typeof sink === "object" && sink !== null
+    ? operationalReplacementByDiagnosticSink.get(sink)
+    : undefined;
+}
+
+export type CreateOperationalErrorReportOptions = Readonly<
+  Record<string, never>
+>;
+
+export type OperationalErrorReportValidationCode =
+  | "ERROR_REPORT_CAPTURE_INVALID"
+  | "ERROR_REPORT_DIAGNOSTICS_INVALID"
+  | "ERROR_REPORT_EVENT_INVALID"
+  | "ERROR_REPORT_INPUT_INVALID";
+
+export type OperationalErrorReportResult =
+  | Readonly<{ ok: true; value: OperationalErrorReport }>
+  | Readonly<{
+      ok: false;
+      code: OperationalErrorReportValidationCode;
+    }>;
 
 export type DispatchResult = Readonly<
   | { sink: string; status: "delivered" }

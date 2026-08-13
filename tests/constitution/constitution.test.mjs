@@ -2852,6 +2852,10 @@ test("capability delivery requires a separately planned certification task", asy
       "i",
     ),
   );
+  assert.match(
+    clientReadySection,
+    /observability@0\.2\.0[^#]+certified[^#]+cleanup-recovery[^#]+not claimed[^#]+retained-resource disposition/iu,
+  );
   const lifecycleSection = programRoadmap
     .split(`## ${lifecyclePhase} — Transactional lifecycle\n`, 2)[1]
     .split("## Capability delivery task pair", 1)[0];
@@ -2944,7 +2948,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+four unchanged subjects[^\n]+backfill-pending[^\n]+observability@0\.2\.0[^\n]+pending/i,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+observability@0\.2\.0[^\n]+certified[^\n]+four unchanged subjects[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2952,7 +2956,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission passes[^\n]+transition and all-certified closure[^\n]+remain open/i,
+    /descriptor admission and transition closure pass[^\n]+all-certified closure rejects the four frozen backfills/i,
   );
   assert.match(
     design,
@@ -3100,9 +3104,19 @@ test("executable capability certification ownership is current", async () => {
   }
   const registry = JSON.parse(registrySource);
   const bookingRecord = registry.records["booking-calendly"];
+  const observabilityRecord = registry.records.observability;
   const standardsRecord = registry.records.standards;
   assert.equal(bookingRecord.status, "certified");
+  assert.equal(observabilityRecord.status, "certified");
   assert.equal(standardsRecord.status, "certified");
+  assert.deepEqual(observabilityRecord.requiredEvidence, [
+    "deployed-application",
+    "fresh-scaffold",
+  ]);
+  assert.deepEqual(
+    observabilityRecord.evidence.map(({ kind }) => kind),
+    ["deployed-application", "fresh-scaffold"],
+  );
   assert.match(
     packageOwnership,
     /descriptor `standards@0\.3\.0` is certified from its exact local subject-bound receipt[^\n]+public `0\.2\.0` availability alone does not alter the installed public package/iu,
@@ -3167,7 +3181,7 @@ test("executable capability certification ownership is current", async () => {
   assert.doesNotMatch(providerReceipt, privateCalendlyUrlPattern);
   assert.match(
     enforcementMap,
-    /descriptor admission passes[^\n]+transition and all-certified closure[^\n]+remain open/iu,
+    /descriptor admission and transition closure pass[^\n]+all-certified closure rejects the four frozen backfills/iu,
   );
   assert.match(
     enforcementMap,
@@ -3225,6 +3239,7 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   const implementationPredecessor = namedLabel("Task", "6");
   const independentStream = namedLabel("Task", "6B");
   const certificationTask = namedLabel("Task", "6D");
+  const diagnosticsReleaseTask = namedLabel("Task", "5");
   const portfolioPhase = compactLabel("P", "2");
 
   assert.match(reviewProtocol, /^### Direct-predecessor gate$/mu);
@@ -3302,17 +3317,20 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   assert.match(
     roadmap,
     new RegExp(
-      `(?:${escapeRegularExpression(portfolioPhase)} )?${escapeRegularExpression(independentStream)} is the separate[\\s\\S]+?certification increment`,
+      `(?:${escapeRegularExpression(portfolioPhase)} )?${escapeRegularExpression(independentStream)} is the separate[\\s\\S]+?certification increment[\\s\\S]+?complete`,
       "iu",
     ),
   );
   assert.match(
     roadmap,
-    /protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, deployment, publication, and production remain separate/iu,
+    /cleanup-recovery[^.]+not claimed[^.]+retained-resource disposition[^.]+accepted/iu,
   );
   assert.match(
     roadmap,
-    /Within the remaining observability task, protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, merge, and push remain unauthorized/iu,
+    new RegExp(
+      `diagnostics ${escapeRegularExpression(diagnosticsReleaseTask)}[^.]+selected[^.]+next increment[^.]+certification transition[^.]+integrated`,
+      "iu",
+    ),
   );
 
   assert.match(
@@ -3495,6 +3513,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   const calendlyCertificationTask = namedLabel("Task", "5B");
   const observabilityTask = namedLabel("Task", "6");
   const generatedTestingTask = namedLabel("Task", "6C");
+  const generatedTestingCertificationTask = namedLabel("Task", "6D");
 
   assert.deepEqual(
     {
@@ -3578,7 +3597,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     roadmap,
-    /The observability capability retains reviewed local fresh-scaffold evidence[^.]+certification outcomes remain separate/iu,
+    /explicitly amended `observability@0\.2\.0` certification candidate records reviewed deployed-application and fresh-scaffold evidence[\s\S]{0,200}`cleanup-recovery` is not claimed/iu,
   );
   assert.match(
     roadmap,
@@ -3609,18 +3628,18 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(namedLabel("Task", "6D"))} evidence renewal[^\\n]+d7c63b0aaa9bebd56c075f16f1e5d86519853698[^\\n]+all eight outcomes`,
+      `${escapeRegularExpression(namedLabel("Task", "6D"))} evidence renewal[^\\n]+all eight[^\\n]+d7c63b0aaa9bebd56c075f16f1e5d86519853698`,
       "iu",
     ),
   );
   assert.match(
     roadmap,
-    /Protected-staging, provider\/source, credentials, telemetry transmission, cleanup, certification transition, deployment, publication, and production remain separate/iu,
+    /observability certification MR is pushed[^.]+merge, package publication, another deployment, provider mutation, cleanup, and production remain separate/iu,
   );
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Plan A is accepted at \`main@368b9491fd2f813f83f1e456823d8c7546f6762c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} evidence renewal`,
+      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(generatedTestingCertificationTask)} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Automatic-CI Plan A is integrated at accepted \`main@368b9491fd2f813f83f1e456823d8c7546f6762c\`[\\s\\S]+${escapeRegularExpression(generatedTestingCertificationTask)} evidence renewal is integrated at accepted \`main@7b5324cfcffc7eb94f48cc304cbfe0ceb08c3486\``,
       "u",
     ),
   );
