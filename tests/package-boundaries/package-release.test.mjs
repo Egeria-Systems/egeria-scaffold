@@ -656,6 +656,7 @@ test("package release workflow is manual, exact-commit-bound, and least privileg
   );
   assert.match(workflow, /^    if: github\.ref == 'refs\/heads\/main'$/m);
   assert.match(workflow, /^    runs-on: ubuntu-24\.04$/m);
+  assert.match(workflow, /^    timeout-minutes: 30$/m);
   assert.match(workflow, /^      name: npm-release$/m);
   const checkoutReference = workflow.match(
     /^        uses: (actions\/checkout@\S+)$/m,
@@ -677,6 +678,15 @@ test("package release workflow is manual, exact-commit-bound, and least privileg
   assert.match(
     workflow,
     /test "\$\(git rev-parse refs\/heads\/main\)" = "\$RELEASE_COMMIT"/,
+  );
+  const releaseContextIndex = workflow.indexOf(
+    "- name: Verify release context",
+  );
+  const releaseCandidateIndex = workflow.indexOf(
+    "- name: Verify release candidate",
+  );
+  assert.ok(
+    releaseContextIndex > -1 && releaseContextIndex < releaseCandidateIndex,
   );
   assert.equal(
     isPinnedGitHubActionReference(setupReference, "pnpm/setup"),

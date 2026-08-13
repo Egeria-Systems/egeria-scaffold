@@ -2,7 +2,11 @@
 
 **Date:** 2026-08-12 (America/Toronto)
 
-**Status:** Plan A local implementation, accepted-main reconciliation, selected PR #10 review repair, and affected verification are complete; the user authorized one focused commit and normal push to the existing branch
+**Status:** Accepted. Plan A received explicit verified-final-diff approval and PR #10 was squash-merged; the pre-integration publication boundary below remains historical evidence.
+
+**Verified-final-diff approval:** `approved`
+
+**Accepted Plan A revision:** `368b9491fd2f813f83f1e456823d8c7546f6762c`
 
 **Accepted Plan A base after reconciliation:** `ee1e1df10fa2be2f09333efecd86de7f7a131d49`
 
