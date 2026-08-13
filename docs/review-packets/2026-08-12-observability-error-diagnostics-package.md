@@ -10,7 +10,7 @@
 
 **Branch:** `observability-error-diagnostics`
 
-**Worktree:** `/Users/CoveMB/Code/CoveMB/egeria-scaffold/.worktrees/observability-error-diagnostics`
+**Worktree:** repository-linked isolated worktree for `observability-error-diagnostics`
 
 This packet presents only Tasks 1-4, the approved Gate A public-package candidate. The final documentation commit cannot include its own future hash. It does not approve or begin Task 5, version materialization, publication, push, pull request, merge, deployment, generated integration, provider configuration, or certification.
 
@@ -96,7 +96,7 @@ Temporary links to unchanged ignored dependencies were used because the isolated
 
 ## Rollback and recovery
 
-Use focused newest-first `git revert` for the final repair-evidence commit, `2ee05d0`, `1bac217`, `6a08c0d`, `195787b`, `1fa0868`, `6eacc5f`, `4ef9572`, and `4c71ea1` as far as the desired recovery boundary. Do not reset or rewrite history.
+Use focused newest-first `git revert` for `1e816bd`, `2ee05d0`, `1bac217`, `6a08c0d`, `195787b`, `1fa0868`, `6eacc5f`, `4ef9572`, and `4c71ea1` as far as the desired recovery boundary. Do not reset or rewrite history.
 
 No package, provider, credential, deployment, generated state, or persistent data was created or changed. Those rollback domains therefore have no current cleanup action.
 

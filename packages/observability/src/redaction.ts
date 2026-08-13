@@ -4,6 +4,7 @@ import type {
 } from "./contracts.js";
 
 const maximumAttributeCount = 16;
+const maximumExceptionRedactionInputBytes = 65_536;
 const attributeNamePattern = /^[a-z][a-z0-9_]{0,63}$/u;
 const safeStringPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u;
 const prohibitedAttributeNamePattern =
@@ -89,7 +90,9 @@ export function truncateUtf8(
 
 export function redactExceptionText(
   value: string,
-): Readonly<{ value: string; redacted: boolean }> {
+): Readonly<{ value: string; redacted: boolean; truncated: boolean }> {
+  const bounded = truncateUtf8(value, maximumExceptionRedactionInputBytes);
+  value = bounded.value;
   let redacted = false;
   const replace = (
     pattern: RegExp,
@@ -114,20 +117,26 @@ export function redactExceptionText(
     (_match, key) => `${key}=${exceptionRedactionMarkers.secret}`,
   );
   replace(exceptionKnownSecretPattern, exceptionRedactionMarkers.secret);
-  replace(
-    uriUserInfoPattern,
-    (_match, scheme) => `${scheme}${exceptionRedactionMarkers.secret}@`,
-  );
+  if (value.includes("://")) {
+    replace(
+      uriUserInfoPattern,
+      (_match, scheme) => `${scheme}${exceptionRedactionMarkers.secret}@`,
+    );
+  }
   replace(exceptionJwtPattern, exceptionRedactionMarkers.secret);
   replace(exceptionEmailPattern, exceptionRedactionMarkers.email);
   replace(exceptionIpv4Pattern, exceptionRedactionMarkers.ip);
-  replace(exceptionIpv6Pattern, (candidate) => {
-    const colonCount = candidate.match(/:/gu)?.length ?? 0;
-    return candidate.includes("::") || colonCount >= 3
-      ? exceptionRedactionMarkers.ip
-      : candidate;
-  });
-  replace(urlDetailsPattern, (_match, base) => base);
+  if (value.includes(":")) {
+    replace(exceptionIpv6Pattern, (candidate) => {
+      const colonCount = candidate.match(/:/gu)?.length ?? 0;
+      return candidate.includes("::") || colonCount >= 3
+        ? exceptionRedactionMarkers.ip
+        : candidate;
+    });
+  }
+  if (value.includes("://")) {
+    replace(urlDetailsPattern, (_match, base) => base);
+  }
   replace(
     uncAbsolutePathPattern,
     (_match, file) => `${exceptionRedactionMarkers.path}\\${file}`,
@@ -141,7 +150,7 @@ export function redactExceptionText(
     (_match, file) => `${exceptionRedactionMarkers.path}/${file}`,
   );
 
-  return Object.freeze({ value, redacted });
+  return Object.freeze({ value, redacted, truncated: bounded.truncated });
 }
 
 function isPlainRecord(value: unknown): value is Readonly<Record<string, unknown>> {

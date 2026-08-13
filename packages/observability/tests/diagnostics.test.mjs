@@ -8,6 +8,7 @@ import {
   isOperationalErrorReport,
   reconstructOperationalErrorReport,
 } from "@egeria-systems/observability";
+import { redactExceptionText } from "../dist/redaction.js";
 
 const fixedClock = Object.freeze({
   now: () => new Date("2026-08-12T12:00:00.000Z"),
@@ -290,6 +291,14 @@ test("diagnostics redact private shapes, paths, URL details, and enforce byte an
   );
   assert.equal(diagnostics.exceptionCode, "ERR_RENDER");
   assert.equal(diagnostics.exceptionDigest, "digest-123");
+});
+
+test("exception redaction pre-bounds untrusted text before pattern matching", () => {
+  const result = redactExceptionText("x".repeat(65_537));
+
+  assert.equal(result.truncated, true);
+  assert.equal(Buffer.byteLength(result.value, "utf8"), 65_536);
+  assert.match(result.value, /\[TRUNCATED\]$/u);
 });
 
 test("restricted diagnostics redact quoted and multi-token credential values completely", () => {

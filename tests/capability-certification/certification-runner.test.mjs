@@ -31,7 +31,7 @@ const generatedTestingReceiptPath = resolve(
   "docs/implementation-evidence/generated-unit-component-testing-certification-receipt.json",
 );
 const generatedTestingEvidenceRevision =
-  "c9294e9dc59d4b7bafed406846af3b43a10733d3";
+  "d7c63b0aaa9bebd56c075f16f1e5d86519853698";
 const generatedTestingSubject = Object.freeze({
   descriptorVersion: "0.3.0",
   behaviorContractDigest:

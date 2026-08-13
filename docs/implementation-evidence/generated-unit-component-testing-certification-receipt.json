@@ -5,7 +5,7 @@
     "descriptorVersion": "0.3.0",
     "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
   },
-  "evidenceRevision": "c9294e9dc59d4b7bafed406846af3b43a10733d3",
+  "evidenceRevision": "d7c63b0aaa9bebd56c075f16f1e5d86519853698",
   "status": "complete",
   "reviewDecision": "accepted",
   "unresolvedPrompts": [],
@@ -21,7 +21,7 @@
         "descriptorVersion": "0.3.0",
         "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
       },
-      "evidenceRevision": "c9294e9dc59d4b7bafed406846af3b43a10733d3",
+      "evidenceRevision": "d7c63b0aaa9bebd56c075f16f1e5d86519853698",
       "commands": [
         "pnpm run verify:generated-testing-certification"
       ],
@@ -36,7 +36,7 @@
         "descriptorVersion": "0.3.0",
         "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
       },
-      "evidenceRevision": "c9294e9dc59d4b7bafed406846af3b43a10733d3",
+      "evidenceRevision": "d7c63b0aaa9bebd56c075f16f1e5d86519853698",
       "commands": [
         "pnpm --dir apps/web run test:unit"
       ],
@@ -51,7 +51,7 @@
         "descriptorVersion": "0.3.0",
         "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
       },
-      "evidenceRevision": "c9294e9dc59d4b7bafed406846af3b43a10733d3",
+      "evidenceRevision": "d7c63b0aaa9bebd56c075f16f1e5d86519853698",
       "commands": [
         "pnpm --dir apps/web run test:component"
       ],
@@ -66,7 +66,7 @@
         "descriptorVersion": "0.3.0",
         "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
       },
-      "evidenceRevision": "c9294e9dc59d4b7bafed406846af3b43a10733d3",
+      "evidenceRevision": "d7c63b0aaa9bebd56c075f16f1e5d86519853698",
       "commands": [
         "node apps/cli/dist/index.js infer --directory GENERATED_PROJECT",
         "node apps/cli/dist/index.js doctor --directory GENERATED_PROJECT",
@@ -83,13 +83,13 @@
         "descriptorVersion": "0.3.0",
         "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
       },
-      "evidenceRevision": "c9294e9dc59d4b7bafed406846af3b43a10733d3",
+      "evidenceRevision": "d7c63b0aaa9bebd56c075f16f1e5d86519853698",
       "commands": [
         "pnpm run verify:generated-testing-certification"
       ],
       "result": "passed",
       "reviewDecision": "accepted",
-      "summary": "The fresh generated project passed lint, Cloudflare type generation, strict typecheck, Next.js build, and OpenNext build checks."
+      "summary": "The fresh generated project passed lint, Cloudflare type generation, strict typecheck, one standalone Next.js build, and the OpenNext transform with --skipNextBuild."
     },
     {
       "identifier": "browser-regression",
@@ -98,7 +98,7 @@
         "descriptorVersion": "0.3.0",
         "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
       },
-      "evidenceRevision": "c9294e9dc59d4b7bafed406846af3b43a10733d3",
+      "evidenceRevision": "d7c63b0aaa9bebd56c075f16f1e5d86519853698",
       "commands": [
         "pnpm run verify:generated-testing-certification"
       ],
@@ -113,14 +113,14 @@
         "descriptorVersion": "0.3.0",
         "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
       },
-      "evidenceRevision": "c9294e9dc59d4b7bafed406846af3b43a10733d3",
+      "evidenceRevision": "d7c63b0aaa9bebd56c075f16f1e5d86519853698",
       "commands": [
         "pnpm run test:generated-fixtures",
         "pnpm run verify:generated-skeletons"
       ],
       "result": "passed",
       "reviewDecision": "accepted",
-      "summary": "All 8 fixture contracts passed, and the fixed verifier passed for portfolio, Calendly portfolio, and site."
+      "summary": "All 9 fixture contracts passed, including 47, 52, and 49 byte-stable files, and the fixed verifier passed for portfolio, Calendly portfolio, and site."
     },
     {
       "identifier": "ci-contract",
@@ -129,13 +129,13 @@
         "descriptorVersion": "0.3.0",
         "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
       },
-      "evidenceRevision": "c9294e9dc59d4b7bafed406846af3b43a10733d3",
+      "evidenceRevision": "d7c63b0aaa9bebd56c075f16f1e5d86519853698",
       "commands": [
         "pnpm run test:constitution"
       ],
       "result": "passed",
       "reviewDecision": "accepted",
-      "summary": "Static workflow contracts passed with explicit unit and component lanes; no hosted workflow run is claimed."
+      "summary": "All 55 constitution tests passed for the consolidated five-job, no-cache workflow contract; no hosted workflow run is claimed."
     }
   ]
 }

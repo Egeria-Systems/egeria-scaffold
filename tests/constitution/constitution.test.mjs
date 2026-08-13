@@ -2956,7 +2956,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission and transition closure pass[^\n]+all-certified closure[^\n]+remains open/i,
+    /descriptor admission and transition closure pass[^\n]+all-certified closure rejects the four frozen backfills/i,
   );
   assert.match(
     design,
@@ -3181,7 +3181,7 @@ test("executable capability certification ownership is current", async () => {
   assert.doesNotMatch(providerReceipt, privateCalendlyUrlPattern);
   assert.match(
     enforcementMap,
-    /descriptor admission and transition closure pass[^\n]+all-certified closure[^\n]+remains open/iu,
+    /descriptor admission and transition closure pass[^\n]+all-certified closure rejects the four frozen backfills/iu,
   );
   assert.match(
     enforcementMap,
@@ -3623,16 +3623,23 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     readme,
-    /standards@0\.3\.0[^\n]+\[accepted-main eight-outcome receipt\]\(docs\/implementation-evidence\/generated-unit-component-testing-certification-receipt\.json\)[^\n]+c9294e9dc59d4b7bafed406846af3b43a10733d3/iu,
-  );
-  assert.match(
-    roadmap,
-    /Push, merge, package publication, another deployment, provider mutation, cleanup, and production remain separate/iu,
+    /standards@0\.3\.0[^\n]+\[renewed eight-outcome receipt\]\(docs\/implementation-evidence\/generated-unit-component-testing-certification-receipt\.json\)[^\n]+d7c63b0aaa9bebd56c075f16f1e5d86519853698/iu,
   );
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(generatedTestingCertificationTask)} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Automatic-CI Plan A is integrated at accepted \`main@368b9491fd2f813f83f1e456823d8c7546f6762c\`[\\s\\S]+${escapeRegularExpression(generatedTestingCertificationTask)} stream must still renew`,
+      `${escapeRegularExpression(namedLabel("Task", "6D"))} evidence renewal[^\\n]+all eight[^\\n]+d7c63b0aaa9bebd56c075f16f1e5d86519853698`,
+      "iu",
+    ),
+  );
+  assert.match(
+    roadmap,
+    /observability certification MR is pushed[^.]+merge, package publication, another deployment, provider mutation, cleanup, and production remain separate/iu,
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(generatedTestingCertificationTask)} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Automatic-CI Plan A is integrated at accepted \`main@368b9491fd2f813f83f1e456823d8c7546f6762c\`[\\s\\S]+${escapeRegularExpression(generatedTestingCertificationTask)} evidence renewal is integrated at accepted \`main@7b5324cfcffc7eb94f48cc304cbfe0ceb08c3486\``,
       "u",
     ),
   );

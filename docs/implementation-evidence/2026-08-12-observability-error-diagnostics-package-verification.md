@@ -8,7 +8,7 @@
 
 **Verified implementation tree before final repair evidence:** `2ee05d0644a0bd8ae2f05e47dfed791248098705`
 
-**Branch and worktree:** `observability-error-diagnostics` at `/Users/CoveMB/Code/CoveMB/egeria-scaffold/.worktrees/observability-error-diagnostics`
+**Branch and worktree:** `observability-error-diagnostics` in its repository-linked isolated worktree
 
 The authorized base is the clean merge of planning commit `ab42a280e953b0dfb5d837290de323c5afd0c56b` with the then-latest local `main`/`origin/main` state `12ecc73a8337ab12ece9dd3a6b2aec03f940383c`. Remote refs were not fetched because the user authorized that exact latest local state and this increment performs no remote, publication, provider, or deployment action.
 
@@ -86,7 +86,7 @@ The package-boundary suite's packed-consumer test builds immediately, packs to a
 
 ## Rollback and recovery
 
-Source recovery is a focused newest-first `git revert`, never reset or history rewriting, across the final repair-evidence commit, `2ee05d0`, `1bac217`, `6a08c0d`, `195787b`, `1fa0868`, `6eacc5f`, `4ef9572`, and `4c71ea1` as far as the desired recovery boundary. The merge base `80d85cc` is the recovery boundary.
+Source recovery is a focused newest-first `git revert`, never reset or history rewriting, across `1e816bd`, `2ee05d0`, `1bac217`, `6a08c0d`, `195787b`, `1fa0868`, `6eacc5f`, `4ef9572`, and `4c71ea1` as far as the desired recovery boundary. The merge base `80d85cc` is the recovery boundary.
 
 No version, registry artifact, provider resource, credential, deployment, generated state, or persistent data was created. There is therefore no current registry, provider, credential, deployment, or data cleanup action. Any future action in those domains needs its own authorization and recovery plan.
 

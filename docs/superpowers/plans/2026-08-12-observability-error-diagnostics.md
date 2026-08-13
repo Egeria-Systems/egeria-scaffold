@@ -25,7 +25,7 @@ The current certification closure is not the package candidate's predecessor and
 
 ## Global Constraints
 
-- Work only in `/Users/CoveMB/Code/CoveMB/egeria-scaffold/.worktrees/observability-error-diagnostics` on branch `observability-error-diagnostics`. Planning base is `2a315aa0e7dce1bf1048b9a2c07e318add9241de`.
+- Work only in the repository-linked isolated worktree for branch `observability-error-diagnostics`. Planning base is `2a315aa0e7dce1bf1048b9a2c07e318add9241de`.
 - Before any edit, read the root and applicable nested `AGENTS.md` files plus every canonical source named in the design. Revalidate branch, status, HEAD, and active worktrees. Stop on unrelated dirty state, base drift, or an overlapping generated-template implementation.
 - Use `rtk` for every shell command and the exact Volta Node/pnpm versions above. Use `CI=true` for pnpm verification.
 - Follow strict RED-GREEN-REFACTOR for behavior changes. Capture the intended RED failure before implementation. Do not manufacture tests for comments, evidence-only changes, or a single CI wiring fix.
@@ -230,13 +230,13 @@ No other file is in scope without a written evidence-backed plan amendment appro
 - Add `createOperationalErrorReport(event, error, capture, options)`, `reconstructOperationalErrorReport(input)`, and `isOperationalErrorReport(value)`.
 - Preserve `createOperationalEvent` and `isOperationalEvent` as the only constructors/brands for safe events.
 
-- [ ] RED: test that an ordinary event cannot contain `message`, `stack`, `cause`, `url`, `path`, or arbitrary nested values and that no diagnostic field is exposed through `OperationalSink` or safe serialization.
-- [ ] RED: test error reports for a normal `Error`, primitive rejection, missing fields, hostile getters/proxies, non-enumeration, two-level cause limit, cycles, multibyte byte limits, 64-line server stack limit, absolute path/query/fragment removal, secret/JWT/email/IP redaction, fixed truncation markers, exact versioned FNV-1a fingerprint vectors, invalid capture vocabularies, and deep immutability.
-- [ ] Run `rtk volta run --node 22.23.2 --pnpm 11.20.0 pnpm --filter @egeria-systems/observability run build` and the focused diagnostics/contracts tests; retain the expected missing-export/type/test failures.
-- [ ] GREEN: implement only the package-owned pure constructors, guarded readers, UTF-8 bounds, normalized stack-line policy, redaction, fingerprint, brand checks, and immutable results needed by the tests.
-- [ ] Advance the operational event schema to `2.0.0`. Require `eventId` and `service`, make `correlationId` optional, and do not let new generated code use a per-event correlation ID. Compatibility with schema `1.0.0` remains available only by retaining the immutable published `0.2.0` package; do not add a dual-schema overload to `0.3.0`.
-- [ ] Run the focused tests GREEN, then `rtk proxy env CI=true volta run --node 22.23.2 --pnpm 11.20.0 pnpm --filter @egeria-systems/observability run verify`.
-- [ ] Commit with message `Add provider-neutral error diagnostics`.
+- [x] RED: test that an ordinary event cannot contain `message`, `stack`, `cause`, `url`, `path`, or arbitrary nested values and that no diagnostic field is exposed through `OperationalSink` or safe serialization.
+- [x] RED: test error reports for a normal `Error`, primitive rejection, missing fields, hostile getters/proxies, non-enumeration, two-level cause limit, cycles, multibyte byte limits, 64-line server stack limit, absolute path/query/fragment removal, secret/JWT/email/IP redaction, fixed truncation markers, exact versioned FNV-1a fingerprint vectors, invalid capture vocabularies, and deep immutability.
+- [x] Run `rtk volta run --node 22.23.2 --pnpm 11.20.0 pnpm --filter @egeria-systems/observability run build` and the focused diagnostics/contracts tests; retain the expected missing-export/type/test failures.
+- [x] GREEN: implement only the package-owned pure constructors, guarded readers, UTF-8 bounds, normalized stack-line policy, redaction, fingerprint, brand checks, and immutable results needed by the tests.
+- [x] Advance the operational event schema to `2.0.0`. Require `eventId` and `service`, make `correlationId` optional, and do not let new generated code use a per-event correlation ID. Compatibility with schema `1.0.0` remains available only by retaining the immutable published `0.2.0` package; do not add a dual-schema overload to `0.3.0`.
+- [x] Run the focused tests GREEN, then `rtk proxy env CI=true volta run --node 22.23.2 --pnpm 11.20.0 pnpm --filter @egeria-systems/observability run verify`.
+- [x] Commit with message `Add provider-neutral error diagnostics`.
 
 ### Task 2: Add explicit diagnostic dispatch and Better Stack encoding
 
@@ -254,14 +254,14 @@ No other file is in scope without a written evidence-backed plan amendment appro
 - Add an in-memory diagnostic sink and assertions in `./testing`.
 - Keep `dispatchOperationalEvent`, `createStructuredLogSink`, and `createBetterStackSink` safe-only.
 
-- [ ] RED: prove safe sinks receive only `report.event`, diagnostic sinks receive the branded report, all valid sinks run despite peer failure, malformed results normalize to stable reasons, and thrown/rejected sinks never escape.
-- [ ] RED: prove one Better Stack enriched record uses bounded `exception.type`, `exception.message`, `exception.stacktrace`, code/digest/fingerprint/cause, capture context, and the existing safe event fields; token, URL, response body, and provider error content never appear in results.
-- [ ] RED: prove error dispatch does not send a second safe-only Better Stack error record when the same adapter is the approved diagnostic destination.
-- [ ] Run focused tests and retain the intended RED failures.
-- [ ] GREEN: implement the distinct diagnostic dispatcher, provider record serializer, Better Stack diagnostic sink, and test sink with the existing injected request, host/token validation, timeout, payload cap, exact `202` success, and content-safe failure behavior.
-- [ ] Keep the enriched record below 96,000 UTF-8 bytes even after JSON encoding; fail closed rather than dropping only the safe event.
-- [ ] Run focused tests GREEN and the full package verification.
-- [ ] Commit with message `Separate operational and diagnostic delivery`.
+- [x] RED: prove safe sinks receive only `report.event`, diagnostic sinks receive the branded report, all valid sinks run despite peer failure, malformed results normalize to stable reasons, and thrown/rejected sinks never escape.
+- [x] RED: prove one Better Stack enriched record uses bounded `exception.type`, `exception.message`, `exception.stacktrace`, code/digest/fingerprint/cause, capture context, and the existing safe event fields; token, URL, response body, and provider error content never appear in results.
+- [x] RED: prove error dispatch does not send a second safe-only Better Stack error record when the same adapter is the approved diagnostic destination.
+- [x] Run focused tests and retain the intended RED failures.
+- [x] GREEN: implement the distinct diagnostic dispatcher, provider record serializer, Better Stack diagnostic sink, and test sink with the existing injected request, host/token validation, timeout, payload cap, exact `202` success, and content-safe failure behavior.
+- [x] Keep the enriched record below 96,000 UTF-8 bytes even after JSON encoding; fail closed rather than dropping only the safe event.
+- [x] Run focused tests GREEN and the full package verification.
+- [x] Commit with message `Separate operational and diagnostic delivery`.
 
 ### Task 3: Add versioned browser error-report envelopes
 
@@ -276,14 +276,14 @@ No other file is in scope without a written evidence-backed plan amendment appro
 - Add a distinct schema `2.0.0` `BrowserErrorEnvelope` with discriminator `error-report` and `createBrowserErrorEnvelope(report)`.
 - Add a browser diagnostic transport sink whose input is an `OperationalErrorReport` and whose output never contains credentials or transport details.
 
-- [ ] RED: reject server-runtime reports, non-error events, unbranded reports, unknown fields, unsafe capture values, and oversized serialized envelopes.
-- [ ] RED: accept bounded browser error, unhandled rejection, React boundary, and selected-catch reports while preserving immutable safe and restricted tiers.
-- [ ] RED: prove the serialized browser envelope is at most 8,192 UTF-8 bytes after deterministic cause removal, stack truncation, then message truncation; prove the fixed truncation markers remain; and return `BROWSER_ERROR_ENVELOPE_TOO_LARGE` when required safe fields alone cannot fit. Test exact 8,192/8,193 boundaries with multibyte and JSON-escaped input.
-- [ ] RED: prove safe web-vital envelopes cannot acquire diagnostics.
-- [ ] Run focused browser tests and retain RED.
-- [ ] GREEN: implement the smallest distinct browser-report envelope and injected delivery boundary.
-- [ ] Run focused tests GREEN and full package verification.
-- [ ] Commit with message `Encode bounded browser error reports`.
+- [x] RED: reject server-runtime reports, non-error events, unbranded reports, unknown fields, unsafe capture values, and oversized serialized envelopes.
+- [x] RED: accept bounded browser error, unhandled rejection, React boundary, and selected-catch reports while preserving immutable safe and restricted tiers.
+- [x] RED: prove the serialized browser envelope is at most 8,192 UTF-8 bytes after deterministic cause removal, stack truncation, then message truncation; prove the fixed truncation markers remain; and return `BROWSER_ERROR_ENVELOPE_TOO_LARGE` when required safe fields alone cannot fit. Test exact 8,192/8,193 boundaries with multibyte and JSON-escaped input.
+- [x] RED: prove safe web-vital envelopes cannot acquire diagnostics.
+- [x] Run focused browser tests and retain RED.
+- [x] GREEN: implement the smallest distinct browser-report envelope and injected delivery boundary.
+- [x] Run focused tests GREEN and full package verification.
+- [x] Commit with message `Encode bounded browser error reports`.
 
 ### Task 4: Document, independently review, and stop at the package gate
 
@@ -297,14 +297,15 @@ No other file is in scope without a written evidence-backed plan amendment appro
 - Modify: `tests/package-boundaries/public-observability.test.mjs`
 - Modify: `tests/package-boundaries/release-safeguards.test.mjs`
 
-- [ ] Add the new public export only if it materially improves boundary clarity; otherwise export the provider-neutral constructors from root and provider adapter from `./server`. Update exact API and pack-inventory tests.
-- [ ] Record a minor Changeset for target `0.3.0`, restricted-data warnings, safe/diagnostic sink separation, compatibility impact, and no new runtime dependency.
-- [ ] Update canonical package instructions/docs to permit bounded restricted diagnostics only through the explicit contract. Keep generic operational attributes safe.
-- [ ] Run package verification, package-boundary tests, constitution, semantic naming, package packing/inventory, zero-runtime-dependency checks, and `rtk git diff --check`.
-- [ ] Dispatch independent read-only requirements, architecture/anti-overengineering, test-evidence, and security/privacy reviewers for the exact package-candidate range. Prohibit edits and recursive fan-out. Validate every finding against the current tree; use a focused RED/GREEN repair only for material defects.
-- [ ] Record the exact comparison, commands/results, API/compatibility effects, review dispositions, risks, and rollback in the evidence and packet.
-- [ ] Commit with message `Record observability diagnostics package candidate`.
-- [ ] Re-run only checks affected by the evidence commit, verify a clean worktree, and STOP at Gate A. Do not publish or edit builder integration files.
+- [x] Add the new public export only if it materially improves boundary clarity; otherwise export the provider-neutral constructors from root and provider adapter from `./server`. Update exact API and pack-inventory tests.
+- [x] Record a minor Changeset for target `0.3.0`, restricted-data warnings, safe/diagnostic sink separation, compatibility impact, and no new runtime dependency.
+- [x] Update canonical package instructions/docs to permit bounded restricted diagnostics only through the explicit contract. Keep generic operational attributes safe.
+- [x] Run package verification, package-boundary tests, constitution, semantic naming, package packing/inventory, zero-runtime-dependency checks, and `rtk git diff --check`.
+- [x] Dispatch independent read-only requirements, architecture/anti-overengineering, test-evidence, and security/privacy reviewers for the exact package-candidate range. Prohibit edits and recursive fan-out. Validate every finding against the current tree; use a focused RED/GREEN repair only for material defects.
+- [x] Record the exact comparison, commands/results, API/compatibility effects, review dispositions, risks, and rollback in the evidence and packet.
+- [x] Commit with message `Record observability diagnostics package candidate`.
+- [x] Re-run only checks affected by the evidence commit, verify a clean worktree, and STOP at Gate A. Do not publish or edit builder integration files.
+- [ ] Obtain exact-diff approval for the reconciled package candidate after accepted-main integration and review repairs.
 
 ### Task 5: Materialize and verify the exact public package
 

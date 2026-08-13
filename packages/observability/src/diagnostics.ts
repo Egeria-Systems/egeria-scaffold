@@ -14,10 +14,10 @@ import {
 } from "./contracts.js";
 import { createOperationalEvent, isOperationalEvent } from "./events.js";
 import {
+  exceptionRedactionMarkers,
   isPrivateDataLikeString,
   redactExceptionText,
   truncateUtf8,
-  utf8ByteLength,
 } from "./redaction.js";
 
 const maximumMessageBytes = 2_048;
@@ -278,7 +278,7 @@ function sanitizeText(
   const bounded = truncateUtf8(redacted.value, maximumBytes);
   return Object.freeze({
     value: bounded.value,
-    changed: redacted.redacted || bounded.truncated,
+    changed: redacted.redacted || redacted.truncated || bounded.truncated,
   });
 }
 
@@ -293,12 +293,18 @@ function sanitizeStack(
   const lineBounded =
     lines.length <= maximumStackLines
       ? lines.join("\n")
-      : [...lines.slice(0, maximumStackLines - 1), "[TRUNCATED]"].join("\n");
+      : [
+          ...lines.slice(0, maximumStackLines - 1),
+          exceptionRedactionMarkers.truncated,
+        ].join("\n");
   const byteBounded = truncateUtf8(lineBounded, maximumStackBytes);
   return Object.freeze({
     value: byteBounded.value,
     changed:
-      redacted.redacted || lines.length > maximumStackLines || byteBounded.truncated,
+      redacted.redacted ||
+      redacted.truncated ||
+      lines.length > maximumStackLines ||
+      byteBounded.truncated,
   });
 }
 
@@ -540,24 +546,5 @@ export function isOperationalErrorReport(
     typeof value === "object" &&
     value !== null &&
     createdReports.has(value)
-  );
-}
-
-export const diagnosticLimits = Object.freeze({
-  maximumCauseLinks,
-  maximumMessageBytes,
-  maximumStackBytes,
-  maximumStackLines,
-});
-
-export function hasValidDiagnosticBounds(
-  diagnostics: ExceptionDiagnostics,
-): boolean {
-  return (
-    (diagnostics.exceptionMessage === undefined ||
-      utf8ByteLength(diagnostics.exceptionMessage) <= maximumMessageBytes) &&
-    (diagnostics.exceptionStacktrace === undefined ||
-      (utf8ByteLength(diagnostics.exceptionStacktrace) <= maximumStackBytes &&
-        diagnostics.exceptionStacktrace.split("\n").length <= maximumStackLines))
   );
 }
