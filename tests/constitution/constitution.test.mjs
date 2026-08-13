@@ -3221,6 +3221,8 @@ test("execution plans enforce direct predecessors and bounded independent-work e
     roadmap,
     implementationPlan,
     certificationPlan,
+    planAReviewPacket,
+    protectedWorkflowPlan,
   ] =
     await Promise.all([
       readRepositoryFile("docs/governance/review-and-contribution.md"),
@@ -3233,6 +3235,12 @@ test("execution plans enforce direct predecessors and bounded independent-work e
       ),
       readRepositoryFile(
         "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md",
+      ),
+      readRepositoryFile(
+        "docs/review-packets/2026-08-12-automatic-ci-efficiency-security.md",
+      ),
+      readRepositoryFile(
+        "docs/superpowers/plans/2026-08-12-protected-workflow-hardening.md",
       ),
     ]);
   const implementationTask = namedLabel("Task", "6C");
@@ -3270,6 +3278,19 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   assert.match(
     reviewProtocol,
     /does not approve[^.]+waive[^.]+final-diff gate[^.]+external mutation/iu,
+  );
+
+  assert.match(
+    protectedWorkflowPlan,
+    /Acceptance artifact:[^\n]+2026-08-12-automatic-ci-efficiency-security\.md[\s\S]+explicit verified-final-diff approval and an exact accepted revision/iu,
+  );
+  assert.match(
+    planAReviewPacket,
+    /\*\*Verified-final-diff approval:\*\* `approved`/u,
+  );
+  assert.match(
+    planAReviewPacket,
+    /\*\*Accepted Plan A revision:\*\* `368b9491fd2f813f83f1e456823d8c7546f6762c`/u,
   );
 
   assert.match(sourcePlan, /2026-08-11[^.]+independent-work exception/iu);
