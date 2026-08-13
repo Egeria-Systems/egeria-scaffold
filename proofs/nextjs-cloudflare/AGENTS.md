@@ -6,7 +6,7 @@ This directory is infrastructure evidence, not a builder application, generated 
 - Externalize all visible copy in `content/en-CA.json` and validate it before rendering.
 - Keep presentation components pure and Cloudflare imports in `src/infrastructure/cloudflare`, configuration/composition roots, or infrastructure tests.
 - Preserve the explicit Node development versus workerd preview/deployment distinction.
-- Use `pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:unit` for Vitest unit behavior, `test:integration:cloudflare` for the `createTestHarness()` Workers-runtime boundary, and `test:e2e:dev` plus `test:e2e:preview` for Playwright browser behavior. Keep this harness as compatibility evidence; never reuse it as product architecture. A passing layer proves only the environment it exercises.
+- Use `pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:unit` for Vitest unit behavior, `test:integration:cloudflare` for the `createTestHarness()` Workers-runtime boundary, and `test:e2e:dev` plus `test:e2e:preview` for Playwright browser behavior. Preview E2E consumes already prepared `.open-next` output, so run the Next build followed by the OpenNext `--skipNextBuild` transform first. Keep this harness as compatibility evidence; never reuse it as product architecture. A passing layer proves only the environment it exercises.
 - Do not add product behavior, provider integrations, analytics, observability, persistence, authentication, payments, or speculative abstractions.
 - Automated accessibility results are evidence only and do not establish WCAG conformance.
 - Read the root `AGENTS.md`, architecture documents, ADRs, and approved P0.2 plan before editing.

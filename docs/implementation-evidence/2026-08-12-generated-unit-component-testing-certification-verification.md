@@ -2,13 +2,15 @@
 
 **Date:** 2026-08-12 (America/Toronto)
 
-**Status:** All eight approved local certification outcomes passed for the exact standards subject; the candidate is reconciled with accepted `main`
+**Status:** All eight approved local certification outcomes were rerun successfully at accepted `main` and independently reviewed; the evidence-ancestry repair awaits verified-final-diff and integration approval
 
 **Planning base:** `12ecc73a8337ab12ece9dd3a6b2aec03f940383c`
 
-**Accepted main revision:** `2f45129e73b7fec9f353fb9c37314e190b5048a2`
+**Accepted main and evidence revision:** `c9294e9dc59d4b7bafed406846af3b43a10733d3`
 
-**Reconciliation merge:** `f9b6067951c8360b20d34e08f9ac2df4765f314e`
+**Task 6D source revision:** `a3f9c01c989fd7b033fbadd1a159b56925848b79`
+
+**Shared tree:** `0c7af5f591aea43c90d06c155bd28f69b0e4a6d1`
 
 **Certification capability:** `standards`
 
@@ -16,7 +18,7 @@
 
 **Certification behavior-contract digest:** `sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb`
 
-**Certification evidence revision:** `f9a962874d587e4594af341a1fe5f62db6d7672c`
+**Certification evidence revision:** `c9294e9dc59d4b7bafed406846af3b43a10733d3`
 
 **Passed certification outcomes:** `fresh-scaffold, unit-tests, component-tests, state-agreement, generated-project-builds, browser-regression, retained-fixture-matrix, ci-contract`
 
@@ -28,26 +30,32 @@
 
 **Certification unresolved prompts:** `none`
 
-## Subject and evidence boundary
+## Defect and evidence boundary
 
-The evidence-producing revision is a descendant of the integrated Task 6C revision and contains the thin compiled-CLI certification runner and its focused tests. The independently recomputed descriptor subject remained `standards@0.3.0` with the digest above before and after the registry-only transition.
+Accepted `origin/main` was `c9294e9dc59d4b7bafed406846af3b43a10733d3`. The clean Task 6D branch was `a3f9c01c989fd7b033fbadd1a159b56925848b79`. Both revisions resolved to the same tree, but the original evidence revision `f9a962874d587e4594af341a1fe5f62db6d7672c` was an ancestor only of the source branch. The repository's squash integration therefore preserved the content but not that evidence revision in accepted-main ancestry.
 
-The strict machine-readable receipt at `docs/implementation-evidence/generated-unit-component-testing-certification-receipt.json` binds all eight approved outcomes to that subject and revision. The capability registry requires only the causal `fresh-scaffold` evidence kind; the other seven outcomes decompose and review the local risk-based proof for that same generated baseline.
+An identity-bounded temporary checkout detached at accepted main reproduced the unmodified admission failure:
 
-## Passed execution record
+```json
+{"ok":false,"gate":"artifacts","issues":[{"code":"CERTIFICATION_EVIDENCE_REVISION_UNKNOWN","path":["records","standards","evidence",0,"revision"],"context":{"reason":"not-in-checked-history"}}]}
+```
 
-The exact Node.js `22.23.2` and pnpm `11.20.0` toolchain paths were used with `CI=true`. Network access was enabled only for package installation, registry audit/signature verification, and browser-backed verification.
+The ancestry validator remains unchanged. Relabelling was rejected because the original evidence had not run at accepted main. Instead, every receipt-bound outcome was rerun in a fresh, identity-bounded checkout at `c9294e9dc59d4b7bafed406846af3b43a10733d3`. The receipt and registry now identify that actual evidence-producing revision.
+
+## Accepted-main evidence rerun
+
+The exact Node.js `22.23.2` and pnpm `11.20.0` toolchain paths were used with `CI=true`. The accepted-main checkout had a clean index and worktree before and after verification and remained detached at the expected revision. Network access was enabled only for package installation, registry audit/signature verification, and browser-backed verification.
 
 | Outcome | Evidence | Result |
 | --- | --- | --- |
-| `fresh-scaffold` | `pnpm run verify:generated-testing-certification` | Passed the compiled create, inference, doctor, diff, install/audit/signature, lint/type, unit/component, build, and development/preview browser matrix; 19 checks reported. |
+| `fresh-scaffold` | `pnpm run verify:generated-testing-certification` | Passed the compiled create, inference, doctor, diff, install/audit/signature, lint/type, unit/component, build, and development/preview browser matrix; all 19 checks reported. |
 | `unit-tests` | Fresh generated `apps/web`: `pnpm run test:unit` | 1 file and 2 tests passed. |
 | `component-tests` | Fresh generated `apps/web`: `pnpm run test:component` | 1 file and 1 test passed under jsdom. |
 | `state-agreement` | Compiled CLI `infer`, `doctor`, and `diff` | State was valid, standards `0.3.0` was confirmed, diagnostics were healthy with zero findings, and the diff was equal with zero differences. |
 | `generated-project-builds` | Fresh-scaffold fixed verifier | Lint, Cloudflare types, strict typecheck, Next.js build, and OpenNext build passed. |
 | `browser-regression` | Fresh-scaffold fixed verifier | Local Next.js development and OpenNext/workerd preview Playwright/axe checks passed. |
 | `retained-fixture-matrix` | `pnpm run test:generated-fixtures`; `pnpm run verify:generated-skeletons` | 8 of 8 fixture contracts passed; 47, 52, and 49 byte-stable files were confirmed; the fixed verifier passed for portfolio, Calendly portfolio, and site. |
-| `ci-contract` | `pnpm run test:constitution` and static workflow inspection | The read-only explicit test-lane contract passed. No hosted run is claimed. |
+| `ci-contract` | `pnpm run test:constitution` and static workflow inspection | 53 of 53 constitution tests passed. No hosted run is claimed. |
 
 The bounded fresh-scaffold result was:
 
@@ -61,33 +69,26 @@ The bounded retained-fixture result was:
 {"ok":true,"fixtures":["portfolio","portfolio-calendly","site"],"profiles":["portfolio","site"],"checks":["pnpm-version","frozen-install","peer-dependencies","dependency-audit","registry-signatures","lint","cloudflare-types","typecheck","unit-tests","component-tests","next-build","opennext-build","browser-install","browser-development","browser-preview"]}
 ```
 
+The separate unit/component/state counts used the production compiled CLI with its documented injected-verifier boundary so that creation did not repeat the already-passed fixed-root verifier. The generated project used the accepted retained portfolio lockfile, installed 758 packages from the frozen lockfile with no downloads, passed the counts above, and returned valid inference, healthy diagnostics, and an equal diff.
+
 ## Setup-invalid attempts and cleanup
 
-The first direct unit/component commands were launched concurrently before the retained fresh project had dependencies. They began competing sandboxed installs and could not resolve the registry. Only those temporary-project processes were stopped; a single frozen install followed by sequential unit and component commands produced the recorded evidence.
+Two initial accepted-main attempts used an unpinned Node/pnpm pair or lacked required sandbox network authority; they were setup-invalid and are not counted. A later direct create entered sandbox registry retries because it invoked the fixed verifier, and the first retained-fixture run lost its session handle before a network-authorized rerun. Their exact temporary processes were terminated and their identity-bounded roots removed. None contributed evidence.
 
-The first retained-fixture invocation lost its session handle, and the duplicate retry ran without network authority. Both invalid process trees were stopped, their exact mode-0700 temporary owners were verified and removed, and neither attempt was counted. The one registry-enabled retained-fixture run above is the recorded result. No generated project content was retained.
+The recorded runs used the repository-pinned toolchain and necessary network authorization. All evidence checkouts, generated projects, and the one-off injected-verifier helper were removed after their owning revisions, modes, and clean states were verified.
 
-## Accepted-main reconciliation
+## Ancestry and integration constraint
 
-After explicit approval of the reviewed certification candidate and authorization to bring current `main` into its branch, `origin/main` was freshly fetched at `2f45129e73b7fec9f353fb9c37314e190b5048a2` and merged into `standards-certification` as `f9b6067951c8360b20d34e08f9ac2df4765f314e`. The merge parents are the reviewed certification artifact `3b930c63d920b3c12c450c9598ff8ca36fdbcc01` and that accepted main revision.
+The evidence revision is accepted main itself, so it is an ancestor of any future integration commit based on that revision or a descendant. The final candidate must be tested as an integration-shaped commit whose parent is accepted main. This is compatible with the repository's observed squash integration method because the receipt references the retained base revision, not a source-branch-only revision.
 
-The only path changed by both streams was `tests/constitution/constitution.test.mjs`. Git's clean merge retained the standards certification ownership contract and the newer release-action contract. The candidate-only comparison against accepted main remains the same 21-file certification scope recorded in the review packet; no generated/runtime input, descriptor, recipe, dependency, schema, workflow, or fixture changed.
+Integration must not change to an older or unrelated base. If accepted main advances, the integrator must prove `c9294e9dc59d4b7bafed406846af3b43a10733d3` is still an ancestor of the actual integration candidate and rerun admission there. No merge into `main`, push, pull request, workflow, or external action is part of this repair.
 
-Fresh reconciliation checks used Node.js `22.23.2`, pnpm `11.20.0`, `CI=true`, and the repository-required `rtk` prefix:
+One bounded independent read-only reviewer covered requirements, architecture/anti-overengineering, test evidence, ancestry, integration, claims, and recovery. The reviewer reported: `No material improvements recommended.` It confirmed the integration strategy only with the ancestry and exact-candidate admission constraint above; source-branch admission remains expected to fail because accepted main is not its ancestor.
 
-- constitution passed 53 of 53 assertions;
-- package boundaries passed 46 of 46 tests, including the inherited pending-Changeset selection and release-action contracts;
-- capability certification passed 24 of 24 tests;
-- certification admission passed for all seven records;
-- `legacy-backfill-exempt` closure produced the required non-zero rejection for only pending observability;
-- `all-certified` closure produced the required non-zero rejection for pending observability and the four unchanged backfills;
-- semantic naming and both reconciliation/full-range diff checks passed; and
-- the clean worktree contained no conflict markers or uncommitted changes.
-
-The expensive generated-project matrix was not repeated because reconciliation changed none of its source, dependency, schema, workflow, or fixture inputs. One bounded read-only final reviewer verified the parent identities, candidate-only and main-only preservation, the shared constitution merge, and an empty remerge diff, then reported: `No material improvements recommended.`
+The reviewed repair tree was also applied to a fresh temporary checkout and committed with accepted main as its sole parent. Accepted main was an ancestor. At repository-present repair candidate `b8ac2bc37455c33735065397211e62123d7223da`, `pnpm --filter @egeria-systems/builder-core run build && node --test packages/builder-core/tests/certification.test.mjs tests/capability-certification/certification-runner.test.mjs` passed 20 of 20 tests: 10 builder-core certification-contract tests and 10 certification-runner/receipt tests. The owning `pnpm run test:capability-certification` command then built builder-core and ran every `tests/capability-certification/*.test.mjs` file, passing 24 of 24 tests at the same revision. Admission passed for all seven records, constitution passed 53 of 53, semantic naming passed, and the diff/status checks were clean. The two closure policies produced only their documented expected rejections for pending observability and the four unchanged backfills.
 
 ## Claim limits and recovery
 
 No workflow was dispatched. No deployment, provider, credential, environment, permission, persistent data, or production system was read or mutated. Passing local Playwright/axe automation does not establish visual quality, human usability, assistive-technology compatibility, or WCAG conformance.
 
-Recovery reverts the registry status, receipt, verification evidence, review packet, and current-status documentation in newest-first focused changes. If the exact subject remains valid, its record returns to `pending`. No source, dependency, provider, deployment, persistent-data, credential, or production recovery applies.
+Recovery reverts the registry binding, receipt, verification evidence, review packet, tests, and current-status documentation in newest-first focused changes. If the exact subject remains valid, its record returns to `pending`. No source, dependency, provider, deployment, persistent-data, credential, or production recovery applies.
