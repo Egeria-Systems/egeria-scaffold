@@ -2,11 +2,13 @@
 
 **Date:** 2026-08-13 (America/Toronto)
 
-**Status:** Local implementation and independent review complete; awaiting verified-final-diff approval
+**Status:** Approved. Plan B received explicit verified-final-diff approval; integration and external actions remain separately gated.
 
-**Verified-final-diff approval:** `pending`
+**Verified-final-diff approval:** `approved`
 
 **Plan B base:** `2b39979aedcf405bd73abcd57ce5d9ee33771059`
+
+**Approved Plan B candidate:** `bac82110549ba3237f9c5a163a523630c9254fce`
 
 **Reviewed implementation candidate before this packet:** `fe1de0083d45b8153442c1ecc09645a86339082d`
 
@@ -14,7 +16,7 @@
 
 **Isolated worktree:** `.worktrees/protected-workflow-hardening`
 
-**Exact comparison:** base `2b39979aedcf405bd73abcd57ce5d9ee33771059` through the focused commit containing this packet. Its parent reviewed candidate is `fe1de0083d45b8153442c1ecc09645a86339082d`; the final handoff reports the containing commit because a commit cannot include its own hash.
+**Approved exact comparison:** `2b39979aedcf405bd73abcd57ce5d9ee33771059..bac82110549ba3237f9c5a163a523630c9254fce`. The focused commit containing this approval record is a documentary descendant and changes no approved workflow, test, compatibility-record, preparation-evidence, or verification-evidence byte.
 
 ## Outcome
 
@@ -135,6 +137,8 @@ Use focused newest-first reverts after base `2b39979aedcf405bd73abcd57ce5d9ee337
 
 Source recovery grants no authority to dispatch, deploy, publish, mutate an environment or credential, change provider state, execute cleanup, alter certification, or perform a production action. No external recovery applies because Plan B changed no external system.
 
-## Stop gate
+## Approval outcome
 
-Stop for explicit verified-final-diff approval after the final packet-integrity and exact Git comparison checks. Do not push, create a pull request, merge, dispatch a workflow, deploy, certify, publish, access providers or secrets, mutate GitHub settings or environments, reply to review comments, or perform a production action.
+Explicit verified-final-diff approval was received on 2026-08-13 for exact comparison `2b39979aedcf405bd73abcd57ce5d9ee33771059..bac82110549ba3237f9c5a163a523630c9254fce` after the final packet-integrity and Git checks. This approval closes the Plan B local review gate only.
+
+Keep the branch and worktree intact pending a separate integration choice. Do not push, create a pull request, merge, dispatch a workflow, deploy, certify, publish, access providers or secrets, mutate GitHub settings or environments, reply to review comments, or perform a production action without explicit authorization.
