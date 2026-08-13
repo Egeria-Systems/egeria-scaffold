@@ -3057,9 +3057,13 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(namedLabel("Task", "6D"))} now certifies the exact \`standards@0\.3\.0\` subject[\\s\\S]+exact final certification diff still requires verified-final-diff approval`,
+      `${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+all eight local outcomes were rerun at that accepted-main revision[\\s\\S]+evidence-ancestry repair's exact final diff requires verified-final-diff and integration approval`,
       "u",
     ),
+  );
+  assert.match(
+    readme,
+    /standards@0\.3\.0[^\n]+\[accepted-main eight-outcome receipt\]\(docs\/implementation-evidence\/generated-unit-component-testing-certification-receipt\.json\)[^\n]+c9294e9dc59d4b7bafed406846af3b43a10733d3/iu,
   );
   assert.match(
     roadmap,
@@ -3068,7 +3072,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} executes its separate certification increment on the isolated \`standards-certification\` branch/worktree`,
+      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+evidence-ancestry repair executes on the isolated \`standards-certification\` branch/worktree`,
       "u",
     ),
   );

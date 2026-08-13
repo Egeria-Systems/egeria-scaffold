@@ -20,7 +20,7 @@ const standardsPlanPath =
 const standardsEvidencePath =
   "docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-verification.md";
 const standardsEvidenceRevision =
-  "f9a962874d587e4594af341a1fe5f62db6d7672c";
+  "c9294e9dc59d4b7bafed406846af3b43a10733d3";
 const committedRegistry = JSON.parse(
   readFileSync(
     new URL("../../../certifications/capabilities.json", import.meta.url),
