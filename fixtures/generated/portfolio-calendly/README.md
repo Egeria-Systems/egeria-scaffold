@@ -32,7 +32,7 @@ pnpm --dir apps/web run test:e2e:dev
 pnpm --dir apps/web run test:e2e:preview
 ```
 
-The development command starts Next.js on loopback port 3100. The preview command builds the OpenNext output and starts Wrangler/workerd on loopback port 3101. They are separate execution environments and do not reuse an ambient server.
+The development command starts Next.js on loopback port 3100. Preview E2E consumes already prepared `.open-next` output and starts Wrangler/workerd on loopback port 3101, so run the Next build followed by the OpenNext `--skipNextBuild` transform first. The development and preview commands are separate execution environments and do not reuse an ambient server.
 
 To test an already deployed project, supply its public HTTPS root explicitly:
 

@@ -246,6 +246,32 @@ async function createSupportPaths(
   }
 }
 
+export function commandFailureReason(error: unknown): string {
+  const metadata: string[] = [];
+
+  if (typeof error === "object" && error !== null) {
+    try {
+      const failure = error as Readonly<{
+        code?: unknown;
+        killed?: unknown;
+      }>;
+      const exitCode: unknown = failure.code;
+      const killed: unknown = failure.killed;
+
+      if (typeof exitCode === "number" && Number.isSafeInteger(exitCode)) {
+        metadata.push(`exit-code=${String(exitCode)}`);
+      }
+      if (typeof killed === "boolean") {
+        metadata.push(`timed-out=${killed ? "true" : "false"}`);
+      }
+    } catch {
+      return "command-failed";
+    }
+  }
+
+  return ["command-failed", ...metadata].join(";");
+}
+
 async function runCommand(input: Readonly<{
   executable: string;
   arguments: readonly string[];
@@ -265,8 +291,8 @@ async function runCommand(input: Readonly<{
       windowsHide: true,
     });
     return { ok: true, value: stdout };
-  } catch {
-    return issue(input.failureCode, "command-failed");
+  } catch (error) {
+    return issue(input.failureCode, commandFailureReason(error));
   }
 }
 
@@ -282,7 +308,11 @@ async function requirePnpmVersion(input: Readonly<{
     failureCode: "PNPM_VERSION_INVALID",
   });
 
-  return result.ok && result.value.trim() === requiredPnpmVersion
+  if (!result.ok) {
+    return result;
+  }
+
+  return result.value.trim() === requiredPnpmVersion
     ? { ok: true, value: undefined }
     : issue("PNPM_VERSION_INVALID", "version-mismatch");
 }
@@ -482,7 +512,14 @@ async function verifyInIsolatedCopy(
           },
           { arguments: ["run", "build"], failureCode: "NEXT_BUILD_FAILED" },
           {
-            arguments: ["run", "build:cloudflare"],
+            arguments: [
+              "--dir",
+              "apps/web",
+              "exec",
+              "opennextjs-cloudflare",
+              "build",
+              "--skipNextBuild",
+            ],
             failureCode: "OPENNEXT_BUILD_FAILED",
           },
         ] as const;

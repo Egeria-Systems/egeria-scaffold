@@ -14,7 +14,7 @@
     "test:unit:watch": "pnpm --dir apps/web run test:unit:watch",
     "test:watch": "pnpm --dir apps/web run test:watch",
     "typecheck": "pnpm --dir apps/web run typecheck",
-    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run build:cloudflare"
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild"
   },
   "engines": {
     "node": "22.23.2",

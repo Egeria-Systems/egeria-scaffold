@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
+import {
+  access,
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { createRequire } from "node:module";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
@@ -24,6 +33,63 @@ const namedLabel = (prefix, ordinal, separator = " ") =>
   [prefix, separator, ordinal].join("");
 const credentialBoundPackageCommandPattern =
   /\b(?:pnpm|npm|yarn)\b[^\n]*(?:\bbuild|\btest)(?=[:\s]|$)/iu;
+
+async function runRepositoryQualityScopeClassifier(input) {
+  const executionRoot = await mkdtemp(
+    join(tmpdir(), "egeria-quality-scope-execution-"),
+  );
+  const outputPath = join(executionRoot, "github-output");
+
+  try {
+    let executablePath = process.env.PATH ?? "";
+    if (input.forceDiffFailure) {
+      const gitPath = (
+        await execFileAsync("which", ["git"], { encoding: "utf8" })
+      ).stdout.trim();
+      const wrapperRoot = join(executionRoot, "bin");
+      const wrapperPath = join(wrapperRoot, "git");
+      await mkdir(wrapperRoot, { recursive: true });
+      await writeFile(
+        wrapperPath,
+        `#!/bin/bash\nif [[ "$1" == "diff" ]]; then\n  exit 2\nfi\nexec ${JSON.stringify(gitPath)} "$@"\n`,
+        "utf8",
+      );
+      await chmod(wrapperPath, 0o755);
+      executablePath = `${wrapperRoot}:${executablePath}`;
+    }
+
+    await execFileAsync("bash", ["-c", input.scopeRun], {
+      cwd: input.repositoryRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: executablePath,
+        EVENT_NAME: input.eventName,
+        PULL_REQUEST_BASE_SHA: input.pullRequestBaseSha,
+        PULL_REQUEST_HEAD_SHA: input.pullRequestHeadSha,
+        PUSH_BASE_SHA: input.pushBaseSha,
+        PUSH_HEAD_SHA: input.pushHeadSha,
+        GITHUB_OUTPUT: outputPath,
+      },
+    });
+
+    const entries = (await readFile(outputPath, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => {
+        const separatorIndex = line.indexOf("=");
+        assert.ok(separatorIndex > 0);
+        return [line.slice(0, separatorIndex), line.slice(separatorIndex + 1)];
+      });
+    assert.deepEqual(
+      entries.map(([name]) => name).toSorted(),
+      ["compatibility-proof", "generated-projects"],
+    );
+    return Object.fromEntries(entries);
+  } finally {
+    await rm(executionRoot, { recursive: true, force: true });
+  }
+}
 
 function enumerateSecretReferences(value, path = "") {
   if (typeof value === "string") {
@@ -272,28 +338,22 @@ test("each authored code context names its test runner, command, and evidence bo
   }
 });
 
-test("ordinary repository CI keeps core checks always-on and scopes deep checks to owned inputs", async () => {
-  const workflowPaths = {
-    repository: ".github/workflows/repository-quality.yml",
-    generated: ".github/workflows/generated-project-quality.yml",
-    compatibility: ".github/workflows/compatibility-proof-quality.yml",
-  };
-  const sources = Object.fromEntries(
-    await Promise.all(
-      Object.entries(workflowPaths).map(async ([identifier, path]) => [
-        identifier,
-        await readRepositoryFile(path),
-      ]),
-    ),
-  );
-  const workflows = Object.fromEntries(
-    Object.entries(sources).map(([identifier, source]) => [
-      identifier,
-      parse(source),
-    ]),
-  );
-  const expectedGeneratedPaths = [
-    ".github/workflows/generated-project-quality.yml",
+function workflowCommands(job) {
+  return job.steps
+    .flatMap(({ run }) => (typeof run === "string" ? [run] : []))
+    .join("\n");
+}
+
+function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
+  const expectedJobIdentifiers = [
+    "scope",
+    "builder-and-packages",
+    "generated-projects",
+    "compatibility-proof",
+    "dependency-review",
+  ];
+  const generatedPaths = [
+    ".github/workflows/**",
     ".gitattributes",
     ".npmrc",
     "package.json",
@@ -307,8 +367,8 @@ test("ordinary repository CI keeps core checks always-on and scopes deep checks 
     "scripts/verify-generated-skeletons.mjs",
     "tests/generated-fixtures/**",
   ];
-  const expectedCompatibilityPaths = [
-    ".github/workflows/compatibility-proof-quality.yml",
+  const compatibilityPaths = [
+    ".github/workflows/**",
     ".npmrc",
     "package.json",
     "pnpm-lock.yaml",
@@ -317,52 +377,113 @@ test("ordinary repository CI keeps core checks always-on and scopes deep checks 
     "proofs/nextjs-cloudflare/**",
   ];
 
-  assert.deepEqual(
-    Object.fromEntries(
-      Object.entries(workflows).map(([identifier, workflow]) => [
-        identifier,
-        workflow.name,
-      ]),
-    ),
-    {
-      repository: "Repository quality",
-      generated: "Generated project quality",
-      compatibility: "Compatibility proof quality",
-    },
-  );
-  assert.deepEqual(workflows.repository.on, {
+  assert.equal(workflow.name, "Repository quality");
+  assert.deepEqual(workflow.on, {
     pull_request: null,
     push: { branches: ["main"] },
   });
-  for (const [workflow, expectedPaths] of [
-    [workflows.generated, expectedGeneratedPaths],
-    [workflows.compatibility, expectedCompatibilityPaths],
-  ]) {
-    assert.deepEqual(workflow.on, {
-      pull_request: { paths: expectedPaths },
-      push: { branches: ["main"], paths: expectedPaths },
-    });
-  }
-  assert.deepEqual(Object.keys(workflows.repository.jobs), [
-    "builder-and-packages",
-  ]);
-  assert.deepEqual(Object.keys(workflows.generated.jobs), ["generated-projects"]);
-  assert.deepEqual(Object.keys(workflows.compatibility.jobs), [
-    "compatibility-proof",
-  ]);
+  assert.deepEqual(workflow.permissions, { contents: "read" });
+  assert.deepEqual(workflow.concurrency, {
+    group: "repository-quality-${{ github.ref }}",
+    "cancel-in-progress": true,
+  });
+  assert.deepEqual(Object.keys(workflow.jobs), expectedJobIdentifiers);
+  assert.doesNotMatch(
+    source,
+    /\bpaths(?:-ignore)?:|\bsecrets\b|id-token:\s*write|environment:|pull_request_target|workflow_run/iu,
+  );
 
-  const commandsByWorkflow = Object.fromEntries(
-    Object.entries(workflows).map(([identifier, workflow]) => [
+  const scopeJob = workflow.jobs.scope;
+  const scopeStep = scopeJob.steps.find(({ id }) => id === "classify");
+  const scopeRun = scopeStep?.run ?? "";
+  assert.deepEqual(scopeJob.outputs, {
+    "generated-projects": "${{ steps.classify.outputs.generated-projects }}",
+    "compatibility-proof": "${{ steps.classify.outputs.compatibility-proof }}",
+  });
+  assert.deepEqual(scopeStep?.env, {
+    EVENT_NAME: "${{ github.event_name }}",
+    PULL_REQUEST_BASE_SHA: "${{ github.event.pull_request.base.sha }}",
+    PULL_REQUEST_HEAD_SHA: "${{ github.event.pull_request.head.sha }}",
+    PUSH_BASE_SHA: "${{ github.event.before }}",
+    PUSH_HEAD_SHA: "${{ github.sha }}",
+  });
+  assert.doesNotMatch(scopeRun, /\$\{\{/u);
+  assert.match(scopeRun, /\^\[0-9a-f\]\{40\}\$/u);
+  assert.match(scopeRun, /0000000000000000000000000000000000000000/u);
+  assert.match(scopeRun, /git cat-file -e "\$\{BASE_SHA\}\^\{commit\}"/u);
+  assert.match(scopeRun, /git cat-file -e "\$\{HEAD_SHA\}\^\{commit\}"/u);
+  assert.match(
+    scopeRun,
+    /git diff --quiet "\$BASE_SHA" "\$HEAD_SHA" -- "\$\{generated_paths\[@\]\}"/u,
+  );
+  assert.match(
+    scopeRun,
+    /git diff --quiet "\$BASE_SHA" "\$HEAD_SHA" -- "\$\{compatibility_paths\[@\]\}"/u,
+  );
+  assert.match(
+    scopeRun,
+    /set -euo pipefail\s+generated_projects="true"\s+compatibility_proof="true"/u,
+  );
+  assert.match(
+    scopeRun,
+    /case "\$generated_status" in[\s\S]+0\)[\s\S]+generated_projects="false"[\s\S]+1\)[\s\S]+generated_projects="true"[\s\S]+\*\)[\s\S]+scope_error="true"/u,
+  );
+  assert.match(
+    scopeRun,
+    /case "\$compatibility_status" in[\s\S]+0\)[\s\S]+compatibility_proof="false"[\s\S]+1\)[\s\S]+compatibility_proof="true"[\s\S]+\*\)[\s\S]+scope_error="true"/u,
+  );
+  assert.match(
+    scopeRun,
+    /if \[\[ "\$scope_error" == "true" \]\]; then[\s\S]+generated_projects="true"[\s\S]+compatibility_proof="true"/u,
+  );
+  assert.match(
+    scopeRun,
+    /printf 'generated-projects=%s\\n' "\$generated_projects" >> "\$GITHUB_OUTPUT"/u,
+  );
+  assert.match(
+    scopeRun,
+    /printf 'compatibility-proof=%s\\n' "\$compatibility_proof" >> "\$GITHUB_OUTPUT"/u,
+  );
+  for (const [name, expectedPaths] of [
+    ["generated_paths", generatedPaths],
+    ["compatibility_paths", compatibilityPaths],
+  ]) {
+    const arrayBody = new RegExp(
+      `(?:^|\\n)\\s*${name}=\\(\\n([\\s\\S]*?)\\n\\s*\\)`,
+      "u",
+    ).exec(scopeRun)?.[1];
+    assert.equal(typeof arrayBody, "string", name);
+    assert.deepEqual(
+      arrayBody
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line.trim())),
+      expectedPaths,
+      name,
+    );
+  }
+
+  assert.equal(
+    workflow.jobs["generated-projects"].if,
+    "needs.scope.outputs.generated-projects == 'true'",
+  );
+  assert.deepEqual(workflow.jobs["generated-projects"].needs, ["scope"]);
+  assert.equal(
+    workflow.jobs["compatibility-proof"].if,
+    "needs.scope.outputs.compatibility-proof == 'true'",
+  );
+  assert.deepEqual(workflow.jobs["compatibility-proof"].needs, ["scope"]);
+  assert.equal(
+    workflow.jobs["dependency-review"].if,
+    "github.event_name == 'pull_request'",
+  );
+
+  const commandsByJob = Object.fromEntries(
+    Object.entries(workflow.jobs).map(([identifier, job]) => [
       identifier,
-      Object.values(workflow.jobs)
-        .flatMap(({ steps }) => steps)
-        .flatMap(({ run }) => (typeof run === "string" ? [run] : [])),
+      workflowCommands(job),
     ]),
   );
-  const commands = Object.values(commandsByWorkflow).flat().join("\n");
-  const repositoryCommands = commandsByWorkflow.repository.join("\n");
-  const generatedCommands = commandsByWorkflow.generated.join("\n");
-  const compatibilityCommands = commandsByWorkflow.compatibility.join("\n");
   for (const command of [
     "pnpm run test:constitution",
     "pnpm run check:semantic-naming",
@@ -374,12 +495,12 @@ test("ordinary repository CI keeps core checks always-on and scopes deep checks 
     "pnpm run check:capability-certification",
   ]) {
     assert.match(
-      repositoryCommands,
-      new RegExp(command.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"),
+      commandsByJob["builder-and-packages"],
+      new RegExp(escapeRegularExpression(command), "u"),
     );
   }
   assert.doesNotMatch(
-    repositoryCommands,
+    commandsByJob["builder-and-packages"],
     /test:generated-fixtures|verify:generated-skeletons|nextjs-cloudflare-proof/u,
   );
   for (const command of [
@@ -387,8 +508,8 @@ test("ordinary repository CI keeps core checks always-on and scopes deep checks 
     "pnpm run verify:generated-skeletons",
   ]) {
     assert.match(
-      generatedCommands,
-      new RegExp(command.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"),
+      commandsByJob["generated-projects"],
+      new RegExp(escapeRegularExpression(command), "u"),
     );
   }
   for (const command of [
@@ -396,7 +517,7 @@ test("ordinary repository CI keeps core checks always-on and scopes deep checks 
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run typecheck",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:unit",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run build",
-    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run build:cloudflare",
+    "pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec opennextjs-cloudflare build --skipNextBuild",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run cf-typegen:check",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:integration:cloudflare",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec playwright install --with-deps chromium",
@@ -404,22 +525,177 @@ test("ordinary repository CI keeps core checks always-on and scopes deep checks 
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:e2e:preview",
   ]) {
     assert.match(
-      compatibilityCommands,
-      new RegExp(command.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"),
+      commandsByJob["compatibility-proof"],
+      new RegExp(escapeRegularExpression(command), "u"),
+    );
+  }
+  assert.doesNotMatch(
+    Object.values(commandsByJob).join("\n"),
+    /\bdeploy\b|\bpublish\b|npm publish|wrangler deploy/iu,
+  );
+
+  const jobsWithCheckout = [
+    "scope",
+    "builder-and-packages",
+    "generated-projects",
+    "compatibility-proof",
+  ];
+  const jobsWithToolchain = [
+    "builder-and-packages",
+    "generated-projects",
+    "compatibility-proof",
+  ];
+  for (const [identifier, job] of Object.entries(workflow.jobs)) {
+    assert.equal(job["runs-on"], "ubuntu-24.04", identifier);
+    assert.equal(typeof job["timeout-minutes"], "number", identifier);
+    assert.ok(job["timeout-minutes"] > 0 && job["timeout-minutes"] <= 45);
+  }
+  for (const identifier of jobsWithCheckout) {
+    const checkout = workflow.jobs[identifier].steps.find(({ uses }) =>
+      uses?.startsWith("actions/checkout@"),
+    );
+    assert.equal(
+      isPinnedGitHubActionReference(checkout?.uses, "actions/checkout"),
+      true,
+      identifier,
+    );
+    assert.equal(checkout?.with?.["persist-credentials"], false, identifier);
+  }
+  for (const identifier of ["scope", "builder-and-packages"]) {
+    const checkout = workflow.jobs[identifier].steps.find(({ uses }) =>
+      uses?.startsWith("actions/checkout@"),
+    );
+    assert.equal(checkout?.with?.["fetch-depth"], 0, identifier);
+  }
+  for (const identifier of jobsWithToolchain) {
+    const setup = workflow.jobs[identifier].steps.find(({ uses }) =>
+      uses?.startsWith("pnpm/setup@"),
+    );
+    assert.equal(
+      isPinnedGitHubActionReference(setup?.uses, "pnpm/setup"),
+      true,
+      identifier,
+    );
+    assert.deepEqual(setup?.with, {
+      version: "11.20.0",
+      runtime: "node@22.23.2",
+      cache: false,
+      install: false,
+    });
+    assert.ok(
+      workflow.jobs[identifier].steps.some(
+        ({ run }) => run === "pnpm install --frozen-lockfile",
+      ),
+      identifier,
     );
   }
 
-  assert.doesNotMatch(commands, /\bdeploy\b|\bpublish\b|npm publish|wrangler deploy/iu);
-  for (const [identifier, source] of Object.entries(sources)) {
-    assert.deepEqual(workflows[identifier].permissions, { contents: "read" });
-    assert.doesNotMatch(
-      source,
-      /\bsecrets\b|id-token:\s*write|environment:/iu,
-      workflowPaths[identifier],
+  const dependencySteps = workflow.jobs["dependency-review"].steps;
+  assert.equal(dependencySteps.length, 1);
+  assert.equal(
+    isPinnedGitHubActionReference(
+      dependencySteps[0]?.uses,
+      "actions/dependency-review-action",
+    ),
+    true,
+  );
+  assert.deepEqual(dependencySteps[0]?.with, {
+    "fail-on-severity": "moderate",
+    "fail-on-scopes": "runtime, development",
+  });
+}
+
+test("ordinary repository CI exposes stable fail-safe quality jobs", async () => {
+  for (const path of [
+    ".github/workflows/generated-project-quality.yml",
+    ".github/workflows/compatibility-proof-quality.yml",
+  ]) {
+    await assert.rejects(access(resolve(repositoryRoot, path)), undefined, path);
+  }
+
+  const source = await readRepositoryFile(
+    ".github/workflows/repository-quality.yml",
+  );
+  const workflow = parse(source);
+  assertConsolidatedRepositoryQualityWorkflow(source, workflow);
+
+  const negativeCases = [
+    {
+      name: "unsafe event interpolation",
+      mutateWorkflow(candidate) {
+        candidate.jobs.scope.steps.find(({ id }) => id === "classify").run +=
+          "\necho ${{ github.event.before }}";
+      },
+    },
+    {
+      name: "secret context",
+      mutateSource: (candidateSource) => candidateSource.replace(
+        "permissions:\n  contents: read",
+        "env:\n  TOKEN: ${{ secrets.UNSAFE }}\n\npermissions:\n  contents: read",
+      ),
+    },
+    {
+      name: "write token",
+      mutateSource: (candidateSource) => candidateSource.replace(
+        "permissions:\n  contents: read",
+        "permissions:\n  contents: read\n  id-token: write",
+      ),
+    },
+    {
+      name: "workflow path filter",
+      mutateWorkflow(candidate) {
+        candidate.on.pull_request = { paths: ["docs/**"] };
+      },
+    },
+    {
+      name: "reusable toolchain cache",
+      mutateWorkflow(candidate) {
+        candidate.jobs["builder-and-packages"].steps.find(({ uses }) =>
+          uses?.startsWith("pnpm/setup@"),
+        ).with.cache = true;
+      },
+    },
+    {
+      name: "disabled fail-safe default",
+      mutateWorkflow(candidate) {
+        const scopeStep = candidate.jobs.scope.steps.find(
+          ({ id }) => id === "classify",
+        );
+        scopeStep.run = scopeStep.run.replace(
+          'generated_projects="true"',
+          'generated_projects="false"',
+        );
+      },
+    },
+    {
+      name: "write authority",
+      mutateWorkflow(candidate) {
+        candidate.permissions.contents = "write";
+      },
+    },
+    {
+      name: "removed generated verification",
+      mutateWorkflow(candidate) {
+        candidate.jobs["generated-projects"].steps = candidate.jobs[
+          "generated-projects"
+        ].steps.filter(
+          ({ run }) => run !== "pnpm run verify:generated-skeletons",
+        );
+      },
+    },
+  ];
+  for (const { name, mutateSource, mutateWorkflow } of negativeCases) {
+    const candidate = structuredClone(workflow);
+    mutateWorkflow?.(candidate);
+    const candidateSource = mutateSource?.(source) ?? source;
+    assert.throws(
+      () => assertConsolidatedRepositoryQualityWorkflow(candidateSource, candidate),
+      { name: "AssertionError" },
+      name,
     );
   }
 
-  const builderSteps = workflows.repository.jobs["builder-and-packages"].steps;
+  const builderSteps = workflow.jobs["builder-and-packages"].steps;
   const buildIndex = builderSteps.findIndex(
     ({ run }) => run === "pnpm run build:builder",
   );
@@ -439,37 +715,193 @@ test("ordinary repository CI keeps core checks always-on and scopes deep checks 
       kernelCommands.indexOf("pnpm run test:packages"),
   );
 
-  for (const workflow of Object.values(workflows)) {
-    for (const job of Object.values(workflow.jobs)) {
-      assert.equal(job["runs-on"], "ubuntu-24.04");
-      assert.equal(typeof job["timeout-minutes"], "number");
-      const checkout = job.steps.find(({ uses }) =>
-        uses?.startsWith("actions/checkout@"),
-      );
-      const setup = job.steps.find(({ uses }) =>
-        uses?.startsWith("pnpm/setup@"),
-      );
-      assert.equal(
-        isPinnedGitHubActionReference(checkout?.uses, "actions/checkout"),
-        true,
-      );
-      assert.equal(checkout?.with?.["persist-credentials"], false);
-      assert.equal(
-        isPinnedGitHubActionReference(setup?.uses, "pnpm/setup"),
-        true,
-      );
-    }
-  }
-  const builderCheckout = workflows.repository.jobs["builder-and-packages"].steps.find(
-    ({ uses }) => uses?.startsWith("actions/checkout@"),
-  );
-  assert.equal(builderCheckout?.with?.["fetch-depth"], 0);
-
   const bookingWorkflow = await readFile(
     resolve(repositoryRoot, ".github/workflows/booking-calendly-certification.yml"),
     "utf8",
   );
   assert.match(bookingWorkflow, /run test:unit[\s\S]+run test:component[\s\S]+Deploy certification Worker/u);
+});
+
+test("repository quality scope classification executes fail-safe Git behavior", async (context) => {
+  const fixtureRoot = await mkdtemp(join(tmpdir(), "egeria-quality-scope-"));
+  context.after(async () => {
+    await rm(fixtureRoot, { recursive: true, force: true });
+  });
+
+  const git = async (...arguments_) =>
+    execFileAsync("git", arguments_, {
+      cwd: fixtureRoot,
+      encoding: "utf8",
+    });
+  await git("init", "--quiet");
+  await git("config", "user.name", "Repository quality contract");
+  await git("config", "user.email", "quality-contract@example.invalid");
+  await git("config", "commit.gpgsign", "false");
+
+  const commitFile = async (relativePath, content, message) => {
+    const absolutePath = resolve(fixtureRoot, relativePath);
+    await mkdir(dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, content, "utf8");
+    await git("add", "--", relativePath);
+    await git("commit", "--quiet", "-m", message);
+    return (await git("rev-parse", "HEAD")).stdout.trim();
+  };
+
+  const baseRevision = await commitFile("README.md", "base\n", "base");
+  const documentationRevision = await commitFile(
+    "docs/note.md",
+    "unrelated\n",
+    "documentation",
+  );
+  const generatedRevision = await commitFile(
+    "apps/cli/scoped.txt",
+    "generated\n",
+    "generated",
+  );
+  const proofRevision = await commitFile(
+    "proofs/nextjs-cloudflare/scoped.txt",
+    "proof\n",
+    "proof",
+  );
+  const workflowRevision = await commitFile(
+    ".github/workflows/scoped.yml",
+    "name: scoped\n",
+    "workflow",
+  );
+
+  const workflowSource = await readRepositoryFile(
+    ".github/workflows/repository-quality.yml",
+  );
+  const workflow = parse(workflowSource);
+  const scopeRun = workflow.jobs.scope.steps.find(
+    ({ id }) => id === "classify",
+  )?.run;
+  assert.equal(typeof scopeRun, "string");
+
+  const bothEnabled = {
+    "generated-projects": "true",
+    "compatibility-proof": "true",
+  };
+  const scenarios = [
+    {
+      name: "unchanged revision",
+      pushBaseSha: baseRevision,
+      pushHeadSha: baseRevision,
+      expected: {
+        "generated-projects": "false",
+        "compatibility-proof": "false",
+      },
+    },
+    {
+      name: "unrelated documentation",
+      pushBaseSha: baseRevision,
+      pushHeadSha: documentationRevision,
+      expected: {
+        "generated-projects": "false",
+        "compatibility-proof": "false",
+      },
+    },
+    {
+      name: "generated-only change",
+      pushBaseSha: documentationRevision,
+      pushHeadSha: generatedRevision,
+      expected: {
+        "generated-projects": "true",
+        "compatibility-proof": "false",
+      },
+    },
+    {
+      name: "proof-only change",
+      pushBaseSha: generatedRevision,
+      pushHeadSha: proofRevision,
+      expected: {
+        "generated-projects": "false",
+        "compatibility-proof": "true",
+      },
+    },
+    {
+      name: "workflow change",
+      pushBaseSha: proofRevision,
+      pushHeadSha: workflowRevision,
+      expected: bothEnabled,
+    },
+    {
+      name: "malformed revision",
+      pushBaseSha: "not-a-revision",
+      pushHeadSha: baseRevision,
+      expected: bothEnabled,
+    },
+    {
+      name: "malformed head revision",
+      pushBaseSha: baseRevision,
+      pushHeadSha: "not-a-revision",
+      expected: bothEnabled,
+    },
+    {
+      name: "missing revision",
+      pushBaseSha: "",
+      pushHeadSha: baseRevision,
+      expected: bothEnabled,
+    },
+    {
+      name: "zero revision",
+      pushBaseSha: "0".repeat(40),
+      pushHeadSha: baseRevision,
+      expected: bothEnabled,
+    },
+    {
+      name: "unresolvable revision",
+      pushBaseSha: "f".repeat(40),
+      pushHeadSha: baseRevision,
+      expected: bothEnabled,
+    },
+    {
+      name: "unsupported event",
+      eventName: "workflow_dispatch",
+      pushBaseSha: baseRevision,
+      pushHeadSha: documentationRevision,
+      expected: bothEnabled,
+    },
+    {
+      name: "Git diff error",
+      pushBaseSha: baseRevision,
+      pushHeadSha: documentationRevision,
+      forceDiffFailure: true,
+      expected: bothEnabled,
+    },
+  ];
+
+  for (const scenario of scenarios) {
+    const actual = await runRepositoryQualityScopeClassifier({
+      scopeRun,
+      repositoryRoot: fixtureRoot,
+      eventName: scenario.eventName ?? "push",
+      pullRequestBaseSha: "",
+      pullRequestHeadSha: "",
+      pushBaseSha: scenario.pushBaseSha,
+      pushHeadSha: scenario.pushHeadSha,
+      forceDiffFailure: scenario.forceDiffFailure ?? false,
+    });
+    assert.deepEqual(actual, scenario.expected, scenario.name);
+  }
+
+  assert.deepEqual(
+    await runRepositoryQualityScopeClassifier({
+      scopeRun,
+      repositoryRoot: fixtureRoot,
+      eventName: "pull_request",
+      pullRequestBaseSha: documentationRevision,
+      pullRequestHeadSha: generatedRevision,
+      pushBaseSha: "not-used",
+      pushHeadSha: "not-used",
+      forceDiffFailure: false,
+    }),
+    {
+      "generated-projects": "true",
+      "compatibility-proof": "false",
+    },
+    "pull-request revisions",
+  );
 });
 
 test("the workspace declares the approved proof root and install policy", async () => {
@@ -482,15 +914,54 @@ test("the workspace declares the approved proof root and install policy", async 
 });
 
 test("the compatibility proof has a private non-app workspace boundary", async () => {
-  const proofManifest = JSON.parse(
-    await readRepositoryFile("proofs/nextjs-cloudflare/package.json"),
-  );
+  const [
+    proofManifestSource,
+    previewConfiguration,
+    proofInstructions,
+    nextConfiguration,
+  ] = await Promise.all([
+      readRepositoryFile("proofs/nextjs-cloudflare/package.json"),
+      readRepositoryFile(
+        "proofs/nextjs-cloudflare/playwright.preview.config.ts",
+      ),
+      readRepositoryFile("proofs/nextjs-cloudflare/AGENTS.md"),
+      readRepositoryFile("proofs/nextjs-cloudflare/next.config.ts"),
+    ]);
+  const proofManifest = JSON.parse(proofManifestSource);
 
   assert.equal(
     proofManifest.name,
     "@egeria-systems/nextjs-cloudflare-proof",
   );
   assert.equal(proofManifest.private, true);
+  assert.equal(
+    proofManifest.scripts["build:cloudflare"],
+    "opennextjs-cloudflare build",
+  );
+  assert.equal(
+    proofManifest.scripts.preview,
+    "opennextjs-cloudflare build && opennextjs-cloudflare preview -- --ip 127.0.0.1 --port 3101",
+  );
+  assert.equal(proofManifest.scripts.deploy, "opennextjs-cloudflare deploy");
+  const verificationCommands = proofManifest.scripts.verify.split(" && ");
+  const nextBuildIndex = verificationCommands.indexOf("pnpm run build");
+  const openNextBuildIndex = verificationCommands.indexOf(
+    "pnpm exec opennextjs-cloudflare build --skipNextBuild",
+  );
+  assert.ok(nextBuildIndex >= 0 && openNextBuildIndex === nextBuildIndex + 1);
+  assert.equal(verificationCommands.includes("pnpm run build:cloudflare"), false);
+  assert.match(
+    previewConfiguration,
+    /pnpm exec opennextjs-cloudflare preview -- --ip 127\.0\.0\.1 --port 3101/u,
+  );
+  assert.doesNotMatch(previewConfiguration, /pnpm run preview/u);
+  assert.match(proofInstructions, /already prepared `.open-next` output/iu);
+  assert.match(proofInstructions, /--skipNextBuild/u);
+  assert.match(nextConfiguration, /output: "standalone"/u);
+  assert.match(
+    nextConfiguration,
+    /outputFileTracingRoot: fileURLToPath\(new URL\("\.\.\/\.\.\/", import\.meta\.url\)\)/u,
+  );
   await assert.rejects(readRepositoryFile("apps/web/package.json"));
   await assert.rejects(readRepositoryFile("apps/compatibility/package.json"));
   await assert.rejects(
@@ -2810,7 +3281,14 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(implementationTask)} is squash-integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\``,
+      `${escapeRegularExpression(implementationTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\``,
+      "u",
+    ),
+  );
+  assert.match(
+    certificationPlan,
+    new RegExp(
+      `${escapeRegularExpression(certificationTask)} was implemented[^.]+and squash-integrated as \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+Accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Plan A is rebased onto that accepted revision`,
       "u",
     ),
   );
@@ -2888,6 +3366,69 @@ test("execution plans enforce direct predecessors and bounded independent-work e
         " plan",
       "iu",
     ),
+  );
+});
+
+test("already-certified standards renewal uses one descendant evidence revision", async () => {
+  const certificationPlan = await readRepositoryFile(
+    "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md",
+  );
+  const renewalBoundary = certificationPlan
+    .split("### Plan A reconciliation boundary\n", 2)[1]
+    ?.split("\n## Certification outcomes", 1)[0];
+  const originalPreflight = namedLabel("Task", "1");
+  const certificationTask = namedLabel("Task", "6D");
+
+  assert.equal(typeof renewalBoundary, "string");
+  assert.match(
+    renewalBoundary,
+    /already-certified `standards@0\.3\.0` subject/iu,
+  );
+  assert.match(
+    renewalBoundary,
+    /This is evidence renewal for the already-certified `standards@0\.3\.0` subject, not a second pending-to-certified transition/iu,
+  );
+  assert.match(
+    renewalBoundary,
+    /single post-Plan A evidence revision[^.]+all eight outcomes/iu,
+  );
+  assert.equal(
+    renewalBoundary.includes(
+      `do not reapply ${originalPreflight}'s original pending-subject prerequisite`,
+    ),
+    true,
+  );
+  assert.match(
+    renewalBoundary,
+    /Rerun all eight on that exact descendant rather than carrying an earlier outcome forward/iu,
+  );
+  assert.match(
+    renewalBoundary,
+    /Preserve the certified registry status throughout this evidence renewal/iu,
+  );
+  assert.equal(
+    renewalBoundary.includes(
+      `may not modify the stopped ${certificationTask} branch, its receipt, registry entry, evidence, or certification status`,
+    ),
+    true,
+  );
+  for (const outcome of [
+    "fresh-scaffold",
+    "unit-tests",
+    "component-tests",
+    "state-agreement",
+    "generated-project-builds",
+    "browser-regression",
+    "retained-fixture-matrix",
+    "ci-contract",
+  ]) {
+    assert.equal(renewalBoundary.includes(`\`${outcome}\``), true, outcome);
+  }
+  assert.equal(
+    renewalBoundary.includes(
+      `resume at this plan's ${originalPreflight} preflight`,
+    ),
+    false,
   );
 });
 
@@ -3042,7 +3583,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} is squash-integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\``,
+      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\``,
       "u",
     ),
   );
@@ -3057,7 +3598,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+all eight local outcomes were rerun at that accepted-main revision[\\s\\S]+evidence-ancestry repair's exact final diff requires verified-final-diff and integration approval`,
+      `${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\` binds the reviewed rerun receipt to accepted-main evidence revision`,
       "u",
     ),
   );
@@ -3072,7 +3613,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+evidence-ancestry repair executes on the isolated \`standards-certification\` branch/worktree`,
+      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Plan A proceeds from that accepted repair revision`,
       "u",
     ),
   );

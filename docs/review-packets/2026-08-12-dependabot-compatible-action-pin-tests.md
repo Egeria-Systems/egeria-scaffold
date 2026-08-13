@@ -1,14 +1,23 @@
 # Dependabot-Compatible Action Pin Tests Review Packet
 
 - **Date:** 2026-08-12
-- **Gate:** verified-final-diff approval pending
-- **Comparison:** `12ecc73a8337ab12ece9dd3a6b2aec03f940383c` to the verified uncommitted working tree
+- **Gate:** accepted and integrated
+- **Historical planned comparison:** `12ecc73a8337ab12ece9dd3a6b2aec03f940383c` to the verified uncommitted working tree
+- **Accepted comparison:** `2b0624c3448d569d68bad93edd8821c48fb432cb..4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`
 
 ## Outcome
 
 Live root workflow policy tests now require the exact expected action repository followed by an immutable full 40-character lowercase hexadecimal commit SHA. They no longer encode one release-specific SHA, so a Dependabot full-SHA update does not fail merely because the release changed.
 
 Dependabot configuration, live workflows, generated templates, retained fixtures, packages, runtime code, provider configuration, and deployment behavior are unchanged. Generated-output tests retain their exact SHA assertions.
+
+## Post-integration acceptance
+
+On 2026-08-12, explicit human authorization to continue the approved automatic-CI Plan A accepted this packet's exact predecessor revision `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`. The revision is a direct, linear commit on top of accepted `2b0624c3448d569d68bad93edd8821c48fb432cb`; it is not represented as a pull-request merge or eligible GitHub review.
+
+GitHub reports the commit's SSH signature as verified with reason `valid`. The commit was accepted on `main` while the two active repository rulesets applied required signatures and pull requests and exposed explicit always-bypass paths for organization administrators and repository role `5`. The commit has no associated pull request, so its acceptance is the configured direct-integration path rather than evidence that the pull-request review rule ran. No GitHub setting was changed during this verification.
+
+Local `main`, `origin/main`, and the Plan A baseline all resolve to `4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e`, and that revision is an ancestor of the Plan A candidate. Hosted push run `31605329575` completed the `Repository quality / builder-and-packages` job successfully for the exact revision. The path-scoped generated-project and compatibility-proof workflows did not run because this predecessor changed only their policy-test consumers; their latest exact Task 6C merge evidence remains the successful pull-request runs recorded by the generated-testing packet.
 
 ## Changed files
 
