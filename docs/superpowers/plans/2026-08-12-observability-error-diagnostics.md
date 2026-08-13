@@ -127,16 +127,40 @@ Modify only as required by the established trusted-publication path:
 
 ```text
 .changeset/add-observability-error-diagnostics.md
+.changeset/clarify-observability-boundary.md
+.changeset/generated-testing-boundary.md
 packages/observability/CHANGELOG.md
+packages/observability/AGENTS.md
+packages/observability/README.md
 packages/observability/package.json
 pnpm-lock.yaml
 scripts/check-package-release.mjs
+tests/constitution/constitution.test.mjs
 tests/package-boundaries/package-release.test.mjs
+tests/package-boundaries/private-packages.test.mjs
 tests/package-boundaries/public-observability.test.mjs
 tests/package-boundaries/release-safeguards.test.mjs
+docs/architecture/package-ownership.md
 docs/implementation-evidence/2026-08-12-observability-error-diagnostics-package-release.md
 docs/review-packets/2026-08-12-observability-error-diagnostics-package-release.md
 ```
+
+The two empty Changesets records are approved no-release inputs that the
+versioning command may mechanically consume. Their deletion must not assign a
+version to any package.
+
+The private-package boundary test is an approved direct workspace-manifest
+consumer and must track the materialized observability version.
+
+The lockfile may update only the transitive `nanoid` resolution from `3.3.17`
+to `3.3.18` because the workflow-equivalent moderate audit blocks on
+GHSA-2v37-7h3g-55p8. Do not change a manifest, the release workflow, source
+code, provider configuration, or certification state for this repair.
+
+The package README and nested instructions must describe the materialized
+`0.3.0` candidate without implying publication. The canonical package owner
+and its constitution assertion must describe per-package registry status so an
+unchanged published version remains present while a new target remains absent.
 
 Do not change the release workflow unless a focused current-tree failure proves it cannot release the exact single package under its existing OIDC/provenance contract. A release-workflow change requires its own exact-file amendment and review.
 

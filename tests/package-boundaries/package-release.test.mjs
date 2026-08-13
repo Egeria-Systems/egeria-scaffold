@@ -43,7 +43,7 @@ const packageRecords = [
     name: "@egeria-systems/observability",
     path: "packages/observability",
     private: false,
-    version: "0.2.0",
+    version: "0.3.0",
   },
   {
     name: "@egeria-systems/standards",
@@ -59,20 +59,20 @@ const packageRecords = [
   },
 ];
 
-const unpublishedTargetRegistryResults = [
+const approvedRegistryResults = [
   {
     name: "@egeria-systems/observability",
-    version: "0.2.0",
+    version: "0.3.0",
     packageStatus: "present",
-    versions: ["0.1.0"],
+    versions: ["0.1.0", "0.2.0"],
     status: "absent",
   },
   {
     name: "@egeria-systems/standards",
     version: "0.2.0",
     packageStatus: "present",
-    versions: ["0.1.0"],
-    status: "absent",
+    versions: ["0.1.0", "0.2.0"],
+    status: "present",
   },
 ];
 
@@ -122,7 +122,7 @@ test("release context rejects invalid refs and commit identities", () => {
   );
 });
 
-test("the exact two-package release candidate is accepted", () => {
+test("the exact single-package release candidate is accepted", () => {
   const problems = checkLocalCandidate({
     packages: packageRecords,
     pendingChangesets: [],
@@ -167,16 +167,30 @@ test("missing, extra, renamed, or private public records are rejected", () => {
 });
 
 test("invalid, zero, and wrong candidate versions are rejected", () => {
-  for (const [version, code] of [
-    ["invalid", "PUBLIC_PACKAGE_VERSION_INVALID"],
-    ["0.0.0", "PUBLIC_PACKAGE_VERSION_INVALID"],
-    ["0.1.0", "PUBLIC_PACKAGE_VERSION_UNEXPECTED"],
-    ["0.3.0", "PUBLIC_PACKAGE_VERSION_UNEXPECTED"],
+  for (const [packageName, version, code] of [
+    [
+      "@egeria-systems/observability",
+      "invalid",
+      "PUBLIC_PACKAGE_VERSION_INVALID",
+    ],
+    [
+      "@egeria-systems/observability",
+      "0.0.0",
+      "PUBLIC_PACKAGE_VERSION_INVALID",
+    ],
+    [
+      "@egeria-systems/observability",
+      "0.2.0",
+      "PUBLIC_PACKAGE_VERSION_UNEXPECTED",
+    ],
+    [
+      "@egeria-systems/standards",
+      "0.3.0",
+      "PUBLIC_PACKAGE_VERSION_UNEXPECTED",
+    ],
   ]) {
     const packages = packageRecords.map((record) =>
-      record.name === "@egeria-systems/standards"
-        ? { ...record, version }
-        : record,
+      record.name === packageName ? { ...record, version } : record,
     );
 
     assert.deepEqual(
@@ -198,12 +212,12 @@ test("pending release intent is rejected after version materialization", () => {
   );
 });
 
-test("release registry state accepts existing histories with absent target versions", () => {
+test("release registry state accepts approved histories and version statuses", () => {
   assert.deepEqual(
     checkRegistryState({
       packages: packageRecords,
       pendingChangesets: [],
-      registryResults: unpublishedTargetRegistryResults,
+      registryResults: approvedRegistryResults,
     }),
     [],
   );
@@ -217,7 +231,7 @@ test("release registry state fails closed for every non-absent target result", (
     "authentication-failed",
     "network-failed",
   ]) {
-    const registryResults = unpublishedTargetRegistryResults.map((result, index) =>
+    const registryResults = approvedRegistryResults.map((result, index) =>
       index === 0
         ? {
             ...result,
@@ -239,13 +253,40 @@ test("release registry state fails closed for every non-absent target result", (
   }
 });
 
+test("registry validation requires the unchanged package version to remain published", () => {
+  for (const status of [
+    "absent",
+    "redirect",
+    "rate-limited",
+    "authentication-failed",
+    "network-failed",
+  ]) {
+    const registryResults = approvedRegistryResults.map((result) =>
+      result.name === "@egeria-systems/standards"
+        ? { ...result, status }
+        : result,
+    );
+
+    assert.deepEqual(
+      problemCodes(
+        checkRegistryState({
+          packages: packageRecords,
+          pendingChangesets: [],
+          registryResults,
+        }),
+      ),
+      ["REGISTRY_STATE_INVALID"],
+    );
+  }
+});
+
 test("registry validation rejects incomplete or mixed target results", () => {
   assert.deepEqual(
     problemCodes(
       checkRegistryState({
         packages: packageRecords,
         pendingChangesets: [],
-        registryResults: unpublishedTargetRegistryResults.slice(0, 1),
+        registryResults: approvedRegistryResults.slice(0, 1),
       }),
     ),
     ["REGISTRY_RESULT_SET_INVALID"],
@@ -255,7 +296,7 @@ test("registry validation rejects incomplete or mixed target results", () => {
       checkRegistryState({
         packages: packageRecords,
         pendingChangesets: [],
-        registryResults: unpublishedTargetRegistryResults.map((result, index) =>
+        registryResults: approvedRegistryResults.map((result, index) =>
           index === 0 ? { ...result, status: "present" } : result,
         ),
       }),
@@ -265,7 +306,7 @@ test("registry validation rejects incomplete or mixed target results", () => {
 });
 
 test("registry validation rejects missing package history", () => {
-  const registryResults = unpublishedTargetRegistryResults.map(
+  const registryResults = approvedRegistryResults.map(
     (result, index) =>
       index === 0
         ? { ...result, packageStatus: "absent", versions: [] }
@@ -284,22 +325,27 @@ test("registry validation rejects missing package history", () => {
   );
 });
 
-test("registry validation rejects unexpected package history versions", () => {
-  for (const versions of [["0.3.0"], ["0.1.0", "0.3.0"], []]) {
-    const registryResults = unpublishedTargetRegistryResults.map(
-      (result, index) => (index === 0 ? { ...result, versions } : result),
-    );
+test("registry validation rejects unexpected history for either package", () => {
+  for (const packageName of [
+    "@egeria-systems/observability",
+    "@egeria-systems/standards",
+  ]) {
+    for (const versions of [["0.3.0"], ["0.1.0", "0.3.0"], []]) {
+      const registryResults = approvedRegistryResults.map((result) =>
+        result.name === packageName ? { ...result, versions } : result,
+      );
 
-    assert.deepEqual(
-      problemCodes(
-        checkRegistryState({
-          packages: packageRecords,
-          pendingChangesets: [],
-          registryResults,
-        }),
-      ),
-      ["REGISTRY_STATE_INVALID"],
-    );
+      assert.deepEqual(
+        problemCodes(
+          checkRegistryState({
+            packages: packageRecords,
+            pendingChangesets: [],
+            registryResults,
+          }),
+        ),
+        ["REGISTRY_STATE_INVALID"],
+      );
+    }
   }
 });
 
@@ -321,35 +367,37 @@ test("registry response statuses are classified fail-closed", () => {
 test("registry adapter checks package history and exact version", async () => {
   const requests = [];
   const result = await readRegistryPackageState({
-    name: "@egeria-systems/standards",
-    version: "0.2.0",
+    name: "@egeria-systems/observability",
+    version: "0.3.0",
     request: async (url, options) => {
       requests.push({ url, redirect: options.redirect });
-      return url.endsWith("/0.2.0")
+      return url.endsWith("/0.3.0")
         ? { status: 404 }
         : {
             status: 200,
-            json: async () => ({ versions: { "0.1.0": {} } }),
+            json: async () => ({
+              versions: { "0.1.0": {}, "0.2.0": {} },
+            }),
           };
     },
   });
 
   assert.deepEqual(result, {
-    name: "@egeria-systems/standards",
-    version: "0.2.0",
+    name: "@egeria-systems/observability",
+    version: "0.3.0",
     packageStatus: "present",
-    versions: ["0.1.0"],
+    versions: ["0.1.0", "0.2.0"],
     status: "absent",
   });
   assert.deepEqual(
     requests.sort((left, right) => left.url.localeCompare(right.url)),
     [
       {
-        url: "https://registry.npmjs.org/%40egeria-systems%2Fstandards",
+        url: "https://registry.npmjs.org/%40egeria-systems%2Fobservability",
         redirect: "manual",
       },
       {
-        url: "https://registry.npmjs.org/%40egeria-systems%2Fstandards/0.2.0",
+        url: "https://registry.npmjs.org/%40egeria-systems%2Fobservability/0.3.0",
         redirect: "manual",
       },
     ],
@@ -359,7 +407,7 @@ test("registry adapter checks package history and exact version", async () => {
 test("registry adapter maps request failures without exposing details", async () => {
   const result = await readRegistryPackageState({
     name: "@egeria-systems/observability",
-    version: "0.2.0",
+    version: "0.3.0",
     request: async () => {
       throw new Error("credential-secret network detail");
     },
@@ -367,7 +415,7 @@ test("registry adapter maps request failures without exposing details", async ()
 
   assert.deepEqual(result, {
     name: "@egeria-systems/observability",
-    version: "0.2.0",
+    version: "0.3.0",
     packageStatus: "network-failed",
     versions: [],
     status: "network-failed",
@@ -377,10 +425,10 @@ test("registry adapter maps request failures without exposing details", async ()
 
 test("registry adapter rejects invalid package metadata without exposing it", async () => {
   const result = await readRegistryPackageState({
-    name: "@egeria-systems/standards",
-    version: "0.2.0",
+    name: "@egeria-systems/observability",
+    version: "0.3.0",
     request: async (url) =>
-      url.endsWith("/0.2.0")
+      url.endsWith("/0.3.0")
         ? { status: 404 }
         : {
             status: 200,
@@ -389,8 +437,8 @@ test("registry adapter rejects invalid package metadata without exposing it", as
   });
 
   assert.deepEqual(result, {
-    name: "@egeria-systems/standards",
-    version: "0.2.0",
+    name: "@egeria-systems/observability",
+    version: "0.3.0",
     packageStatus: "invalid-response",
     versions: [],
     status: "absent",

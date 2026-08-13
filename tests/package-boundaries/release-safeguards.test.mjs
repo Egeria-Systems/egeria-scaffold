@@ -321,67 +321,44 @@ test("pending Changeset discovery selects every Markdown record in deterministic
 });
 
 test("the release candidate materializes only the approved public versions", async () => {
-  const diagnosticChangeset = "add-observability-error-diagnostics.md";
-  const releaseEvidenceChangeset = "clarify-observability-boundary.md";
-  const generatedTestingChangeset = "generated-testing-boundary.md";
   const changesetFiles = await loadPendingChangesets();
-  assert.deepEqual(changesetFiles, [
-    diagnosticChangeset,
-    releaseEvidenceChangeset,
-    generatedTestingChangeset,
-  ]);
-  for (const changesetFile of [
-    releaseEvidenceChangeset,
-    generatedTestingChangeset,
-  ]) {
-    assert.deepEqual(
-      await readFile(resolve(repositoryRoot, ".changeset", changesetFile)),
-      Buffer.from("---\n---\n"),
-    );
-  }
-  const diagnosticIntent = await readFile(
-    resolve(repositoryRoot, ".changeset", diagnosticChangeset),
+  assert.deepEqual(changesetFiles, []);
+
+  const observabilityManifest = await readJson(
+    "packages/observability/package.json",
+  );
+  const observabilityChangelog = await readFile(
+    resolve(repositoryRoot, "packages/observability/CHANGELOG.md"),
     "utf8",
   );
-  assert.match(
-    diagnosticIntent,
-    /^---\n"@egeria-systems\/observability": minor\n---\n/u,
+  assert.equal(observabilityManifest.version, "0.3.0");
+  assert.match(observabilityChangelog, /^# @egeria-systems\/observability$/m);
+  assert.match(observabilityChangelog, /^## 0\.3\.0$/m);
+  assert.match(observabilityChangelog, /^## 0\.2\.0$/m);
+  assert.match(observabilityChangelog, /^## 0\.1\.0$/m);
+  assert.match(observabilityChangelog, /restricted diagnostic contract/u);
+  assert.match(observabilityChangelog, /schema `2\.0\.0`/u);
+  assert.match(observabilityChangelog, /zero runtime dependencies/u);
+  assert.match(observabilityChangelog, /not backward compatible/u);
+
+  const standardsManifest = await readJson("packages/standards/package.json");
+  const standardsChangelog = await readFile(
+    resolve(repositoryRoot, "packages/standards/CHANGELOG.md"),
+    "utf8",
   );
-  assert.match(diagnosticIntent, /restricted diagnostic/u);
-  assert.match(diagnosticIntent, /schema `2\.0\.0`/u);
-  assert.match(diagnosticIntent, /zero runtime dependencies/u);
-  assert.match(diagnosticIntent, /not backward compatible/u);
-
-  for (const [manifestPath, changelogPath, packageName, releaseSummary] of [
-    [
-      "packages/standards/package.json",
-      "packages/standards/CHANGELOG.md",
-      "@egeria-systems/standards",
-      "Add a flat ESLint config that rejects static user-visible JSX, relevant attribute, and Next.js metadata copy outside validated content or localization sources.",
-    ],
-    [
-      "packages/observability/package.json",
-      "packages/observability/CHANGELOG.md",
-      "@egeria-systems/observability",
-      "Add privacy-safe operational event contracts, redaction, server and browser delivery boundaries, Better Stack protocol support, and test sinks.",
-    ],
-  ]) {
-    const manifest = await readJson(manifestPath);
-    const changelog = await readFile(
-      resolve(repositoryRoot, changelogPath),
-      "utf8",
-    );
-
-    assert.equal(manifest.version, "0.2.0", manifestPath);
-    assert.match(changelog, new RegExp(`^# ${packageName}$`, "m"));
-    assert.match(changelog, /^## 0\.2\.0$/m);
-    assert.match(changelog, /^## 0\.1\.0$/m);
-    assert.ok(changelog.includes(releaseSummary), changelogPath);
-    assert.match(
-      changelog,
-      /Establish the initial public package APIs, including strict type-aware ESLint configuration, and release safeguards\./,
-    );
-  }
+  assert.equal(standardsManifest.version, "0.2.0");
+  assert.match(standardsChangelog, /^# @egeria-systems\/standards$/m);
+  assert.doesNotMatch(standardsChangelog, /^## 0\.3\.0$/m);
+  assert.match(standardsChangelog, /^## 0\.2\.0$/m);
+  assert.match(standardsChangelog, /^## 0\.1\.0$/m);
+  assert.match(
+    standardsChangelog,
+    /Add a flat ESLint config that rejects static user-visible JSX, relevant attribute, and Next\.js metadata copy outside validated content or localization sources\./,
+  );
+  assert.match(
+    standardsChangelog,
+    /Establish the initial public package APIs, including strict type-aware ESLint configuration, and release safeguards\./,
+  );
 
   for (const manifestPath of [
     "package.json",

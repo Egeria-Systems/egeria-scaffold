@@ -92,7 +92,7 @@ Analytics remains an independent capability. Importing this package never enable
 
 ## Compatibility and release state
 
-The source candidate advances events and browser envelopes from schema `1.0.0` to `2.0.0`, requires `eventId` and `service`, and makes `correlationId` optional. It is intended for the next pre-1.0 minor release and is not backward compatible with the published `0.2.0` contract. The manifest intentionally remains `0.2.0`; the pending Changeset records version intent but does not authorize versioning or publication.
+The source candidate advances events and browser envelopes from schema `1.0.0` to `2.0.0`, requires `eventId` and `service`, and makes `correlationId` optional. It is materialized in the manifest as the `0.3.0` release candidate and is not backward compatible with the published `0.2.0` contract. Version materialization does not authorize publication; live registry validation, exact-final-diff approval, integration, push, and publication remain separate gates.
 
 Run `pnpm run verify` in this package to build declarations and JavaScript, lint the strict source, run behavior tests, and type-check the package.
 

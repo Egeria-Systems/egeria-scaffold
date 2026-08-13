@@ -1201,7 +1201,7 @@ test("package ownership documentation records the approved release boundary", as
   assert.match(packageOwnership, /OIDC trusted publishing/i);
   assert.match(
     packageOwnership,
-    /both package names and target versions are absent/i,
+    /each public package[\s\S]+exact registry history[\s\S]+unchanged version[\s\S]+present[\s\S]+new target version[\s\S]+absent/i,
   );
   assert.match(
     packageOwnership,

@@ -11,14 +11,16 @@ const expectedPublicPackages = Object.freeze([
   Object.freeze({
     name: "@egeria-systems/observability",
     path: "packages/observability",
-    version: "0.2.0",
-    publishedVersions: Object.freeze(["0.1.0"]),
+    version: "0.3.0",
+    publishedVersions: Object.freeze(["0.1.0", "0.2.0"]),
+    expectedVersionStatus: "absent",
   }),
   Object.freeze({
     name: "@egeria-systems/standards",
     path: "packages/standards",
     version: "0.2.0",
-    publishedVersions: Object.freeze(["0.1.0"]),
+    publishedVersions: Object.freeze(["0.1.0", "0.2.0"]),
+    expectedVersionStatus: "present",
   }),
 ]);
 
@@ -113,7 +115,7 @@ export function checkLocalCandidate({ packages, pendingChangesets }) {
       problems.push(
         createProblem(
           "PUBLIC_PACKAGE_VERSION_UNEXPECTED",
-          "The public package candidate must use the approved target version.",
+          "The public package candidate must use the approved release-candidate version.",
         ),
       );
     }
@@ -172,22 +174,21 @@ export function checkRegistryState({
   );
   if (
     registryResults.some(({ name, packageStatus, status, versions }) => {
-      const expectedVersions =
-        expectedPackagesByName.get(name)?.publishedVersions;
+      const expectedPackage = expectedPackagesByName.get(name);
 
       return (
         packageStatus !== "present" ||
-        status !== "absent" ||
+        status !== expectedPackage?.expectedVersionStatus ||
         !Array.isArray(versions) ||
         JSON.stringify([...versions].sort()) !==
-          JSON.stringify(expectedVersions)
+          JSON.stringify(expectedPackage?.publishedVersions)
       );
     })
   ) {
     return freezeProblems([
       createProblem(
         "REGISTRY_STATE_INVALID",
-        "Both public package histories must contain only the approved prior version and both exact target versions must be absent from the registry.",
+        "Each public package history and exact candidate-version status must match the approved registry state.",
       ),
     ]);
   }
