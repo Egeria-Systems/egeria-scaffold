@@ -32,7 +32,12 @@ The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](..
 | Historical deployed Cloudflare Worker | `egeria-scaffold-nextjs-cloudflare-proof` |
 | Current shared GitHub environment | `test-deploy` |
 | Current shared Cloudflare Worker | `test-deploy` |
-| GitHub setup action | `pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c` |
+| Current manual deployment checkout action | `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` |
+| Current manual deployment setup action | `pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2` |
+| Current manual deployment revision binding | required `expected_revision`; `refs/heads/main`; lowercase 40-hex input; `GITHUB_SHA` and checked-out `HEAD` equality |
+| Current manual deployment checkout | `${{ github.sha }}`; full history; persisted credentials disabled |
+| Current manual deployment pnpm cache | disabled |
+| Current manual deployment timeout | 45 minutes |
 | Deployed Node.js | `22.23.0` |
 | Deployed implementation | `160b8ef261e69ec783ad93b7bfe69d932ba84541` |
 | Deployed `pnpm-lock.yaml` SHA-256 | `72fab6af3a327404e287094e99438b98f7a43007765a4a9e6255cc357dd637c7` |
@@ -75,6 +80,8 @@ The shared Playwright suite checks a selected axe ruleset, keyboard focus, 320 C
 ## Deployment boundary
 
 Deployment is manual GitHub Actions work. GitHub Actions is the sole deployment authority. The current workflow uses the non-production `test-deploy` environment, public `DEPLOY_URL` variable, and exact `test-deploy` Worker under the eligibility, protection, serialization, lease, cleanup, and recovery rules in the [shared test deployment policy](../governance/shared-test-deployment.md).
+
+The current manual workflow requires an explicitly approved exact lowercase 40-hex `main` revision, checks out `${{ github.sha }}` with full history and persisted credentials disabled, validates the ref, dispatch input, `GITHUB_SHA`, and checked-out `HEAD` before installation, disables the reusable pnpm cache, and bounds the job to 45 minutes. Local static validation of these controls does not prove GitHub-hosted execution, deployment, provider behavior, certification, publication, cleanup execution, or production safety.
 
 The historical deployment evidence is unchanged: the manual workflow at [`.github/workflows/compatibility-proof.yml`](../../.github/workflows/compatibility-proof.yml) ran from `main` through the earlier `compatibility` environment. [Run `30966212691`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/30966212691) completed successfully for exact commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`, deployed Worker version `fddba63e-c0e9-497e-98c4-4942461fb753` at the historical proof Worker, and passed the deployed smoke suite 4/4. An independent deployed rerun also passed 4/4. These historical identities are evidence facts, not the current deployment target.
 

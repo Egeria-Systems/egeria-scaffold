@@ -1271,8 +1271,20 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
       step,
     ]),
   );
+  const job = parsedWorkflow.jobs["verify-and-deploy"];
 
   assert.match(workflow, /^on:\n  workflow_dispatch:\n/m);
+  assert.deepEqual(parsedWorkflow.on, {
+    workflow_dispatch: {
+      inputs: {
+        expected_revision: {
+          description: "Exact main revision approved for deployment",
+          required: true,
+          type: "string",
+        },
+      },
+    },
+  });
   assert.doesNotMatch(workflow, /^  (?:push|pull_request|schedule):/m);
   assert.match(workflow, /^permissions:\n  contents: read\n/m);
   assert.match(
@@ -1280,6 +1292,7 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
     /^  group: test-deploy\n  cancel-in-progress: false\n  queue: max$/m,
   );
   assert.match(workflow, /if: github\.ref == 'refs\/heads\/main'/);
+  assert.equal(job["timeout-minutes"], 45);
   assert.match(workflow, /^      name: test-deploy$/m);
   assert.match(workflow, /^      url: \$\{\{ vars\.DEPLOY_URL \}\}$/m);
   assert.equal(
@@ -1289,6 +1302,11 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
     ),
     true,
   );
+  assert.deepEqual(stepsByName["Check out repository"].with, {
+    "fetch-depth": 0,
+    ref: "${{ github.sha }}",
+    "persist-credentials": false,
+  });
   assert.equal(
     isPinnedGitHubActionReference(
       stepsByName["Set up pnpm and Node.js"].uses,
@@ -1299,8 +1317,27 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   assert.doesNotMatch(workflow, /pnpm\/action-setup|actions\/setup-node/);
   assert.match(workflow, /^          version: 11\.20\.0$/m);
   assert.match(workflow, /^          runtime: node@22\.23\.2$/m);
-  assert.match(workflow, /^          cache: true$/m);
+  assert.match(workflow, /^          cache: false$/m);
   assert.match(workflow, /^          install: false$/m);
+  assert.deepEqual(stepsByName["Verify approved revision"].env, {
+    EXPECTED_REVISION: "${{ inputs.expected_revision }}",
+  });
+  assert.match(
+    stepsByName["Verify approved revision"].run,
+    /test "\$GITHUB_REF" = "refs\/heads\/main"/u,
+  );
+  assert.match(
+    stepsByName["Verify approved revision"].run,
+    /\[\[ "\$EXPECTED_REVISION" =~ \^\[0-9a-f\]\{40\}\$ \]\]/u,
+  );
+  assert.match(
+    stepsByName["Verify approved revision"].run,
+    /test "\$GITHUB_SHA" = "\$EXPECTED_REVISION"/u,
+  );
+  assert.match(
+    stepsByName["Verify approved revision"].run,
+    /test "\$\(git rev-parse HEAD\)" = "\$GITHUB_SHA"/u,
+  );
   assert.match(workflow, /pnpm install --frozen-lockfile/);
   assert.match(workflow, /run: pnpm run verify:compatibility-proof/);
   assert.equal(proofManifest.scripts.deploy, "opennextjs-cloudflare deploy");
@@ -1316,12 +1353,19 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
     },
   ]);
 
+  const revisionIndex = job.steps.findIndex(
+    ({ name }) => name === "Verify approved revision",
+  );
+  const installIndex = job.steps.findIndex(
+    ({ name }) => name === "Install dependencies",
+  );
   const verifyIndex = workflow.indexOf("- name: Verify compatibility proof");
   const deployIndex = workflow.indexOf("- name: Deploy compatibility Worker");
   const deployedTestIndex = workflow.indexOf(
     "- name: Test deployed compatibility proof",
   );
 
+  assert.ok(revisionIndex > -1 && revisionIndex < installIndex);
   assert.ok(verifyIndex > -1 && verifyIndex < deployIndex);
   assert.ok(deployIndex < deployedTestIndex);
 
@@ -1499,6 +1543,7 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   const job = workflow.jobs["verify-and-deploy"];
   assert.equal(job.if, "github.ref == 'refs/heads/main'");
   assert.equal(job["runs-on"], "ubuntu-24.04");
+  assert.equal(job["timeout-minutes"], 45);
   assert.deepEqual(job.environment, {
     name: "test-deploy",
     url: "${{ vars.DEPLOY_URL }}",
@@ -1539,9 +1584,20 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   assert.deepEqual(stepsByName["Set up pnpm and Node.js"].with, {
     version: "11.20.0",
     runtime: "node@22.23.2",
-    cache: true,
+    cache: false,
     install: false,
   });
+  assert.deepEqual(stepsByName["Verify approved revision"].env, {
+    EXPECTED_REVISION: "${{ inputs.expected_revision }}",
+  });
+  assert.match(
+    stepsByName["Verify approved revision"].run,
+    /test "\$GITHUB_SHA" = "\$EXPECTED_REVISION"/u,
+  );
+  assert.match(
+    stepsByName["Verify approved revision"].run,
+    /test "\$\(git rev-parse HEAD\)" = "\$GITHUB_SHA"/u,
+  );
   assert.equal(
     isPinnedGitHubActionReference(
       stepsByName["Upload local certification receipt"].uses,
@@ -1738,7 +1794,7 @@ test("observability certification deployment is manual, exact-revision, and secr
   assert.deepEqual(stepsByName["Set up pnpm and Node.js"].with, {
     version: "11.20.0",
     runtime: "node@22.23.2",
-    cache: true,
+    cache: false,
     install: false,
   });
 
@@ -3221,6 +3277,8 @@ test("execution plans enforce direct predecessors and bounded independent-work e
     roadmap,
     implementationPlan,
     certificationPlan,
+    planAReviewPacket,
+    protectedWorkflowPlan,
   ] =
     await Promise.all([
       readRepositoryFile("docs/governance/review-and-contribution.md"),
@@ -3233,6 +3291,12 @@ test("execution plans enforce direct predecessors and bounded independent-work e
       ),
       readRepositoryFile(
         "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md",
+      ),
+      readRepositoryFile(
+        "docs/review-packets/2026-08-12-automatic-ci-efficiency-security.md",
+      ),
+      readRepositoryFile(
+        "docs/superpowers/plans/2026-08-12-protected-workflow-hardening.md",
       ),
     ]);
   const implementationTask = namedLabel("Task", "6C");
@@ -3270,6 +3334,19 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   assert.match(
     reviewProtocol,
     /does not approve[^.]+waive[^.]+final-diff gate[^.]+external mutation/iu,
+  );
+
+  assert.match(
+    protectedWorkflowPlan,
+    /Acceptance artifact:[^\n]+2026-08-12-automatic-ci-efficiency-security\.md[\s\S]+explicit verified-final-diff approval and an exact accepted revision/iu,
+  );
+  assert.match(
+    planAReviewPacket,
+    /\*\*Verified-final-diff approval:\*\* `approved`/u,
+  );
+  assert.match(
+    planAReviewPacket,
+    /\*\*Accepted Plan A revision:\*\* `368b9491fd2f813f83f1e456823d8c7546f6762c`/u,
   );
 
   assert.match(sourcePlan, /2026-08-11[^.]+independent-work exception/iu);
