@@ -15,3 +15,6 @@ dist/
 playwright-report/
 test-results/
 .superpowers/
+docs/implementation-evidence/
+docs/review-packets/
+docs/superpowers/

@@ -360,16 +360,6 @@ test("builder-core direct consumers describe the private generation boundary", a
     resolve(repositoryRoot, "packages/builder-core/README.md"),
     "utf8",
   );
-  const builderPlanPath = [
-    "docs/superpowers/plans/2026-08-05-",
-    "p",
-    "1",
-    "-builder-kernel.md",
-  ].join("");
-  const builderPlan = await readFile(
-    resolve(repositoryRoot, builderPlanPath),
-    "utf8",
-  );
   const packageOwnership = await readFile(
     resolve(repositoryRoot, "docs/architecture/package-ownership.md"),
     "utf8",
@@ -445,11 +435,6 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /one-line JSON output/);
   assert.doesNotMatch(packageOwnership, /future CLI consumer/);
   assert.match(packageOwnership, /existing-repository transformation/);
-  assert.doesNotMatch(
-    builderPlan,
-    /Creation refuses an existing destination[^\n]*It never overwrites/,
-  );
-  assert.match(builderPlan, /portable-rename race/);
   assert.match(enforcementMap, /desired, installed, and inferred/);
   assert.match(enforcementMap, /read-only diagnostics/);
   assert.match(enforcementMap, /exact source and template allowlists/);

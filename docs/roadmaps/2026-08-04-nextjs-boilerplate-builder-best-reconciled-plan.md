@@ -390,10 +390,10 @@ Use one pnpm monorepo with a thin CLI and a private internal core package.
 │   ├── architecture/
 │   ├── adr/
 │   ├── compatibility/
-│   ├── implementation-evidence/
-│   ├── review-packets/
+│   ├── implementation-evidence/ # private local workflow artifacts, ignored by Git
+│   ├── review-packets/          # private local workflow artifacts, ignored by Git
 │   ├── roadmaps/
-│   └── superpowers/plans/
+│   └── superpowers/plans/       # private local workflow artifacts, ignored by Git
 ├── pnpm-workspace.yaml
 └── package.json
 ```
@@ -995,7 +995,7 @@ The first client launch is not blocked by a mandatory manual review under the de
 
 ### Test-tool and evidence ownership
 
-The [approved generated unit and component testing design](../superpowers/specs/2026-08-10-generated-unit-component-testing-design.md) owns the detailed boundary. Its [Task 6C implementation plan](../superpowers/plans/2026-08-10-generated-unit-component-testing.md) and separate [Task 6D certification plan](../superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md) provide the gated execution sequence.
+The approved private generated unit and component testing design owns the detailed boundary. Its private implementation and certification plans provide the gated execution sequence; these local workflow artifacts are ignored by Git.
 
 - Builder-core, CLI, standards, observability, and other authored builder-repository unit, integration, subprocess, and contract tests retain the Node.js test runner. No mass Vitest migration is planned.
 - P3 introduces `fast-check` with the Node.js test runner for materially combinatorial capability resolution, state, migration, version-graph, and recovery invariants. Property failures must retain counterexample, seed, path, and any model-command replay data. `fast-check` is not a default generated-project dependency.
@@ -1186,13 +1186,13 @@ Every implementation increment requires:
 1. actual repository inspection;
 2. applicable root and nested `AGENTS.md` review;
 3. current official-documentation and advisory review;
-4. dated implementation evidence;
-5. an exact-file implementation plan under `docs/superpowers/plans/`;
+4. dated private local implementation evidence under `docs/implementation-evidence/`;
+5. an exact-file private local implementation plan under `docs/superpowers/plans/`;
 6. test-driven development under the canonical builder-repository development boundary in `docs/governance/review-and-contribution.md`;
 7. small focused commits;
 8. independent non-overlapping reviewers;
 9. remediation and renewed verification;
-10. a review packet;
+10. a private local review packet under `docs/review-packets/`;
 11. a mandatory pause for user approval.
 
 Reviewer scopes:

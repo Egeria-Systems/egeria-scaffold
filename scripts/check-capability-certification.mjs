@@ -24,6 +24,9 @@ function parseArguments(arguments_) {
   if (arguments_.length === 0) {
     return { kind: "admission" };
   }
+  if (arguments_.length === 1 && arguments_[0] === "--artifacts") {
+    return { kind: "artifacts" };
+  }
   if (
     arguments_.length === 2 &&
     arguments_[0] === "--closure" &&
@@ -64,11 +67,7 @@ async function revisionIsInCheckedHistory(revision) {
   const options = {
     cwd: repositoryRoot,
     encoding: "utf8",
-    env: {
-      HOME: process.env.HOME,
-      PATH: process.env.PATH,
-      TMPDIR: process.env.TMPDIR,
-    },
+    env: { PATH: process.env.PATH },
     windowsHide: true,
   };
 
@@ -83,6 +82,48 @@ async function revisionIsInCheckedHistory(revision) {
   } catch {
     return false;
   }
+}
+
+async function validatePrivateArtifacts(registry) {
+  const artifactPaths = new Set();
+  for (const record of Object.values(registry.records)) {
+    if (record.taskPlan !== null) {
+      artifactPaths.add(record.taskPlan);
+    }
+    for (const evidence of record.evidence) {
+      artifactPaths.add(evidence.path);
+    }
+  }
+  const artifacts = Object.fromEntries(
+    await Promise.all(
+      [...artifactPaths]
+        .sort()
+        .map(async (path) => [path, await readArtifact(path)]),
+    ),
+  );
+  const evidenceRevisions = [
+    ...new Set(
+      Object.values(registry.records).flatMap((record) =>
+        record.evidence.map((evidence) => evidence.revision),
+      ),
+    ),
+  ].sort();
+  const validRevisions = (
+    await Promise.all(
+      evidenceRevisions.map(async (revision) => ({
+        revision,
+        valid: await revisionIsInCheckedHistory(revision),
+      })),
+    )
+  )
+    .filter(({ valid }) => valid)
+    .map(({ revision }) => revision);
+
+  return validateCertificationArtifacts({
+    registry,
+    artifacts,
+    validRevisions,
+  });
 }
 
 async function runMain() {
@@ -101,60 +142,41 @@ async function runMain() {
   }
 
   const registry = validateContract(certificationRegistrySchema, rawRegistry);
-  const catalog = createVerifiedCapabilityCatalog();
-  if (!registry.ok || !catalog.ok) {
+  if (!registry.ok) {
     writeStandard({
       ok: false,
       gate: "contract",
-      issues: registry.ok ? catalog.issues : registry.issues,
+      issues: registry.issues,
     });
     process.exitCode = 1;
     return;
   }
 
-  const artifactPaths = new Set();
-  for (const record of Object.values(registry.value.records)) {
-    if (record.taskPlan !== null) {
-      artifactPaths.add(record.taskPlan);
+  if (command.kind === "artifacts") {
+    const artifactValidation = await validatePrivateArtifacts(registry.value);
+    if (!artifactValidation.ok) {
+      writeStandard({
+        ok: false,
+        gate: "artifacts",
+        issues: artifactValidation.issues,
+      });
+      process.exitCode = 1;
+      return;
     }
-    for (const evidence of record.evidence) {
-      artifactPaths.add(evidence.path);
-    }
+    writeStandard({
+      ok: true,
+      gate: "artifacts",
+      records: Object.keys(registry.value.records).length,
+    });
+    return;
   }
-  const artifacts = Object.fromEntries(
-    await Promise.all(
-      [...artifactPaths]
-        .sort()
-        .map(async (path) => [path, await readArtifact(path)]),
-    ),
-  );
-  const evidenceRevisions = [
-    ...new Set(
-      Object.values(registry.value.records).flatMap((record) =>
-        record.evidence.map((evidence) => evidence.revision),
-      ),
-    ),
-  ].sort();
-  const validRevisions = (
-    await Promise.all(
-      evidenceRevisions.map(async (revision) => ({
-        revision,
-        valid: await revisionIsInCheckedHistory(revision),
-      })),
-    )
-  )
-    .filter(({ valid }) => valid)
-    .map(({ revision }) => revision);
-  const artifactValidation = validateCertificationArtifacts({
-    registry: registry.value,
-    artifacts,
-    validRevisions,
-  });
-  if (!artifactValidation.ok) {
+
+  const catalog = createVerifiedCapabilityCatalog();
+  if (!catalog.ok) {
     writeStandard({
       ok: false,
-      gate: "artifacts",
-      issues: artifactValidation.issues,
+      gate: "contract",
+      issues: catalog.issues,
     });
     process.exitCode = 1;
     return;

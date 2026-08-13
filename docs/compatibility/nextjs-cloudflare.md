@@ -8,7 +8,7 @@ This P0.2 combination is accepted after verified-final-diff approval. The origin
 
 Node `22.23.2` revalidation is local-only. On 2026-08-06, the current candidate passed the frozen install, dependency audit, Next.js and OpenNext builds, workerd integration harness, development and preview browser checks, and the selected automated accessibility checks. The deployed evidence remains on Node `22.23.0`; no workflow was dispatched and no Worker was deployed for this patch update. Neither the local nor deployed results prove a production profile, production readiness, or WCAG conformance.
 
-The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). Preparation evidence and the approved implementation plan remain separately reviewable in [implementation evidence](../implementation-evidence/2026-08-04-p0-2-compatibility-preparation.md) and the [P0.2 plan](../superpowers/plans/2026-08-04-p0-2-nextjs-cloudflare-compatibility-proof.md).
+The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). Preparation evidence and the approved implementation plan remain separately reviewable as private local workflow artifacts ignored by Git.
 
 ## Exact matrix
 

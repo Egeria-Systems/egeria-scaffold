@@ -30,10 +30,6 @@ const certificationRegistryPath = resolve(
   repositoryRoot,
   "certifications/capabilities.json",
 );
-const providerReceiptPath = resolve(
-  repositoryRoot,
-  "docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md",
-);
 const certificationCheckScript = resolve(
   repositoryRoot,
   "scripts/check-capability-certification.mjs",
@@ -246,24 +242,6 @@ test("the observability registry records reviewed deployed and fresh-scaffold ev
       subject,
     },
   ]);
-
-  const providerReceipt = await readFile(providerReceiptPath, "utf8");
-  assert.match(
-    providerReceipt,
-    /^\*\*Passed certification outcomes:\*\* `deployed-application, fresh-scaffold`$/mu,
-  );
-  assert.match(
-    providerReceipt,
-    /^\*\*Reviewed certification outcomes:\*\* `deployed-application, fresh-scaffold`$/mu,
-  );
-  assert.match(
-    providerReceipt,
-    /Cleanup was not executed or validated, `cleanup-recovery` is not a passed or reviewed outcome, and no cleanup or recovery claim is made\./u,
-  );
-  assert.match(
-    providerReceipt,
-    /Cleanup\/recovery evidence accepted: `not claimed and not evaluated`\./u,
-  );
 
   const transitionClosure = await runCertificationClosure(
     "legacy-backfill-exempt",
