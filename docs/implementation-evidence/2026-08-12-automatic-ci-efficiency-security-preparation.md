@@ -14,7 +14,7 @@
 - Reconciled accepted base: `origin/main@ee1e1df10fa2be2f09333efecd86de7f7a131d49`
 - Final comparison: `ee1e1df10fa2be2f09333efecd86de7f7a131d49...<Plan-A-candidate>`
 
-The worktree was clean before preparation edits. `git merge-base --is-ancestor 4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e HEAD` passed before and after the initial refresh. Task 6D was later squash-integrated at `c9294e9dc59d4b7bafed406846af3b43a10733d3`; accepted repair `ee1e1df10fa2be2f09333efecd86de7f7a131d49` then bound the reviewed rerun receipt to that accepted-main evidence revision. Admission and all 24 capability-certification tests pass on the reconciled Plan A candidate. Plan A was rebased onto that accepted revision with documentary conflict reconciliation only, and it is now an ancestor of the candidate. The worktree inventory showed no second checkout of `ci-efficiency-security` and no unaccounted writer in this worktree.
+The worktree was clean before preparation edits. `git merge-base --is-ancestor 4e7e68a5b5d8232137b6d4e0f7b7b03896f6ac7e HEAD` passed before and after the initial refresh. Task 6D was later squash-integrated at `c9294e9dc59d4b7bafed406846af3b43a10733d3`; accepted repair `ee1e1df10fa2be2f09333efecd86de7f7a131d49` then bound the reviewed rerun receipt to that accepted-main evidence revision. Admission and all 24 capability-certification tests pass in the accepted-main reconciliation phase on the reconciled Plan A candidate. Plan A was rebased onto that accepted revision with documentary conflict reconciliation only, and it is now an ancestor of the candidate. The worktree inventory showed no second checkout of `ci-efficiency-security` and no unaccounted writer in this worktree.
 
 ## Authority and stop boundaries
 
@@ -49,7 +49,7 @@ Workflow-level path filtering can leave a required workflow check pending when n
 
 The consolidated workflow will keep the exact current action repositories and immutable full SHAs for checkout and pnpm setup. The new dependency-review job will initially bind official `actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294`; the upstream commit exists in the official repository, is GitHub-verified, and identifies the `v5.0.0` release merge. Policy tests will continue to require the exact repository plus a full lowercase 40-hex SHA without encoding one release-specific value.
 
-No root workflow currently persists Next.js, OpenNext, Playwright, or browser-binary caches. The only reusable workflow cache is `pnpm/setup` with `cache: true` in the three root quality workflows. The generated workflow template already uses `cache: false`. Plan A standardizes ordinary root and generated quality paths on `cache: false`, does not add `actions/cache`, and does not cache Playwright browsers. Playwright's current CI guidance does not recommend browser-binary caching because restore time is comparable to downloading and Linux system dependencies are not cacheable. Next.js documents CI build caching, but the current Turbopack production filesystem cache remains opt-in/experimental; Plan A does not introduce it.
+No root workflow currently persists Next.js, OpenNext, Playwright, or browser-binary caches. The only reusable workflow cache is `pnpm/setup` with `cache: true` in the three root quality workflows. The generated workflow template already uses `cache: false`. Plan A standardizes ordinary root and generated quality paths on `cache: false`, does not add `actions/cache`, and does not cache Playwright browsers. Playwright's current CI guidance does not recommend browser-binary caching because restore time is comparable to downloading and Linux system dependencies are not cacheable. The exact pinned Next.js 16.3.0 package enables Turbopack production filesystem caching by default, but Plan A does not persist `.next/cache` across clean jobs or identity-bounded copies and adds no reusable cross-run cache.
 
 ## Generated and proof verification contracts
 
@@ -92,7 +92,7 @@ Executed with Node `22.23.2` and pnpm `11.20.0`:
 | Command | Result |
 | --- | --- |
 | `pnpm run check:capability-certification` | Passed; admission; 7 records |
-| `pnpm run test:capability-certification` | Passed; 20/20 |
+| `pnpm run test:capability-certification` | Passed; 20/20 in the initial pre-reconciliation preparation phase |
 | `pnpm run test:constitution` after canonical sequencing reconciliation | Passed; 53/53 |
 | `pnpm run check:semantic-naming` | Passed |
 | `pnpm audit --audit-level moderate` | Passed; no known vulnerabilities |
@@ -107,7 +107,7 @@ These checks establish registry consistency, local certification contracts, and 
 - GitHub secure workflow use and full-SHA pinning: <https://docs.github.com/en/actions/reference/security/secure-use>
 - GitHub dependency review: <https://docs.github.com/en/code-security/concepts/supply-chain-security/dependency-review>
 - OpenNext Cloudflare CLI and `--skipNextBuild`: <https://opennext.js.org/cloudflare/cli>
-- Next.js Turbopack filesystem cache: <https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopackFileSystemCache>
+- Next.js 16.3.0 configuration source: <https://github.com/vercel/next.js/blob/v16.3.0/packages/next/src/server/config-shared.ts>
 - Playwright CI browser caching: <https://playwright.dev/docs/ci>
 
 ## Expected RED evidence

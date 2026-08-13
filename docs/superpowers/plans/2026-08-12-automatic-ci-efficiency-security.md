@@ -20,7 +20,7 @@ Implementation authorization for this plan permits only local repository edits, 
 
 Accepted `main@ee1e1df10fa2be2f09333efecd86de7f7a131d49` records `standards@0.3.0` as certified from Task 6D's reviewed local eight-outcome receipt rerun at accepted-main evidence revision `c9294e9dc59d4b7bafed406846af3b43a10733d3`. Task 6D and its evidence-ancestry repairs were developed on separate streams and integrated before Plan A reconciliation. Plan A must not modify, rebase, copy, discard, certify, approve, or integrate the stopped `standards-certification` branch.
 
-This optimization changes managed workflow, preview, and Next configuration bytes but adds no managed surface, inference probe, evidence kind, dependency, environment variable, provider, or generated application behavior. Task 1 nevertheless re-evaluates materiality against the current `standards` and `deployment-cloudflare` descriptors and certification contracts. Neither descriptor version nor canonical behavior-contract digest changes. If Plan A is later approved and integrated, renewal of Task 6D's affected evidence belongs to a separately resumed Task 6D preflight: its evidence-producing revision must descend from the accepted Plan A revision, the affected build, browser, fixture, state, and CI-contract outcomes must be rerun against the optimized topology, and the unchanged subject/digest must be recomputed. Plan A may record that future requirement but must not perform the evidence renewal or any certification transition. Both final diffs retain separate approval gates.
+This optimization changes managed workflow, preview, and Next configuration bytes but adds no managed surface, inference probe, evidence kind, dependency, environment variable, provider, or generated application behavior. Task 1 nevertheless re-evaluates materiality against the current `standards` and `deployment-cloudflare` descriptors and certification contracts. Neither descriptor version nor canonical behavior-contract digest changes. If Plan A is later approved and integrated, renewal of Task 6D's evidence belongs to a separately resumed Task 6D evidence-renewal preflight: its evidence-producing revision must descend from the accepted Plan A revision, the unchanged subject/digest must be recomputed, and all eight receipt outcomes must be rerun against the optimized topology under that one descendant revision. The subject remains certified throughout; the renewal must not reapply the original pending-subject gate or perform a second pending-to-certified transition. Plan A may record that future requirement but must not perform the evidence renewal or any certification transition. Both final diffs retain separate approval gates.
 
 ## Exact file scope
 
@@ -202,7 +202,18 @@ Expected: stable job names always appear for pull requests; deep work is skipped
 - [x] Create the review packet with exact comparison, changed files, commits, commands/results, reviewer dispositions, remaining risks, deferred hosted/settings work, claims, and recovery.
 - [x] Verify status, untracked files, worktree identities, commit history, and exact diff. Stop for verified-final-diff approval.
 
-Do not push, open a pull request, dispatch CI, change required checks, begin Plan B, deploy, certify, publish, or mutate any external system.
+The original Plan A execution boundary did not authorize a push, pull-request mutation, CI dispatch, required-check change, Plan B, deployment, certification, publication, or other external mutation. The amendment below records the later explicit authority for one normal push to the existing branch only; every other boundary remains unchanged.
+
+### 2026-08-13 PR #10 review-repair amendment
+
+- [x] Revalidate open PR #10, its current head, accepted base, local branch, remote branch, and worktree before changing the reviewed candidate.
+- [x] Verify each selected inline and nitpick finding against current sources. Apply only current repairs; record why proposed dependency-review `base-ref` and `head-ref` inputs are not added on pull-request events.
+- [x] Use a focused RED/GREEN contract for bounded command-failure metadata, preserving command success, timeout, maximum-output, and content-safety behavior.
+- [x] Strengthen constitution coverage for source-level workflow guards, independent head-revision failure, exact scope-array ownership, output parsing, preview-command rejection, and accepted Task 6D wording.
+- [x] Correct candidate/phase attribution in evidence, generated/preview ownership in the design, and the pinned Next.js 16.3.0 production-cache default without changing the no-cross-run-cache decision.
+- [x] Run affected focused and full owning tests, capability-certification admission and behavior, applicable closure checks, semantic naming, Changesets status, and `git diff --check`; record why builder/fixture/browser success matrices are or are not repeated.
+- [x] Obtain one bounded read-only final review of the complete uncommitted repair, repair only validated material findings, and rerun affected verification.
+- [x] Prepare one focused repair for commit and a normal fast-forward push of the existing branch under the user's separate 2026-08-13 publication authorization. Do not force-push, create or replace a branch or pull request, update PR metadata or comments, merge, or begin Plan B.
 
 ## Completion criteria
 

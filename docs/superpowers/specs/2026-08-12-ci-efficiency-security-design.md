@@ -84,13 +84,15 @@ Its OpenNext step transforms the immediately preceding Next build with `opennext
 
 The existing `build:cloudflare` and `preview` package scripts remain unchanged for backward compatibility. Verification paths call the underlying prepared-output commands directly, so current generated-project public commands are not silently redefined.
 
-The compiled generator's project verifier, generated root `verify` script, fixed-root verifier, generated workflow, and preview Playwright configuration all use this same order:
+The compiled generator's project verifier, generated root `verify` script, fixed-root verifier, and generated workflow own this execution order:
 
 1. one Next build;
 2. one OpenNext transformation with `--skipNextBuild`;
 3. Chromium installation;
 4. development browser checks; and
 5. workerd preview against the prepared output.
+
+The preview Playwright configuration owns only step 5: it starts workerd preview against already prepared `.open-next` output. The verifier, generated root command, fixed-root verifier, or generated workflow that invokes it owns the preceding Next build, OpenNext transformation, Chromium installation, and development-browser checks.
 
 The workflow and preview configuration are already managed `standards` surfaces. No new capability surface, public package API, dependency, environment variable, or evidence kind is introduced. Accepted `main@ee1e1df10fa2be2f09333efecd86de7f7a131d49` records `standards@0.3.0` as certified through the reviewed eight-outcome receipt rerun at accepted-main evidence revision `c9294e9dc59d4b7bafed406846af3b43a10733d3`. Plan A does not change that subject, digest, receipt, registry entry, or status. If Plan A is accepted and integrated, the separate standards-certification stream must renew affected operational evidence on a descendant using the optimized commands and no-cache contract. If implementation preflight finds that the canonical behavior-contract digest must change, implementation stops for a descriptor/certification plan amendment rather than inheriting the old subject.
 
@@ -113,7 +115,7 @@ The manual compatibility workflow consumes that prepared output and its deploy-o
 
 No root, generated, proof, certification, or release workflow restores or saves `.next/cache`.
 
-The repository pins Next.js 16.3.0 with Turbopack. Next.js documents general `.next/cache` persistence, but Turbopack filesystem caching for production builds remains experimental and opt-in. Enabling meaningful reuse would add experimental application configuration plus an unsigned GitHub cache to small, clean-build evidence paths.
+The repository pins Next.js 16.3.0 with Turbopack, whose exact package source enables filesystem caching for production builds by default. The repository's clean jobs and identity-bounded copies still do not restore or save `.next/cache` across runs. Enabling meaningful cross-run reuse would add an unsigned GitHub cache to small, clean-build evidence paths and require an explicit cache-identity and invalidation contract.
 
 That trade is rejected because:
 
@@ -123,7 +125,7 @@ That trade is rejected because:
 - GitHub caches are unsigned and restored as untrusted input; and
 - cache transfer has already been comparable to or slower than frozen installation in this repository.
 
-Reconsideration requires a separate approved design after production-build caching stabilizes or hosted data shows compilation remains a material bottleneck after deduplication.
+Reconsideration requires a separate approved design after hosted data shows compilation remains a material bottleneck after deduplication and that design establishes safe cache identity, trust, and invalidation boundaries.
 
 ### All other reusable caches are rejected
 
@@ -223,6 +225,6 @@ This design does not authorize or add a push, pull request, merge, workflow disp
 - [GitHub secure use](https://docs.github.com/en/actions/reference/security/secure-use) recommends full-SHA pins and least privilege.
 - [GitHub dependency review](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/manage-your-dependency-security/configure-dependency-review-action) documents pull-request vulnerability enforcement.
 - [Next.js CI build caching](https://nextjs.org/docs/pages/guides/ci-build-caching) documents `.next/cache` as an available optimization.
-- [Next.js Turbopack filesystem cache](https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopackFileSystemCache) identifies production-build caching as experimental.
+- [Next.js 16.3.0 configuration source](https://github.com/vercel/next.js/blob/v16.3.0/packages/next/src/server/config-shared.ts) records production-build filesystem caching as enabled by default.
 - [OpenNext Cloudflare CLI](https://opennext.js.org/cloudflare/cli) documents `build --skipNextBuild` and separate preview/deploy consumption of built output.
 - [Playwright CI](https://playwright.dev/docs/ci) advises against browser-binary caching.

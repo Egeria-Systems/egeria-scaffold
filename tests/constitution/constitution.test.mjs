@@ -76,7 +76,11 @@ async function runRepositoryQualityScopeClassifier(input) {
     const entries = (await readFile(outputPath, "utf8"))
       .trim()
       .split("\n")
-      .map((line) => line.split("="));
+      .map((line) => {
+        const separatorIndex = line.indexOf("=");
+        assert.ok(separatorIndex > 0);
+        return [line.slice(0, separatorIndex), line.slice(separatorIndex + 1)];
+      });
     assert.deepEqual(
       entries.map(([name]) => name).toSorted(),
       ["compatibility-proof", "generated-projects"],
@@ -440,10 +444,22 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     scopeRun,
     /printf 'compatibility-proof=%s\\n' "\$compatibility_proof" >> "\$GITHUB_OUTPUT"/u,
   );
-  for (const path of [...generatedPaths, ...compatibilityPaths]) {
-    assert.match(
-      scopeRun,
-      new RegExp(`"${escapeRegularExpression(path)}"`, "u"),
+  for (const [name, expectedPaths] of [
+    ["generated_paths", generatedPaths],
+    ["compatibility_paths", compatibilityPaths],
+  ]) {
+    const arrayBody = new RegExp(
+      `(?:^|\\n)\\s*${name}=\\(\\n([\\s\\S]*?)\\n\\s*\\)`,
+      "u",
+    ).exec(scopeRun)?.[1];
+    assert.equal(typeof arrayBody, "string", name);
+    assert.deepEqual(
+      arrayBody
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line.trim())),
+      expectedPaths,
+      name,
     );
   }
 
@@ -604,43 +620,76 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
   assertConsolidatedRepositoryQualityWorkflow(source, workflow);
 
   const negativeCases = [
-    ["unsafe event interpolation", (candidate) => {
-      candidate.jobs.scope.steps.find(({ id }) => id === "classify").run +=
-        "\necho ${{ github.event.before }}";
-    }],
-    ["workflow path filter", (candidate) => {
-      candidate.on.pull_request = { paths: ["docs/**"] };
-    }],
-    ["reusable toolchain cache", (candidate) => {
-      candidate.jobs["builder-and-packages"].steps.find(({ uses }) =>
-        uses?.startsWith("pnpm/setup@"),
-      ).with.cache = true;
-    }],
-    ["disabled fail-safe default", (candidate) => {
-      const scopeStep = candidate.jobs.scope.steps.find(
-        ({ id }) => id === "classify",
-      );
-      scopeStep.run = scopeStep.run.replace(
-        'generated_projects="true"',
-        'generated_projects="false"',
-      );
-    }],
-    ["write authority", (candidate) => {
-      candidate.permissions.contents = "write";
-    }],
-    ["removed generated verification", (candidate) => {
-      candidate.jobs["generated-projects"].steps = candidate.jobs[
-        "generated-projects"
-      ].steps.filter(
-        ({ run }) => run !== "pnpm run verify:generated-skeletons",
-      );
-    }],
+    {
+      name: "unsafe event interpolation",
+      mutateWorkflow(candidate) {
+        candidate.jobs.scope.steps.find(({ id }) => id === "classify").run +=
+          "\necho ${{ github.event.before }}";
+      },
+    },
+    {
+      name: "secret context",
+      mutateSource: (candidateSource) => candidateSource.replace(
+        "permissions:\n  contents: read",
+        "env:\n  TOKEN: ${{ secrets.UNSAFE }}\n\npermissions:\n  contents: read",
+      ),
+    },
+    {
+      name: "write token",
+      mutateSource: (candidateSource) => candidateSource.replace(
+        "permissions:\n  contents: read",
+        "permissions:\n  contents: read\n  id-token: write",
+      ),
+    },
+    {
+      name: "workflow path filter",
+      mutateWorkflow(candidate) {
+        candidate.on.pull_request = { paths: ["docs/**"] };
+      },
+    },
+    {
+      name: "reusable toolchain cache",
+      mutateWorkflow(candidate) {
+        candidate.jobs["builder-and-packages"].steps.find(({ uses }) =>
+          uses?.startsWith("pnpm/setup@"),
+        ).with.cache = true;
+      },
+    },
+    {
+      name: "disabled fail-safe default",
+      mutateWorkflow(candidate) {
+        const scopeStep = candidate.jobs.scope.steps.find(
+          ({ id }) => id === "classify",
+        );
+        scopeStep.run = scopeStep.run.replace(
+          'generated_projects="true"',
+          'generated_projects="false"',
+        );
+      },
+    },
+    {
+      name: "write authority",
+      mutateWorkflow(candidate) {
+        candidate.permissions.contents = "write";
+      },
+    },
+    {
+      name: "removed generated verification",
+      mutateWorkflow(candidate) {
+        candidate.jobs["generated-projects"].steps = candidate.jobs[
+          "generated-projects"
+        ].steps.filter(
+          ({ run }) => run !== "pnpm run verify:generated-skeletons",
+        );
+      },
+    },
   ];
-  for (const [name, mutate] of negativeCases) {
+  for (const { name, mutateSource, mutateWorkflow } of negativeCases) {
     const candidate = structuredClone(workflow);
-    mutate(candidate);
+    mutateWorkflow?.(candidate);
+    const candidateSource = mutateSource?.(source) ?? source;
     assert.throws(
-      () => assertConsolidatedRepositoryQualityWorkflow(source, candidate),
+      () => assertConsolidatedRepositoryQualityWorkflow(candidateSource, candidate),
       { name: "AssertionError" },
       name,
     );
@@ -783,6 +832,12 @@ test("repository quality scope classification executes fail-safe Git behavior", 
       expected: bothEnabled,
     },
     {
+      name: "malformed head revision",
+      pushBaseSha: baseRevision,
+      pushHeadSha: "not-a-revision",
+      expected: bothEnabled,
+    },
+    {
       name: "missing revision",
       pushBaseSha: "",
       pushHeadSha: baseRevision,
@@ -899,7 +954,7 @@ test("the compatibility proof has a private non-app workspace boundary", async (
     previewConfiguration,
     /pnpm exec opennextjs-cloudflare preview -- --ip 127\.0\.0\.1 --port 3101/u,
   );
-  assert.doesNotMatch(previewConfiguration, /pnpm preview/u);
+  assert.doesNotMatch(previewConfiguration, /pnpm run preview/u);
   assert.match(proofInstructions, /already prepared `.open-next` output/iu);
   assert.match(proofInstructions, /--skipNextBuild/u);
   assert.match(nextConfiguration, /output: "standalone"/u);
@@ -3231,9 +3286,9 @@ test("execution plans enforce direct predecessors and bounded independent-work e
     ),
   );
   assert.match(
-    sourcePlan,
+    certificationPlan,
     new RegExp(
-      `${escapeRegularExpression(certificationTask)} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Plan A proceeds from that accepted repair revision`,
+      `${escapeRegularExpression(certificationTask)} was implemented[^.]+and squash-integrated as \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+Accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Plan A is rebased onto that accepted revision`,
       "u",
     ),
   );
@@ -3311,6 +3366,69 @@ test("execution plans enforce direct predecessors and bounded independent-work e
         " plan",
       "iu",
     ),
+  );
+});
+
+test("already-certified standards renewal uses one descendant evidence revision", async () => {
+  const certificationPlan = await readRepositoryFile(
+    "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md",
+  );
+  const renewalBoundary = certificationPlan
+    .split("### Plan A reconciliation boundary\n", 2)[1]
+    ?.split("\n## Certification outcomes", 1)[0];
+  const originalPreflight = namedLabel("Task", "1");
+  const certificationTask = namedLabel("Task", "6D");
+
+  assert.equal(typeof renewalBoundary, "string");
+  assert.match(
+    renewalBoundary,
+    /already-certified `standards@0\.3\.0` subject/iu,
+  );
+  assert.match(
+    renewalBoundary,
+    /This is evidence renewal for the already-certified `standards@0\.3\.0` subject, not a second pending-to-certified transition/iu,
+  );
+  assert.match(
+    renewalBoundary,
+    /single post-Plan A evidence revision[^.]+all eight outcomes/iu,
+  );
+  assert.equal(
+    renewalBoundary.includes(
+      `do not reapply ${originalPreflight}'s original pending-subject prerequisite`,
+    ),
+    true,
+  );
+  assert.match(
+    renewalBoundary,
+    /Rerun all eight on that exact descendant rather than carrying an earlier outcome forward/iu,
+  );
+  assert.match(
+    renewalBoundary,
+    /Preserve the certified registry status throughout this evidence renewal/iu,
+  );
+  assert.equal(
+    renewalBoundary.includes(
+      `may not modify the stopped ${certificationTask} branch, its receipt, registry entry, evidence, or certification status`,
+    ),
+    true,
+  );
+  for (const outcome of [
+    "fresh-scaffold",
+    "unit-tests",
+    "component-tests",
+    "state-agreement",
+    "generated-project-builds",
+    "browser-regression",
+    "retained-fixture-matrix",
+    "ci-contract",
+  ]) {
+    assert.equal(renewalBoundary.includes(`\`${outcome}\``), true, outcome);
+  }
+  assert.equal(
+    renewalBoundary.includes(
+      `resume at this plan's ${originalPreflight} preflight`,
+    ),
+    false,
   );
 });
 
@@ -3480,7 +3598,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\` binds the reviewed rerun receipt to accepted-main evidence revision`,
+      `${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\` binds the reviewed rerun receipt to accepted-main evidence revision`,
       "u",
     ),
   );
@@ -3495,7 +3613,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Plan A proceeds from that accepted repair revision`,
+      `${escapeRegularExpression(generatedTestingTask)} is integrated at \`main@12ecc73a8337ab12ece9dd3a6b2aec03f940383c\`[\\s\\S]+${escapeRegularExpression(namedLabel("Task", "6D"))} is squash-integrated at accepted \`main@c9294e9dc59d4b7bafed406846af3b43a10733d3\`[\\s\\S]+accepted repair \`ee1e1df10fa2be2f09333efecd86de7f7a131d49\`[\\s\\S]+Plan A proceeds from that accepted repair revision`,
       "u",
     ),
   );

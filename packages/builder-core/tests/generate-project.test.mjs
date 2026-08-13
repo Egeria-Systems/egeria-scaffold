@@ -542,6 +542,10 @@ test("the pnpm verifier maps command failures without child output", async () =>
 
       const result = await verifier.verifyInIsolatedCopy(source);
       assertFailure(result, code);
+      assert.equal(
+        result.issues[0]?.context.reason,
+        "command-failed;exit-code=23;timed-out=false",
+      );
       assert.doesNotMatch(JSON.stringify(result.issues), /sensitive-output|sensitive-error/);
       assert.equal(await exists(source), true);
     }
@@ -572,6 +576,24 @@ test("the pnpm verifier maps command failures without child output", async () =>
       "PNPM_VERSION_INVALID",
     );
   });
+});
+
+test("command failure diagnostics retain only bounded process metadata", () => {
+  assert.equal(
+    verifierModule.commandFailureReason({ code: 23, killed: false }),
+    "command-failed;exit-code=23;timed-out=false",
+  );
+  assert.equal(
+    verifierModule.commandFailureReason({ code: null, killed: true }),
+    "command-failed;timed-out=true",
+  );
+  assert.equal(
+    verifierModule.commandFailureReason({
+      code: "sensitive-error",
+      killed: "sensitive-output",
+    }),
+    "command-failed",
+  );
 });
 
 test("portfolio and site generation writes exact state-last repositories", async () => {
