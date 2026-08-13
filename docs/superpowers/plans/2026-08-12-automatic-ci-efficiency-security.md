@@ -199,8 +199,8 @@ Expected: stable job names always appear for pull requests; deep work is skipped
 
 - [x] Dispatch one bounded independent read-only reviewer over the exact base-to-candidate comparison. Require three separately labeled, non-overlapping reports: requirements; architecture and anti-overengineering; and test evidence. Across those reports cover job-skip fail safety, shell/ref injection, permissions/pins/cache, complete command coverage, build-order correctness, fixture derivation, certification materiality, documentation, tests, claims, and recovery. Prohibit edits and recursive fan-out.
 - [x] Validate every finding against the current tree. For each material defect, add a focused failing regression test, implement the minimum repair, and rerun only affected checks.
-- [ ] Create the review packet with exact comparison, changed files, commits, commands/results, reviewer dispositions, remaining risks, deferred hosted/settings work, claims, and recovery.
-- [ ] Verify status, untracked files, worktree identities, commit history, and exact diff. Stop for verified-final-diff approval.
+- [x] Create the review packet with exact comparison, changed files, commits, commands/results, reviewer dispositions, remaining risks, deferred hosted/settings work, claims, and recovery.
+- [x] Verify status, untracked files, worktree identities, commit history, and exact diff. Stop for verified-final-diff approval.
 
 Do not push, open a pull request, dispatch CI, change required checks, begin Plan B, deploy, certify, publish, or mutate any external system.
 
