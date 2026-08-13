@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   checkLocalCandidate,
+  checkPullRequestReleaseIntent,
   checkRegistryState,
   checkReleaseContext,
   classifyRegistryResponseStatus,
@@ -58,6 +59,12 @@ const packageRecords = [
     version: "0.0.0",
   },
 ];
+
+const basePackageRecords = packageRecords.map((record) =>
+  record.name === "@egeria-systems/observability"
+    ? { ...record, version: "0.2.0" }
+    : record,
+);
 
 const approvedRegistryResults = [
   {
@@ -130,6 +137,104 @@ test("the exact single-package release candidate is accepted", () => {
 
   assert.deepEqual(problems, []);
   assert.equal(Object.isFrozen(problems), true);
+});
+
+test("the exact materialized public package transition is accepted", () => {
+  const problems = checkPullRequestReleaseIntent({
+    basePackages: basePackageRecords,
+    packages: packageRecords,
+    pendingChangesets: [],
+  });
+
+  assert.deepEqual(problems, []);
+  assert.equal(Object.isFrozen(problems), true);
+});
+
+test("the materialized release exception rejects base or candidate drift", () => {
+  const cases = [
+    {
+      basePackages: basePackageRecords.map((record) =>
+        record.name === "@egeria-systems/observability"
+          ? { ...record, version: "0.3.0" }
+          : record,
+      ),
+      packages: packageRecords,
+      pendingChangesets: [],
+      code: "RELEASE_BASE_STATE_INVALID",
+    },
+    {
+      basePackages: basePackageRecords.map((record) =>
+        record.name === "@egeria-systems/standards"
+          ? { ...record, version: "0.1.0" }
+          : record,
+      ),
+      packages: packageRecords,
+      pendingChangesets: [],
+      code: "RELEASE_BASE_STATE_INVALID",
+    },
+    {
+      basePackages: [
+        ...basePackageRecords,
+        {
+          name: "@egeria-systems/extra",
+          path: "packages/extra",
+          private: false,
+          version: "0.2.0",
+        },
+      ],
+      packages: packageRecords,
+      pendingChangesets: [],
+      code: "RELEASE_BASE_STATE_INVALID",
+    },
+    {
+      basePackages: basePackageRecords,
+      packages: packageRecords.map((record) =>
+        record.name === "@egeria-systems/observability"
+          ? { ...record, version: "0.2.0" }
+          : record,
+      ),
+      pendingChangesets: [],
+      code: "PUBLIC_PACKAGE_VERSION_UNEXPECTED",
+    },
+    {
+      basePackages: basePackageRecords,
+      packages: [
+        ...packageRecords,
+        {
+          name: "@egeria-systems/extra",
+          path: "packages/extra",
+          private: false,
+          version: "0.2.0",
+        },
+      ],
+      pendingChangesets: [],
+      code: "PUBLIC_PACKAGE_SET_INVALID",
+    },
+    {
+      basePackages: basePackageRecords,
+      packages: packageRecords,
+      pendingChangesets: ["pending-release.md"],
+      code: "PENDING_CHANGESET",
+    },
+  ];
+
+  for (const {
+    basePackages,
+    packages,
+    pendingChangesets,
+    code,
+  } of cases) {
+    assert.deepEqual(
+      problemCodes(
+        checkPullRequestReleaseIntent({
+          basePackages,
+          packages,
+          pendingChangesets,
+        }),
+      ),
+      [code],
+    );
+  }
 });
 
 test("missing, extra, renamed, or private public records are rejected", () => {

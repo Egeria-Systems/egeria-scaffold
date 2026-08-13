@@ -705,7 +705,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
   assert.ok(buildIndex >= 0 && buildIndex < packageTestIndex);
   assert.equal(
     builderSteps.find(({ name }) => name === "Check release intent")?.run,
-    "pnpm exec changeset status --since origin/main",
+    "pnpm run check:package-release pull-request origin/main || pnpm exec changeset status --since origin/main",
   );
 
   const rootManifest = JSON.parse(await readRepositoryFile("package.json"));

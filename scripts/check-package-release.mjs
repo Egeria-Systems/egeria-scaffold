@@ -1,9 +1,13 @@
+import { execFile } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const execFileAsync = promisify(execFile);
 const packageRoots = ["apps", "packages", "proofs"];
+const revisionPattern = /^(?!-)[0-9A-Za-z][0-9A-Za-z._/-]*$/;
 const semverPattern =
   /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
@@ -11,6 +15,7 @@ const expectedPublicPackages = Object.freeze([
   Object.freeze({
     name: "@egeria-systems/observability",
     path: "packages/observability",
+    pullRequestBaseVersion: "0.2.0",
     version: "0.3.0",
     publishedVersions: Object.freeze(["0.1.0", "0.2.0"]),
     expectedVersionStatus: "absent",
@@ -18,6 +23,7 @@ const expectedPublicPackages = Object.freeze([
   Object.freeze({
     name: "@egeria-systems/standards",
     path: "packages/standards",
+    pullRequestBaseVersion: "0.2.0",
     version: "0.2.0",
     publishedVersions: Object.freeze(["0.1.0", "0.2.0"]),
     expectedVersionStatus: "present",
@@ -133,6 +139,38 @@ export function checkLocalCandidate({ packages, pendingChangesets }) {
   return freezeProblems(problems);
 }
 
+export function checkPullRequestReleaseIntent({
+  basePackages,
+  packages,
+  pendingChangesets,
+}) {
+  const localProblems = checkLocalCandidate({ packages, pendingChangesets });
+
+  if (localProblems.length > 0) {
+    return localProblems;
+  }
+
+  const basePackagesByName = new Map(
+    basePackages.map((packageRecord) => [packageRecord.name, packageRecord]),
+  );
+  if (
+    !identitiesAgree(basePackages) ||
+    expectedPublicPackages.some(
+      ({ name, pullRequestBaseVersion }) =>
+        basePackagesByName.get(name)?.version !== pullRequestBaseVersion,
+    )
+  ) {
+    return freezeProblems([
+      createProblem(
+        "RELEASE_BASE_STATE_INVALID",
+        "The materialized release exception requires the approved prior public package state.",
+      ),
+    ]);
+  }
+
+  return freezeProblems([]);
+}
+
 function registryResultIdentity(registryResults) {
   return registryResults
     .map(({ name, version }) => ({ name, version }))
@@ -225,6 +263,57 @@ async function loadPackageRecords() {
       return {
         name: manifest.name,
         path: relative(repositoryRoot, dirname(manifestPath)) || ".",
+        private: manifest.private,
+        version: manifest.version,
+      };
+    }),
+  );
+}
+
+function isWorkspaceManifestPath(path) {
+  return (
+    path === "package.json" ||
+    /^(?:apps|packages|proofs)\/[^/]+\/package\.json$/.test(path)
+  );
+}
+
+async function loadPackageRecordsAtRevision(revision) {
+  if (!revisionPattern.test(revision ?? "")) {
+    throw new Error("invalid revision");
+  }
+
+  const { stdout: manifestInventory } = await execFileAsync(
+    "git",
+    [
+      "ls-tree",
+      "-r",
+      "--name-only",
+      revision,
+      "--",
+      "package.json",
+      ...packageRoots,
+    ],
+    { cwd: repositoryRoot, encoding: "utf8" },
+  );
+  const manifestPaths = manifestInventory
+    .split("\n")
+    .filter(isWorkspaceManifestPath);
+
+  return Promise.all(
+    manifestPaths.map(async (manifestPath) => {
+      const { stdout } = await execFileAsync(
+        "git",
+        ["show", `${revision}:${manifestPath}`],
+        { cwd: repositoryRoot, encoding: "utf8" },
+      );
+      const manifest = JSON.parse(stdout);
+
+      return {
+        name: manifest.name,
+        path:
+          manifestPath === "package.json"
+            ? "."
+            : manifestPath.slice(0, -"/package.json".length),
         private: manifest.private,
         version: manifest.version,
       };
@@ -349,6 +438,13 @@ async function run(mode) {
   if (mode === "local") {
     return checkLocalCandidate({ packages, pendingChangesets });
   }
+  if (mode === "pull-request") {
+    return checkPullRequestReleaseIntent({
+      basePackages: await loadPackageRecordsAtRevision(process.argv[3]),
+      packages,
+      pendingChangesets,
+    });
+  }
   if (mode === "registry") {
     return checkRegistryState({
       packages,
@@ -360,7 +456,7 @@ async function run(mode) {
   return freezeProblems([
     createProblem(
       "RELEASE_CHECK_MODE_INVALID",
-      "Release check mode must be context, local, or registry.",
+      "Release check mode must be context, local, pull-request, or registry.",
     ),
   ]);
 }

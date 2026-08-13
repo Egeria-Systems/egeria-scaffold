@@ -126,6 +126,7 @@ The source-candidate manifest may add exports but remains version `0.2.0` until 
 Modify only as required by the established trusted-publication path:
 
 ```text
+.github/workflows/repository-quality.yml
 .changeset/add-observability-error-diagnostics.md
 .changeset/clarify-observability-boundary.md
 .changeset/generated-testing-boundary.md
@@ -163,6 +164,15 @@ and its constitution assertion must describe per-package registry status so an
 unchanged published version remains present while a new target remains absent.
 
 Do not change the release workflow unless a focused current-tree failure proves it cannot release the exact single package under its existing OIDC/provenance contract. A release-workflow change requires its own exact-file amendment and review.
+
+The ordinary repository-quality release-intent check may accept the exact
+already-materialized transition from public package versions `0.2.0` and
+`0.2.0` on the comparison base to observability `0.3.0` and unchanged
+standards `0.2.0` in the candidate, with the exact public package set and no
+pending Changeset. Every mismatch or validation failure must fall back to the
+existing `changeset status --since origin/main` check. This is a fail-closed
+Task 5 exception, not a general no-Changeset mode or authority to thin other
+repository-quality jobs.
 
 ### Generated capability integration
 
