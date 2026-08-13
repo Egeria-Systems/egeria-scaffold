@@ -3063,7 +3063,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     readme,
-    /standards@0\.3\.0[^\n]+accepted-main eight-outcome receipt[^\n]+c9294e9dc59d4b7bafed406846af3b43a10733d3/iu,
+    /standards@0\.3\.0[^\n]+\[accepted-main eight-outcome receipt\]\(docs\/implementation-evidence\/generated-unit-component-testing-certification-receipt\.json\)[^\n]+c9294e9dc59d4b7bafed406846af3b43a10733d3/iu,
   );
   assert.match(
     roadmap,

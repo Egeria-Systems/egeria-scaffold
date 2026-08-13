@@ -95,8 +95,8 @@ The candidate diff was applied to a fresh shared clone detached at accepted main
 | --- | --- |
 | `git merge-base --is-ancestor c9294e9... INTEGRATION_CANDIDATE` | Passed; accepted main is the direct parent |
 | Source-branch admission | Expected rejection; only `CERTIFICATION_EVIDENCE_REVISION_UNKNOWN` for standards, proving the branch does not mask the pre-squash topology |
-| Focused builder-core certification plus receipt runner | Passed; 20 of 20 |
-| `pnpm run test:capability-certification` | Passed; 24 of 24 |
+| `pnpm --filter @egeria-systems/builder-core run build && node --test packages/builder-core/tests/certification.test.mjs tests/capability-certification/certification-runner.test.mjs` at `b8ac2bc37455c33735065397211e62123d7223da` | Passed; 20 of 20: 10 builder-core certification-contract tests and 10 certification-runner/receipt tests |
+| `pnpm run test:capability-certification` at `b8ac2bc37455c33735065397211e62123d7223da` | Passed; 24 of 24 across every `tests/capability-certification/*.test.mjs` file after building builder-core |
 | Integration-candidate `check:capability-certification` | Passed; admission; 7 records |
 | `legacy-backfill-exempt` closure | Expected rejection; only observability remains `pending` |
 | `all-certified` closure | Expected rejection; observability plus the four unchanged backfills |
