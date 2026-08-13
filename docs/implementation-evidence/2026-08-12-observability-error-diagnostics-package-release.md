@@ -1,17 +1,19 @@
 # Observability error diagnostics package release-candidate evidence
 
 - Date: 2026-08-13
-- Status: release candidate prepared; push and publication not authorized
+- Status: release candidate in draft pull request; package publication not authorized
 - Accepted main base: `83d5ef1d4f1676704b5a578f0bf499d745cf01e8`
-- Reviewed implementation candidate: `9703299070cf78d6fa8b640ec06c7085ee485121`
+- Materialized package candidate: `9703299070cf78d6fa8b640ec06c7085ee485121`
+- Release-intent CI repair: `babcc71c32ed0854fbccb015f990c005b58289d9`
 - Branch: `observability-error-diagnostics`
 - Isolated worktree: `.worktrees/observability-error-diagnostics`
+- Draft pull request: [#19](https://github.com/Egeria-Systems/egeria-scaffold/pull/19)
 
 ## Outcome
 
 The release candidate materializes only `@egeria-systems/observability@0.3.0`. `@egeria-systems/standards` remains at its already published `0.2.0` version. Changesets generated the observability version and changelog exactly once, consumed the observability Changeset and two empty no-release Changesets, and left no pending Changeset.
 
-The live npm registry guard accepted exact histories `["0.1.0", "0.2.0"]` for both public packages, confirmed that observability `0.3.0` is absent, and confirmed that unchanged standards `0.2.0` remains present. No branch was pushed, no workflow was dispatched, and no package was published.
+The live npm registry guard accepted exact histories `["0.1.0", "0.2.0"]` for both public packages, confirmed that observability `0.3.0` is absent, and confirmed that unchanged standards `0.2.0` remains present. The branch was pushed and draft pull request #19 was opened under explicit user authority. No release workflow was dispatched and no package was published.
 
 ## Approved scope amendments
 
@@ -22,6 +24,7 @@ The user explicitly approved these evidence-backed Task 5 amendments before each
 - Apply a lockfile-only transitive `nanoid` update from `3.3.17` to `3.3.18`, without changing a dependency manifest or workflow, after the workflow-equivalent moderate audit was blocked by [GHSA-2v37-7h3g-55p8](https://github.com/advisories/GHSA-2v37-7h3g-55p8).
 - Update the packed observability README and nested package instructions to describe the materialized `0.3.0` candidate without implying publication.
 - Update the canonical package owner and constitution assertion so the registry contract supports an unchanged published version remaining present while a new target remains absent.
+- Repair ordinary pull-request release intent after hosted CI proved that raw Changesets status rejects the already-materialized candidate. The approved exception accepts only the exact base transition from observability/standards `0.2.0`/`0.2.0` to `0.3.0`/`0.2.0`, with the exact public package set and no pending Changeset. Every mismatch or adapter failure falls back to raw Changesets status. No other repository-quality job was removed or relaxed.
 
 The approved implementation plan records every amended file and preserves the prohibition on Task 6+, provider configuration, deployment, publication, and certification-state changes.
 
@@ -46,6 +49,7 @@ No npm setting, GitHub setting, provider resource, secret, or permission was cha
 | Canonical registry contract | The focused constitution file failed 1 of 47 assertions when the new per-package status contract was applied against the stale canonical owner. | It passed 47/47 after the canonical owner described exact history plus present unchanged and absent new target states. |
 | Packed release instructions | The packed-package test failed 1 of 4 checks when the tarball contained the stale `0.2.0` and pending-Changeset README. | The packed manifest and README checks passed 4/4 with the materialized `0.3.0` candidate and separate publication authority. |
 | Package-generic registry failures | A temporary test mutation that bypassed standards status and history validation caused exactly 2 of 18 focused release checks to fail. | The unchanged generic checker was restored; status failures and invalid histories for either package pass 18/18. |
+| Materialized pull-request release intent | Hosted `pnpm exec changeset status --since origin/main` failed because Task 5 had intentionally consumed all Changesets. A temporary mutation removing current-candidate validation caused the focused negative control to fail on the wrong current observability version. | The restored guard accepts only the exact prior/current public-package transition. Base drift, current version drift, current public-set drift, and a pending Changeset are causally rejected; raw Changesets remains the workflow fallback. |
 
 `pnpm run version-packages` was executed exactly once. The resulting manifest, changelog, and Changeset deletions were inspected rather than hand-authored.
 
@@ -63,7 +67,8 @@ All Node and pnpm commands used the Volta-pinned Node `22.23.2` and pnpm `11.20.
 | --- | --- |
 | `pnpm install --frozen-lockfile` | Passed; lockfile accepted and 885 entries passed the supply-chain policy. |
 | Focused release, safeguard, and public-package tests | Passed; final release model 18/18, packed observability 4/4, and combined focused release state 31/31. |
-| `pnpm run verify:package-release-candidate` | Passed on the exact implementation tree: constitution 55/55, package boundaries 47/47, standards 33/33, observability 49/49, plus builder build, lint, copy lint, typecheck, and local release validation. |
+| `pnpm run verify:package-release-candidate` | Passed on the exact CI-repair tree: constitution 55/55, package boundaries 49/49, standards 33/33, observability 49/49, plus builder build, lint, copy lint, typecheck, and local release validation. |
+| `pnpm run check:package-release pull-request origin/main \|\| pnpm exec changeset status --since origin/main` | Passed through the exact materialized-transition guard; the fallback remains present for every nonmatching candidate or guard failure. |
 | `pnpm peers check` | Passed with no issues. |
 | `pnpm audit --audit-level=moderate` | Passed; no known vulnerabilities. |
 | `pnpm audit --prod --audit-level=moderate` | Passed; no known vulnerabilities. |
@@ -81,7 +86,9 @@ The peer, audit, signature, and compatibility checks were not repeated after doc
 | Requirements | None. | No material improvements recommended; ready for the evidence/commit gate. |
 | Architecture and anti-overengineering | The packed README and nested instructions still described pre-materialization state; the canonical package owner still required both package targets to be absent. | Repaired under explicit approval. Re-review found no material improvements and no Task 6+, provider, deployment, or certification drift. |
 | Test evidence | The tarball test did not inspect the packed README; standards negative registry status and history cases were incomplete. | Repaired with packed-artifact assertions and package-generic negative controls. Re-review found no material improvements and no mutation residue. |
-| Security, privacy, and supply chain | None after repair. | No material improvements recommended; registry errors remain content-safe, the workflow and manifests are unchanged, the lockfile change is exact, and no secret or private data appears in the diff. |
+| Security, privacy, and supply chain | None after repair. | No material improvements recommended; registry errors remain content-safe, the release workflow and manifests are unchanged, the lockfile change is exact, and no secret or private data appears in the diff. |
+| CI repair requirements and security | None. | No material improvements recommended; the exact revision is read with argument-vector Git commands, failures remain content-safe, and the release workflow, providers, credentials, and certification state are unchanged. |
+| CI repair architecture and test evidence | The initial focused contract lacked direct wrong-head, current-public-set, and pending-Changeset negative controls. | Added the causal cases, verified the current-candidate guard with a temporary mutation, restored the guard, and obtained a no-material-improvements recheck. |
 
 ## Risks, gate, and recovery
 
@@ -90,6 +97,7 @@ The peer, audit, signature, and compatibility checks were not repeated after doc
 - npm versions are immutable. A partially completed publication requires separately approved forward recovery and consumer assessment; never automatically retry or replace an already published version.
 - Registry audit and signature results are current snapshots, not proof of complete supply-chain safety. Published provenance and exact artifact contents cannot be verified before publication.
 - Local Node, packing, build, lint, typecheck, and compatibility-proof unit checks do not prove hosted workflow behavior, deployment, provider ingestion, production safety, accessibility conformance, or certification.
+- The pull-request exception is intentionally one transition only. Once the comparison base no longer has observability/standards `0.2.0`/`0.2.0`, it fails closed and ordinary Changesets status remains mandatory.
 - Before publication, recovery is to abandon or revert the local candidate through a separately authorized Git action. No external package, provider, deployment, or certification state has changed.
 
-Stop here for explicit approval before any push or publication. Task 6+, deployment, provider configuration, workflow dispatch, publication, and certification-state changes remain outside this increment.
+Draft-pull-request publication and this CI repair were explicitly authorized. Stop before package publication, release-workflow dispatch, Task 6+, deployment, provider configuration, or certification-state changes.
