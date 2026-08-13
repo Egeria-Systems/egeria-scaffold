@@ -50,7 +50,7 @@ jobs:
         run: pnpm run build
 
       - name: Build OpenNext application
-        run: pnpm run build:cloudflare
+        run: pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild
 
       - name: Install Chromium
         run: pnpm --dir apps/web run browser:install:ci

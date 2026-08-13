@@ -43,16 +43,18 @@ All package versions are exact. The workspace uses a one-day package maturity po
 
 - `pnpm run test:constitution` checks repository structure, pins, workspace privacy and boundaries, documentation links, and named architecture contracts. It does not execute Next.js or workerd.
 - `test:unit` uses ordinary Vitest on Node.js to exercise copy validation and pure presentation rendering.
-- `build` proves that Next.js can compile and type-check the App Router page and route. It is not runtime evidence.
+- `build` proves that Next.js can compile and type-check the App Router page and route and emit standalone output traced from the workspace root. It is not runtime evidence.
 - `test:e2e:dev` runs the page, route, keyboard focus, 320 CSS-pixel reflow, reduced-motion, and axe smoke checks against `next dev` on Node.js.
-- `build:cloudflare` proves that OpenNext can produce `.open-next/worker.js`. A successful build alone does not prove Worker execution.
+- `build:cloudflare` remains the standalone convenience command proving that OpenNext can produce `.open-next/worker.js`. In combined verification, the preceding standalone Next output is transformed with `opennextjs-cloudflare build --skipNextBuild` so Next is not rebuilt. A successful build alone does not prove Worker execution.
 - `test:integration:cloudflare` sends an HTTP request through Wrangler's production-Worker harness and verifies the provider-neutral runtime-report response under workerd.
-- `test:e2e:preview` runs the same browser and automated accessibility checks against the OpenNext workerd preview.
+- `test:e2e:preview` starts OpenNext preview directly from already prepared `.open-next` output and runs the same browser and automated accessibility checks under workerd.
 - `test:e2e:deployed` runs the shared smoke suite against `COMPATIBILITY_URL`. It first polls the typed runtime-report condition to tolerate edge propagation, then applies the same bounded browser and accessibility checks. The final workflow and an independent rerun both passed 4/4.
 
 ## Runtime distinctions
 
 `next dev` runs the Next.js development path on Node.js. OpenNext build output is exercised by the Wrangler harness and preview under workerd-compatible execution. The deployed check separately exercises the non-production Cloudflare Worker.
+
+The current automatic root workflow consolidates ordinary proof quality with repository and generated-project quality while preserving a stable `compatibility-proof` job. Reusable pnpm caches are disabled. Validated job-level scoping may skip the proof only when neither proof nor shared inputs changed; invalid revision or diff state runs it. This local/static workflow contract does not claim a hosted run, required-check configuration, or deployed result. The historical workflow and deployment evidence below remains unchanged.
 
 The `/api/compatibility` response is a target-boundary report. It reads the configured `PROOF_ENVIRONMENT` binding through the Cloudflare adapter and returns the declared target runtime. It is not general-purpose runtime introspection and must not be used to imply that `next dev` itself runs under workerd.
 

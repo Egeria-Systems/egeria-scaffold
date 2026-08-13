@@ -625,7 +625,14 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     ["run", "test:unit"],
     ["run", "test:component"],
     ["run", "build"],
-    ["run", "build:cloudflare"],
+    [
+      "--dir",
+      "apps/web",
+      "exec",
+      "opennextjs-cloudflare",
+      "build",
+      "--skipNextBuild",
+    ],
     ["--dir", "apps/web", "run", "browser:install"],
     ["--dir", "apps/web", "run", "test:e2e:dev"],
     ["--dir", "apps/web", "run", "test:e2e:preview"],
@@ -662,6 +669,37 @@ test("live verification reports a stable failure and still removes its owner", a
           },
         }),
       "DEPENDENCY_AUDIT_FAILED",
+    );
+    assert.equal(await pathExists(ownedPath), false);
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
+});
+
+test("live verification maps the prepared OpenNext transform failure", async () => {
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-fixture-opennext-"));
+  let ownedPath;
+
+  try {
+    await expectFixtureError(
+      () =>
+        verifyGeneratedSkeletonsForTesting({
+          async createOwner() {
+            const identity = await createKnownOwner(ownerParent);
+            ownedPath = identity.path;
+            return identity;
+          },
+          async runCommand(input) {
+            if (
+              input.arguments.join(" ") ===
+              "--dir apps/web exec opennextjs-cloudflare build --skipNextBuild"
+            ) {
+              throw new Error("PRIVATE_VALUE");
+            }
+            return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+          },
+        }),
+      "OPENNEXT_BUILD_FAILED",
     );
     assert.equal(await pathExists(ownedPath), false);
   } finally {

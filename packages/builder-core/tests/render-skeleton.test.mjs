@@ -972,7 +972,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       "test:watch": "pnpm --dir apps/web run test:watch",
       typecheck: "pnpm --dir apps/web run typecheck",
       verify:
-        "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm run build:cloudflare",
+        "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild",
     },
     engines: { node: "22.23.2", pnpm: "11.20.0" },
     packageManager: "pnpm@11.20.0",
@@ -2044,6 +2044,7 @@ test("generated browser quality is environment-specific and content-agnostic", a
   const development = files.get("apps/web/playwright.dev.config.ts");
   const preview = files.get("apps/web/playwright.preview.config.ts");
   const deployed = files.get("apps/web/playwright.deployed.config.ts");
+  const nextConfiguration = files.get("apps/web/next.config.ts");
   const specification = files.get("apps/web/tests/e2e/site-quality.spec.ts");
   const workflow = files.get(".github/workflows/quality.yml");
   const workflowConfiguration = parseGeneratedYaml(
@@ -2052,6 +2053,7 @@ test("generated browser quality is environment-specific and content-agnostic", a
   );
   const ignore = files.get(".gitignore");
   const readme = files.get("README.md");
+  const instructions = files.get("AGENTS.md");
 
   assert.match(shared, /fullyParallel: false/u);
   assert.match(shared, /forbidOnly: Boolean\(process\.env\.CI\)/u);
@@ -2065,8 +2067,17 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.match(development, /pnpm run dev --hostname 127\.0\.0\.1 --port 3100/u);
   assert.match(development, /reuseExistingServer: false/u);
   assert.match(preview, /http:\/\/127\.0\.0\.1:3101/u);
-  assert.match(preview, /pnpm run preview --ip 127\.0\.0\.1 --port 3101/u);
+  assert.match(
+    preview,
+    /pnpm exec opennextjs-cloudflare preview -- --ip 127\.0\.0\.1 --port 3101/u,
+  );
+  assert.doesNotMatch(preview, /pnpm run preview/u);
   assert.match(preview, /reuseExistingServer: false/u);
+  assert.match(nextConfiguration, /output: "standalone"/u);
+  assert.match(
+    nextConfiguration,
+    /outputFileTracingRoot: fileURLToPath\(new URL\("\.\.\/\.\.\/", import\.meta\.url\)\)/u,
+  );
 
   assert.match(deployed, /PLAYWRIGHT_DEPLOYED_URL/u);
   assert.match(deployed, /protocol !== "https:"/u);
@@ -2175,7 +2186,11 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.match(workflow, /pnpm run test:unit/u);
   assert.match(workflow, /pnpm run test:component/u);
   assert.match(workflow, /pnpm run build/u);
-  assert.match(workflow, /pnpm run build:cloudflare/u);
+  assert.match(
+    workflow,
+    /pnpm --dir apps\/web exec opennextjs-cloudflare build --skipNextBuild/u,
+  );
+  assert.doesNotMatch(workflow, /pnpm run build:cloudflare/u);
   assert.match(workflow, /browser:install:ci/u);
   assert.match(workflow, /test:e2e:dev/u);
   assert.match(workflow, /test:e2e:preview/u);
@@ -2216,7 +2231,10 @@ test("generated browser quality is environment-specific and content-agnostic", a
         { name: "Test generated unit behavior", run: "pnpm run test:unit" },
         { name: "Test generated components", run: "pnpm run test:component" },
         { name: "Build Next.js application", run: "pnpm run build" },
-        { name: "Build OpenNext application", run: "pnpm run build:cloudflare" },
+        {
+          name: "Build OpenNext application",
+          run: "pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild",
+        },
         {
           name: "Install Chromium",
           run: "pnpm --dir apps/web run browser:install:ci",
@@ -2251,6 +2269,10 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.match(readme, /explicitly install Chromium/iu);
   assert.match(readme, /pnpm run test:unit/u);
   assert.match(readme, /pnpm run test:component/u);
+  assert.match(readme, /already prepared `.open-next` output/iu);
+  assert.match(readme, /--skipNextBuild/u);
+  assert.match(instructions, /already prepared `.open-next` output/iu);
+  assert.match(instructions, /--skipNextBuild/u);
   assert.match(readme, /jsdom does not exercise CSS layout/iu);
   assert.match(readme, /does not establish WCAG conformance/iu);
 });
