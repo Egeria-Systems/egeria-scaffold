@@ -1,11 +1,13 @@
 # Observability error diagnostics package release-candidate review
 
 - Date: 2026-08-13
-- Status: exact candidate in draft pull request; package not published
-- Comparison base: `83d5ef1d4f1676704b5a578f0bf499d745cf01e8`
+- Status: exact candidate in open pull request; package not published
+- Task 5 preparation base: `83d5ef1d4f1676704b5a578f0bf499d745cf01e8`
+- Reconciled main: `141747af8c451dde8f60cac56840e4b208cc8d00`
+- Reconciliation merge: `c57d14fa3aeddcfe3087dfbe381aa2db46672325`
 - Materialized package candidate: `9703299070cf78d6fa8b640ec06c7085ee485121`
 - Release-intent CI repair: `babcc71c32ed0854fbccb015f990c005b58289d9`
-- Draft pull request: [#19](https://github.com/Egeria-Systems/egeria-scaffold/pull/19)
+- Pull request: [#19](https://github.com/Egeria-Systems/egeria-scaffold/pull/19)
 - Evidence: [observability error diagnostics package release-candidate evidence](../implementation-evidence/2026-08-12-observability-error-diagnostics-package-release.md)
 
 ## Review result
@@ -45,7 +47,9 @@ No release workflow, standards package, application, builder-core, provider, dep
 - `9703299` — `Prepare observability diagnostics release`
 - `745d711` — `Record observability diagnostics release evidence`
 - `babcc71` — `Allow materialized release intent in CI`
-- The final CI-repair evidence commit is the commit containing this packet.
+- `821eb82` — `Record release intent CI repair`
+- `c57d14f` — `Merge main into observability diagnostics release`
+- The final reconciliation-evidence commit is the commit containing this packet.
 
 ## Verification summary
 
@@ -72,6 +76,7 @@ No release workflow, standards package, application, builder-core, provider, dep
 - Security, privacy, and supply chain: no material defect; the registry guard remains content-safe, the release workflow and dependency manifests are unchanged, the lockfile repair is exact, and no secret or private data appears in the diff.
 - CI repair requirements and security: no material defect; revision reads use argument-vector Git commands, failures are content-safe, and the release workflow, providers, credentials, and certification state remain unchanged.
 - CI repair architecture and test evidence: repaired missing current-version, current-public-set, and pending-Changeset negative controls. A temporary guard-removal mutation failed the focused test; after restoration, the reviewer found no material improvements.
+- Current-main reconciliation: requirements/security and architecture/test-evidence rechecks of committed comparison `origin/main...c57d14f` found no material improvements after the automatic shared-test merge and full verification.
 
 ## Stop gate
 

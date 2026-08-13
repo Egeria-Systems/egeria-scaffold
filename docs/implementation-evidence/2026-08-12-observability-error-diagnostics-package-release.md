@@ -1,19 +1,21 @@
 # Observability error diagnostics package release-candidate evidence
 
 - Date: 2026-08-13
-- Status: release candidate in draft pull request; package publication not authorized
-- Accepted main base: `83d5ef1d4f1676704b5a578f0bf499d745cf01e8`
+- Status: release candidate in open pull request; package publication not authorized
+- Task 5 preparation base: `83d5ef1d4f1676704b5a578f0bf499d745cf01e8`
+- Reconciled main: `141747af8c451dde8f60cac56840e4b208cc8d00`
+- Reconciliation merge: `c57d14fa3aeddcfe3087dfbe381aa2db46672325`
 - Materialized package candidate: `9703299070cf78d6fa8b640ec06c7085ee485121`
 - Release-intent CI repair: `babcc71c32ed0854fbccb015f990c005b58289d9`
 - Branch: `observability-error-diagnostics`
 - Isolated worktree: `.worktrees/observability-error-diagnostics`
-- Draft pull request: [#19](https://github.com/Egeria-Systems/egeria-scaffold/pull/19)
+- Pull request: [#19](https://github.com/Egeria-Systems/egeria-scaffold/pull/19)
 
 ## Outcome
 
 The release candidate materializes only `@egeria-systems/observability@0.3.0`. `@egeria-systems/standards` remains at its already published `0.2.0` version. Changesets generated the observability version and changelog exactly once, consumed the observability Changeset and two empty no-release Changesets, and left no pending Changeset.
 
-The live npm registry guard accepted exact histories `["0.1.0", "0.2.0"]` for both public packages, confirmed that observability `0.3.0` is absent, and confirmed that unchanged standards `0.2.0` remains present. The branch was pushed and draft pull request #19 was opened under explicit user authority. No release workflow was dispatched and no package was published.
+The live npm registry guard accepted exact histories `["0.1.0", "0.2.0"]` for both public packages, confirmed that observability `0.3.0` is absent, and confirmed that unchanged standards `0.2.0` remains present. The branch was pushed and pull request #19 was opened under explicit user authority. No release workflow was dispatched and no package was published.
 
 ## Approved scope amendments
 
@@ -65,7 +67,7 @@ All Node and pnpm commands used the Volta-pinned Node `22.23.2` and pnpm `11.20.
 
 | Command | Result |
 | --- | --- |
-| `pnpm install --frozen-lockfile` | Passed; lockfile accepted and 885 entries passed the supply-chain policy. |
+| `pnpm install --frozen-lockfile` | Passed after current-main reconciliation; lockfile accepted and 885 entries passed the supply-chain policy. The initial sandboxed retry hit DNS restrictions before the approved networked retry completed. |
 | Focused release, safeguard, and public-package tests | Passed; final release model 18/18, packed observability 4/4, and combined focused release state 31/31. |
 | `pnpm run verify:package-release-candidate` | Passed on the exact CI-repair tree: constitution 55/55, package boundaries 49/49, standards 33/33, observability 49/49, plus builder build, lint, copy lint, typecheck, and local release validation. |
 | `pnpm run check:package-release pull-request origin/main \|\| pnpm exec changeset status --since origin/main` | Passed through the exact materialized-transition guard; the fallback remains present for every nonmatching candidate or guard failure. |
@@ -77,7 +79,7 @@ All Node and pnpm commands used the Volta-pinned Node `22.23.2` and pnpm `11.20.
 | Compatibility-proof `test:unit` | Passed, 4/4, after the lockfile repair. |
 | `git diff --cached --check` | Passed before the implementation commit. |
 
-The peer, audit, signature, and compatibility checks were not repeated after documentation and test-only repairs because their manifest, lockfile, dependency, and proof inputs were unchanged. An earlier sandboxed frozen-install attempt could not reach the package store; the approved exact-toolchain retry succeeded without adding an unapproved tracked file.
+The peer, audit, signature, and compatibility checks were not repeated after documentation and test-only repairs because their Task 5 manifest, dependency, and proof inputs were unchanged. Current accepted-main dependency and workflow inputs were reconciled before the final frozen install and release-candidate gate. An earlier sandboxed frozen-install attempt could not reach the package store; the approved exact-toolchain retry succeeded without adding an unapproved tracked file.
 
 ## Independent review
 
@@ -89,6 +91,7 @@ The peer, audit, signature, and compatibility checks were not repeated after doc
 | Security, privacy, and supply chain | None after repair. | No material improvements recommended; registry errors remain content-safe, the release workflow and manifests are unchanged, the lockfile change is exact, and no secret or private data appears in the diff. |
 | CI repair requirements and security | None. | No material improvements recommended; the exact revision is read with argument-vector Git commands, failures remain content-safe, and the release workflow, providers, credentials, and certification state are unchanged. |
 | CI repair architecture and test evidence | The initial focused contract lacked direct wrong-head, current-public-set, and pending-Changeset negative controls. | Added the causal cases, verified the current-candidate guard with a temporary mutation, restored the guard, and obtained a no-material-improvements recheck. |
+| Current-main reconciliation | None. | Requirements/security and architecture/test-evidence rechecks of the committed `origin/main...c57d14f` comparison found no material improvements after the automatic shared-test merge and full verification. |
 
 ## Risks, gate, and recovery
 
