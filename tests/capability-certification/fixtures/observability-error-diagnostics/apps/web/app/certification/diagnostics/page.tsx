@@ -5,8 +5,6 @@ import {
   reportCaughtBrowserError,
 } from "../../../src/infrastructure/observability/browser-reporter";
 
-let boundaryHasThrown = false;
-
 function throwSyntheticFailure(): never {
   throw new Error("synthetic diagnostics certification failure");
 }
@@ -16,8 +14,9 @@ export default function DiagnosticsCertificationPage() {
     typeof globalThis.location === "object" &&
     new URLSearchParams(globalThis.location.search).get("case") ===
       "react-boundary";
-  if (boundaryRequested && !boundaryHasThrown) {
-    boundaryHasThrown = true;
+  const recoveryRequested =
+    Reflect.get(globalThis, "__diagnosticsCertificationRecover") === true;
+  if (boundaryRequested && !recoveryRequested) {
     throwSyntheticFailure();
   }
 

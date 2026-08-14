@@ -135,8 +135,13 @@ test("the generated reporters exercise the bounded error-diagnostics matrix", as
   const boundaryResponse = page.waitForResponse(isErrorResponse);
   await page.goto("/certification/diagnostics?case=react-boundary");
   await boundaryResponse;
-  await expect(page.getByRole("heading")).toBeVisible();
-  await page.getByRole("button").click();
+  await expect(
+    page.getByRole("heading", { name: "Something went wrong" }),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    Reflect.set(globalThis, "__diagnosticsCertificationRecover", true);
+  });
+  await page.getByRole("button", { name: "Try again" }).click();
   await expect(
     page.getByRole("heading", { name: "Diagnostics certification" }),
   ).toBeVisible();
