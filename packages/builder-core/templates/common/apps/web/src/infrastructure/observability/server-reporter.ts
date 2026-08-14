@@ -7,7 +7,7 @@ import {
   type DispatchResult,
   type ErrorCaptureContext,
   type OperationalAttributeValue,
-  type OperationalErrorCategory,
+  type OperationalErrorReport,
   type OperationalEventInput,
   type OperationalSink,
 } from "@egeria-systems/observability";
@@ -23,14 +23,10 @@ import {
 } from "../cloudflare/observability-context";
 
 export type BrowserOperationalInput = Readonly<{
-  name:
-    | "browser.window.error"
-    | "browser.unhandled.rejection"
-    | "browser.web.vital";
-  kind: "application.error" | "web.vital";
-  severity: "error" | "info";
-  correlationId: string;
-  errorCategory?: OperationalErrorCategory;
+  name: "browser.web.vital";
+  kind: "web.vital";
+  severity: "info";
+  eventId: string;
   attributes: Readonly<Record<string, OperationalAttributeValue>>;
   allowedAttributeNames: readonly string[];
 }>;
@@ -370,46 +366,53 @@ async function reportError(
     const report = createOperationalErrorReport(event.value, error, capture, {});
     if (!report.ok) return;
 
-    const structuredSink = createStructuredSink();
-    const diagnosticSink = createBetterStackDiagnosticSink({
-      ingestingHost: runtime.ingestingHost,
-      sourceToken: runtime.sourceToken,
-      request: requestBetterStack,
-      timeoutMilliseconds: 5_000,
-    });
-    let deliveryFailureReported = false;
-    const reportFailureOnce = async (
-      result: Extract<DispatchResult, { status: "failed" }>,
-    ): Promise<void> => {
-      if (deliveryFailureReported) return;
-      deliveryFailureReported = true;
-      await reportDeliveryFailure(runtime, structuredSink, result);
-    };
-    const delivery = (async (): Promise<void> => {
-      const results = await dispatchOperationalErrorReport(report.value, {
-        operationalSinks: [structuredSink],
-        diagnosticSinks: diagnosticSink.ok ? [diagnosticSink.value] : [],
-      });
-      const diagnosticFailure = results.find(
-        (result): result is Extract<DispatchResult, { status: "failed" }> =>
-          result.sink === "better-stack" && result.status === "failed",
-      );
-      if (diagnosticFailure !== undefined) {
-        await reportFailureOnce(diagnosticFailure);
-      }
-    })();
-
-    try {
-      runtime.schedule(delivery);
-    } catch {
-      await reportFailureOnce({
-        sink: "cloudflare-execution-context",
-        status: "failed",
-        reason: "sink-threw",
-      });
-    }
+    await dispatchErrorReport(runtime, report.value);
   } catch {
     // Error reporting must never become an application failure.
+  }
+}
+
+async function dispatchErrorReport(
+  runtime: ObservabilityRuntimeContext,
+  report: OperationalErrorReport,
+): Promise<void> {
+  const structuredSink = createStructuredSink();
+  const diagnosticSink = createBetterStackDiagnosticSink({
+    ingestingHost: runtime.ingestingHost,
+    sourceToken: runtime.sourceToken,
+    request: requestBetterStack,
+    timeoutMilliseconds: 5_000,
+  });
+  let deliveryFailureReported = false;
+  const reportFailureOnce = async (
+    result: Extract<DispatchResult, { status: "failed" }>,
+  ): Promise<void> => {
+    if (deliveryFailureReported) return;
+    deliveryFailureReported = true;
+    await reportDeliveryFailure(runtime, structuredSink, result);
+  };
+  const delivery = (async (): Promise<void> => {
+    const results = await dispatchOperationalErrorReport(report, {
+      operationalSinks: [structuredSink],
+      diagnosticSinks: diagnosticSink.ok ? [diagnosticSink.value] : [],
+    });
+    const diagnosticFailure = results.find(
+      (result): result is Extract<DispatchResult, { status: "failed" }> =>
+        result.sink === "better-stack" && result.status === "failed",
+    );
+    if (diagnosticFailure !== undefined) {
+      await reportFailureOnce(diagnosticFailure);
+    }
+  })();
+
+  try {
+    runtime.schedule(delivery);
+  } catch {
+    await reportFailureOnce({
+      sink: "cloudflare-execution-context",
+      status: "failed",
+      reason: "sink-threw",
+    });
   }
 }
 
@@ -493,15 +496,22 @@ export async function reportBrowserEvent(
       runtime: "browser",
       severity: input.severity,
       context: {
-        eventId: crypto.randomUUID(),
-        correlationId: input.correlationId,
+        eventId: input.eventId,
         service: "web",
       },
-      ...(input.errorCategory === undefined
-        ? {}
-        : { errorCategory: input.errorCategory }),
       attributes: input.attributes,
     },
     input.allowedAttributeNames,
   );
+}
+
+export async function reportBrowserErrorReport(
+  report: OperationalErrorReport,
+): Promise<void> {
+  try {
+    const runtime = await readObservabilityRuntimeContext();
+    await dispatchErrorReport(runtime, report);
+  } catch {
+    // Error reporting must never become an application failure.
+  }
 }
