@@ -606,7 +606,6 @@ let serverReporterLoad = 0;
 async function loadGeneratedServerReporter(
   files,
   {
-    dispatchShouldReject = false,
     ingestingHost = "s123.eu-nbg-2.betterstackdata.com",
     scheduleShouldThrow = false,
     sourceToken = "source-token-123456",
@@ -625,29 +624,16 @@ async function loadGeneratedServerReporter(
     },
   }).outputText;
   serverReporterLoad += 1;
-  const eventKey = `__serverReporterEvents${serverReporterLoad}`;
-  const structuredKey = `__serverReporterStructured${serverReporterLoad}`;
-  const betterStackKey = `__serverReporterBetterStack${serverReporterLoad}`;
-  const dispatchKey = `__serverReporterDispatches${serverReporterLoad}`;
   const scheduleKey = `__serverReporterScheduled${serverReporterLoad}`;
-  globalThis[eventKey] = [];
-  globalThis[structuredKey] = [];
-  globalThis[betterStackKey] = [];
-  globalThis[dispatchKey] = [];
   globalThis[scheduleKey] = [];
-  const rootModule = `data:text/javascript;base64,${Buffer.from(
-    [
-      `export function createOperationalEvent(input) { globalThis[${JSON.stringify(eventKey)}].push(input); return { ok: true, value: Object.freeze(input) }; }`,
-      'export function normalizeErrorCategory() { return "unexpected"; }',
-      `export function dispatchOperationalEvent(event, sinks) { globalThis[${JSON.stringify(dispatchKey)}].push({ event, sinks }); return ${dispatchShouldReject ? 'Promise.reject(new Error("provider failed"))' : "Promise.resolve([])"}; }`,
-    ].join("\n"),
-  ).toString("base64")}`;
-  const serverModule = `data:text/javascript;base64,${Buffer.from(
-    [
-      `export function createStructuredLogSink(configuration) { globalThis[${JSON.stringify(structuredKey)}].push(configuration); return Object.freeze({ kind: "structured" }); }`,
-      `export function createBetterStackSink(configuration) { globalThis[${JSON.stringify(betterStackKey)}].push(configuration); return configuration.ingestingHost === "" || configuration.sourceToken === "" ? Object.freeze({ ok: false }) : Object.freeze({ ok: true, value: Object.freeze({ kind: "better-stack" }) }); }`,
-    ].join("\n"),
-  ).toString("base64")}`;
+  const rootModule = new URL(
+    "../../observability/dist/index.js",
+    import.meta.url,
+  ).href;
+  const serverModule = new URL(
+    "../../observability/dist/server.js",
+    import.meta.url,
+  ).href;
   const contextModule = `data:text/javascript;base64,${Buffer.from(
     [
       "export async function readObservabilityRuntimeContext() {",
@@ -675,11 +661,40 @@ async function loadGeneratedServerReporter(
     module: await import(
       `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#reporter-${serverReporterLoad}`
     ),
-    events: globalThis[eventKey],
-    structuredConfigurations: globalThis[structuredKey],
-    betterStackConfigurations: globalThis[betterStackKey],
-    dispatches: globalThis[dispatchKey],
     scheduled: globalThis[scheduleKey],
+  };
+}
+
+let instrumentationLoad = 0;
+
+async function loadGeneratedInstrumentation(files) {
+  const source = indexFiles(files).get("apps/web/instrumentation.ts");
+  assert.notEqual(source, undefined);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  instrumentationLoad += 1;
+  const callKey = `__serverInstrumentationCalls${instrumentationLoad}`;
+  globalThis[callKey] = [];
+  const reporterModule = `data:text/javascript;base64,${Buffer.from(
+    `export async function reportServerError(error, context) { globalThis[${JSON.stringify(callKey)}].push({ error, context }); await new Promise((resolve) => setImmediate(resolve)); }`,
+  ).toString("base64")}`;
+  const executable = transpiled.replace(
+    'from "./src/infrastructure/observability/server-reporter"',
+    `from ${JSON.stringify(reporterModule)}`,
+  );
+  assert.notEqual(executable, transpiled);
+
+  return {
+    module: await import(
+      `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#instrumentation-${instrumentationLoad}`
+    ),
+    calls: globalThis[callKey],
   };
 }
 
@@ -1500,7 +1515,98 @@ test("the browser route accepts only bounded same-origin operational envelopes",
   assert.equal(failedTransport.reports.length, 1);
 });
 
-test("server reporting contains runtime and provider failures without raw error data", async () => {
+test("Next request instrumentation awaits reporting with only approved framework inputs", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedInstrumentation(rendered.files);
+  const error = Object.assign(new Error("synthetic request failure"), {
+    digest: "next-digest-1",
+  });
+  const request = {
+    path: "/private/customer?token=credential-secret",
+    method: "GET",
+    headers: {
+      authorization: "Bearer credential-secret",
+      cookie: "session=private",
+    },
+  };
+  const context = {
+    routerKind: "App Router",
+    routePath: "/app/(store)/products/[productId]",
+    routeType: "render",
+    renderSource: "react-server-components",
+    renderType: "dynamic-resume",
+    revalidateReason: "on-demand",
+  };
+
+  const reporting = loaded.module.onRequestError(error, request, context);
+  assert.equal(reporting instanceof Promise, true);
+  await reporting;
+
+  assert.deepEqual(loaded.calls, [
+    {
+      error,
+      context: {
+        requestMethod: "GET",
+        routerKind: "App Router",
+        routePath: "/app/(store)/products/[productId]",
+        routeType: "render",
+        renderSource: "react-server-components",
+        renderType: "dynamic-resume",
+        revalidateReason: "on-demand",
+      },
+    },
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify(loaded.calls),
+    /private\/customer|credential-secret|authorization|cookie|session=/u,
+  );
+});
+
+test("server reporting accepts the current Next route type vocabulary", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedServerReporter(rendered.files, {
+    ingestingHost: "",
+    sourceToken: "",
+  });
+  const structuredRecords = [];
+  const routeTypes = ["action", "proxy", "render", "route"];
+  const originalConsoleInfo = console.info;
+  console.info = (record) => structuredRecords.push(record);
+
+  try {
+    for (const routeType of routeTypes) {
+      await loaded.module.reportServerError(new Error("synthetic failure"), {
+        routeType,
+      });
+    }
+    await Promise.all(loaded.scheduled);
+  } finally {
+    console.info = originalConsoleInfo;
+  }
+
+  assert.deepEqual(
+    structuredRecords.map(({ attributes }) => attributes.route_type),
+    routeTypes,
+  );
+});
+
+test("server reporting normalizes only valid proxy and Pages route contexts", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(
     await renderSkeleton({
@@ -1511,117 +1617,53 @@ test("server reporting contains runtime and provider failures without raw error 
     }),
   );
   const loaded = await loadGeneratedServerReporter(rendered.files);
-
-  await assert.doesNotReject(() =>
-    loaded.module.reportServerError(
-      new Error("private message with bearer-secret-token"),
-    ),
-  );
-  assert.equal(loaded.events.length, 1);
-  assert.deepEqual(loaded.events[0], {
-    name: "server.request.error",
-    kind: "application.error",
-    runtime: "server",
-    severity: "error",
-    context: {
-      correlationId: loaded.events[0].context.correlationId,
-      releaseId: "release-123",
-    },
-    errorCategory: "unexpected",
-    attributes: {},
-  });
-  assert.match(
-    loaded.events[0].context.correlationId,
-    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
-  );
-  assert.doesNotMatch(
-    JSON.stringify(loaded.events),
-    /private message|bearer-secret-token/u,
-  );
-
-  assert.equal(loaded.structuredConfigurations.length, 1);
-  assert.equal(loaded.betterStackConfigurations.length, 1);
-  assert.deepEqual(
-    {
-      identifier: loaded.structuredConfigurations[0].identifier,
-      write: typeof loaded.structuredConfigurations[0].write,
-    },
-    { identifier: "cloudflare-workers-logs", write: "function" },
-  );
-  assert.deepEqual(
-    {
-      ingestingHost: loaded.betterStackConfigurations[0].ingestingHost,
-      sourceToken: loaded.betterStackConfigurations[0].sourceToken,
-      timeoutMilliseconds:
-        loaded.betterStackConfigurations[0].timeoutMilliseconds,
-      request: typeof loaded.betterStackConfigurations[0].request,
-    },
-    {
-      ingestingHost: "s123.eu-nbg-2.betterstackdata.com",
-      sourceToken: "source-token-123456",
-      timeoutMilliseconds: 5_000,
-      request: "function",
-    },
-  );
-  assert.equal(loaded.dispatches.length, 1);
-  assert.deepEqual(
-    loaded.dispatches[0].sinks.map(({ kind }) => kind),
-    ["structured", "better-stack"],
-  );
-  assert.equal(loaded.scheduled.length, 1);
-  await assert.doesNotReject(() => loaded.scheduled[0]);
-
-  const structuredRecords = [];
+  const providerRecords = [];
   const originalConsoleInfo = console.info;
-  console.info = (record) => structuredRecords.push(record);
-  try {
-    loaded.structuredConfigurations[0].write({ bounded: true });
-  } finally {
-    console.info = originalConsoleInfo;
-  }
-  assert.deepEqual(structuredRecords, [{ bounded: true }]);
-
-  const providerRequests = [];
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (url, init) => {
-    providerRequests.push({ url, init });
+  console.info = () => undefined;
+  globalThis.fetch = async (_url, init) => {
+    providerRecords.push(JSON.parse(init.body));
     return { status: 202 };
   };
+
   try {
-    assert.deepEqual(
-      await loaded.betterStackConfigurations[0].request({
-        url: "https://s123.eu-nbg-2.betterstackdata.com",
-        method: "POST",
-        headers: { Authorization: "Bearer source-token-123456" },
-        body: '{"bounded":true}',
-        timeoutMilliseconds: 5_000,
-      }),
-      { status: 202 },
-    );
+    await loaded.module.reportServerError(new Error("proxy failure"), {
+      routerKind: "Pages Router",
+      routePath: "/proxy",
+      routeType: "proxy",
+    });
+    await loaded.module.reportServerError(new Error("page failure"), {
+      routerKind: "Pages Router",
+      routePath: "/orders/[...orderParts]",
+      routeType: "render",
+    });
+    await loaded.module.reportServerError(new Error("root page failure"), {
+      routerKind: "Pages Router",
+      routePath: "/",
+      routeType: "render",
+    });
+    await loaded.module.reportServerError(new Error("invalid proxy router"), {
+      routerKind: "App Router",
+      routePath: "/proxy",
+      routeType: "proxy",
+    });
+    await loaded.module.reportServerError(new Error("missing proxy router"), {
+      routePath: "/proxy",
+      routeType: "proxy",
+    });
+    await Promise.all(loaded.scheduled);
   } finally {
+    console.info = originalConsoleInfo;
     globalThis.fetch = originalFetch;
   }
-  assert.equal(providerRequests.length, 1);
-  assert.equal(
-    providerRequests[0].url,
-    "https://s123.eu-nbg-2.betterstackdata.com",
-  );
+
   assert.deepEqual(
-    {
-      method: providerRequests[0].init.method,
-      headers: providerRequests[0].init.headers,
-      body: providerRequests[0].init.body,
-    },
-    {
-      method: "POST",
-      headers: { Authorization: "Bearer source-token-123456" },
-      body: '{"bounded":true}',
-    },
+    providerRecords.map(({ capture }) => capture.routeIdentifier),
+    ["proxy", "orders/[catch-all]", "root", undefined, undefined],
   );
-  assert.equal(providerRequests[0].init.signal instanceof AbortSignal, true);
 });
 
-test("server reporting omits invalid provider credentials and contains failures", async () => {
+test("server request and selected-catch reports separate safe and restricted delivery", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(
     await renderSkeleton({
@@ -1631,27 +1673,403 @@ test("server reporting omits invalid provider credentials and contains failures"
       packageVersions,
     }),
   );
+  const loaded = await loadGeneratedServerReporter(rendered.files);
+  const structuredRecords = [];
+  const providerRequests = [];
+  const originalConsoleInfo = console.info;
+  const originalFetch = globalThis.fetch;
+  console.info = (record) => structuredRecords.push(record);
+  globalThis.fetch = async (url, init) => {
+    providerRequests.push({ url, init });
+    return { status: 202 };
+  };
+  const error = Object.assign(new TypeError("synthetic request failure"), {
+    digest: "next-digest-1",
+    stack:
+      "TypeError: synthetic request failure\n" +
+      "    at render (/app/products/page.tsx:10:2)",
+  });
+
+  try {
+    await assert.doesNotReject(() =>
+      loaded.module.reportServerError(error, {
+        correlationId: "request-123",
+        requestMethod: "GET",
+        routerKind: "App Router",
+        routePath: "/app/(store)/products/[productId]",
+        routeType: "render",
+        renderSource: "react-server-components",
+        renderType: "dynamic-resume",
+        revalidateReason: "on-demand",
+      }),
+    );
+    assert.equal(loaded.scheduled.length, 1);
+    await assert.doesNotReject(() => loaded.scheduled[0]);
+
+    await assert.doesNotReject(() =>
+      loaded.module.reportCaughtServerError(
+        new Error("synthetic selected failure"),
+        { operation: "refresh-catalog", correlationId: "operation-456" },
+      ),
+    );
+    assert.equal(loaded.scheduled.length, 2);
+    await assert.doesNotReject(() => loaded.scheduled[1]);
+  } finally {
+    console.info = originalConsoleInfo;
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(structuredRecords.length, 2);
+  assert.deepEqual(structuredRecords[0], {
+    schema_version: "2.0.0",
+    dt: structuredRecords[0].dt,
+    event_name: "server.request.error",
+    event_kind: "application.error",
+    runtime: "server",
+    severity: "error",
+    event_id: structuredRecords[0].event_id,
+    correlation_id: "request-123",
+    release_id: "release-123",
+    service: "web",
+    error_category: "unexpected",
+    attributes: {
+      capture_mechanism: "next-request-error",
+      handled: false,
+      http_method: "GET",
+      render_source: "react-server-components",
+      render_type: "dynamic-resume",
+      revalidate_reason: "on-demand",
+      route_identifier: "group.products.dynamic",
+      route_type: "render",
+      router_kind: "app-router",
+    },
+  });
+  assert.match(
+    structuredRecords[0].event_id,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+  );
+  assert.equal("environment" in structuredRecords[0], false);
+  assert.equal(providerRequests.length, 2);
+  const providerRecords = providerRequests.map(({ init }) =>
+    JSON.parse(init.body),
+  );
+  assert.deepEqual(providerRecords[0].capture, {
+    mechanism: "next-request-error",
+    handled: false,
+    routerKind: "app-router",
+    routeType: "render",
+    renderSource: "react-server-components",
+    renderType: "dynamic-resume",
+    revalidateReason: "on-demand",
+    requestMethod: "GET",
+    routeIdentifier: "group/products/[dynamic]",
+  });
+  assert.equal(providerRecords[0]["exception.type"], "TypeError");
+  assert.equal(
+    providerRecords[0]["exception.message"],
+    "synthetic request failure",
+  );
+  assert.match(
+    providerRecords[0]["exception.stacktrace"],
+    /TypeError: synthetic request failure[\s\S]+\[REDACTED_PATH\]\/page\.tsx:10:2/u,
+  );
+  assert.equal(providerRecords[0]["exception.digest"], "next-digest-1");
+  assert.match(
+    providerRecords[0]["exception.fingerprint"],
+    /^fnv1a32-v1:[a-f0-9]{8}$/u,
+  );
+  assert.equal(providerRecords[0]["exception.truncated"], true);
+  assert.deepEqual(providerRecords[1].capture, {
+    mechanism: "selected-catch",
+    handled: true,
+    operation: "refresh-catalog",
+  });
+  assert.equal(providerRecords[1].correlation_id, "operation-456");
+  assert.equal(
+    providerRequests.every(({ init }) => init.signal instanceof AbortSignal),
+    true,
+  );
+  for (const [index, structuredRecord] of structuredRecords.entries()) {
+    for (const [key, value] of Object.entries(structuredRecord)) {
+      assert.deepEqual(providerRecords[index][key], value);
+    }
+  }
+  assert.doesNotMatch(
+    JSON.stringify(structuredRecords),
+    /exception\.|fingerprint|synthetic request failure/u,
+  );
+});
+
+test("generated server delivery uses the actual observability package record shapes", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedServerReporter(rendered.files);
+  const structuredRecords = [];
+  const providerRequests = [];
+  const originalConsoleInfo = console.info;
+  const originalFetch = globalThis.fetch;
+  console.info = (record) => structuredRecords.push(record);
+  globalThis.fetch = async (url, init) => {
+    providerRequests.push({ url, init });
+    return { status: 202 };
+  };
+
+  try {
+    await loaded.module.reportServerError(
+      new TypeError("synthetic package record"),
+      {
+        requestMethod: "GET",
+        routerKind: "App Router",
+        routePath: "/app/(store)/products/[productId]",
+        routeType: "route",
+      },
+    );
+    await loaded.scheduled[0];
+  } finally {
+    console.info = originalConsoleInfo;
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(structuredRecords.length, 1);
+  assert.equal(structuredRecords[0].schema_version, "2.0.0");
+  assert.equal(structuredRecords[0].event_name, "server.request.error");
+  assert.equal(structuredRecords[0].event_kind, "application.error");
+  assert.equal("schemaVersion" in structuredRecords[0], false);
+  assert.deepEqual(structuredRecords[0].attributes, {
+    capture_mechanism: "next-request-error",
+    handled: false,
+    http_method: "GET",
+    route_identifier: "group.products.dynamic",
+    route_type: "route",
+    router_kind: "app-router",
+  });
+  assert.equal(providerRequests.length, 1);
+  const diagnosticRecord = JSON.parse(providerRequests[0].init.body);
+  assert.equal(diagnosticRecord.event_id, structuredRecords[0].event_id);
+  assert.equal(diagnosticRecord["exception.type"], "TypeError");
+  assert.equal(
+    diagnosticRecord["exception.message"],
+    "synthetic package record",
+  );
+  assert.match(
+    diagnosticRecord["exception.fingerprint"],
+    /^fnv1a32-v1:[a-f0-9]{8}$/u,
+  );
+  assert.equal(
+    diagnosticRecord.capture.routeIdentifier,
+    "group/products/[dynamic]",
+  );
+  assert.equal("diagnostics" in diagnosticRecord, false);
+});
+
+test("generated server contains oversized diagnostics without HTTP or recursive reporting", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedServerReporter(rendered.files);
+  const structuredRecords = [];
+  let providerRequests = 0;
+  const originalConsoleInfo = console.info;
+  const originalFetch = globalThis.fetch;
+  console.info = (record) => structuredRecords.push(record);
+  globalThis.fetch = async () => {
+    providerRequests += 1;
+    return { status: 202 };
+  };
+  const oversizedError = {
+    name: "TypeError",
+    message: "\u0000".repeat(2_048),
+    stack: "\u0000".repeat(16_384),
+    cause: {
+      name: "CauseOne",
+      stack: "\u0000".repeat(16_384),
+      cause: { name: "CauseTwo", stack: "\u0000".repeat(16_384) },
+    },
+  };
+
+  try {
+    await loaded.module.reportServerError(oversizedError);
+    await loaded.scheduled[0];
+  } finally {
+    console.info = originalConsoleInfo;
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(providerRequests, 0);
+  assert.deepEqual(
+    structuredRecords.map(({ event_name }) => event_name),
+    ["server.request.error", "observability.delivery.failed"],
+  );
+  assert.deepEqual(structuredRecords[1].attributes, {
+    reason: "payload-too-large",
+    sink: "better-stack",
+  });
+});
+
+test("server reporting contains hostile inputs and diagnostic delivery failures", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const structuredRecords = [];
+  const originalConsoleInfo = console.info;
+  const originalFetch = globalThis.fetch;
+  console.info = (record) => structuredRecords.push(record);
+
   const withoutProvider = await loadGeneratedServerReporter(rendered.files, {
     ingestingHost: "",
     sourceToken: "",
   });
-  await assert.doesNotReject(() =>
-    withoutProvider.module.reportServerError(new Error("private failure")),
-  );
-  assert.deepEqual(
-    withoutProvider.dispatches[0].sinks.map(({ kind }) => kind),
-    ["structured"],
-  );
+  let withoutProviderRequests = 0;
+  try {
+    globalThis.fetch = async () => {
+      withoutProviderRequests += 1;
+      throw new Error("provider response contained credential-secret");
+    };
+    await assert.doesNotReject(() =>
+      withoutProvider.module.reportServerError(
+        new Error("private failure"),
+        {
+          requestMethod: "TRACE",
+          routerKind: "Private Router",
+          routePath: "/app/private/customer@example.com?token=secret",
+          routeType: "middleware",
+          renderSource: "private-source",
+          renderType: "static",
+          revalidateReason: "private-reason",
+        },
+      ),
+    );
+    await withoutProvider.scheduled[0];
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(withoutProviderRequests, 0);
+  assert.equal(structuredRecords.length, 1);
+  assert.equal(structuredRecords[0].event_name, "server.request.error");
+  assert.deepEqual(structuredRecords[0].attributes, {
+    capture_mechanism: "next-request-error",
+    handled: false,
+  });
 
   const failing = await loadGeneratedServerReporter(rendered.files, {
-    dispatchShouldReject: true,
+    scheduleShouldThrow: false,
+  });
+  const hostileError = Object.create(null, {
+    name: { get: () => "Error" },
+    message: {
+      get: () => "synthetic " + "x".repeat(4_000),
+    },
+    stack: {
+      get: () => "Error: synthetic\n" + "at frame (/private/path:1:2)\n".repeat(8_000),
+    },
+    digest: {
+      get() {
+        throw new Error("hostile getter credential-secret");
+      },
+    },
+    privateField: { value: "credential-secret" },
+  });
+  const failingProviderRecords = [];
+  try {
+    globalThis.fetch = async (_url, init) => {
+      failingProviderRecords.push(JSON.parse(init.body));
+      return {
+        status: 503,
+        body: "provider response credential-secret",
+      };
+    };
+    await assert.doesNotReject(() =>
+      failing.module.reportServerError(hostileError, {
+        requestMethod: "POST",
+        routerKind: "Pages Router",
+        routePath: "/orders/[...orderParts]",
+        routeType: "route",
+        renderSource: "server-rendering",
+        renderType: "dynamic",
+        revalidateReason: "stale",
+      }),
+    );
+    assert.equal(failing.scheduled.length, 1);
+    await assert.doesNotReject(() => failing.scheduled[0]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(failingProviderRecords.length, 1);
+  assert.equal(
+    new TextEncoder().encode(
+      JSON.stringify(failingProviderRecords[0]),
+    ).byteLength < 96_000,
+    true,
+  );
+  assert.deepEqual(failingProviderRecords[0].capture, {
+    mechanism: "next-request-error",
+    handled: false,
+    routerKind: "pages-router",
+    routeType: "route",
+    renderSource: "server-rendering",
+    renderType: "dynamic",
+    revalidateReason: "stale",
+    requestMethod: "POST",
+    routeIdentifier: "orders/[catch-all]",
+  });
+  assert.equal(structuredRecords.length, 3);
+  assert.equal(
+    structuredRecords[2].event_name,
+    "observability.delivery.failed",
+  );
+  assert.deepEqual(structuredRecords[2].attributes, {
+    reason: "provider-rejected",
+    sink: "better-stack",
+  });
+  assert.doesNotMatch(
+    JSON.stringify([...structuredRecords, ...failingProviderRecords]),
+    /credential-secret|provider response|private\/path|privateField/u,
+  );
+
+  const scheduleFailureRecords = [];
+  console.info = (record) => scheduleFailureRecords.push(record);
+  const scheduleFailure = await loadGeneratedServerReporter(rendered.files, {
     scheduleShouldThrow: true,
   });
-  await assert.doesNotReject(() =>
-    failing.module.reportServerError(new Error("private failure")),
+  try {
+    globalThis.fetch = async () => ({ status: 503 });
+    await assert.doesNotReject(() =>
+      scheduleFailure.module.reportServerError(new Error("synthetic failure"), {
+        requestMethod: "GET",
+      }),
+    );
+    await assert.doesNotReject(() => scheduleFailure.scheduled[0]);
+  } finally {
+    console.info = originalConsoleInfo;
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(
+    scheduleFailureRecords.filter(
+      ({ event_name: eventName }) =>
+        eventName === "observability.delivery.failed",
+    ).length,
+    1,
   );
-  assert.equal(failing.scheduled.length, 1);
-  await assert.doesNotReject(() => failing.scheduled[0]);
 });
 
 test("rendering conditionally overlays the home route and materializes each Calendly mode", async () => {
