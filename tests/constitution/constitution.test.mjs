@@ -2834,16 +2834,14 @@ test("executable capability certification ownership is current", async () => {
   const observabilityRecord = registry.records.observability;
   const standardsRecord = registry.records.standards;
   assert.equal(bookingRecord.status, "certified");
-  assert.equal(observabilityRecord.status, "certified");
+  assert.equal(observabilityRecord.status, "pending");
   assert.equal(standardsRecord.status, "certified");
   assert.deepEqual(observabilityRecord.requiredEvidence, [
+    "cleanup-recovery",
     "deployed-application",
     "fresh-scaffold",
   ]);
-  assert.deepEqual(
-    observabilityRecord.evidence.map(({ kind }) => kind),
-    ["deployed-application", "fresh-scaffold"],
-  );
+  assert.deepEqual(observabilityRecord.evidence, []);
   assert.match(
     packageOwnership,
     /descriptor `standards@0\.3\.0` is certified from its exact local subject-bound receipt[^\n]+public `0\.2\.0` availability alone does not alter the installed public package/iu,

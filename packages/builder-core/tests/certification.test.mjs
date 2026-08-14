@@ -10,7 +10,7 @@ const evidencePath =
   "docs/implementation-evidence/2026-08-10-booking-calendly-certification-verification.md";
 const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
 const observabilityPlanPath =
-  "docs/superpowers/plans/2026-08-10-production-observability-certification.md";
+  "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md";
 const standardsPlanPath =
   "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md";
 const standardsEvidencePath =
@@ -32,7 +32,7 @@ const descriptorDigests = Object.freeze({
   "deployment-cloudflare":
     "sha256:846ae45d15ba9d8f256a9b7a1d8a4f3cda1b871a3b3f79f7656fd621050e8273",
   observability:
-    "sha256:937a3dcad0c96b45ae9f4acb977bd65e46e2caa50bd3fc6dfb29561a1ab637b9",
+    "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99",
   "section-composition":
     "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
   "site-routing":
@@ -83,6 +83,7 @@ const requiredEvidence = Object.freeze({
     "fresh-scaffold",
   ]),
   observability: Object.freeze([
+    "cleanup-recovery",
     "deployed-application",
     "fresh-scaffold",
   ]),
@@ -352,42 +353,23 @@ test("descriptor admission rejects incomplete, stale, extra, and false-legacy co
   );
 });
 
-test("material observability is certified from reviewed deployed and fresh-scaffold evidence", () => {
+test("material observability diagnostics remain pending for their exact subject", () => {
   const observabilityDescriptor = descriptorsByIdentifier.get("observability");
   assert.notEqual(observabilityDescriptor, undefined);
   const observabilityRecord = committedRegistry.records.observability;
 
-  assert.equal(observabilityDescriptor.version, "0.2.0");
+  const requiredEvidence = [
+    "cleanup-recovery",
+    "deployed-application",
+    "fresh-scaffold",
+  ];
+  assert.equal(observabilityDescriptor.version, "0.3.0");
   assert.deepEqual(observabilityRecord, {
-    subject: core.createCertificationSubject(
-      observabilityDescriptor,
-      ["deployed-application", "fresh-scaffold"],
-    ),
-    requiredEvidence: ["deployed-application", "fresh-scaffold"],
-    status: "certified",
+    subject: core.createCertificationSubject(observabilityDescriptor, requiredEvidence),
+    requiredEvidence,
+    status: "pending",
     taskPlan: observabilityPlanPath,
-    evidence: [
-      {
-        kind: "deployed-application",
-        path: "docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md",
-        outcome: "passed",
-        revision: "ee1e1df10fa2be2f09333efecd86de7f7a131d49",
-        subject: core.createCertificationSubject(
-          observabilityDescriptor,
-          ["deployed-application", "fresh-scaffold"],
-        ),
-      },
-      {
-        kind: "fresh-scaffold",
-        path: "docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md",
-        outcome: "passed",
-        revision: "ee1e1df10fa2be2f09333efecd86de7f7a131d49",
-        subject: core.createCertificationSubject(
-          observabilityDescriptor,
-          ["deployed-application", "fresh-scaffold"],
-        ),
-      },
-    ],
+    evidence: [],
   });
   const falseLegacy = structuredClone(committedRegistry);
   falseLegacy.records.observability.status = "backfill-pending";

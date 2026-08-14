@@ -654,11 +654,15 @@ function createDescriptors(
     },
     {
       identifier: "observability",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
-      dependencies: ["deployment-cloudflare"],
+      dependencies: [
+        "content-files",
+        "deployment-cloudflare",
+        "section-composition",
+      ],
       ...sharedCapabilityMetadata,
       supportedProfiles: ["portfolio", "site"],
       requiredPackages: ["@egeria-systems/observability"],
@@ -674,6 +678,7 @@ function createDescriptors(
       dataClassifications: [
         "bounded-operational-telemetry",
         "provider-platform-error-and-exception-logs",
+        "restricted-error-diagnostics",
       ],
       retentionAssumptions: ["provider-controlled-operational-log-retention"],
       privilegedOperations: [
@@ -685,6 +690,7 @@ function createDescriptors(
         "cloudflare-execution-context-lifetime",
         "cloudflare-version-metadata",
         "same-origin-browser-ingest",
+        "separate-operational-and-diagnostic-sinks",
       ],
       managedSurfaces: [
         createPackageSurface(
@@ -740,6 +746,36 @@ function createDescriptors(
           "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
           "application-owned",
         ),
+        createFileSurface(
+          "observability-page-error-boundary",
+          "observability",
+          "apps/web/app/error.tsx",
+          "application-owned",
+        ),
+        createFileSurface(
+          "observability-global-error-boundary",
+          "observability",
+          "apps/web/app/global-error.tsx",
+          "application-owned",
+        ),
+        createFileSurface(
+          "observability-error-copy-source",
+          "observability",
+          "apps/web/content/en-CA/observability.yaml",
+          "application-owned",
+        ),
+        createFileSurface(
+          "observability-error-copy",
+          "observability",
+          "apps/web/src/infrastructure/observability/error-copy.ts",
+          "application-owned",
+        ),
+        createFileSurface(
+          "observability-error-fallback",
+          "observability",
+          "apps/web/src/presentation/error-fallback.tsx",
+          "application-owned",
+        ),
       ],
       inferenceProbes: [
         createPackageProbe(
@@ -765,6 +801,13 @@ function createDescriptors(
         createFileProbe(
           "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
         ),
+        createFileProbe("apps/web/app/error.tsx"),
+        createFileProbe("apps/web/app/global-error.tsx"),
+        createFileProbe("apps/web/content/en-CA/observability.yaml"),
+        createFileProbe(
+          "apps/web/src/infrastructure/observability/error-copy.ts",
+        ),
+        createFileProbe("apps/web/src/presentation/error-fallback.tsx"),
         createJsonValueProbe(
           "apps/web/wrangler.jsonc",
           "/observability/enabled",

@@ -23,11 +23,14 @@ const portfolioPaths = [
   "README.md",
   "apps/web/AGENTS.md",
   "apps/web/app/api/observability/route.ts",
+  "apps/web/app/error.tsx",
+  "apps/web/app/global-error.tsx",
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
   "apps/web/content/content.config.yaml",
   "apps/web/content/en-CA/long-form/introduction.md",
+  "apps/web/content/en-CA/observability.yaml",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/instrumentation-client.ts",
@@ -45,10 +48,12 @@ const portfolioPaths = [
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/cloudflare/observability-context.ts",
   "apps/web/src/infrastructure/observability/browser-reporter.ts",
+  "apps/web/src/infrastructure/observability/error-copy.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/infrastructure/observability/server-reporter.ts",
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
+  "apps/web/src/presentation/error-fallback.tsx",
   "apps/web/src/sections/section-registry.tsx",
   "apps/web/tests/component/content-page.test.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
@@ -70,12 +75,15 @@ const sitePaths = [
   "apps/web/AGENTS.md",
   "apps/web/app/about/page.tsx",
   "apps/web/app/api/observability/route.ts",
+  "apps/web/app/error.tsx",
+  "apps/web/app/global-error.tsx",
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
   "apps/web/content/content.config.yaml",
   "apps/web/content/en-CA/about.yaml",
   "apps/web/content/en-CA/long-form/introduction.md",
+  "apps/web/content/en-CA/observability.yaml",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/instrumentation-client.ts",
@@ -93,10 +101,12 @@ const sitePaths = [
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/cloudflare/observability-context.ts",
   "apps/web/src/infrastructure/observability/browser-reporter.ts",
+  "apps/web/src/infrastructure/observability/error-copy.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/infrastructure/observability/server-reporter.ts",
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
+  "apps/web/src/presentation/error-fallback.tsx",
   "apps/web/src/sections/section-registry.tsx",
   "apps/web/tests/component/content-page.test.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
@@ -128,7 +138,7 @@ const bookingCalendlyCopy = {
 
 const packageVersions = {
   standards: "0.1.0",
-  observability: "0.2.0",
+  observability: "0.3.0",
 };
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -1179,7 +1189,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.7.0",
+    recipeVersion: "0.8.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -1255,7 +1265,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       typecheck: "next typegen && tsc --noEmit",
     },
     dependencies: {
-      "@egeria-systems/observability": "0.2.0",
+      "@egeria-systems/observability": "0.3.0",
       "@opennextjs/cloudflare": "1.20.2",
       next: "16.3.0",
       react: "19.2.8",
@@ -1361,7 +1371,7 @@ test("production observability renders bounded Next and Cloudflare composition",
 
   assert.match(
     workspace,
-    /minimumReleaseAgeExclude:\n  - "@egeria-systems\/observability@0\.2\.0"/u,
+    /minimumReleaseAgeExclude:\n  - "@egeria-systems\/observability@0\.3\.0"/u,
   );
 
   assert.deepEqual(wrangler.observability, {
@@ -2461,7 +2471,7 @@ test("rendering conditionally overlays the home route and materializes each Cale
     );
 
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, "0.7.0");
+    assert.equal(rendered.project.recipeVersion, "0.8.0");
     assert.equal(
       rendered.project.selectedCapabilities.at(-1),
       "booking-calendly",
@@ -4414,8 +4424,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 92],
-    ["site", 94],
+    ["portfolio", 97],
+    ["site", 99],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -4557,7 +4567,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       packageVersions,
     }),
   );
-  assert.equal(selected.surfaces.length, 97);
+  assert.equal(selected.surfaces.length, 102);
   assert.deepEqual(
     selected.surfaces
       .filter(
