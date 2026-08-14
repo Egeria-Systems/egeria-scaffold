@@ -1,12 +1,3 @@
-import {
-  createOperationalErrorReport,
-  createOperationalEvent,
-  dispatchOperationalErrorReport,
-  dispatchOperationalEvent,
-  type DiagnosticSink,
-} from "@egeria-systems/observability";
-import { createStructuredLogSink } from "@egeria-systems/observability/server";
-
 import { reportCaughtServerError } from "../../../../src/infrastructure/observability/server-reporter";
 
 const markerPattern = /^diagnostics-[a-z]+-[0-9a-f]{16}$/u;
@@ -15,14 +6,59 @@ const cases = Object.freeze([
   "selected-server-catch",
   "diagnostic-failure-containment",
 ] as const);
-const captureAttributes = Object.freeze({
-  capture_mechanism: "selected-catch",
-  handled: true,
-  operation: "certification-failure",
-});
+const cloudflareContextKey = Symbol.for("__cloudflare-context__");
+const certificationLeaseKey = Symbol.for(
+  "__observability-diagnostics-certification-lease__",
+);
+const controlledDiagnosticHost =
+  "certification.eu-central-1.betterstackdata.com";
+const controlledDiagnosticToken = "certification-placeholder";
+const operationalRecordKeys = Object.freeze([
+  "attributes",
+  "correlation_id",
+  "dt",
+  "environment",
+  "error_category",
+  "event_id",
+  "event_kind",
+  "event_name",
+  "release_id",
+  "runtime",
+  "schema_version",
+  "service",
+  "severity",
+]);
+
+type UnknownRecord = Readonly<Record<string, unknown>>;
 
 function emptyResponse(status: number): Response {
   return new Response(null, { status });
+}
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasOnlyKeys(value: UnknownRecord, allowed: readonly string[]): boolean {
+  return Object.keys(value).every((key) => allowed.includes(key));
+}
+
+function hasExactAttributes(
+  record: UnknownRecord,
+  expected: UnknownRecord,
+): boolean {
+  const attributes = record.attributes;
+  return (
+    isRecord(attributes) &&
+    JSON.stringify(attributes) === JSON.stringify(expected)
+  );
+}
+
+function isSafeRecord(record: UnknownRecord): boolean {
+  return (
+    hasOnlyKeys(record, operationalRecordKeys) &&
+    !Object.keys(record).some((key) => key.startsWith("exception."))
+  );
 }
 
 function readInput(request: Request) {
@@ -50,101 +86,188 @@ function readInput(request: Request) {
   });
 }
 
-function createStructuredSink() {
-  return createStructuredLogSink({
-    identifier: "cloudflare-workers-logs",
-    write: (record) => console.info(record),
+async function captureGeneratedDispatch(
+  action: () => Promise<void>,
+  rejectDiagnostic: boolean,
+) {
+  if (Reflect.get(globalThis, certificationLeaseKey) === true) {
+    throw new Error("certification capture already active");
+  }
+  const previousContext = Reflect.get(globalThis, cloudflareContextKey);
+  if (!isRecord(previousContext)) {
+    throw new Error("Cloudflare context unavailable");
+  }
+  const previousExecutionContext = previousContext.ctx;
+  if (!isRecord(previousExecutionContext)) {
+    throw new Error("Cloudflare execution context unavailable");
+  }
+
+  const scheduled: Promise<unknown>[] = [];
+  const records: UnknownRecord[] = [];
+  let diagnosticAttempts = 0;
+  const previousFetch = globalThis.fetch;
+  const previousConsoleInfo = console.info.bind(console);
+  const replacementEnvironment = rejectDiagnostic
+    ? Object.freeze({
+        BETTER_STACK_INGESTING_HOST: controlledDiagnosticHost,
+        BETTER_STACK_SOURCE_TOKEN: controlledDiagnosticToken,
+      })
+    : previousContext.env;
+  const replacementContext = Object.freeze({
+    ...previousContext,
+    env: replacementEnvironment,
+    ctx: Object.freeze({
+      ...previousExecutionContext,
+      waitUntil(task: Promise<unknown>) {
+        scheduled.push(Promise.resolve(task));
+      },
+    }),
+  });
+
+  Reflect.set(globalThis, certificationLeaseKey, true);
+  Reflect.set(globalThis, cloudflareContextKey, replacementContext);
+  console.info = (...values: unknown[]) => {
+    const [candidate] = values;
+    if (isRecord(candidate) && typeof candidate.event_name === "string") {
+      records.push(candidate);
+    }
+    try {
+      previousConsoleInfo(...values);
+    } catch {
+      // Certification observation must not change generated reporting behavior.
+    }
+  };
+  if (rejectDiagnostic) {
+    globalThis.fetch = async (input) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      if (url !== `https://${controlledDiagnosticHost}`) {
+        throw new Error("unexpected certification request");
+      }
+      diagnosticAttempts += 1;
+      return new Response(null, { status: 503 });
+    };
+  }
+
+  try {
+    await action();
+    await Promise.all(scheduled);
+  } finally {
+    globalThis.fetch = previousFetch;
+    console.info = previousConsoleInfo;
+    Reflect.set(globalThis, cloudflareContextKey, previousContext);
+    Reflect.set(globalThis, certificationLeaseKey, false);
+  }
+
+  return Object.freeze({
+    records: Object.freeze(records),
+    diagnosticAttempts,
+    scheduledTasks: scheduled.length,
   });
 }
 
-async function exerciseDiagnosticFailure(marker: string): Promise<Response> {
-  const event = createOperationalEvent(
-    {
-      name: "server.caught.error",
-      kind: "application.error",
-      runtime: "server",
-      severity: "error",
-      context: { eventId: marker, service: "web" },
-      errorCategory: "unexpected",
-      attributes: captureAttributes,
-    },
-    {
-      allowedAttributeNames: [
-        "capture_mechanism",
-        "handled",
-        "operation",
-      ],
-      clock: { now: () => new Date() },
-    },
+async function exerciseSelectedServerCatch(marker: string): Promise<Response> {
+  let captured;
+  try {
+    captured = await captureGeneratedDispatch(async () => {
+      try {
+        throw new Error("synthetic selected server error");
+      } catch (error) {
+        await reportCaughtServerError(error, {
+          operation: "certification-server",
+          correlationId: marker,
+        });
+      }
+    }, false);
+  } catch {
+    return emptyResponse(500);
+  }
+
+  const originals = captured.records.filter(
+    (record) => record.event_name === "server.caught.error",
   );
-  if (!event.ok) return emptyResponse(500);
-  const report = createOperationalErrorReport(
-    event.value,
-    new Error("synthetic controlled diagnostic failure"),
-    {
-      mechanism: "selected-catch",
+  const original = originals[0];
+  const valid =
+    captured.scheduledTasks === 1 &&
+    captured.records.length === 1 &&
+    originals.length === 1 &&
+    original !== undefined &&
+    original.correlation_id === marker &&
+    isSafeRecord(original) &&
+    hasExactAttributes(original, {
+      capture_mechanism: "selected-catch",
+      handled: true,
+      operation: "certification-server",
+    });
+  return emptyResponse(valid ? 204 : 500);
+}
+
+async function exerciseDiagnosticFailure(marker: string): Promise<Response> {
+  let captured;
+  try {
+    captured = await captureGeneratedDispatch(
+      () =>
+        reportCaughtServerError(
+          new Error("synthetic controlled diagnostic failure"),
+          {
+            operation: "certification-failure",
+            correlationId: marker,
+          },
+        ),
+      true,
+    );
+  } catch {
+    return emptyResponse(500);
+  }
+
+  const originals = captured.records.filter(
+    (record) => record.event_name === "server.caught.error",
+  );
+  const healthRecords = captured.records.filter(
+    (record) => record.event_name === "observability.delivery.failed",
+  );
+  const original = originals[0];
+  const healthRecord = healthRecords[0];
+  const recursiveDiagnosticAttempts = Math.max(
+    0,
+    captured.diagnosticAttempts - 1,
+  );
+  const valid =
+    captured.scheduledTasks === 1 &&
+    captured.diagnosticAttempts === 1 &&
+    captured.records.length === 2 &&
+    originals.length === 1 &&
+    healthRecords.length === 1 &&
+    original !== undefined &&
+    healthRecord !== undefined &&
+    original.correlation_id === marker &&
+    isSafeRecord(original) &&
+    isSafeRecord(healthRecord) &&
+    hasExactAttributes(original, {
+      capture_mechanism: "selected-catch",
       handled: true,
       operation: "certification-failure",
-    },
-    {},
-  );
-  if (!report.ok) return emptyResponse(500);
-
-  let diagnosticAttempts = 0;
-  const rejectingDiagnosticSink: DiagnosticSink = Object.freeze({
-    identifier: "better-stack",
-    writeReport: () => {
-      diagnosticAttempts += 1;
-      return Object.freeze({
-        status: "failed" as const,
-        reason: "provider-rejected" as const,
-      });
-    },
-  });
-  const structuredSink = createStructuredSink();
-  const delivery = await dispatchOperationalErrorReport(report.value, {
-    operationalSinks: [structuredSink],
-    diagnosticSinks: [rejectingDiagnosticSink],
-  });
-  const diagnosticResult = delivery.find(
-    (result) => result.sink === "better-stack",
-  );
-  if (
-    diagnosticAttempts !== 1 ||
-    diagnosticResult?.status !== "failed" ||
-    diagnosticResult.reason !== "provider-rejected"
-  ) {
-    return emptyResponse(500);
-  }
-
-  const health = createOperationalEvent(
-    {
-      name: "observability.delivery.failed",
-      kind: "application.lifecycle",
-      runtime: "server",
-      severity: "warning",
-      context: { eventId: `${marker}-health`, service: "web" },
-      attributes: { reason: "provider-rejected", sink: "better-stack" },
-    },
-    {
-      allowedAttributeNames: ["reason", "sink"],
-      clock: { now: () => new Date() },
-    },
-  );
-  if (!health.ok) return emptyResponse(500);
-  const healthDelivery = await dispatchOperationalEvent(health.value, [
-    structuredSink,
-  ]);
-  if (healthDelivery[0]?.status !== "delivered") {
-    return emptyResponse(500);
-  }
+    }) &&
+    hasExactAttributes(healthRecord, {
+      reason: "provider-rejected",
+      sink: "better-stack",
+    }) &&
+    recursiveDiagnosticAttempts === 0;
+  if (!valid) return emptyResponse(500);
 
   return Response.json({
     ok: true,
-    diagnosticAttempts,
+    diagnosticAttempts: captured.diagnosticAttempts,
     deliveryResult: "provider-rejected",
     applicationResult: "preserved",
-    healthRecords: 1,
+    healthRecords: healthRecords.length,
+    originalRecords: originals.length,
+    recursiveDiagnosticAttempts,
+    scheduledTasks: captured.scheduledTasks,
   });
 }
 
@@ -156,15 +279,7 @@ export async function GET(request: Request): Promise<Response> {
     throw new Error("synthetic Next request error");
   }
   if (input.case === "selected-server-catch") {
-    try {
-      throw new Error("synthetic selected server error");
-    } catch (error) {
-      await reportCaughtServerError(error, {
-        operation: "certification-server",
-        correlationId: input.marker,
-      });
-    }
-    return emptyResponse(204);
+    return exerciseSelectedServerCatch(input.marker);
   }
   return exerciseDiagnosticFailure(input.marker);
 }

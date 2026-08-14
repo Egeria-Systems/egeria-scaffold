@@ -29,8 +29,8 @@ const routeCounts = Object.freeze({
   captureInvocations: 3,
   acceptedOriginals: 3,
   syntheticApplicationRequests: 3,
-  workersRecords: 4,
-  betterStackRecords: 2,
+  expectedWorkersRecords: 4,
+  expectedBetterStackRecords: 2,
   diagnosticDeliveryFailures: 1,
 });
 const browserCounts = Object.freeze({
@@ -38,8 +38,8 @@ const browserCounts = Object.freeze({
   captureInvocations: 6,
   acceptedOriginals: 5,
   syntheticApplicationRequests: 7,
-  workersRecords: 5,
-  betterStackRecords: 5,
+  expectedWorkersRecords: 5,
+  expectedBetterStackRecords: 5,
   diagnosticDeliveryFailures: 0,
 });
 
@@ -190,12 +190,18 @@ async function runRequest(request, adapters) {
       "diagnosticAttempts",
       "healthRecords",
       "ok",
+      "originalRecords",
+      "recursiveDiagnosticAttempts",
+      "scheduledTasks",
     ]) ||
     value.ok !== true ||
     value.diagnosticAttempts !== 1 ||
     value.deliveryResult !== "provider-rejected" ||
     value.applicationResult !== "preserved" ||
-    value.healthRecords !== 1
+    value.healthRecords !== 1 ||
+    value.originalRecords !== 1 ||
+    value.recursiveDiagnosticAttempts !== 0 ||
+    value.scheduledTasks !== 1
   ) {
     throw createError("EXERCISE_FAILURE_RESULT_INVALID");
   }
@@ -215,6 +221,7 @@ async function exerciseWithAdapters(input, adapters) {
     subject,
     revision: validatedInput.revision,
     cases: serverCases,
+    providerRecordsClaimed: false,
     counts: routeCounts,
     checks: Object.freeze(requests.map(({ check }) => check)),
   });
@@ -243,6 +250,7 @@ function receiptMatches(value, expected) {
     value.version === "0.3.0" &&
     JSON.stringify(value.subject) === JSON.stringify(subject) &&
     value.revision === expected.revision &&
+    value.providerRecordsClaimed === false &&
     JSON.stringify(value.cases) === JSON.stringify(expected.cases) &&
     JSON.stringify(value.counts) === JSON.stringify(expected.counts)
   );
@@ -267,6 +275,7 @@ export function reconcileObservabilityErrorDiagnosticsReceipts(
       cases: browserCases,
       counts: browserCounts,
     }) ||
+    browserReceipt.scope !== "browser-only" ||
     !Array.isArray(browserReceipt.eventIdentifiers) ||
     browserReceipt.eventIdentifiers.length !== 5 ||
     new Set(browserReceipt.eventIdentifiers).size !== 5 ||
@@ -286,14 +295,15 @@ export function reconcileObservabilityErrorDiagnosticsReceipts(
     subject,
     revision,
     cases: Object.freeze([...browserCases, ...serverCases]),
+    providerRecordsClaimed: false,
     counts: Object.freeze({
       cases: 8,
       captureInvocations: 9,
       acceptedOriginals: 8,
       syntheticApplicationRequests: 10,
       maximumSyntheticApplicationRequests: 16,
-      workersRecords: 9,
-      betterStackRecords: 7,
+      expectedWorkersRecords: 9,
+      expectedBetterStackRecords: 7,
       diagnosticDeliveryFailures: 1,
     }),
     checks: Object.freeze([

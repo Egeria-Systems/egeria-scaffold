@@ -37,6 +37,8 @@ const expectedFixtureChecks = Object.freeze([
   "certification-fixture-frozen-install",
   "certification-fixture-browser-install",
   "certification-fixture-browser-capture",
+  "certification-fixture-server-capture",
+  "certification-fixture-capture-semantics",
   "repository-sources-unchanged",
 ]);
 const expectedBrowserCases = Object.freeze([
@@ -45,6 +47,26 @@ const expectedBrowserCases = Object.freeze([
   "react-boundary",
   "selected-browser-catch",
   "duplicate-suppression",
+]);
+const expectedServerCases = Object.freeze([
+  "next-request-error",
+  "selected-server-catch",
+  "diagnostic-failure-containment",
+]);
+const expectedLocalCases = Object.freeze([
+  ...expectedBrowserCases,
+  ...expectedServerCases,
+]);
+const expectedLocalChecks = Object.freeze([
+  "generated-browser-error-unhandled",
+  "generated-unhandled-rejection-unhandled",
+  "generated-react-boundary-handled",
+  "generated-selected-browser-catch-handled",
+  "generated-duplicate-suppression",
+  "browser-private-context-omitted",
+  "generated-next-request-error",
+  "generated-selected-server-catch-context",
+  "generated-diagnostic-failure-containment",
 ]);
 const fixtureRoot = resolve(
   repositoryRoot,
@@ -196,14 +218,17 @@ async function runProjectCommand(
   }
 }
 
-function requireBrowserReceipt(receipt, revision) {
+function requireLocalReceipt(receipt, revision) {
   if (
     receipt?.ok !== true ||
     receipt.capability !== "observability" ||
     receipt.version !== "0.3.0" ||
     JSON.stringify(receipt.subject) !== JSON.stringify(subject) ||
     receipt.revision !== revision ||
-    JSON.stringify(receipt.cases) !== JSON.stringify(expectedBrowserCases) ||
+    receipt.scope !== "local-full" ||
+    receipt.providerRecordsClaimed !== false ||
+    JSON.stringify(receipt.cases) !== JSON.stringify(expectedLocalCases) ||
+    JSON.stringify(receipt.checks) !== JSON.stringify(expectedLocalChecks) ||
     !Array.isArray(receipt.eventIdentifiers) ||
     receipt.eventIdentifiers.length !== 5 ||
     new Set(receipt.eventIdentifiers).size !== 5 ||
@@ -216,17 +241,20 @@ function requireBrowserReceipt(receipt, revision) {
     ) ||
     JSON.stringify(receipt.counts) !==
       JSON.stringify({
-        cases: 5,
-        captureInvocations: 6,
-        acceptedOriginals: 5,
-        syntheticApplicationRequests: 7,
-        workersRecords: 5,
-        betterStackRecords: 5,
-        diagnosticDeliveryFailures: 0,
+        cases: 8,
+        captureInvocations: 9,
+        acceptedOriginals: 8,
+        syntheticApplicationRequests: 10,
+        diagnosticDeliveryFailures: 1,
       })
   ) {
     throw createError("CERTIFICATION_FIXTURE_RECEIPT_INVALID");
   }
+}
+
+export function validateLocalFixtureReceiptForTesting(receipt, revision) {
+  requireLocalReceipt(receipt, revision);
+  return true;
 }
 
 function fixtureVerifierFor(revision) {
@@ -265,6 +293,7 @@ function fixtureVerifierFor(revision) {
       XDG_CACHE_HOME: cache,
       EXPECTED_REVISION: revision,
       OBSERVABILITY_DIAGNOSTICS_BROWSER_RECEIPT_PATH: browserReceiptPath,
+      OBSERVABILITY_DIAGNOSTICS_SCOPE: "local-full",
     };
 
     await runProjectCommand(
@@ -304,7 +333,7 @@ function fixtureVerifierFor(revision) {
     } catch {
       throw createError("CERTIFICATION_FIXTURE_RECEIPT_INVALID");
     }
-    requireBrowserReceipt(browserReceipt, revision);
+    requireLocalReceipt(browserReceipt, revision);
     await requireSnapshotUnchanged(projectRoot, generatedSnapshot);
     await Promise.all(
       protectedRepositoryRoots.map((root, index) =>

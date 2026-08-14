@@ -62,6 +62,8 @@ const fixtureVerificationChecks = Object.freeze([
   "certification-fixture-frozen-install",
   "certification-fixture-browser-install",
   "certification-fixture-browser-capture",
+  "certification-fixture-server-capture",
+  "certification-fixture-capture-semantics",
   "repository-sources-unchanged",
 ]);
 const browserCases = Object.freeze([
@@ -76,6 +78,44 @@ const serverCases = Object.freeze([
   "selected-server-catch",
   "diagnostic-failure-containment",
 ]);
+const localCases = Object.freeze([...browserCases, ...serverCases]);
+const localFixtureCounts = Object.freeze({
+  cases: 8,
+  captureInvocations: 9,
+  acceptedOriginals: 8,
+  syntheticApplicationRequests: 10,
+  diagnosticDeliveryFailures: 1,
+});
+const localFixtureChecks = Object.freeze([
+  "generated-browser-error-unhandled",
+  "generated-unhandled-rejection-unhandled",
+  "generated-react-boundary-handled",
+  "generated-selected-browser-catch-handled",
+  "generated-duplicate-suppression",
+  "browser-private-context-omitted",
+  "generated-next-request-error",
+  "generated-selected-server-catch-context",
+  "generated-diagnostic-failure-containment",
+]);
+
+function createLocalFixtureReceipt() {
+  return {
+    ok: true,
+    capability: "observability",
+    version: "0.3.0",
+    subject: exactSubject,
+    revision: exactRevision,
+    scope: "local-full",
+    cases: localCases,
+    eventIdentifiers: Array.from(
+      { length: 5 },
+      (_, index) => `00000000-0000-4000-8000-00000000000${index}`,
+    ),
+    counts: localFixtureCounts,
+    providerRecordsClaimed: false,
+    checks: localFixtureChecks,
+  };
+}
 
 const runnerPath = resolve(
   repositoryRoot,
@@ -374,6 +414,70 @@ test("the thin local runner binds exact recipe, subject, revision, fixed verific
   assert.doesNotMatch(JSON.stringify(result), /0\.2\.0/u);
 });
 
+test("the local fixture receipt binds every capture case and rejects semantic or provider-claim drift", async () => {
+  const { validateLocalFixtureReceiptForTesting } = await loadModule(runnerPath);
+  const receipt = createLocalFixtureReceipt();
+
+  assert.equal(
+    validateLocalFixtureReceiptForTesting(receipt, exactRevision),
+    true,
+  );
+
+  for (const mutate of [
+    (value) => value.cases.pop(),
+    (value) => value.checks.splice(3, 1),
+    (value) => {
+      value.counts.acceptedOriginals = 9;
+    },
+    (value) => {
+      value.providerRecordsClaimed = true;
+    },
+  ]) {
+    const drifted = structuredClone(receipt);
+    mutate(drifted);
+    assert.throws(
+      () => validateLocalFixtureReceiptForTesting(drifted, exactRevision),
+      (error) => error?.code === "CERTIFICATION_FIXTURE_RECEIPT_INVALID",
+    );
+  }
+});
+
+test("the temporary fixture routes every server case through generated capture and asserts exact context", async () => {
+  const [runner, routeFixture, browserFixture] = await Promise.all([
+    readFile(runnerPath, "utf8"),
+    readFile(
+      join(
+        fixtureRoot,
+        "apps/web/app/api/certification/diagnostics/route.ts",
+      ),
+      "utf8",
+    ),
+    readFile(
+      join(fixtureRoot, "observability-error-diagnostics.spec.ts"),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(runner, /OBSERVABILITY_DIAGNOSTICS_SCOPE[\s\S]+local-full/u);
+  assert.doesNotMatch(
+    routeFixture,
+    /createOperationalErrorReport|dispatchOperationalErrorReport/u,
+  );
+  assert.match(routeFixture, /Symbol\.for\("__cloudflare-context__"\)/u);
+  assert.match(
+    routeFixture,
+    /reportCaughtServerError[\s\S]+certification-failure/u,
+  );
+  assert.match(routeFixture, /observability\.delivery\.failed/u);
+  assert.match(routeFixture, /recursiveDiagnosticAttempts/u);
+  assert.match(browserFixture, /scope === "local-full"/u);
+  assert.match(browserFixture, /capture_mechanism/u);
+  assert.match(browserFixture, /browser-private-context-omitted/u);
+  for (const name of serverCases) {
+    assert.match(browserFixture, new RegExp(name, "u"));
+  }
+});
+
 test("the local runner rejects recipe drift before fixed verification", async () => {
   const { certifyObservabilityErrorDiagnosticsForTesting } =
     await loadModule(runnerPath);
@@ -493,6 +597,9 @@ test("the deployed exercise is bounded to three server cases and reads content o
                 deliveryResult: "provider-rejected",
                 applicationResult: "preserved",
                 healthRecords: 1,
+                originalRecords: 1,
+                recursiveDiagnosticAttempts: 0,
+                scheduledTasks: 1,
               };
             },
           };
@@ -513,13 +620,14 @@ test("the deployed exercise is bounded to three server cases and reads content o
     subject: exactSubject,
     revision: exactRevision,
     cases: serverCases,
+    providerRecordsClaimed: false,
     counts: {
       cases: 3,
       captureInvocations: 3,
       acceptedOriginals: 3,
       syntheticApplicationRequests: 3,
-      workersRecords: 4,
-      betterStackRecords: 2,
+      expectedWorkersRecords: 4,
+      expectedBetterStackRecords: 2,
       diagnosticDeliveryFailures: 1,
     },
     checks: [
@@ -546,13 +654,14 @@ test("route and browser receipts reconcile to the frozen eight-case matrix", asy
     subject: exactSubject,
     revision: exactRevision,
     cases: serverCases,
+    providerRecordsClaimed: false,
     counts: {
       cases: 3,
       captureInvocations: 3,
       acceptedOriginals: 3,
       syntheticApplicationRequests: 3,
-      workersRecords: 4,
-      betterStackRecords: 2,
+      expectedWorkersRecords: 4,
+      expectedBetterStackRecords: 2,
       diagnosticDeliveryFailures: 1,
     },
   };
@@ -563,6 +672,8 @@ test("route and browser receipts reconcile to the frozen eight-case matrix", asy
     subject: exactSubject,
     revision: exactRevision,
     cases: browserCases,
+    scope: "browser-only",
+    providerRecordsClaimed: false,
     eventIdentifiers: Array.from(
       { length: 5 },
       (_, index) => `00000000-0000-4000-8000-00000000000${index}`,
@@ -572,8 +683,8 @@ test("route and browser receipts reconcile to the frozen eight-case matrix", asy
       captureInvocations: 6,
       acceptedOriginals: 5,
       syntheticApplicationRequests: 7,
-      workersRecords: 5,
-      betterStackRecords: 5,
+      expectedWorkersRecords: 5,
+      expectedBetterStackRecords: 5,
       diagnosticDeliveryFailures: 0,
     },
   };
@@ -591,14 +702,15 @@ test("route and browser receipts reconcile to the frozen eight-case matrix", asy
       subject: exactSubject,
       revision: exactRevision,
       cases: [...browserCases, ...serverCases],
+      providerRecordsClaimed: false,
       counts: {
         cases: 8,
         captureInvocations: 9,
         acceptedOriginals: 8,
         syntheticApplicationRequests: 10,
         maximumSyntheticApplicationRequests: 16,
-        workersRecords: 9,
-        betterStackRecords: 7,
+        expectedWorkersRecords: 9,
+        expectedBetterStackRecords: 7,
         diagnosticDeliveryFailures: 1,
       },
       checks: [
@@ -833,10 +945,16 @@ test("the prepared workflow is manual, exact-revision, protected, single-attempt
   assert.match(pageFixture, /unhandledrejection/u);
   assert.match(pageFixture, /react-boundary/u);
   assert.match(routeFixture, /reportCaughtServerError/u);
-  assert.match(routeFixture, /dispatchOperationalErrorReport/u);
+  assert.doesNotMatch(routeFixture, /dispatchOperationalErrorReport/u);
+  assert.match(
+    routeFixture,
+    /reportCaughtServerError[\s\S]+certification-failure/u,
+  );
   assert.match(routeFixture, /provider-rejected/u);
   assert.match(routeFixture, /observability\.delivery\.failed/u);
   assert.match(browserFixture, /duplicate-suppression/u);
+  assert.match(browserFixture, /local-full/u);
+  assert.match(browserFixture, /browser-private-context-omitted/u);
   assert.match(browserFixture, /OBSERVABILITY_DIAGNOSTICS_BROWSER_RECEIPT_PATH/u);
 
   const allNewSources = [
