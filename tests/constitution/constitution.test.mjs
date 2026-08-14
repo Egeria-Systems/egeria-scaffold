@@ -2411,6 +2411,15 @@ test("the documented capability catalog uses the normalized contract", async () 
     capabilityIdentifiers,
   );
 
+  const observabilityRow = capabilityRows.find(
+    ([identifier]) => identifier === "`observability`",
+  );
+  assert.notEqual(observabilityRow, undefined);
+  assert.equal(
+    observabilityRow[5],
+    "`content-files`, `deployment-cloudflare`, `section-composition`",
+  );
+
   const allowedProfiles = new Set([
     "portfolio",
     "site",
@@ -2519,7 +2528,7 @@ test("capability delivery requires a separately planned certification task", asy
   const lifecyclePhase = compactLabel("P", "3");
   const appFoundationPhase = compactLabel("P", "4");
   const initialCertificationTask = namedLabel("Task", "5B");
-  const currentCertificationTask = namedLabel("Task", "6B");
+  const historicalCertificationTask = namedLabel("Task", "6B");
   const preparationGate = namedLabel("Gate", "1");
 
   assert.match(
@@ -2587,13 +2596,17 @@ test("capability delivery requires a separately planned certification task", asy
   assert.match(
     clientReadySection,
     new RegExp(
-      `${escapeRegularExpression(currentCertificationTask)}[^#]+observability@0\\.2\\.0`,
+      `${escapeRegularExpression(historicalCertificationTask)}[^#]+observability@0\\.2\\.0`,
       "i",
     ),
   );
   assert.match(
     clientReadySection,
     /observability@0\.2\.0[^#]+certified[^#]+cleanup-recovery[^#]+not claimed[^#]+retained-resource disposition/iu,
+  );
+  assert.match(
+    clientReadySection,
+    /observability@0\.3\.0[^#]+ordinary `pending`[^#]+empty evidence[^#]+no certification has run/iu,
   );
   const lifecycleSection = programRoadmap
     .split(`## ${lifecyclePhase} — Transactional lifecycle\n`, 2)[1]
@@ -2687,7 +2700,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+observability@0\.2\.0[^\n]+certified[^\n]+four unchanged subjects[^\n]+backfill-pending/i,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+observability@0\.3\.0[^\n]+pending[^\n]+empty evidence[^\n]+four unchanged subjects[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2695,7 +2708,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission and transition closure pass[^\n]+all-certified closure rejects the four frozen backfills/i,
+    /descriptor admission passes[^\n]+transition closure rejects pending observability[^\n]+all-certified closure rejects pending observability and the four frozen backfills/i,
   );
 });
 
@@ -2798,6 +2811,7 @@ test("client-required public-site work is relocated after lifecycle without requ
 
 test("executable capability certification ownership is current", async () => {
   const [
+    rootReadme,
     overview,
     capabilityModel,
     enforcementMap,
@@ -2808,6 +2822,7 @@ test("executable capability certification ownership is current", async () => {
     packageOwnership,
     registrySource,
   ] = await Promise.all([
+    readRepositoryFile("README.md"),
     readRepositoryFile("docs/architecture/overview.md"),
     readRepositoryFile("docs/architecture/capability-model.md"),
     readRepositoryFile("docs/architecture/enforcement-map.md"),
@@ -2843,6 +2858,54 @@ test("executable capability certification ownership is current", async () => {
   ]);
   assert.deepEqual(observabilityRecord.evidence, []);
   assert.match(
+    rootReadme,
+    /recipe `0\.8\.0`[^\n]+observability@0\.3\.0/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /all three Next\.js request-error inputs[^\n]+browser error\/rejection instrumentation[^\n]+five declared application-owned error surfaces[^\n]+app\/error\.tsx[^\n]+app\/global-error\.tsx[^\n]+externalized observability copy[^\n]+typed copy reader[^\n]+pure fallback presentation/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /same-origin[^\n]+safe-event and restricted error-report envelopes[^\n]+8,192 bytes/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /Workers custom records receive only the bounded safe operational event[^\n]+only the Better Stack diagnostic adapter receives the restricted message/iu,
+  );
+  for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
+    assert.match(
+      document,
+      /observability@0\.3\.0[^\n]+pending[^\n]+empty evidence/iu,
+    );
+    assert.match(
+      document,
+      /observability@0\.2\.0[^\n]+historical evidence[^\n]+(?:prior|exact historical) subject/iu,
+    );
+  }
+  for (const document of [
+    rootReadme,
+    overview,
+    capabilityModel,
+    enforcementMap,
+    roadmap,
+    builderCoreReadme,
+    packageOwnership,
+  ]) {
+    assert.doesNotMatch(
+      document,
+      /\]\([^)]*(?:superpowers|implementation-evidence|review-packets)\//u,
+    );
+  }
+  assert.match(
+    packageOwnership,
+    /observability `0\.3\.0`[^\n]+OIDC trusted publishing[^\n]+provenance/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /local\/static\/generated evidence[^\n]+no deployed\/provider receipt[^\n]+retention[^\n]+cleanup\/recovery[^\n]+durable delivery[^\n]+production readiness[^\n]+privacy completeness[^\n]+visual quality[^\n]+human accessibility[^\n]+WCAG-conformance proof/iu,
+  );
+  assert.match(
     packageOwnership,
     /descriptor `standards@0\.3\.0` is certified from its exact local subject-bound receipt[^\n]+public `0\.2\.0` availability alone does not alter the installed public package/iu,
   );
@@ -2870,7 +2933,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission and transition closure pass[^\n]+all-certified closure rejects the four frozen backfills/iu,
+    /descriptor admission passes[^\n]+transition closure rejects pending observability[^\n]+all-certified closure rejects pending observability and the four frozen backfills/iu,
   );
   assert.match(
     enforcementMap,
@@ -3188,7 +3251,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     roadmap,
-    /observability certification MR is pushed[^.]+merge, package publication, another deployment, provider mutation, cleanup, and production remain separate/iu,
+    /restricted-error-diagnostics reconciliation candidate[^\n]+unintegrated[^\n]+independent implementation review, merge, certification, another deployment, provider mutation, cleanup, and production remain separate/iu,
   );
   assert.match(
     roadmap,
