@@ -8,7 +8,7 @@ import test from "node:test";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const reviewedRecipeLockfile = resolve(
   packageRoot,
-  "../../fixtures/generated/portfolio/pnpm-lock.yaml",
+  "lockfiles/web-recipe-0.8.0/pnpm-lock.yaml",
 );
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
 const verifierModule = await import(
@@ -41,11 +41,14 @@ const portfolioRenderedPaths = [
   "README.md",
   "apps/web/AGENTS.md",
   "apps/web/app/api/observability/route.ts",
+  "apps/web/app/error.tsx",
+  "apps/web/app/global-error.tsx",
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
   "apps/web/content/content.config.yaml",
   "apps/web/content/en-CA/long-form/introduction.md",
+  "apps/web/content/en-CA/observability.yaml",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/instrumentation-client.ts",
@@ -63,10 +66,12 @@ const portfolioRenderedPaths = [
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/cloudflare/observability-context.ts",
   "apps/web/src/infrastructure/observability/browser-reporter.ts",
+  "apps/web/src/infrastructure/observability/error-copy.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/infrastructure/observability/server-reporter.ts",
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
+  "apps/web/src/presentation/error-fallback.tsx",
   "apps/web/src/sections/section-registry.tsx",
   "apps/web/tests/component/content-page.test.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
@@ -641,16 +646,16 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
-      assert.equal(generated.state.origin.recipeVersion, "0.7.0");
+      assert.equal(generated.state.origin.recipeVersion, "0.8.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 95 : 97,
+        profile === "portfolio" ? 100 : 102,
       );
       assert.equal(
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "observability",
         )?.version,
-        "0.2.0",
+        "0.3.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -824,7 +829,7 @@ test("portfolio and site generation writes exact state-last repositories", async
       assert.equal(webManifest.devDependencies.tailwindcss, "4.3.3");
       assert.equal(
         webManifest.dependencies["@egeria-systems/observability"],
-        "0.2.0",
+        "0.3.0",
       );
 
       const deliveredPaths = await listFiles(destination);
@@ -926,7 +931,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
       accepted.state.installedCapabilities,
       core.createInstalledManifest(resolved),
     );
-    assert.equal(accepted.state.managedSurfaces.length, 100);
+    assert.equal(accepted.state.managedSurfaces.length, 105);
     assert.equal(
       accepted.state.managedSurfaces.filter(
         ({ owner }) =>

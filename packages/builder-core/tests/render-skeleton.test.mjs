@@ -23,11 +23,14 @@ const portfolioPaths = [
   "README.md",
   "apps/web/AGENTS.md",
   "apps/web/app/api/observability/route.ts",
+  "apps/web/app/error.tsx",
+  "apps/web/app/global-error.tsx",
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
   "apps/web/content/content.config.yaml",
   "apps/web/content/en-CA/long-form/introduction.md",
+  "apps/web/content/en-CA/observability.yaml",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/instrumentation-client.ts",
@@ -45,10 +48,12 @@ const portfolioPaths = [
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/cloudflare/observability-context.ts",
   "apps/web/src/infrastructure/observability/browser-reporter.ts",
+  "apps/web/src/infrastructure/observability/error-copy.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/infrastructure/observability/server-reporter.ts",
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
+  "apps/web/src/presentation/error-fallback.tsx",
   "apps/web/src/sections/section-registry.tsx",
   "apps/web/tests/component/content-page.test.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
@@ -70,12 +75,15 @@ const sitePaths = [
   "apps/web/AGENTS.md",
   "apps/web/app/about/page.tsx",
   "apps/web/app/api/observability/route.ts",
+  "apps/web/app/error.tsx",
+  "apps/web/app/global-error.tsx",
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
   "apps/web/content/content.config.yaml",
   "apps/web/content/en-CA/about.yaml",
   "apps/web/content/en-CA/long-form/introduction.md",
+  "apps/web/content/en-CA/observability.yaml",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/instrumentation-client.ts",
@@ -93,10 +101,12 @@ const sitePaths = [
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/cloudflare/observability-context.ts",
   "apps/web/src/infrastructure/observability/browser-reporter.ts",
+  "apps/web/src/infrastructure/observability/error-copy.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/infrastructure/observability/server-reporter.ts",
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
+  "apps/web/src/presentation/error-fallback.tsx",
   "apps/web/src/sections/section-registry.tsx",
   "apps/web/tests/component/content-page.test.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
@@ -128,7 +138,7 @@ const bookingCalendlyCopy = {
 
 const packageVersions = {
   standards: "0.1.0",
-  observability: "0.2.0",
+  observability: "0.3.0",
 };
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -471,63 +481,122 @@ async function loadGeneratedObservabilityRoute(files, throwOnReport = false) {
     },
   }).outputText;
   observabilityRouteLoad += 1;
-  const reportKey = `__observabilityReports${observabilityRouteLoad}`;
+  const eventKey = `__observabilityEvents${observabilityRouteLoad}`;
+  const reportKey = `__observabilityErrorReports${observabilityRouteLoad}`;
+  const prohibitedTokenKey =
+    `__isProhibitedObservabilityToken${observabilityRouteLoad}`;
+  globalThis[eventKey] = [];
   globalThis[reportKey] = [];
+  const canonicalReporter = await loadGeneratedServerReporter(files, {
+    ingestingHost: "",
+    sourceToken: "",
+  });
+  globalThis[prohibitedTokenKey] =
+    canonicalReporter.module.isProhibitedObservabilityToken;
   const reporterModule = `data:text/javascript;base64,${Buffer.from(
     [
-      `export async function reportBrowserEvent(input) { globalThis[${JSON.stringify(reportKey)}].push(input);`,
+      `export async function reportBrowserEvent(input) { globalThis[${JSON.stringify(eventKey)}].push(input);`,
       ...(throwOnReport ? ['throw new Error("transport failed");'] : []),
       "}",
+      `export async function reportBrowserErrorReport(input) { globalThis[${JSON.stringify(reportKey)}].push(input);`,
+      ...(throwOnReport ? ['throw new Error("transport failed");'] : []),
+      "}",
+      `export const isProhibitedObservabilityToken = globalThis[${JSON.stringify(prohibitedTokenKey)}];`,
     ].join("\n"),
   ).toString("base64")}`;
-  const executable = transpiled.replace(
+  const withReporter = transpiled.replace(
     'from "../../../src/infrastructure/observability/server-reporter"',
     `from ${JSON.stringify(reporterModule)}`,
   );
-  assert.notEqual(executable, transpiled);
+  const executable = withReporter.replace(
+    'from "@egeria-systems/observability"',
+    `from ${JSON.stringify(new URL("../../observability/dist/index.js", import.meta.url).href)}`,
+  );
+  assert.notEqual(withReporter, transpiled);
+  assert.notEqual(executable, withReporter);
 
   return {
     module: await import(
       `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#route-${observabilityRouteLoad}`
     ),
+    events: globalThis[eventKey],
     reports: globalThis[reportKey],
   };
 }
 
-function browserErrorEnvelope(overrides = {}) {
-  return {
-    schemaVersion: "1.0.0",
-    event: {
-      name: "browser.window.error",
-      kind: "application.error",
-      runtime: "browser",
-      severity: "error",
-      context: { correlationId: "browser-event-123" },
-      errorCategory: "unexpected",
-      attributes: { source: "window-error" },
-    },
-    ...overrides,
-  };
+async function browserErrorEnvelope(
+  error = Object.freeze({
+    name: "Error",
+    message: "synthetic browser failure",
+    stack: "Error: synthetic browser failure\n    at render (src/app.tsx:12:4)",
+  }),
+  overrides = {},
+) {
+  const observability = await import("../../observability/dist/index.js");
+  const browser = await import("../../observability/dist/browser.js");
+  const capture = Object.freeze({
+    mechanism: "browser-error-event",
+    handled: false,
+  });
+  const event = assertSuccess(
+    observability.createOperationalEvent(
+      {
+        name: "browser.window.error",
+        kind: "application.error",
+        runtime: "browser",
+        severity: "error",
+        context: { eventId: "browser-event-123", service: "web" },
+        errorCategory: "unexpected",
+        attributes: {
+          capture_mechanism: "browser-error-event",
+          handled: false,
+        },
+      },
+      {
+        allowedAttributeNames: ["capture_mechanism", "handled"],
+        clock: { now: () => new Date("2026-08-13T12:00:00.000Z") },
+      },
+    ),
+  );
+  const report = assertSuccess(
+    observability.createOperationalErrorReport(event, error, capture, {}),
+  );
+  const envelope = assertSuccess(browser.createBrowserErrorEnvelope(report));
+  return { ...envelope, ...overrides };
 }
 
-function webVitalEnvelope() {
-  return {
-    schemaVersion: "1.0.0",
-    event: {
-      name: "browser.web.vital",
-      kind: "web.vital",
-      runtime: "browser",
-      severity: "info",
-      context: { correlationId: "browser-vital-123" },
-      attributes: {
-        metric_name: "LCP",
-        value: 1_234.5,
-        delta: 10.25,
-        rating: "good",
-        navigation_type: "navigate",
+async function webVitalEnvelope() {
+  const observability = await import("../../observability/dist/index.js");
+  const browser = await import("../../observability/dist/browser.js");
+  const event = assertSuccess(
+    observability.createOperationalEvent(
+      {
+        name: "browser.web.vital",
+        kind: "web.vital",
+        runtime: "browser",
+        severity: "info",
+        context: { eventId: "browser-vital-123", service: "web" },
+        attributes: {
+          metric_name: "LCP",
+          value: 1_234.5,
+          delta: 10.25,
+          rating: "good",
+          navigation_type: "navigate",
+        },
       },
-    },
-  };
+      {
+        allowedAttributeNames: [
+          "delta",
+          "metric_name",
+          "navigation_type",
+          "rating",
+          "value",
+        ],
+        clock: { now: () => new Date("2026-08-13T12:00:00.000Z") },
+      },
+    ),
+  );
+  return assertSuccess(browser.createBrowserEnvelope(event));
 }
 
 function observabilityRequest(body, overrides = {}) {
@@ -561,34 +630,13 @@ async function loadGeneratedBrowserReporter(files) {
     },
   }).outputText;
   browserReporterLoad += 1;
-  const eventKey = `__browserReporterEvents${browserReporterLoad}`;
-  globalThis[eventKey] = [];
-  const rootModule = `data:text/javascript;base64,${Buffer.from(
-    [
-      `export function createOperationalEvent(input, options) { globalThis[${JSON.stringify(eventKey)}].push(input); const allowed = new Set(options.allowedAttributeNames); const invalid = Object.keys(input.attributes).some((name) => !/^[a-z][a-z0-9_]{0,63}$/.test(name) || !allowed.has(name)); return invalid ? { ok: false } : { ok: true, value: Object.freeze(input) }; }`,
-      "export async function dispatchOperationalEvent(event, sinks) {",
-      "return Promise.all(sinks.map(async (sink) => {",
-      "try { await sink.emit(event); return { ok: true }; } catch { return { ok: false }; }",
-      "}));",
-      "}",
-    ].join("\n"),
-  ).toString("base64")}`;
-  const browserModule = `data:text/javascript;base64,${Buffer.from(
-    [
-      "export function createBrowserSink(configuration) {",
-      "return Object.freeze({ emit(event) {",
-      'return configuration.send({ schemaVersion: "1.0.0", event });',
-      "} });",
-      "}",
-    ].join("\n"),
-  ).toString("base64")}`;
   const withRoot = transpiled.replace(
     'from "@egeria-systems/observability"',
-    `from ${JSON.stringify(rootModule)}`,
+    `from ${JSON.stringify(new URL("../../observability/dist/index.js", import.meta.url).href)}`,
   );
   const executable = withRoot.replace(
     'from "@egeria-systems/observability/browser"',
-    `from ${JSON.stringify(browserModule)}`,
+    `from ${JSON.stringify(new URL("../../observability/dist/browser.js", import.meta.url).href)}`,
   );
   assert.notEqual(withRoot, transpiled);
   assert.notEqual(executable, withRoot);
@@ -597,7 +645,175 @@ async function loadGeneratedBrowserReporter(files) {
     module: await import(
       `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#browser-reporter-${browserReporterLoad}`
     ),
-    events: globalThis[eventKey],
+  };
+}
+
+let browserInstrumentationLoad = 0;
+
+async function loadGeneratedBrowserInstrumentation(files) {
+  const source = indexFiles(files).get("apps/web/instrumentation-client.ts");
+  assert.notEqual(source, undefined);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  browserInstrumentationLoad += 1;
+  const callKey = `__browserInstrumentationCalls${browserInstrumentationLoad}`;
+  globalThis[callKey] = [];
+  const reporterModule = `data:text/javascript;base64,${Buffer.from(
+    `export function reportBrowserError(error, source) { globalThis[${JSON.stringify(callKey)}].push({ error, source }); }`,
+  ).toString("base64")}`;
+  const executable = transpiled.replace(
+    'from "./src/infrastructure/observability/browser-reporter"',
+    `from ${JSON.stringify(reporterModule)}`,
+  );
+  assert.notEqual(executable, transpiled);
+
+  const listeners = new Map();
+  const previousAddEventListener = globalThis.addEventListener;
+  globalThis.addEventListener = (type, listener) => {
+    listeners.set(type, listener);
+  };
+  try {
+    await import(
+      `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#browser-instrumentation-${browserInstrumentationLoad}`
+    );
+  } finally {
+    if (previousAddEventListener === undefined) {
+      delete globalThis.addEventListener;
+    } else {
+      globalThis.addEventListener = previousAddEventListener;
+    }
+  }
+
+  return { listeners, calls: globalThis[callKey] };
+}
+
+async function readCommonWebTemplate(path) {
+  return readFile(
+    new URL(`../templates/common/apps/web/${path}`, import.meta.url),
+    "utf8",
+  );
+}
+
+async function loadErrorCopyModule(files) {
+  const [source, copySource] = await Promise.all([
+    readCommonWebTemplate("src/infrastructure/observability/error-copy.ts"),
+    readCommonWebTemplate("content/en-CA/observability.yaml"),
+  ]);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const contentModule = await compileGeneratedContentModule(files);
+  const withCopy = transpiled.replace(
+    'import observabilityCopySource from "../../../content/en-CA/observability.yaml";',
+    `const observabilityCopySource = ${JSON.stringify(copySource)};`,
+  );
+  const executable = withCopy.replace(
+    'from "../../content/content-schema"',
+    `from ${JSON.stringify(contentModule.moduleUrl)}`,
+  );
+  assert.notEqual(withCopy, transpiled);
+  assert.notEqual(executable, withCopy);
+  return import(
+    `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`
+  );
+}
+
+function createTestJsxRuntimeUrl() {
+  return `data:text/javascript;base64,${Buffer.from(
+    [
+      "export const Fragment = Symbol.for('react.fragment');",
+      "export function jsx(type, props, key) { return { type, props: props ?? {}, key: key ?? null }; }",
+      "export const jsxs = jsx;",
+    ].join("\n"),
+  ).toString("base64")}`;
+}
+
+async function loadErrorFallbackModule() {
+  const source = await readCommonWebTemplate(
+    "src/presentation/error-fallback.tsx",
+  );
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      jsx: typescript.JsxEmit.ReactJSX,
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const executable = transpiled.replace(
+    'from "react/jsx-runtime"',
+    `from ${JSON.stringify(createTestJsxRuntimeUrl())}`,
+  );
+  assert.notEqual(executable, transpiled);
+  return import(
+    `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`
+  );
+}
+
+let errorBoundaryLoad = 0;
+
+async function loadErrorBoundaryModule(path) {
+  const source = await readCommonWebTemplate(path);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      jsx: typescript.JsxEmit.ReactJSX,
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  errorBoundaryLoad += 1;
+  const reportKey = `__errorBoundaryReports${errorBoundaryLoad}`;
+  globalThis[reportKey] = [];
+  const reactModule = `data:text/javascript;base64,${Buffer.from(
+    "export function useEffect(effect) { effect(); }",
+  ).toString("base64")}`;
+  const copyModule = `data:text/javascript;base64,${Buffer.from(
+    'export function readErrorFallbackCopy() { return Object.freeze({ heading: "Something went wrong", summary: "We could not complete this page. Please try again.", retryLabel: "Try again" }); }',
+  ).toString("base64")}`;
+  const reporterModule = `data:text/javascript;base64,${Buffer.from(
+    `export function reportReactBoundaryError(error, context) { globalThis[${JSON.stringify(reportKey)}].push({ error, context }); }`,
+  ).toString("base64")}`;
+  const fallbackModule = `data:text/javascript;base64,${Buffer.from(
+    "export function ErrorFallback(props) { return { type: 'error-fallback', props, key: null }; }",
+  ).toString("base64")}`;
+  const executable = transpiled
+    .replace('from "react"', `from ${JSON.stringify(reactModule)}`)
+    .replace(
+      /from "\.\.\/src\/infrastructure\/observability\/error-copy"/u,
+      `from ${JSON.stringify(copyModule)}`,
+    )
+    .replace(
+      /from "\.\.\/src\/infrastructure\/observability\/browser-reporter"/u,
+      `from ${JSON.stringify(reporterModule)}`,
+    )
+    .replace(
+      /from "\.\.\/src\/presentation\/error-fallback"/u,
+      `from ${JSON.stringify(fallbackModule)}`,
+    )
+    .replace(
+      'from "react/jsx-runtime"',
+      `from ${JSON.stringify(createTestJsxRuntimeUrl())}`,
+    );
+  assert.notEqual(executable, transpiled);
+  return {
+    module: await import(
+      `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#error-boundary-${errorBoundaryLoad}`
+    ),
+    reports: globalThis[reportKey],
   };
 }
 
@@ -606,8 +822,8 @@ let serverReporterLoad = 0;
 async function loadGeneratedServerReporter(
   files,
   {
-    dispatchShouldReject = false,
     ingestingHost = "s123.eu-nbg-2.betterstackdata.com",
+    rejectErrorDispatch = false,
     scheduleShouldThrow = false,
     sourceToken = "source-token-123456",
   } = {},
@@ -625,29 +841,25 @@ async function loadGeneratedServerReporter(
     },
   }).outputText;
   serverReporterLoad += 1;
-  const eventKey = `__serverReporterEvents${serverReporterLoad}`;
-  const structuredKey = `__serverReporterStructured${serverReporterLoad}`;
-  const betterStackKey = `__serverReporterBetterStack${serverReporterLoad}`;
-  const dispatchKey = `__serverReporterDispatches${serverReporterLoad}`;
   const scheduleKey = `__serverReporterScheduled${serverReporterLoad}`;
-  globalThis[eventKey] = [];
-  globalThis[structuredKey] = [];
-  globalThis[betterStackKey] = [];
-  globalThis[dispatchKey] = [];
   globalThis[scheduleKey] = [];
-  const rootModule = `data:text/javascript;base64,${Buffer.from(
-    [
-      `export function createOperationalEvent(input) { globalThis[${JSON.stringify(eventKey)}].push(input); return { ok: true, value: Object.freeze(input) }; }`,
-      'export function normalizeErrorCategory() { return "unexpected"; }',
-      `export function dispatchOperationalEvent(event, sinks) { globalThis[${JSON.stringify(dispatchKey)}].push({ event, sinks }); return ${dispatchShouldReject ? 'Promise.reject(new Error("provider failed"))' : "Promise.resolve([])"}; }`,
-    ].join("\n"),
-  ).toString("base64")}`;
-  const serverModule = `data:text/javascript;base64,${Buffer.from(
-    [
-      `export function createStructuredLogSink(configuration) { globalThis[${JSON.stringify(structuredKey)}].push(configuration); return Object.freeze({ kind: "structured" }); }`,
-      `export function createBetterStackSink(configuration) { globalThis[${JSON.stringify(betterStackKey)}].push(configuration); return configuration.ingestingHost === "" || configuration.sourceToken === "" ? Object.freeze({ ok: false }) : Object.freeze({ ok: true, value: Object.freeze({ kind: "better-stack" }) }); }`,
-    ].join("\n"),
-  ).toString("base64")}`;
+  const rootModule = new URL(
+    "../../observability/dist/index.js",
+    import.meta.url,
+  ).href;
+  const reporterRootModule = rejectErrorDispatch
+    ? `data:text/javascript;base64,${Buffer.from(
+        [
+          `import { createOperationalErrorReport, createOperationalEvent, dispatchOperationalEvent, normalizeErrorCategory } from ${JSON.stringify(rootModule)};`,
+          "export { createOperationalErrorReport, createOperationalEvent, dispatchOperationalEvent, normalizeErrorCategory };",
+          'export async function dispatchOperationalErrorReport() { throw new Error("synthetic dispatch rejection"); }',
+        ].join("\n"),
+      ).toString("base64")}`
+    : rootModule;
+  const serverModule = new URL(
+    "../../observability/dist/server.js",
+    import.meta.url,
+  ).href;
   const contextModule = `data:text/javascript;base64,${Buffer.from(
     [
       "export async function readObservabilityRuntimeContext() {",
@@ -657,7 +869,7 @@ async function loadGeneratedServerReporter(
   ).toString("base64")}`;
   const withRoot = transpiled.replace(
     'from "@egeria-systems/observability"',
-    `from ${JSON.stringify(rootModule)}`,
+    `from ${JSON.stringify(reporterRootModule)}`,
   );
   const withServer = withRoot.replace(
     'from "@egeria-systems/observability/server"',
@@ -675,11 +887,40 @@ async function loadGeneratedServerReporter(
     module: await import(
       `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#reporter-${serverReporterLoad}`
     ),
-    events: globalThis[eventKey],
-    structuredConfigurations: globalThis[structuredKey],
-    betterStackConfigurations: globalThis[betterStackKey],
-    dispatches: globalThis[dispatchKey],
     scheduled: globalThis[scheduleKey],
+  };
+}
+
+let instrumentationLoad = 0;
+
+async function loadGeneratedInstrumentation(files) {
+  const source = indexFiles(files).get("apps/web/instrumentation.ts");
+  assert.notEqual(source, undefined);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  instrumentationLoad += 1;
+  const callKey = `__serverInstrumentationCalls${instrumentationLoad}`;
+  globalThis[callKey] = [];
+  const reporterModule = `data:text/javascript;base64,${Buffer.from(
+    `export async function reportServerError(error, context) { globalThis[${JSON.stringify(callKey)}].push({ error, context }); await new Promise((resolve) => setImmediate(resolve)); }`,
+  ).toString("base64")}`;
+  const executable = transpiled.replace(
+    'from "./src/infrastructure/observability/server-reporter"',
+    `from ${JSON.stringify(reporterModule)}`,
+  );
+  assert.notEqual(executable, transpiled);
+
+  return {
+    module: await import(
+      `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#instrumentation-${instrumentationLoad}`
+    ),
+    calls: globalThis[callKey],
   };
 }
 
@@ -916,6 +1157,37 @@ test("portfolio and site render exact sorted deterministic file sets", async () 
   }
 });
 
+test("generated observability guidance preserves restricted diagnostic boundaries", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const files = indexFiles(rendered.files);
+  const readme = files.get("README.md");
+  const instructions = files.get("apps/web/AGENTS.md");
+
+  for (const document of [readme, instructions]) {
+    assert.match(
+      document,
+      /safe operational events[\s\S]+restricted error reports/iu,
+    );
+    assert.match(document, /server route[\s\S]+revalidat[\s\S]+re-sanitiz/iu);
+    assert.match(document, /not a privacy guarantee/iu);
+    assert.match(document, /not source-map deobfuscated/iu);
+    assert.match(
+      document,
+      /Workers(?: Logs)? custom records[\s\S]+only[\s\S]+safe[\s\S]+only[\s\S]+Better Stack diagnostic adapter[\s\S]+restricted/iu,
+    );
+  }
+
+  assert.doesNotMatch(readme, /never receives raw error messages, stacks/iu);
+});
+
 test("rendered manifests and desired project match the approved resolved recipe", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const portfolio = assertSuccess(
@@ -936,7 +1208,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.7.0",
+    recipeVersion: "0.8.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -1012,7 +1284,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       typecheck: "next typegen && tsc --noEmit",
     },
     dependencies: {
-      "@egeria-systems/observability": "0.2.0",
+      "@egeria-systems/observability": "0.3.0",
       "@opennextjs/cloudflare": "1.20.2",
       next: "16.3.0",
       react: "19.2.8",
@@ -1118,7 +1390,7 @@ test("production observability renders bounded Next and Cloudflare composition",
 
   assert.match(
     workspace,
-    /minimumReleaseAgeExclude:\n  - "@egeria-systems\/observability@0\.2\.0"/u,
+    /minimumReleaseAgeExclude:\n  - "@egeria-systems\/observability@0\.3\.0"/u,
   );
 
   assert.deepEqual(wrangler.observability, {
@@ -1166,7 +1438,45 @@ test("production observability renders bounded Next and Cloudflare composition",
   );
 });
 
-test("the browser reporter emits exact credential-free bounded envelopes", async () => {
+test("browser instrumentation passes actual error and rejection values", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedBrowserInstrumentation(rendered.files);
+  const error = new Error("browser stack evidence");
+  const opaqueErrorEvent = Object.freeze({
+    error: undefined,
+    message: "opaque cross-origin failure",
+    filename: "https://private.example/page?token=credential-secret",
+  });
+  const rejectionReason = "primitive rejection";
+
+  loaded.listeners.get("error")?.({
+    error,
+    message: error.message,
+    filename: "https://private.example/private.ts?token=credential-secret",
+  });
+  loaded.listeners.get("error")?.(opaqueErrorEvent);
+  loaded.listeners.get("unhandledrejection")?.({ reason: rejectionReason });
+
+  assert.deepEqual(loaded.calls, [
+    { error, source: "window-error" },
+    { error: opaqueErrorEvent.message, source: "window-error" },
+    { error: rejectionReason, source: "unhandled-rejection" },
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify(loaded.calls),
+    /private\.example|private\.ts|credential-secret|filename/u,
+  );
+});
+
+test("browser reporting creates bounded diagnostic envelopes and suppresses duplicate objects", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(
     await renderSkeleton({
@@ -1183,87 +1493,87 @@ test("the browser reporter emits exact credential-free bounded envelopes", async
     requests.push({ input, init });
     return { ok: true };
   };
+  const duplicate = Object.assign(new Error("same browser failure"), {
+    stack: "Error: same browser failure\n    at render (src/app.tsx:12:4)",
+  });
+  const reactBoundaryError = new Error("react boundary failure");
+  const hostile = new Proxy(
+    {},
+    {
+      get() {
+        throw new Error("hostile getter private value");
+      },
+    },
+  );
 
   try {
-    assert.equal(loaded.module.reportBrowserError("window-error"), undefined);
-    assert.equal(
-      loaded.module.reportWebVital({
-        name: "LCP",
-        value: 1_234.5,
-        delta: 10.25,
-        rating: "good",
-        navigationType: "navigate",
-        message: "private value",
-        url: "https://portfolio.example/private?token=secret",
-      }),
-      undefined,
-    );
+    loaded.module.reportBrowserError(duplicate, "window-error");
+    loaded.module.reportReactBoundaryError(duplicate, { boundary: "page" });
+    loaded.module.reportReactBoundaryError(reactBoundaryError, {
+      boundary: "global",
+    });
+    loaded.module.reportReactBoundaryError(new Error("invalid boundary"), {
+      boundary: "nested",
+    });
+    loaded.module.reportBrowserError("primitive rejection", "unhandled-rejection");
+    loaded.module.reportBrowserError("primitive rejection", "unhandled-rejection");
+    loaded.module.reportCaughtBrowserError(hostile, {
+      operation: "refresh-content",
+    });
     await new Promise((resolve) => setImmediate(resolve));
   } finally {
     globalThis.fetch = originalFetch;
   }
 
-  assert.equal(requests.length, 2);
-  for (const request of requests) {
-    assert.equal(request.input, "/api/observability");
-    assert.equal(request.init.method, "POST");
-    assert.deepEqual(request.init.headers, {
-      "Content-Type": "application/json",
-    });
-    assert.equal(request.init.credentials, "omit");
-    assert.equal(request.init.referrerPolicy, "no-referrer");
-    assert.equal(request.init.keepalive, true);
+  assert.equal(requests.length, 5);
+  for (const { input, init } of requests) {
+    assert.equal(input, "/api/observability");
+    assert.equal(init.method, "POST");
+    assert.deepEqual(init.headers, { "Content-Type": "application/json" });
+    assert.equal(init.credentials, "omit");
+    assert.equal(init.referrerPolicy, "no-referrer");
+    assert.equal(init.keepalive, true);
+    assert.deepEqual(Object.keys(JSON.parse(init.body)).sort(), [
+      "report",
+      "schemaVersion",
+      "type",
+    ]);
+    assert.equal(JSON.parse(init.body).schemaVersion, "2.0.0");
+    assert.equal(JSON.parse(init.body).type, "error-report");
+    assert.ok(new TextEncoder().encode(init.body).byteLength <= 8_192);
   }
 
-  const [browserError, webVital] = requests.map(({ init }) =>
-    JSON.parse(init.body),
-  );
-  assert.deepEqual(browserError, {
-    schemaVersion: "1.0.0",
-    event: {
-      name: "browser.window.error",
-      kind: "application.error",
-      runtime: "browser",
-      severity: "error",
-      context: {
-        correlationId: browserError.event.context.correlationId,
+  const envelopes = requests.map(({ init }) => JSON.parse(init.body));
+  assert.equal(new Set(envelopes.map(({ report }) => report.event.context.eventId)).size, 5);
+  assert.deepEqual(
+    envelopes.map(({ report }) => report.capture),
+    [
+      { mechanism: "browser-error-event", handled: false },
+      { mechanism: "react-error-boundary", handled: true },
+      { mechanism: "browser-unhandled-rejection", handled: false },
+      { mechanism: "browser-unhandled-rejection", handled: false },
+      {
+        mechanism: "selected-catch",
+        handled: true,
+        operation: "refresh-content",
       },
-      errorCategory: "unexpected",
-      attributes: { source: "window-error" },
-    },
-  });
+    ],
+  );
   assert.match(
-    browserError.event.context.correlationId,
-    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+    envelopes[0].report.diagnostics.exceptionStacktrace,
+    /src\/app\.tsx:12:4/u,
   );
-  assert.deepEqual(webVital, {
-    schemaVersion: "1.0.0",
-    event: {
-      name: "browser.web.vital",
-      kind: "web.vital",
-      runtime: "browser",
-      severity: "info",
-      context: { correlationId: webVital.event.context.correlationId },
-      attributes: {
-        metric_name: "LCP",
-        value: 1_234.5,
-        delta: 10.25,
-        rating: "good",
-        navigation_type: "navigate",
-      },
-    },
-  });
   assert.doesNotMatch(
-    JSON.stringify(requests),
-    /private value|portfolio\.example|token=secret|message|url/u,
+    JSON.stringify(envelopes),
+    /credential|document\.cookie|localStorage|sessionStorage|private\.example|userAgent|referrer|hostile getter private value/u,
   );
 
   globalThis.fetch = async () => {
-    throw new Error("transport failed with private response");
+    throw new Error("private provider response");
   };
   try {
     await assert.doesNotReject(async () => {
-      loaded.module.reportBrowserError("unhandled-rejection");
+      loaded.module.reportBrowserError(new Error("network failure"), "window-error");
       await new Promise((resolve) => setImmediate(resolve));
     });
   } finally {
@@ -1271,7 +1581,28 @@ test("the browser reporter emits exact credential-free bounded envelopes", async
   }
 });
 
-test("the browser route accepts only bounded same-origin operational envelopes", async () => {
+test("browser recovery source set exists before capability admission", async () => {
+  const sourcePaths = [
+    "app/error.tsx",
+    "app/global-error.tsx",
+    "content/en-CA/observability.yaml",
+    "src/infrastructure/observability/error-copy.ts",
+    "src/presentation/error-fallback.tsx",
+  ];
+
+  const sources = await Promise.all(
+    sourcePaths.map((path) =>
+      readFile(
+        new URL(`../templates/common/apps/web/${path}`, import.meta.url),
+        "utf8",
+      ),
+    ),
+  );
+
+  assert.equal(sources.every((source) => source.trim().length > 0), true);
+});
+
+test("browser route reconstructs bounded error reports and retains safe web vitals", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(
     await renderSkeleton({
@@ -1282,176 +1613,134 @@ test("the browser route accepts only bounded same-origin operational envelopes",
     }),
   );
   const loaded = await loadGeneratedObservabilityRoute(rendered.files);
-
-  assert.equal(
-    (await loaded.module.POST(observabilityRequest(browserErrorEnvelope())))
-      .status,
-    202,
-  );
-  assert.equal(
-    (await loaded.module.POST(observabilityRequest(webVitalEnvelope()))).status,
-    202,
-  );
-  assert.equal(
-    (
-      await loaded.module.POST(
-        observabilityRequest(webVitalEnvelope(), {
-          url: "http://127.0.0.1:3100/api/observability",
-          headers: {
-            host: "portfolio.example:3100",
-            origin: "http://portfolio.example:3100",
-            "sec-fetch-site": "same-origin",
-          },
-        }),
-      )
-    ).status,
-    202,
-  );
-  const expectedWebVitalReport = {
-    name: "browser.web.vital",
-    kind: "web.vital",
-    severity: "info",
-    correlationId: "browser-vital-123",
-    attributes: {
-      metric_name: "LCP",
-      value: 1_234.5,
-      delta: 10.25,
-      rating: "good",
-      navigation_type: "navigate",
-    },
-    allowedAttributeNames: [
-      "delta",
-      "metric_name",
-      "navigation_type",
-      "rating",
-      "value",
-    ],
+  const validErrorEnvelope = await browserErrorEnvelope();
+  const validWebVitalEnvelope = await webVitalEnvelope();
+  const assertEmptyResponse = async (request, status) => {
+    const response = await loaded.module.POST(request);
+    assert.equal(response.status, status);
+    assert.equal(await response.text(), "");
   };
-  assert.deepEqual(loaded.reports, [
+
+  await assertEmptyResponse(observabilityRequest(validErrorEnvelope), 202);
+  await assertEmptyResponse(observabilityRequest(validWebVitalEnvelope), 202);
+  await assertEmptyResponse(
+    observabilityRequest(validWebVitalEnvelope, {
+      url: "http://127.0.0.1:3100/api/observability",
+      headers: {
+        host: "portfolio.example:3100",
+        origin: "http://portfolio.example:3100",
+        "sec-fetch-site": "same-origin",
+      },
+    }),
+    202,
+  );
+
+  assert.equal(loaded.reports.length, 1);
+  assert.deepEqual(loaded.reports[0], validErrorEnvelope.report);
+  assert.deepEqual(loaded.events, [
     {
-      name: "browser.window.error",
-      kind: "application.error",
-      severity: "error",
-      correlationId: "browser-event-123",
-      errorCategory: "unexpected",
-      attributes: { source: "window-error" },
-      allowedAttributeNames: ["source"],
+      name: "browser.web.vital",
+      kind: "web.vital",
+      severity: "info",
+      eventId: "browser-vital-123",
+      attributes: validWebVitalEnvelope.event.attributes,
+      allowedAttributeNames: [
+        "delta",
+        "metric_name",
+        "navigation_type",
+        "rating",
+        "value",
+      ],
     },
-    expectedWebVitalReport,
-    expectedWebVitalReport,
+    {
+      name: "browser.web.vital",
+      kind: "web.vital",
+      severity: "info",
+      eventId: "browser-vital-123",
+      attributes: validWebVitalEnvelope.event.attributes,
+      allowedAttributeNames: [
+        "delta",
+        "metric_name",
+        "navigation_type",
+        "rating",
+        "value",
+      ],
+    },
   ]);
 
-  const invalidRequests = [
-    [
-      observabilityRequest(browserErrorEnvelope(), {
-        headers: { origin: "https://cross-origin.example" },
-      }),
-      403,
-    ],
-    [
-      observabilityRequest(browserErrorEnvelope(), {
-        headers: { origin: "not-an-origin" },
-      }),
-      403,
-    ],
-    [
-      observabilityRequest(browserErrorEnvelope(), {
-        url: "ftp://portfolio.example/api/observability",
-        headers: { origin: "ftp://portfolio.example" },
-      }),
-      403,
-    ],
-    [
-      observabilityRequest(browserErrorEnvelope(), {
-        url: "http://127.0.0.1:3100/api/observability",
-        headers: {
-          host: "portfolio.example:3100",
-          origin: "http://portfolio.example:3100",
-        },
-      }),
-      403,
-    ],
-    [
-      observabilityRequest(browserErrorEnvelope(), {
-        url: "http://127.0.0.1:3100/api/observability",
-        headers: {
-          host: "different.example:3100",
-          origin: "http://portfolio.example:3100",
-          "sec-fetch-site": "same-origin",
-        },
-      }),
-      403,
-    ],
-    [
-      observabilityRequest(browserErrorEnvelope(), {
-        url: "https://127.0.0.1:3100/api/observability",
-        headers: {
-          host: "portfolio.example:3100",
-          origin: "http://portfolio.example:3100",
-          "sec-fetch-site": "same-origin",
-        },
-      }),
-      403,
-    ],
-    [
-      observabilityRequest(browserErrorEnvelope(), {
-        headers: { "content-type": "text/plain" },
-      }),
-      415,
-    ],
-    [observabilityRequest("{"), 400],
-    [
-      observabilityRequest({
-        ...browserErrorEnvelope(),
-        unexpected: true,
-      }),
-      400,
-    ],
-    [
-      observabilityRequest({
-        ...browserErrorEnvelope(),
-        event: {
-          ...browserErrorEnvelope().event,
-          message: "private error message",
-        },
-      }),
-      400,
-    ],
-    [
-      observabilityRequest({
-        ...browserErrorEnvelope(),
-        event: {
-          ...browserErrorEnvelope().event,
-          kind: "visitor.analytics",
-        },
-      }),
-      400,
-    ],
-    [
-      observabilityRequest({
-        ...browserErrorEnvelope(),
-        event: {
-          ...browserErrorEnvelope().event,
-          context: { correlationId: "bearer-secret-token" },
-        },
-      }),
-      400,
-    ],
-    [
-      observabilityRequest("x".repeat(8_193)),
-      413,
-    ],
-    [
-      observabilityRequest(browserErrorEnvelope(), {
-        headers: { "content-length": "8193" },
-      }),
-      413,
-    ],
+  const mutate = (operation) => {
+    const value = structuredClone(validErrorEnvelope);
+    operation(value);
+    return value;
+  };
+  const invalidBodies = [
+    "{",
+    { ...validErrorEnvelope, extra: true },
+    { schemaVersion: "2.0.0", type: "error-report" },
+    mutate(({ report }) => {
+      report.event.extra = true;
+    }),
+    mutate(({ report }) => {
+      report.capture.mechanism = "unknown-capture";
+    }),
+    mutate(({ report }) => {
+      report.capture.operation = { nested: "private" };
+    }),
+    mutate(({ report }) => {
+      report.diagnostics.exceptionMessage = "x".repeat(2_049);
+    }),
+    mutate(({ report }) => {
+      report.diagnostics.exceptionMessage =
+        "Authorization: Bearer credential-secret";
+    }),
+    {
+      ...structuredClone(validWebVitalEnvelope),
+      event: {
+        ...structuredClone(validWebVitalEnvelope.event),
+        context: { eventId: "credential-marker", service: "web" },
+      },
+    },
   ];
-  for (const [request, status] of invalidRequests) {
-    assert.equal((await loaded.module.POST(request)).status, status);
+  for (const body of invalidBodies) {
+    await assertEmptyResponse(observabilityRequest(body), 400);
   }
-  assert.equal(loaded.reports.length, 3);
+
+  await assertEmptyResponse(
+    observabilityRequest(validErrorEnvelope, {
+      headers: { origin: "https://cross-origin.example" },
+    }),
+    403,
+  );
+  await assertEmptyResponse(
+    observabilityRequest(validErrorEnvelope, {
+      url: "http://127.0.0.1:3100/api/observability",
+      headers: {
+        host: "portfolio.example:3100",
+        origin: "http://portfolio.example:3100",
+      },
+    }),
+    403,
+  );
+  await assertEmptyResponse(
+    observabilityRequest(validErrorEnvelope, {
+      headers: { "content-type": "text/plain" },
+    }),
+    415,
+  );
+  await assertEmptyResponse(
+    observabilityRequest(validErrorEnvelope, {
+      headers: { "content-length": "8193" },
+    }),
+    413,
+  );
+
+  const largeError = new Error("m".repeat(3_000));
+  largeError.stack = `Error: ${"s".repeat(20_000)}\n    at render (src/app.tsx:1:1)`;
+  const exactEnvelope = await browserErrorEnvelope(largeError);
+  const exactBody = JSON.stringify(exactEnvelope);
+  assert.equal(new TextEncoder().encode(exactBody).byteLength, 8_192);
+  await assertEmptyResponse(observabilityRequest(exactBody), 202);
+  await assertEmptyResponse(observabilityRequest(`${exactBody} `), 413);
 
   let pullCount = 0;
   let cancelled = false;
@@ -1459,9 +1748,7 @@ test("the browser route accepts only bounded same-origin operational envelopes",
     {
       pull(controller) {
         pullCount += 1;
-        controller.enqueue(
-          new Uint8Array(pullCount === 1 ? 8_192 : 1),
-        );
+        controller.enqueue(new Uint8Array(pullCount === 1 ? 8_192 : 1));
       },
       cancel() {
         cancelled = true;
@@ -1469,38 +1756,320 @@ test("the browser route accepts only bounded same-origin operational envelopes",
     },
     { highWaterMark: 0 },
   );
-  assert.equal(
-    (
-      await loaded.module.POST({
-        body: oversizedStream,
-        headers: new Headers({
-          origin: "https://portfolio.example",
-          "content-type": "application/json",
-        }),
-        url: "https://portfolio.example/api/observability",
-      })
-    ).status,
+  await assertEmptyResponse(
+    {
+      body: oversizedStream,
+      headers: new Headers({
+        origin: "https://portfolio.example",
+        "content-type": "application/json",
+      }),
+      url: "https://portfolio.example/api/observability",
+    },
     413,
   );
   assert.equal(pullCount, 2);
   assert.equal(cancelled, true);
-
-  const failedTransport = await loadGeneratedObservabilityRoute(
-    rendered.files,
-    true,
-  );
-  assert.equal(
-    (
-      await failedTransport.module.POST(
-        observabilityRequest(browserErrorEnvelope()),
-      )
-    ).status,
-    202,
-  );
-  assert.equal(failedTransport.reports.length, 1);
 });
 
-test("server reporting contains runtime and provider failures without raw error data", async () => {
+test("browser route rejects malformed UTF-8 without dispatching observability", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedObservabilityRoute(rendered.files);
+  const validErrorEnvelope = await browserErrorEnvelope();
+  const encodedEnvelope = new TextEncoder().encode(
+    JSON.stringify(validErrorEnvelope),
+  );
+  const malformedByteOffset = decoder.decode(encodedEnvelope).indexOf(
+    "synthetic browser failure",
+  );
+  assert.notEqual(malformedByteOffset, -1);
+  encodedEnvelope[malformedByteOffset] = 0xff;
+  const chunks = [
+    encodedEnvelope.subarray(0, malformedByteOffset + 1),
+    encodedEnvelope.subarray(malformedByteOffset + 1),
+  ];
+
+  let cancelled = false;
+  let nextChunk = 0;
+  const malformedStream = new ReadableStream(
+    {
+      pull(controller) {
+        const chunk = chunks[nextChunk];
+        nextChunk += 1;
+        if (chunk === undefined) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+      cancel() {
+        cancelled = true;
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  const response = await loaded.module.POST({
+    body: malformedStream,
+    headers: new Headers({
+      origin: "https://portfolio.example",
+      "content-type": "application/json",
+    }),
+    url: "https://portfolio.example/api/observability",
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(await response.text(), "");
+  assert.equal(cancelled, true);
+  assert.deepEqual(loaded.events, []);
+  assert.deepEqual(loaded.reports, []);
+});
+
+test("error recovery copy and presentation are exact, validated, and pure", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const copyModule = await loadErrorCopyModule(rendered.files);
+  const fallbackModule = await loadErrorFallbackModule();
+  const copy = Object.freeze({
+    heading: "Something went wrong",
+    summary: "We could not complete this page. Please try again.",
+    retryLabel: "Try again",
+  });
+
+  assert.deepEqual(copyModule.readErrorFallbackCopy(), copy);
+  for (const invalid of [
+    null,
+    { ...copy, extra: "not allowed" },
+    { ...copy, heading: "" },
+    { ...copy, summary: { nested: "not copy" } },
+    { ...copy, retryLabel: "Try\u0000again" },
+  ]) {
+    assert.throws(() => copyModule.parseErrorFallbackCopy(invalid), {
+      name: "TypeError",
+      message: "CONTENT_INVALID",
+    });
+  }
+
+  let retried = false;
+  const renderedFallback = fallbackModule.ErrorFallback({
+    copy,
+    onRetry: () => {
+      retried = true;
+    },
+  });
+  assert.equal(renderedFallback.type, "main");
+  assert.equal(
+    renderedFallback.props["aria-labelledby"],
+    "error-fallback-heading",
+  );
+  const section = renderedFallback.props.children;
+  assert.equal(section.type, "section");
+  const [heading, summary, retry] = section.props.children;
+  assert.equal(heading.type, "h1");
+  assert.equal(heading.props.id, "error-fallback-heading");
+  assert.equal(heading.props.children, copy.heading);
+  assert.equal(summary.type, "p");
+  assert.equal(summary.props.children, copy.summary);
+  assert.equal(retry.type, "button");
+  assert.equal(retry.props.type, "button");
+  assert.equal(retry.props.children, copy.retryLabel);
+  retry.props.onClick();
+  assert.equal(retried, true);
+});
+
+test("page and global boundaries report once and render the required roots", async () => {
+  const pageBoundary = await loadErrorBoundaryModule("app/error.tsx");
+  const globalBoundary = await loadErrorBoundaryModule("app/global-error.tsx");
+  const pageError = new Error("page boundary failure");
+  const globalError = new Error("global boundary failure");
+  const reset = () => undefined;
+
+  const pageResult = pageBoundary.module.default({ error: pageError, reset });
+  assert.deepEqual(pageBoundary.reports, [
+    { error: pageError, context: { boundary: "page" } },
+  ]);
+  const pageFallback = pageResult.type(pageResult.props);
+  assert.equal(pageFallback.type, "error-fallback");
+  assert.equal(pageFallback.props.onRetry, reset);
+
+  const globalResult = globalBoundary.module.default({
+    error: globalError,
+    reset,
+  });
+  assert.deepEqual(globalBoundary.reports, [
+    { error: globalError, context: { boundary: "global" } },
+  ]);
+  assert.equal(globalResult.type, "html");
+  assert.equal(globalResult.props.lang, "en-CA");
+  assert.equal(globalResult.props.children.type, "body");
+  const globalFallbackElement = globalResult.props.children.props.children;
+  const globalFallback = globalFallbackElement.type(globalFallbackElement.props);
+  assert.equal(globalFallback.type, "error-fallback");
+});
+
+
+test("Next request instrumentation awaits reporting with only approved framework inputs", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedInstrumentation(rendered.files);
+  const error = Object.assign(new Error("synthetic request failure"), {
+    digest: "next-digest-1",
+  });
+  const request = {
+    path: "/private/customer?token=credential-secret",
+    method: "GET",
+    headers: {
+      authorization: "Bearer credential-secret",
+      cookie: "session=private",
+    },
+  };
+  const context = {
+    routerKind: "App Router",
+    routePath: "/app/(store)/products/[productId]",
+    routeType: "render",
+    renderSource: "react-server-components",
+    renderType: "dynamic-resume",
+    revalidateReason: "on-demand",
+  };
+
+  const reporting = loaded.module.onRequestError(error, request, context);
+  assert.equal(reporting instanceof Promise, true);
+  await reporting;
+
+  assert.deepEqual(loaded.calls, [
+    {
+      error,
+      context: {
+        requestMethod: "GET",
+        routerKind: "App Router",
+        routePath: "/app/(store)/products/[productId]",
+        routeType: "render",
+        renderSource: "react-server-components",
+        renderType: "dynamic-resume",
+        revalidateReason: "on-demand",
+      },
+    },
+  ]);
+  assert.doesNotMatch(
+    JSON.stringify(loaded.calls),
+    /private\/customer|credential-secret|authorization|cookie|session=/u,
+  );
+});
+
+test("server reporting accepts the current Next route type vocabulary", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedServerReporter(rendered.files, {
+    ingestingHost: "",
+    sourceToken: "",
+  });
+  const structuredRecords = [];
+  const routeTypes = ["action", "proxy", "render", "route"];
+  const originalConsoleInfo = console.info;
+  console.info = (record) => structuredRecords.push(record);
+
+  try {
+    for (const routeType of routeTypes) {
+      await loaded.module.reportServerError(new Error("synthetic failure"), {
+        routeType,
+      });
+    }
+    await Promise.all(loaded.scheduled);
+  } finally {
+    console.info = originalConsoleInfo;
+  }
+
+  assert.deepEqual(
+    structuredRecords.map(({ attributes }) => attributes.route_type),
+    routeTypes,
+  );
+});
+
+test("server reporting contains unexpected diagnostic dispatch rejections", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedServerReporter(rendered.files, {
+    rejectErrorDispatch: true,
+  });
+
+  await assert.doesNotReject(() =>
+    loaded.module.reportServerError(new Error("synthetic failure")),
+  );
+  assert.equal(loaded.scheduled.length, 1);
+  await assert.doesNotReject(() => loaded.scheduled[0]);
+});
+
+test("browser event delivery preserves the validated event identifier", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedServerReporter(rendered.files, {
+    ingestingHost: "",
+    sourceToken: "",
+  });
+  const structuredRecords = [];
+  const originalConsoleInfo = console.info;
+  console.info = (record) => structuredRecords.push(record);
+
+  try {
+    await loaded.module.reportBrowserEvent({
+      name: "browser.web.vital",
+      kind: "web.vital",
+      severity: "info",
+      eventId: "browser-vital-123",
+      attributes: { metric_name: "LCP" },
+      allowedAttributeNames: ["metric_name"],
+    });
+    await loaded.scheduled[0];
+  } finally {
+    console.info = originalConsoleInfo;
+  }
+
+  assert.equal(structuredRecords.length, 1);
+  assert.equal(structuredRecords[0].event_id, "browser-vital-123");
+});
+
+test("server reporting normalizes only valid proxy and Pages route contexts", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(
     await renderSkeleton({
@@ -1511,117 +2080,53 @@ test("server reporting contains runtime and provider failures without raw error 
     }),
   );
   const loaded = await loadGeneratedServerReporter(rendered.files);
-
-  await assert.doesNotReject(() =>
-    loaded.module.reportServerError(
-      new Error("private message with bearer-secret-token"),
-    ),
-  );
-  assert.equal(loaded.events.length, 1);
-  assert.deepEqual(loaded.events[0], {
-    name: "server.request.error",
-    kind: "application.error",
-    runtime: "server",
-    severity: "error",
-    context: {
-      correlationId: loaded.events[0].context.correlationId,
-      releaseId: "release-123",
-    },
-    errorCategory: "unexpected",
-    attributes: {},
-  });
-  assert.match(
-    loaded.events[0].context.correlationId,
-    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
-  );
-  assert.doesNotMatch(
-    JSON.stringify(loaded.events),
-    /private message|bearer-secret-token/u,
-  );
-
-  assert.equal(loaded.structuredConfigurations.length, 1);
-  assert.equal(loaded.betterStackConfigurations.length, 1);
-  assert.deepEqual(
-    {
-      identifier: loaded.structuredConfigurations[0].identifier,
-      write: typeof loaded.structuredConfigurations[0].write,
-    },
-    { identifier: "cloudflare-workers-logs", write: "function" },
-  );
-  assert.deepEqual(
-    {
-      ingestingHost: loaded.betterStackConfigurations[0].ingestingHost,
-      sourceToken: loaded.betterStackConfigurations[0].sourceToken,
-      timeoutMilliseconds:
-        loaded.betterStackConfigurations[0].timeoutMilliseconds,
-      request: typeof loaded.betterStackConfigurations[0].request,
-    },
-    {
-      ingestingHost: "s123.eu-nbg-2.betterstackdata.com",
-      sourceToken: "source-token-123456",
-      timeoutMilliseconds: 5_000,
-      request: "function",
-    },
-  );
-  assert.equal(loaded.dispatches.length, 1);
-  assert.deepEqual(
-    loaded.dispatches[0].sinks.map(({ kind }) => kind),
-    ["structured", "better-stack"],
-  );
-  assert.equal(loaded.scheduled.length, 1);
-  await assert.doesNotReject(() => loaded.scheduled[0]);
-
-  const structuredRecords = [];
+  const providerRecords = [];
   const originalConsoleInfo = console.info;
-  console.info = (record) => structuredRecords.push(record);
-  try {
-    loaded.structuredConfigurations[0].write({ bounded: true });
-  } finally {
-    console.info = originalConsoleInfo;
-  }
-  assert.deepEqual(structuredRecords, [{ bounded: true }]);
-
-  const providerRequests = [];
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (url, init) => {
-    providerRequests.push({ url, init });
+  console.info = () => undefined;
+  globalThis.fetch = async (_url, init) => {
+    providerRecords.push(JSON.parse(init.body));
     return { status: 202 };
   };
+
   try {
-    assert.deepEqual(
-      await loaded.betterStackConfigurations[0].request({
-        url: "https://s123.eu-nbg-2.betterstackdata.com",
-        method: "POST",
-        headers: { Authorization: "Bearer source-token-123456" },
-        body: '{"bounded":true}',
-        timeoutMilliseconds: 5_000,
-      }),
-      { status: 202 },
-    );
+    await loaded.module.reportServerError(new Error("proxy failure"), {
+      routerKind: "Pages Router",
+      routePath: "/proxy",
+      routeType: "proxy",
+    });
+    await loaded.module.reportServerError(new Error("page failure"), {
+      routerKind: "Pages Router",
+      routePath: "/orders/[...orderParts]",
+      routeType: "render",
+    });
+    await loaded.module.reportServerError(new Error("root page failure"), {
+      routerKind: "Pages Router",
+      routePath: "/",
+      routeType: "render",
+    });
+    await loaded.module.reportServerError(new Error("invalid proxy router"), {
+      routerKind: "App Router",
+      routePath: "/proxy",
+      routeType: "proxy",
+    });
+    await loaded.module.reportServerError(new Error("missing proxy router"), {
+      routePath: "/proxy",
+      routeType: "proxy",
+    });
+    await Promise.all(loaded.scheduled);
   } finally {
+    console.info = originalConsoleInfo;
     globalThis.fetch = originalFetch;
   }
-  assert.equal(providerRequests.length, 1);
-  assert.equal(
-    providerRequests[0].url,
-    "https://s123.eu-nbg-2.betterstackdata.com",
-  );
+
   assert.deepEqual(
-    {
-      method: providerRequests[0].init.method,
-      headers: providerRequests[0].init.headers,
-      body: providerRequests[0].init.body,
-    },
-    {
-      method: "POST",
-      headers: { Authorization: "Bearer source-token-123456" },
-      body: '{"bounded":true}',
-    },
+    providerRecords.map(({ capture }) => capture.routeIdentifier),
+    ["proxy", "orders/[catch-all]", "root", undefined, undefined],
   );
-  assert.equal(providerRequests[0].init.signal instanceof AbortSignal, true);
 });
 
-test("server reporting omits invalid provider credentials and contains failures", async () => {
+test("server request and selected-catch reports separate safe and restricted delivery", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(
     await renderSkeleton({
@@ -1631,27 +2136,406 @@ test("server reporting omits invalid provider credentials and contains failures"
       packageVersions,
     }),
   );
+  const loaded = await loadGeneratedServerReporter(rendered.files);
+  const structuredRecords = [];
+  const providerRequests = [];
+  const originalConsoleInfo = console.info;
+  const originalFetch = globalThis.fetch;
+  console.info = (record) => structuredRecords.push(record);
+  globalThis.fetch = async (url, init) => {
+    providerRequests.push({ url, init });
+    return { status: 202 };
+  };
+  const error = Object.assign(new TypeError("synthetic request failure"), {
+    digest: "next-digest-1",
+    stack:
+      "TypeError: synthetic request failure\n" +
+      "    at render (/app/products/page.tsx:10:2)",
+  });
+
+  try {
+    await assert.doesNotReject(() =>
+      loaded.module.reportServerError(error, {
+        correlationId: "request-123",
+        requestMethod: "GET",
+        routerKind: "App Router",
+        routePath: "/app/(store)/products/[productId]",
+        routeType: "render",
+        renderSource: "react-server-components",
+        renderType: "dynamic-resume",
+        revalidateReason: "on-demand",
+      }),
+    );
+    assert.equal(loaded.scheduled.length, 1);
+    await assert.doesNotReject(() => loaded.scheduled[0]);
+
+    await assert.doesNotReject(() =>
+      loaded.module.reportCaughtServerError(
+        new Error("synthetic selected failure"),
+        { operation: "refresh-catalog", correlationId: "operation-456" },
+      ),
+    );
+    assert.equal(loaded.scheduled.length, 2);
+    await assert.doesNotReject(() => loaded.scheduled[1]);
+  } finally {
+    console.info = originalConsoleInfo;
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(structuredRecords.length, 2);
+  assert.deepEqual(structuredRecords[0], {
+    schema_version: "2.0.0",
+    dt: structuredRecords[0].dt,
+    event_name: "server.request.error",
+    event_kind: "application.error",
+    runtime: "server",
+    severity: "error",
+    event_id: structuredRecords[0].event_id,
+    correlation_id: "request-123",
+    release_id: "release-123",
+    service: "web",
+    error_category: "unexpected",
+    attributes: {
+      capture_mechanism: "next-request-error",
+      handled: false,
+      http_method: "GET",
+      render_source: "react-server-components",
+      render_type: "dynamic-resume",
+      revalidate_reason: "on-demand",
+      route_identifier: "group.products.dynamic",
+      route_type: "render",
+      router_kind: "app-router",
+    },
+  });
+  assert.match(
+    structuredRecords[0].event_id,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+  );
+  assert.equal("environment" in structuredRecords[0], false);
+  assert.equal(providerRequests.length, 2);
+  const providerRecords = providerRequests.map(({ init }) =>
+    JSON.parse(init.body),
+  );
+  assert.deepEqual(providerRecords[0].capture, {
+    mechanism: "next-request-error",
+    handled: false,
+    routerKind: "app-router",
+    routeType: "render",
+    renderSource: "react-server-components",
+    renderType: "dynamic-resume",
+    revalidateReason: "on-demand",
+    requestMethod: "GET",
+    routeIdentifier: "group/products/[dynamic]",
+  });
+  assert.equal(providerRecords[0]["exception.type"], "TypeError");
+  assert.equal(
+    providerRecords[0]["exception.message"],
+    "synthetic request failure",
+  );
+  assert.match(
+    providerRecords[0]["exception.stacktrace"],
+    /TypeError: synthetic request failure[\s\S]+\[REDACTED_PATH\]\/page\.tsx:10:2/u,
+  );
+  assert.equal(providerRecords[0]["exception.digest"], "next-digest-1");
+  assert.match(
+    providerRecords[0]["exception.fingerprint"],
+    /^fnv1a32-v1:[a-f0-9]{8}$/u,
+  );
+  assert.equal(providerRecords[0]["exception.truncated"], true);
+  assert.deepEqual(providerRecords[1].capture, {
+    mechanism: "selected-catch",
+    handled: true,
+    operation: "refresh-catalog",
+  });
+  assert.equal(providerRecords[1].correlation_id, "operation-456");
+  assert.equal(
+    providerRequests.every(({ init }) => init.signal instanceof AbortSignal),
+    true,
+  );
+  for (const [index, structuredRecord] of structuredRecords.entries()) {
+    for (const [key, value] of Object.entries(structuredRecord)) {
+      assert.deepEqual(providerRecords[index][key], value);
+    }
+  }
+  assert.doesNotMatch(
+    JSON.stringify(structuredRecords),
+    /exception\.|fingerprint|synthetic request failure/u,
+  );
+});
+
+test("generated server delivery uses the actual observability package record shapes", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedServerReporter(rendered.files);
+  const structuredRecords = [];
+  const providerRequests = [];
+  const originalConsoleInfo = console.info;
+  const originalFetch = globalThis.fetch;
+  console.info = (record) => structuredRecords.push(record);
+  globalThis.fetch = async (url, init) => {
+    providerRequests.push({ url, init });
+    return { status: 202 };
+  };
+
+  try {
+    await loaded.module.reportServerError(
+      new TypeError("synthetic package record"),
+      {
+        requestMethod: "GET",
+        routerKind: "App Router",
+        routePath: "/app/(store)/products/[productId]",
+        routeType: "route",
+      },
+    );
+    await loaded.scheduled[0];
+  } finally {
+    console.info = originalConsoleInfo;
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(structuredRecords.length, 1);
+  assert.equal(structuredRecords[0].schema_version, "2.0.0");
+  assert.equal(structuredRecords[0].event_name, "server.request.error");
+  assert.equal(structuredRecords[0].event_kind, "application.error");
+  assert.equal("schemaVersion" in structuredRecords[0], false);
+  assert.deepEqual(structuredRecords[0].attributes, {
+    capture_mechanism: "next-request-error",
+    handled: false,
+    http_method: "GET",
+    route_identifier: "group.products.dynamic",
+    route_type: "route",
+    router_kind: "app-router",
+  });
+  assert.equal(providerRequests.length, 1);
+  const diagnosticRecord = JSON.parse(providerRequests[0].init.body);
+  assert.equal(diagnosticRecord.event_id, structuredRecords[0].event_id);
+  assert.equal(diagnosticRecord["exception.type"], "TypeError");
+  assert.equal(
+    diagnosticRecord["exception.message"],
+    "synthetic package record",
+  );
+  assert.match(
+    diagnosticRecord["exception.fingerprint"],
+    /^fnv1a32-v1:[a-f0-9]{8}$/u,
+  );
+  assert.equal(
+    diagnosticRecord.capture.routeIdentifier,
+    "group/products/[dynamic]",
+  );
+  assert.equal("diagnostics" in diagnosticRecord, false);
+});
+
+test("generated server contains oversized diagnostics without HTTP or recursive reporting", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedServerReporter(rendered.files);
+  const structuredRecords = [];
+  let providerRequests = 0;
+  const originalConsoleInfo = console.info;
+  const originalFetch = globalThis.fetch;
+  console.info = (record) => structuredRecords.push(record);
+  globalThis.fetch = async () => {
+    providerRequests += 1;
+    return { status: 202 };
+  };
+  const oversizedError = {
+    name: "TypeError",
+    message: "\u0000".repeat(2_048),
+    stack: "\u0000".repeat(16_384),
+    cause: {
+      name: "CauseOne",
+      stack: "\u0000".repeat(16_384),
+      cause: { name: "CauseTwo", stack: "\u0000".repeat(16_384) },
+    },
+  };
+
+  try {
+    await loaded.module.reportServerError(oversizedError);
+    await loaded.scheduled[0];
+  } finally {
+    console.info = originalConsoleInfo;
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(providerRequests, 0);
+  assert.deepEqual(
+    structuredRecords.map(({ event_name }) => event_name),
+    ["server.request.error", "observability.delivery.failed"],
+  );
+  assert.deepEqual(structuredRecords[1].attributes, {
+    reason: "payload-too-large",
+    sink: "better-stack",
+  });
+});
+
+test("server reporting contains hostile inputs and diagnostic delivery failures", async (testContext) => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const structuredRecords = [];
+  const originalConsoleInfo = console.info;
+  const originalFetch = globalThis.fetch;
+  console.info = (record) => structuredRecords.push(record);
+  testContext.after(() => {
+    console.info = originalConsoleInfo;
+  });
+
   const withoutProvider = await loadGeneratedServerReporter(rendered.files, {
     ingestingHost: "",
     sourceToken: "",
   });
-  await assert.doesNotReject(() =>
-    withoutProvider.module.reportServerError(new Error("private failure")),
-  );
-  assert.deepEqual(
-    withoutProvider.dispatches[0].sinks.map(({ kind }) => kind),
-    ["structured"],
-  );
+  let withoutProviderRequests = 0;
+  try {
+    globalThis.fetch = async () => {
+      withoutProviderRequests += 1;
+      throw new Error("provider response contained credential-secret");
+    };
+    await assert.doesNotReject(() =>
+      withoutProvider.module.reportServerError(
+        new Error("private failure"),
+        {
+          requestMethod: "TRACE",
+          routerKind: "Private Router",
+          routePath: "/app/private/customer@example.com?token=secret",
+          routeType: "middleware",
+          renderSource: "private-source",
+          renderType: "static",
+          revalidateReason: "private-reason",
+        },
+      ),
+    );
+    await withoutProvider.scheduled[0];
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(withoutProviderRequests, 0);
+  assert.equal(structuredRecords.length, 1);
+  assert.equal(structuredRecords[0].event_name, "server.request.error");
+  assert.deepEqual(structuredRecords[0].attributes, {
+    capture_mechanism: "next-request-error",
+    handled: false,
+  });
 
   const failing = await loadGeneratedServerReporter(rendered.files, {
-    dispatchShouldReject: true,
+    scheduleShouldThrow: false,
+  });
+  const hostileError = Object.create(null, {
+    name: { get: () => "Error" },
+    message: {
+      get: () => "synthetic " + "x".repeat(4_000),
+    },
+    stack: {
+      get: () => "Error: synthetic\n" + "at frame (/private/path:1:2)\n".repeat(8_000),
+    },
+    digest: {
+      get() {
+        throw new Error("hostile getter credential-secret");
+      },
+    },
+    privateField: { value: "credential-secret" },
+  });
+  const failingProviderRecords = [];
+  try {
+    globalThis.fetch = async (_url, init) => {
+      failingProviderRecords.push(JSON.parse(init.body));
+      return {
+        status: 503,
+        body: "provider response credential-secret",
+      };
+    };
+    await assert.doesNotReject(() =>
+      failing.module.reportServerError(hostileError, {
+        requestMethod: "POST",
+        routerKind: "Pages Router",
+        routePath: "/orders/[...orderParts]",
+        routeType: "route",
+        renderSource: "server-rendering",
+        renderType: "dynamic",
+        revalidateReason: "stale",
+      }),
+    );
+    assert.equal(failing.scheduled.length, 1);
+    await assert.doesNotReject(() => failing.scheduled[0]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(failingProviderRecords.length, 1);
+  assert.equal(
+    new TextEncoder().encode(
+      JSON.stringify(failingProviderRecords[0]),
+    ).byteLength < 96_000,
+    true,
+  );
+  assert.deepEqual(failingProviderRecords[0].capture, {
+    mechanism: "next-request-error",
+    handled: false,
+    routerKind: "pages-router",
+    routeType: "route",
+    renderSource: "server-rendering",
+    renderType: "dynamic",
+    revalidateReason: "stale",
+    requestMethod: "POST",
+    routeIdentifier: "orders/[catch-all]",
+  });
+  assert.equal(structuredRecords.length, 3);
+  assert.equal(
+    structuredRecords[2].event_name,
+    "observability.delivery.failed",
+  );
+  assert.deepEqual(structuredRecords[2].attributes, {
+    reason: "provider-rejected",
+    sink: "better-stack",
+  });
+  assert.doesNotMatch(
+    JSON.stringify([...structuredRecords, ...failingProviderRecords]),
+    /credential-secret|provider response|private\/path|privateField/u,
+  );
+
+  const scheduleFailureRecords = [];
+  console.info = (record) => scheduleFailureRecords.push(record);
+  const scheduleFailure = await loadGeneratedServerReporter(rendered.files, {
     scheduleShouldThrow: true,
   });
-  await assert.doesNotReject(() =>
-    failing.module.reportServerError(new Error("private failure")),
+  try {
+    globalThis.fetch = async () => ({ status: 503 });
+    await assert.doesNotReject(() =>
+      scheduleFailure.module.reportServerError(new Error("synthetic failure"), {
+        requestMethod: "GET",
+      }),
+    );
+    await assert.doesNotReject(() => scheduleFailure.scheduled[0]);
+  } finally {
+    console.info = originalConsoleInfo;
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(
+    scheduleFailureRecords.filter(
+      ({ event_name: eventName }) =>
+        eventName === "observability.delivery.failed",
+    ).length,
+    1,
   );
-  assert.equal(failing.scheduled.length, 1);
-  await assert.doesNotReject(() => failing.scheduled[0]);
 });
 
 test("rendering conditionally overlays the home route and materializes each Calendly mode", async () => {
@@ -1673,7 +2557,7 @@ test("rendering conditionally overlays the home route and materializes each Cale
     );
 
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, "0.7.0");
+    assert.equal(rendered.project.recipeVersion, "0.8.0");
     assert.equal(
       rendered.project.selectedCapabilities.at(-1),
       "booking-calendly",
@@ -3626,8 +4510,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 92],
-    ["site", 94],
+    ["portfolio", 97],
+    ["site", 99],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -3769,7 +4653,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       packageVersions,
     }),
   );
-  assert.equal(selected.surfaces.length, 97);
+  assert.equal(selected.surfaces.length, 102);
   assert.deepEqual(
     selected.surfaces
       .filter(

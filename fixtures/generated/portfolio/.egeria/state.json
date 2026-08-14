@@ -53,7 +53,7 @@
         "repository-stateful",
         "external-stateful"
       ],
-      "version": "0.2.0"
+      "version": "0.3.0"
     }
   ],
   "lastSuccessfulVerification": {
@@ -74,7 +74,7 @@
   },
   "managedSurfaces": [
     {
-      "fingerprint": "sha256:932b3d7a9fafd7dd3b086cbcb2ebf575a15034be90b599939b1d2fcfbd6b3c8c",
+      "fingerprint": "sha256:020061380ecdf4eaafdff982bc2cc3be4a7867f752f874bfc1eb6dbc1c983952",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -139,7 +139,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:d9bcfc2bb2ed11b2a1183da46b3dfdaa884eb839ee1e4cf1aada3d04e82a7744",
+      "fingerprint": "sha256:8ed05ee38a82665d838a0e5a0c61d8bc67e3e455a0882c121c7584b05068c830",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -152,7 +152,7 @@
       "path": ".egeria/project.yaml"
     },
     {
-      "fingerprint": "sha256:bed579d13e7ae099248f3f4124f970fcc7b7a7eaeba5d5f6c68342eb48da4997",
+      "fingerprint": "sha256:6a440c7ccbe739ff1db72c953bf1e37266b1a50df961edce6c62419d8bab32ea",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -260,7 +260,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:990aba03fa502f65ab954b16ca29a2ead013302d958fecb5d8b789b5d99df983",
+      "fingerprint": "sha256:724e108ef190e8dce0dac43addd5cf5b88f61dc577cb59e5e4b5829f275798f9",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -511,7 +511,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:f5999bce657b9fedc8d418705619db9fedaf84eef95cca7c8bd3bd6f11786478",
+      "fingerprint": "sha256:990f97df2cb8a4798c7ce039e7f6fa0e743ebaf93368fe0f1f90a7c796903b2b",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -581,7 +581,7 @@
       "path": "apps/web/src/content/read-content.ts"
     },
     {
-      "fingerprint": "sha256:9b02544938fd567cd7cfa0ba670a34cdc26ed1d67dff12eafa3570c8230e5b8c",
+      "fingerprint": "sha256:8c8c4fd3412112fa50773ce02756ccf2f97b265c8b609c35b397bcbac8203085",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -710,7 +710,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:75e6c5d88e9d89c43e44cc3db79f38805771d1e7f723bd0c88410ab3518bec67",
+      "fingerprint": "sha256:a9373820327bdfa94cddf625e90e9d6372d921044c3aabfedd4f8ed59ec69d07",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -724,7 +724,7 @@
       "path": "apps/web/app/api/observability/route.ts"
     },
     {
-      "fingerprint": "sha256:3a43eded916707f38243f547e54c9d500a6029a4f436796ecc6adf43dba00269",
+      "fingerprint": "sha256:9722b012487e7cd514f42f8fee02e37ee2706a45db02bc7e33156963bdf40d0c",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -738,7 +738,7 @@
       "path": "apps/web/instrumentation-client.ts"
     },
     {
-      "fingerprint": "sha256:972e69ce65b09a5d18ea64a17f3448f96d31c4fcdc68d83619bcb3307edb499d",
+      "fingerprint": "sha256:0c6ea3a819be830d7551c5ab64e1ecad4d00248529d58ed7aaddcb85709ebbca",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -766,7 +766,63 @@
       "path": "apps/web/src/infrastructure/cloudflare/observability-context.ts"
     },
     {
-      "fingerprint": "sha256:08b8b986de3e69ac65cb590acf0b2b9bd12a97da05bc3c0551c2be86917fee91",
+      "fingerprint": "sha256:ef461e56e5bb86bc05b89515cc2789e4201e9eb48f8ac06b7035735219a52c2e",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "observability-error-copy",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "observability",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/infrastructure/observability/error-copy.ts"
+    },
+    {
+      "fingerprint": "sha256:a05df3a90a920a747842dbd766a68c0f52df8a90978a2419836df83313519550",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "observability-error-copy-source",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "observability",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/content/en-CA/observability.yaml"
+    },
+    {
+      "fingerprint": "sha256:f60bdac6ed3c66252ccb5a75d6961584f13a6ed6d35eed3363f8685579276492",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "observability-error-fallback",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "observability",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/presentation/error-fallback.tsx"
+    },
+    {
+      "fingerprint": "sha256:e4cb19f30f11d647a41ef45c9c5911706769ebc9842797802ab1e100c7b2bd9d",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "observability-global-error-boundary",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "observability",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/app/global-error.tsx"
+    },
+    {
+      "fingerprint": "sha256:a09e2d94133d00d7d72ce4dcb988afb0adf5e34fc0dd8068f9fd582899d63034",
       "fingerprintTarget": {
         "kind": "json-value",
         "pointer": "/dependencies/@egeria-systems~1observability"
@@ -779,6 +835,20 @@
       },
       "ownership": "merge-managed",
       "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:829b25e9a75d6a89bb4a875b14dcec62c8df0ba48641e4c9cba5b2e77ab8daa0",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "observability-page-error-boundary",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "observability",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/app/error.tsx"
     },
     {
       "fingerprint": "sha256:1ad97f88cab83d93e01953f32104d0583f26793cfe9b35d7a75ed400a05f7956",
@@ -795,7 +865,7 @@
       "path": "apps/web/src/infrastructure/observability/installed-capability.ts"
     },
     {
-      "fingerprint": "sha256:3db4ffd003ccf0003b23844fb3c8d94533e2655e4c1847465c620d4e8434b6fc",
+      "fingerprint": "sha256:9478268eeae340750033378816f0fdf86d931722740fb99b61ad30762fed0da0",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -809,7 +879,7 @@
       "path": "apps/web/instrumentation.ts"
     },
     {
-      "fingerprint": "sha256:8dfbff56d557bdb9314239fec04b5cac3032149aaf271602d3ee86b728c9c645",
+      "fingerprint": "sha256:f7c925ea38d6d12bd93c70ef940cdf4d7a1d00d1a113f6d70da948e16b64faf7",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -983,7 +1053,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:4740d9c9547af9f2f383ea1549780505546b52fbe011eabd10492ca5ae7157cc",
+      "fingerprint": "sha256:c617c71800f8a300bcca47d0b720a34989ae445d5fc2511a74af1c1b54b23790",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1423,7 +1493,7 @@
   ],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.7.0"
+    "recipeVersion": "0.8.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

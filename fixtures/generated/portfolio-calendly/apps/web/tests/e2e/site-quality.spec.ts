@@ -123,6 +123,104 @@ test("renders structured content without page or console errors", async ({
   }
 });
 
+test("sends a synthetic browser error through the same-origin route", async ({
+  page,
+}) => {
+  const errorReports: Record<string, unknown>[] = [];
+  await page.route("**/api/observability", async (route) => {
+    const request = route.request();
+    const body = request.postData();
+    if (request.method() === "POST" && body !== null) {
+      const value = JSON.parse(body) as unknown;
+      if (
+        typeof value === "object" &&
+        value !== null &&
+        !Array.isArray(value) &&
+        Reflect.get(value, "type") === "error-report"
+      ) {
+        errorReports.push(value as Record<string, unknown>);
+      }
+    }
+    await route.fulfill({ status: 202, body: "" });
+  });
+  await openWithoutRuntimeErrors(page, LANDING_PATH);
+
+  await page.evaluate(() => {
+    const error = new Error("synthetic browser failure");
+    error.stack =
+      "Error: synthetic browser failure\n    at render (src/app.tsx:12:4)";
+    window.dispatchEvent(
+      new ErrorEvent("error", { error, message: error.message }),
+    );
+  });
+
+  await expect.poll(() => errorReports.length).toBe(1);
+  const envelope = errorReports[0] as {
+    report: {
+      capture: Record<string, unknown>;
+      diagnostics: Record<string, unknown>;
+      event: {
+        attributes: Record<string, unknown>;
+        context: Record<string, unknown>;
+      } & Record<string, unknown>;
+    };
+  } & Record<string, unknown>;
+  expect(Object.keys(envelope).sort()).toEqual([
+    "report",
+    "schemaVersion",
+    "type",
+  ]);
+  expect(Object.keys(envelope.report).sort()).toEqual([
+    "capture",
+    "diagnostics",
+    "event",
+  ]);
+  expect(Object.keys(envelope.report.event).sort()).toEqual([
+    "attributes",
+    "context",
+    "errorCategory",
+    "kind",
+    "name",
+    "occurredAt",
+    "runtime",
+    "schemaVersion",
+    "severity",
+  ]);
+  expect(Object.keys(envelope.report.event.context).sort()).toEqual([
+    "eventId",
+    "service",
+  ]);
+  expect(Object.keys(envelope.report.event.attributes).sort()).toEqual([
+    "capture_mechanism",
+    "handled",
+  ]);
+  expect(Object.keys(envelope.report.capture).sort()).toEqual([
+    "handled",
+    "mechanism",
+  ]);
+  expect(Object.keys(envelope.report.diagnostics)).toEqual(
+    expect.arrayContaining(["exceptionType", "fingerprint", "truncated"]),
+  );
+  expect(
+    Object.keys(envelope.report.diagnostics).every((key) =>
+      [
+        "cause",
+        "exceptionCode",
+        "exceptionDigest",
+        "exceptionMessage",
+        "exceptionStacktrace",
+        "exceptionType",
+        "fingerprint",
+        "truncated",
+      ].includes(key),
+    ),
+  ).toBe(true);
+  const serialized = JSON.stringify(envelope);
+  expect(new TextEncoder().encode(serialized).byteLength).toBeLessThanOrEqual(
+    8_192,
+  );
+});
+
 test("follows internal navigation when it is present", async ({ page }) => {
   await openWithoutRuntimeErrors(page, LANDING_PATH);
   const landingTarget = documentTarget(page.url());

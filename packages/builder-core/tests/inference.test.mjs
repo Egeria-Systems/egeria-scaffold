@@ -597,7 +597,7 @@ test("observability inference requires source files and deployment-owned Wrangle
     ({ identifier }) => identifier === "observability",
   );
   assert.notEqual(descriptor, undefined);
-  assert.equal(descriptor.version, "0.2.0");
+  assert.equal(descriptor.version, "0.3.0");
 
   const files = Object.fromEntries(
     descriptor.inferenceProbes
@@ -605,7 +605,7 @@ test("observability inference requires source files and deployment-owned Wrangle
       .map(({ path }) => [path, "export {};\n"]),
   );
   files["apps/web/package.json"] = `${JSON.stringify({
-    dependencies: { "@egeria-systems/observability": "0.2.0" },
+    dependencies: { "@egeria-systems/observability": "0.3.0" },
   })}\n`;
   files["apps/web/wrangler.jsonc"] = `${JSON.stringify({
     observability: {

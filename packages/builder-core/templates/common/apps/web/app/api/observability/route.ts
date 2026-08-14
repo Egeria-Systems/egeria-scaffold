@@ -1,12 +1,17 @@
 import {
+  reconstructOperationalErrorReport,
+  type OperationalErrorReport,
+} from "@egeria-systems/observability";
+
+import {
+  isProhibitedObservabilityToken,
+  reportBrowserErrorReport,
   reportBrowserEvent,
   type BrowserOperationalInput,
 } from "../../../src/infrastructure/observability/server-reporter";
 
 const maximumPayloadBytes = 8_192;
-const correlationIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
-const prohibitedTokenPattern =
-  /(?:authorization|bearer|cookie|password|secret|token)/iu;
+const contextTokenPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const webVitalNames = ["CLS", "FCP", "FID", "INP", "LCP", "TTFB"] as const;
 const webVitalRatings = ["good", "needs-improvement", "poor"] as const;
 const navigationTypes = [
@@ -23,7 +28,7 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 }
 
 function hasExactKeys(
-  value: Readonly<Record<string, unknown>>,
+  value: object,
   keys: readonly string[],
 ): boolean {
   const actual = Object.keys(value).sort();
@@ -41,66 +46,73 @@ function includes<const Value extends string>(
   return typeof value === "string" && values.includes(value as Value);
 }
 
-function readCorrelationId(value: unknown): string | undefined {
+function readEventId(value: unknown): string | undefined {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, ["correlationId"]) ||
-    typeof value.correlationId !== "string" ||
-    !correlationIdPattern.test(value.correlationId) ||
-    prohibitedTokenPattern.test(value.correlationId)
+    !hasExactKeys(value, ["eventId", "service"]) ||
+    typeof value.eventId !== "string" ||
+    !contextTokenPattern.test(value.eventId) ||
+    isProhibitedObservabilityToken(value.eventId) ||
+    value.service !== "web"
   ) {
     return undefined;
   }
-  return value.correlationId;
+  return value.eventId;
 }
 
-function readErrorEvent(
-  event: Readonly<Record<string, unknown>>,
-  correlationId: string,
-): BrowserOperationalInput | undefined {
+function isBrowserErrorReport(report: OperationalErrorReport): boolean {
+  const { capture, event } = report;
   if (
-    !hasExactKeys(event, [
-      "attributes",
-      "context",
-      "errorCategory",
-      "kind",
-      "name",
-      "runtime",
-      "severity",
-    ]) ||
     event.kind !== "application.error" ||
     event.runtime !== "browser" ||
     event.severity !== "error" ||
-    event.errorCategory !== "unexpected" ||
-    !isRecord(event.attributes) ||
-    !hasExactKeys(event.attributes, ["source"])
+    readEventId(event.context) === undefined ||
+    !hasExactKeys(event.attributes, [
+      "capture_mechanism",
+      "handled",
+      ...(capture.operation === undefined ? [] : ["operation"]),
+    ]) ||
+    event.attributes.capture_mechanism !== capture.mechanism ||
+    event.attributes.handled !== capture.handled ||
+    (capture.operation === undefined
+      ? "operation" in event.attributes
+      : event.attributes.operation !== capture.operation)
   ) {
-    return undefined;
+    return false;
   }
-  const source = event.attributes.source;
-  const name = event.name;
-  if (
-    (source !== "window-error" && source !== "unhandled-rejection") ||
-    (name !== "browser.window.error" &&
-      name !== "browser.unhandled.rejection") ||
-    (source === "window-error") !== (name === "browser.window.error")
-  ) {
-    return undefined;
+
+  switch (event.name) {
+    case "browser.window.error":
+      return (
+        hasExactKeys(capture, ["handled", "mechanism"]) &&
+        capture.mechanism === "browser-error-event" &&
+        capture.handled === false
+      );
+    case "browser.unhandled.rejection":
+      return (
+        hasExactKeys(capture, ["handled", "mechanism"]) &&
+        capture.mechanism === "browser-unhandled-rejection" &&
+        capture.handled === false
+      );
+    case "browser.react.boundary":
+      return (
+        hasExactKeys(capture, ["handled", "mechanism"]) &&
+        capture.mechanism === "react-error-boundary" &&
+        capture.handled === true
+      );
+    case "browser.caught.error":
+      return (
+        hasExactKeys(capture, ["handled", "mechanism", "operation"]) &&
+        capture.mechanism === "selected-catch" &&
+        capture.handled === true
+      );
+    default:
+      return false;
   }
-  return Object.freeze({
-    name,
-    kind: "application.error",
-    severity: "error",
-    correlationId,
-    errorCategory: "unexpected",
-    attributes: Object.freeze({ source }),
-    allowedAttributeNames: Object.freeze(["source"]),
-  });
 }
 
 function readWebVitalEvent(
   event: Readonly<Record<string, unknown>>,
-  correlationId: string,
 ): BrowserOperationalInput | undefined {
   if (
     !hasExactKeys(event, [
@@ -108,9 +120,14 @@ function readWebVitalEvent(
       "context",
       "kind",
       "name",
+      "occurredAt",
       "runtime",
+      "schemaVersion",
       "severity",
     ]) ||
+    event.schemaVersion !== "2.0.0" ||
+    typeof event.occurredAt !== "string" ||
+    Number.isNaN(Date.parse(event.occurredAt)) ||
     event.name !== "browser.web.vital" ||
     event.kind !== "web.vital" ||
     event.runtime !== "browser" ||
@@ -135,11 +152,13 @@ function readWebVitalEvent(
   ) {
     return undefined;
   }
+  const eventId = readEventId(event.context);
+  if (eventId === undefined) return undefined;
   return Object.freeze({
     name: "browser.web.vital",
     kind: "web.vital",
     severity: "info",
-    correlationId,
+    eventId,
     attributes: Object.freeze({
       metric_name: event.attributes.metric_name,
       value: event.attributes.value,
@@ -157,20 +176,39 @@ function readWebVitalEvent(
   });
 }
 
-function readBrowserEvent(value: unknown): BrowserOperationalInput | undefined {
+type BrowserInput =
+  | Readonly<{ kind: "error-report"; report: OperationalErrorReport }>
+  | Readonly<{ event: BrowserOperationalInput; kind: "event" }>;
+
+function readBrowserInput(value: unknown): BrowserInput | undefined {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, ["event", "schemaVersion"]) ||
-    value.schemaVersion !== "1.0.0" ||
+    value.schemaVersion !== "2.0.0" ||
+    (value.type !== "error-report" && value.type !== "operational-event")
+  ) {
+    return undefined;
+  }
+
+  if (value.type === "error-report") {
+    if (!hasExactKeys(value, ["report", "schemaVersion", "type"])) {
+      return undefined;
+    }
+    const reconstructed = reconstructOperationalErrorReport(value.report);
+    return reconstructed.ok && isBrowserErrorReport(reconstructed.value)
+      ? Object.freeze({ kind: "error-report", report: reconstructed.value })
+      : undefined;
+  }
+
+  if (
+    !hasExactKeys(value, ["event", "schemaVersion", "type"]) ||
     !isRecord(value.event)
   ) {
     return undefined;
   }
-  const correlationId = readCorrelationId(value.event.context);
-  if (correlationId === undefined) return undefined;
-  return value.event.kind === "application.error"
-    ? readErrorEvent(value.event, correlationId)
-    : readWebVitalEvent(value.event, correlationId);
+  const event = readWebVitalEvent(value.event);
+  return event === undefined
+    ? undefined
+    : Object.freeze({ kind: "event", event });
 }
 
 function emptyResponse(status: number): Response {
@@ -214,7 +252,7 @@ async function readBoundedBody(request: Request): Promise<BoundedBodyResult> {
   if (request.body === null) return { ok: true, source: "" };
 
   const reader = request.body.getReader();
-  const decoder = new TextDecoder();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
   let source = "";
   let totalBytes = 0;
 
@@ -274,16 +312,20 @@ export async function POST(request: Request): Promise<Response> {
     return emptyResponse(body.reason === "too-large" ? 413 : 400);
   }
 
-  let report: BrowserOperationalInput | undefined;
+  let input: BrowserInput | undefined;
   try {
-    report = readBrowserEvent(JSON.parse(body.source) as unknown);
+    input = readBrowserInput(JSON.parse(body.source) as unknown);
   } catch {
     return emptyResponse(400);
   }
-  if (report === undefined) return emptyResponse(400);
+  if (input === undefined) return emptyResponse(400);
 
   try {
-    await reportBrowserEvent(report);
+    if (input.kind === "error-report") {
+      await reportBrowserErrorReport(input.report);
+    } else {
+      await reportBrowserEvent(input.event);
+    }
   } catch {
     // A reporting failure cannot change the application response.
   }

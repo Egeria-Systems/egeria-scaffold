@@ -205,55 +205,41 @@ function responseWithoutReadableContent(status) {
   );
 }
 
-test("the observability registry records reviewed deployed and fresh-scaffold evidence without claiming cleanup", async () => {
+test("the observability registry keeps restricted error diagnostics pending for their exact subject", async () => {
   const registry = JSON.parse(
     await readFile(certificationRegistryPath, "utf8"),
   );
   const record = registry.records.observability;
   const subject = {
-    descriptorVersion: "0.2.0",
+    descriptorVersion: "0.3.0",
     behaviorContractDigest:
-      "sha256:937a3dcad0c96b45ae9f4acb977bd65e46e2caa50bd3fc6dfb29561a1ab637b9",
+      "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99",
   };
 
   assert.deepEqual(record.subject, subject);
   assert.equal(
     record.taskPlan,
-    "docs/superpowers/plans/2026-08-10-production-observability-certification.md",
+    "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md",
   );
   assert.deepEqual(record.requiredEvidence, [
+    "cleanup-recovery",
     "deployed-application",
     "fresh-scaffold",
   ]);
-  assert.equal(record.status, "certified");
-  assert.deepEqual(record.evidence, [
-    {
-      kind: "deployed-application",
-      path: "docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md",
-      outcome: "passed",
-      revision: "ee1e1df10fa2be2f09333efecd86de7f7a131d49",
-      subject,
-    },
-    {
-      kind: "fresh-scaffold",
-      path: "docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md",
-      outcome: "passed",
-      revision: "ee1e1df10fa2be2f09333efecd86de7f7a131d49",
-      subject,
-    },
-  ]);
+  assert.equal(record.status, "pending");
+  assert.deepEqual(record.evidence, []);
 
   const transitionClosure = await runCertificationClosure(
     "legacy-backfill-exempt",
   );
-  assert.equal(transitionClosure.exitCode, 0);
+  assert.equal(transitionClosure.exitCode, 1);
   assert.equal(transitionClosure.stderr, "");
-  assert.doesNotMatch(transitionClosure.stdout, /observability/u);
+  assert.match(transitionClosure.stdout, /observability/u);
 
   const fullClosure = await runCertificationClosure("all-certified");
   assert.equal(fullClosure.exitCode, 1);
   assert.equal(fullClosure.stderr, "");
-  assert.doesNotMatch(fullClosure.stdout, /observability/u);
+  assert.match(fullClosure.stdout, /observability/u);
 });
 
 test("observability production mutation keeps real owner identity while testing mocks commands and verification", async () => {

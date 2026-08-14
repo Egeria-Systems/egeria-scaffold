@@ -4,7 +4,7 @@ import { createCapabilityCatalog } from "./capability-catalog.js";
 
 export const verifiedCapabilityPackageVersions = Object.freeze({
   standards: "0.1.0",
-  observability: "0.2.0",
+  observability: "0.3.0",
 } as const);
 
 export function createVerifiedCapabilityCatalog(): ValidationResult<

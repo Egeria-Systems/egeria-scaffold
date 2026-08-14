@@ -523,11 +523,15 @@ test("the portfolio and site catalog declares the exact seven executable capabil
     },
     {
       identifier: "observability",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
-      dependencies: ["deployment-cloudflare"],
+      dependencies: [
+        "content-files",
+        "deployment-cloudflare",
+        "section-composition",
+      ],
       optionalIntegrations: [],
       conflicts: [],
       supportedProfiles: ["portfolio", "site"],
@@ -547,6 +551,7 @@ test("the portfolio and site catalog declares the exact seven executable capabil
       dataClassifications: [
         "bounded-operational-telemetry",
         "provider-platform-error-and-exception-logs",
+        "restricted-error-diagnostics",
       ],
       retentionAssumptions: ["provider-controlled-operational-log-retention"],
       privilegedOperations: [
@@ -558,6 +563,7 @@ test("the portfolio and site catalog declares the exact seven executable capabil
         "cloudflare-execution-context-lifetime",
         "cloudflare-version-metadata",
         "same-origin-browser-ingest",
+        "separate-operational-and-diagnostic-sinks",
       ],
       managedSurfaces: [
         {
@@ -640,6 +646,46 @@ test("the portfolio and site catalog declares the exact seven executable capabil
           fingerprintTarget: { kind: "file" },
           mergeStrategy: "replace-file",
         },
+        {
+          identifier: "observability-page-error-boundary",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/app/error.tsx",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-global-error-boundary",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/app/global-error.tsx",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-error-copy-source",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/content/en-CA/observability.yaml",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-error-copy",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/src/infrastructure/observability/error-copy.ts",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-error-fallback",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/src/presentation/error-fallback.tsx",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
       ],
       inferenceProbes: [
         {
@@ -685,6 +731,20 @@ test("the portfolio and site catalog declares the exact seven executable capabil
           kind: "file",
           path:
             "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
+        },
+        { kind: "file", path: "apps/web/app/error.tsx" },
+        { kind: "file", path: "apps/web/app/global-error.tsx" },
+        {
+          kind: "file",
+          path: "apps/web/content/en-CA/observability.yaml",
+        },
+        {
+          kind: "file",
+          path: "apps/web/src/infrastructure/observability/error-copy.ts",
+        },
+        {
+          kind: "file",
+          path: "apps/web/src/presentation/error-fallback.tsx",
         },
         {
           kind: "json-value",
@@ -962,7 +1022,7 @@ test("capability package versions must be exact stable releases and issues do no
 test("the verified generation catalog pins exact public package releases", () => {
   assert.deepEqual(core.verifiedCapabilityPackageVersions, {
     standards: "0.1.0",
-    observability: "0.2.0",
+    observability: "0.3.0",
   });
   assert.equal(Object.isFrozen(core.verifiedCapabilityPackageVersions), true);
   assert.throws(() => {
@@ -1005,7 +1065,7 @@ test("the verified generation catalog pins exact public package releases", () =>
         path: "apps/web/package.json",
         section: "dependencies",
         packageName: "@egeria-systems/observability",
-        version: "0.2.0",
+        version: "0.3.0",
       },
     ],
   );
@@ -1023,7 +1083,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.7.0",
+      recipeVersion: "0.8.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1035,7 +1095,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.7.0",
+      recipeVersion: "0.8.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1066,7 +1126,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.7.0");
+  assert.equal(portfolio.recipeVersion, "0.8.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1100,7 +1160,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
       ({ identifier }) => identifier,
     );
 
-    assert.equal(selected.recipeVersion, "0.7.0");
+    assert.equal(selected.recipeVersion, "0.8.0");
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
         selectedIdentifiers.indexOf("booking-calendly"),
@@ -1147,7 +1207,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "observability",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -1183,10 +1243,10 @@ test("resolution traverses dependency identifiers lexically rather than trusting
     resolved.capabilities.map(({ identifier }) => identifier),
     [
       "standards",
-      "deployment-cloudflare",
-      "observability",
       "content-files",
+      "deployment-cloudflare",
       "section-composition",
+      "observability",
       "site-routing",
     ],
   );

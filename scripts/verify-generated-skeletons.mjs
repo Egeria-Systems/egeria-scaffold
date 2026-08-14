@@ -37,11 +37,14 @@ const portfolioFiles = Object.freeze([
   "README.md",
   "apps/web/AGENTS.md",
   "apps/web/app/api/observability/route.ts",
+  "apps/web/app/error.tsx",
+  "apps/web/app/global-error.tsx",
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
   "apps/web/content/content.config.yaml",
   "apps/web/content/en-CA/long-form/introduction.md",
+  "apps/web/content/en-CA/observability.yaml",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/instrumentation-client.ts",
@@ -59,10 +62,12 @@ const portfolioFiles = Object.freeze([
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/cloudflare/observability-context.ts",
   "apps/web/src/infrastructure/observability/browser-reporter.ts",
+  "apps/web/src/infrastructure/observability/error-copy.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/infrastructure/observability/server-reporter.ts",
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
+  "apps/web/src/presentation/error-fallback.tsx",
   "apps/web/src/sections/section-registry.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
   "apps/web/tests/component/content-page.test.tsx",
@@ -137,15 +142,15 @@ export const generatedFixtureContracts = Object.freeze([
       "deployment-cloudflare",
       "observability",
     ]),
-    expectedRecipeVersion: "0.7.0",
+    expectedRecipeVersion: "0.8.0",
     expectedStandardsVersion: "0.3.0",
-    expectedObservabilityVersion: "0.2.0",
+    expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
     expectedDeploymentCloudflareVersion: "0.2.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: null,
-    expectedSurfaces: 95,
+    expectedSurfaces: 100,
   }),
   Object.freeze({
     identifier: "portfolio-calendly",
@@ -174,15 +179,15 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "booking-calendly",
     ]),
-    expectedRecipeVersion: "0.7.0",
+    expectedRecipeVersion: "0.8.0",
     expectedStandardsVersion: "0.3.0",
-    expectedObservabilityVersion: "0.2.0",
+    expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
     expectedDeploymentCloudflareVersion: "0.2.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: "0.1.0",
-    expectedSurfaces: 100,
+    expectedSurfaces: 105,
   }),
   Object.freeze({
     identifier: "site",
@@ -209,15 +214,15 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "site-routing",
     ]),
-    expectedRecipeVersion: "0.7.0",
+    expectedRecipeVersion: "0.8.0",
     expectedStandardsVersion: "0.3.0",
-    expectedObservabilityVersion: "0.2.0",
+    expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
     expectedDeploymentCloudflareVersion: "0.2.0",
     expectedSiteRoutingVersion: "0.3.0",
     expectedBookingCalendlyVersion: null,
-    expectedSurfaces: 97,
+    expectedSurfaces: 102,
   }),
 ]);
 
@@ -243,9 +248,9 @@ const requiredPublicPackages = [
   {
     name: "@egeria-systems/observability",
     field: "dependencies",
-    version: "0.2.0",
+    version: "0.3.0",
     integrity:
-      "sha512-t0ulhalC7yc53PLABF4lu+jknR2jwdNJOLXd48Vtt5dw3KubGUTzSUU4Bn8jqvRonVn47vb0TexHOsxFoe1wDA==",
+      "sha512-AnqIa6qn1aLYuntoQ1zo9A80ioiStR2mKJg5mq/v/NrKNAFQfP7InXojel9Azst3lLDUUdyDuEDFmCIgyWDwrA==",
   },
   {
     name: "@egeria-systems/standards",
@@ -263,7 +268,7 @@ pmOnFail: error
 
 minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
-  - "@egeria-systems/observability@0.2.0"
+  - "@egeria-systems/observability@0.3.0"
 
 resolutionMode: time-based
 
@@ -319,7 +324,7 @@ function expectedRootManifest(projectName) {
 function expectedWebManifest(projectName) {
   return {
     dependencies: {
-      "@egeria-systems/observability": "0.2.0",
+      "@egeria-systems/observability": "0.3.0",
       "@opennextjs/cloudflare": "1.20.2",
       next: "16.3.0",
       react: "19.2.8",

@@ -17,6 +17,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
+import { requiredEvidence } from "./certification-contracts.mjs";
+
 const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const builtEntry = resolve(packageRoot, "dist/index.js");
@@ -353,6 +355,111 @@ test("doctor and diff report a healthy minimal repository", async () => {
   assert.deepEqual(difference, { equal: true, differences: [] });
 });
 
+test("restricted error diagnostics admission advances every direct owner together", async () => {
+  const catalog = core.createVerifiedCapabilityCatalog();
+  assert.equal(catalog.ok, true);
+  const descriptor = catalog.value.find(
+    ({ identifier }) => identifier === "observability",
+  );
+  assert.notEqual(descriptor, undefined);
+  assert.equal(descriptor.version, "0.3.0");
+  assert.equal(core.verifiedCapabilityPackageVersions.observability, "0.3.0");
+  assert.deepEqual(descriptor.dependencies, [
+    "content-files",
+    "deployment-cloudflare",
+    "section-composition",
+  ]);
+  assert.ok(
+    descriptor.dataClassifications.includes("restricted-error-diagnostics"),
+  );
+  assert.ok(
+    descriptor.adapterSemanticRequirements.includes(
+      "separate-operational-and-diagnostic-sinks",
+    ),
+  );
+
+  const newPaths = [
+    "apps/web/app/error.tsx",
+    "apps/web/app/global-error.tsx",
+    "apps/web/content/en-CA/observability.yaml",
+    "apps/web/src/infrastructure/observability/error-copy.ts",
+    "apps/web/src/presentation/error-fallback.tsx",
+  ];
+  assert.deepEqual(
+    descriptor.managedSurfaces
+      .map(({ path }) => path)
+      .filter((path) => newPaths.includes(path))
+      .sort(),
+    newPaths,
+  );
+  assert.deepEqual(
+    descriptor.inferenceProbes
+      .filter(({ kind }) => kind === "file")
+      .map(({ path }) => path)
+      .filter((path) => newPaths.includes(path))
+      .sort(),
+    newPaths,
+  );
+  assert.deepEqual(
+    core.profileRecipes.map(({ identifier, recipeVersion }) => ({
+      identifier,
+      recipeVersion,
+    })),
+    [
+      { identifier: "portfolio", recipeVersion: "0.8.0" },
+      { identifier: "site", recipeVersion: "0.8.0" },
+    ],
+  );
+
+  const registry = JSON.parse(
+    await readFile(
+      new URL("../../../certifications/capabilities.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.deepEqual(registry.records.observability, {
+    subject: core.createCertificationSubject(
+      descriptor,
+      requiredEvidence.observability,
+    ),
+    requiredEvidence: requiredEvidence.observability,
+    status: "pending",
+    taskPlan:
+      "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md",
+    evidence: [],
+  });
+
+  const [packageTemplate, workspace, lockfile] = await Promise.all([
+    readFile(
+      new URL("../templates/common/apps/web/package.json.template", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../templates/common/pnpm-workspace.yaml", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../lockfiles/web-recipe-0.8.0/pnpm-lock.yaml", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.equal(
+    JSON.parse(packageTemplate).dependencies[
+      "@egeria-systems/observability"
+    ],
+    "0.3.0",
+  );
+  assert.match(
+    workspace,
+    /minimumReleaseAgeExclude:\n  - "@egeria-systems\/observability@0\.3\.0"/u,
+  );
+  assert.match(lockfile, /@egeria-systems\/observability@0\.3\.0/u);
+  assert.doesNotMatch(
+    lockfile,
+    /@egeria-systems\/observability@(?:file:|link:|workspace:)|(?:file:|link:|workspace:).*observability/u,
+  );
+});
+
 test("doctor and diff agree across the canonical portfolio composition", async () => {
   const catalogResult = core.createCapabilityCatalog({
     standards: "1.2.3",
@@ -440,15 +547,22 @@ test("doctor and diff agree across the canonical portfolio composition", async (
     "apps/web/instrumentation-client.ts": "export {};\n",
     "apps/web/instrumentation.ts": "export {};\n",
     "apps/web/app/api/observability/route.ts": "export {};\n",
+    "apps/web/app/error.tsx": "export {};\n",
+    "apps/web/app/global-error.tsx": "export {};\n",
+    "apps/web/content/en-CA/observability.yaml": "title: Error\n",
     "apps/web/src/infrastructure/cloudflare/observability-context.ts":
       "export {};\n",
     "apps/web/src/infrastructure/observability/browser-reporter.ts":
+      "export {};\n",
+    "apps/web/src/infrastructure/observability/error-copy.ts":
       "export {};\n",
     "apps/web/src/infrastructure/observability/installed-capability.ts":
       "export {};\n",
     "apps/web/src/infrastructure/observability/server-reporter.ts":
       "export {};\n",
     "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx":
+      "export {};\n",
+    "apps/web/src/presentation/error-fallback.tsx":
       "export {};\n",
     ".github/workflows/quality.yml": "name: Quality\n",
     "apps/web/playwright.config.shared.ts": "export {};\n",

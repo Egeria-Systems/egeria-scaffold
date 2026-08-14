@@ -95,9 +95,9 @@ test("fixture inspection accepts only the exact portable generated trees", async
   );
 
   for (const contract of generatedFixtureContracts) {
-    assert.equal(contract.expectedRecipeVersion, "0.7.0");
+    assert.equal(contract.expectedRecipeVersion, "0.8.0");
     assert.equal(contract.expectedStandardsVersion, "0.3.0");
-    assert.equal(contract.expectedObservabilityVersion, "0.2.0");
+    assert.equal(contract.expectedObservabilityVersion, "0.3.0");
     assert.equal(contract.expectedContentFilesVersion, "0.4.0");
     assert.equal(contract.expectedDeploymentCloudflareVersion, "0.2.0");
     assert.equal(
@@ -111,10 +111,10 @@ test("fixture inspection accepts only the exact portable generated trees", async
     assert.equal(
       contract.expectedSurfaces,
       contract.identifier === "portfolio-calendly"
-        ? 100
+        ? 105
         : contract.identifier === "portfolio"
-          ? 95
-          : 97,
+          ? 100
+          : 102,
     );
     const snapshot = await inspectGeneratedFixture(
       resolve(repositoryRoot, contract.relativeRoot),
@@ -136,11 +136,11 @@ test("fixture inspection accepts only the exact portable generated trees", async
   const site = generatedFixtureContracts.find(
     ({ identifier }) => identifier === "site",
   );
-  assert.equal(basePortfolio.expectedFiles.length, 47);
-  assert.equal(site.expectedFiles.length, 49);
+  assert.equal(basePortfolio.expectedFiles.length, 52);
+  assert.equal(site.expectedFiles.length, 54);
   assert.equal(
     calendlyPortfolio.expectedFiles.length,
-    47 - 1 + 6,
+    52 - 1 + 6,
     "six booking sources replace one common home destination and add five distinct paths",
   );
   assert.deepEqual(calendlyPortfolio.createArguments, [
