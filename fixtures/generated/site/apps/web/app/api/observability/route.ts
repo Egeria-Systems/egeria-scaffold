@@ -4,6 +4,7 @@ import {
 } from "@egeria-systems/observability";
 
 import {
+  isProhibitedObservabilityToken,
   reportBrowserErrorReport,
   reportBrowserEvent,
   type BrowserOperationalInput,
@@ -11,8 +12,6 @@ import {
 
 const maximumPayloadBytes = 8_192;
 const contextTokenPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
-const prohibitedTokenPattern =
-  /(?:authorization|bearer|cookie|password|secret|token)/iu;
 const webVitalNames = ["CLS", "FCP", "FID", "INP", "LCP", "TTFB"] as const;
 const webVitalRatings = ["good", "needs-improvement", "poor"] as const;
 const navigationTypes = [
@@ -53,7 +52,7 @@ function readEventId(value: unknown): string | undefined {
     !hasExactKeys(value, ["eventId", "service"]) ||
     typeof value.eventId !== "string" ||
     !contextTokenPattern.test(value.eventId) ||
-    prohibitedTokenPattern.test(value.eventId) ||
+    isProhibitedObservabilityToken(value.eventId) ||
     value.service !== "web"
   ) {
     return undefined;

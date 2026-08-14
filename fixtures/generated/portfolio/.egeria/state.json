@@ -581,7 +581,7 @@
       "path": "apps/web/src/content/read-content.ts"
     },
     {
-      "fingerprint": "sha256:9b02544938fd567cd7cfa0ba670a34cdc26ed1d67dff12eafa3570c8230e5b8c",
+      "fingerprint": "sha256:8c8c4fd3412112fa50773ce02756ccf2f97b265c8b609c35b397bcbac8203085",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -710,7 +710,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:e3dc1df4d962e41531b04f35d76a6def57baf6c89f871c4fd9776af6f5d91e96",
+      "fingerprint": "sha256:a9373820327bdfa94cddf625e90e9d6372d921044c3aabfedd4f8ed59ec69d07",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -766,7 +766,7 @@
       "path": "apps/web/src/infrastructure/cloudflare/observability-context.ts"
     },
     {
-      "fingerprint": "sha256:2c840def448119945a916f29c496a87a82dc208a53ee909ec2a95c367d5d80ee",
+      "fingerprint": "sha256:ef461e56e5bb86bc05b89515cc2789e4201e9eb48f8ac06b7035735219a52c2e",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -879,7 +879,7 @@
       "path": "apps/web/instrumentation.ts"
     },
     {
-      "fingerprint": "sha256:220b1dca8b5821183b7f1724934a1b0f08a7496aed183ffa1eb006ed1587c731",
+      "fingerprint": "sha256:f7c925ea38d6d12bd93c70ef940cdf4d7a1d00d1a113f6d70da948e16b64faf7",
       "fingerprintTarget": {
         "kind": "file"
       },

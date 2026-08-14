@@ -201,6 +201,39 @@ test("path classification scans user-facing Markdown and preserves internal prov
   );
 });
 
+test("repository scanning treats exact SHA-512 integrity values as opaque data", async () => {
+  const root = "/repository";
+  const path = "scripts/registry-metadata.mjs";
+  const integrity = [
+    "sha512-AnqIa6qn1aLYuntoQ1zo9A80ioiStR2mKJg5mq/v/NrKNAFQf",
+    compactLabel("P", "7"),
+    "InXojel9Azst3lLDUUdyDuEDFmCIgyWDwrA==",
+  ].join("");
+  const prohibitedLabel = namedLabel("Task", "3");
+  const source = [
+    `const integrity = ${JSON.stringify(integrity)};`,
+    `const label = ${JSON.stringify(prohibitedLabel)};`,
+  ].join("\n");
+
+  assert.deepEqual(
+    await scanRepository({
+      paths: [path],
+      readFile: async () => Buffer.from(source, "utf8"),
+      root,
+    }),
+    [
+      {
+        column: source.split("\n")[1].indexOf(prohibitedLabel) + 1,
+        family: "named-sequence",
+        kind: "content",
+        line: 2,
+        path,
+        value: prohibitedLabel,
+      },
+    ],
+  );
+});
+
 test("Git enumeration includes live tracked and untracked paths with NUL-safe parsing", async () => {
   const calls = [];
   const paths = await listRepositoryPaths({

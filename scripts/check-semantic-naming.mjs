@@ -141,6 +141,13 @@ const namedPattern = new RegExp(
   String.raw`(?:(?<![A-Za-z0-9])(?:${namedPrefixPattern})|(?<=[a-z0-9])(?:${titleCasePrefixPattern}))[\s._-]*(?:${ordinalPattern})`,
   "gu",
 );
+const opaqueSha512IntegrityPattern =
+  /sha512-[A-Za-z0-9+/]{86}==(?=$|[^A-Za-z0-9+/=])/gu;
+
+const maskOpaqueIntegrityValues = (source) =>
+  source.replace(opaqueSha512IntegrityPattern, (value) =>
+    " ".repeat(value.length),
+  );
 
 const findNamedPrefix = (value) => {
   const normalized = value.toLowerCase();
@@ -355,7 +362,8 @@ export async function scanRepository({
       throw new TypeError(`SEMANTIC_NAMING_READ_FAILED:${path}`);
     }
     const source = decodeUtf8(content, `SEMANTIC_NAMING_TEXT_INVALID:${path}`);
-    for (const match of findSequencingLabels(source)) {
+    const scannableSource = maskOpaqueIntegrityValues(source);
+    for (const match of findSequencingLabels(scannableSource)) {
       findings.push({
         ...sourceLocation(source, match.index),
         family: match.family,

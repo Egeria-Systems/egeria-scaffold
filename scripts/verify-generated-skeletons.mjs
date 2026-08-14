@@ -250,9 +250,7 @@ const requiredPublicPackages = [
     field: "dependencies",
     version: "0.3.0",
     integrity:
-      "sha512-AnqIa6qn1aLYuntoQ1zo9A80ioiStR2mKJg5mq/v/NrKNAFQf" +
-      "P" +
-      "7InXojel9Azst3lLDUUdyDuEDFmCIgyWDwrA==",
+      "sha512-AnqIa6qn1aLYuntoQ1zo9A80ioiStR2mKJg5mq/v/NrKNAFQfP7InXojel9Azst3lLDUUdyDuEDFmCIgyWDwrA==",
   },
   {
     name: "@egeria-systems/standards",

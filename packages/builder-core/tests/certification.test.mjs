@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import * as core from "../dist/index.js";
+import { requiredEvidence } from "./certification-contracts.mjs";
 
 const planPath =
   "docs/superpowers/plans/2026-08-10-booking-calendly-certification.md";
@@ -68,29 +69,6 @@ function createEvidenceDocument({
 }
 
 const evidenceDocumentSource = createEvidenceDocument();
-
-const requiredEvidence = Object.freeze({
-  "booking-calendly": Object.freeze([
-    "cleanup-recovery",
-    "deployed-application",
-    "fresh-scaffold",
-    "provider-confirmed",
-  ]),
-  "content-files": Object.freeze(["fresh-scaffold"]),
-  "deployment-cloudflare": Object.freeze([
-    "cleanup-recovery",
-    "deployed-application",
-    "fresh-scaffold",
-  ]),
-  observability: Object.freeze([
-    "cleanup-recovery",
-    "deployed-application",
-    "fresh-scaffold",
-  ]),
-  "section-composition": Object.freeze(["fresh-scaffold"]),
-  "site-routing": Object.freeze(["fresh-scaffold"]),
-  standards: Object.freeze(["fresh-scaffold"]),
-});
 
 function assertSuccess(result) {
   assert.equal(result.ok, true, JSON.stringify(result.issues));
@@ -358,15 +336,13 @@ test("material observability diagnostics remain pending for their exact subject"
   assert.notEqual(observabilityDescriptor, undefined);
   const observabilityRecord = committedRegistry.records.observability;
 
-  const requiredEvidence = [
-    "cleanup-recovery",
-    "deployed-application",
-    "fresh-scaffold",
-  ];
   assert.equal(observabilityDescriptor.version, "0.3.0");
   assert.deepEqual(observabilityRecord, {
-    subject: core.createCertificationSubject(observabilityDescriptor, requiredEvidence),
-    requiredEvidence,
+    subject: core.createCertificationSubject(
+      observabilityDescriptor,
+      requiredEvidence.observability,
+    ),
+    requiredEvidence: requiredEvidence.observability,
     status: "pending",
     taskPlan: observabilityPlanPath,
     evidence: [],

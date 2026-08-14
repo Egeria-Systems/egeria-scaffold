@@ -17,6 +17,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
+import { requiredEvidence } from "./certification-contracts.mjs";
+
 const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const builtEntry = resolve(packageRoot, "dist/index.js");
@@ -415,14 +417,12 @@ test("restricted error diagnostics admission advances every direct owner togethe
       "utf8",
     ),
   );
-  const requiredEvidence = [
-    "cleanup-recovery",
-    "deployed-application",
-    "fresh-scaffold",
-  ];
   assert.deepEqual(registry.records.observability, {
-    subject: core.createCertificationSubject(descriptor, requiredEvidence),
-    requiredEvidence,
+    subject: core.createCertificationSubject(
+      descriptor,
+      requiredEvidence.observability,
+    ),
+    requiredEvidence: requiredEvidence.observability,
     status: "pending",
     taskPlan:
       "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md",

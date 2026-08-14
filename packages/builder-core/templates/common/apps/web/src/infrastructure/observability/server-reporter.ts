@@ -49,7 +49,7 @@ export type CaughtServerErrorContext = Readonly<{
 
 const contextTokenPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const operationPattern = /^[a-z][a-z0-9.-]{0,63}$/u;
-const prohibitedTokenPattern =
+const prohibitedObservabilityTokenPattern =
   /(?:authorization|bearer|cookie|credential|password|secret|token)/iu;
 const requestMethods = Object.freeze([
   "GET",
@@ -102,7 +102,7 @@ function readField(value: unknown, key: string): unknown {
 function readContextToken(value: unknown): string | undefined {
   return typeof value === "string" &&
     contextTokenPattern.test(value) &&
-    !prohibitedTokenPattern.test(value)
+    !isProhibitedObservabilityToken(value)
     ? value
     : undefined;
 }
@@ -110,7 +110,7 @@ function readContextToken(value: unknown): string | undefined {
 function readOperation(value: unknown): string | undefined {
   return typeof value === "string" &&
     operationPattern.test(value) &&
-    !prohibitedTokenPattern.test(value)
+    !isProhibitedObservabilityToken(value)
     ? value
     : undefined;
 }
@@ -137,7 +137,7 @@ function normalizeRouteSegment(segment: string): string | undefined {
     return "[dynamic]";
   }
   return /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/u.test(segment) &&
-    !prohibitedTokenPattern.test(segment)
+    !isProhibitedObservabilityToken(segment)
     ? segment
     : undefined;
 }
@@ -198,6 +198,10 @@ function createOperationalRouteIdentifier(
     })
     .join(".");
   return identifier.length <= 64 ? identifier : undefined;
+}
+
+export function isProhibitedObservabilityToken(value: string): boolean {
+  return prohibitedObservabilityTokenPattern.test(value);
 }
 
 function createNextRequestCapture(
@@ -403,7 +407,10 @@ async function dispatchErrorReport(
     if (diagnosticFailure !== undefined) {
       await reportFailureOnce(diagnosticFailure);
     }
-  })();
+  })().then(
+    () => undefined,
+    () => undefined,
+  );
 
   try {
     runtime.schedule(delivery);
@@ -422,12 +429,17 @@ async function reportOperationalInput(
 ): Promise<void> {
   try {
     const runtime = await readObservabilityRuntimeContext();
+    const eventContext = createEventContext(
+      runtime,
+      input.context.correlationId,
+    );
     const event = createOperationalEvent(
       {
         ...input,
         context: {
           ...input.context,
-          ...createEventContext(runtime, input.context.correlationId),
+          ...eventContext,
+          eventId: input.context.eventId ?? eventContext.eventId,
         },
       },
       {

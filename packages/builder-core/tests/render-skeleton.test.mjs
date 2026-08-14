@@ -483,8 +483,16 @@ async function loadGeneratedObservabilityRoute(files, throwOnReport = false) {
   observabilityRouteLoad += 1;
   const eventKey = `__observabilityEvents${observabilityRouteLoad}`;
   const reportKey = `__observabilityErrorReports${observabilityRouteLoad}`;
+  const prohibitedTokenKey =
+    `__isProhibitedObservabilityToken${observabilityRouteLoad}`;
   globalThis[eventKey] = [];
   globalThis[reportKey] = [];
+  const canonicalReporter = await loadGeneratedServerReporter(files, {
+    ingestingHost: "",
+    sourceToken: "",
+  });
+  globalThis[prohibitedTokenKey] =
+    canonicalReporter.module.isProhibitedObservabilityToken;
   const reporterModule = `data:text/javascript;base64,${Buffer.from(
     [
       `export async function reportBrowserEvent(input) { globalThis[${JSON.stringify(eventKey)}].push(input);`,
@@ -493,6 +501,7 @@ async function loadGeneratedObservabilityRoute(files, throwOnReport = false) {
       `export async function reportBrowserErrorReport(input) { globalThis[${JSON.stringify(reportKey)}].push(input);`,
       ...(throwOnReport ? ['throw new Error("transport failed");'] : []),
       "}",
+      `export const isProhibitedObservabilityToken = globalThis[${JSON.stringify(prohibitedTokenKey)}];`,
     ].join("\n"),
   ).toString("base64")}`;
   const withReporter = transpiled.replace(
@@ -814,6 +823,7 @@ async function loadGeneratedServerReporter(
   files,
   {
     ingestingHost = "s123.eu-nbg-2.betterstackdata.com",
+    rejectErrorDispatch = false,
     scheduleShouldThrow = false,
     sourceToken = "source-token-123456",
   } = {},
@@ -837,6 +847,15 @@ async function loadGeneratedServerReporter(
     "../../observability/dist/index.js",
     import.meta.url,
   ).href;
+  const reporterRootModule = rejectErrorDispatch
+    ? `data:text/javascript;base64,${Buffer.from(
+        [
+          `import { createOperationalErrorReport, createOperationalEvent, dispatchOperationalEvent, normalizeErrorCategory } from ${JSON.stringify(rootModule)};`,
+          "export { createOperationalErrorReport, createOperationalEvent, dispatchOperationalEvent, normalizeErrorCategory };",
+          'export async function dispatchOperationalErrorReport() { throw new Error("synthetic dispatch rejection"); }',
+        ].join("\n"),
+      ).toString("base64")}`
+    : rootModule;
   const serverModule = new URL(
     "../../observability/dist/server.js",
     import.meta.url,
@@ -850,7 +869,7 @@ async function loadGeneratedServerReporter(
   ).toString("base64")}`;
   const withRoot = transpiled.replace(
     'from "@egeria-systems/observability"',
-    `from ${JSON.stringify(rootModule)}`,
+    `from ${JSON.stringify(reporterRootModule)}`,
   );
   const withServer = withRoot.replace(
     'from "@egeria-systems/observability/server"',
@@ -1674,6 +1693,13 @@ test("browser route reconstructs bounded error reports and retains safe web vita
       report.diagnostics.exceptionMessage =
         "Authorization: Bearer credential-secret";
     }),
+    {
+      ...structuredClone(validWebVitalEnvelope),
+      event: {
+        ...structuredClone(validWebVitalEnvelope.event),
+        context: { eventId: "credential-marker", service: "web" },
+      },
+    },
   ];
   for (const body of invalidBodies) {
     await assertEmptyResponse(observabilityRequest(body), 400);
@@ -1984,6 +2010,63 @@ test("server reporting accepts the current Next route type vocabulary", async ()
     structuredRecords.map(({ attributes }) => attributes.route_type),
     routeTypes,
   );
+});
+
+test("server reporting contains unexpected diagnostic dispatch rejections", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedServerReporter(rendered.files, {
+    rejectErrorDispatch: true,
+  });
+
+  await assert.doesNotReject(() =>
+    loaded.module.reportServerError(new Error("synthetic failure")),
+  );
+  assert.equal(loaded.scheduled.length, 1);
+  await assert.doesNotReject(() => loaded.scheduled[0]);
+});
+
+test("browser event delivery preserves the validated event identifier", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const loaded = await loadGeneratedServerReporter(rendered.files, {
+    ingestingHost: "",
+    sourceToken: "",
+  });
+  const structuredRecords = [];
+  const originalConsoleInfo = console.info;
+  console.info = (record) => structuredRecords.push(record);
+
+  try {
+    await loaded.module.reportBrowserEvent({
+      name: "browser.web.vital",
+      kind: "web.vital",
+      severity: "info",
+      eventId: "browser-vital-123",
+      attributes: { metric_name: "LCP" },
+      allowedAttributeNames: ["metric_name"],
+    });
+    await loaded.scheduled[0];
+  } finally {
+    console.info = originalConsoleInfo;
+  }
+
+  assert.equal(structuredRecords.length, 1);
+  assert.equal(structuredRecords[0].event_id, "browser-vital-123");
 });
 
 test("server reporting normalizes only valid proxy and Pages route contexts", async () => {
@@ -2299,7 +2382,7 @@ test("generated server contains oversized diagnostics without HTTP or recursive 
   });
 });
 
-test("server reporting contains hostile inputs and diagnostic delivery failures", async () => {
+test("server reporting contains hostile inputs and diagnostic delivery failures", async (testContext) => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(
     await renderSkeleton({
@@ -2313,6 +2396,9 @@ test("server reporting contains hostile inputs and diagnostic delivery failures"
   const originalConsoleInfo = console.info;
   const originalFetch = globalThis.fetch;
   console.info = (record) => structuredRecords.push(record);
+  testContext.after(() => {
+    console.info = originalConsoleInfo;
+  });
 
   const withoutProvider = await loadGeneratedServerReporter(rendered.files, {
     ingestingHost: "",
