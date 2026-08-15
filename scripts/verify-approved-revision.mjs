@@ -1,6 +1,12 @@
 import { execFileSync } from "node:child_process";
 
 const canonicalRevisionPattern = /^[0-9a-f]{40}$/u;
+const admissionFailureMessage = "Approved revision admission failed.\n";
+
+function rejectAdmission() {
+  process.stderr.write(admissionFailureMessage);
+  process.exitCode = 1;
+}
 
 function revisionIsApproved() {
   if (process.argv.length !== 2) return false;
@@ -25,10 +31,8 @@ function revisionIsApproved() {
 
 try {
   if (!revisionIsApproved()) {
-    process.stderr.write("Approved revision admission failed.\n");
-    process.exitCode = 1;
+    rejectAdmission();
   }
 } catch {
-  process.stderr.write("Approved revision admission failed.\n");
-  process.exitCode = 1;
+  rejectAdmission();
 }

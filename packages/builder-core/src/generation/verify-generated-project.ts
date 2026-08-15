@@ -15,7 +15,9 @@ import {
   classifyLockfileOnlyTransition,
   cleanupOwnedDirectory,
   createOwnedTemporaryDirectory,
+  readDirectoryIdentity,
   snapshotSourceTree,
+  sourceIdentityMatches,
   sourceTreesEqual,
   type PathIdentity,
 } from "./source-tree-safety.js";
@@ -259,8 +261,16 @@ export async function prepareLockfile(
   writer: ExclusiveFileWriter = writeExclusive,
 ): Promise<ValidationResult<void>> {
   const fixedRoot = resolve(root);
+  const identity = await readDirectoryIdentity(fixedRoot);
+  if (identity === undefined) {
+    return issue("LOCKFILE_PREPARATION_FAILED", "source-invalid");
+  }
+
   const before = await snapshotSourceTree(fixedRoot);
-  if (before === undefined) {
+  if (
+    before === undefined ||
+    !(await sourceIdentityMatches(identity))
+  ) {
     return issue("LOCKFILE_PREPARATION_FAILED", "source-invalid");
   }
 
@@ -282,6 +292,10 @@ export async function prepareLockfile(
         ? "lockfile-write-failed-source-changed"
         : "lockfile-write-failed",
     );
+  }
+
+  if (!(await sourceIdentityMatches(identity))) {
+    return issue("LOCKFILE_PREPARATION_FAILED", "source-changed");
   }
 
   const after = await snapshotSourceTree(fixedRoot);

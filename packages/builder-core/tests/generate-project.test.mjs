@@ -1,5 +1,18 @@
 import assert from "node:assert/strict";
-import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  cp,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -162,6 +175,55 @@ test(
     assert.equal(await exists(identity.path), false);
   },
 );
+
+test("source snapshots reject a symbolic-link root", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-snapshot-root-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const source = join(parent, "source");
+  const linkedSource = join(parent, "linked-source");
+  await mkdir(source);
+  await writeFile(join(source, "package.json"), "{}\n");
+  await symlink(source, linkedSource, "dir");
+
+  assert.equal(
+    await sourceTreeSafety.snapshotSourceTree(linkedSource),
+    undefined,
+  );
+});
+
+test("lockfile preparation rejects a byte-identical replacement root", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-lockfile-root-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const source = join(parent, "source");
+  const originalSource = join(parent, "original-source");
+  await mkdir(source);
+  await writeFile(join(source, "package.json"), "{}\n");
+
+  const result = await verifierModule.prepareLockfile(
+    source,
+    async (lockfilePath, content) => {
+      await rename(source, originalSource);
+      await cp(originalSource, source, {
+        recursive: true,
+        force: false,
+        errorOnExist: true,
+      });
+      await writeFile(lockfilePath, content, { flag: "wx" });
+      return { ok: true };
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    issues: [
+      {
+        code: "LOCKFILE_PREPARATION_FAILED",
+        path: [],
+        context: { reason: "source-changed" },
+      },
+    ],
+  });
+});
 
 test("lockfile-only transition classification preserves inventory and source-change distinctions", () => {
   const packageEntry = { kind: "file", fingerprint: "sha256:package" };

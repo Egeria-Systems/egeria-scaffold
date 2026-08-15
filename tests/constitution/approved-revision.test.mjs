@@ -95,6 +95,13 @@ test("approved revision admission accepts only the exact current main event revi
     );
   }
 
-  const argumentResult = await runVerifier({}, ["unexpected-argument"]);
+  const argumentResult = await runVerifier({}, [
+    "credential-secret-deploy-revision-a1b2c3d4e5f6",
+  ]);
   assert.notEqual(argumentResult.code, 0);
+  assert.equal(argumentResult.stdout, "");
+  assert.equal(
+    argumentResult.stderr,
+    "Approved revision admission failed.\n",
+  );
 });

@@ -32,6 +32,19 @@ export type LockfileOnlyTransition =
   | "unexpected-inventory"
   | "source-changed";
 
+export async function readDirectoryIdentity(
+  path: string,
+): Promise<PathIdentity | undefined> {
+  try {
+    const stats = await lstat(path, { bigint: true });
+    return stats.isSymbolicLink() || !stats.isDirectory()
+      ? undefined
+      : { path, device: stats.dev, inode: stats.ino };
+  } catch {
+    return undefined;
+  }
+}
+
 export async function sourceIdentityMatches(
   identity: PathIdentity,
 ): Promise<boolean> {
@@ -90,6 +103,11 @@ export async function createOwnedTemporaryDirectory(
 export async function snapshotSourceTree(
   root: string,
 ): Promise<ReadonlyMap<string, SourceEntry> | undefined> {
+  const identity = await readDirectoryIdentity(root);
+  if (identity === undefined) {
+    return undefined;
+  }
+
   const entries = new Map<string, SourceEntry>();
 
   async function visit(path: string, relativePath: string): Promise<boolean> {
@@ -128,7 +146,9 @@ export async function snapshotSourceTree(
     return true;
   }
 
-  return (await visit(root, "")) ? entries : undefined;
+  return (await visit(root, "")) && (await sourceIdentityMatches(identity))
+    ? entries
+    : undefined;
 }
 
 function sourceEntriesEqual(
