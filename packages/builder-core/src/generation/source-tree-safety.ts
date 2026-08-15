@@ -1,4 +1,11 @@
-import { lstat, readFile, readdir, rm } from "node:fs/promises";
+import {
+  chmod,
+  lstat,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+} from "node:fs/promises";
 import { join } from "node:path";
 
 import { fingerprintFileContent } from "../ownership/fingerprint.js";
@@ -9,9 +16,21 @@ export type PathIdentity = Readonly<{
   inode: bigint;
 }>;
 
+export type OwnedTemporaryDirectoryResult =
+  | Readonly<{ ok: true; value: PathIdentity }>
+  | Readonly<{
+      ok: false;
+      reason: "creation-failed" | "invalid-identity";
+    }>;
+
 export type SourceEntry =
   | Readonly<{ kind: "directory" }>
   | Readonly<{ kind: "file"; fingerprint: string }>;
+
+export type LockfileOnlyTransition =
+  | "valid"
+  | "unexpected-inventory"
+  | "source-changed";
 
 export async function sourceIdentityMatches(
   identity: PathIdentity,
@@ -41,6 +60,30 @@ export async function cleanupOwnedDirectory(
     return true;
   } catch {
     return false;
+  }
+}
+
+export async function createOwnedTemporaryDirectory(
+  parent: string,
+  prefix: string,
+): Promise<OwnedTemporaryDirectoryResult> {
+  let identity: PathIdentity | undefined;
+
+  try {
+    const path = await mkdtemp(join(parent, prefix));
+    const stats = await lstat(path, { bigint: true });
+    if (stats.isSymbolicLink() || !stats.isDirectory()) {
+      return { ok: false, reason: "invalid-identity" };
+    }
+
+    identity = { path, device: stats.dev, inode: stats.ino };
+    await chmod(path, 0o700);
+    return { ok: true, value: identity };
+  } catch {
+    if (identity !== undefined) {
+      await cleanupOwnedDirectory(identity);
+    }
+    return { ok: false, reason: "creation-failed" };
   }
 }
 
@@ -88,7 +131,7 @@ export async function snapshotSourceTree(
   return (await visit(root, "")) ? entries : undefined;
 }
 
-export function sourceEntriesEqual(
+function sourceEntriesEqual(
   left: SourceEntry,
   right: SourceEntry,
 ): boolean {
@@ -97,6 +140,27 @@ export function sourceEntriesEqual(
     (left.kind === "directory" ||
       (right.kind === "file" && left.fingerprint === right.fingerprint))
   );
+}
+
+export function classifyLockfileOnlyTransition(
+  before: ReadonlyMap<string, SourceEntry>,
+  after: ReadonlyMap<string, SourceEntry>,
+): LockfileOnlyTransition {
+  if (before.has("pnpm-lock.yaml")) {
+    return "unexpected-inventory";
+  }
+
+  for (const [path, entry] of before) {
+    const current = after.get(path);
+    if (current === undefined || !sourceEntriesEqual(entry, current)) {
+      return "source-changed";
+    }
+  }
+
+  return after.get("pnpm-lock.yaml")?.kind === "file" &&
+    after.size === before.size + 1
+    ? "valid"
+    : "unexpected-inventory";
 }
 
 export function sourceTreesEqual(

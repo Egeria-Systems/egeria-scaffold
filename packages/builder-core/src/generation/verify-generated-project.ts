@@ -1,10 +1,8 @@
 import { execFile } from "node:child_process";
 import {
-  chmod,
   cp,
   lstat,
   mkdir,
-  mkdtemp,
   open,
   readFile,
 } from "node:fs/promises";
@@ -14,12 +12,12 @@ import { promisify } from "node:util";
 import { ordinaryGenerationVerificationChecks } from "../contracts/generation-verification.js";
 import type { ValidationResult } from "../contracts/result.js";
 import {
+  classifyLockfileOnlyTransition,
   cleanupOwnedDirectory,
+  createOwnedTemporaryDirectory,
   snapshotSourceTree,
-  sourceEntriesEqual,
   sourceTreesEqual,
   type PathIdentity,
-  type SourceEntry,
 } from "./source-tree-safety.js";
 
 export type GeneratedProjectVerification = Readonly<{
@@ -160,27 +158,6 @@ export async function writeExclusive(
   return { ok: false, sourceChanged: true };
 }
 
-async function createOwnedDirectory(
-  parent: string,
-  prefix: string,
-): Promise<ValidationResult<PathIdentity>> {
-  try {
-    const path = await mkdtemp(join(parent, prefix));
-    const stats = await lstat(path, { bigint: true });
-    if (stats.isSymbolicLink() || !stats.isDirectory()) {
-      return issue("VERIFIER_SETUP_FAILED", "invalid-owner");
-    }
-
-    await chmod(path, 0o700);
-    return {
-      ok: true,
-      value: { path, device: stats.dev, inode: stats.ino },
-    };
-  } catch {
-    return issue("VERIFIER_SETUP_FAILED", "owner-creation-failed");
-  }
-}
-
 async function createSupportPaths(
   identity: PathIdentity,
 ): Promise<ValidationResult<SupportPaths>> {
@@ -277,24 +254,6 @@ async function requirePnpmVersion(input: Readonly<{
     : issue("PNPM_VERSION_INVALID", "version-mismatch");
 }
 
-function onlyLockfileWasAdded(
-  before: ReadonlyMap<string, SourceEntry>,
-  after: ReadonlyMap<string, SourceEntry>,
-): boolean {
-  if (
-    before.has("pnpm-lock.yaml") ||
-    after.get("pnpm-lock.yaml")?.kind !== "file" ||
-    after.size !== before.size + 1
-  ) {
-    return false;
-  }
-
-  return [...before].every(([path, entry]) => {
-    const current = after.get(path);
-    return current !== undefined && sourceEntriesEqual(entry, current);
-  });
-}
-
 export async function prepareLockfile(
   root: string,
   writer: ExclusiveFileWriter = writeExclusive,
@@ -326,7 +285,8 @@ export async function prepareLockfile(
   }
 
   const after = await snapshotSourceTree(fixedRoot);
-  return after !== undefined && onlyLockfileWasAdded(before, after)
+  return after !== undefined &&
+    classifyLockfileOnlyTransition(before, after) === "valid"
     ? { ok: true, value: undefined }
     : issue("LOCKFILE_PREPARATION_FAILED", "source-changed");
 }
@@ -341,7 +301,7 @@ async function verifyInIsolatedCopy(
     return issue("FROZEN_INSTALL_FAILED", "source-invalid");
   }
 
-  const owner = await createOwnedDirectory(
+  const owner = await createOwnedTemporaryDirectory(
     dirname(fixedRoot),
     ".egeria-validation-",
   );

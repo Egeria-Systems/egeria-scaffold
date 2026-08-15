@@ -9,6 +9,10 @@ import type {
   ContractIssue,
   ValidationResult,
 } from "../contracts/result.js";
+import {
+  createFileSurfaceDescriptor,
+  createJsonValueSurfaceDescriptor,
+} from "../contracts/surface-target.js";
 
 export type CapabilityPackageVersions = Readonly<{
   standards: string;
@@ -36,14 +40,12 @@ function createFileSurface(
   path: string,
   ownership: "managed" | "application-owned",
 ): ManagedSurfaceDescriptor {
-  return {
+  return createFileSurfaceDescriptor({
     identifier,
     owner: { kind: "capability", identifier: capability },
     path,
     ownership,
-    fingerprintTarget: { kind: "file" },
-    mergeStrategy: "replace-file",
-  };
+  });
 }
 
 function createPackageSurface(
@@ -51,14 +53,15 @@ function createPackageSurface(
   capability: string,
   pointer: string,
 ): ManagedSurfaceDescriptor {
-  return {
-    identifier,
-    owner: { kind: "capability", identifier: capability },
-    path: "apps/web/package.json",
-    ownership: "merge-managed",
-    fingerprintTarget: { kind: "json-value", pointer },
-    mergeStrategy: "json-property",
-  };
+  return createJsonValueSurfaceDescriptor(
+    {
+      identifier,
+      owner: { kind: "capability", identifier: capability },
+      path: "apps/web/package.json",
+      ownership: "merge-managed",
+    },
+    pointer,
+  );
 }
 
 function createFileProbe(path: string): InferenceProbe {

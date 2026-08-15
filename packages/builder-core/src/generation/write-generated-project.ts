@@ -1,8 +1,6 @@
 import {
-  chmod,
   lstat,
   mkdir,
-  mkdtemp,
   open,
   readFile,
   realpath,
@@ -28,6 +26,7 @@ import {
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
 import { validateContract } from "../contracts/result.js";
+import { createFileSurfaceDescriptor } from "../contracts/surface-target.js";
 import {
   installedStateSchema,
   type InstalledState,
@@ -43,9 +42,10 @@ import {
   type RenderedSkeleton,
 } from "./render-skeleton.js";
 import {
+  classifyLockfileOnlyTransition,
   cleanupOwnedDirectory,
+  createOwnedTemporaryDirectory,
   snapshotSourceTree,
-  sourceEntriesEqual,
   sourceIdentityMatches,
   type PathIdentity,
   type SourceEntry,
@@ -210,33 +210,21 @@ async function resolveDestination(
 async function createSourceRoot(
   parent: string,
 ): Promise<ValidationResult<PathIdentity>> {
-  let identity: PathIdentity | undefined;
-
-  try {
-    const path = await mkdtemp(join(parent, ".egeria-create-"));
-    const stats = await lstat(path, { bigint: true });
-
-    if (stats.isSymbolicLink() || !stats.isDirectory()) {
-      return issue(
-        "TEMPORARY_DIRECTORY_AMBIGUOUS",
-        [],
-        "invalid-source",
-      );
-    }
-
-    identity = { path, device: stats.dev, inode: stats.ino };
-    await chmod(path, 0o700);
-    return { ok: true, value: identity };
-  } catch {
-    if (identity !== undefined) {
-      await cleanupOwnedDirectory(identity);
-    }
-    return issue(
-      "TEMPORARY_DIRECTORY_CREATE_FAILED",
-      [],
-      "creation-failed",
-    );
+  const created = await createOwnedTemporaryDirectory(
+    parent,
+    ".egeria-create-",
+  );
+  if (created.ok) {
+    return created;
   }
+
+  return created.reason === "invalid-identity"
+    ? issue("TEMPORARY_DIRECTORY_AMBIGUOUS", [], "invalid-source")
+    : issue(
+        "TEMPORARY_DIRECTORY_CREATE_FAILED",
+        [],
+        "creation-failed",
+      );
 }
 
 async function requireSourceIdentity(
@@ -313,32 +301,10 @@ function validatePreparedLockfile(
   before: ReadonlyMap<string, SourceEntry>,
   after: ReadonlyMap<string, SourceEntry>,
 ): ValidationResult<void> {
-  const lockfile = after.get("pnpm-lock.yaml");
-
-  if (
-    before.has("pnpm-lock.yaml") ||
-    lockfile?.kind !== "file" ||
-    after.size !== before.size + 1
-  ) {
-    return issue(
-      "LOCKFILE_PREPARATION_INVALID",
-      [],
-      "unexpected-inventory",
-    );
-  }
-
-  for (const [path, entry] of before) {
-    const current = after.get(path);
-    if (current === undefined || !sourceEntriesEqual(entry, current)) {
-      return issue(
-        "LOCKFILE_PREPARATION_INVALID",
-        [],
-        "source-changed",
-      );
-    }
-  }
-
-  return { ok: true, value: undefined };
+  const transition = classifyLockfileOnlyTransition(before, after);
+  return transition === "valid"
+    ? { ok: true, value: undefined }
+    : issue("LOCKFILE_PREPARATION_INVALID", [], transition);
 }
 
 function expectedCapabilityIdentifiers(
@@ -393,30 +359,24 @@ function verificationIsExact(value: unknown): value is GeneratedProjectVerificat
 
 function createBuilderStateSurfaces(): readonly ManagedSurfaceDescriptor[] {
   return [
-    {
+    createFileSurfaceDescriptor({
       identifier: "builder-project-configuration",
       owner: { kind: "builder-kernel" },
       path: ".egeria/project.yaml",
       ownership: "managed",
-      fingerprintTarget: { kind: "file" },
-      mergeStrategy: "replace-file",
-    },
-    {
+    }),
+    createFileSurfaceDescriptor({
       identifier: "builder-dependency-lockfile",
       owner: { kind: "builder-kernel" },
       path: "pnpm-lock.yaml",
       ownership: "managed",
-      fingerprintTarget: { kind: "file" },
-      mergeStrategy: "replace-file",
-    },
-    {
+    }),
+    createFileSurfaceDescriptor({
       identifier: "builder-migration-log",
       owner: { kind: "builder-kernel" },
       path: ".egeria/migrations.jsonl",
       ownership: "managed",
-      fingerprintTarget: { kind: "file" },
-      mergeStrategy: "replace-file",
-    },
+    }),
   ];
 }
 
