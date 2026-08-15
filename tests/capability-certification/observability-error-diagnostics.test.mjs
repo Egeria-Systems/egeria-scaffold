@@ -712,6 +712,196 @@ test("the deployed exercise is bounded to three server cases and reads content o
   );
 });
 
+test("the deployed fixture overrides and restores the request-scoped Cloudflare context without replacing the platform global", async () => {
+  const { ModuleKind, ScriptTarget, transpileModule } =
+    requireFromBuilderCore("typescript");
+  const temporaryRoot = await mkdtemp(
+    join(tmpdir(), "diagnostics-cloudflare-context-"),
+  );
+  const routeModulePath = join(temporaryRoot, "route.mjs");
+  const reporterModulePath = join(temporaryRoot, "server-reporter.mjs");
+  const contextKey = Symbol.for("__cloudflare-context__");
+  const leaseKey = Symbol.for(
+    "__observability-diagnostics-certification-lease__",
+  );
+  const previousContextDescriptor = Object.getOwnPropertyDescriptor(
+    globalThis,
+    contextKey,
+  );
+  const previousFetch = globalThis.fetch;
+  const previousConsoleInfo = console.info;
+  const scheduled = [];
+  const providerRequests = [];
+  const cloudflareContext = {
+    env: {
+      BETTER_STACK_INGESTING_HOST: "provider.example",
+      BETTER_STACK_SOURCE_TOKEN: "provider-placeholder",
+    },
+    ctx: {
+      waitUntil(task) {
+        scheduled.push(Promise.resolve(task));
+      },
+    },
+  };
+  const initialEnvironment = cloudflareContext.env;
+  const initialExecutionContext = cloudflareContext.ctx;
+  let activeCloudflareContext = cloudflareContext;
+
+  try {
+    const routeSource = await readFile(
+      join(
+        fixtureRoot,
+        "apps/web/app/api/certification/diagnostics/route.ts",
+      ),
+      "utf8",
+    );
+    const routeJavaScript = transpileModule(routeSource, {
+      compilerOptions: {
+        module: ModuleKind.ESNext,
+        target: ScriptTarget.ES2022,
+      },
+    }).outputText.replace(
+      '"../../../../src/infrastructure/observability/server-reporter"',
+      '"./server-reporter.mjs"',
+    );
+    await writeFile(routeModulePath, routeJavaScript, "utf8");
+    await writeFile(
+      reporterModulePath,
+      `const contextKey = Symbol.for("__cloudflare-context__");
+
+export async function reportCaughtServerError(_error, context) {
+  const runtime = Reflect.get(globalThis, contextKey);
+  console.info({
+    event_name: "server.caught.error",
+    correlation_id: context.correlationId,
+    attributes: {
+      capture_mechanism: "selected-catch",
+      handled: true,
+      operation: context.operation,
+    },
+  });
+  const delivery = (async () => {
+    try {
+      const response = await fetch(
+        \`https://\${runtime.env.BETTER_STACK_INGESTING_HOST}\`,
+        { method: "POST" },
+      );
+      if (response.status !== 202) {
+        console.info({
+          event_name: "observability.delivery.failed",
+          attributes: { reason: "provider-rejected", sink: "better-stack" },
+        });
+      }
+    } catch {
+      console.info({
+        event_name: "observability.delivery.failed",
+        attributes: { reason: "sink-threw", sink: "better-stack" },
+      });
+    }
+  })();
+  runtime.ctx.waitUntil(delivery);
+}
+`,
+      "utf8",
+    );
+    Object.defineProperty(globalThis, contextKey, {
+      configurable: true,
+      get: () => activeCloudflareContext,
+    });
+    console.info = () => undefined;
+    globalThis.fetch = async (_url, init) => {
+      providerRequests.push(init?.method);
+      return new Response(null, { status: 202 });
+    };
+
+    const route = await import(`${pathToFileURL(routeModulePath).href}?test=${Date.now()}`);
+    const markerSuffix = exactRevision.slice(0, 16);
+    const requestFor = (name) =>
+      new Request(
+        `https://diagnostics-certification.example/api/certification/diagnostics?case=${name}&marker=diagnostics-${name === "selected-server-catch" ? "server" : "failure"}-${markerSuffix}`,
+      );
+
+    const selectedResponse = await route.GET(
+      requestFor("selected-server-catch"),
+    );
+    assert.equal(selectedResponse.status, 204);
+    assert.equal(cloudflareContext.env, initialEnvironment);
+    assert.equal(cloudflareContext.ctx, initialExecutionContext);
+    await Promise.allSettled(scheduled.splice(0));
+
+    const failureResponse = await route.GET(
+      requestFor("diagnostic-failure-containment"),
+    );
+    assert.equal(failureResponse.status, 200);
+    assert.deepEqual(await failureResponse.json(), {
+      ok: true,
+      diagnosticAttempts: 1,
+      deliveryResult: "provider-rejected",
+      applicationResult: "preserved",
+      healthRecords: 1,
+      originalRecords: 1,
+      recursiveDiagnosticAttempts: 0,
+      scheduledTasks: 1,
+    });
+    assert.equal(cloudflareContext.env, initialEnvironment);
+    assert.equal(cloudflareContext.ctx, initialExecutionContext);
+    assert.deepEqual(providerRequests, ["POST"]);
+
+    const cleanupEnvironment = {
+      BETTER_STACK_INGESTING_HOST: "provider.example",
+      BETTER_STACK_SOURCE_TOKEN: "provider-placeholder",
+    };
+    const cleanupExecutionContext = {
+      waitUntil(task) {
+        scheduled.push(Promise.resolve(task));
+      },
+    };
+    const cleanupTarget = {
+      env: cleanupEnvironment,
+      ctx: cleanupExecutionContext,
+    };
+    const restorationAttempts = [];
+    activeCloudflareContext = new Proxy(cleanupTarget, {
+      set(target, property, value) {
+        if (property === "env" && value === cleanupEnvironment) {
+          restorationAttempts.push("env");
+          throw new Error("synthetic environment restoration failure");
+        }
+        if (property === "ctx" && value === cleanupExecutionContext) {
+          restorationAttempts.push("ctx");
+        }
+        return Reflect.set(target, property, value);
+      },
+    });
+    const fetchBeforeFailedCleanup = globalThis.fetch;
+    const consoleBeforeFailedCleanup = console.info;
+
+    const failedCleanupResponse = await route.GET(
+      requestFor("diagnostic-failure-containment"),
+    );
+    assert.equal(failedCleanupResponse.status, 500);
+    assert.deepEqual(
+      new Set(restorationAttempts),
+      new Set(["env", "ctx"]),
+    );
+    assert.equal(cleanupTarget.ctx, cleanupExecutionContext);
+    assert.equal(globalThis.fetch, fetchBeforeFailedCleanup);
+    assert.equal(console.info, consoleBeforeFailedCleanup);
+    assert.equal(Reflect.get(globalThis, leaseKey), false);
+  } finally {
+    await Promise.allSettled(scheduled.splice(0));
+    globalThis.fetch = previousFetch;
+    console.info = previousConsoleInfo;
+    Reflect.deleteProperty(globalThis, leaseKey);
+    if (previousContextDescriptor === undefined) {
+      Reflect.deleteProperty(globalThis, contextKey);
+    } else {
+      Object.defineProperty(globalThis, contextKey, previousContextDescriptor);
+    }
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});
+
 test("route and browser receipts reconcile to the frozen eight-case matrix", async () => {
   const { reconcileObservabilityErrorDiagnosticsReceipts } =
     await loadModule(exercisePath);

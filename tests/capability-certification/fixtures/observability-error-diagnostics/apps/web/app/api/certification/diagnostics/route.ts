@@ -99,6 +99,7 @@ async function captureGeneratedDispatch(
   if (!isRecord(previousContext)) {
     throw new Error("Cloudflare context unavailable");
   }
+  const previousEnvironment = previousContext.env;
   const previousExecutionContext = previousContext.ctx;
   if (!isRecord(previousExecutionContext)) {
     throw new Error("Cloudflare execution context unavailable");
@@ -108,61 +109,125 @@ async function captureGeneratedDispatch(
   const records: UnknownRecord[] = [];
   let diagnosticAttempts = 0;
   const previousFetch = globalThis.fetch;
-  const previousConsoleInfo = console.info.bind(console);
+  const previousConsoleInfo = console.info;
   const replacementEnvironment = rejectDiagnostic
     ? Object.freeze({
         BETTER_STACK_INGESTING_HOST: controlledDiagnosticHost,
         BETTER_STACK_SOURCE_TOKEN: controlledDiagnosticToken,
       })
     : previousContext.env;
-  const replacementContext = Object.freeze({
-    ...previousContext,
-    env: replacementEnvironment,
-    ctx: Object.freeze({
-      ...previousExecutionContext,
-      waitUntil(task: Promise<unknown>) {
-        scheduled.push(Promise.resolve(task));
-      },
-    }),
+  const replacementExecutionContext = Object.freeze({
+    ...previousExecutionContext,
+    waitUntil(task: Promise<unknown>) {
+      scheduled.push(Promise.resolve(task));
+    },
   });
 
-  Reflect.set(globalThis, certificationLeaseKey, true);
-  Reflect.set(globalThis, cloudflareContextKey, replacementContext);
-  console.info = (...values: unknown[]) => {
-    const [candidate] = values;
-    if (isRecord(candidate) && typeof candidate.event_name === "string") {
-      records.push(candidate);
-    }
-    try {
-      previousConsoleInfo(...values);
-    } catch {
-      // Certification observation must not change generated reporting behavior.
-    }
-  };
-  if (rejectDiagnostic) {
-    globalThis.fetch = async (input) => {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url;
-      if (url !== `https://${controlledDiagnosticHost}`) {
-        throw new Error("unexpected certification request");
-      }
-      diagnosticAttempts += 1;
-      return new Response(null, { status: 503 });
-    };
-  }
-
+  let environmentReplaced = false;
+  let executionContextReplaced = false;
+  let leaseAcquired = false;
+  let consoleReplaced = false;
+  let fetchReplaced = false;
+  let captureFailed = false;
+  let captureError: unknown;
   try {
+    environmentReplaced = Reflect.set(
+      previousContext,
+      "env",
+      replacementEnvironment,
+    );
+    if (!environmentReplaced) {
+      throw new Error("Cloudflare context replacement unavailable");
+    }
+    executionContextReplaced = Reflect.set(
+      previousContext,
+      "ctx",
+      replacementExecutionContext,
+    );
+    if (!executionContextReplaced) {
+      throw new Error("Cloudflare context replacement unavailable");
+    }
+    if (!Reflect.set(globalThis, certificationLeaseKey, true)) {
+      throw new Error("certification lease unavailable");
+    }
+    leaseAcquired = true;
+    console.info = (...values: unknown[]) => {
+      const [candidate] = values;
+      if (isRecord(candidate) && typeof candidate.event_name === "string") {
+        records.push(candidate);
+      }
+      try {
+        Reflect.apply(previousConsoleInfo, console, values);
+      } catch {
+        // Certification observation must not change generated reporting behavior.
+      }
+    };
+    consoleReplaced = true;
+    if (rejectDiagnostic) {
+      globalThis.fetch = async (input) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        if (url !== `https://${controlledDiagnosticHost}`) {
+          throw new Error("unexpected certification request");
+        }
+        diagnosticAttempts += 1;
+        return new Response(null, { status: 503 });
+      };
+      fetchReplaced = true;
+    }
+
     await action();
     await Promise.all(scheduled);
-  } finally {
-    globalThis.fetch = previousFetch;
-    console.info = previousConsoleInfo;
-    Reflect.set(globalThis, cloudflareContextKey, previousContext);
-    Reflect.set(globalThis, certificationLeaseKey, false);
+  } catch (error) {
+    captureFailed = true;
+    captureError = error;
+  }
+
+  let cleanupFailed = false;
+  const attemptCleanup = (cleanup: () => boolean | void) => {
+    try {
+      if (cleanup() === false) {
+        cleanupFailed = true;
+      }
+    } catch {
+      cleanupFailed = true;
+    }
+  };
+  if (fetchReplaced) {
+    attemptCleanup(() => {
+      globalThis.fetch = previousFetch;
+    });
+  }
+  if (consoleReplaced) {
+    attemptCleanup(() => {
+      console.info = previousConsoleInfo;
+    });
+  }
+  if (executionContextReplaced) {
+    attemptCleanup(() =>
+      Reflect.set(previousContext, "ctx", previousExecutionContext),
+    );
+  }
+  if (environmentReplaced) {
+    attemptCleanup(() =>
+      Reflect.set(previousContext, "env", previousEnvironment),
+    );
+  }
+  if (leaseAcquired) {
+    attemptCleanup(() =>
+      Reflect.set(globalThis, certificationLeaseKey, false),
+    );
+  }
+
+  if (captureFailed) {
+    throw captureError;
+  }
+  if (cleanupFailed) {
+    throw new Error("Cloudflare context restoration failed");
   }
 
   return Object.freeze({
