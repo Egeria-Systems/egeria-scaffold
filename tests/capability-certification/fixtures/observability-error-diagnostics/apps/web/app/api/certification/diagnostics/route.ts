@@ -99,6 +99,7 @@ async function captureGeneratedDispatch(
   if (!isRecord(previousContext)) {
     throw new Error("Cloudflare context unavailable");
   }
+  const previousEnvironment = previousContext.env;
   const previousExecutionContext = previousContext.ctx;
   if (!isRecord(previousExecutionContext)) {
     throw new Error("Cloudflare execution context unavailable");
@@ -115,19 +116,34 @@ async function captureGeneratedDispatch(
         BETTER_STACK_SOURCE_TOKEN: controlledDiagnosticToken,
       })
     : previousContext.env;
-  const replacementContext = Object.freeze({
-    ...previousContext,
-    env: replacementEnvironment,
-    ctx: Object.freeze({
-      ...previousExecutionContext,
-      waitUntil(task: Promise<unknown>) {
-        scheduled.push(Promise.resolve(task));
-      },
-    }),
+  const replacementExecutionContext = Object.freeze({
+    ...previousExecutionContext,
+    waitUntil(task: Promise<unknown>) {
+      scheduled.push(Promise.resolve(task));
+    },
   });
 
+  const environmentReplaced = Reflect.set(
+    previousContext,
+    "env",
+    replacementEnvironment,
+  );
+  const executionContextReplaced = Reflect.set(
+    previousContext,
+    "ctx",
+    replacementExecutionContext,
+  );
+  if (!environmentReplaced || !executionContextReplaced) {
+    if (environmentReplaced) {
+      Reflect.set(previousContext, "env", previousEnvironment);
+    }
+    if (executionContextReplaced) {
+      Reflect.set(previousContext, "ctx", previousExecutionContext);
+    }
+    throw new Error("Cloudflare context replacement unavailable");
+  }
+
   Reflect.set(globalThis, certificationLeaseKey, true);
-  Reflect.set(globalThis, cloudflareContextKey, replacementContext);
   console.info = (...values: unknown[]) => {
     const [candidate] = values;
     if (isRecord(candidate) && typeof candidate.event_name === "string") {
@@ -161,8 +177,20 @@ async function captureGeneratedDispatch(
   } finally {
     globalThis.fetch = previousFetch;
     console.info = previousConsoleInfo;
-    Reflect.set(globalThis, cloudflareContextKey, previousContext);
+    const environmentRestored = Reflect.set(
+      previousContext,
+      "env",
+      previousEnvironment,
+    );
+    const executionContextRestored = Reflect.set(
+      previousContext,
+      "ctx",
+      previousExecutionContext,
+    );
     Reflect.set(globalThis, certificationLeaseKey, false);
+    if (!environmentRestored || !executionContextRestored) {
+      throw new Error("Cloudflare context restoration failed");
+    }
   }
 
   return Object.freeze({
