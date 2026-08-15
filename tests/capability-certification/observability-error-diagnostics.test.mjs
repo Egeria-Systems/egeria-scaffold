@@ -712,7 +712,7 @@ test("the deployed exercise is bounded to three server cases and reads content o
   );
 });
 
-test("the deployed fixture overrides the request-scoped Cloudflare context without replacing the platform global", async () => {
+test("the deployed fixture overrides and restores the request-scoped Cloudflare context without replacing the platform global", async () => {
   const { ModuleKind, ScriptTarget, transpileModule } =
     requireFromBuilderCore("typescript");
   const temporaryRoot = await mkdtemp(
@@ -743,6 +743,9 @@ test("the deployed fixture overrides the request-scoped Cloudflare context witho
       },
     },
   };
+  const initialEnvironment = cloudflareContext.env;
+  const initialExecutionContext = cloudflareContext.ctx;
+  let activeCloudflareContext = cloudflareContext;
 
   try {
     const routeSource = await readFile(
@@ -803,7 +806,7 @@ export async function reportCaughtServerError(_error, context) {
     );
     Object.defineProperty(globalThis, contextKey, {
       configurable: true,
-      get: () => cloudflareContext,
+      get: () => activeCloudflareContext,
     });
     console.info = () => undefined;
     globalThis.fetch = async (_url, init) => {
@@ -822,6 +825,8 @@ export async function reportCaughtServerError(_error, context) {
       requestFor("selected-server-catch"),
     );
     assert.equal(selectedResponse.status, 204);
+    assert.equal(cloudflareContext.env, initialEnvironment);
+    assert.equal(cloudflareContext.ctx, initialExecutionContext);
     await Promise.allSettled(scheduled.splice(0));
 
     const failureResponse = await route.GET(
@@ -838,7 +843,51 @@ export async function reportCaughtServerError(_error, context) {
       recursiveDiagnosticAttempts: 0,
       scheduledTasks: 1,
     });
+    assert.equal(cloudflareContext.env, initialEnvironment);
+    assert.equal(cloudflareContext.ctx, initialExecutionContext);
     assert.deepEqual(providerRequests, ["POST"]);
+
+    const cleanupEnvironment = {
+      BETTER_STACK_INGESTING_HOST: "provider.example",
+      BETTER_STACK_SOURCE_TOKEN: "provider-placeholder",
+    };
+    const cleanupExecutionContext = {
+      waitUntil(task) {
+        scheduled.push(Promise.resolve(task));
+      },
+    };
+    const cleanupTarget = {
+      env: cleanupEnvironment,
+      ctx: cleanupExecutionContext,
+    };
+    const restorationAttempts = [];
+    activeCloudflareContext = new Proxy(cleanupTarget, {
+      set(target, property, value) {
+        if (property === "env" && value === cleanupEnvironment) {
+          restorationAttempts.push("env");
+          throw new Error("synthetic environment restoration failure");
+        }
+        if (property === "ctx" && value === cleanupExecutionContext) {
+          restorationAttempts.push("ctx");
+        }
+        return Reflect.set(target, property, value);
+      },
+    });
+    const fetchBeforeFailedCleanup = globalThis.fetch;
+    const consoleBeforeFailedCleanup = console.info;
+
+    const failedCleanupResponse = await route.GET(
+      requestFor("diagnostic-failure-containment"),
+    );
+    assert.equal(failedCleanupResponse.status, 500);
+    assert.deepEqual(
+      new Set(restorationAttempts),
+      new Set(["env", "ctx"]),
+    );
+    assert.equal(cleanupTarget.ctx, cleanupExecutionContext);
+    assert.equal(globalThis.fetch, fetchBeforeFailedCleanup);
+    assert.equal(console.info, consoleBeforeFailedCleanup);
+    assert.equal(Reflect.get(globalThis, leaseKey), false);
   } finally {
     await Promise.allSettled(scheduled.splice(0));
     globalThis.fetch = previousFetch;

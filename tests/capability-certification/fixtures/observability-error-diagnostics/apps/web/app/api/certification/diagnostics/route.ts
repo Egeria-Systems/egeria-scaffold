@@ -109,7 +109,7 @@ async function captureGeneratedDispatch(
   const records: UnknownRecord[] = [];
   let diagnosticAttempts = 0;
   const previousFetch = globalThis.fetch;
-  const previousConsoleInfo = console.info.bind(console);
+  const previousConsoleInfo = console.info;
   const replacementEnvironment = rejectDiagnostic
     ? Object.freeze({
         BETTER_STACK_INGESTING_HOST: controlledDiagnosticHost,
@@ -123,74 +123,111 @@ async function captureGeneratedDispatch(
     },
   });
 
-  const environmentReplaced = Reflect.set(
-    previousContext,
-    "env",
-    replacementEnvironment,
-  );
-  const executionContextReplaced = Reflect.set(
-    previousContext,
-    "ctx",
-    replacementExecutionContext,
-  );
-  if (!environmentReplaced || !executionContextReplaced) {
-    if (environmentReplaced) {
-      Reflect.set(previousContext, "env", previousEnvironment);
-    }
-    if (executionContextReplaced) {
-      Reflect.set(previousContext, "ctx", previousExecutionContext);
-    }
-    throw new Error("Cloudflare context replacement unavailable");
-  }
-
-  Reflect.set(globalThis, certificationLeaseKey, true);
-  console.info = (...values: unknown[]) => {
-    const [candidate] = values;
-    if (isRecord(candidate) && typeof candidate.event_name === "string") {
-      records.push(candidate);
-    }
-    try {
-      previousConsoleInfo(...values);
-    } catch {
-      // Certification observation must not change generated reporting behavior.
-    }
-  };
-  if (rejectDiagnostic) {
-    globalThis.fetch = async (input) => {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url;
-      if (url !== `https://${controlledDiagnosticHost}`) {
-        throw new Error("unexpected certification request");
-      }
-      diagnosticAttempts += 1;
-      return new Response(null, { status: 503 });
-    };
-  }
-
+  let environmentReplaced = false;
+  let executionContextReplaced = false;
+  let leaseAcquired = false;
+  let consoleReplaced = false;
+  let fetchReplaced = false;
+  let captureFailed = false;
+  let captureError: unknown;
   try {
-    await action();
-    await Promise.all(scheduled);
-  } finally {
-    globalThis.fetch = previousFetch;
-    console.info = previousConsoleInfo;
-    const environmentRestored = Reflect.set(
+    environmentReplaced = Reflect.set(
       previousContext,
       "env",
-      previousEnvironment,
+      replacementEnvironment,
     );
-    const executionContextRestored = Reflect.set(
+    if (!environmentReplaced) {
+      throw new Error("Cloudflare context replacement unavailable");
+    }
+    executionContextReplaced = Reflect.set(
       previousContext,
       "ctx",
-      previousExecutionContext,
+      replacementExecutionContext,
     );
-    Reflect.set(globalThis, certificationLeaseKey, false);
-    if (!environmentRestored || !executionContextRestored) {
-      throw new Error("Cloudflare context restoration failed");
+    if (!executionContextReplaced) {
+      throw new Error("Cloudflare context replacement unavailable");
     }
+    if (!Reflect.set(globalThis, certificationLeaseKey, true)) {
+      throw new Error("certification lease unavailable");
+    }
+    leaseAcquired = true;
+    console.info = (...values: unknown[]) => {
+      const [candidate] = values;
+      if (isRecord(candidate) && typeof candidate.event_name === "string") {
+        records.push(candidate);
+      }
+      try {
+        Reflect.apply(previousConsoleInfo, console, values);
+      } catch {
+        // Certification observation must not change generated reporting behavior.
+      }
+    };
+    consoleReplaced = true;
+    if (rejectDiagnostic) {
+      globalThis.fetch = async (input) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        if (url !== `https://${controlledDiagnosticHost}`) {
+          throw new Error("unexpected certification request");
+        }
+        diagnosticAttempts += 1;
+        return new Response(null, { status: 503 });
+      };
+      fetchReplaced = true;
+    }
+
+    await action();
+    await Promise.all(scheduled);
+  } catch (error) {
+    captureFailed = true;
+    captureError = error;
+  }
+
+  let cleanupFailed = false;
+  const attemptCleanup = (cleanup: () => boolean | void) => {
+    try {
+      if (cleanup() === false) {
+        cleanupFailed = true;
+      }
+    } catch {
+      cleanupFailed = true;
+    }
+  };
+  if (fetchReplaced) {
+    attemptCleanup(() => {
+      globalThis.fetch = previousFetch;
+    });
+  }
+  if (consoleReplaced) {
+    attemptCleanup(() => {
+      console.info = previousConsoleInfo;
+    });
+  }
+  if (executionContextReplaced) {
+    attemptCleanup(() =>
+      Reflect.set(previousContext, "ctx", previousExecutionContext),
+    );
+  }
+  if (environmentReplaced) {
+    attemptCleanup(() =>
+      Reflect.set(previousContext, "env", previousEnvironment),
+    );
+  }
+  if (leaseAcquired) {
+    attemptCleanup(() =>
+      Reflect.set(globalThis, certificationLeaseKey, false),
+    );
+  }
+
+  if (captureFailed) {
+    throw captureError;
+  }
+  if (cleanupFailed) {
+    throw new Error("Cloudflare context restoration failed");
   }
 
   return Object.freeze({
