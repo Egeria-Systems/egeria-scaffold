@@ -99,7 +99,13 @@ test("tracked text excludes personal home-directory paths", async () => {
   const unexpectedMatches = [];
 
   for (const path of await listTrackedPaths()) {
-    const bytes = await readFile(resolve(repositoryRoot, path));
+    let bytes;
+    try {
+      bytes = await readFile(resolve(repositoryRoot, path));
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
     if (bytes.includes(0)) {
       continue;
     }

@@ -13,7 +13,7 @@ export async function runCertificationCli(configuration, runtime = process) {
     return;
   }
 
-  const input = configuration.parseArguments(runtime.argv.slice(2));
+  const input = await configuration.parseArguments(runtime.argv.slice(2));
   if (input === undefined) {
     runtime.stderr.write(
       `${JSON.stringify({

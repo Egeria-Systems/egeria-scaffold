@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { chmod, mkdtemp } from "node:fs/promises";
+import { chmod, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -145,21 +145,44 @@ function requireDiffResult(configuration, value) {
   }
 }
 
+async function requireRecipeVersion(configuration, projectRoot) {
+  if (configuration.expectedRecipeVersion === undefined) return;
+
+  let source;
+  try {
+    source = await readFile(join(projectRoot, ".egeria/project.yaml"), "utf8");
+  } catch {
+    fail(configuration, "FRESH_SCAFFOLD_RECIPE_INVALID");
+  }
+  const recipeLines = source
+    .split("\n")
+    .filter((line) => line.startsWith("recipeVersion:"));
+  if (
+    recipeLines.length !== 1 ||
+    recipeLines[0] !== `recipeVersion: ${configuration.expectedRecipeVersion}`
+  ) {
+    fail(configuration, "FRESH_SCAFFOLD_RECIPE_INVALID");
+  }
+}
+
 function requireAdapters(configuration, adapters) {
   if (
     adapters === null ||
     typeof adapters !== "object" ||
     typeof adapters.runCommand !== "function" ||
-    typeof adapters.verifyProject !== "function"
+    typeof adapters.verifyProject !== "function" ||
+    (configuration.expectedFixtureChecks !== undefined &&
+      typeof adapters.verifyFixture !== "function")
   ) {
     fail(configuration, "CERTIFICATION_ADAPTER_INVALID");
   }
 }
 
-function productionAdapters() {
+function productionAdapters(verifyFixture) {
   return {
     runCommand: defaultRunCommand,
     verifyProject: verifyGeneratedProject,
+    ...(verifyFixture === undefined ? {} : { verifyFixture }),
   };
 }
 
@@ -181,8 +204,11 @@ async function createOwnedDirectory() {
   };
 }
 
-export function certifyFreshScaffold(configuration) {
-  return certifyFreshScaffoldForTesting(configuration, productionAdapters());
+export function certifyFreshScaffold(configuration, verifyFixture) {
+  return certifyFreshScaffoldForTesting(
+    configuration,
+    productionAdapters(verifyFixture),
+  );
 }
 
 export async function certifyFreshScaffoldForTesting(configuration, adapters) {
@@ -244,6 +270,8 @@ export async function certifyFreshScaffoldForTesting(configuration, adapters) {
     );
     requireDiffResult(configuration, diff);
 
+    await requireRecipeVersion(configuration, projectRoot);
+
     let generatedVerification;
     try {
       generatedVerification = await adapters.verifyProject(
@@ -269,13 +297,40 @@ export async function certifyFreshScaffoldForTesting(configuration, adapters) {
       fail(configuration, "GENERATED_PROJECT_VERIFICATION_INVALID");
     }
 
+    let fixtureVerification;
+    if (configuration.expectedFixtureChecks !== undefined) {
+      try {
+        fixtureVerification = await adapters.verifyFixture({
+          projectRoot,
+          runCommand: adapters.runCommand,
+          environment: createIsolatedProcessEnvironment(),
+        });
+      } catch (error) {
+        if (configuration.isCertificationError(error)) throw error;
+        fail(configuration, "CERTIFICATION_FIXTURE_VERIFICATION_FAILED");
+      }
+      if (
+        fixtureVerification?.ok !== true ||
+        !arraysEqual(
+          fixtureVerification.checks,
+          configuration.expectedFixtureChecks,
+        )
+      ) {
+        fail(configuration, "CERTIFICATION_FIXTURE_VERIFICATION_INVALID");
+      }
+    }
+
     result = {
       ok: true,
       capability: configuration.capabilityIdentifier,
       version: configuration.capabilityVersion,
       profile: configuration.profile,
       ...configuration.receipt,
-      checks: [...certificationChecks, ...generatedVerification.checks],
+      checks: [
+        ...certificationChecks,
+        ...generatedVerification.checks,
+        ...(fixtureVerification?.checks ?? []),
+      ],
     };
   } catch (error) {
     pendingError = configuration.isCertificationError(error)
