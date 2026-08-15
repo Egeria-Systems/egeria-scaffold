@@ -13,12 +13,13 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
 import { certifyBookingCalendlyForTesting } from "../../scripts/certify-booking-calendly.mjs";
 import { certifyGeneratedTestingForTesting } from "../../scripts/certify-generated-testing.mjs";
+import { runCertificationCli } from "../../scripts/lib/certification-cli.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(
@@ -76,6 +77,140 @@ const fixedChecks = Object.freeze([
   "browser-development",
   "browser-preview",
 ]);
+
+function createCertificationCliRuntime(arguments_ = []) {
+  const scriptPath = resolve(
+    repositoryRoot,
+    "scripts/example-certification.mjs",
+  );
+  const stdout = [];
+  const stderr = [];
+  const runtime = {
+    argv: [process.execPath, scriptPath, ...arguments_],
+    stdout: { write: (value) => stdout.push(value) },
+    stderr: { write: (value) => stderr.push(value) },
+    exitCode: undefined,
+  };
+
+  return {
+    moduleUrl: pathToFileURL(scriptPath).href,
+    runtime,
+    stdout,
+    stderr,
+  };
+}
+
+test("the certification CLI runner is inert when its module is imported", async () => {
+  const execution = createCertificationCliRuntime();
+  execution.runtime.argv[1] = resolve(repositoryRoot, "scripts/importer.mjs");
+
+  await runCertificationCli(
+    {
+      moduleUrl: execution.moduleUrl,
+      parseArguments: () => assert.fail("an imported module must not parse"),
+      certify: () => assert.fail("an imported module must not certify"),
+      isCertificationError: () => false,
+    },
+    execution.runtime,
+  );
+
+  assert.deepEqual(execution.stdout, []);
+  assert.deepEqual(execution.stderr, []);
+  assert.equal(execution.runtime.exitCode, undefined);
+});
+
+test("the certification CLI runner owns argument, success, and failure framing", async (context) => {
+  await context.test("rejects arguments without echoing them", async () => {
+    const execution = createCertificationCliRuntime([
+      "--unknown",
+      "private-value",
+    ]);
+
+    await runCertificationCli(
+      {
+        moduleUrl: execution.moduleUrl,
+        parseArguments: () => undefined,
+        certify: () => assert.fail("invalid arguments must not certify"),
+        isCertificationError: () => false,
+      },
+      execution.runtime,
+    );
+
+    assert.deepEqual(execution.stdout, []);
+    assert.deepEqual(execution.stderr, [
+      `${JSON.stringify({
+        ok: false,
+        code: "CERTIFICATION_ARGUMENT_INVALID",
+      })}\n`,
+    ]);
+    assert.equal(execution.runtime.exitCode, 2);
+    assert.doesNotMatch(execution.stderr.join(""), /private-value/u);
+  });
+
+  await context.test("writes one JSON success result", async () => {
+    const execution = createCertificationCliRuntime();
+
+    await runCertificationCli(
+      {
+        moduleUrl: execution.moduleUrl,
+        parseArguments: () => ({ profile: "portfolio" }),
+        certify: async (input) => ({ ok: true, profile: input.profile }),
+        isCertificationError: () => false,
+      },
+      execution.runtime,
+    );
+
+    assert.deepEqual(execution.stdout, [
+      `${JSON.stringify({ ok: true, profile: "portfolio" })}\n`,
+    ]);
+    assert.deepEqual(execution.stderr, []);
+    assert.equal(execution.runtime.exitCode, undefined);
+  });
+
+  class LocalCertificationError extends Error {
+    constructor(code) {
+      super("certification failed");
+      this.code = code;
+    }
+  }
+
+  for (const [name, error, expectedCode] of [
+    [
+      "preserves a typed certification code",
+      new LocalCertificationError("TYPED_FAILURE"),
+      "TYPED_FAILURE",
+    ],
+    [
+      "contains an untyped failure",
+      new Error("private-value"),
+      "CERTIFICATION_FAILED",
+    ],
+  ]) {
+    await context.test(name, async () => {
+      const execution = createCertificationCliRuntime();
+
+      await runCertificationCli(
+        {
+          moduleUrl: execution.moduleUrl,
+          parseArguments: () => ({}),
+          certify: async () => {
+            throw error;
+          },
+          isCertificationError: (candidate) =>
+            candidate instanceof LocalCertificationError,
+        },
+        execution.runtime,
+      );
+
+      assert.deepEqual(execution.stdout, []);
+      assert.deepEqual(execution.stderr, [
+        `${JSON.stringify({ ok: false, code: expectedCode })}\n`,
+      ]);
+      assert.equal(execution.runtime.exitCode, 1);
+      assert.doesNotMatch(execution.stderr.join(""), /private-value/u);
+    });
+  }
+});
 
 async function pathExists(path) {
   try {

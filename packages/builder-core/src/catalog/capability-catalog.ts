@@ -92,9 +92,566 @@ function createJsonValueProbe(
   };
 }
 
+type CapabilityEvidencePoint = Readonly<{
+  managedSurface: ManagedSurfaceDescriptor;
+  inferenceProbe: InferenceProbe;
+}>;
+
+function createFileEvidencePoint(
+  identifier: string,
+  capability: string,
+  path: string,
+  ownership: "managed" | "application-owned",
+): CapabilityEvidencePoint {
+  return {
+    managedSurface: createFileSurface(identifier, capability, path, ownership),
+    inferenceProbe: createFileProbe(path),
+  };
+}
+
+function encodeJsonPointerSegment(value: string): string {
+  return value.replaceAll("~", "~0").replaceAll("/", "~1");
+}
+
+function createPackageEvidencePoint(
+  identifier: string,
+  capability: string,
+  section: "dependencies" | "devDependencies",
+  packageName: string,
+  version: string,
+): CapabilityEvidencePoint {
+  return {
+    managedSurface: createPackageSurface(
+      identifier,
+      capability,
+      `/${section}/${encodeJsonPointerSegment(packageName)}`,
+    ),
+    inferenceProbe: createPackageProbe(section, packageName, version),
+  };
+}
+
+function createPackageJsonValueEvidencePoint(
+  identifier: string,
+  capability: string,
+  pointer: string,
+  expected: string | boolean | number,
+): CapabilityEvidencePoint {
+  return {
+    managedSurface: createPackageSurface(identifier, capability, pointer),
+    inferenceProbe: createJsonValueProbe(
+      "apps/web/package.json",
+      pointer,
+      expected,
+    ),
+  };
+}
+
+function projectManagedSurfaces(
+  evidencePoints: readonly CapabilityEvidencePoint[],
+): readonly ManagedSurfaceDescriptor[] {
+  return evidencePoints.map(({ managedSurface }) => managedSurface);
+}
+
+function projectInferenceProbes(
+  evidencePoints: readonly CapabilityEvidencePoint[],
+): readonly InferenceProbe[] {
+  return evidencePoints.map(({ inferenceProbe }) => inferenceProbe);
+}
+
+function projectEvidencePoints(
+  evidencePoints: readonly CapabilityEvidencePoint[],
+): Readonly<{
+  managedSurfaces: readonly ManagedSurfaceDescriptor[];
+  inferenceProbes: readonly InferenceProbe[];
+}> {
+  return {
+    managedSurfaces: projectManagedSurfaces(evidencePoints),
+    inferenceProbes: projectInferenceProbes(evidencePoints),
+  };
+}
+
 function createDescriptors(
   packageVersions: CapabilityPackageVersions,
 ): readonly CapabilityDescriptor[] {
+  const standardsEvidencePoints = [
+    createPackageEvidencePoint(
+      "standards-axe-playwright-package",
+      "standards",
+      "devDependencies",
+      "@axe-core/playwright",
+      "4.12.1",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-browser-install-ci-script",
+      "standards",
+      "/scripts/browser:install:ci",
+      "playwright install --with-deps chromium",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-browser-install-script",
+      "standards",
+      "/scripts/browser:install",
+      "playwright install chromium",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-component-test-script",
+      "standards",
+      "/scripts/test:component",
+      "vitest run --project component",
+    ),
+    createFileEvidencePoint(
+      "standards-component-test-setup",
+      "standards",
+      "apps/web/tests/setup/component.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "standards-component-test-specification",
+      "standards",
+      "apps/web/tests/component/content-page.test.tsx",
+      "application-owned",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-component-watch-script",
+      "standards",
+      "/scripts/test:component:watch",
+      "vitest --project component",
+    ),
+    createFileEvidencePoint(
+      "standards-browser-quality-specification",
+      "standards",
+      "apps/web/tests/e2e/site-quality.spec.ts",
+      "application-owned",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-deployed-browser-test-script",
+      "standards",
+      "/scripts/test:e2e:deployed",
+      "playwright test --config playwright.deployed.config.ts",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-development-browser-test-script",
+      "standards",
+      "/scripts/test:e2e:dev",
+      "playwright test --config playwright.dev.config.ts",
+    ),
+    createPackageEvidencePoint(
+      "standards-dom-testing-library-package",
+      "standards",
+      "devDependencies",
+      "@testing-library/dom",
+      "10.4.1",
+    ),
+    createFileEvidencePoint(
+      "standards-eslint-configuration",
+      "standards",
+      "apps/web/eslint.config.mjs",
+      "managed",
+    ),
+    createPackageEvidencePoint(
+      "standards-jest-dom-package",
+      "standards",
+      "devDependencies",
+      "@testing-library/jest-dom",
+      "7.0.1",
+    ),
+    createPackageEvidencePoint(
+      "standards-jsdom-package",
+      "standards",
+      "devDependencies",
+      "jsdom",
+      "30.0.1",
+    ),
+    createPackageEvidencePoint(
+      "standards-package",
+      "standards",
+      "devDependencies",
+      "@egeria-systems/standards",
+      packageVersions.standards,
+    ),
+    createFileEvidencePoint(
+      "standards-playwright-deployed-configuration",
+      "standards",
+      "apps/web/playwright.deployed.config.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "standards-playwright-development-configuration",
+      "standards",
+      "apps/web/playwright.dev.config.ts",
+      "managed",
+    ),
+    createPackageEvidencePoint(
+      "standards-playwright-package",
+      "standards",
+      "devDependencies",
+      "@playwright/test",
+      "1.62.1",
+    ),
+    createFileEvidencePoint(
+      "standards-playwright-preview-configuration",
+      "standards",
+      "apps/web/playwright.preview.config.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "standards-playwright-shared-configuration",
+      "standards",
+      "apps/web/playwright.config.shared.ts",
+      "managed",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-preview-browser-test-script",
+      "standards",
+      "/scripts/test:e2e:preview",
+      "playwright test --config playwright.preview.config.ts",
+    ),
+    createFileEvidencePoint(
+      "standards-quality-workflow",
+      "standards",
+      ".github/workflows/quality.yml",
+      "managed",
+    ),
+    createPackageEvidencePoint(
+      "standards-react-testing-library-package",
+      "standards",
+      "devDependencies",
+      "@testing-library/react",
+      "16.3.2",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-test-script",
+      "standards",
+      "/scripts/test",
+      "vitest run",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-test-watch-script",
+      "standards",
+      "/scripts/test:watch",
+      "vitest",
+    ),
+    createFileEvidencePoint(
+      "standards-typescript-configuration",
+      "standards",
+      "apps/web/tsconfig.json",
+      "managed",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-unit-test-script",
+      "standards",
+      "/scripts/test:unit",
+      "vitest run --project unit",
+    ),
+    createFileEvidencePoint(
+      "standards-unit-test-specification",
+      "standards",
+      "apps/web/tests/unit/content-schema.test.ts",
+      "application-owned",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-unit-watch-script",
+      "standards",
+      "/scripts/test:unit:watch",
+      "vitest --project unit",
+    ),
+    createPackageEvidencePoint(
+      "standards-user-event-package",
+      "standards",
+      "devDependencies",
+      "@testing-library/user-event",
+      "14.6.3",
+    ),
+    createPackageEvidencePoint(
+      "standards-vite-react-package",
+      "standards",
+      "devDependencies",
+      "@vitejs/plugin-react",
+      "6.0.5",
+    ),
+    createFileEvidencePoint(
+      "standards-vitest-configuration",
+      "standards",
+      "apps/web/vitest.config.ts",
+      "managed",
+    ),
+    createPackageEvidencePoint(
+      "standards-vitest-package",
+      "standards",
+      "devDependencies",
+      "vitest",
+      "4.1.10",
+    ),
+  ] as const;
+
+  const contentFilesEvidencePoints = [
+    createPackageEvidencePoint(
+      "content-files-raw-loader-package",
+      "content-files",
+      "devDependencies",
+      "raw-loader",
+      "4.0.2",
+    ),
+    createPackageEvidencePoint(
+      "content-files-yaml-package",
+      "content-files",
+      "dependencies",
+      "yaml",
+      "2.9.0",
+    ),
+    createFileEvidencePoint(
+      "content-files-configuration",
+      "content-files",
+      "apps/web/content/content.config.yaml",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "content-files-long-form-introduction",
+      "content-files",
+      "apps/web/content/en-CA/long-form/introduction.md",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "content-files-site-content",
+      "content-files",
+      "apps/web/content/en-CA/site.yaml",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "content-files-schema",
+      "content-files",
+      "apps/web/src/content/content-schema.ts",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "content-files-source-declarations",
+      "content-files",
+      "apps/web/src/content/content-source.d.ts",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "content-files-reader",
+      "content-files",
+      "apps/web/src/content/read-content.ts",
+      "application-owned",
+    ),
+  ] as const;
+
+  const sectionCompositionGlobalStyles = createFileEvidencePoint(
+    "section-composition-global-styles",
+    "section-composition",
+    "apps/web/app/globals.css",
+    "application-owned",
+  );
+  const sectionCompositionPostcssPackage = createPackageEvidencePoint(
+    "section-composition-postcss-package",
+    "section-composition",
+    "devDependencies",
+    "postcss",
+    "8.5.26",
+  );
+  const sectionCompositionTailwindPackage = createPackageEvidencePoint(
+    "section-composition-tailwind-package",
+    "section-composition",
+    "devDependencies",
+    "tailwindcss",
+    "4.3.3",
+  );
+  const sectionCompositionTailwindPostcssPackage = createPackageEvidencePoint(
+    "section-composition-tailwind-postcss-package",
+    "section-composition",
+    "devDependencies",
+    "@tailwindcss/postcss",
+    "4.3.3",
+  );
+  const sectionCompositionPostcssConfiguration = createFileEvidencePoint(
+    "section-composition-postcss-configuration",
+    "section-composition",
+    "apps/web/postcss.config.mjs",
+    "application-owned",
+  );
+  const sectionCompositionPresentation = createFileEvidencePoint(
+    "section-composition-presentation",
+    "section-composition",
+    "apps/web/src/presentation/content-page.tsx",
+    "application-owned",
+  );
+  const sectionCompositionRegistry = createFileEvidencePoint(
+    "section-composition-registry",
+    "section-composition",
+    "apps/web/src/sections/section-registry.tsx",
+    "application-owned",
+  );
+
+  const deploymentCloudflareEvidencePoints = [
+    createPackageEvidencePoint(
+      "deployment-cloudflare-package",
+      "deployment-cloudflare",
+      "dependencies",
+      "@opennextjs/cloudflare",
+      "1.20.2",
+    ),
+    createPackageEvidencePoint(
+      "deployment-cloudflare-wrangler-package",
+      "deployment-cloudflare",
+      "devDependencies",
+      "wrangler",
+      "4.118.0",
+    ),
+    createFileEvidencePoint(
+      "deployment-cloudflare-next-configuration",
+      "deployment-cloudflare",
+      "apps/web/next.config.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "deployment-cloudflare-open-next-configuration",
+      "deployment-cloudflare",
+      "apps/web/open-next.config.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "deployment-cloudflare-wrangler-configuration",
+      "deployment-cloudflare",
+      "apps/web/wrangler.jsonc",
+      "managed",
+    ),
+  ] as const;
+
+  const observabilityPackage = createPackageEvidencePoint(
+    "observability-package",
+    "observability",
+    "dependencies",
+    "@egeria-systems/observability",
+    packageVersions.observability,
+  );
+  const observabilityBrowserIngestRoute = createFileEvidencePoint(
+    "observability-browser-ingest-route",
+    "observability",
+    "apps/web/app/api/observability/route.ts",
+    "application-owned",
+  );
+  const observabilityBrowserInstrumentation = createFileEvidencePoint(
+    "observability-browser-instrumentation",
+    "observability",
+    "apps/web/instrumentation-client.ts",
+    "application-owned",
+  );
+  const observabilityBrowserReporter = createFileEvidencePoint(
+    "observability-browser-reporter",
+    "observability",
+    "apps/web/src/infrastructure/observability/browser-reporter.ts",
+    "application-owned",
+  );
+  const observabilityCloudflareContext = createFileEvidencePoint(
+    "observability-cloudflare-context",
+    "observability",
+    "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+    "application-owned",
+  );
+  const observabilityRegistration = createFileEvidencePoint(
+    "observability-registration",
+    "observability",
+    "apps/web/src/infrastructure/observability/installed-capability.ts",
+    "managed",
+  );
+  const observabilityServerInstrumentation = createFileEvidencePoint(
+    "observability-server-instrumentation",
+    "observability",
+    "apps/web/instrumentation.ts",
+    "application-owned",
+  );
+  const observabilityServerReporter = createFileEvidencePoint(
+    "observability-server-reporter",
+    "observability",
+    "apps/web/src/infrastructure/observability/server-reporter.ts",
+    "application-owned",
+  );
+  const observabilityWebVitalsReporter = createFileEvidencePoint(
+    "observability-web-vitals-reporter",
+    "observability",
+    "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
+    "application-owned",
+  );
+  const observabilityPageErrorBoundary = createFileEvidencePoint(
+    "observability-page-error-boundary",
+    "observability",
+    "apps/web/app/error.tsx",
+    "application-owned",
+  );
+  const observabilityGlobalErrorBoundary = createFileEvidencePoint(
+    "observability-global-error-boundary",
+    "observability",
+    "apps/web/app/global-error.tsx",
+    "application-owned",
+  );
+  const observabilityErrorCopySource = createFileEvidencePoint(
+    "observability-error-copy-source",
+    "observability",
+    "apps/web/content/en-CA/observability.yaml",
+    "application-owned",
+  );
+  const observabilityErrorCopy = createFileEvidencePoint(
+    "observability-error-copy",
+    "observability",
+    "apps/web/src/infrastructure/observability/error-copy.ts",
+    "application-owned",
+  );
+  const observabilityErrorFallback = createFileEvidencePoint(
+    "observability-error-fallback",
+    "observability",
+    "apps/web/src/presentation/error-fallback.tsx",
+    "application-owned",
+  );
+
+  const siteRoutingEvidencePoints = [
+    createFileEvidencePoint(
+      "site-routing-about-route",
+      "site-routing",
+      "apps/web/app/about/page.tsx",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-about-content",
+      "site-routing",
+      "apps/web/content/en-CA/about.yaml",
+      "application-owned",
+    ),
+  ] as const;
+
+  const bookingCalendlyEvidencePoints = [
+    createFileEvidencePoint(
+      "booking-calendly-browser-specification",
+      "booking-calendly",
+      "apps/web/tests/e2e/calendly-booking.spec.ts",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "booking-calendly-client-component",
+      "booking-calendly",
+      "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "booking-calendly-content",
+      "booking-calendly",
+      "apps/web/content/en-CA/booking-calendly.yaml",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "booking-calendly-content-reader",
+      "booking-calendly",
+      "apps/web/src/integrations/booking-calendly/booking-content.ts",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "booking-calendly-settings",
+      "booking-calendly",
+      "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+      "managed",
+    ),
+  ] as const;
+
   return [
     {
       identifier: "standards",
@@ -131,296 +688,7 @@ function createDescriptors(
       threatReviewLevel: "elevated",
       platformResources: [],
       adapterSemanticRequirements: [],
-      managedSurfaces: [
-        createPackageSurface(
-          "standards-axe-playwright-package",
-          "standards",
-          "/devDependencies/@axe-core~1playwright",
-        ),
-        createPackageSurface(
-          "standards-browser-install-ci-script",
-          "standards",
-          "/scripts/browser:install:ci",
-        ),
-        createPackageSurface(
-          "standards-browser-install-script",
-          "standards",
-          "/scripts/browser:install",
-        ),
-        createPackageSurface(
-          "standards-component-test-script",
-          "standards",
-          "/scripts/test:component",
-        ),
-        createFileSurface(
-          "standards-component-test-setup",
-          "standards",
-          "apps/web/tests/setup/component.ts",
-          "managed",
-        ),
-        createFileSurface(
-          "standards-component-test-specification",
-          "standards",
-          "apps/web/tests/component/content-page.test.tsx",
-          "application-owned",
-        ),
-        createPackageSurface(
-          "standards-component-watch-script",
-          "standards",
-          "/scripts/test:component:watch",
-        ),
-        createFileSurface(
-          "standards-browser-quality-specification",
-          "standards",
-          "apps/web/tests/e2e/site-quality.spec.ts",
-          "application-owned",
-        ),
-        createPackageSurface(
-          "standards-deployed-browser-test-script",
-          "standards",
-          "/scripts/test:e2e:deployed",
-        ),
-        createPackageSurface(
-          "standards-development-browser-test-script",
-          "standards",
-          "/scripts/test:e2e:dev",
-        ),
-        createPackageSurface(
-          "standards-dom-testing-library-package",
-          "standards",
-          "/devDependencies/@testing-library~1dom",
-        ),
-        createFileSurface(
-          "standards-eslint-configuration",
-          "standards",
-          "apps/web/eslint.config.mjs",
-          "managed",
-        ),
-        createPackageSurface(
-          "standards-jest-dom-package",
-          "standards",
-          "/devDependencies/@testing-library~1jest-dom",
-        ),
-        createPackageSurface(
-          "standards-jsdom-package",
-          "standards",
-          "/devDependencies/jsdom",
-        ),
-        createPackageSurface(
-          "standards-package",
-          "standards",
-          "/devDependencies/@egeria-systems~1standards",
-        ),
-        createFileSurface(
-          "standards-playwright-deployed-configuration",
-          "standards",
-          "apps/web/playwright.deployed.config.ts",
-          "managed",
-        ),
-        createFileSurface(
-          "standards-playwright-development-configuration",
-          "standards",
-          "apps/web/playwright.dev.config.ts",
-          "managed",
-        ),
-        createPackageSurface(
-          "standards-playwright-package",
-          "standards",
-          "/devDependencies/@playwright~1test",
-        ),
-        createFileSurface(
-          "standards-playwright-preview-configuration",
-          "standards",
-          "apps/web/playwright.preview.config.ts",
-          "managed",
-        ),
-        createFileSurface(
-          "standards-playwright-shared-configuration",
-          "standards",
-          "apps/web/playwright.config.shared.ts",
-          "managed",
-        ),
-        createPackageSurface(
-          "standards-preview-browser-test-script",
-          "standards",
-          "/scripts/test:e2e:preview",
-        ),
-        createFileSurface(
-          "standards-quality-workflow",
-          "standards",
-          ".github/workflows/quality.yml",
-          "managed",
-        ),
-        createPackageSurface(
-          "standards-react-testing-library-package",
-          "standards",
-          "/devDependencies/@testing-library~1react",
-        ),
-        createPackageSurface(
-          "standards-test-script",
-          "standards",
-          "/scripts/test",
-        ),
-        createPackageSurface(
-          "standards-test-watch-script",
-          "standards",
-          "/scripts/test:watch",
-        ),
-        createFileSurface(
-          "standards-typescript-configuration",
-          "standards",
-          "apps/web/tsconfig.json",
-          "managed",
-        ),
-        createPackageSurface(
-          "standards-unit-test-script",
-          "standards",
-          "/scripts/test:unit",
-        ),
-        createFileSurface(
-          "standards-unit-test-specification",
-          "standards",
-          "apps/web/tests/unit/content-schema.test.ts",
-          "application-owned",
-        ),
-        createPackageSurface(
-          "standards-unit-watch-script",
-          "standards",
-          "/scripts/test:unit:watch",
-        ),
-        createPackageSurface(
-          "standards-user-event-package",
-          "standards",
-          "/devDependencies/@testing-library~1user-event",
-        ),
-        createPackageSurface(
-          "standards-vite-react-package",
-          "standards",
-          "/devDependencies/@vitejs~1plugin-react",
-        ),
-        createFileSurface(
-          "standards-vitest-configuration",
-          "standards",
-          "apps/web/vitest.config.ts",
-          "managed",
-        ),
-        createPackageSurface(
-          "standards-vitest-package",
-          "standards",
-          "/devDependencies/vitest",
-        ),
-      ],
-      inferenceProbes: [
-        createPackageProbe(
-          "devDependencies",
-          "@axe-core/playwright",
-          "4.12.1",
-        ),
-        createJsonValueProbe(
-          "apps/web/package.json",
-          "/scripts/browser:install:ci",
-          "playwright install --with-deps chromium",
-        ),
-        createJsonValueProbe(
-          "apps/web/package.json",
-          "/scripts/browser:install",
-          "playwright install chromium",
-        ),
-        createJsonValueProbe(
-          "apps/web/package.json",
-          "/scripts/test:component",
-          "vitest run --project component",
-        ),
-        createFileProbe("apps/web/tests/setup/component.ts"),
-        createFileProbe("apps/web/tests/component/content-page.test.tsx"),
-        createJsonValueProbe(
-          "apps/web/package.json",
-          "/scripts/test:component:watch",
-          "vitest --project component",
-        ),
-        createFileProbe("apps/web/tests/e2e/site-quality.spec.ts"),
-        createJsonValueProbe(
-          "apps/web/package.json",
-          "/scripts/test:e2e:deployed",
-          "playwright test --config playwright.deployed.config.ts",
-        ),
-        createJsonValueProbe(
-          "apps/web/package.json",
-          "/scripts/test:e2e:dev",
-          "playwright test --config playwright.dev.config.ts",
-        ),
-        createPackageProbe(
-          "devDependencies",
-          "@testing-library/dom",
-          "10.4.1",
-        ),
-        createFileProbe("apps/web/eslint.config.mjs"),
-        createPackageProbe(
-          "devDependencies",
-          "@testing-library/jest-dom",
-          "7.0.1",
-        ),
-        createPackageProbe("devDependencies", "jsdom", "30.0.1"),
-        createPackageProbe(
-          "devDependencies",
-          "@egeria-systems/standards",
-          packageVersions.standards,
-        ),
-        createFileProbe("apps/web/playwright.deployed.config.ts"),
-        createFileProbe("apps/web/playwright.dev.config.ts"),
-        createPackageProbe(
-          "devDependencies",
-          "@playwright/test",
-          "1.62.1",
-        ),
-        createFileProbe("apps/web/playwright.preview.config.ts"),
-        createFileProbe("apps/web/playwright.config.shared.ts"),
-        createJsonValueProbe(
-          "apps/web/package.json",
-          "/scripts/test:e2e:preview",
-          "playwright test --config playwright.preview.config.ts",
-        ),
-        createFileProbe(".github/workflows/quality.yml"),
-        createPackageProbe(
-          "devDependencies",
-          "@testing-library/react",
-          "16.3.2",
-        ),
-        createJsonValueProbe(
-          "apps/web/package.json",
-          "/scripts/test",
-          "vitest run",
-        ),
-        createJsonValueProbe(
-          "apps/web/package.json",
-          "/scripts/test:watch",
-          "vitest",
-        ),
-        createFileProbe("apps/web/tsconfig.json"),
-        createJsonValueProbe(
-          "apps/web/package.json",
-          "/scripts/test:unit",
-          "vitest run --project unit",
-        ),
-        createFileProbe("apps/web/tests/unit/content-schema.test.ts"),
-        createJsonValueProbe(
-          "apps/web/package.json",
-          "/scripts/test:unit:watch",
-          "vitest --project unit",
-        ),
-        createPackageProbe(
-          "devDependencies",
-          "@testing-library/user-event",
-          "14.6.3",
-        ),
-        createPackageProbe(
-          "devDependencies",
-          "@vitejs/plugin-react",
-          "6.0.5",
-        ),
-        createFileProbe("apps/web/vitest.config.ts"),
-        createPackageProbe("devDependencies", "vitest", "4.1.10"),
-      ],
+      ...projectEvidencePoints(standardsEvidencePoints),
       verificationPlan: [
         "package-resolution",
         "lint",
@@ -455,66 +723,7 @@ function createDescriptors(
       requiredPackages: ["raw-loader", "yaml"],
       platformResources: [],
       adapterSemanticRequirements: [],
-      managedSurfaces: [
-        createPackageSurface(
-          "content-files-raw-loader-package",
-          "content-files",
-          "/devDependencies/raw-loader",
-        ),
-        createPackageSurface(
-          "content-files-yaml-package",
-          "content-files",
-          "/dependencies/yaml",
-        ),
-        createFileSurface(
-          "content-files-configuration",
-          "content-files",
-          "apps/web/content/content.config.yaml",
-          "application-owned",
-        ),
-        createFileSurface(
-          "content-files-long-form-introduction",
-          "content-files",
-          "apps/web/content/en-CA/long-form/introduction.md",
-          "application-owned",
-        ),
-        createFileSurface(
-          "content-files-site-content",
-          "content-files",
-          "apps/web/content/en-CA/site.yaml",
-          "application-owned",
-        ),
-        createFileSurface(
-          "content-files-schema",
-          "content-files",
-          "apps/web/src/content/content-schema.ts",
-          "application-owned",
-        ),
-        createFileSurface(
-          "content-files-source-declarations",
-          "content-files",
-          "apps/web/src/content/content-source.d.ts",
-          "application-owned",
-        ),
-        createFileSurface(
-          "content-files-reader",
-          "content-files",
-          "apps/web/src/content/read-content.ts",
-          "application-owned",
-        ),
-      ],
-      inferenceProbes: [
-        createPackageProbe("devDependencies", "raw-loader", "4.0.2"),
-        createPackageProbe("dependencies", "yaml", "2.9.0"),
-        createFileProbe("apps/web/content/content.config.yaml"),
-        createFileProbe(
-          "apps/web/content/en-CA/long-form/introduction.md",
-        ),
-        createFileProbe("apps/web/content/en-CA/site.yaml"),
-        createFileProbe("apps/web/src/content/content-schema.ts"),
-        createFileProbe("apps/web/src/content/content-source.d.ts"),
-        createFileProbe("apps/web/src/content/read-content.ts"),
-      ],
+      ...projectEvidencePoints(contentFilesEvidencePoints),
       verificationPlan: ["content-contracts", "typecheck"],
       documentationEvidenceRequirements: ["copy-externalization"],
       removalAndRecoveryRequirements: ["review-content-and-source-removal"],
@@ -531,60 +740,24 @@ function createDescriptors(
       requiredPackages: ["@tailwindcss/postcss", "postcss", "tailwindcss"],
       platformResources: [],
       adapterSemanticRequirements: [],
-      managedSurfaces: [
-        createFileSurface(
-          "section-composition-global-styles",
-          "section-composition",
-          "apps/web/app/globals.css",
-          "application-owned",
-        ),
-        createPackageSurface(
-          "section-composition-postcss-package",
-          "section-composition",
-          "/devDependencies/postcss",
-        ),
-        createPackageSurface(
-          "section-composition-tailwind-package",
-          "section-composition",
-          "/devDependencies/tailwindcss",
-        ),
-        createPackageSurface(
-          "section-composition-tailwind-postcss-package",
-          "section-composition",
-          "/devDependencies/@tailwindcss~1postcss",
-        ),
-        createFileSurface(
-          "section-composition-postcss-configuration",
-          "section-composition",
-          "apps/web/postcss.config.mjs",
-          "application-owned",
-        ),
-        createFileSurface(
-          "section-composition-presentation",
-          "section-composition",
-          "apps/web/src/presentation/content-page.tsx",
-          "application-owned",
-        ),
-        createFileSurface(
-          "section-composition-registry",
-          "section-composition",
-          "apps/web/src/sections/section-registry.tsx",
-          "application-owned",
-        ),
-      ],
-      inferenceProbes: [
-        createPackageProbe(
-          "devDependencies",
-          "@tailwindcss/postcss",
-          "4.3.3",
-        ),
-        createPackageProbe("devDependencies", "postcss", "8.5.26"),
-        createPackageProbe("devDependencies", "tailwindcss", "4.3.3"),
-        createFileProbe("apps/web/app/globals.css"),
-        createFileProbe("apps/web/postcss.config.mjs"),
-        createFileProbe("apps/web/src/presentation/content-page.tsx"),
-        createFileProbe("apps/web/src/sections/section-registry.tsx"),
-      ],
+      managedSurfaces: projectManagedSurfaces([
+        sectionCompositionGlobalStyles,
+        sectionCompositionPostcssPackage,
+        sectionCompositionTailwindPackage,
+        sectionCompositionTailwindPostcssPackage,
+        sectionCompositionPostcssConfiguration,
+        sectionCompositionPresentation,
+        sectionCompositionRegistry,
+      ]),
+      inferenceProbes: projectInferenceProbes([
+        sectionCompositionTailwindPostcssPackage,
+        sectionCompositionPostcssPackage,
+        sectionCompositionTailwindPackage,
+        sectionCompositionGlobalStyles,
+        sectionCompositionPostcssConfiguration,
+        sectionCompositionPresentation,
+        sectionCompositionRegistry,
+      ]),
       verificationPlan: ["typecheck", "next-build"],
       documentationEvidenceRequirements: ["bounded-section-composition"],
       removalAndRecoveryRequirements: [
@@ -603,47 +776,7 @@ function createDescriptors(
       requiredPackages: ["@opennextjs/cloudflare", "wrangler"],
       platformResources: ["cloudflare-worker", "cloudflare-static-assets"],
       adapterSemanticRequirements: ["node-runtime", "worker-static-assets"],
-      managedSurfaces: [
-        createPackageSurface(
-          "deployment-cloudflare-package",
-          "deployment-cloudflare",
-          "/dependencies/@opennextjs~1cloudflare",
-        ),
-        createPackageSurface(
-          "deployment-cloudflare-wrangler-package",
-          "deployment-cloudflare",
-          "/devDependencies/wrangler",
-        ),
-        createFileSurface(
-          "deployment-cloudflare-next-configuration",
-          "deployment-cloudflare",
-          "apps/web/next.config.ts",
-          "managed",
-        ),
-        createFileSurface(
-          "deployment-cloudflare-open-next-configuration",
-          "deployment-cloudflare",
-          "apps/web/open-next.config.ts",
-          "managed",
-        ),
-        createFileSurface(
-          "deployment-cloudflare-wrangler-configuration",
-          "deployment-cloudflare",
-          "apps/web/wrangler.jsonc",
-          "managed",
-        ),
-      ],
-      inferenceProbes: [
-        createPackageProbe(
-          "dependencies",
-          "@opennextjs/cloudflare",
-          "1.20.2",
-        ),
-        createPackageProbe("devDependencies", "wrangler", "4.118.0"),
-        createFileProbe("apps/web/next.config.ts"),
-        createFileProbe("apps/web/open-next.config.ts"),
-        createFileProbe("apps/web/wrangler.jsonc"),
-      ],
+      ...projectEvidencePoints(deploymentCloudflareEvidencePoints),
       verificationPlan: ["next-build", "opennext-build", "wrangler-types"],
       documentationEvidenceRequirements: [
         "nextjs-opennext-cloudflare-compatibility",
@@ -692,122 +825,39 @@ function createDescriptors(
         "same-origin-browser-ingest",
         "separate-operational-and-diagnostic-sinks",
       ],
-      managedSurfaces: [
-        createPackageSurface(
-          "observability-package",
-          "observability",
-          "/dependencies/@egeria-systems~1observability",
-        ),
-        createFileSurface(
-          "observability-browser-ingest-route",
-          "observability",
-          "apps/web/app/api/observability/route.ts",
-          "application-owned",
-        ),
-        createFileSurface(
-          "observability-browser-instrumentation",
-          "observability",
-          "apps/web/instrumentation-client.ts",
-          "application-owned",
-        ),
-        createFileSurface(
-          "observability-browser-reporter",
-          "observability",
-          "apps/web/src/infrastructure/observability/browser-reporter.ts",
-          "application-owned",
-        ),
-        createFileSurface(
-          "observability-cloudflare-context",
-          "observability",
-          "apps/web/src/infrastructure/cloudflare/observability-context.ts",
-          "application-owned",
-        ),
-        createFileSurface(
-          "observability-registration",
-          "observability",
-          "apps/web/src/infrastructure/observability/installed-capability.ts",
-          "managed",
-        ),
-        createFileSurface(
-          "observability-server-instrumentation",
-          "observability",
-          "apps/web/instrumentation.ts",
-          "application-owned",
-        ),
-        createFileSurface(
-          "observability-server-reporter",
-          "observability",
-          "apps/web/src/infrastructure/observability/server-reporter.ts",
-          "application-owned",
-        ),
-        createFileSurface(
-          "observability-web-vitals-reporter",
-          "observability",
-          "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
-          "application-owned",
-        ),
-        createFileSurface(
-          "observability-page-error-boundary",
-          "observability",
-          "apps/web/app/error.tsx",
-          "application-owned",
-        ),
-        createFileSurface(
-          "observability-global-error-boundary",
-          "observability",
-          "apps/web/app/global-error.tsx",
-          "application-owned",
-        ),
-        createFileSurface(
-          "observability-error-copy-source",
-          "observability",
-          "apps/web/content/en-CA/observability.yaml",
-          "application-owned",
-        ),
-        createFileSurface(
-          "observability-error-copy",
-          "observability",
-          "apps/web/src/infrastructure/observability/error-copy.ts",
-          "application-owned",
-        ),
-        createFileSurface(
-          "observability-error-fallback",
-          "observability",
-          "apps/web/src/presentation/error-fallback.tsx",
-          "application-owned",
-        ),
-      ],
+      managedSurfaces: projectManagedSurfaces([
+        observabilityPackage,
+        observabilityBrowserIngestRoute,
+        observabilityBrowserInstrumentation,
+        observabilityBrowserReporter,
+        observabilityCloudflareContext,
+        observabilityRegistration,
+        observabilityServerInstrumentation,
+        observabilityServerReporter,
+        observabilityWebVitalsReporter,
+        observabilityPageErrorBoundary,
+        observabilityGlobalErrorBoundary,
+        observabilityErrorCopySource,
+        observabilityErrorCopy,
+        observabilityErrorFallback,
+      ]),
       inferenceProbes: [
-        createPackageProbe(
-          "dependencies",
-          "@egeria-systems/observability",
-          packageVersions.observability,
-        ),
-        createFileProbe("apps/web/app/api/observability/route.ts"),
-        createFileProbe("apps/web/instrumentation-client.ts"),
-        createFileProbe("apps/web/instrumentation.ts"),
-        createFileProbe(
-          "apps/web/src/infrastructure/cloudflare/observability-context.ts",
-        ),
-        createFileProbe(
-          "apps/web/src/infrastructure/observability/browser-reporter.ts",
-        ),
-        createFileProbe(
-          "apps/web/src/infrastructure/observability/installed-capability.ts",
-        ),
-        createFileProbe(
-          "apps/web/src/infrastructure/observability/server-reporter.ts",
-        ),
-        createFileProbe(
-          "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
-        ),
-        createFileProbe("apps/web/app/error.tsx"),
-        createFileProbe("apps/web/app/global-error.tsx"),
-        createFileProbe("apps/web/content/en-CA/observability.yaml"),
-        createFileProbe(
-          "apps/web/src/infrastructure/observability/error-copy.ts",
-        ),
-        createFileProbe("apps/web/src/presentation/error-fallback.tsx"),
+        ...projectInferenceProbes([
+          observabilityPackage,
+          observabilityBrowserIngestRoute,
+          observabilityBrowserInstrumentation,
+          observabilityServerInstrumentation,
+          observabilityCloudflareContext,
+          observabilityBrowserReporter,
+          observabilityRegistration,
+          observabilityServerReporter,
+          observabilityWebVitalsReporter,
+          observabilityPageErrorBoundary,
+          observabilityGlobalErrorBoundary,
+          observabilityErrorCopySource,
+          observabilityErrorCopy,
+          observabilityErrorFallback,
+        ]),
         createJsonValueProbe(
           "apps/web/wrangler.jsonc",
           "/observability/enabled",
@@ -866,24 +916,7 @@ function createDescriptors(
       requiredPackages: [],
       platformResources: [],
       adapterSemanticRequirements: [],
-      managedSurfaces: [
-        createFileSurface(
-          "site-routing-about-route",
-          "site-routing",
-          "apps/web/app/about/page.tsx",
-          "application-owned",
-        ),
-        createFileSurface(
-          "site-routing-about-content",
-          "site-routing",
-          "apps/web/content/en-CA/about.yaml",
-          "application-owned",
-        ),
-      ],
-      inferenceProbes: [
-        createFileProbe("apps/web/app/about/page.tsx"),
-        createFileProbe("apps/web/content/en-CA/about.yaml"),
-      ],
+      ...projectEvidencePoints(siteRoutingEvidencePoints),
       verificationPlan: ["typecheck", "next-build"],
       documentationEvidenceRequirements: ["multi-page-routing-contract"],
       removalAndRecoveryRequirements: ["review-route-and-content-removal"],
@@ -908,51 +941,7 @@ function createDescriptors(
       threatReviewLevel: "elevated",
       platformResources: [],
       adapterSemanticRequirements: [],
-      managedSurfaces: [
-        createFileSurface(
-          "booking-calendly-browser-specification",
-          "booking-calendly",
-          "apps/web/tests/e2e/calendly-booking.spec.ts",
-          "application-owned",
-        ),
-        createFileSurface(
-          "booking-calendly-client-component",
-          "booking-calendly",
-          "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
-          "application-owned",
-        ),
-        createFileSurface(
-          "booking-calendly-content",
-          "booking-calendly",
-          "apps/web/content/en-CA/booking-calendly.yaml",
-          "application-owned",
-        ),
-        createFileSurface(
-          "booking-calendly-content-reader",
-          "booking-calendly",
-          "apps/web/src/integrations/booking-calendly/booking-content.ts",
-          "application-owned",
-        ),
-        createFileSurface(
-          "booking-calendly-settings",
-          "booking-calendly",
-          "apps/web/src/integrations/booking-calendly/booking-settings.ts",
-          "managed",
-        ),
-      ],
-      inferenceProbes: [
-        createFileProbe("apps/web/tests/e2e/calendly-booking.spec.ts"),
-        createFileProbe(
-          "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
-        ),
-        createFileProbe("apps/web/content/en-CA/booking-calendly.yaml"),
-        createFileProbe(
-          "apps/web/src/integrations/booking-calendly/booking-content.ts",
-        ),
-        createFileProbe(
-          "apps/web/src/integrations/booking-calendly/booking-settings.ts",
-        ),
-      ],
+      ...projectEvidencePoints(bookingCalendlyEvidencePoints),
       verificationPlan: [
         "typecheck",
         "next-build",

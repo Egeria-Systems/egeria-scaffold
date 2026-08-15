@@ -8,6 +8,7 @@ import {
   surfaceOwnerSchema,
   surfaceOwnershipModeSchema,
 } from "./capability.js";
+import { ordinaryGenerationVerificationChecks } from "./generation-verification.js";
 import {
   fingerprintSchema,
   safeRelativePathSchema,
@@ -69,14 +70,7 @@ const legacyVerificationChecks = [
 const currentVerificationChecks = [
   "contracts",
   "pre-state-inference",
-  "lockfile",
-  "frozen-install",
-  "lint",
-  "typecheck",
-  "unit-tests",
-  "component-tests",
-  "next-build",
-  "opennext-build",
+  ...ordinaryGenerationVerificationChecks,
   "post-state-inference",
 ] as const;
 
@@ -94,21 +88,19 @@ const legacyVerificationChecksSchema = z
   ])
   .readonly();
 
-const currentVerificationChecksSchema = z
-  .tuple([
-    z.literal("contracts"),
-    z.literal("pre-state-inference"),
-    z.literal("lockfile"),
-    z.literal("frozen-install"),
-    z.literal("lint"),
-    z.literal("typecheck"),
-    z.literal("unit-tests"),
-    z.literal("component-tests"),
-    z.literal("next-build"),
-    z.literal("opennext-build"),
-    z.literal("post-state-inference"),
-  ])
-  .readonly();
+function createLiteralTupleSchema<
+  const Values extends readonly [string, ...string[]],
+>(values: Values) {
+  const literalSchemas = values.map((value) => z.literal(value)) as {
+    [Index in keyof Values]: z.ZodLiteral<Values[Index]>;
+  };
+
+  return z.tuple(literalSchemas);
+}
+
+const currentVerificationChecksSchema = createLiteralTupleSchema(
+  currentVerificationChecks,
+).readonly();
 
 const verificationChecksSchema = z
   .union([legacyVerificationChecksSchema, currentVerificationChecksSchema])
