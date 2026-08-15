@@ -1,10 +1,8 @@
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
-
 import {
   certifyFreshScaffold,
   certifyFreshScaffoldForTesting,
 } from "./lib/certify-fresh-scaffold.mjs";
+import { runCertificationCli } from "./lib/certification-cli.mjs";
 
 const expectedCapabilities = Object.freeze([
   "standards",
@@ -63,38 +61,14 @@ export function certifyGeneratedTestingForTesting(adapters) {
   return certifyFreshScaffoldForTesting(configuration, adapters);
 }
 
-async function runMain() {
-  if (process.argv.length !== 2) {
-    process.stderr.write(
-      `${JSON.stringify({
-        ok: false,
-        code: "CERTIFICATION_ARGUMENT_INVALID",
-      })}\n`,
-    );
-    process.exitCode = 2;
-    return;
-  }
-
-  try {
-    const result = await certifyGeneratedTesting();
-    process.stdout.write(`${JSON.stringify(result)}\n`);
-  } catch (error) {
-    process.stderr.write(
-      `${JSON.stringify({
-        ok: false,
-        code:
-          error instanceof GeneratedTestingCertificationError
-            ? error.code
-            : "CERTIFICATION_FAILED",
-      })}\n`,
-    );
-    process.exitCode = 1;
-  }
+function parseArguments(arguments_) {
+  return arguments_.length === 0 ? {} : undefined;
 }
 
-if (
-  process.argv[1] !== undefined &&
-  pathToFileURL(resolve(process.argv[1])).href === import.meta.url
-) {
-  await runMain();
-}
+await runCertificationCli({
+  moduleUrl: import.meta.url,
+  parseArguments,
+  certify: certifyGeneratedTesting,
+  isCertificationError: (error) =>
+    error instanceof GeneratedTestingCertificationError,
+});

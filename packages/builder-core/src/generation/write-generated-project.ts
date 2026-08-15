@@ -1,14 +1,10 @@
 import {
-  chmod,
   lstat,
   mkdir,
-  mkdtemp,
   open,
   readFile,
-  readdir,
   realpath,
   rename,
-  rm,
 } from "node:fs/promises";
 import { basename, dirname, join, parse, resolve } from "node:path";
 
@@ -30,13 +26,13 @@ import {
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
 import { validateContract } from "../contracts/result.js";
+import { createFileSurfaceDescriptor } from "../contracts/surface-target.js";
 import {
   installedStateSchema,
   type InstalledState,
 } from "../contracts/state.js";
 import { inferRepository } from "../inference/infer-repository.js";
 import { createInstalledManifest } from "../manifest/create-installed-manifest.js";
-import { fingerprintFileContent } from "../ownership/fingerprint.js";
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
 import { createFileSystemRepositoryReader } from "../repository/repository-reader.js";
 import { serializeProjectYaml, serializeStateJson } from "../state/codecs.js";
@@ -45,6 +41,15 @@ import {
   type GenerationRequest,
   type RenderedSkeleton,
 } from "./render-skeleton.js";
+import {
+  classifyLockfileOnlyTransition,
+  cleanupOwnedDirectory,
+  createOwnedTemporaryDirectory,
+  snapshotSourceTree,
+  sourceIdentityMatches,
+  type PathIdentity,
+  type SourceEntry,
+} from "./source-tree-safety.js";
 import {
   verificationChecks,
   type GeneratedProjectVerification,
@@ -61,20 +66,10 @@ export type GeneratedProject = Readonly<{
   state: InstalledState;
 }>;
 
-type PathIdentity = Readonly<{
-  path: string;
-  device: bigint;
-  inode: bigint;
-}>;
-
 type Destination = Readonly<{
   path: string;
   parent: string;
 }>;
-
-type SourceEntry =
-  | Readonly<{ kind: "directory" }>
-  | Readonly<{ kind: "file"; fingerprint: string }>;
 
 const encoder = new TextEncoder();
 const exactRequestKeys = [
@@ -215,47 +210,21 @@ async function resolveDestination(
 async function createSourceRoot(
   parent: string,
 ): Promise<ValidationResult<PathIdentity>> {
-  let identity: PathIdentity | undefined;
+  const created = await createOwnedTemporaryDirectory(
+    parent,
+    ".egeria-create-",
+  );
+  if (created.ok) {
+    return created;
+  }
 
-  try {
-    const path = await mkdtemp(join(parent, ".egeria-create-"));
-    const stats = await lstat(path, { bigint: true });
-
-    if (stats.isSymbolicLink() || !stats.isDirectory()) {
-      return issue(
-        "TEMPORARY_DIRECTORY_AMBIGUOUS",
+  return created.reason === "invalid-identity"
+    ? issue("TEMPORARY_DIRECTORY_AMBIGUOUS", [], "invalid-source")
+    : issue(
+        "TEMPORARY_DIRECTORY_CREATE_FAILED",
         [],
-        "invalid-source",
+        "creation-failed",
       );
-    }
-
-    identity = { path, device: stats.dev, inode: stats.ino };
-    await chmod(path, 0o700);
-    return { ok: true, value: identity };
-  } catch {
-    if (identity !== undefined) {
-      await cleanupSource(identity);
-    }
-    return issue(
-      "TEMPORARY_DIRECTORY_CREATE_FAILED",
-      [],
-      "creation-failed",
-    );
-  }
-}
-
-async function sourceIdentityMatches(identity: PathIdentity): Promise<boolean> {
-  try {
-    const stats = await lstat(identity.path, { bigint: true });
-    return (
-      !stats.isSymbolicLink() &&
-      stats.isDirectory() &&
-      stats.dev === identity.device &&
-      stats.ino === identity.inode
-    );
-  } catch {
-    return false;
-  }
 }
 
 async function requireSourceIdentity(
@@ -268,19 +237,6 @@ async function requireSourceIdentity(
         [],
         "identity-changed",
       );
-}
-
-async function cleanupSource(identity: PathIdentity): Promise<boolean> {
-  if (!(await sourceIdentityMatches(identity))) {
-    return false;
-  }
-
-  try {
-    await rm(identity.path, { recursive: true });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function writeExclusive(
@@ -341,90 +297,14 @@ async function writeInitialFiles(
   return { ok: true, value: undefined };
 }
 
-async function snapshotSource(
-  root: string,
-): Promise<ValidationResult<ReadonlyMap<string, SourceEntry>>> {
-  const entries = new Map<string, SourceEntry>();
-
-  async function visit(path: string, relativePath: string): Promise<boolean> {
-    let children;
-    try {
-      children = await readdir(path, { withFileTypes: true });
-    } catch {
-      return false;
-    }
-
-    for (const child of children) {
-      const childPath = join(path, child.name);
-      const childRelativePath = relativePath
-        ? `${relativePath}/${child.name}`
-        : child.name;
-
-      if (child.isDirectory()) {
-        entries.set(childRelativePath, { kind: "directory" });
-        if (!(await visit(childPath, childRelativePath))) {
-          return false;
-        }
-      } else if (child.isFile()) {
-        try {
-          entries.set(childRelativePath, {
-            kind: "file",
-            fingerprint: fingerprintFileContent(await readFile(childPath)),
-          });
-        } catch {
-          return false;
-        }
-      } else {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  return (await visit(root, ""))
-    ? { ok: true, value: entries }
-    : issue("SOURCE_SNAPSHOT_FAILED", [], "snapshot-failed");
-}
-
-function sourceEntriesEqual(left: SourceEntry, right: SourceEntry): boolean {
-  return (
-    left.kind === right.kind &&
-    (left.kind === "directory" ||
-      (right.kind === "file" && left.fingerprint === right.fingerprint))
-  );
-}
-
 function validatePreparedLockfile(
   before: ReadonlyMap<string, SourceEntry>,
   after: ReadonlyMap<string, SourceEntry>,
 ): ValidationResult<void> {
-  const lockfile = after.get("pnpm-lock.yaml");
-
-  if (
-    before.has("pnpm-lock.yaml") ||
-    lockfile?.kind !== "file" ||
-    after.size !== before.size + 1
-  ) {
-    return issue(
-      "LOCKFILE_PREPARATION_INVALID",
-      [],
-      "unexpected-inventory",
-    );
-  }
-
-  for (const [path, entry] of before) {
-    const current = after.get(path);
-    if (current === undefined || !sourceEntriesEqual(entry, current)) {
-      return issue(
-        "LOCKFILE_PREPARATION_INVALID",
-        [],
-        "source-changed",
-      );
-    }
-  }
-
-  return { ok: true, value: undefined };
+  const transition = classifyLockfileOnlyTransition(before, after);
+  return transition === "valid"
+    ? { ok: true, value: undefined }
+    : issue("LOCKFILE_PREPARATION_INVALID", [], transition);
 }
 
 function expectedCapabilityIdentifiers(
@@ -479,30 +359,24 @@ function verificationIsExact(value: unknown): value is GeneratedProjectVerificat
 
 function createBuilderStateSurfaces(): readonly ManagedSurfaceDescriptor[] {
   return [
-    {
+    createFileSurfaceDescriptor({
       identifier: "builder-project-configuration",
       owner: { kind: "builder-kernel" },
       path: ".egeria/project.yaml",
       ownership: "managed",
-      fingerprintTarget: { kind: "file" },
-      mergeStrategy: "replace-file",
-    },
-    {
+    }),
+    createFileSurfaceDescriptor({
       identifier: "builder-dependency-lockfile",
       owner: { kind: "builder-kernel" },
       path: "pnpm-lock.yaml",
       ownership: "managed",
-      fingerprintTarget: { kind: "file" },
-      mergeStrategy: "replace-file",
-    },
-    {
+    }),
+    createFileSurfaceDescriptor({
       identifier: "builder-migration-log",
       owner: { kind: "builder-kernel" },
       path: ".egeria/migrations.jsonl",
       ownership: "managed",
-      fingerprintTarget: { kind: "file" },
-      mergeStrategy: "replace-file",
-    },
+    }),
   ];
 }
 
@@ -629,9 +503,9 @@ async function executeGeneration(input: Readonly<{
     return initialWrite;
   }
 
-  const beforeLockfile = await snapshotSource(input.source.path);
-  if (!beforeLockfile.ok) {
-    return beforeLockfile;
+  const beforeLockfile = await snapshotSourceTree(input.source.path);
+  if (beforeLockfile === undefined) {
+    return issue("SOURCE_SNAPSHOT_FAILED", [], "snapshot-failed");
   }
 
   const prepared = await input.verifier.prepareLockfile(input.source.path);
@@ -643,8 +517,8 @@ async function executeGeneration(input: Readonly<{
     return prepared;
   }
 
-  const afterLockfile = await snapshotSource(input.source.path);
-  if (!afterLockfile.ok) {
+  const afterLockfile = await snapshotSourceTree(input.source.path);
+  if (afterLockfile === undefined) {
     return issue(
       "LOCKFILE_PREPARATION_INVALID",
       [],
@@ -652,8 +526,8 @@ async function executeGeneration(input: Readonly<{
     );
   }
   const lockfileValid = validatePreparedLockfile(
-    beforeLockfile.value,
-    afterLockfile.value,
+    beforeLockfile,
+    afterLockfile,
   );
   if (!lockfileValid.ok) {
     return lockfileValid;
@@ -822,7 +696,7 @@ export async function generateProject(input: Readonly<{
     return result;
   }
 
-  return (await cleanupSource(source.value))
+  return (await cleanupOwnedDirectory(source.value))
     ? result
     : appendCleanupFailure(result);
 }

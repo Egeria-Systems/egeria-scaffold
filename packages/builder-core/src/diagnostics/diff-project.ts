@@ -1,8 +1,8 @@
 import type { CapabilityDescriptor } from "../contracts/capability.js";
 import type { ProfileRecipe } from "../contracts/profile.js";
-import type { InstalledSurface } from "../contracts/state.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
 import {
+  deriveProjectDiscrepancies,
   inspectProject,
   migrationLogPath,
   projectConfigurationPath,
@@ -82,16 +82,6 @@ function uniqueSortedDifferences(
   return [...unique.values()].sort(compareDifferences);
 }
 
-function surfaceKey(surface: Readonly<{ identifier: string; path: string }>): string {
-  return `${surface.identifier}\u0000${surface.path}`;
-}
-
-function capabilityOwner(surface?: InstalledSurface): string | undefined {
-  return surface?.owner.kind === "capability"
-    ? surface.owner.identifier
-    : undefined;
-}
-
 export async function diffProject(
   input: DiffProjectRequest,
 ): Promise<ProjectDiff> {
@@ -122,63 +112,45 @@ export async function diffProject(
     return { equal: true, differences: [] };
   }
 
-  const installedState = inspection.inference.state.value;
-  const desired = new Set(
-    inspection.resolution.value.capabilities.map(({ identifier }) => identifier),
-  );
-  const installed = new Set(
-    installedState.installedCapabilities.map(({ identifier }) => identifier),
-  );
+  const discrepancies = deriveProjectDiscrepancies(inspection);
   const differences: ProjectDifference[] = [];
 
-  for (const identifier of [...desired].sort(compareText)) {
-    if (!installed.has(identifier)) {
-      differences.push(difference("desired-only", { capability: identifier }));
+  for (const fact of discrepancies.capabilities) {
+    if (fact.desired && !fact.installed) {
+      differences.push(
+        difference("desired-only", { capability: fact.identifier }),
+      );
     }
-  }
-
-  for (const identifier of [...installed].sort(compareText)) {
-    if (!desired.has(identifier)) {
-      differences.push(difference("installed-only", { capability: identifier }));
+    if (!fact.desired && fact.installed) {
+      differences.push(
+        difference("installed-only", { capability: fact.identifier }),
+      );
     }
-  }
-
-  for (const evidence of inspection.inference.capabilities) {
     if (
-      (evidence.category === "probable" || evidence.category === "partial") &&
-      !installed.has(evidence.identifier)
+      (fact.inferenceCategory === "probable" ||
+        fact.inferenceCategory === "partial") &&
+      !fact.installed
     ) {
       differences.push(
-        difference("inferred-only", { capability: evidence.identifier }),
+        difference("inferred-only", { capability: fact.identifier }),
       );
     } else if (
-      evidence.category === "contradictory" ||
-      evidence.category === "ambiguous"
+      fact.inferenceCategory === "contradictory" ||
+      fact.inferenceCategory === "ambiguous"
     ) {
       differences.push(
-        difference("inference-mismatch", { capability: evidence.identifier }),
+        difference("inference-mismatch", { capability: fact.identifier }),
       );
     }
   }
 
-  const surfaceByKey = new Map(
-    installedState.managedSurfaces.map((surface) => [surfaceKey(surface), surface]),
-  );
-
-  for (const evidence of inspection.inference.surfaces) {
-    if (
-      evidence.status !== "missing" &&
-      evidence.status !== "drifted" &&
-      evidence.status !== "ambiguous"
-    ) {
-      continue;
-    }
-
-    const capability = capabilityOwner(surfaceByKey.get(surfaceKey(evidence)));
+  for (const fact of discrepancies.surfaces) {
     differences.push(
       difference("managed-surface-drift", {
-        ...(capability === undefined ? {} : { capability }),
-        path: evidence.path,
+        ...(fact.capability === undefined
+          ? {}
+          : { capability: fact.capability }),
+        path: fact.path,
       }),
     );
   }

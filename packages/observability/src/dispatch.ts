@@ -15,6 +15,15 @@ import { isPrivateDataLikeString } from "./redaction.js";
 
 const sinkIdentifierPattern = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u;
 
+function isSinkIdentifier(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= 64 &&
+    sinkIdentifierPattern.test(value) &&
+    !isPrivateDataLikeString(value)
+  );
+}
+
 function isFailureReason(value: unknown): value is SinkFailureReason {
   return (
     typeof value === "string" &&
@@ -55,12 +64,7 @@ function readSinkIdentifier(value: unknown): string | undefined {
   try {
     if (typeof value !== "object" || value === null) return undefined;
     const identifier = Reflect.get(value, "identifier") as unknown;
-    return typeof identifier === "string" &&
-      identifier.length <= 64 &&
-      sinkIdentifierPattern.test(identifier) &&
-      !isPrivateDataLikeString(identifier)
-      ? identifier
-      : undefined;
+    return isSinkIdentifier(identifier) ? identifier : undefined;
   } catch {
     return undefined;
   }
@@ -95,12 +99,7 @@ async function dispatchToSink(
     }
 
     const candidateIdentifier = Reflect.get(sink, "identifier") as unknown;
-    if (
-      typeof candidateIdentifier === "string" &&
-      candidateIdentifier.length <= 64 &&
-      sinkIdentifierPattern.test(candidateIdentifier) &&
-      !isPrivateDataLikeString(candidateIdentifier)
-    ) {
+    if (isSinkIdentifier(candidateIdentifier)) {
       identifier = candidateIdentifier;
     }
 

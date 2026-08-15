@@ -15,6 +15,10 @@ import type {
   ValidationResult,
 } from "../contracts/result.js";
 import { validateContract } from "../contracts/result.js";
+import {
+  createFileSurfaceDescriptor,
+  createJsonValueSurfaceDescriptor,
+} from "../contracts/surface-target.js";
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
 import { profileRecipes } from "../profiles/profile-recipes.js";
 import {
@@ -223,28 +227,27 @@ function createFileSurface(
   path: string,
   ownership: "managed" | "application-owned",
 ): ManagedSurfaceDescriptor {
-  return {
+  return createFileSurfaceDescriptor({
     identifier,
     owner: { kind: "builder-kernel" },
     path,
     ownership,
-    fingerprintTarget: { kind: "file" },
-    mergeStrategy: "replace-file",
-  };
+  });
 }
 
 function createPackageSurface(
   identifier: string,
   pointer: string,
 ): ManagedSurfaceDescriptor {
-  return {
-    identifier,
-    owner: { kind: "builder-kernel" },
-    path: "apps/web/package.json",
-    ownership: "merge-managed",
-    fingerprintTarget: { kind: "json-value", pointer },
-    mergeStrategy: "json-property",
-  };
+  return createJsonValueSurfaceDescriptor(
+    {
+      identifier,
+      owner: { kind: "builder-kernel" },
+      path: "apps/web/package.json",
+      ownership: "merge-managed",
+    },
+    pointer,
+  );
 }
 
 function createBuilderSurfaces(): readonly ManagedSurfaceDescriptor[] {

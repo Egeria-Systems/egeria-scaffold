@@ -1,10 +1,10 @@
 import type { CapabilityDescriptor } from "../contracts/capability.js";
 import type { ProfileRecipe } from "../contracts/profile.js";
 import type { ContractIssue } from "../contracts/result.js";
-import type { InstalledSurface } from "../contracts/state.js";
 import type { RepositoryStateEvidence } from "../inference/infer-repository.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
 import {
+  deriveProjectDiscrepancies,
   inspectProject,
   migrationLogPath,
   projectConfigurationPath,
@@ -188,16 +188,6 @@ function controlDiagnostics(
   ];
 }
 
-function surfaceKey(surface: Readonly<{ identifier: string; path: string }>): string {
-  return `${surface.identifier}\u0000${surface.path}`;
-}
-
-function capabilityOwner(surface?: InstalledSurface): string | undefined {
-  return surface?.owner.kind === "capability"
-    ? surface.owner.identifier
-    : undefined;
-}
-
 function uniqueSortedDiagnostics(
   diagnostics: readonly Diagnostic[],
 ): readonly Diagnostic[] {
@@ -227,104 +217,83 @@ function resolvedDiagnostics(inspection: ProjectInspection): readonly Diagnostic
     return [];
   }
 
-  const desired = new Set(
-    inspection.resolution.value.capabilities.map(({ identifier }) => identifier),
-  );
-  const installed = new Set(
-    state.value.installedCapabilities.map(({ identifier }) => identifier),
-  );
-  const unknownStateCapabilities = new Set(
-    inspection.inference.capabilities
-      .filter(({ code }) => code === "CAPABILITY_DESCRIPTOR_MISSING")
-      .map(({ identifier }) => identifier),
-  );
+  const discrepancies = deriveProjectDiscrepancies(inspection);
   const diagnostics: Diagnostic[] = [];
 
-  for (const identifier of [...unknownStateCapabilities].sort(compareText)) {
-    diagnostics.push(
-      diagnostic("STATE_CAPABILITY_UNKNOWN", "error", {
-        capability: identifier,
-        path: statePath,
-      }),
-    );
-  }
-
-  for (const identifier of [...new Set([...desired, ...installed])].sort(compareText)) {
-    if (unknownStateCapabilities.has(identifier)) {
+  for (const fact of discrepancies.capabilities) {
+    if (fact.descriptorMissing) {
+      diagnostics.push(
+        diagnostic("STATE_CAPABILITY_UNKNOWN", "error", {
+          capability: fact.identifier,
+          path: statePath,
+        }),
+      );
       continue;
     }
 
-    if (desired.has(identifier) && !installed.has(identifier)) {
+    if (fact.desired && !fact.installed) {
       diagnostics.push(
         diagnostic("DESIRED_INSTALLED_MISMATCH", "error", {
-          capability: identifier,
+          capability: fact.identifier,
           context: { relation: "desired-only" },
         }),
       );
-    } else if (!desired.has(identifier) && installed.has(identifier)) {
+    } else if (!fact.desired && fact.installed) {
       diagnostics.push(
         diagnostic("DESIRED_INSTALLED_MISMATCH", "error", {
-          capability: identifier,
+          capability: fact.identifier,
           context: { relation: "installed-only" },
         }),
       );
     }
-  }
 
-  for (const evidence of inspection.inference.capabilities) {
-    if (unknownStateCapabilities.has(evidence.identifier)) {
-      continue;
-    }
-
-    if (evidence.category === "contradictory") {
+    if (fact.inferenceCategory === "contradictory") {
       diagnostics.push(
         diagnostic("INSTALLED_INFERENCE_CONTRADICTION", "error", {
-          capability: evidence.identifier,
-          context: { category: evidence.category },
+          capability: fact.identifier,
+          context: { category: fact.inferenceCategory },
         }),
       );
     } else if (
-      (evidence.category === "probable" || evidence.category === "partial") &&
-      !installed.has(evidence.identifier)
+      (fact.inferenceCategory === "probable" ||
+        fact.inferenceCategory === "partial") &&
+      !fact.installed
     ) {
       diagnostics.push(
         diagnostic("INSTALLED_INFERENCE_CONTRADICTION", "warning", {
-          capability: evidence.identifier,
-          context: { category: evidence.category },
+          capability: fact.identifier,
+          context: { category: fact.inferenceCategory },
         }),
       );
-    } else if (evidence.category === "ambiguous") {
+    } else if (fact.inferenceCategory === "ambiguous") {
       diagnostics.push(
         diagnostic("INFERENCE_AMBIGUOUS", "warning", {
-          capability: evidence.identifier,
-          context: { category: evidence.category },
+          capability: fact.identifier,
+          context: { category: fact.inferenceCategory },
         }),
       );
     }
   }
 
-  const surfaceByKey = new Map(
-    state.value.managedSurfaces.map((surface) => [surfaceKey(surface), surface]),
-  );
-
-  for (const evidence of inspection.inference.surfaces) {
-    const surface = surfaceByKey.get(surfaceKey(evidence));
-    const capability = capabilityOwner(surface);
-
-    if (evidence.status === "missing" || evidence.status === "drifted") {
+  for (const fact of discrepancies.surfaces) {
+    if (fact.status === "missing" || fact.status === "drifted") {
       diagnostics.push(
         diagnostic("MANAGED_SURFACE_DRIFT", "warning", {
-          ...(capability === undefined ? {} : { capability }),
-          path: evidence.path,
-          context: { status: evidence.status },
+          ...(fact.capability === undefined
+            ? {}
+            : { capability: fact.capability }),
+          path: fact.path,
+          context: { status: fact.status },
         }),
       );
-    } else if (evidence.status === "ambiguous") {
+    } else {
       diagnostics.push(
         diagnostic("INFERENCE_AMBIGUOUS", "warning", {
-          ...(capability === undefined ? {} : { capability }),
-          path: evidence.path,
-          context: { reason: evidence.code ?? "ambiguous" },
+          ...(fact.capability === undefined
+            ? {}
+            : { capability: fact.capability }),
+          path: fact.path,
+          context: { reason: fact.reason ?? "ambiguous" },
         }),
       );
     }

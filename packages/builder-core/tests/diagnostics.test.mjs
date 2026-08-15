@@ -24,6 +24,9 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const builtEntry = resolve(packageRoot, "dist/index.js");
 const typeScriptCompiler = resolve(packageRoot, "node_modules/typescript/bin/tsc");
 const core = await import(pathToFileURL(builtEntry));
+const projectInspection = await import(
+  pathToFileURL(resolve(packageRoot, "dist/diagnostics/project-inspection.js")),
+);
 const encoder = new TextEncoder();
 
 const verificationChecks = [
@@ -232,6 +235,144 @@ function diagnosticByCode(result, code) {
 test("builder-core exports the approved read-only doctor and diff API", () => {
   assert.equal(typeof core.doctorRepository, "function");
   assert.equal(typeof core.diffProject, "function");
+});
+
+test("doctor and diff share neutral capability and managed-surface discrepancy facts", () => {
+  const standards = createDescriptor("standards");
+  const installedOnly = createDescriptor("installed-only");
+  const unknownInstalled = {
+    ...installCapability(standards),
+    identifier: "unknown-installed",
+  };
+  const capabilitySurface = createSurface({
+    identifier: "capability-missing",
+    path: "missing.txt",
+  });
+  const builderSurface = {
+    ...createSurface({
+      identifier: "builder-ambiguous",
+      path: "ambiguous.txt",
+    }),
+    owner: { kind: "builder-kernel" },
+  };
+  const installedState = state(
+    [
+      installCapability(standards),
+      installCapability(installedOnly),
+      unknownInstalled,
+    ],
+    [capabilitySurface, builderSurface],
+  );
+
+  assert.deepEqual(
+    projectInspection.deriveProjectDiscrepancies({
+      project: { kind: "valid", value: project() },
+      migrations: { kind: "valid", value: [] },
+      resolution: {
+        ok: true,
+        value: {
+          capabilities: [standards, createDescriptor("desired-only")],
+        },
+      },
+      inference: {
+        state: { kind: "valid", value: installedState },
+        capabilities: [
+          {
+            identifier: "standards",
+            category: "contradictory",
+            probes: [],
+          },
+          {
+            identifier: "inferred-only",
+            category: "probable",
+            probes: [],
+          },
+          {
+            identifier: "installed-only",
+            category: "confirmed",
+            probes: [],
+          },
+          {
+            identifier: "unknown-installed",
+            category: "ambiguous",
+            probes: [],
+            code: "CAPABILITY_DESCRIPTOR_MISSING",
+          },
+        ],
+        surfaces: [
+          {
+            identifier: "capability-missing",
+            path: "missing.txt",
+            status: "missing",
+          },
+          {
+            identifier: "builder-ambiguous",
+            path: "ambiguous.txt",
+            status: "ambiguous",
+            code: "READ_FAILED",
+          },
+          {
+            identifier: "confirmed",
+            path: "confirmed.txt",
+            status: "confirmed",
+          },
+        ],
+      },
+    }),
+    {
+      capabilities: [
+        {
+          identifier: "desired-only",
+          desired: true,
+          installed: false,
+          descriptorMissing: false,
+        },
+        {
+          identifier: "inferred-only",
+          desired: false,
+          installed: false,
+          descriptorMissing: false,
+          inferenceCategory: "probable",
+        },
+        {
+          identifier: "installed-only",
+          desired: false,
+          installed: true,
+          descriptorMissing: false,
+          inferenceCategory: "confirmed",
+        },
+        {
+          identifier: "standards",
+          desired: true,
+          installed: true,
+          descriptorMissing: false,
+          inferenceCategory: "contradictory",
+        },
+        {
+          identifier: "unknown-installed",
+          desired: false,
+          installed: true,
+          descriptorMissing: true,
+          inferenceCategory: "ambiguous",
+          inferenceCode: "CAPABILITY_DESCRIPTOR_MISSING",
+        },
+      ],
+      surfaces: [
+        {
+          identifier: "builder-ambiguous",
+          path: "ambiguous.txt",
+          status: "ambiguous",
+          reason: "READ_FAILED",
+        },
+        {
+          identifier: "capability-missing",
+          path: "missing.txt",
+          status: "missing",
+          capability: "standards",
+        },
+      ],
+    },
+  );
 });
 
 test("the package root exposes the exact diagnostics types", async () => {

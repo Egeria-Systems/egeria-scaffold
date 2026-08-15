@@ -10,6 +10,9 @@ const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const builtEntry = resolve(packageRoot, "dist/index.js");
 const contracts = await import(pathToFileURL(builtEntry));
+const surfaceTargets = await import(
+  pathToFileURL(resolve(packageRoot, "dist/contracts/surface-target.js"))
+);
 
 const schemaArtifactNames = [
   "capability.schema.json",
@@ -196,6 +199,44 @@ function assertMergeTargetIssue(schema, value, path) {
     },
   ]);
 }
+
+test("managed-surface constructors bind target and merge policy without changing ownership", () => {
+  const builderSurface = surfaceTargets.createFileSurfaceDescriptor({
+    identifier: "builder-project-configuration",
+    owner: { kind: "builder-kernel" },
+    path: ".egeria/project.yaml",
+    ownership: "managed",
+  });
+  const capabilitySurface = surfaceTargets.createJsonValueSurfaceDescriptor(
+    {
+      identifier: "standards-package",
+      owner: { kind: "capability", identifier: "standards" },
+      path: "apps/web/package.json",
+      ownership: "merge-managed",
+    },
+    "/devDependencies/@egeria-systems~1standards",
+  );
+
+  assert.deepEqual(builderSurface, {
+    identifier: "builder-project-configuration",
+    owner: { kind: "builder-kernel" },
+    path: ".egeria/project.yaml",
+    ownership: "managed",
+    fingerprintTarget: { kind: "file" },
+    mergeStrategy: "replace-file",
+  });
+  assert.deepEqual(capabilitySurface, {
+    identifier: "standards-package",
+    owner: { kind: "capability", identifier: "standards" },
+    path: "apps/web/package.json",
+    ownership: "merge-managed",
+    fingerprintTarget: {
+      kind: "json-value",
+      pointer: "/devDependencies/@egeria-systems~1standards",
+    },
+    mergeStrategy: "json-property",
+  });
+});
 
 test("builder-core exports the executable contract boundary", () => {
   for (const exportName of [
