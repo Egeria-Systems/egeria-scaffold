@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   constants,
@@ -10,6 +11,7 @@ import {
 } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
+import { isDeepStrictEqual, promisify } from "node:util";
 
 import {
   certifyFreshScaffold,
@@ -17,6 +19,7 @@ import {
 } from "./lib/certify-fresh-scaffold.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const execFileAsync = promisify(execFile);
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
 const publicRegistry = "https://registry.npmjs.org/";
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
@@ -185,6 +188,26 @@ async function requireSnapshotUnchanged(root, snapshot) {
   }
 }
 
+async function requireTreeIdentical(root, snapshot) {
+  let current;
+  try {
+    current = await snapshotTree(root);
+  } catch {
+    throw createError("CERTIFICATION_SOURCE_CHANGED");
+  }
+  if (!isDeepStrictEqual(current, snapshot)) {
+    throw createError("CERTIFICATION_SOURCE_CHANGED");
+  }
+}
+
+export function snapshotTreeForTesting(root) {
+  return snapshotTree(root);
+}
+
+export function requireTreeIdenticalForTesting(root, snapshot) {
+  return requireTreeIdentical(root, snapshot);
+}
+
 async function copyCertificationFixtures(projectRoot) {
   for (const mapping of fixtureMappings) {
     const source = join(fixtureRoot, mapping.source);
@@ -223,12 +246,12 @@ function requireLocalReceipt(receipt, revision) {
     receipt?.ok !== true ||
     receipt.capability !== "observability" ||
     receipt.version !== "0.3.0" ||
-    JSON.stringify(receipt.subject) !== JSON.stringify(subject) ||
+    !isDeepStrictEqual(receipt.subject, subject) ||
     receipt.revision !== revision ||
     receipt.scope !== "local-full" ||
     receipt.providerRecordsClaimed !== false ||
-    JSON.stringify(receipt.cases) !== JSON.stringify(expectedLocalCases) ||
-    JSON.stringify(receipt.checks) !== JSON.stringify(expectedLocalChecks) ||
+    !isDeepStrictEqual(receipt.cases, expectedLocalCases) ||
+    !isDeepStrictEqual(receipt.checks, expectedLocalChecks) ||
     !Array.isArray(receipt.eventIdentifiers) ||
     receipt.eventIdentifiers.length !== 5 ||
     new Set(receipt.eventIdentifiers).size !== 5 ||
@@ -239,14 +262,13 @@ function requireLocalReceipt(receipt, revision) {
           identifier,
         ),
     ) ||
-    JSON.stringify(receipt.counts) !==
-      JSON.stringify({
-        cases: 8,
-        captureInvocations: 9,
-        acceptedOriginals: 8,
-        syntheticApplicationRequests: 10,
-        diagnosticDeliveryFailures: 1,
-      })
+    !isDeepStrictEqual(receipt.counts, {
+      cases: 8,
+      captureInvocations: 9,
+      acceptedOriginals: 8,
+      syntheticApplicationRequests: 10,
+      diagnosticDeliveryFailures: 1,
+    })
   ) {
     throw createError("CERTIFICATION_FIXTURE_RECEIPT_INVALID");
   }
@@ -337,7 +359,7 @@ function fixtureVerifierFor(revision) {
     await requireSnapshotUnchanged(projectRoot, generatedSnapshot);
     await Promise.all(
       protectedRepositoryRoots.map((root, index) =>
-        requireSnapshotUnchanged(root, protectedSnapshots[index]),
+        requireTreeIdentical(root, protectedSnapshots[index]),
       ),
     );
 
@@ -363,15 +385,39 @@ export function certifyObservabilityErrorDiagnosticsForTesting(
   );
 }
 
-function parseArguments(arguments_) {
+async function readCurrentRevision() {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["rev-parse", "--verify", "HEAD"],
+      { cwd: repositoryRoot, encoding: "utf8" },
+    );
+    const revision = stdout.trim();
+    return exactRevisionPattern.test(revision) ? revision : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function parseArguments(arguments_, readHead = readCurrentRevision) {
+  if (arguments_.length === 0) {
+    const revision = await readHead();
+    return revision === undefined ? undefined : { revision };
+  }
   if (arguments_.length === 2 && arguments_[0] === "--revision") {
-    return { revision: arguments_[1] };
+    const revision =
+      arguments_[1] === "HEAD" ? await readHead() : arguments_[1];
+    return revision === undefined ? undefined : { revision };
   }
   return undefined;
 }
 
+export function parseArgumentsForTesting(arguments_, readHead) {
+  return parseArguments(arguments_, readHead);
+}
+
 async function runMain() {
-  const input = parseArguments(process.argv.slice(2));
+  const input = await parseArguments(process.argv.slice(2));
   if (input === undefined) {
     process.stderr.write(
       `${JSON.stringify({

@@ -183,7 +183,7 @@ jobs:
           OBSERVABILITY_DIAGNOSTICS_BROWSER_RECEIPT_PATH: ${{ runner.temp }}/observability-error-diagnostics-browser-receipt.json
         run: |
           umask 077
-          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec playwright test --config playwright.deployed.config.ts tests/e2e/observability-error-diagnostics.spec.ts
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec playwright test --config playwright.deployed.config.ts --retries=0 tests/e2e/observability-error-diagnostics.spec.ts
           test "$(wc -l < "$OBSERVABILITY_DIAGNOSTICS_BROWSER_RECEIPT_PATH")" -eq 1
           test "$(wc -c < "$OBSERVABILITY_DIAGNOSTICS_BROWSER_RECEIPT_PATH")" -le 4096
           test "$(stat -c "%a" "$OBSERVABILITY_DIAGNOSTICS_BROWSER_RECEIPT_PATH")" = "600"

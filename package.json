@@ -31,7 +31,6 @@
     "verify:booking-calendly-certification": "pnpm run build:builder && node scripts/certify-booking-calendly.mjs",
     "verify:generated-testing-certification": "pnpm run build:builder && node scripts/certify-generated-testing.mjs",
     "verify:observability-error-diagnostics-certification": "pnpm run build:builder && node scripts/certify-observability-error-diagnostics.mjs",
-    "verify:production-observability-certification": "pnpm run build:builder && node scripts/certify-production-observability.mjs",
     "verify:generated-skeletons": "node scripts/verify-generated-skeletons.mjs",
     "verify:package-release-candidate": "pnpm run verify:builder-packages:quality && pnpm run check:package-release local",
     "version-packages": "changeset version"

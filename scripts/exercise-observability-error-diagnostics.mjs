@@ -1,6 +1,7 @@
 import { lstat, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 
 const requestTimeoutMilliseconds = 10_000;
 const maximumReceiptBytes = 4_096;
@@ -248,11 +249,11 @@ function receiptMatches(value, expected) {
     value?.ok === true &&
     value.capability === "observability" &&
     value.version === "0.3.0" &&
-    JSON.stringify(value.subject) === JSON.stringify(subject) &&
+    isDeepStrictEqual(value.subject, subject) &&
     value.revision === expected.revision &&
     value.providerRecordsClaimed === false &&
-    JSON.stringify(value.cases) === JSON.stringify(expected.cases) &&
-    JSON.stringify(value.counts) === JSON.stringify(expected.counts)
+    isDeepStrictEqual(value.cases, expected.cases) &&
+    isDeepStrictEqual(value.counts, expected.counts)
   );
 }
 

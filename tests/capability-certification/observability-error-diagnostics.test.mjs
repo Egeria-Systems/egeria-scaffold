@@ -145,6 +145,14 @@ const fixtureRoot = resolve(
   repositoryRoot,
   "tests/capability-certification/fixtures/observability-error-diagnostics",
 );
+const retiredCertificationPaths = Object.freeze([
+  ".github/workflows/production-observability-certification.yml",
+  "scripts/certify-production-observability.mjs",
+  "scripts/exercise-production-observability.mjs",
+  "tests/capability-certification/fixtures/observability-error-route.ts",
+  "tests/capability-certification/fixtures/observability-browser-error.spec.ts",
+  "tests/capability-certification/production-observability.test.mjs",
+]);
 
 async function pathExists(path) {
   try {
@@ -423,6 +431,23 @@ test("the local fixture receipt binds every capture case and rejects semantic or
     true,
   );
 
+  const reordered = structuredClone(receipt);
+  reordered.subject = {
+    behaviorContractDigest: exactSubject.behaviorContractDigest,
+    descriptorVersion: exactSubject.descriptorVersion,
+  };
+  reordered.counts = {
+    diagnosticDeliveryFailures: 1,
+    syntheticApplicationRequests: 10,
+    acceptedOriginals: 8,
+    captureInvocations: 9,
+    cases: 8,
+  };
+  assert.equal(
+    validateLocalFixtureReceiptForTesting(reordered, exactRevision),
+    true,
+  );
+
   for (const mutate of [
     (value) => value.cases.pop(),
     (value) => value.checks.splice(3, 1),
@@ -439,6 +464,25 @@ test("the local fixture receipt binds every capture case and rejects semantic or
       () => validateLocalFixtureReceiptForTesting(drifted, exactRevision),
       (error) => error?.code === "CERTIFICATION_FIXTURE_RECEIPT_INVALID",
     );
+  }
+});
+
+test("the protected repository source guard rejects added files", async () => {
+  const runner = await loadModule(runnerPath);
+  assert.equal(typeof runner.snapshotTreeForTesting, "function");
+  assert.equal(typeof runner.requireTreeIdenticalForTesting, "function");
+  const root = await mkdtemp(join(tmpdir(), "diagnostics-protected-tree-"));
+
+  try {
+    await writeFile(join(root, "accepted.txt"), "accepted\n", "utf8");
+    const snapshot = await runner.snapshotTreeForTesting(root);
+    await writeFile(join(root, "unexpected.txt"), "unexpected\n", "utf8");
+    await assert.rejects(
+      () => runner.requireTreeIdenticalForTesting(root, snapshot),
+      (error) => error?.code === "CERTIFICATION_SOURCE_CHANGED",
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 
@@ -567,6 +611,30 @@ test("the runner CLI rejects unknown private input without echoing it", async ()
     })}\n`,
   );
   assert.doesNotMatch(failure.stderr, /private-value/u);
+});
+
+test("the package runner resolves HEAD to the exact checkout revision", async () => {
+  const runner = await loadModule(runnerPath);
+  assert.equal(typeof runner.parseArgumentsForTesting, "function");
+  let headReads = 0;
+  const readHead = async () => {
+    headReads += 1;
+    return exactRevision;
+  };
+
+  assert.deepEqual(
+    await runner.parseArgumentsForTesting([], readHead),
+    { revision: exactRevision },
+  );
+  assert.equal(headReads, 1);
+  assert.deepEqual(
+    await runner.parseArgumentsForTesting(
+      ["--revision", exactRevision],
+      readHead,
+    ),
+    { revision: exactRevision },
+  );
+  assert.equal(headReads, 1);
 });
 
 test("the deployed exercise is bounded to three server cases and reads content only for the controlled safe result", async () => {
@@ -733,9 +801,66 @@ test("route and browser receipts reconcile to the frozen eight-case matrix", asy
       ),
     (error) => error?.code === "RECEIPT_COUNTS_INVALID",
   );
+
+  const reorderedRoute = structuredClone(routeReceipt);
+  reorderedRoute.subject = {
+    behaviorContractDigest: exactSubject.behaviorContractDigest,
+    descriptorVersion: exactSubject.descriptorVersion,
+  };
+  reorderedRoute.counts = Object.fromEntries(
+    Object.entries(reorderedRoute.counts).reverse(),
+  );
+  const reorderedBrowser = structuredClone(browserReceipt);
+  reorderedBrowser.subject = {
+    behaviorContractDigest: exactSubject.behaviorContractDigest,
+    descriptorVersion: exactSubject.descriptorVersion,
+  };
+  reorderedBrowser.counts = Object.fromEntries(
+    Object.entries(reorderedBrowser.counts).reverse(),
+  );
+  assert.equal(
+    reconcileObservabilityErrorDiagnosticsReceipts(
+      reorderedRoute,
+      reorderedBrowser,
+      exactRevision,
+    ).ok,
+    true,
+  );
 });
 
-test("the Cloudflare deployment sanitizer can bind the current subject without changing its historical default", async () => {
+test("the current diagnostics certification has no dispatchable predecessor path", async () => {
+  for (const path of retiredCertificationPaths) {
+    assert.equal(await pathExists(resolve(repositoryRoot, path)), false, path);
+  }
+
+  const workspace = JSON.parse(
+    await readFile(resolve(repositoryRoot, "package.json"), "utf8"),
+  );
+  assert.equal(
+    workspace.scripts["verify:production-observability-certification"],
+    undefined,
+  );
+
+  const deploymentPolicy = await readFile(
+    resolve(repositoryRoot, "docs/governance/shared-test-deployment.md"),
+    "utf8",
+  );
+  assert.doesNotMatch(
+    deploymentPolicy,
+    /production-observability-certification/u,
+  );
+
+  const enforcementMap = await readFile(
+    resolve(repositoryRoot, "docs/architecture/enforcement-map.md"),
+    "utf8",
+  );
+  assert.doesNotMatch(
+    enforcementMap,
+    /verify:production-observability-certification/u,
+  );
+});
+
+test("the Cloudflare deployment sanitizer requires the explicit current subject version", async () => {
   const { createCloudflareDeploymentReceiptForTesting } = await loadModule(
     resolve(repositoryRoot, "scripts/create-cloudflare-deployment-receipt.mjs"),
   );
@@ -755,9 +880,17 @@ test("the Cloudflare deployment sanitizer can bind the current subject without c
     revision: exactRevision,
     worker: "test-deploy",
   };
-  assert.equal(
-    createCloudflareDeploymentReceiptForTesting(input).version,
-    "0.2.0",
+  assert.throws(
+    () => createCloudflareDeploymentReceiptForTesting(input),
+    (error) => error?.code === "DEPLOYMENT_RECEIPT_VERSION_INVALID",
+  );
+  assert.throws(
+    () =>
+      createCloudflareDeploymentReceiptForTesting({
+        ...input,
+        capabilityVersion: "0.2.0",
+      }),
+    (error) => error?.code === "DEPLOYMENT_RECEIPT_VERSION_INVALID",
   );
   assert.deepEqual(
     createCloudflareDeploymentReceiptForTesting({
@@ -883,6 +1016,10 @@ test("the prepared workflow is manual, exact-revision, protected, single-attempt
   assert.match(
     stepsByName["Install observability provider secrets"].run,
     /--version 0\.3\.0/u,
+  );
+  assert.match(
+    stepsByName["Test deployed browser diagnostics"].run,
+    /playwright test --config playwright\.deployed\.config\.ts --retries=0 tests\/e2e\/observability-error-diagnostics\.spec\.ts/u,
   );
   assert.match(
     stepsByName["Reconcile bounded certification matrix"].run,

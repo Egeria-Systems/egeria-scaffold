@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 const maximumInputBytes = 65_536;
 const maximumDeploymentCount = 100;
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
-const supportedCapabilityVersions = Object.freeze(["0.2.0", "0.3.0"]);
+const supportedCapabilityVersion = "0.3.0";
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const workerName = "test-deploy";
 const checks = Object.freeze([
@@ -115,7 +115,7 @@ export function createCloudflareDeploymentReceiptForTesting({
   rawInput,
   revision,
   worker,
-  capabilityVersion = "0.2.0",
+  capabilityVersion,
 } = {}) {
   if (typeof revision !== "string" || !exactRevisionPattern.test(revision)) {
     throw createError("DEPLOYMENT_RECEIPT_REVISION_INVALID");
@@ -123,7 +123,7 @@ export function createCloudflareDeploymentReceiptForTesting({
   if (worker !== workerName) {
     throw createError("DEPLOYMENT_RECEIPT_WORKER_INVALID");
   }
-  if (!supportedCapabilityVersions.includes(capabilityVersion)) {
+  if (capabilityVersion !== supportedCapabilityVersion) {
     throw createError("DEPLOYMENT_RECEIPT_VERSION_INVALID");
   }
 
@@ -178,19 +178,17 @@ async function readBoundedInput(path) {
 
 function parseArguments(arguments_) {
   if (
-    (arguments_.length === 6 || arguments_.length === 8) &&
+    arguments_.length === 8 &&
     arguments_[0] === "--input" &&
     arguments_[2] === "--revision" &&
     arguments_[4] === "--worker" &&
-    (arguments_.length === 6 || arguments_[6] === "--version")
+    arguments_[6] === "--version"
   ) {
     return {
       input: arguments_[1],
       revision: arguments_[3],
       worker: arguments_[5],
-      ...(arguments_.length === 8
-        ? { capabilityVersion: arguments_[7] }
-        : {}),
+      capabilityVersion: arguments_[7],
     };
   }
   return undefined;

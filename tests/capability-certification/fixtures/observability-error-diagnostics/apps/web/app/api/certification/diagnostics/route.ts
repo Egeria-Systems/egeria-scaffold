@@ -90,6 +90,8 @@ async function captureGeneratedDispatch(
   action: () => Promise<void>,
   rejectDiagnostic: boolean,
 ) {
+  // This short-lived certification fixture patches isolate-wide globals. The
+  // protected lease keeps captures exclusive; never reuse it for shared traffic.
   if (Reflect.get(globalThis, certificationLeaseKey) === true) {
     throw new Error("certification capture already active");
   }
