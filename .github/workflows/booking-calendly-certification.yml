@@ -47,9 +47,7 @@ jobs:
       - name: Verify approved revision
         env:
           EXPECTED_REVISION: ${{ inputs.expected_revision }}
-        run: |
-          test "$GITHUB_SHA" = "$EXPECTED_REVISION"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+        run: node scripts/verify-approved-revision.mjs
 
       - name: Install builder dependencies
         run: pnpm install --frozen-lockfile

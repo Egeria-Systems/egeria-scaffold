@@ -1128,7 +1128,7 @@ test("the prepared workflow is manual, exact-revision, protected, single-attempt
   }
   assert.match(
     stepsByName["Verify approved revision and subject"].run,
-    /test "\$GITHUB_SHA" = "\$EXPECTED_REVISION"/u,
+    /node scripts\/verify-approved-revision\.mjs/u,
   );
   assert.match(
     stepsByName["Verify approved revision and subject"].run,

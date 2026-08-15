@@ -1,5 +1,18 @@
 import assert from "node:assert/strict";
-import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  cp,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -15,6 +28,9 @@ const verifierModule = await import(
   pathToFileURL(
     resolve(packageRoot, "dist/generation/verify-generated-project.js"),
   ),
+);
+const sourceTreeSafety = await import(
+  pathToFileURL(resolve(packageRoot, "dist/generation/source-tree-safety.js")),
 );
 
 const generatedChecks = [
@@ -132,6 +148,167 @@ async function exists(path) {
     throw error;
   }
 }
+
+test(
+  "owned temporary directories are sibling-scoped, identity-bound, private, and safely cleaned up",
+  async (context) => {
+    const parent = await mkdtemp(join(tmpdir(), "egeria-owned-parent-"));
+    context.after(() => rm(parent, { recursive: true, force: true }));
+
+    const created = await sourceTreeSafety.createOwnedTemporaryDirectory(
+      parent,
+      ".egeria-owned-",
+    );
+    assert.equal(created.ok, true);
+
+    const identity = created.value;
+    const stats = await lstat(identity.path, { bigint: true });
+    assert.equal(await realpath(dirname(identity.path)), await realpath(parent));
+    assert.match(identity.path, /\/\.egeria-owned-[^/]+$/);
+    assert.equal(stats.isSymbolicLink(), false);
+    assert.equal(stats.isDirectory(), true);
+    assert.equal(stats.dev, identity.device);
+    assert.equal(stats.ino, identity.inode);
+    assert.equal(Number(stats.mode & 0o777n), 0o700);
+
+    assert.equal(await sourceTreeSafety.cleanupOwnedDirectory(identity), true);
+    assert.equal(await exists(identity.path), false);
+  },
+);
+
+test("source snapshots reject a symbolic-link root", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-snapshot-root-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const source = join(parent, "source");
+  const linkedSource = join(parent, "linked-source");
+  await mkdir(source);
+  await writeFile(join(source, "package.json"), "{}\n");
+  await symlink(source, linkedSource, "dir");
+
+  assert.equal(
+    await sourceTreeSafety.snapshotSourceTree(linkedSource),
+    undefined,
+  );
+});
+
+test("lockfile preparation rejects a byte-identical replacement root", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-lockfile-root-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const source = join(parent, "source");
+  const originalSource = join(parent, "original-source");
+  await mkdir(source);
+  await writeFile(join(source, "package.json"), "{}\n");
+
+  const result = await verifierModule.prepareLockfile(
+    source,
+    async (lockfilePath, content) => {
+      await rename(source, originalSource);
+      await cp(originalSource, source, {
+        recursive: true,
+        force: false,
+        errorOnExist: true,
+      });
+      await writeFile(lockfilePath, content, { flag: "wx" });
+      return { ok: true };
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    issues: [
+      {
+        code: "LOCKFILE_PREPARATION_FAILED",
+        path: [],
+        context: { reason: "source-changed" },
+      },
+    ],
+  });
+});
+
+test("lockfile-only transition classification preserves inventory and source-change distinctions", () => {
+  const packageEntry = { kind: "file", fingerprint: "sha256:package" };
+  const directoryEntry = { kind: "directory" };
+  const lockfileEntry = { kind: "file", fingerprint: "sha256:lockfile" };
+  const unchanged = new Map([
+    ["package.json", packageEntry],
+    ["src", directoryEntry],
+  ]);
+
+  for (const scenario of [
+    {
+      name: "valid",
+      before: unchanged,
+      after: new Map([...unchanged, ["pnpm-lock.yaml", lockfileEntry]]),
+      expected: "valid",
+    },
+    {
+      name: "pre-existing lockfile",
+      before: new Map([...unchanged, ["pnpm-lock.yaml", lockfileEntry]]),
+      after: new Map([...unchanged, ["pnpm-lock.yaml", lockfileEntry]]),
+      expected: "unexpected-inventory",
+    },
+    {
+      name: "missing lockfile",
+      before: unchanged,
+      after: unchanged,
+      expected: "unexpected-inventory",
+    },
+    {
+      name: "non-file lockfile",
+      before: unchanged,
+      after: new Map([...unchanged, ["pnpm-lock.yaml", directoryEntry]]),
+      expected: "unexpected-inventory",
+    },
+    {
+      name: "extra entry",
+      before: unchanged,
+      after: new Map([
+        ...unchanged,
+        ["pnpm-lock.yaml", lockfileEntry],
+        ["unexpected", packageEntry],
+      ]),
+      expected: "unexpected-inventory",
+    },
+    {
+      name: "removed prior entry",
+      before: unchanged,
+      after: new Map([
+        ["package.json", packageEntry],
+        ["pnpm-lock.yaml", lockfileEntry],
+      ]),
+      expected: "source-changed",
+    },
+    {
+      name: "changed prior file",
+      before: unchanged,
+      after: new Map([
+        ["package.json", { kind: "file", fingerprint: "sha256:changed" }],
+        ["src", directoryEntry],
+        ["pnpm-lock.yaml", lockfileEntry],
+      ]),
+      expected: "source-changed",
+    },
+    {
+      name: "changed prior kind",
+      before: unchanged,
+      after: new Map([
+        ["package.json", directoryEntry],
+        ["src", directoryEntry],
+        ["pnpm-lock.yaml", lockfileEntry],
+      ]),
+      expected: "source-changed",
+    },
+  ]) {
+    assert.equal(
+      sourceTreeSafety.classifyLockfileOnlyTransition(
+        scenario.before,
+        scenario.after,
+      ),
+      scenario.expected,
+      scenario.name,
+    );
+  }
+});
 
 async function listFiles(root) {
   const files = [];
@@ -1125,10 +1302,12 @@ test("lockfile preparation may add only one regular lockfile without mutations",
     const cases = [
       {
         name: "missing-lockfile",
+        reason: "unexpected-inventory",
         prepare: async () => ({ ok: true, value: undefined }),
       },
       {
         name: "changed-manifest",
+        reason: "source-changed",
         prepare: async (root) => {
           await writeFile(join(root, "package.json"), "{}\n");
           await writeFile(
@@ -1140,6 +1319,7 @@ test("lockfile preparation may add only one regular lockfile without mutations",
       },
       {
         name: "extra-file",
+        reason: "unexpected-inventory",
         prepare: async (root) => {
           await writeFile(join(root, "unexpected"), "unexpected");
           await writeFile(
@@ -1151,6 +1331,7 @@ test("lockfile preparation may add only one regular lockfile without mutations",
       },
       {
         name: "symlink-lockfile",
+        reason: "source-inventory-invalid",
         prepare: async (root) => {
           await symlink("package.json", join(root, "pnpm-lock.yaml"));
           return { ok: true, value: undefined };
@@ -1168,6 +1349,7 @@ test("lockfile preparation may add only one regular lockfile without mutations",
       });
 
       assertFailure(result, "LOCKFILE_PREPARATION_INVALID");
+      assert.equal(result.issues[0].context.reason, scenario.reason);
       assert.equal(await exists(destination), false);
       assert.equal(await exists(fake.roots[0]), false);
       assert.deepEqual(fake.calls, ["prepare-lockfile"]);

@@ -1,20 +1,26 @@
 import { execFile } from "node:child_process";
 import {
-  chmod,
   cp,
   lstat,
   mkdir,
-  mkdtemp,
   open,
   readFile,
-  readdir,
-  rm,
 } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 
-import { fingerprintFileContent } from "../ownership/fingerprint.js";
+import { ordinaryGenerationVerificationChecks } from "../contracts/generation-verification.js";
 import type { ValidationResult } from "../contracts/result.js";
+import {
+  classifyLockfileOnlyTransition,
+  cleanupOwnedDirectory,
+  createOwnedTemporaryDirectory,
+  readDirectoryIdentity,
+  snapshotSourceTree,
+  sourceIdentityMatches,
+  sourceTreesEqual,
+  type PathIdentity,
+} from "./source-tree-safety.js";
 
 export type GeneratedProjectVerification = Readonly<{
   checks: typeof verificationChecks;
@@ -27,12 +33,6 @@ export interface GeneratedProjectVerifier {
   ): Promise<ValidationResult<GeneratedProjectVerification>>;
 }
 
-type PathIdentity = Readonly<{
-  path: string;
-  device: bigint;
-  inode: bigint;
-}>;
-
 type SupportPaths = Readonly<{
   identity: PathIdentity;
   home: string;
@@ -40,10 +40,6 @@ type SupportPaths = Readonly<{
   store: string;
   userConfiguration: string;
 }>;
-
-type SourceEntry =
-  | Readonly<{ kind: "directory" }>
-  | Readonly<{ kind: "file"; fingerprint: string }>;
 
 type ExclusiveWriteResult =
   | Readonly<{ ok: true }>
@@ -80,16 +76,7 @@ const recipeLockfile = new URL(
 const exclusiveFileOperations: ExclusiveFileOperations = {
   open,
 };
-export const verificationChecks = Object.freeze([
-  "lockfile",
-  "frozen-install",
-  "lint",
-  "typecheck",
-  "unit-tests",
-  "component-tests",
-  "next-build",
-  "opennext-build",
-] as const);
+export const verificationChecks = ordinaryGenerationVerificationChecks;
 
 function issue<T>(code: string, reason: string): ValidationResult<T> {
   return {
@@ -132,33 +119,6 @@ function createChildEnvironment(support: SupportPaths): NodeJS.ProcessEnv {
   };
 }
 
-async function sourceIdentityMatches(identity: PathIdentity): Promise<boolean> {
-  try {
-    const stats = await lstat(identity.path, { bigint: true });
-    return (
-      !stats.isSymbolicLink() &&
-      stats.isDirectory() &&
-      stats.dev === identity.device &&
-      stats.ino === identity.inode
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function cleanupOwnedDirectory(identity: PathIdentity): Promise<boolean> {
-  if (!(await sourceIdentityMatches(identity))) {
-    return false;
-  }
-
-  try {
-    await rm(identity.path, { recursive: true });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export async function writeExclusive(
   path: string,
   content: Uint8Array = new Uint8Array(),
@@ -198,27 +158,6 @@ export async function writeExclusive(
   // could delete a replacement created after this handle was opened, so the
   // caller must fail closed and let the identity-owned staging root clean up.
   return { ok: false, sourceChanged: true };
-}
-
-async function createOwnedDirectory(
-  parent: string,
-  prefix: string,
-): Promise<ValidationResult<PathIdentity>> {
-  try {
-    const path = await mkdtemp(join(parent, prefix));
-    const stats = await lstat(path, { bigint: true });
-    if (stats.isSymbolicLink() || !stats.isDirectory()) {
-      return issue("VERIFIER_SETUP_FAILED", "invalid-owner");
-    }
-
-    await chmod(path, 0o700);
-    return {
-      ok: true,
-      value: { path, device: stats.dev, inode: stats.ino },
-    };
-  } catch {
-    return issue("VERIFIER_SETUP_FAILED", "owner-creation-failed");
-  }
 }
 
 async function createSupportPaths(
@@ -317,98 +256,21 @@ async function requirePnpmVersion(input: Readonly<{
     : issue("PNPM_VERSION_INVALID", "version-mismatch");
 }
 
-async function snapshotSource(
-  root: string,
-): Promise<ValidationResult<ReadonlyMap<string, SourceEntry>>> {
-  const entries = new Map<string, SourceEntry>();
-
-  async function visit(path: string, relativePath: string): Promise<boolean> {
-    let children;
-    try {
-      children = await readdir(path, { withFileTypes: true });
-    } catch {
-      return false;
-    }
-
-    for (const child of children) {
-      const childPath = join(path, child.name);
-      const childRelativePath = relativePath
-        ? `${relativePath}/${child.name}`
-        : child.name;
-
-      if (child.isDirectory()) {
-        entries.set(childRelativePath, { kind: "directory" });
-        if (!(await visit(childPath, childRelativePath))) {
-          return false;
-        }
-      } else if (child.isFile()) {
-        try {
-          entries.set(childRelativePath, {
-            kind: "file",
-            fingerprint: fingerprintFileContent(await readFile(childPath)),
-          });
-        } catch {
-          return false;
-        }
-      } else {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  return (await visit(root, ""))
-    ? { ok: true, value: entries }
-    : issue("SOURCE_SNAPSHOT_FAILED", "source-invalid");
-}
-
-function entriesEqual(left: SourceEntry, right: SourceEntry): boolean {
-  return (
-    left.kind === right.kind &&
-    (left.kind === "directory" ||
-      (right.kind === "file" && left.fingerprint === right.fingerprint))
-  );
-}
-
-function onlyLockfileWasAdded(
-  before: ReadonlyMap<string, SourceEntry>,
-  after: ReadonlyMap<string, SourceEntry>,
-): boolean {
-  if (
-    before.has("pnpm-lock.yaml") ||
-    after.get("pnpm-lock.yaml")?.kind !== "file" ||
-    after.size !== before.size + 1
-  ) {
-    return false;
-  }
-
-  return [...before].every(([path, entry]) => {
-    const current = after.get(path);
-    return current !== undefined && entriesEqual(entry, current);
-  });
-}
-
-function snapshotsEqual(
-  left: ReadonlyMap<string, SourceEntry>,
-  right: ReadonlyMap<string, SourceEntry>,
-): boolean {
-  return (
-    left.size === right.size &&
-    [...left].every(([path, entry]) => {
-      const current = right.get(path);
-      return current !== undefined && entriesEqual(entry, current);
-    })
-  );
-}
-
 export async function prepareLockfile(
   root: string,
   writer: ExclusiveFileWriter = writeExclusive,
 ): Promise<ValidationResult<void>> {
   const fixedRoot = resolve(root);
-  const before = await snapshotSource(fixedRoot);
-  if (!before.ok) {
+  const identity = await readDirectoryIdentity(fixedRoot);
+  if (identity === undefined) {
+    return issue("LOCKFILE_PREPARATION_FAILED", "source-invalid");
+  }
+
+  const before = await snapshotSourceTree(fixedRoot);
+  if (
+    before === undefined ||
+    !(await sourceIdentityMatches(identity))
+  ) {
     return issue("LOCKFILE_PREPARATION_FAILED", "source-invalid");
   }
 
@@ -432,8 +294,13 @@ export async function prepareLockfile(
     );
   }
 
-  const after = await snapshotSource(fixedRoot);
-  return after.ok && onlyLockfileWasAdded(before.value, after.value)
+  if (!(await sourceIdentityMatches(identity))) {
+    return issue("LOCKFILE_PREPARATION_FAILED", "source-changed");
+  }
+
+  const after = await snapshotSourceTree(fixedRoot);
+  return after !== undefined &&
+    classifyLockfileOnlyTransition(before, after) === "valid"
     ? { ok: true, value: undefined }
     : issue("LOCKFILE_PREPARATION_FAILED", "source-changed");
 }
@@ -443,12 +310,12 @@ async function verifyInIsolatedCopy(
   root: string,
 ): Promise<ValidationResult<GeneratedProjectVerification>> {
   const fixedRoot = resolve(root);
-  const sourceBefore = await snapshotSource(fixedRoot);
-  if (!sourceBefore.ok) {
+  const sourceBefore = await snapshotSourceTree(fixedRoot);
+  if (sourceBefore === undefined) {
     return issue("FROZEN_INSTALL_FAILED", "source-invalid");
   }
 
-  const owner = await createOwnedDirectory(
+  const owner = await createOwnedTemporaryDirectory(
     dirname(fixedRoot),
     ".egeria-validation-",
   );
@@ -540,8 +407,11 @@ async function verifyInIsolatedCopy(
           }
         }
 
-        const sourceAfter = await snapshotSource(fixedRoot);
-        if (!sourceAfter.ok || !snapshotsEqual(sourceBefore.value, sourceAfter.value)) {
+        const sourceAfter = await snapshotSourceTree(fixedRoot);
+        if (
+          sourceAfter === undefined ||
+          !sourceTreesEqual(sourceBefore, sourceAfter)
+        ) {
           result = issue("FROZEN_INSTALL_FAILED", "source-changed");
         }
       }

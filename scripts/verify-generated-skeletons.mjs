@@ -8,7 +8,6 @@ import {
   mkdtemp,
   readFile,
   readdir,
-  rm,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,9 +15,16 @@ import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import {
+  cleanupOwnedDirectory,
+  createIsolatedProcessEnvironment,
+  isolatedProcessOptions,
+  pathIdentityMatches,
+  readPathIdentity,
+} from "./lib/isolated-process.mjs";
+
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const maximumOutputBytes = 1024 * 1024;
 const versionTimeoutMilliseconds = 30 * 1000;
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const requiredPnpmVersion = "11.20.0";
@@ -402,31 +408,8 @@ function fingerprint(content) {
   return createHash("sha256").update(content).digest("hex");
 }
 
-function findEnvironmentValue(name) {
-  const normalizedName = name.toLowerCase();
-  return Object.entries(process.env).find(
-    ([key, value]) =>
-      key.toLowerCase() === normalizedName && value !== undefined,
-  )?.[1];
-}
-
 function createChildEnvironment(support) {
-  const environment = {};
-
-  for (const key of ["PATH", "SystemRoot", "ComSpec", "PATHEXT", "LANG"]) {
-    const value = findEnvironmentValue(key);
-    if (value !== undefined) {
-      environment[key] = value;
-    }
-  }
-  if (process.platform === "darwin") {
-    environment.__CF_USER_TEXT_ENCODING = "0x0:0x0:0x0";
-  }
-
-  return {
-    ...environment,
-    CI: "true",
-    NEXT_TELEMETRY_DISABLED: "1",
+  return createIsolatedProcessEnvironment({
     HOME: support.home,
     USERPROFILE: support.home,
     TMPDIR: support.temporary,
@@ -436,45 +419,22 @@ function createChildEnvironment(support) {
     NPM_CONFIG_USERCONFIG: support.userConfiguration,
     PLAYWRIGHT_BROWSERS_PATH: support.browsers,
     XDG_CACHE_HOME: support.cache,
-  };
+  });
 }
 
-async function pathIdentityMatches(identity) {
-  try {
-    const stats = await lstat(identity.path, { bigint: true });
-    return (
-      !stats.isSymbolicLink() &&
-      stats.isDirectory() &&
-      stats.dev === identity.device &&
-      stats.ino === identity.inode
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function createOwnedDirectory() {
+async function createGeneratedFixtureOwner() {
   const path = await mkdtemp(join(tmpdir(), "egeria-generated-fixtures-"));
-  const stats = await lstat(path, { bigint: true });
+  const identity = await readPathIdentity(path);
 
-  if (stats.isSymbolicLink() || !stats.isDirectory()) {
+  if (identity.isSymbolicLink || !identity.isDirectory) {
     fail("VERIFICATION_SETUP_FAILED");
   }
   await chmod(path, 0o700);
-  return { path, device: stats.dev, inode: stats.ino };
-}
-
-async function cleanupOwnedDirectory(identity) {
-  if (!(await pathIdentityMatches(identity))) {
-    return false;
-  }
-
-  try {
-    await rm(identity.path, { recursive: true });
-    return true;
-  } catch {
-    return false;
-  }
+  return {
+    path: identity.path,
+    device: identity.device,
+    inode: identity.inode,
+  };
 }
 
 async function createSupportPaths(root) {
@@ -698,12 +658,9 @@ async function defaultRunCommand(input) {
     [...input.arguments],
     {
       cwd: input.cwd,
-      encoding: "utf8",
       env: input.environment,
-      maxBuffer: maximumOutputBytes,
-      shell: false,
       timeout: input.timeout,
-      windowsHide: true,
+      ...isolatedProcessOptions,
     },
   );
   return stdout;
@@ -891,7 +848,7 @@ async function verifySourcesWithAdapters(adapters, sourcesBefore) {
 
 export function verifyGeneratedSkeletons() {
   return verifyGeneratedSkeletonsForTesting({
-    createOwner: createOwnedDirectory,
+    createOwner: createGeneratedFixtureOwner,
     runCommand: defaultRunCommand,
   });
 }
@@ -928,7 +885,7 @@ export async function verifyGeneratedSkeletonsForTesting(adapters) {
 
 export function verifyGeneratedProject(root, identifier) {
   return verifyGeneratedProjectForTesting(root, identifier, {
-    createOwner: createOwnedDirectory,
+    createOwner: createGeneratedFixtureOwner,
     runCommand: defaultRunCommand,
   });
 }

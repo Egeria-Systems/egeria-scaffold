@@ -7,6 +7,10 @@ import {
   dispatchOperationalErrorReport,
   dispatchOperationalEvent,
 } from "@egeria-systems/observability";
+import {
+  createBetterStackDiagnosticSink,
+  createBetterStackSink,
+} from "@egeria-systems/observability/server";
 
 function createEvent() {
   const result = createOperationalEvent(
@@ -163,6 +167,86 @@ test("dispatch contains malformed sinks and rejects noncanonical events", async 
     { sink: "workers-logs", status: "failed", reason: "invalid-event" },
   ]);
   assert.equal(calls, 0);
+});
+
+test("dispatch applies one bounded privacy-safe sink identifier policy", async () => {
+  const maximumLengthIdentifier = "a".repeat(64);
+  const candidates = [
+    { identifier: "workers-logs", expected: "workers-logs" },
+    {
+      identifier: maximumLengthIdentifier,
+      expected: maximumLengthIdentifier,
+    },
+    { identifier: "a".repeat(65), expected: "invalid-sink" },
+    { identifier: "Bad-Sink", expected: "invalid-sink" },
+    { identifier: "sink_name", expected: "invalid-sink" },
+    { identifier: "credential-secret", expected: "invalid-sink" },
+    { identifier: 42, expected: "invalid-sink" },
+    { identifier: null, expected: "invalid-sink" },
+    { identifier: undefined, expected: "invalid-sink" },
+  ];
+  const hostileSink = {
+    get identifier() {
+      throw new Error("credential-secret response body");
+    },
+    write: () => ({ status: "delivered" }),
+  };
+
+  const results = await dispatchOperationalEvent(createEvent(), [
+    ...candidates.map(({ identifier }) => ({
+      identifier,
+      write: () => ({ status: "delivered" }),
+    })),
+    hostileSink,
+    null,
+  ]);
+
+  assert.deepEqual(results, [
+    ...candidates.map(({ expected }) => ({
+      sink: expected,
+      status: "delivered",
+    })),
+    { sink: "invalid-sink", status: "failed", reason: "sink-threw" },
+    { sink: "invalid-sink", status: "failed", reason: "invalid-result" },
+  ]);
+  assert.doesNotMatch(JSON.stringify(results), /credential-secret/u);
+});
+
+test("diagnostic replacement still selects only its valid matching sink", async () => {
+  let requests = 0;
+  const request = async () => {
+    requests += 1;
+    return { status: 202 };
+  };
+  const operational = createBetterStackSink({
+    ingestingHost: "s123.eu-nbg-2.betterstackdata.com",
+    sourceToken: "source-token-123456",
+    request,
+  });
+  const diagnostic = createBetterStackDiagnosticSink({
+    ingestingHost: "s123.eu-nbg-2.betterstackdata.com",
+    sourceToken: "source-token-123456",
+    request,
+  });
+  assert.equal(operational.ok, true);
+  assert.equal(diagnostic.ok, true);
+
+  const results = await dispatchOperationalErrorReport(createErrorReport(), {
+    operationalSinks: [
+      operational.value,
+      {
+        identifier: "a".repeat(65),
+        write: () => ({ status: "delivered" }),
+      },
+    ],
+    diagnosticSinks: [diagnostic.value],
+  });
+
+  assert.equal(requests, 1);
+  assert.deepEqual(results, [
+    { sink: "invalid-sink", status: "delivered" },
+    { sink: "better-stack", status: "delivered" },
+  ]);
 });
 
 test("dispatch contains mutation attempts before the next sink observes them", async () => {

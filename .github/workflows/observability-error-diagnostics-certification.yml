@@ -44,10 +44,7 @@ jobs:
         env:
           EXPECTED_REVISION: ${{ inputs.expected_revision }}
         run: |
-          test "$GITHUB_REF" = "refs/heads/main"
-          [[ "$EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ ]]
-          test "$GITHUB_SHA" = "$EXPECTED_REVISION"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node scripts/verify-approved-revision.mjs
           git merge-base --is-ancestor 393225988aaed173e21dc547e69ff5b03305cf93 "$GITHUB_SHA"
           git merge-base --is-ancestor d543de78d8e1c238a499aeba5e315f4db724dd1b "$GITHUB_SHA"
 

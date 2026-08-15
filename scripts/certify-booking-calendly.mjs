@@ -1,10 +1,8 @@
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
-
 import {
   certifyFreshScaffold,
   certifyFreshScaffoldForTesting,
 } from "./lib/certify-fresh-scaffold.mjs";
+import { runCertificationCli } from "./lib/certification-cli.mjs";
 
 const defaultCalendlyUrl = "https://calendly.com/example/intro";
 const expectedCapabilities = Object.freeze([
@@ -66,39 +64,10 @@ function parseArguments(arguments_) {
   return undefined;
 }
 
-async function runMain() {
-  const input = parseArguments(process.argv.slice(2));
-  if (input === undefined) {
-    process.stderr.write(
-      `${JSON.stringify({
-        ok: false,
-        code: "CERTIFICATION_ARGUMENT_INVALID",
-      })}\n`,
-    );
-    process.exitCode = 2;
-    return;
-  }
-
-  try {
-    const result = await certifyBookingCalendly(input);
-    process.stdout.write(`${JSON.stringify(result)}\n`);
-  } catch (error) {
-    process.stderr.write(
-      `${JSON.stringify({
-        ok: false,
-        code:
-          error instanceof BookingCalendlyCertificationError
-            ? error.code
-            : "CERTIFICATION_FAILED",
-      })}\n`,
-    );
-    process.exitCode = 1;
-  }
-}
-
-if (
-  process.argv[1] !== undefined &&
-  pathToFileURL(resolve(process.argv[1])).href === import.meta.url
-) {
-  await runMain();
-}
+await runCertificationCli({
+  moduleUrl: import.meta.url,
+  parseArguments,
+  certify: certifyBookingCalendly,
+  isCertificationError: (error) =>
+    error instanceof BookingCalendlyCertificationError,
+});

@@ -1320,21 +1320,9 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
   assert.deepEqual(stepsByName["Verify approved revision"].env, {
     EXPECTED_REVISION: "${{ inputs.expected_revision }}",
   });
-  assert.match(
+  assert.equal(
     stepsByName["Verify approved revision"].run,
-    /test "\$GITHUB_REF" = "refs\/heads\/main"/u,
-  );
-  assert.match(
-    stepsByName["Verify approved revision"].run,
-    /\[\[ "\$EXPECTED_REVISION" =~ \^\[0-9a-f\]\{40\}\$ \]\]/u,
-  );
-  assert.match(
-    stepsByName["Verify approved revision"].run,
-    /test "\$GITHUB_SHA" = "\$EXPECTED_REVISION"/u,
-  );
-  assert.match(
-    stepsByName["Verify approved revision"].run,
-    /test "\$\(git rev-parse HEAD\)" = "\$GITHUB_SHA"/u,
+    "node scripts/verify-approved-revision.mjs",
   );
   assert.match(workflow, /pnpm install --frozen-lockfile/);
   assert.match(workflow, /run: pnpm run verify:compatibility-proof/);
@@ -1568,13 +1556,9 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   assert.deepEqual(stepsByName["Verify approved revision"].env, {
     EXPECTED_REVISION: "${{ inputs.expected_revision }}",
   });
-  assert.match(
+  assert.equal(
     stepsByName["Verify approved revision"].run,
-    /test "\$GITHUB_SHA" = "\$EXPECTED_REVISION"/u,
-  );
-  assert.match(
-    stepsByName["Verify approved revision"].run,
-    /test "\$\(git rev-parse HEAD\)" = "\$GITHUB_SHA"/u,
+    "node scripts/verify-approved-revision.mjs",
   );
   assert.equal(
     isPinnedGitHubActionReference(
