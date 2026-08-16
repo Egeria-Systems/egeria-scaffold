@@ -188,6 +188,56 @@ test("the generated reporters exercise the bounded error-diagnostics matrix", as
   const receiptPath = readReceiptPath();
   const errorReports: UnknownRecord[] = [];
   let suppressedWebVitalRequests = 0;
+  let escapedWebVitalRequests = 0;
+
+  await page.exposeFunction("__recordSuppressedWebVitalRequest", () => {
+    suppressedWebVitalRequests += 1;
+  });
+  await page.addInitScript(() => {
+    const nativeFetch = globalThis.fetch.bind(globalThis);
+    globalThis.fetch = async (...arguments_: Parameters<typeof fetch>) => {
+      const [input, init] = arguments_;
+      const requestUrl =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      if (
+        new URL(requestUrl, globalThis.location.href).pathname ===
+          "/api/observability" &&
+        typeof init?.body === "string"
+      ) {
+        try {
+          const envelope = JSON.parse(init.body) as unknown;
+          if (
+            typeof envelope === "object" &&
+            envelope !== null &&
+            Reflect.get(envelope, "type") === "operational-event"
+          ) {
+            const event = Reflect.get(envelope, "event");
+            if (
+              typeof event === "object" &&
+              event !== null &&
+              Reflect.get(event, "name") === "browser.web.vital"
+            ) {
+              const recordSuppression = Reflect.get(
+                globalThis,
+                "__recordSuppressedWebVitalRequest",
+              );
+              if (typeof recordSuppression === "function") {
+                await recordSuppression();
+              }
+              return new Response(null, { status: 202 });
+            }
+          }
+        } catch {
+          // The original fetch owns malformed or non-JSON request handling.
+        }
+      }
+      return nativeFetch(...arguments_);
+    };
+  });
 
   await page.route("**/api/observability", async (route) => {
     const envelope = readEnvelope(route.request());
@@ -197,7 +247,7 @@ test("the generated reporters exercise the bounded error-diagnostics matrix", as
       isRecord(event) &&
       event.name === "browser.web.vital"
     ) {
-      suppressedWebVitalRequests += 1;
+      escapedWebVitalRequests += 1;
       await route.fulfill({ status: 202 });
       return;
     }
@@ -259,11 +309,14 @@ test("the generated reporters exercise the bounded error-diagnostics matrix", as
   expectBrowserSemantics(errorReports);
   const eventIdentifiers = errorReports.map(readEventIdentifier);
   expect(new Set(eventIdentifiers).size).toBe(5);
-  expect(suppressedWebVitalRequests).toBeLessThanOrEqual(16);
 
   if (scope === "local-full") {
     await exerciseLocalServerCases(page, revision);
   }
+  await page.close();
+  expect(suppressedWebVitalRequests).toBeGreaterThan(0);
+  expect(suppressedWebVitalRequests).toBeLessThanOrEqual(16);
+  expect(escapedWebVitalRequests).toBe(0);
 
   const localFull = scope === "local-full";
   await writeFile(
