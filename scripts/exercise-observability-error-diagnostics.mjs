@@ -4,8 +4,12 @@ import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 
 const requestTimeoutMilliseconds = 10_000;
+const readinessPollIntervalMilliseconds = 30_000;
+const maximumReadinessRequests = 6;
 const maximumReceiptBytes = 4_096;
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
+const cloudflareVersionIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const eventIdentifierPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const subject = Object.freeze({
@@ -90,6 +94,20 @@ function readInput(input) {
   return Object.freeze({ baseUrl, revision: input.revision });
 }
 
+function readReadinessInput(input) {
+  const validatedInput = readInput(input);
+  if (
+    typeof input?.cloudflareVersionId !== "string" ||
+    !cloudflareVersionIdPattern.test(input.cloudflareVersionId)
+  ) {
+    throw createError("READINESS_VERSION_INVALID");
+  }
+  return Object.freeze({
+    ...validatedInput,
+    cloudflareVersionId: input.cloudflareVersionId,
+  });
+}
+
 function readAdapters(adapters) {
   if (
     adapters === null ||
@@ -100,6 +118,14 @@ function readAdapters(adapters) {
     throw createError("EXERCISE_ADAPTER_INVALID");
   }
   return adapters;
+}
+
+function readReadinessAdapters(adapters) {
+  const validatedAdapters = readAdapters(adapters);
+  if (typeof validatedAdapters.wait !== "function") {
+    throw createError("EXERCISE_ADAPTER_INVALID");
+  }
+  return validatedAdapters;
 }
 
 function hasExactKeys(value, keys) {
@@ -208,6 +234,64 @@ async function runRequest(request, adapters) {
   }
 }
 
+async function readStatus(url, adapters) {
+  let response;
+  try {
+    response = await adapters.fetch(url, {
+      method: "GET",
+      signal: adapters.createTimeoutSignal(requestTimeoutMilliseconds),
+    });
+  } catch (error) {
+    const name = readFailureName(error);
+    throw createError(
+      name === "AbortError" || name === "TimeoutError"
+        ? "EXERCISE_REQUEST_TIMEOUT"
+        : "EXERCISE_REQUEST_FAILED",
+    );
+  }
+
+  try {
+    return response?.status;
+  } catch {
+    throw createError("EXERCISE_REQUEST_FAILED");
+  }
+}
+
+async function waitForReadinessWithAdapters(input, adapters) {
+  const validatedInput = readReadinessInput(input);
+  const validatedAdapters = readReadinessAdapters(adapters);
+  const readinessUrl = `${validatedInput.baseUrl}api/certification/diagnostics?readiness=${encodeURIComponent(validatedInput.cloudflareVersionId)}`;
+
+  for (let attempt = 1; attempt <= maximumReadinessRequests; attempt += 1) {
+    const status = await readStatus(readinessUrl, validatedAdapters);
+    if (status === 204) {
+      return Object.freeze({
+        ok: true,
+        capability: "observability",
+        version: "0.3.0",
+        subject,
+        revision: validatedInput.revision,
+        cloudflareVersionId: validatedInput.cloudflareVersionId,
+        providerRecordsClaimed: false,
+        counts: Object.freeze({
+          readinessRequests: attempt,
+          maximumReadinessRequests,
+          pollIntervalMilliseconds: readinessPollIntervalMilliseconds,
+        }),
+        checks: Object.freeze(["canonical-diagnostics-route-ready"]),
+      });
+    }
+    if (status !== 404 && status !== 503) {
+      throw createError("READINESS_STATUS_UNEXPECTED");
+    }
+    if (attempt < maximumReadinessRequests) {
+      await validatedAdapters.wait(readinessPollIntervalMilliseconds);
+    }
+  }
+
+  throw createError("READINESS_STATUS_UNEXPECTED");
+}
+
 async function exerciseWithAdapters(input, adapters) {
   const validatedInput = readInput(input);
   const validatedAdapters = readAdapters(adapters);
@@ -231,7 +315,20 @@ async function exerciseWithAdapters(input, adapters) {
 const productionAdapters = Object.freeze({
   fetch: globalThis.fetch,
   createTimeoutSignal: (milliseconds) => AbortSignal.timeout(milliseconds),
+  wait: (milliseconds) =>
+    new Promise((resolveWait) => setTimeout(resolveWait, milliseconds)),
 });
+
+export function waitForObservabilityErrorDiagnosticsReadiness(input) {
+  return waitForReadinessWithAdapters(input, productionAdapters);
+}
+
+export function waitForObservabilityErrorDiagnosticsReadinessForTesting(
+  input,
+  adapters,
+) {
+  return waitForReadinessWithAdapters(input, adapters);
+}
 
 export function exerciseObservabilityErrorDiagnostics(input) {
   return exerciseWithAdapters(input, productionAdapters);
@@ -338,7 +435,55 @@ async function readBoundedReceipt(path) {
   }
 }
 
+async function readReadinessVersionFromReceipt(path, revision) {
+  let receipt;
+  try {
+    receipt = await readBoundedReceipt(path);
+  } catch {
+    throw createError("READINESS_DEPLOYMENT_RECEIPT_INVALID");
+  }
+  if (
+    !hasExactKeys(receipt, [
+      "capability",
+      "checks",
+      "cloudflareDeploymentId",
+      "cloudflareVersionId",
+      "gitRevision",
+      "ok",
+      "version",
+      "worker",
+    ]) ||
+    receipt.ok !== true ||
+    receipt.capability !== "observability" ||
+    receipt.version !== "0.3.0" ||
+    receipt.worker !== "test-deploy" ||
+    receipt.gitRevision !== revision ||
+    typeof receipt.cloudflareDeploymentId !== "string" ||
+    !cloudflareVersionIdPattern.test(receipt.cloudflareDeploymentId) ||
+    typeof receipt.cloudflareVersionId !== "string" ||
+    !cloudflareVersionIdPattern.test(receipt.cloudflareVersionId) ||
+    !Array.isArray(receipt.checks)
+  ) {
+    throw createError("READINESS_DEPLOYMENT_RECEIPT_INVALID");
+  }
+  return receipt.cloudflareVersionId;
+}
+
 function parseArguments(arguments_) {
+  if (
+    arguments_.length === 7 &&
+    arguments_[0] === "--wait-readiness" &&
+    arguments_[1] === "--base-url" &&
+    arguments_[3] === "--revision" &&
+    arguments_[5] === "--deployment-receipt"
+  ) {
+    return {
+      kind: "readiness",
+      baseUrl: arguments_[2],
+      revision: arguments_[4],
+      deploymentReceiptPath: arguments_[6],
+    };
+  }
   if (
     arguments_.length === 4 &&
     arguments_[0] === "--base-url" &&
@@ -378,14 +523,24 @@ async function runMain() {
   }
 
   try {
-    const receipt =
-      input.kind === "exercise"
-        ? await exerciseObservabilityErrorDiagnostics(input)
-        : reconcileObservabilityErrorDiagnosticsReceipts(
-            await readBoundedReceipt(input.routeReceiptPath),
-            await readBoundedReceipt(input.browserReceiptPath),
-            input.revision,
-          );
+    let receipt;
+    if (input.kind === "readiness") {
+      receipt = await waitForObservabilityErrorDiagnosticsReadiness({
+        ...input,
+        cloudflareVersionId: await readReadinessVersionFromReceipt(
+          input.deploymentReceiptPath,
+          input.revision,
+        ),
+      });
+    } else if (input.kind === "exercise") {
+      receipt = await exerciseObservabilityErrorDiagnostics(input);
+    } else {
+      receipt = reconcileObservabilityErrorDiagnosticsReceipts(
+        await readBoundedReceipt(input.routeReceiptPath),
+        await readBoundedReceipt(input.browserReceiptPath),
+        input.revision,
+      );
+    }
     process.stdout.write(`${JSON.stringify(receipt)}\n`);
   } catch (error) {
     process.stderr.write(

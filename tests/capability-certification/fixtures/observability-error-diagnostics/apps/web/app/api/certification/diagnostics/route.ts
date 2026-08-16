@@ -1,6 +1,8 @@
 import { reportCaughtServerError } from "../../../../src/infrastructure/observability/server-reporter";
 
 const markerPattern = /^diagnostics-[a-z]+-[0-9a-f]{16}$/u;
+const cloudflareVersionIdPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const cases = Object.freeze([
   "next-request-error",
   "selected-server-catch",
@@ -59,6 +61,35 @@ function isSafeRecord(record: UnknownRecord): boolean {
     hasOnlyKeys(record, operationalRecordKeys) &&
     !Object.keys(record).some((key) => key.startsWith("exception."))
   );
+}
+
+function hasExpectedDeploymentBindings(
+  value: unknown,
+  cloudflareVersionId: string,
+): boolean {
+  if (!isRecord(value) || !isRecord(value.env)) return false;
+  return (
+    typeof value.env.BETTER_STACK_INGESTING_HOST === "string" &&
+    value.env.BETTER_STACK_INGESTING_HOST.length > 0 &&
+    typeof value.env.BETTER_STACK_SOURCE_TOKEN === "string" &&
+    value.env.BETTER_STACK_SOURCE_TOKEN.length > 0 &&
+    isRecord(value.env.CF_VERSION_METADATA) &&
+    value.env.CF_VERSION_METADATA.id === cloudflareVersionId
+  );
+}
+
+function readReadinessVersion(url: URL): string | undefined {
+  const actualKeys = [...url.searchParams.keys()];
+  const cloudflareVersionId = url.searchParams.get("readiness");
+  if (
+    actualKeys.length === 1 &&
+    actualKeys[0] === "readiness" &&
+    cloudflareVersionId !== null &&
+    cloudflareVersionIdPattern.test(cloudflareVersionId)
+  ) {
+    return cloudflareVersionId;
+  }
+  return undefined;
 }
 
 function readInput(request: Request) {
@@ -339,6 +370,18 @@ async function exerciseDiagnosticFailure(marker: string): Promise<Response> {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  const readinessVersion = readReadinessVersion(url);
+  if (readinessVersion !== undefined) {
+    return emptyResponse(
+      hasExpectedDeploymentBindings(
+        Reflect.get(globalThis, cloudflareContextKey),
+        readinessVersion,
+      )
+        ? 204
+        : 503,
+    );
+  }
   const input = readInput(request);
   if (input === undefined) return emptyResponse(400);
 
