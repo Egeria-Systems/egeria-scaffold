@@ -519,6 +519,12 @@ test("the temporary fixture routes every server case through generated capture a
   assert.match(browserFixture, /scope === "local-full"/u);
   assert.match(browserFixture, /capture_mechanism/u);
   assert.match(browserFixture, /browser-private-context-omitted/u);
+  assert.match(browserFixture, /page\.addInitScript/u);
+  assert.match(browserFixture, /escapedWebVitalRequests/u);
+  assert.match(
+    browserFixture,
+    /await page\.close\(\);[\s\S]+expect\(escapedWebVitalRequests\)\.toBe\(0\)/u,
+  );
   for (const name of serverCases) {
     assert.match(browserFixture, new RegExp(name, "u"));
   }
