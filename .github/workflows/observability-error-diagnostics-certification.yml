@@ -162,6 +162,18 @@ jobs:
           test "$(wc -c < "$DEPLOYMENT_RECEIPT")" -le 1024
           test "$(stat -c "%a" "$DEPLOYMENT_RECEIPT")" = "600"
 
+      - name: Wait for deployed diagnostics readiness
+        env:
+          OBSERVABILITY_DIAGNOSTICS_CERTIFICATION_URL: ${{ vars.DEPLOY_URL }}
+          EXPECTED_REVISION: ${{ inputs.expected_revision }}
+          DEPLOYMENT_RECEIPT: ${{ runner.temp }}/observability-error-diagnostics-cloudflare-receipt.json
+        run: |
+          umask 077
+          node scripts/exercise-observability-error-diagnostics.mjs --wait-readiness --base-url "$OBSERVABILITY_DIAGNOSTICS_CERTIFICATION_URL" --revision "$EXPECTED_REVISION" --deployment-receipt "$DEPLOYMENT_RECEIPT" > "$RUNNER_TEMP/observability-error-diagnostics-readiness-receipt.json"
+          test "$(wc -l < "$RUNNER_TEMP/observability-error-diagnostics-readiness-receipt.json")" -eq 1
+          test "$(wc -c < "$RUNNER_TEMP/observability-error-diagnostics-readiness-receipt.json")" -le 2048
+          test "$(stat -c "%a" "$RUNNER_TEMP/observability-error-diagnostics-readiness-receipt.json")" = "600"
+
       - name: Exercise deployed server diagnostics
         env:
           OBSERVABILITY_DIAGNOSTICS_CERTIFICATION_URL: ${{ vars.DEPLOY_URL }}
@@ -201,6 +213,7 @@ jobs:
           path: |
             ${{ runner.temp }}/observability-error-diagnostics-local-receipt.json
             ${{ runner.temp }}/observability-error-diagnostics-candidate-receipt.json
+            ${{ runner.temp }}/observability-error-diagnostics-readiness-receipt.json
             ${{ runner.temp }}/observability-error-diagnostics-route-receipt.json
             ${{ runner.temp }}/observability-error-diagnostics-browser-receipt.json
             ${{ runner.temp }}/observability-error-diagnostics-matrix-receipt.json

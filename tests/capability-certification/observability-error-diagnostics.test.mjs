@@ -35,6 +35,8 @@ const exactSubject = Object.freeze({
     "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99",
 });
 const exactRevision = "0123456789abcdef0123456789abcdef01234567";
+const exactCloudflareVersionId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+const otherCloudflareVersionId = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff";
 const requiredEvidence = Object.freeze([
   "cleanup-recovery",
   "deployed-application",
@@ -637,6 +639,131 @@ test("the package runner resolves HEAD to the exact checkout revision", async ()
   assert.equal(headReads, 1);
 });
 
+test("deployment readiness waits for the canonical diagnostics route to replace the stale baseline", async () => {
+  const { waitForObservabilityErrorDiagnosticsReadinessForTesting } =
+    await loadModule(exercisePath);
+  const statuses = [404, 503, 204];
+  const requests = [];
+  const waits = [];
+
+  const result =
+    await waitForObservabilityErrorDiagnosticsReadinessForTesting(
+      {
+        baseUrl: "https://diagnostics-certification.example/",
+        revision: exactRevision,
+        cloudflareVersionId: exactCloudflareVersionId,
+      },
+      {
+        async fetch(url, init) {
+          requests.push({ url, init });
+          return new Response(null, { status: statuses.shift() });
+        },
+        createTimeoutSignal(milliseconds) {
+          assert.equal(milliseconds, 10_000);
+          return { bounded: true };
+        },
+        async wait(milliseconds) {
+          waits.push(milliseconds);
+        },
+      },
+    );
+
+  assert.deepEqual(result, {
+    ok: true,
+    capability: "observability",
+    version: "0.3.0",
+    subject: exactSubject,
+    revision: exactRevision,
+    cloudflareVersionId: exactCloudflareVersionId,
+    providerRecordsClaimed: false,
+    counts: {
+      readinessRequests: 3,
+      maximumReadinessRequests: 6,
+      pollIntervalMilliseconds: 30_000,
+    },
+    checks: ["canonical-diagnostics-route-ready"],
+  });
+  assert.deepEqual(
+    requests.map(({ url, init }) => ({
+      url,
+      method: init.method,
+      signal: init.signal,
+    })),
+    Array.from({ length: 3 }, () => ({
+      url: `https://diagnostics-certification.example/api/certification/diagnostics?readiness=${exactCloudflareVersionId}`,
+      method: "GET",
+      signal: { bounded: true },
+    })),
+  );
+  assert.deepEqual(waits, [30_000, 30_000]);
+});
+
+test("deployment readiness stops after six status-only probes", async () => {
+  const { waitForObservabilityErrorDiagnosticsReadinessForTesting } =
+    await loadModule(exercisePath);
+  let requests = 0;
+  const waits = [];
+
+  await assert.rejects(
+    () =>
+      waitForObservabilityErrorDiagnosticsReadinessForTesting(
+        {
+          baseUrl: "https://diagnostics-certification.example/",
+          revision: exactRevision,
+          cloudflareVersionId: exactCloudflareVersionId,
+        },
+        {
+          async fetch() {
+            requests += 1;
+            return new Response(null, { status: 404 });
+          },
+          createTimeoutSignal() {
+            return { bounded: true };
+          },
+          async wait(milliseconds) {
+            waits.push(milliseconds);
+          },
+        },
+      ),
+    (error) => error?.code === "READINESS_STATUS_UNEXPECTED",
+  );
+  assert.equal(requests, 6);
+  assert.deepEqual(waits, [30_000, 30_000, 30_000, 30_000, 30_000]);
+});
+
+test("deployment readiness fails closed on an unexpected status", async () => {
+  const { waitForObservabilityErrorDiagnosticsReadinessForTesting } =
+    await loadModule(exercisePath);
+  let requests = 0;
+  const waits = [];
+
+  await assert.rejects(
+    () =>
+      waitForObservabilityErrorDiagnosticsReadinessForTesting(
+        {
+          baseUrl: "https://diagnostics-certification.example/",
+          revision: exactRevision,
+          cloudflareVersionId: exactCloudflareVersionId,
+        },
+        {
+          async fetch() {
+            requests += 1;
+            return new Response(null, { status: requests === 1 ? 403 : 204 });
+          },
+          createTimeoutSignal() {
+            return { bounded: true };
+          },
+          async wait(milliseconds) {
+            waits.push(milliseconds);
+          },
+        },
+      ),
+    (error) => error?.code === "READINESS_STATUS_UNEXPECTED",
+  );
+  assert.equal(requests, 1);
+  assert.deepEqual(waits, []);
+});
+
 test("the deployed exercise is bounded to three server cases and reads content only for the controlled safe result", async () => {
   const { exerciseObservabilityErrorDiagnosticsForTesting } =
     await loadModule(exercisePath);
@@ -736,6 +863,7 @@ test("the deployed fixture overrides and restores the request-scoped Cloudflare 
     env: {
       BETTER_STACK_INGESTING_HOST: "provider.example",
       BETTER_STACK_SOURCE_TOKEN: "provider-placeholder",
+      CF_VERSION_METADATA: { id: exactCloudflareVersionId },
     },
     ctx: {
       waitUntil(task) {
@@ -816,10 +944,25 @@ export async function reportCaughtServerError(_error, context) {
 
     const route = await import(`${pathToFileURL(routeModulePath).href}?test=${Date.now()}`);
     const markerSuffix = exactRevision.slice(0, 16);
+    const readinessRequest = new Request(
+      `https://diagnostics-certification.example/api/certification/diagnostics?readiness=${exactCloudflareVersionId}`,
+    );
+    const otherVersionReadinessRequest = new Request(
+      `https://diagnostics-certification.example/api/certification/diagnostics?readiness=${otherCloudflareVersionId}`,
+    );
     const requestFor = (name) =>
       new Request(
         `https://diagnostics-certification.example/api/certification/diagnostics?case=${name}&marker=diagnostics-${name === "selected-server-catch" ? "server" : "failure"}-${markerSuffix}`,
       );
+
+    const readyResponse = await route.GET(readinessRequest);
+    assert.equal(readyResponse.status, 204);
+    const otherVersionResponse = await route.GET(otherVersionReadinessRequest);
+    assert.equal(otherVersionResponse.status, 503);
+    cloudflareContext.env = {};
+    const missingProviderResponse = await route.GET(readinessRequest);
+    assert.equal(missingProviderResponse.status, 503);
+    cloudflareContext.env = initialEnvironment;
 
     const selectedResponse = await route.GET(
       requestFor("selected-server-catch"),
@@ -1208,6 +1351,22 @@ test("the prepared workflow is manual, exact-revision, protected, single-attempt
     /--version 0\.3\.0/u,
   );
   assert.match(
+    stepsByName["Wait for deployed diagnostics readiness"].run,
+    /--wait-readiness --base-url "\$OBSERVABILITY_DIAGNOSTICS_CERTIFICATION_URL" --revision "\$EXPECTED_REVISION" --deployment-receipt "\$DEPLOYMENT_RECEIPT"/u,
+  );
+  assert.match(
+    stepsByName["Wait for deployed diagnostics readiness"].run,
+    /observability-error-diagnostics-readiness-receipt\.json/u,
+  );
+  assert.ok(
+    job.steps.indexOf(stepsByName["Wait for deployed diagnostics readiness"]) >
+      job.steps.indexOf(stepsByName["Install observability provider secrets"]),
+  );
+  assert.ok(
+    job.steps.indexOf(stepsByName["Exercise deployed server diagnostics"]) >
+      job.steps.indexOf(stepsByName["Wait for deployed diagnostics readiness"]),
+  );
+  assert.match(
     stepsByName["Test deployed browser diagnostics"].run,
     /playwright test --config playwright\.deployed\.config\.ts --retries=0 tests\/e2e\/observability-error-diagnostics\.spec\.ts/u,
   );
@@ -1218,6 +1377,10 @@ test("the prepared workflow is manual, exact-revision, protected, single-attempt
   assert.equal(
     stepsByName["Upload certification receipts"].with["retention-days"],
     7,
+  );
+  assert.match(
+    stepsByName["Upload certification receipts"].with.path,
+    /observability-error-diagnostics-readiness-receipt\.json/u,
   );
   assert.doesNotMatch(
     stepsByName["Upload certification receipts"].with.path,
