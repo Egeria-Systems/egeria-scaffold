@@ -97,12 +97,14 @@ test("private workflow artifact roots keep only the accepted content-safe receip
     );
   }
 
-  await assert.rejects(() =>
-    execFileAsync(
-      "git",
-      ["check-ignore", "--quiet", "--no-index", trackedAcceptedReceipt],
-      { cwd: repositoryRoot },
-    ),
+  await assert.rejects(
+    () =>
+      execFileAsync(
+        "git",
+        ["check-ignore", "--quiet", "--no-index", trackedAcceptedReceipt],
+        { cwd: repositoryRoot },
+      ),
+    (error) => Number(error.code) === 1,
   );
 });
 

@@ -59,7 +59,7 @@
 
 ## Privacy exclusions
 
-No credential or secret value, ingest host, private origin, raw log, raw provider record, diagnostic message, stack, cause, path, filename, header, cookie, request or response body, IP address, user agent, screenshot, trace, video, client data, or real traffic is retained here.
+No secret or credential value, private or machine-specific path or filename, or raw provider data is retained here.
 
 ## Claim boundary
 
