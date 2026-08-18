@@ -425,7 +425,7 @@ test("the portfolio and site catalog declares the exact seven executable capabil
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -434,16 +434,16 @@ test("the portfolio and site catalog declares the exact seven executable capabil
       conflicts: [],
       supportedProfiles: ["portfolio", "site"],
       requiredPackages: ["@opennextjs/cloudflare", "wrangler"],
-      environmentVariables: [],
-      secrets: [],
+      environmentVariables: ["DEPLOY_URL"],
+      secrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
       platformResources: ["cloudflare-worker", "cloudflare-static-assets"],
       externalDomains: [],
       contentSecurityPolicyContributions: [],
       browserStorage: [],
       dataClassifications: [],
       retentionAssumptions: [],
-      privilegedOperations: [],
-      threatReviewLevel: "standard",
+      privilegedOperations: ["cloudflare-worker-deployment"],
+      threatReviewLevel: "elevated",
       adapterSemanticRequirements: ["node-runtime", "worker-static-assets"],
       managedSurfaces: [
         {
@@ -467,6 +467,14 @@ test("the portfolio and site catalog declares the exact seven executable capabil
             pointer: "/devDependencies/wrangler",
           },
           mergeStrategy: "json-property",
+        },
+        {
+          identifier: "deployment-cloudflare-workflow",
+          owner: { kind: "capability", identifier: "deployment-cloudflare" },
+          path: ".github/workflows/deploy.yml",
+          ownership: "managed",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
         },
         {
           identifier: "deployment-cloudflare-next-configuration",
@@ -508,17 +516,26 @@ test("the portfolio and site catalog declares the exact seven executable capabil
           packageName: "wrangler",
           version: "4.118.0",
         },
+        { kind: "file", path: ".github/workflows/deploy.yml" },
         { kind: "file", path: "apps/web/next.config.ts" },
         { kind: "file", path: "apps/web/open-next.config.ts" },
         { kind: "file", path: "apps/web/wrangler.jsonc" },
       ],
       migrationPlanners: [],
-      verificationPlan: ["next-build", "opennext-build", "wrangler-types"],
+      verificationPlan: [
+        "next-build",
+        "opennext-build",
+        "wrangler-types",
+        "deployment-workflow-contracts",
+        "browser-deployed",
+      ],
       documentationEvidenceRequirements: [
         "nextjs-opennext-cloudflare-compatibility",
+        "deployment-authority-and-claim-boundaries",
       ],
       removalAndRecoveryRequirements: [
         "review-deployment-source-and-provider-state-separately",
+        "revoke-or-rotate-deployment-credentials-separately",
       ],
     },
     {
@@ -1083,7 +1100,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.8.0",
+      recipeVersion: "0.9.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1095,7 +1112,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.8.0",
+      recipeVersion: "0.9.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1126,7 +1143,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.8.0");
+  assert.equal(portfolio.recipeVersion, "0.9.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1160,7 +1177,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
       ({ identifier }) => identifier,
     );
 
-    assert.equal(selected.recipeVersion, "0.8.0");
+    assert.equal(selected.recipeVersion, "0.9.0");
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
         selectedIdentifiers.indexOf("booking-calendly"),
@@ -1200,7 +1217,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",

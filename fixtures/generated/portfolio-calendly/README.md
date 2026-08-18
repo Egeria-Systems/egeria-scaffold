@@ -40,9 +40,19 @@ To test an already deployed project, supply its public HTTPS root explicitly:
 PLAYWRIGHT_DEPLOYED_URL=https://example.com pnpm --dir apps/web run test:e2e:deployed
 ```
 
-Deployed mode rejects missing, malformed, non-HTTPS, credential-bearing, query-bearing, and fragment-bearing URLs. It starts no server and is not run by the generated workflow.
+Deployed mode rejects missing, malformed, non-HTTPS, credential-bearing, query-bearing, and fragment-bearing URLs. It starts no server. The automatic quality workflow remains local-only; the separate manual deployment workflow runs this check after deployment.
 
 Playwright reports and test results are ignored locally and uploaded for seven days when generated CI browser checks fail. Axe and browser checks provide bounded evidence for selected automated and interaction behaviors. Passing them does not establish WCAG conformance, assistive-technology compatibility, or human usability.
+
+## Protected Cloudflare deployment
+
+The generated `.github/workflows/deploy.yml` is manual and accepts the exact lowercase 40-character `main` revision approved for deployment. Before enabling it, create a GitHub environment named `production`, restrict it to the protected `main` branch, add required reviewers where the repository plan supports them, and set its `DEPLOY_URL` variable to the public HTTPS root that the deployed browser check must exercise. Enable Prevent self-review when the selected GitHub plan and environment controls support it. Verify the control instead of assuming it exists; when unavailable, record that limitation in the deployment approval evidence and require an eligible reviewer other than the workflow initiator.
+
+Store `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` as environment secrets. Use a Cloudflare token scoped to the target account and only the Worker-edit permissions required by this stateless deployment. Do not commit either value. Rotate or revoke the token separately when access changes or the deployment is retired.
+
+The workflow uses frozen dependencies and runs lint, typecheck, unit, component, Next, OpenNext, development-browser, and workerd-preview checks before the credential-bearing step. That step only validates the two required values and deploys the already prepared `.open-next` output. A deployed HTTPS Playwright/axe smoke follows. Source removal does not undeploy a Worker, remove a route/domain, revoke a token, restore provider configuration, or erase provider data.
+
+Local checks and workflow structure do not prove that GitHub protections are configured, credentials are valid, deployment succeeded, cleanup/recovery works, or the application is production-ready. Deployment execution and `deployment-cloudflare` certification require separate explicit approval and evidence. Visual quality, performance, human accessibility, and any WCAG conformance claim remain separate.
 
 ## Operational telemetry
 

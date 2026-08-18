@@ -43,7 +43,7 @@
         "repository-stateful",
         "external-stateful"
       ],
-      "version": "0.2.0"
+      "version": "0.3.0"
     },
     {
       "deliveryMode": "hybrid",
@@ -139,7 +139,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:8ed05ee38a82665d838a0e5a0c61d8bc67e3e455a0882c121c7584b05068c830",
+      "fingerprint": "sha256:61896aa2a0be31b6a50dcd8180692290ea4c98163c0aae48df15807467bcb0b0",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -152,7 +152,7 @@
       "path": ".egeria/project.yaml"
     },
     {
-      "fingerprint": "sha256:6a440c7ccbe739ff1db72c953bf1e37266b1a50df961edce6c62419d8bab32ea",
+      "fingerprint": "sha256:8a9d8f668c6ab40294846a0757daeaf99fbdd01bc5812c16628fb697d6e10757",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -165,7 +165,7 @@
       "path": "README.md"
     },
     {
-      "fingerprint": "sha256:bde527f30fe8e228bb7acf6528b96426d1af8570d6101883006e30aa0861ffd3",
+      "fingerprint": "sha256:6bb40d30bbd0e3753a5b7a82c5d5ecd0325239191d8d487d49f5283eeebf8c41",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -679,6 +679,20 @@
       },
       "ownership": "merge-managed",
       "path": "apps/web/package.json"
+    },
+    {
+      "fingerprint": "sha256:e36e7e20efa075f4738fba3d01db271c2f5387e977ea639b9ee898fbc71bb148",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "deployment-cloudflare-workflow",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "deployment-cloudflare",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": ".github/workflows/deploy.yml"
     },
     {
       "fingerprint": "sha256:af2e781e9b185d0dcb3abb9ad26ca39a309f56aafcf58f0f60c61b52c8813af4",
@@ -1493,7 +1507,7 @@
   ],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.8.0"
+    "recipeVersion": "0.9.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

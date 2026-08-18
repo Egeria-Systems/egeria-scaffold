@@ -7,6 +7,7 @@ export type TemplateCatalogEntry = Readonly<{
 }>;
 
 const commonTemplateSources = [
+  "common/.github/workflows/deploy.yml.template",
   "common/.github/workflows/quality.yml.template",
   "common/.gitignore.template",
   "common/.nvmrc",

@@ -502,6 +502,12 @@ function createDescriptors(
       "4.118.0",
     ),
     createFileEvidencePoint(
+      "deployment-cloudflare-workflow",
+      "deployment-cloudflare",
+      ".github/workflows/deploy.yml",
+      "managed",
+    ),
+    createFileEvidencePoint(
       "deployment-cloudflare-next-configuration",
       "deployment-cloudflare",
       "apps/web/next.config.ts",
@@ -769,7 +775,7 @@ function createDescriptors(
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -777,15 +783,27 @@ function createDescriptors(
       ...sharedCapabilityMetadata,
       supportedProfiles: ["portfolio", "site"],
       requiredPackages: ["@opennextjs/cloudflare", "wrangler"],
+      environmentVariables: ["DEPLOY_URL"],
+      secrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
       platformResources: ["cloudflare-worker", "cloudflare-static-assets"],
+      privilegedOperations: ["cloudflare-worker-deployment"],
+      threatReviewLevel: "elevated",
       adapterSemanticRequirements: ["node-runtime", "worker-static-assets"],
       ...projectEvidencePoints(deploymentCloudflareEvidencePoints),
-      verificationPlan: ["next-build", "opennext-build", "wrangler-types"],
+      verificationPlan: [
+        "next-build",
+        "opennext-build",
+        "wrangler-types",
+        "deployment-workflow-contracts",
+        "browser-deployed",
+      ],
       documentationEvidenceRequirements: [
         "nextjs-opennext-cloudflare-compatibility",
+        "deployment-authority-and-claim-boundaries",
       ],
       removalAndRecoveryRequirements: [
         "review-deployment-source-and-provider-state-separately",
+        "revoke-or-rotate-deployment-credentials-separately",
       ],
     },
     {

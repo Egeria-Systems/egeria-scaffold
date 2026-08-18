@@ -154,7 +154,8 @@ export const installedStateSchema = z
   .superRefine((state, context) => {
     const expectedChecks =
       state.origin.recipeVersion === "0.7.0" ||
-      state.origin.recipeVersion === "0.8.0"
+      state.origin.recipeVersion === "0.8.0" ||
+      state.origin.recipeVersion === "0.9.0"
         ? currentVerificationChecks
         : legacyVerificationChecks;
 
