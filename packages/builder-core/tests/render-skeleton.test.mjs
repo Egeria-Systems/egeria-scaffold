@@ -16,6 +16,7 @@ const tokens = {
 };
 
 const portfolioPaths = [
+  ".github/workflows/deploy.yml",
   ".github/workflows/quality.yml",
   ".gitignore",
   ".nvmrc",
@@ -67,6 +68,7 @@ const portfolioPaths = [
 ];
 
 const sitePaths = [
+  ".github/workflows/deploy.yml",
   ".github/workflows/quality.yml",
   ".gitignore",
   ".nvmrc",
@@ -4510,8 +4512,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 97],
-    ["site", 99],
+    ["portfolio", 98],
+    ["site", 100],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({

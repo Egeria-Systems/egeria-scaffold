@@ -50,6 +50,7 @@ const completeChecks = [
   "post-state-inference",
 ];
 const portfolioRenderedPaths = [
+  ".github/workflows/deploy.yml",
   ".github/workflows/quality.yml",
   ".gitignore",
   ".nvmrc",
@@ -823,10 +824,16 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
-      assert.equal(generated.state.origin.recipeVersion, "0.8.0");
+      assert.equal(generated.state.origin.recipeVersion, "0.9.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 100 : 102,
+        profile === "portfolio" ? 101 : 103,
+      );
+      assert.equal(
+        generated.state.installedCapabilities.find(
+          ({ identifier }) => identifier === "deployment-cloudflare",
+        )?.version,
+        "0.3.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(

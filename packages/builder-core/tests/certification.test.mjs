@@ -22,6 +22,8 @@ const standardsEvidencePath =
   "docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-verification.md";
 const standardsEvidenceRevision =
   "d7c63b0aaa9bebd56c075f16f1e5d86519853698";
+const deploymentPlanPath =
+  "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const committedRegistry = JSON.parse(
   readFileSync(
     new URL("../../../certifications/capabilities.json", import.meta.url),
@@ -419,6 +421,24 @@ test("material standards testing changes have exact reviewed certification evide
       },
     ],
   });
+});
+
+test("material generated deployment changes create a new task-linked pending subject", () => {
+  const deploymentRecord = committedRegistry.records["deployment-cloudflare"];
+
+  assert.equal(deploymentRecord.subject.descriptorVersion, "0.3.0");
+  assert.match(
+    deploymentRecord.subject.behaviorContractDigest,
+    /^sha256:[0-9a-f]{64}$/u,
+  );
+  assert.deepEqual(deploymentRecord.requiredEvidence, [
+    "cleanup-recovery",
+    "deployed-application",
+    "fresh-scaffold",
+  ]);
+  assert.equal(deploymentRecord.status, "pending");
+  assert.equal(deploymentRecord.taskPlan, deploymentPlanPath);
+  assert.deepEqual(deploymentRecord.evidence, []);
 });
 
 test("repository artifacts bind successful evidence to capability, subject, revision, and outcome", () => {
