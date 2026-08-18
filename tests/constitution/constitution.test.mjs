@@ -2188,7 +2188,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+observability@0\.3\.0[^\n]+certified[^\n]+four unchanged subjects[^\n]+backfill-pending/i,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+observability@0\.3\.0[^\n]+certified[^\n]+deployment-cloudflare@0\.3\.0[^\n]+pending[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2196,7 +2196,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+closure pass[^\n]+all-certified[^\n]+rejects only the four frozen backfills/i,
+    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+rejects the pending deployment subject[^\n]+all-certified[^\n]+three frozen backfills/i,
   );
 });
 
@@ -2334,9 +2334,12 @@ test("executable capability certification ownership is current", async () => {
   }
   const registry = JSON.parse(registrySource);
   const bookingRecord = registry.records["booking-calendly"];
+  const deploymentRecord = registry.records["deployment-cloudflare"];
   const observabilityRecord = registry.records.observability;
   const standardsRecord = registry.records.standards;
   assert.equal(bookingRecord.status, "certified");
+  assert.equal(deploymentRecord.status, "pending");
+  assert.deepEqual(deploymentRecord.evidence, []);
   assert.equal(observabilityRecord.status, "certified");
   assert.equal(standardsRecord.status, "certified");
   assert.deepEqual(observabilityRecord.requiredEvidence, [
@@ -2362,7 +2365,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     rootReadme,
-    /recipe `0\.8\.0`[^\n]+observability@0\.3\.0/iu,
+    /recipe `0\.9\.0`[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0/iu,
   );
   assert.match(
     capabilityModel,
@@ -2436,7 +2439,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+closure pass[^\n]+all-certified[^\n]+rejects only the four frozen backfills/iu,
+    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+rejects the pending deployment subject[^\n]+all-certified[^\n]+three frozen backfills/iu,
   );
   assert.match(
     enforcementMap,
