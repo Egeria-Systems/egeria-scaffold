@@ -1115,7 +1115,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
       accepted.state.installedCapabilities,
       core.createInstalledManifest(resolved),
     );
-    assert.equal(accepted.state.managedSurfaces.length, 105);
+    assert.equal(accepted.state.managedSurfaces.length, 106);
     assert.equal(
       accepted.state.managedSurfaces.filter(
         ({ owner }) =>

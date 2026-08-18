@@ -1100,7 +1100,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.8.0",
+      recipeVersion: "0.9.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1112,7 +1112,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.8.0",
+      recipeVersion: "0.9.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1217,7 +1217,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",

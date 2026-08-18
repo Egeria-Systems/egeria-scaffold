@@ -69,16 +69,16 @@
     },
     "deployment-cloudflare": {
       "subject": {
-        "descriptorVersion": "0.2.0",
-        "behaviorContractDigest": "sha256:846ae45d15ba9d8f256a9b7a1d8a4f3cda1b871a3b3f79f7656fd621050e8273"
+        "descriptorVersion": "0.3.0",
+        "behaviorContractDigest": "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41"
       },
       "requiredEvidence": [
         "cleanup-recovery",
         "deployed-application",
         "fresh-scaffold"
       ],
-      "status": "backfill-pending",
-      "taskPlan": null,
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md",
       "evidence": []
     },
     "observability": {

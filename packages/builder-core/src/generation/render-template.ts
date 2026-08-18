@@ -16,11 +16,16 @@ const templateTokenNames = new Set([
   "workerName",
   "githubWorkflowExpression",
   "githubRefExpression",
+  "githubShaExpression",
+  "githubExpectedRevisionExpression",
+  "githubDeployUrlExpression",
+  "githubCloudflareAccountIdExpression",
+  "githubCloudflareApiTokenExpression",
   "calendlyDestinationJson",
   "calendlyModeJson",
 ]);
 const templateTokenPattern =
-  /{{(projectName|displayNameJson|workerName|githubWorkflowExpression|githubRefExpression|calendlyDestinationJson|calendlyModeJson)}}/g;
+  /{{(projectName|displayNameJson|workerName|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|calendlyDestinationJson|calendlyModeJson)}}/g;
 const completeTokenPattern = /{{([^{}]*)}}/g;
 const bookingCalendlySettingsSource =
   "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template";
@@ -31,6 +36,13 @@ const bookingCalendlyTokenNames = new Set([
 const fixedTemplateTokens = {
   githubWorkflowExpression: "${{ github.workflow }}",
   githubRefExpression: "${{ github.ref }}",
+  githubShaExpression: "${{ github.sha }}",
+  githubExpectedRevisionExpression: "${{ inputs.expected_revision }}",
+  githubDeployUrlExpression: "${{ vars.DEPLOY_URL }}",
+  githubCloudflareAccountIdExpression:
+    "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
+  githubCloudflareApiTokenExpression:
+    "${{ secrets.CLOUDFLARE_API_TOKEN }}",
 } as const;
 
 export type TemplateTokens = Readonly<{

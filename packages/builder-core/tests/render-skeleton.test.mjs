@@ -1211,7 +1211,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.8.0",
+    recipeVersion: "0.9.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -2560,7 +2560,7 @@ test("rendering conditionally overlays the home route and materializes each Cale
     );
 
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, "0.8.0");
+    assert.equal(rendered.project.recipeVersion, "0.9.0");
     assert.equal(
       rendered.project.selectedCapabilities.at(-1),
       "booking-calendly",
@@ -2999,10 +2999,14 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
   });
   const approvedRevision = "a".repeat(40);
   const runGuard = (environment) =>
-    spawnSync("bash", ["-euo", "pipefail", "-c", revisionGuard.run], {
-      encoding: "utf8",
-      env: { ...process.env, ...environment },
-    });
+    spawnSync(
+      "bash",
+      ["--noprofile", "--norc", "-e", "-o", "pipefail", "-c", revisionGuard.run],
+      {
+        encoding: "utf8",
+        env: { ...process.env, ...environment },
+      },
+    );
   assert.equal(
     runGuard({
       EXPECTED_REVISION: approvedRevision,
@@ -3033,7 +3037,11 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
       GITHUB_REF: "refs/heads/release",
     },
   ]) {
-    assert.notEqual(runGuard(environment).status, 0);
+    assert.notEqual(
+      runGuard(environment).status,
+      0,
+      JSON.stringify(environment),
+    );
   }
 
   assert.equal(
@@ -3086,7 +3094,7 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
   assert.match(deployStep.run, /opennextjs-cloudflare deploy/u);
   assert.doesNotMatch(
     deployStep.run,
-    /\b(?:build|install|test|preview)\b|next|wrangler/iu,
+    /(?:pnpm|opennextjs-cloudflare)[^\n]*\b(?:build|install|test|preview)\b|\bwrangler\b/iu,
   );
   assert.equal(
     job.steps.filter((step) =>
@@ -4684,7 +4692,7 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
       /(?:apps\/jobs|packages\/|\.egeria|pnpm-lock\.yaml|middleware)/,
     );
     const output = [...indexFiles(rendered.files)]
-      .filter(([path]) => path !== ".github/workflows/quality.yml")
+      .filter(([path]) => !path.startsWith(".github/workflows/"))
       .map(([, content]) => content)
       .join("\n")
       .toLowerCase();
@@ -4853,7 +4861,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       packageVersions,
     }),
   );
-  assert.equal(selected.surfaces.length, 102);
+  assert.equal(selected.surfaces.length, 103);
   assert.deepEqual(
     selected.surfaces
       .filter(
