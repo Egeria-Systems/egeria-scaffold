@@ -2930,6 +2930,7 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
     rendered.files,
     ".github/workflows/deploy.yml",
   );
+  const readme = indexFiles(rendered.files).get("README.md");
 
   assert.deepEqual(workflow.on, {
     workflow_dispatch: {
@@ -2945,8 +2946,17 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
   assert.deepEqual(workflow.permissions, { contents: "read" });
   assert.deepEqual(workflow.concurrency, {
     group: "production-deploy",
+    queue: "max",
     "cancel-in-progress": false,
   });
+  assert.match(
+    readme,
+    /prevent self-review[^.]+GitHub plan and environment controls support it/iu,
+  );
+  assert.match(
+    readme,
+    /when unavailable[^.]+record that limitation[^.]+reviewer other than the workflow initiator/iu,
+  );
 
   const job = workflow.jobs["verify-and-deploy"];
   assert.equal(job.if, "github.ref == 'refs/heads/main'");

@@ -152,7 +152,7 @@
       "path": ".egeria/project.yaml"
     },
     {
-      "fingerprint": "sha256:14dbb76108244093ceba631682dfbd112efd90febfd43ac1fcfd4d6843cee144",
+      "fingerprint": "sha256:8a9d8f668c6ab40294846a0757daeaf99fbdd01bc5812c16628fb697d6e10757",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -681,7 +681,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:83be410aad26e5647c233a8eb831e46a33775d24effffcd1861bc9b5b3a34110",
+      "fingerprint": "sha256:3124524980f2d14e51b361100f2bc3cf39fbaec882196540a122554d4aa95888",
       "fingerprintTarget": {
         "kind": "file"
       },

@@ -46,7 +46,7 @@ Playwright reports and test results are ignored locally and uploaded for seven d
 
 ## Protected Cloudflare deployment
 
-The generated `.github/workflows/deploy.yml` is manual and accepts the exact lowercase 40-character `main` revision approved for deployment. Before enabling it, create a GitHub environment named `production`, restrict it to the protected `main` branch, add required reviewers where the repository plan supports them, and set its `DEPLOY_URL` variable to the public HTTPS root that the deployed browser check must exercise.
+The generated `.github/workflows/deploy.yml` is manual and accepts the exact lowercase 40-character `main` revision approved for deployment. Before enabling it, create a GitHub environment named `production`, restrict it to the protected `main` branch, add required reviewers where the repository plan supports them, and set its `DEPLOY_URL` variable to the public HTTPS root that the deployed browser check must exercise. Enable Prevent self-review when the selected GitHub plan and environment controls support it. Verify the control instead of assuming it exists; when unavailable, record that limitation in the deployment approval evidence and require an eligible reviewer other than the workflow initiator.
 
 Store `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` as environment secrets. Use a Cloudflare token scoped to the target account and only the Worker-edit permissions required by this stateless deployment. Do not commit either value. Rotate or revoke the token separately when access changes or the deployment is retired.
 

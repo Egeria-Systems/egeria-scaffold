@@ -2373,6 +2373,10 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
+    /portfolio` and `site` recipes are `0\.9\.0`[^\n]+deployment-cloudflare@0\.3\.0[^\n]+observability@0\.3\.0/iu,
+  );
+  assert.match(
+    capabilityModel,
     /same-origin[^\n]+safe-event and restricted error-report envelopes[^\n]+8,192 bytes/iu,
   );
   assert.match(
