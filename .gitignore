@@ -15,6 +15,7 @@ dist/
 playwright-report/
 test-results/
 .superpowers/
-docs/implementation-evidence/
+docs/implementation-evidence/*
+!docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md
 docs/review-packets/
 docs/superpowers/

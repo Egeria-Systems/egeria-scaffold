@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import * as core from "../dist/index.js";
@@ -13,7 +13,7 @@ const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
 const observabilityPlanPath =
   "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md";
 const observabilityEvidencePath =
-  "docs/implementation-evidence/observability-error-diagnostics-provider-receipt-template.md";
+  "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md";
 const observabilityEvidenceRevision =
   "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad";
 const standardsPlanPath =
@@ -358,6 +358,25 @@ test("material observability diagnostics have exact reviewed certification evide
       subject,
     })),
   });
+  const acceptedReceiptUrl = new URL(
+    `../../../${observabilityEvidencePath}`,
+    import.meta.url,
+  );
+  assert.equal(existsSync(acceptedReceiptUrl), true, observabilityEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { observability: observabilityRecord },
+      },
+      artifacts: {
+        [observabilityPlanPath]: "# approved plan",
+        [observabilityEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [observabilityEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
   const falseLegacy = structuredClone(committedRegistry);
   falseLegacy.records.observability.status = "backfill-pending";
   falseLegacy.records.observability.taskPlan = null;

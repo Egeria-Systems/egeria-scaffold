@@ -39,6 +39,8 @@ const acceptedEvidenceRevision =
   "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad";
 const acceptedWorkflowRunId = "31925083913";
 const acceptedRecoveryRunId = "31925927776";
+const historicalSubjectDigest =
+  "sha256:a4f15a132e08da307ab412673b02152fee8509c0cc1dabb4b60856abd61f5d97";
 const exactCloudflareVersionId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 const otherCloudflareVersionId = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff";
 const requiredEvidence = Object.freeze([
@@ -353,6 +355,21 @@ function sameJson(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function collectSubjects(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap(collectSubjects);
+  }
+  if (value === null || typeof value !== "object") {
+    return [];
+  }
+
+  const subjects =
+    "descriptorVersion" in value || "behaviorContractDigest" in value
+      ? [value]
+      : [];
+  return [...subjects, ...Object.values(value).flatMap(collectSubjects)];
+}
+
 function validateCompletedCertificationReceipt(receipt) {
   const issues = [];
   const requireCondition = (condition, issue) => {
@@ -500,8 +517,10 @@ function validateCompletedCertificationReceipt(receipt) {
     "cleanup",
   );
   requireCondition(
-    !/0\.2\.0|a4f15a132e08da307ab412673b02152fee8509c0cc1dabb4b60856abd61f5d97/u.test(
-      JSON.stringify(receipt),
+    collectSubjects(receipt).every(
+      (subject) =>
+        subject.descriptorVersion !== "0.2.0" &&
+        subject.behaviorContractDigest !== historicalSubjectDigest,
     ),
     "historical-evidence",
   );
@@ -520,7 +539,7 @@ test("the diagnostics certification receipt accepts the exact reviewed subject a
       "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md",
     evidence: requiredEvidence.map((kind) => ({
       kind,
-      path: "docs/implementation-evidence/observability-error-diagnostics-provider-receipt-template.md",
+      path: "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
       outcome: "passed",
       revision: acceptedEvidenceRevision,
       subject: exactSubject,
@@ -550,6 +569,13 @@ test("the completed receipt rejects stale identity, evidence, provider, cleanup,
   const acceptedReceipt = JSON.parse(await readFile(localReceiptPath, "utf8"));
   assert.deepEqual(validateCompletedCertificationReceipt(acceptedReceipt), []);
   const cases = [
+    ["receipt-contract", (value) => { value.schemaVersion = "2.0.0"; }],
+    ["receipt-contract", (value) => { value.capability = "other"; }],
+    ["receipt-contract", (value) => { value.status = "pending"; }],
+    ["receipt-contract", (value) => { value.unresolvedPrompts.push("review"); }],
+    ["receipt-contract", (value) => { value.evidence.recipeVersion = "0.7.0"; }],
+    ["hosted-run", (value) => { value.hostedRunClaim.claimed = false; }],
+    ["hosted-run", (value) => { value.evidence.workflow.artifact.digest = `sha256:${"0".repeat(64)}`; }],
     ["revision", (value) => { value.evidenceRevision = "bec51540c9ff4b68af790e9413cd9d1102d54396"; }],
     ["revision", (value) => { value.outcomes[0].evidenceRevision = "0".repeat(40); }],
     ["subject", (value) => { value.subject.behaviorContractDigest = `sha256:${"0".repeat(64)}`; }],
@@ -562,6 +588,7 @@ test("the completed receipt rejects stale identity, evidence, provider, cleanup,
     ["cleanup", (value) => { value.evidence.cleanup.workerSecretsRemoved = false; }],
     ["review", (value) => { value.outcomes[0].reviewDecision = "rejected"; }],
     ["historical-evidence", (value) => { value.historicalEvidence = { descriptorVersion: "0.2.0" }; }],
+    ["historical-evidence", (value) => { value.historicalEvidence = { behaviorContractDigest: historicalSubjectDigest }; }],
   ];
 
   for (const [expectedIssue, mutate] of cases) {

@@ -2354,7 +2354,7 @@ test("executable capability certification ownership is current", async () => {
     ["cleanup-recovery", "deployed-application", "fresh-scaffold"].map(
       (kind) => ({
         kind,
-        path: "docs/implementation-evidence/observability-error-diagnostics-provider-receipt-template.md",
+        path: "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
         outcome: "passed",
         revision: "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
       }),

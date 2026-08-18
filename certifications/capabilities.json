@@ -96,7 +96,7 @@
       "evidence": [
         {
           "kind": "cleanup-recovery",
-          "path": "docs/implementation-evidence/observability-error-diagnostics-provider-receipt-template.md",
+          "path": "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
           "outcome": "passed",
           "revision": "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
           "subject": {
@@ -106,7 +106,7 @@
         },
         {
           "kind": "deployed-application",
-          "path": "docs/implementation-evidence/observability-error-diagnostics-provider-receipt-template.md",
+          "path": "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
           "outcome": "passed",
           "revision": "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
           "subject": {
@@ -116,7 +116,7 @@
         },
         {
           "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/observability-error-diagnostics-provider-receipt-template.md",
+          "path": "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
           "outcome": "passed",
           "revision": "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
           "subject": {

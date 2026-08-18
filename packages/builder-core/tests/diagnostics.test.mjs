@@ -558,16 +558,23 @@ test("restricted error diagnostics admission advances every direct owner togethe
       "utf8",
     ),
   );
+  const subject = core.createCertificationSubject(
+    descriptor,
+    requiredEvidence.observability,
+  );
   assert.deepEqual(registry.records.observability, {
-    subject: core.createCertificationSubject(
-      descriptor,
-      requiredEvidence.observability,
-    ),
+    subject,
     requiredEvidence: requiredEvidence.observability,
-    status: "pending",
+    status: "certified",
     taskPlan:
       "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md",
-    evidence: [],
+    evidence: requiredEvidence.observability.map((kind) => ({
+      kind,
+      path: "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
+      outcome: "passed",
+      revision: "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
+      subject,
+    })),
   });
 
   const [packageTemplate, workspace, lockfile] = await Promise.all([
