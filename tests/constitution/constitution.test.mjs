@@ -2090,11 +2090,11 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     clientReadySection,
-    /observability@0\.3\.0[^#]+ordinary `pending`[^#]+empty evidence[^#]+fresh-scaffold[^#]+bec51540c9ff4b68af790e9413cd9d1102d54396[^#]+accepted[^#]+no deployed-application or cleanup-recovery evidence/iu,
+    /observability@0\.3\.0[^#]+certified[^#]+fresh-scaffold[^#]+deployed-application[^#]+cleanup-recovery[^#]+bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad[^#]+31925083913[^#]+31925927776/iu,
   );
   assert.match(
     architectureOverview,
-    /observability[^.]+accepted local `fresh-scaffold` evidence[^.]+bec51540c9ff4b68af790e9413cd9d1102d54396[^.]+`cleanup-recovery` and `deployed-application` remain future evidence/iu,
+    /observability@0\.3\.0[^.]+certified[^.]+fresh-scaffold[^.]+deployed-application[^.]+cleanup-recovery[^.]+bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad/iu,
   );
   const lifecycleSection = programRoadmap
     .split(`## ${lifecyclePhase} — Transactional lifecycle\n`, 2)[1]
@@ -2188,7 +2188,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+observability@0\.3\.0[^\n]+pending[^\n]+empty evidence[^\n]+four unchanged subjects[^\n]+backfill-pending/i,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+observability@0\.3\.0[^\n]+certified[^\n]+four unchanged subjects[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2196,7 +2196,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission passes[^\n]+transition closure rejects pending observability[^\n]+all-certified closure rejects pending observability and the four frozen backfills/i,
+    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+closure pass[^\n]+all-certified[^\n]+rejects only the four frozen backfills/i,
   );
 });
 
@@ -2337,14 +2337,29 @@ test("executable capability certification ownership is current", async () => {
   const observabilityRecord = registry.records.observability;
   const standardsRecord = registry.records.standards;
   assert.equal(bookingRecord.status, "certified");
-  assert.equal(observabilityRecord.status, "pending");
+  assert.equal(observabilityRecord.status, "certified");
   assert.equal(standardsRecord.status, "certified");
   assert.deepEqual(observabilityRecord.requiredEvidence, [
     "cleanup-recovery",
     "deployed-application",
     "fresh-scaffold",
   ]);
-  assert.deepEqual(observabilityRecord.evidence, []);
+  assert.deepEqual(
+    observabilityRecord.evidence.map(({ kind, path, outcome, revision }) => ({
+      kind,
+      path,
+      outcome,
+      revision,
+    })),
+    ["cleanup-recovery", "deployed-application", "fresh-scaffold"].map(
+      (kind) => ({
+        kind,
+        path: "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
+        outcome: "passed",
+        revision: "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
+      }),
+    ),
+  );
   assert.match(
     rootReadme,
     /recipe `0\.8\.0`[^\n]+observability@0\.3\.0/iu,
@@ -2364,7 +2379,7 @@ test("executable capability certification ownership is current", async () => {
   for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
     assert.match(
       document,
-      /observability@0\.3\.0[^\n]+pending[^\n]+empty evidence/iu,
+      /observability@0\.3\.0[^\n]+certified[^\n]+bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad/iu,
     );
     assert.match(
       document,
@@ -2391,7 +2406,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /local\/static\/generated evidence[^\n]+no deployed\/provider receipt[^\n]+retention[^\n]+cleanup\/recovery[^\n]+durable delivery[^\n]+production readiness[^\n]+privacy completeness[^\n]+visual quality[^\n]+human accessibility[^\n]+WCAG-conformance proof/iu,
+    /certification does not establish[^\n]+durable delivery[^\n]+ongoing provider availability[^\n]+production readiness[^\n]+privacy completeness[^\n]+visual quality[^\n]+human accessibility[^\n]+WCAG conformance/iu,
   );
   assert.match(
     packageOwnership,
@@ -2421,7 +2436,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission passes[^\n]+transition closure rejects pending observability[^\n]+all-certified closure rejects pending observability and the four frozen backfills/iu,
+    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+closure pass[^\n]+all-certified[^\n]+rejects only the four frozen backfills/iu,
   );
   assert.match(
     enforcementMap,
@@ -2739,7 +2754,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     roadmap,
-    /restricted-error-diagnostics implementation revision `393225988aaed173e21dc547e69ff5b03305cf93`[^\n]+integrated by accepted-main merge `d543de78d8e1c238a499aeba5e315f4db724dd1b`[^\n]+fresh-scaffold[^\n]+bec51540c9ff4b68af790e9413cd9d1102d54396[^\n]+pending[^\n]+empty evidence[^\n]+No deployed-application or cleanup-recovery evidence/iu,
+    /restricted-error-diagnostics implementation revision `393225988aaed173e21dc547e69ff5b03305cf93`[^\n]+integrated by accepted-main merge `d543de78d8e1c238a499aeba5e315f4db724dd1b`[^\n]+observability@0\.3\.0[^\n]+certified[^\n]+fresh-scaffold[^\n]+deployed-application[^\n]+cleanup-recovery[^\n]+bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad/iu,
   );
   assert.match(
     roadmap,

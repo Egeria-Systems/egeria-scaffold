@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import * as core from "../dist/index.js";
@@ -12,6 +12,10 @@ const evidencePath =
 const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
 const observabilityPlanPath =
   "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md";
+const observabilityEvidencePath =
+  "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md";
+const observabilityEvidenceRevision =
+  "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad";
 const standardsPlanPath =
   "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md";
 const standardsEvidencePath =
@@ -331,22 +335,48 @@ test("descriptor admission rejects incomplete, stale, extra, and false-legacy co
   );
 });
 
-test("material observability diagnostics remain pending for their exact subject", () => {
+test("material observability diagnostics have exact reviewed certification evidence", () => {
   const observabilityDescriptor = descriptorsByIdentifier.get("observability");
   assert.notEqual(observabilityDescriptor, undefined);
   const observabilityRecord = committedRegistry.records.observability;
+  const subject = core.createCertificationSubject(
+    observabilityDescriptor,
+    requiredEvidence.observability,
+  );
 
   assert.equal(observabilityDescriptor.version, "0.3.0");
   assert.deepEqual(observabilityRecord, {
-    subject: core.createCertificationSubject(
-      observabilityDescriptor,
-      requiredEvidence.observability,
-    ),
+    subject,
     requiredEvidence: requiredEvidence.observability,
-    status: "pending",
+    status: "certified",
     taskPlan: observabilityPlanPath,
-    evidence: [],
+    evidence: requiredEvidence.observability.map((kind) => ({
+      kind,
+      path: observabilityEvidencePath,
+      outcome: "passed",
+      revision: observabilityEvidenceRevision,
+      subject,
+    })),
   });
+  const acceptedReceiptUrl = new URL(
+    `../../../${observabilityEvidencePath}`,
+    import.meta.url,
+  );
+  assert.equal(existsSync(acceptedReceiptUrl), true, observabilityEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { observability: observabilityRecord },
+      },
+      artifacts: {
+        [observabilityPlanPath]: "# approved plan",
+        [observabilityEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [observabilityEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
   const falseLegacy = structuredClone(committedRegistry);
   falseLegacy.records.observability.status = "backfill-pending";
   falseLegacy.records.observability.taskPlan = null;

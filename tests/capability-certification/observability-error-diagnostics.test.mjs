@@ -35,6 +35,12 @@ const exactSubject = Object.freeze({
     "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99",
 });
 const exactRevision = "0123456789abcdef0123456789abcdef01234567";
+const acceptedEvidenceRevision =
+  "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad";
+const acceptedWorkflowRunId = "31925083913";
+const acceptedRecoveryRunId = "31925927776";
+const historicalSubjectDigest =
+  "sha256:a4f15a132e08da307ab412673b02152fee8509c0cc1dabb4b60856abd61f5d97";
 const exactCloudflareVersionId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 const otherCloudflareVersionId = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff";
 const requiredEvidence = Object.freeze([
@@ -98,6 +104,32 @@ const localFixtureChecks = Object.freeze([
   "generated-next-request-error",
   "generated-selected-server-catch-context",
   "generated-diagnostic-failure-containment",
+]);
+const acceptedBrowserEventIdentifiers = Object.freeze([
+  "cc6d8a25-5775-4fbc-93a6-3bc8d7e069b4",
+  "4bf98f1a-8051-45f3-9382-ee66bc2425c4",
+  "67972ffc-2fe3-4742-9d61-5ba9339bb5e7",
+  "bc569a98-5b28-4d1b-95cc-a491561907df",
+  "0b9e58aa-77cb-4bf7-adb0-4e2c2d4acc35",
+]);
+const acceptedWorkersEventNames = Object.freeze([
+  "browser.caught.error",
+  "browser.react.boundary",
+  "browser.unhandled.rejection",
+  "browser.window.error",
+  "observability.delivery.failed",
+  "server.caught.error",
+  "server.request.error",
+]);
+const acceptedWorkersSafeFieldNames = Object.freeze([
+  "attributes.capture_mechanism",
+  "attributes.handled",
+  "attributes.http_method",
+  "attributes.operation",
+  "attributes.reason",
+  "attributes.route_type",
+  "attributes.router_kind",
+  "attributes.sink",
 ]);
 
 function createLocalFixtureReceipt() {
@@ -319,16 +351,199 @@ function responseWithoutReadableContent(status) {
   );
 }
 
-test("the diagnostics certification receipt covers only the exact pending subject and reviewed local outcome", async (t) => {
+function sameJson(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function collectSubjects(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap(collectSubjects);
+  }
+  if (value === null || typeof value !== "object") {
+    return [];
+  }
+
+  const subjects =
+    "descriptorVersion" in value || "behaviorContractDigest" in value
+      ? [value]
+      : [];
+  return [...subjects, ...Object.values(value).flatMap(collectSubjects)];
+}
+
+function validateCompletedCertificationReceipt(receipt) {
+  const issues = [];
+  const requireCondition = (condition, issue) => {
+    if (!condition && !issues.includes(issue)) issues.push(issue);
+  };
+  const outcomes = Array.isArray(receipt?.outcomes) ? receipt.outcomes : [];
+  const evidence = receipt?.evidence;
+  const captureCases = Array.isArray(evidence?.capture?.cases)
+    ? evidence.capture.cases
+    : [];
+  const browserRecordCounts = Array.isArray(
+    evidence?.betterStack?.browserEventRecordCounts,
+  )
+    ? evidence.betterStack.browserEventRecordCounts
+    : [];
+
+  requireCondition(receipt?.schemaVersion === "1.0.0", "receipt-contract");
+  requireCondition(receipt?.capability === "observability", "receipt-contract");
+  requireCondition(sameJson(receipt?.subject, exactSubject), "subject");
+  requireCondition(
+    receipt?.evidenceRevision === acceptedEvidenceRevision &&
+      outcomes.every(
+        (outcome) => outcome.evidenceRevision === acceptedEvidenceRevision,
+      ),
+    "revision",
+  );
+  requireCondition(receipt?.status === "complete", "receipt-contract");
+  requireCondition(
+    receipt?.reviewDecision === "accepted" &&
+      outcomes.every((outcome) => outcome.reviewDecision === "accepted"),
+    "review",
+  );
+  requireCondition(
+    sameJson(receipt?.unresolvedPrompts, []),
+    "receipt-contract",
+  );
+  requireCondition(
+    sameJson(receipt?.hostedRunClaim, {
+      claimed: true,
+      basis: "github-actions-exact-revision",
+      workflowRunId: acceptedWorkflowRunId,
+      recoveryRunId: acceptedRecoveryRunId,
+    }),
+    "hosted-run",
+  );
+  requireCondition(
+    sameJson(
+      outcomes.map(({ identifier }) => identifier),
+      requiredEvidence,
+    ) && new Set(outcomes.map(({ identifier }) => identifier)).size === 3,
+    "evidence-outcomes",
+  );
+  requireCondition(
+    outcomes.every(
+      (outcome) =>
+        outcome.capability === "observability" &&
+        sameJson(outcome.subject, exactSubject) &&
+        outcome.result === "passed",
+    ),
+    "evidence-outcomes",
+  );
+  requireCondition(evidence?.recipeVersion === "0.8.0", "receipt-contract");
+  requireCondition(
+    evidence?.workflow?.runId === acceptedWorkflowRunId &&
+      evidence.workflow.jobId === "95111274249" &&
+      evidence.workflow.conclusion === "success" &&
+      evidence.workflow.artifact?.id === "9257644521" &&
+      evidence.workflow.artifact?.digest ===
+        "sha256:8ab852234f9e54188768ec648ee73e1746631f2f48e54dc30345afce722a389d" &&
+      evidence.workflow.artifact?.retentionDays === 7,
+    "hosted-run",
+  );
+  requireCondition(
+    sameJson(
+      captureCases.map(({ identifier }) => identifier),
+      localCases,
+    ) && captureCases.every(({ result }) => result === "passed"),
+    "capture",
+  );
+  requireCondition(
+    sameJson(evidence?.capture?.counts, {
+      cases: 8,
+      captureInvocations: 9,
+      acceptedOriginals: 8,
+      syntheticApplicationRequests: 10,
+      diagnosticDeliveryFailures: 1,
+      workersCustomRecords: 9,
+      betterStackRecords: 7,
+    }) &&
+      evidence?.capture?.suppressedWebVitalRequests === 8 &&
+      evidence?.capture?.escapedWebVitalRequests === 0,
+    "capture",
+  );
+  requireCondition(
+    evidence?.workers?.customRecords === 9 &&
+      evidence.workers.customRecordErrors === 0 &&
+      evidence.workers.unexpectedRecords === 0 &&
+      evidence.workers.webVitalRecords === 0 &&
+      sameJson(evidence.workers.eventNames, acceptedWorkersEventNames),
+    "workers-records",
+  );
+  requireCondition(
+    sameJson(
+      evidence?.workers?.reviewedSafeFieldNames,
+      acceptedWorkersSafeFieldNames,
+    ),
+    "workers-restricted-field",
+  );
+  requireCondition(
+    sameJson(
+      browserRecordCounts,
+      acceptedBrowserEventIdentifiers.map((eventIdentifier) => ({
+        eventIdentifier,
+        records: 1,
+      })),
+    ) &&
+      evidence?.betterStack?.totalRecords === 7 &&
+      evidence.betterStack.serverReleaseBoundRecords === 2 &&
+      evidence.betterStack.controlledRejectionRecords === 0 &&
+      evidence.betterStack.informationRecords === 0 &&
+      evidence.betterStack.unexpectedRecords === 0,
+    "provider-record-count",
+  );
+  requireCondition(
+    evidence?.cleanup?.recoveryRunId === acceptedRecoveryRunId &&
+      evidence.cleanup.jobId === "95113370391" &&
+      evidence.cleanup.conclusion === "success" &&
+      evidence.cleanup.workerSecretsRemoved === true &&
+      evidence.cleanup.baselineRestored === true &&
+      sameJson(evidence.cleanup.routeStatuses, {
+        "/api/compatibility": 200,
+        "/api/observability": 404,
+        "/certification/diagnostics": 404,
+        "/api/certification/diagnostics": 404,
+      }) &&
+      sameJson(evidence.cleanup.retainedBindings, ["PROOF_ENVIRONMENT"]) &&
+      evidence.cleanup.workersLogsEnabled === false &&
+      evidence.cleanup.workersTracesEnabled === false &&
+      evidence.cleanup.temporaryArtifactsRemoved === true &&
+      evidence.cleanup.syntheticDataRetentionDays === 3 &&
+      evidence.cleanup.artifactRetentionDays === 7 &&
+      evidence.cleanup.incrementalSpendUsd === 0 &&
+      evidence.cleanup.credentialsRetainedBy === "CoveMB" &&
+      evidence.cleanup.credentialReviewDeadline === "2026-08-21",
+    "cleanup",
+  );
+  requireCondition(
+    collectSubjects(receipt).every(
+      (subject) =>
+        subject.descriptorVersion !== "0.2.0" &&
+        subject.behaviorContractDigest !== historicalSubjectDigest,
+    ),
+    "historical-evidence",
+  );
+
+  return issues;
+}
+
+test("the diagnostics certification receipt accepts the exact reviewed subject and all required outcomes", async (t) => {
   const registry = JSON.parse(await readFile(registryPath, "utf8"));
   const record = registry.records.observability;
   assert.deepEqual(record, {
     subject: exactSubject,
     requiredEvidence,
-    status: "pending",
+    status: "certified",
     taskPlan:
       "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md",
-    evidence: [],
+    evidence: requiredEvidence.map((kind) => ({
+      kind,
+      path: "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
+      outcome: "passed",
+      revision: acceptedEvidenceRevision,
+      subject: exactSubject,
+    })),
   });
 
   if (!(await pathExists(localReceiptPath))) {
@@ -337,46 +552,54 @@ test("the diagnostics certification receipt covers only the exact pending subjec
   }
 
   const receipt = JSON.parse(await readFile(localReceiptPath, "utf8"));
-  assert.equal(receipt.schemaVersion, "1.0.0");
-  assert.equal(receipt.capability, "observability");
-  assert.deepEqual(receipt.subject, exactSubject);
-  assert.match(receipt.evidenceRevision, /^[0-9a-f]{40}$/u);
-  assert.equal(receipt.status, "complete");
-  assert.equal(receipt.reviewDecision, "accepted");
-  assert.deepEqual(receipt.unresolvedPrompts, []);
-  assert.deepEqual(receipt.hostedRunClaim, {
-    claimed: false,
-    basis: "local-fresh-scaffold-only",
-  });
-  assert.equal(receipt.outcomes.length, 1);
-  assert.deepEqual(
-    receipt.outcomes.map(({ identifier, result, reviewDecision }) => ({
-      identifier,
-      result,
-      reviewDecision,
-    })),
-    [
-      {
-        identifier: "fresh-scaffold",
-        result: "passed",
-        reviewDecision: "accepted",
-      },
-    ],
-  );
-  assert.deepEqual(receipt.outcomes[0].subject, exactSubject);
-  assert.equal(
-    receipt.outcomes[0].evidenceRevision,
-    receipt.evidenceRevision,
-  );
+  assert.deepEqual(validateCompletedCertificationReceipt(receipt), []);
   await execFileAsync(
     "git",
     ["merge-base", "--is-ancestor", receipt.evidenceRevision, "HEAD"],
     { cwd: repositoryRoot },
   );
-  assert.doesNotMatch(
-    JSON.stringify(receipt),
-    /0\.2\.0|a4f15a132e08da307ab412673b02152fee8509c0cc1dabb4b60856abd61f5d97/u,
-  );
+});
+
+test("the completed receipt rejects stale identity, evidence, provider, cleanup, and review drift", async (t) => {
+  if (!(await pathExists(localReceiptPath))) {
+    t.skip("private local receipt is absent from an ordinary checkout");
+    return;
+  }
+
+  const acceptedReceipt = JSON.parse(await readFile(localReceiptPath, "utf8"));
+  assert.deepEqual(validateCompletedCertificationReceipt(acceptedReceipt), []);
+  const cases = [
+    ["receipt-contract", (value) => { value.schemaVersion = "2.0.0"; }],
+    ["receipt-contract", (value) => { value.capability = "other"; }],
+    ["receipt-contract", (value) => { value.status = "pending"; }],
+    ["receipt-contract", (value) => { value.unresolvedPrompts.push("review"); }],
+    ["receipt-contract", (value) => { value.evidence.recipeVersion = "0.7.0"; }],
+    ["hosted-run", (value) => { value.hostedRunClaim.claimed = false; }],
+    ["hosted-run", (value) => { value.evidence.workflow.artifact.digest = `sha256:${"0".repeat(64)}`; }],
+    ["revision", (value) => { value.evidenceRevision = "bec51540c9ff4b68af790e9413cd9d1102d54396"; }],
+    ["revision", (value) => { value.outcomes[0].evidenceRevision = "0".repeat(40); }],
+    ["subject", (value) => { value.subject.behaviorContractDigest = `sha256:${"0".repeat(64)}`; }],
+    ["evidence-outcomes", (value) => { value.outcomes.pop(); }],
+    ["evidence-outcomes", (value) => { value.outcomes.push({ ...value.outcomes[0], identifier: "unexpected" }); }],
+    ["evidence-outcomes", (value) => { value.outcomes[1] = structuredClone(value.outcomes[0]); }],
+    ["capture", (value) => { value.evidence.capture.cases[0].result = "failed"; }],
+    ["provider-record-count", (value) => { value.evidence.betterStack.browserEventRecordCounts[0].records = 2; }],
+    ["workers-restricted-field", (value) => { value.evidence.workers.reviewedSafeFieldNames.push("message"); }],
+    ["cleanup", (value) => { value.evidence.cleanup.workerSecretsRemoved = false; }],
+    ["review", (value) => { value.outcomes[0].reviewDecision = "rejected"; }],
+    ["historical-evidence", (value) => { value.historicalEvidence = { descriptorVersion: "0.2.0" }; }],
+    ["historical-evidence", (value) => { value.historicalEvidence = { behaviorContractDigest: historicalSubjectDigest }; }],
+  ];
+
+  for (const [expectedIssue, mutate] of cases) {
+    const changed = structuredClone(acceptedReceipt);
+    mutate(changed);
+    assert.equal(
+      validateCompletedCertificationReceipt(changed).includes(expectedIssue),
+      true,
+      expectedIssue,
+    );
+  }
 });
 
 test("the thin local runner binds exact recipe, subject, revision, fixed verification, fixture checks, and cleanup", async () => {

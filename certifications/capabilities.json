@@ -91,9 +91,40 @@
         "deployed-application",
         "fresh-scaffold"
       ],
-      "status": "pending",
+      "status": "certified",
       "taskPlan": "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md",
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "cleanup-recovery",
+          "path": "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99"
+          }
+        },
+        {
+          "kind": "deployed-application",
+          "path": "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99"
+          }
+        },
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99"
+          }
+        }
+      ]
     },
     "section-composition": {
       "subject": {
