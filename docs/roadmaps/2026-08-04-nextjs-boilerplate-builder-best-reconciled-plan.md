@@ -200,60 +200,9 @@ Explicitly excluded by default:
 
 ## 3. Capability model
 
-### Capability metadata
+### Descriptor contract
 
-Every capability descriptor declares:
-
-```text
-identifier
-capability version
-delivery mode
-state classification
-removal policy
-dependencies
-optional integrations
-conflicts
-supported profiles/recipes
-required packages
-environment variables
-secrets
-platform resources
-external domains
-CSP contributions
-cookies and browser storage
-data classifications
-retention assumptions
-privileged operations
-threat-review level
-adapter semantic requirements
-generated and managed surfaces
-repository-inference probes
-migration planners
-verification plan
-documentation-evidence requirements
-```
-
-Recommended types:
-
-```ts
-type CapabilityDeliveryMode =
-  | "package-backed"
-  | "source-generated"
-  | "hybrid";
-
-type CapabilityStateClassification =
-  | "stateless"
-  | "repository-stateful"
-  | "external-stateful"
-  | "persistent-data";
-
-type CapabilityRemovalPolicy =
-  | "automatic"
-  | "reviewed"
-  | "export-and-remove"
-  | "eject-only"
-  | "unsupported";
-```
+The [capability model's descriptor contract](../architecture/capability-model.md#descriptor-contract) is the canonical owner of descriptor fields, cardinality, vocabulary, managed-surface and inference-probe structures, state constraints, and removal/recovery metadata. This source plan does not duplicate that normative contract.
 
 ### Main catalog
 
