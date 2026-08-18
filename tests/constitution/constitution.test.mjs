@@ -1026,6 +1026,62 @@ test("the compatibility record preserves its required evidence boundaries", asyn
   assert.match(compatibility, /do(?:es)? not establish WCAG conformance/i);
 });
 
+test("the compatibility package matrix follows executable version owners", async () => {
+  const [compatibility, rootSource, proofSource] = await Promise.all([
+    readRepositoryFile("docs/compatibility/nextjs-cloudflare.md"),
+    readRepositoryFile("package.json"),
+    readRepositoryFile("proofs/nextjs-cloudflare/package.json"),
+  ]);
+  const rootManifest = JSON.parse(rootSource);
+  const proofManifest = JSON.parse(proofSource);
+  const matrixBody = compatibility
+    .split("## Exact matrix\n\n", 2)[1]
+    ?.split("\n\n", 1)[0];
+  assert.equal(typeof matrixBody, "string");
+  const exactMatrix = new Map(
+    matrixBody
+      .split("\n")
+      .slice(2)
+      .map((row) => row.split("|").slice(1, -1).map((cell) => cell.trim())),
+  );
+
+  assert.equal(
+    proofManifest.dependencies.react,
+    proofManifest.dependencies["react-dom"],
+  );
+  const expectedPackageVersions = [
+    ["Node.js", rootManifest.engines.node],
+    ["pnpm", rootManifest.engines.pnpm],
+    ["Next.js", proofManifest.dependencies.next],
+    ["React / React DOM", proofManifest.dependencies.react],
+    [
+      "OpenNext Cloudflare",
+      proofManifest.dependencies["@opennextjs/cloudflare"],
+    ],
+    ["Wrangler", proofManifest.devDependencies.wrangler],
+    ["TypeScript", proofManifest.devDependencies.typescript],
+    ["ESLint", proofManifest.devDependencies.eslint],
+    [
+      "Next ESLint config",
+      proofManifest.devDependencies["eslint-config-next"],
+    ],
+    [
+      "typescript-eslint",
+      proofManifest.devDependencies["typescript-eslint"],
+    ],
+    ["Vitest", proofManifest.devDependencies.vitest],
+    ["Playwright", proofManifest.devDependencies["@playwright/test"]],
+    [
+      "axe Playwright adapter",
+      proofManifest.devDependencies["@axe-core/playwright"],
+    ],
+  ];
+
+  for (const [surface, version] of expectedPackageVersions) {
+    assert.equal(exactMatrix.get(surface), `\`${version}\``, surface);
+  }
+});
+
 test("canonical documentation points to the non-product compatibility proof", async () => {
   const documents = await Promise.all([
     readRepositoryFile("README.md"),
