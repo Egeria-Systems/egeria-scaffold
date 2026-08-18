@@ -2,11 +2,13 @@
 
 ## Status and evidence date
 
-**Evidence date:** 2026-08-06
+**Evidence date:** 2026-08-13
 
 This P0.2 combination is accepted after verified-final-diff approval. The original implementation candidate passed local Node.js, Next.js, OpenNext, workerd harness, preview, Ubuntu workflow, non-production Worker, Chromium, and automated accessibility checks under Node `22.23.0`.
 
-Node `22.23.2` revalidation is local-only. On 2026-08-06, the current candidate passed the frozen install, dependency audit, Next.js and OpenNext builds, workerd integration harness, development and preview browser checks, and the selected automated accessibility checks. The deployed evidence remains on Node `22.23.0`; no workflow was dispatched and no Worker was deployed for this patch update. Neither the local nor deployed results prove a production profile, production readiness, or WCAG conformance.
+The initial Node `22.23.2` revalidation is local-only. On 2026-08-06, the current candidate passed the frozen install, dependency audit, Next.js and OpenNext builds, workerd integration harness, development and preview browser checks, and the selected automated accessibility checks. No workflow was dispatched and no Worker was deployed for that patch update.
+
+On 2026-08-13, Repository quality [run `31742910235`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/31742910235) passed the complete `compatibility-proof` job for exact commit `05fc743e5e24801d6e16e2ed89a8962397272238`, proof Wrangler `4.120.1`, and its frozen lockfile. The job passed frozen installation, lint, typecheck, unit behavior, Next.js build, OpenNext build, generated Cloudflare types, Cloudflare harness integration, Chromium installation, development-browser behavior, and OpenNext-preview browser behavior. It did not deploy a Worker. Historical deployed evidence remains on Node `22.23.0` at commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`, whose proof used Wrangler `4.118.0`. Neither the local, hosted, nor deployed results prove a production profile, production readiness, or WCAG conformance.
 
 The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). Preparation evidence and the approved implementation plan remain separately reviewable as private local workflow artifacts ignored by Git.
 
@@ -19,7 +21,7 @@ The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](..
 | Next.js | `16.3.0` |
 | React / React DOM | `19.2.8` |
 | OpenNext Cloudflare | `1.20.2` |
-| Wrangler | `4.118.0` |
+| Wrangler | `4.120.1` |
 | TypeScript | `6.0.3` |
 | ESLint | `9.39.5` |
 | Next ESLint config | `16.3.0` |
@@ -83,7 +85,7 @@ Deployment is manual GitHub Actions work. GitHub Actions is the sole deployment 
 
 The current manual workflow requires an explicitly approved exact lowercase 40-hex `main` revision, checks out `${{ github.sha }}` with full history and persisted credentials disabled, validates the ref, dispatch input, `GITHUB_SHA`, and checked-out `HEAD` before installation, disables the reusable pnpm cache, and bounds the job to 45 minutes. Local static validation of these controls does not prove GitHub-hosted execution, deployment, provider behavior, certification, publication, cleanup execution, or production safety.
 
-The historical deployment evidence is unchanged: the manual workflow at [`.github/workflows/compatibility-proof.yml`](../../.github/workflows/compatibility-proof.yml) ran from `main` through the earlier `compatibility` environment. [Run `30966212691`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/30966212691) completed successfully for exact commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`, deployed Worker version `fddba63e-c0e9-497e-98c4-4942461fb753` at the historical proof Worker, and passed the deployed smoke suite 4/4. An independent deployed rerun also passed 4/4. These historical identities are evidence facts, not the current deployment target.
+The historical deployment evidence is unchanged: the manual workflow at [`.github/workflows/compatibility-proof.yml`](../../.github/workflows/compatibility-proof.yml) ran from `main` through the earlier `compatibility` environment. [Run `30966212691`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/30966212691) completed successfully for exact commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`, whose proof used Wrangler `4.118.0`; it deployed Worker version `fddba63e-c0e9-497e-98c4-4942461fb753` at the historical proof Worker and passed the deployed smoke suite 4/4. An independent deployed rerun also passed 4/4. These historical identities are evidence facts, not the current deployment target.
 
 For a current run, the workflow references only `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, restricts them to the deploy-only step, publishes the previously verified OpenNext artifact to the explicit `test-deploy` target without rebuilding it under credentials, and maps `DEPLOY_URL` only to the post-deployment test interface. The shared environment may also hold the two source-specific Better Stack names allowed by the shared policy, but the compatibility workflow must not reference them. Values must never be committed or copied into logs or evidence. A run is blocked until the live environment's `main` restriction, available protection rules, bypass decision, URL-to-Worker match, credential scope and expiry, quota, and owners pass a fresh read-only preflight.
 
