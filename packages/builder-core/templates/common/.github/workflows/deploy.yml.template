@@ -83,8 +83,8 @@ jobs:
 
       - name: Verify deployment target configured
         env:
-          DEPLOY_URL: {{githubDeployUrlExpression}}
-        run: test -n "$DEPLOY_URL"
+          PLAYWRIGHT_DEPLOYED_URL: {{githubDeployUrlExpression}}
+        run: pnpm --dir apps/web exec playwright test --config playwright.deployed.config.ts --list
 
       - name: Deploy Cloudflare Worker
         env:

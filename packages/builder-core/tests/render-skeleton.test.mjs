@@ -3014,7 +3014,11 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
       ["--noprofile", "--norc", "-e", "-o", "pipefail", "-c", revisionGuard.run],
       {
         encoding: "utf8",
-        env: { ...process.env, ...environment },
+        env: {
+          EXPECTED_REVISION: environment.EXPECTED_REVISION,
+          GITHUB_SHA: environment.GITHUB_SHA,
+          GITHUB_REF: environment.GITHUB_REF,
+        },
       },
     );
   assert.equal(
@@ -3089,11 +3093,11 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
     "pnpm --dir apps/web run test:e2e:preview",
   );
   assert.deepEqual(steps["Verify deployment target configured"].env, {
-    DEPLOY_URL: "${{ vars.DEPLOY_URL }}",
+    PLAYWRIGHT_DEPLOYED_URL: "${{ vars.DEPLOY_URL }}",
   });
   assert.equal(
     steps["Verify deployment target configured"].run,
-    'test -n "$DEPLOY_URL"',
+    "pnpm --dir apps/web exec playwright test --config playwright.deployed.config.ts --list",
   );
 
   const deployStep = steps["Deploy Cloudflare Worker"];
@@ -3101,6 +3105,14 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
     CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
     CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
   });
+  assert.match(
+    deployStep.run,
+    /^test -n "\$CLOUDFLARE_ACCOUNT_ID"$/mu,
+  );
+  assert.match(
+    deployStep.run,
+    /^test -n "\$CLOUDFLARE_API_TOKEN"$/mu,
+  );
   assert.match(deployStep.run, /opennextjs-cloudflare deploy/u);
   assert.doesNotMatch(
     deployStep.run,
