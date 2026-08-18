@@ -294,6 +294,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template",
       "booking-calendly/apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
       "booking-calendly/apps/web/tests/e2e/calendly-booking.spec.ts",
+      "common/.github/workflows/deploy.yml.template",
       "common/.github/workflows/quality.yml.template",
       "common/.gitignore.template",
       "common/.nvmrc",
@@ -384,7 +385,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /explicit allowlisted templates/);
   assert.match(builderInstructions, /YAML 1.2/);
   assert.match(builderInstructions, /Markdown with validated YAML front matter/);
-  assert.match(builderInstructions, /recipe `0.8.0`/);
+  assert.match(builderInstructions, /recipe `0.9.0`/);
   assert.match(builderInstructions, /source-owned typed section registry/);
   assert.match(builderInstructions, /Tailwind CSS and PostCSS/);
   assert.match(builderInstructions, /Vitest Node\/jsdom/);
@@ -404,7 +405,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /explicit allowlisted templates/);
   assert.match(builderReadme, /YAML 1.2/);
   assert.match(builderReadme, /Markdown with validated YAML front matter/);
-  assert.match(builderReadme, /recipe `0.8.0`/);
+  assert.match(builderReadme, /recipe `0.9.0`/);
   assert.match(builderReadme, /four source-registered typed section shapes/);
   assert.match(builderReadme, /Tailwind CSS and PostCSS/);
   assert.match(builderReadme, /named generated Vitest unit\/component projects/);

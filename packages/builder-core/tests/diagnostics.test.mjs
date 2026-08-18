@@ -547,8 +547,8 @@ test("restricted error diagnostics admission advances every direct owner togethe
       recipeVersion,
     })),
     [
-      { identifier: "portfolio", recipeVersion: "0.8.0" },
-      { identifier: "site", recipeVersion: "0.8.0" },
+      { identifier: "portfolio", recipeVersion: "0.9.0" },
+      { identifier: "site", recipeVersion: "0.9.0" },
     ],
   );
 
@@ -712,6 +712,7 @@ test("doctor and diff agree across the canonical portfolio composition", async (
       "export {};\n",
     "apps/web/src/presentation/error-fallback.tsx":
       "export {};\n",
+    ".github/workflows/deploy.yml": "name: Deploy\n",
     ".github/workflows/quality.yml": "name: Quality\n",
     "apps/web/playwright.config.shared.ts": "export {};\n",
     "apps/web/playwright.deployed.config.ts": "export {};\n",

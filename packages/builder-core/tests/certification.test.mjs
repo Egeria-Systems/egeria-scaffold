@@ -22,6 +22,8 @@ const standardsEvidencePath =
   "docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-verification.md";
 const standardsEvidenceRevision =
   "d7c63b0aaa9bebd56c075f16f1e5d86519853698";
+const deploymentPlanPath =
+  "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const committedRegistry = JSON.parse(
   readFileSync(
     new URL("../../../certifications/capabilities.json", import.meta.url),
@@ -35,7 +37,7 @@ const descriptorDigests = Object.freeze({
   "content-files":
     "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05",
   "deployment-cloudflare":
-    "sha256:846ae45d15ba9d8f256a9b7a1d8a4f3cda1b871a3b3f79f7656fd621050e8273",
+    "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41",
   observability:
     "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99",
   "section-composition":
@@ -91,11 +93,13 @@ function createRecord(identifier) {
   const taskPlan =
     identifier === "booking-calendly"
       ? planPath
-      : identifier === "observability"
-        ? observabilityPlanPath
-        : identifier === "standards"
-          ? standardsPlanPath
-        : null;
+      : identifier === "deployment-cloudflare"
+        ? deploymentPlanPath
+        : identifier === "observability"
+          ? observabilityPlanPath
+          : identifier === "standards"
+            ? standardsPlanPath
+            : null;
 
   return {
     subject: {
@@ -105,6 +109,7 @@ function createRecord(identifier) {
     requiredEvidence: requiredEvidence[identifier],
     status:
       identifier === "booking-calendly" ||
+      identifier === "deployment-cloudflare" ||
       identifier === "observability" ||
       identifier === "standards"
         ? "pending"
@@ -370,6 +375,7 @@ test("material observability diagnostics have exact reviewed certification evide
         records: { observability: observabilityRecord },
       },
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [observabilityEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
       },
@@ -421,6 +427,24 @@ test("material standards testing changes have exact reviewed certification evide
   });
 });
 
+test("material generated deployment changes create a new task-linked pending subject", () => {
+  const deploymentRecord = committedRegistry.records["deployment-cloudflare"];
+
+  assert.equal(deploymentRecord.subject.descriptorVersion, "0.3.0");
+  assert.match(
+    deploymentRecord.subject.behaviorContractDigest,
+    /^sha256:[0-9a-f]{64}$/u,
+  );
+  assert.deepEqual(deploymentRecord.requiredEvidence, [
+    "cleanup-recovery",
+    "deployed-application",
+    "fresh-scaffold",
+  ]);
+  assert.equal(deploymentRecord.status, "pending");
+  assert.equal(deploymentRecord.taskPlan, deploymentPlanPath);
+  assert.deepEqual(deploymentRecord.evidence, []);
+});
+
 test("repository artifacts bind successful evidence to capability, subject, revision, and outcome", () => {
   const recorded = cloneRegistry();
   const booking = recorded.records["booking-calendly"];
@@ -430,6 +454,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
@@ -444,6 +469,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
@@ -468,6 +494,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
     core.validateCertificationArtifacts({
       registry: relabeled,
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
@@ -507,6 +534,7 @@ test("repository artifacts reject revisions outside the checked Git history", ()
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
@@ -539,6 +567,7 @@ test("repository artifacts reject incomplete or unresolved reviewer receipts", (
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
@@ -578,6 +607,7 @@ test("repository artifacts require affirmative review of every claimed outcome",
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
@@ -605,6 +635,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "booking-calendly", "status"],
+        context: { reason: "pending" },
+      },
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "deployment-cloudflare", "status"],
         context: { reason: "pending" },
       },
       {
@@ -640,6 +675,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       policy: "legacy-backfill-exempt",
     }).issues,
     [
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "deployment-cloudflare", "status"],
+        context: { reason: "pending" },
+      },
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "standards", "status"],

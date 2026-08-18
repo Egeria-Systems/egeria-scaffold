@@ -10,7 +10,7 @@ project:
   defaultLocale: en-CA
   displayName: Acme Portfolio Booking
   name: acme-portfolio-calendly
-recipeVersion: 0.8.0
+recipeVersion: 0.9.0
 schemaVersion: 1.0.0
 selectedCapabilities:
   - standards

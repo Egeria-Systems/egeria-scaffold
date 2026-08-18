@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
@@ -16,6 +17,7 @@ const tokens = {
 };
 
 const portfolioPaths = [
+  ".github/workflows/deploy.yml",
   ".github/workflows/quality.yml",
   ".gitignore",
   ".nvmrc",
@@ -67,6 +69,7 @@ const portfolioPaths = [
 ];
 
 const sitePaths = [
+  ".github/workflows/deploy.yml",
   ".github/workflows/quality.yml",
   ".gitignore",
   ".nvmrc",
@@ -1208,7 +1211,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.8.0",
+    recipeVersion: "0.9.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -2557,7 +2560,7 @@ test("rendering conditionally overlays the home route and materializes each Cale
     );
 
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, "0.8.0");
+    assert.equal(rendered.project.recipeVersion, "0.9.0");
     assert.equal(
       rendered.project.selectedCapabilities.at(-1),
       "booking-calendly",
@@ -2910,6 +2913,233 @@ test("generated popup Calendly browser specification keeps every configured mode
       2367,
     ),
     [],
+  );
+});
+
+test("generated deployment is manual, revision-bound, least-privilege, and deploys only verified output", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const workflow = parseGeneratedYaml(
+    rendered.files,
+    ".github/workflows/deploy.yml",
+  );
+  const readme = indexFiles(rendered.files).get("README.md");
+
+  assert.deepEqual(workflow.on, {
+    workflow_dispatch: {
+      inputs: {
+        expected_revision: {
+          description: "Exact main revision approved for deployment",
+          required: true,
+          type: "string",
+        },
+      },
+    },
+  });
+  assert.deepEqual(workflow.permissions, { contents: "read" });
+  assert.deepEqual(workflow.concurrency, {
+    group: "production-deploy",
+    queue: "max",
+    "cancel-in-progress": false,
+  });
+  assert.match(
+    readme,
+    /prevent self-review[^.]+GitHub plan and environment controls support it/iu,
+  );
+  assert.match(
+    readme,
+    /when unavailable[^.]+record that limitation[^.]+reviewer other than the workflow initiator/iu,
+  );
+
+  const job = workflow.jobs["verify-and-deploy"];
+  assert.equal(job.if, "github.ref == 'refs/heads/main'");
+  assert.equal(job["runs-on"], "ubuntu-24.04");
+  assert.equal(job["timeout-minutes"], 45);
+  assert.deepEqual(job.environment, {
+    name: "production",
+    url: "${{ vars.DEPLOY_URL }}",
+  });
+
+  const steps = Object.fromEntries(job.steps.map((step) => [step.name, step]));
+  assert.deepEqual(Object.keys(steps), [
+    "Check out repository",
+    "Set up pnpm and Node.js",
+    "Verify approved revision",
+    "Install dependencies",
+    "Lint generated project",
+    "Typecheck generated project",
+    "Test generated unit behavior",
+    "Test generated components",
+    "Build Next.js application",
+    "Build OpenNext application",
+    "Install Chromium",
+    "Test Next.js development",
+    "Test OpenNext workerd preview",
+    "Verify deployment target configured",
+    "Deploy Cloudflare Worker",
+    "Test deployed application",
+    "Upload deployment browser failure artifacts",
+  ]);
+  assert.deepEqual(steps["Check out repository"], {
+    name: "Check out repository",
+    uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+    with: {
+      "fetch-depth": 0,
+      ref: "${{ github.sha }}",
+      "persist-credentials": false,
+    },
+  });
+  assert.deepEqual(steps["Set up pnpm and Node.js"].with, {
+    version: "11.20.0",
+    runtime: "node@22.23.2",
+    cache: false,
+    install: false,
+  });
+
+  const revisionGuard = steps["Verify approved revision"];
+  assert.deepEqual(revisionGuard.env, {
+    EXPECTED_REVISION: "${{ inputs.expected_revision }}",
+  });
+  const approvedRevision = "a".repeat(40);
+  const runGuard = (environment) =>
+    spawnSync(
+      "bash",
+      ["--noprofile", "--norc", "-e", "-o", "pipefail", "-c", revisionGuard.run],
+      {
+        encoding: "utf8",
+        env: {
+          EXPECTED_REVISION: environment.EXPECTED_REVISION,
+          GITHUB_SHA: environment.GITHUB_SHA,
+          GITHUB_REF: environment.GITHUB_REF,
+        },
+      },
+    );
+  assert.equal(
+    runGuard({
+      EXPECTED_REVISION: approvedRevision,
+      GITHUB_SHA: approvedRevision,
+      GITHUB_REF: "refs/heads/main",
+    }).status,
+    0,
+  );
+  for (const environment of [
+    {
+      EXPECTED_REVISION: "A".repeat(40),
+      GITHUB_SHA: "A".repeat(40),
+      GITHUB_REF: "refs/heads/main",
+    },
+    {
+      EXPECTED_REVISION: "a".repeat(39),
+      GITHUB_SHA: "a".repeat(39),
+      GITHUB_REF: "refs/heads/main",
+    },
+    {
+      EXPECTED_REVISION: approvedRevision,
+      GITHUB_SHA: "b".repeat(40),
+      GITHUB_REF: "refs/heads/main",
+    },
+    {
+      EXPECTED_REVISION: approvedRevision,
+      GITHUB_SHA: approvedRevision,
+      GITHUB_REF: "refs/heads/release",
+    },
+  ]) {
+    assert.notEqual(
+      runGuard(environment).status,
+      0,
+      JSON.stringify(environment),
+    );
+  }
+
+  assert.equal(
+    steps["Install dependencies"].run,
+    "pnpm install --frozen-lockfile",
+  );
+  assert.equal(steps["Lint generated project"].run, "pnpm run lint");
+  assert.equal(
+    steps["Typecheck generated project"].run,
+    "pnpm run typecheck",
+  );
+  assert.equal(
+    steps["Test generated unit behavior"].run,
+    "pnpm run test:unit",
+  );
+  assert.equal(
+    steps["Test generated components"].run,
+    "pnpm run test:component",
+  );
+  assert.equal(steps["Build Next.js application"].run, "pnpm run build");
+  assert.equal(
+    steps["Build OpenNext application"].run,
+    "pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild",
+  );
+  assert.equal(
+    steps["Install Chromium"].run,
+    "pnpm --dir apps/web run browser:install:ci",
+  );
+  assert.equal(
+    steps["Test Next.js development"].run,
+    "pnpm --dir apps/web run test:e2e:dev",
+  );
+  assert.equal(
+    steps["Test OpenNext workerd preview"].run,
+    "pnpm --dir apps/web run test:e2e:preview",
+  );
+  assert.deepEqual(steps["Verify deployment target configured"].env, {
+    PLAYWRIGHT_DEPLOYED_URL: "${{ vars.DEPLOY_URL }}",
+  });
+  assert.equal(
+    steps["Verify deployment target configured"].run,
+    "pnpm --dir apps/web exec playwright test --config playwright.deployed.config.ts --list",
+  );
+
+  const deployStep = steps["Deploy Cloudflare Worker"];
+  assert.deepEqual(deployStep.env, {
+    CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
+    CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
+  });
+  assert.match(
+    deployStep.run,
+    /^test -n "\$CLOUDFLARE_ACCOUNT_ID"$/mu,
+  );
+  assert.match(
+    deployStep.run,
+    /^test -n "\$CLOUDFLARE_API_TOKEN"$/mu,
+  );
+  assert.match(deployStep.run, /opennextjs-cloudflare deploy/u);
+  assert.doesNotMatch(
+    deployStep.run,
+    /(?:pnpm|opennextjs-cloudflare)[^\n]*\b(?:build|install|test|preview)\b|\bwrangler\b/iu,
+  );
+  assert.equal(
+    job.steps.filter((step) =>
+      Object.values(step.env ?? {}).some((value) =>
+        String(value).includes("secrets."),
+      ),
+    ).length,
+    1,
+  );
+  assert.deepEqual(steps["Test deployed application"].env, {
+    PLAYWRIGHT_DEPLOYED_URL: "${{ vars.DEPLOY_URL }}",
+  });
+  assert.equal(
+    steps["Test deployed application"].run,
+    "pnpm --dir apps/web run test:e2e:deployed",
+  );
+  assert.equal(
+    steps["Upload deployment browser failure artifacts"].if,
+    "failure()",
+  );
+  assert.equal(
+    steps["Upload deployment browser failure artifacts"].uses,
+    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
   );
 });
 
@@ -4484,7 +4714,7 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
       /(?:apps\/jobs|packages\/|\.egeria|pnpm-lock\.yaml|middleware)/,
     );
     const output = [...indexFiles(rendered.files)]
-      .filter(([path]) => path !== ".github/workflows/quality.yml")
+      .filter(([path]) => !path.startsWith(".github/workflows/"))
       .map(([, content]) => content)
       .join("\n")
       .toLowerCase();
@@ -4510,8 +4740,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 97],
-    ["site", 99],
+    ["portfolio", 98],
+    ["site", 100],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -4653,7 +4883,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       packageVersions,
     }),
   );
-  assert.equal(selected.surfaces.length, 102);
+  assert.equal(selected.surfaces.length, 103);
   assert.deepEqual(
     selected.surfaces
       .filter(

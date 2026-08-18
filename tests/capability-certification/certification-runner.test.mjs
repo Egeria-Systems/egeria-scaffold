@@ -331,7 +331,7 @@ async function runCheck(
   }
 }
 
-test("the repository registry admits certified restricted error diagnostics and closes the current transition", async () => {
+test("the repository registry admits current descriptors and rejects closure while deployment is pending", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -345,11 +345,18 @@ test("the repository registry admits certified restricted error diagnostics and 
 
   const closure = await runCheck(["--closure", "legacy-backfill-exempt"]);
   assert.deepEqual(closure, {
-    exitCode: 0,
+    exitCode: 1,
     stdout: `${JSON.stringify({
-      ok: true,
+      ok: false,
       gate: "closure",
       policy: "legacy-backfill-exempt",
+      issues: [
+        {
+          code: "CAPABILITY_CERTIFICATION_PENDING",
+          path: ["records", "deployment-cloudflare", "status"],
+          context: { reason: "pending" },
+        },
+      ],
     })}\n`,
     stderr: "",
   });
@@ -363,7 +370,7 @@ test("the repository registry admits certified restricted error diagnostics and 
       policy: "all-certified",
       issues: [
         ["content-files", "backfill-pending"],
-        ["deployment-cloudflare", "backfill-pending"],
+        ["deployment-cloudflare", "pending"],
         ["section-composition", "backfill-pending"],
         ["site-routing", "backfill-pending"],
       ].map(([capabilityIdentifier, reason]) => ({

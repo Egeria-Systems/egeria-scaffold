@@ -135,6 +135,7 @@ const readableRecipeVersions = [
   "0.6.0",
   "0.7.0",
   "0.8.0",
+  "0.9.0",
 ];
 
 const validState = {
@@ -642,6 +643,10 @@ test("installed state is strict and records the exact successful generation chec
     ...validState,
     origin: { ...validState.origin, recipeVersion: "0.8.0" },
   });
+  assertAccepts(contracts.installedStateSchema, {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.9.0" },
+  });
   assertRejects(contracts.installedStateSchema, {
     ...validState,
     lastSuccessfulVerification: {
@@ -652,6 +657,14 @@ test("installed state is strict and records the exact successful generation chec
   assertRejects(contracts.installedStateSchema, {
     ...validState,
     origin: { ...validState.origin, recipeVersion: "0.8.0" },
+    lastSuccessfulVerification: {
+      kind: "generation",
+      checks: legacyVerificationChecks,
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.9.0" },
     lastSuccessfulVerification: {
       kind: "generation",
       checks: legacyVerificationChecks,
