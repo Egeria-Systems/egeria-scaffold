@@ -649,6 +649,12 @@ function contractForIdentifier(identifier) {
   return contract;
 }
 
+function contractForGeneratedProject(identifier, expectedProjectName) {
+  const contract = contractForIdentifier(identifier);
+  if (expectedProjectName === undefined) return contract;
+  return Object.freeze({ ...contract, projectName: expectedProjectName });
+}
+
 export function inspectGeneratedFixture(root, identifier) {
   return inspectFixture(resolve(root), contractForIdentifier(identifier));
 }
@@ -884,20 +890,29 @@ export async function verifyGeneratedSkeletonsForTesting(adapters) {
   return verifySourcesWithAdapters(adapters, sources);
 }
 
-export function verifyGeneratedProject(root, identifier) {
-  return verifyGeneratedProjectForTesting(root, identifier, {
-    createOwner: createGeneratedFixtureOwner,
-    runCommand: defaultRunCommand,
-  });
+export function verifyGeneratedProject(root, identifier, expectedProjectName) {
+  return verifyGeneratedProjectForTesting(
+    root,
+    identifier,
+    {
+      createOwner: createGeneratedFixtureOwner,
+      runCommand: defaultRunCommand,
+    },
+    expectedProjectName,
+  );
 }
 
 export async function verifyGeneratedProjectForTesting(
   root,
   identifier,
   adapters,
+  expectedProjectName,
 ) {
   requireAdapters(adapters);
-  const contract = contractForIdentifier(identifier);
+  const contract = contractForGeneratedProject(
+    identifier,
+    expectedProjectName,
+  );
   const source = await sourceForRoot(root, contract);
   return verifySourcesWithAdapters(adapters, [source]);
 }

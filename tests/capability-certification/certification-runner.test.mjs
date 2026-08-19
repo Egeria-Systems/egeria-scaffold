@@ -239,6 +239,7 @@ function createSuccessfulScaffoldAdapters({
     commands: [],
     ownedPath: undefined,
     projectRoot: undefined,
+    verifiedProjectName: undefined,
     verifiedRoot: undefined,
   };
 
@@ -310,8 +311,9 @@ function createSuccessfulScaffoldAdapters({
         }
         throw new Error("unexpected command");
       },
-      async verifyProject(root, identifier) {
+      async verifyProject(root, identifier, expectedProjectName) {
         state.verifiedRoot = root;
+        state.verifiedProjectName = expectedProjectName;
         assert.equal(identifier, verifierIdentifier);
         return {
           ok: true,
@@ -650,9 +652,9 @@ test("Cloudflare deployment certification binds a fresh portfolio to the exact d
           "--profile",
           "portfolio",
           "--name",
-          "acme-portfolio",
+          "acme-generated-project",
           "--display-name",
-          "Acme Portfolio",
+          "Acme Generated Project",
           "--directory",
           scaffold.state.projectRoot,
         ],
@@ -662,6 +664,10 @@ test("Cloudflare deployment certification binds a fresh portfolio to the exact d
       ],
     );
     assert.equal(scaffold.state.verifiedRoot, scaffold.state.projectRoot);
+    assert.equal(
+      scaffold.state.verifiedProjectName,
+      "acme-generated-project",
+    );
     assert.equal(await pathExists(scaffold.state.ownedPath), false);
     assert.doesNotMatch(JSON.stringify(result), /PRIVATE_VALUE/u);
   } finally {

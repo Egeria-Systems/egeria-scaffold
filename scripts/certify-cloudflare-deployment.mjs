@@ -61,8 +61,8 @@ function configurationFor(revision) {
 
   return Object.freeze({
     profile: "portfolio",
-    projectName: "acme-portfolio",
-    displayName: "Acme Portfolio",
+    projectName: "acme-generated-project",
+    displayName: "Acme Generated Project",
     createArguments: Object.freeze([]),
     expectedCapabilities,
     capabilityIdentifier: "deployment-cloudflare",
