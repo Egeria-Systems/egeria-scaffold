@@ -2964,6 +2964,7 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
   assert.deepEqual(job.container, {
     image:
       "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
+    options: "--shm-size=1g",
   });
   assert.equal(job["timeout-minutes"], 45);
   assert.deepEqual(job.environment, {
@@ -3395,6 +3396,7 @@ test("generated browser quality is environment-specific and content-agnostic", a
       container: {
         image:
           "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
+        options: "--shm-size=1g",
       },
       "timeout-minutes": 30,
       steps: [
