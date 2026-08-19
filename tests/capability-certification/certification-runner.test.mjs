@@ -510,6 +510,7 @@ test("Cloudflare deployment certification binds a fresh portfolio to the exact d
     const result = await certifyCloudflareDeploymentForTesting(
       { revision },
       {
+        readCurrentRevision: async () => revision,
         async runCommand(input) {
           commands.push(input);
           assert.equal(input.executable, process.execPath);
@@ -662,6 +663,26 @@ test("Cloudflare deployment certification rejects a non-exact evidence revision"
     (error) => {
       assert.equal(error.name, "CloudflareDeploymentCertificationError");
       assert.equal(error.code, "CERTIFICATION_REVISION_INVALID");
+      return true;
+    },
+  );
+});
+
+test("Cloudflare deployment certification rejects a revision that is not the current checkout", async () => {
+  const revision = "a".repeat(40);
+  await assert.rejects(
+    certifyCloudflareDeploymentForTesting(
+      { revision },
+      {
+        readCurrentRevision: async () => "b".repeat(40),
+        runCommand: async () => assert.fail("mismatched input must not run"),
+        verifyProject: async () =>
+          assert.fail("mismatched input must not verify"),
+      },
+    ),
+    (error) => {
+      assert.equal(error.name, "CloudflareDeploymentCertificationError");
+      assert.equal(error.code, "CERTIFICATION_REVISION_MISMATCH");
       return true;
     },
   );

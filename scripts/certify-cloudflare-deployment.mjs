@@ -1,9 +1,16 @@
+import { execFile } from "node:child_process";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
 import {
   certifyFreshScaffold,
   certifyFreshScaffoldForTesting,
 } from "./lib/certify-fresh-scaffold.mjs";
 import { runCertificationCli } from "./lib/certification-cli.mjs";
 
+const execFileAsync = promisify(execFile);
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
 const subject = Object.freeze({
   descriptorVersion: "0.3.0",
@@ -74,14 +81,52 @@ function configurationFor(revision) {
   });
 }
 
-export function certifyCloudflareDeployment(input = {}) {
-  return certifyFreshScaffold(configurationFor(input?.revision));
+async function readCurrentRevision() {
+  try {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    });
+    const revision = stdout.trim();
+    if (!exactRevisionPattern.test(revision)) {
+      throw new Error("invalid revision");
+    }
+    return revision;
+  } catch {
+    throw createError("CERTIFICATION_REVISION_READ_FAILED");
+  }
+}
+
+async function requireCurrentRevision(revision, readRevision) {
+  let currentRevision;
+  try {
+    currentRevision = await readRevision();
+  } catch (error) {
+    if (error instanceof CloudflareDeploymentCertificationError) throw error;
+    throw createError("CERTIFICATION_REVISION_READ_FAILED");
+  }
+  if (currentRevision !== revision) {
+    throw createError("CERTIFICATION_REVISION_MISMATCH");
+  }
+}
+
+export async function certifyCloudflareDeployment(input = {}) {
+  const configuration = configurationFor(input?.revision);
+  await requireCurrentRevision(input.revision, readCurrentRevision);
+  return certifyFreshScaffold(configuration);
 }
 
 export function certifyCloudflareDeploymentForTesting(input, adapters) {
-  return certifyFreshScaffoldForTesting(
-    configurationFor(input?.revision),
-    adapters,
+  const configuration = configurationFor(input?.revision);
+  if (typeof adapters?.readCurrentRevision !== "function") {
+    throw createError("CERTIFICATION_ADAPTER_INVALID");
+  }
+  return requireCurrentRevision(
+    input.revision,
+    adapters.readCurrentRevision,
+  ).then(() =>
+    certifyFreshScaffoldForTesting(configuration, adapters),
   );
 }
 
