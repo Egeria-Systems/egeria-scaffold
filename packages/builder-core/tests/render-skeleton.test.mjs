@@ -2988,6 +2988,7 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
     "Test OpenNext workerd preview",
     "Verify deployment target configured",
     "Deploy Cloudflare Worker",
+    "Wait for deployed application",
     "Test deployed application",
     "Upload deployment browser failure artifacts",
   ]);
@@ -3130,6 +3131,69 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
       ),
     ).length,
     1,
+  );
+  assert.deepEqual(steps["Wait for deployed application"].env, {
+    DEPLOY_URL: "${{ vars.DEPLOY_URL }}",
+  });
+  assert.equal(
+    steps["Wait for deployed application"].run,
+    `attempt=1
+while [ "$attempt" -le 12 ]; do
+  status="$(curl --connect-timeout 5 --max-time 10 --silent --output /dev/null --write-out '%{http_code}' "$DEPLOY_URL" || true)"
+  case "$status" in
+    2??) exit 0 ;;
+  esac
+  if [ "$attempt" -eq 12 ]; then
+    echo "Deployment did not become ready" >&2
+    exit 1
+  fi
+  sleep 5
+  attempt=$((attempt + 1))
+done
+`,
+  );
+  const runReadinessProbe = (curlFunction) =>
+    spawnSync(
+      "sh",
+      [
+        "-e",
+        "-c",
+        `${curlFunction}
+sleep() { :; }
+${steps["Wait for deployed application"].run}`,
+      ],
+      {
+        encoding: "utf8",
+        env: { DEPLOY_URL: "https://example.invalid" },
+      },
+    );
+  assert.equal(
+    runReadinessProbe(
+      'curl() { if [ "$attempt" -lt 3 ]; then printf 404; else printf 200; fi; }',
+    ).status,
+    0,
+  );
+  assert.equal(
+    runReadinessProbe(
+      'curl() { if [ "$attempt" -lt 3 ]; then return 28; else printf 200; fi; }',
+    ).status,
+    0,
+  );
+  const unavailableDeployment = runReadinessProbe(
+    "curl() { printf 404; }",
+  );
+  assert.notEqual(unavailableDeployment.status, 0);
+  assert.equal(
+    unavailableDeployment.stderr,
+    "Deployment did not become ready\n",
+  );
+  assert.ok(
+    job.steps.indexOf(steps["Deploy Cloudflare Worker"]) <
+      job.steps.indexOf(steps["Wait for deployed application"]),
+  );
+  assert.ok(
+    job.steps.indexOf(steps["Wait for deployed application"]) <
+      job.steps.indexOf(steps["Test deployed application"]),
   );
   assert.deepEqual(steps["Test deployed application"].env, {
     PLAYWRIGHT_DEPLOYED_URL: "${{ vars.DEPLOY_URL }}",
