@@ -18,7 +18,10 @@ import { promisify } from "node:util";
 import test from "node:test";
 
 import { certifyBookingCalendlyForTesting } from "../../scripts/certify-booking-calendly.mjs";
-import { certifyCloudflareDeploymentForTesting } from "../../scripts/certify-cloudflare-deployment.mjs";
+import {
+  certifyCloudflareDeploymentForTesting,
+  readCloudflareDeploymentRevisionForTesting,
+} from "../../scripts/certify-cloudflare-deployment.mjs";
 import { certifyGeneratedTestingForTesting } from "../../scripts/certify-generated-testing.mjs";
 import { runCertificationCli } from "../../scripts/lib/certification-cli.mjs";
 
@@ -646,6 +649,59 @@ test("Cloudflare deployment certification binds a fresh portfolio to the exact d
     } else {
       process.env.CLOUDFLARE_API_TOKEN = previousToken;
     }
+  }
+});
+
+test("Cloudflare deployment certification requires a clean checkout", async () => {
+  const cleanRoot = await mkdtemp(
+    join(tmpdir(), "egeria-deployment-certification-revision-"),
+  );
+
+  try {
+    await writeFile(join(cleanRoot, "tracked.txt"), "baseline\n", "utf8");
+    await execFileAsync("git", ["init", "--quiet"], { cwd: cleanRoot });
+    await execFileAsync("git", ["add", "tracked.txt"], { cwd: cleanRoot });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Certification Test",
+        "-c",
+        "user.email=certification@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "baseline",
+      ],
+      { cwd: cleanRoot },
+    );
+    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
+      cwd: cleanRoot,
+      encoding: "utf8",
+    });
+
+    assert.equal(
+      await readCloudflareDeploymentRevisionForTesting(cleanRoot),
+      stdout.trim(),
+    );
+
+    for (const [path, contents] of [
+      ["untracked.txt", "untracked\n"],
+      ["tracked.txt", "modified\n"],
+    ]) {
+      await writeFile(join(cleanRoot, path), contents, "utf8");
+      await assert.rejects(
+        readCloudflareDeploymentRevisionForTesting(cleanRoot),
+        (error) => {
+          assert.equal(error.name, "CloudflareDeploymentCertificationError");
+          assert.equal(error.code, "CERTIFICATION_WORKTREE_DIRTY");
+          return true;
+        },
+      );
+      await rm(join(cleanRoot, path));
+    }
+  } finally {
+    await rm(cleanRoot, { recursive: true, force: true });
   }
 });
 

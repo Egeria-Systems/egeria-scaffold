@@ -81,21 +81,44 @@ function configurationFor(revision) {
   });
 }
 
-async function readCurrentRevision() {
+async function readCurrentRevision(root = repositoryRoot) {
+  let revision;
   try {
     const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
-      cwd: repositoryRoot,
+      cwd: root,
       encoding: "utf8",
       env: { PATH: process.env.PATH },
     });
-    const revision = stdout.trim();
+    revision = stdout.trim();
     if (!exactRevisionPattern.test(revision)) {
       throw new Error("invalid revision");
     }
-    return revision;
   } catch {
     throw createError("CERTIFICATION_REVISION_READ_FAILED");
   }
+
+  let status;
+  try {
+    ({ stdout: status } = await execFileAsync(
+      "git",
+      ["status", "--porcelain=v1", "--untracked-files=all"],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: { PATH: process.env.PATH },
+      },
+    ));
+  } catch {
+    throw createError("CERTIFICATION_REVISION_READ_FAILED");
+  }
+  if (status !== "") {
+    throw createError("CERTIFICATION_WORKTREE_DIRTY");
+  }
+  return revision;
+}
+
+export async function readCloudflareDeploymentRevisionForTesting(root) {
+  return readCurrentRevision(root);
 }
 
 async function requireCurrentRevision(revision, readRevision) {
