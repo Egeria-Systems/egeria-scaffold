@@ -18,6 +18,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 
 import { certifyBookingCalendlyForTesting } from "../../scripts/certify-booking-calendly.mjs";
+import { certifyCloudflareDeploymentForTesting } from "../../scripts/certify-cloudflare-deployment.mjs";
 import { certifyGeneratedTestingForTesting } from "../../scripts/certify-generated-testing.mjs";
 import { runCertificationCli } from "../../scripts/lib/certification-cli.mjs";
 
@@ -54,6 +55,10 @@ const privateSubject = Object.freeze({
 const certificationScript = resolve(
   repositoryRoot,
   "scripts/certify-booking-calendly.mjs",
+);
+const cloudflareDeploymentCertificationScript = resolve(
+  repositoryRoot,
+  "scripts/certify-cloudflare-deployment.mjs",
 );
 const generatedTestingCertificationScript = resolve(
   repositoryRoot,
@@ -490,6 +495,232 @@ test("private certification validation rejects missing, rejected, and non-ancest
   } finally {
     await rm(cleanRoot, { recursive: true, force: true });
   }
+});
+
+test("Cloudflare deployment certification binds a fresh portfolio to the exact deployment subject", async () => {
+  const commands = [];
+  let ownedPath;
+  let projectRoot;
+  let verifiedRoot;
+  const revision = "a".repeat(40);
+  const previousToken = process.env.CLOUDFLARE_API_TOKEN;
+  process.env.CLOUDFLARE_API_TOKEN = "PRIVATE_VALUE";
+
+  try {
+    const result = await certifyCloudflareDeploymentForTesting(
+      { revision },
+      {
+        async runCommand(input) {
+          commands.push(input);
+          assert.equal(input.executable, process.execPath);
+          assert.equal(input.environment.CLOUDFLARE_API_TOKEN, undefined);
+          assert.equal(input.environment.CLOUDFLARE_ACCOUNT_ID, undefined);
+          assert.equal(input.environment.NODE_OPTIONS, undefined);
+          const command = input.arguments[1];
+
+          if (command === "create") {
+            projectRoot = input.arguments[
+              input.arguments.indexOf("--directory") + 1
+            ];
+            ownedPath = dirname(projectRoot);
+            assert.equal((await lstat(ownedPath)).mode & 0o777, 0o700);
+            await mkdir(join(projectRoot, ".egeria"), { recursive: true });
+            await writeFile(
+              join(projectRoot, ".egeria/project.yaml"),
+              "recipeVersion: 0.9.0\n",
+            );
+            return `${JSON.stringify({
+              ok: true,
+              command: "create",
+              destination: projectRoot,
+              profile: "portfolio",
+              capabilities: [
+                "standards",
+                "content-files",
+                "section-composition",
+                "deployment-cloudflare",
+                "observability",
+              ],
+            })}\n`;
+          }
+          if (command === "infer") {
+            return `${JSON.stringify({
+              ok: true,
+              command: "infer",
+              result: {
+                state: {
+                  kind: "valid",
+                  value: {
+                    installedCapabilities: [
+                      {
+                        identifier: "deployment-cloudflare",
+                        version: "0.3.0",
+                      },
+                    ],
+                  },
+                },
+                capabilities: [
+                  {
+                    identifier: "deployment-cloudflare",
+                    category: "confirmed",
+                  },
+                ],
+              },
+            })}\n`;
+          }
+          if (command === "doctor") {
+            return `${JSON.stringify({
+              ok: true,
+              command: "doctor",
+              result: { healthy: true, diagnostics: [] },
+            })}\n`;
+          }
+          if (command === "diff") {
+            return `${JSON.stringify({
+              ok: true,
+              command: "diff",
+              result: { equal: true, differences: [] },
+            })}\n`;
+          }
+          throw new Error("unexpected command");
+        },
+        async verifyProject(root, identifier) {
+          verifiedRoot = root;
+          assert.equal(identifier, "portfolio");
+          return {
+            ok: true,
+            fixtures: ["portfolio"],
+            profiles: ["portfolio"],
+            checks: fixedChecks,
+          };
+        },
+      },
+    );
+
+    assert.deepEqual(result, {
+      ok: true,
+      capability: "deployment-cloudflare",
+      version: "0.3.0",
+      profile: "portfolio",
+      subject: {
+        descriptorVersion: "0.3.0",
+        behaviorContractDigest:
+          "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41",
+      },
+      recipeVersion: "0.9.0",
+      evidenceRevision: revision,
+      checks: [
+        "compiled-cli-create",
+        "state-inference",
+        "healthy-diagnostics",
+        "exact-diff",
+        ...fixedChecks,
+      ],
+    });
+    assert.deepEqual(
+      commands.map(({ arguments: arguments_ }) => arguments_.slice(1)),
+      [
+        [
+          "create",
+          "--profile",
+          "portfolio",
+          "--name",
+          "deployment-certification-portfolio",
+          "--display-name",
+          "Deployment Certification Portfolio",
+          "--directory",
+          projectRoot,
+        ],
+        ["infer", "--directory", projectRoot],
+        ["doctor", "--directory", projectRoot],
+        ["diff", "--directory", projectRoot],
+      ],
+    );
+    assert.equal(verifiedRoot, projectRoot);
+    assert.equal(await pathExists(ownedPath), false);
+    assert.doesNotMatch(JSON.stringify(result), /PRIVATE_VALUE/u);
+  } finally {
+    if (previousToken === undefined) {
+      delete process.env.CLOUDFLARE_API_TOKEN;
+    } else {
+      process.env.CLOUDFLARE_API_TOKEN = previousToken;
+    }
+  }
+});
+
+test("Cloudflare deployment certification rejects a non-exact evidence revision", () => {
+  assert.throws(
+    () =>
+      certifyCloudflareDeploymentForTesting(
+        { revision: "a".repeat(39) },
+        {
+          runCommand: async () => assert.fail("invalid input must not run"),
+          verifyProject: async () =>
+            assert.fail("invalid input must not verify"),
+        },
+      ),
+    (error) => {
+      assert.equal(error.name, "CloudflareDeploymentCertificationError");
+      assert.equal(error.code, "CERTIFICATION_REVISION_INVALID");
+      return true;
+    },
+  );
+});
+
+test("the Cloudflare deployment certification entry accepts only its revision argument without echoing it", async () => {
+  let invalidRevision;
+  try {
+    await execFileAsync(process.execPath, [
+      cloudflareDeploymentCertificationScript,
+      "--revision",
+      "private-value",
+    ], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    });
+    assert.fail("an invalid revision must fail");
+  } catch (error) {
+    invalidRevision = error;
+  }
+
+  assert.equal(invalidRevision.code, 1);
+  assert.equal(invalidRevision.stdout, "");
+  assert.equal(
+    invalidRevision.stderr,
+    `${JSON.stringify({
+      ok: false,
+      code: "CERTIFICATION_REVISION_INVALID",
+    })}\n`,
+  );
+  assert.doesNotMatch(invalidRevision.stderr, /private-value/u);
+
+  let unknownArgument;
+  try {
+    await execFileAsync(process.execPath, [
+      cloudflareDeploymentCertificationScript,
+      "--unknown",
+      "private-value",
+    ], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    });
+    assert.fail("an unknown argument must fail");
+  } catch (error) {
+    unknownArgument = error;
+  }
+
+  assert.equal(unknownArgument.code, 2);
+  assert.equal(unknownArgument.stdout, "");
+  assert.equal(
+    unknownArgument.stderr,
+    `${JSON.stringify({
+      ok: false,
+      code: "CERTIFICATION_ARGUMENT_INVALID",
+    })}\n`,
+  );
+  assert.doesNotMatch(unknownArgument.stderr, /private-value/u);
 });
 
 test("generated testing certification binds a fresh portfolio to the exact standards subject", async () => {
