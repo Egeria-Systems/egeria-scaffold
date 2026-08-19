@@ -2961,6 +2961,10 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
   const job = workflow.jobs["verify-and-deploy"];
   assert.equal(job.if, "github.ref == 'refs/heads/main'");
   assert.equal(job["runs-on"], "ubuntu-24.04");
+  assert.deepEqual(job.container, {
+    image:
+      "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
+  });
   assert.equal(job["timeout-minutes"], 45);
   assert.deepEqual(job.environment, {
     name: "production",
@@ -3004,6 +3008,7 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
   });
 
   const revisionGuard = steps["Verify approved revision"];
+  assert.equal(revisionGuard.shell, "bash");
   assert.deepEqual(revisionGuard.env, {
     EXPECTED_REVISION: "${{ inputs.expected_revision }}",
   });
@@ -3082,7 +3087,7 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
   );
   assert.equal(
     steps["Install Chromium"].run,
-    "pnpm --dir apps/web run browser:install:ci",
+    "pnpm --dir apps/web exec playwright install chromium",
   );
   assert.equal(
     steps["Test Next.js development"].run,
@@ -3305,7 +3310,11 @@ test("generated browser quality is environment-specific and content-agnostic", a
     /pnpm --dir apps\/web exec opennextjs-cloudflare build --skipNextBuild/u,
   );
   assert.doesNotMatch(workflow, /pnpm run build:cloudflare/u);
-  assert.match(workflow, /browser:install:ci/u);
+  assert.match(
+    workflow,
+    /pnpm --dir apps\/web exec playwright install chromium/u,
+  );
+  assert.doesNotMatch(workflow, /playwright install --with-deps/u);
   assert.match(workflow, /test:e2e:dev/u);
   assert.match(workflow, /test:e2e:preview/u);
   assert.match(workflow, /if: failure\(\)/u);
@@ -3319,6 +3328,10 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.deepEqual(workflowConfiguration.jobs, {
     verify: {
       "runs-on": "ubuntu-24.04",
+      container: {
+        image:
+          "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
+      },
       "timeout-minutes": 30,
       steps: [
         {
@@ -3351,7 +3364,7 @@ test("generated browser quality is environment-specific and content-agnostic", a
         },
         {
           name: "Install Chromium",
-          run: "pnpm --dir apps/web run browser:install:ci",
+          run: "pnpm --dir apps/web exec playwright install chromium",
         },
         {
           name: "Test Next.js development",
