@@ -137,20 +137,23 @@ async function requireCurrentRevision(revision, readRevision) {
 export async function certifyCloudflareDeployment(input = {}) {
   const configuration = configurationFor(input?.revision);
   await requireCurrentRevision(input.revision, readCurrentRevision);
-  return certifyFreshScaffold(configuration);
+  const result = await certifyFreshScaffold(configuration);
+  await requireCurrentRevision(input.revision, readCurrentRevision);
+  return result;
 }
 
-export function certifyCloudflareDeploymentForTesting(input, adapters) {
+export async function certifyCloudflareDeploymentForTesting(input, adapters) {
   const configuration = configurationFor(input?.revision);
   if (typeof adapters?.readCurrentRevision !== "function") {
     throw createError("CERTIFICATION_ADAPTER_INVALID");
   }
-  return requireCurrentRevision(
-    input.revision,
-    adapters.readCurrentRevision,
-  ).then(() =>
-    certifyFreshScaffoldForTesting(configuration, adapters),
+  await requireCurrentRevision(input.revision, adapters.readCurrentRevision);
+  const result = await certifyFreshScaffoldForTesting(
+    configuration,
+    adapters,
   );
+  await requireCurrentRevision(input.revision, adapters.readCurrentRevision);
+  return result;
 }
 
 function parseArguments(arguments_) {

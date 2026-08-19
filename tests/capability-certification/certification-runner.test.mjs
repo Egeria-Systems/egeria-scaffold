@@ -229,6 +229,101 @@ async function pathExists(path) {
   }
 }
 
+function createSuccessfulScaffoldAdapters({
+  inferredCapability,
+  readCurrentRevision,
+  postCreate = async () => {},
+  verifierIdentifier = "portfolio",
+}) {
+  const state = {
+    commands: [],
+    ownedPath: undefined,
+    projectRoot: undefined,
+    verifiedRoot: undefined,
+  };
+
+  return {
+    state,
+    adapters: {
+      readCurrentRevision,
+      async runCommand(input) {
+        state.commands.push(input);
+        assert.equal(input.executable, process.execPath);
+        assert.equal(input.environment.CLOUDFLARE_API_TOKEN, undefined);
+        assert.equal(input.environment.CLOUDFLARE_ACCOUNT_ID, undefined);
+        assert.equal(input.environment.NPM_TOKEN, undefined);
+        assert.equal(input.environment.NODE_OPTIONS, undefined);
+        const command = input.arguments[1];
+
+        if (command === "create") {
+          state.projectRoot = input.arguments[
+            input.arguments.indexOf("--directory") + 1
+          ];
+          state.ownedPath = dirname(state.projectRoot);
+          assert.equal((await lstat(state.ownedPath)).mode & 0o777, 0o700);
+          await postCreate(state.projectRoot);
+          return `${JSON.stringify({
+            ok: true,
+            command: "create",
+            destination: state.projectRoot,
+            profile: "portfolio",
+            capabilities: [
+              "standards",
+              "content-files",
+              "section-composition",
+              "deployment-cloudflare",
+              "observability",
+            ],
+          })}\n`;
+        }
+        if (command === "infer") {
+          return `${JSON.stringify({
+            ok: true,
+            command: "infer",
+            result: {
+              state: {
+                kind: "valid",
+                value: { installedCapabilities: [inferredCapability] },
+              },
+              capabilities: [
+                {
+                  identifier: inferredCapability.identifier,
+                  category: "confirmed",
+                },
+              ],
+            },
+          })}\n`;
+        }
+        if (command === "doctor") {
+          return `${JSON.stringify({
+            ok: true,
+            command: "doctor",
+            result: { healthy: true, diagnostics: [] },
+          })}\n`;
+        }
+        if (command === "diff") {
+          return `${JSON.stringify({
+            ok: true,
+            command: "diff",
+            result: { equal: true, differences: [] },
+          })}\n`;
+        }
+        throw new Error("unexpected command");
+      },
+      async verifyProject(root, identifier) {
+        state.verifiedRoot = root;
+        assert.equal(identifier, verifierIdentifier);
+        return {
+          ok: true,
+          fixtures: [verifierIdentifier],
+          profiles: ["portfolio"],
+          checks: fixedChecks,
+        };
+      },
+    },
+  };
+}
+
 async function copyCertificationRuntime(cleanRoot) {
   await chmod(cleanRoot, 0o700);
   await mkdir(join(cleanRoot, "scripts"), { recursive: true });
@@ -501,104 +596,28 @@ test("private certification validation rejects missing, rejected, and non-ancest
 });
 
 test("Cloudflare deployment certification binds a fresh portfolio to the exact deployment subject", async () => {
-  const commands = [];
-  let ownedPath;
-  let projectRoot;
-  let verifiedRoot;
   const revision = "a".repeat(40);
   const previousToken = process.env.CLOUDFLARE_API_TOKEN;
   process.env.CLOUDFLARE_API_TOKEN = "PRIVATE_VALUE";
+  const scaffold = createSuccessfulScaffoldAdapters({
+    inferredCapability: {
+      identifier: "deployment-cloudflare",
+      version: "0.3.0",
+    },
+    readCurrentRevision: async () => revision,
+    postCreate: async (projectRoot) => {
+      await mkdir(join(projectRoot, ".egeria"), { recursive: true });
+      await writeFile(
+        join(projectRoot, ".egeria/project.yaml"),
+        "recipeVersion: 0.9.0\n",
+      );
+    },
+  });
 
   try {
     const result = await certifyCloudflareDeploymentForTesting(
       { revision },
-      {
-        readCurrentRevision: async () => revision,
-        async runCommand(input) {
-          commands.push(input);
-          assert.equal(input.executable, process.execPath);
-          assert.equal(input.environment.CLOUDFLARE_API_TOKEN, undefined);
-          assert.equal(input.environment.CLOUDFLARE_ACCOUNT_ID, undefined);
-          assert.equal(input.environment.NODE_OPTIONS, undefined);
-          const command = input.arguments[1];
-
-          if (command === "create") {
-            projectRoot = input.arguments[
-              input.arguments.indexOf("--directory") + 1
-            ];
-            ownedPath = dirname(projectRoot);
-            assert.equal((await lstat(ownedPath)).mode & 0o777, 0o700);
-            await mkdir(join(projectRoot, ".egeria"), { recursive: true });
-            await writeFile(
-              join(projectRoot, ".egeria/project.yaml"),
-              "recipeVersion: 0.9.0\n",
-            );
-            return `${JSON.stringify({
-              ok: true,
-              command: "create",
-              destination: projectRoot,
-              profile: "portfolio",
-              capabilities: [
-                "standards",
-                "content-files",
-                "section-composition",
-                "deployment-cloudflare",
-                "observability",
-              ],
-            })}\n`;
-          }
-          if (command === "infer") {
-            return `${JSON.stringify({
-              ok: true,
-              command: "infer",
-              result: {
-                state: {
-                  kind: "valid",
-                  value: {
-                    installedCapabilities: [
-                      {
-                        identifier: "deployment-cloudflare",
-                        version: "0.3.0",
-                      },
-                    ],
-                  },
-                },
-                capabilities: [
-                  {
-                    identifier: "deployment-cloudflare",
-                    category: "confirmed",
-                  },
-                ],
-              },
-            })}\n`;
-          }
-          if (command === "doctor") {
-            return `${JSON.stringify({
-              ok: true,
-              command: "doctor",
-              result: { healthy: true, diagnostics: [] },
-            })}\n`;
-          }
-          if (command === "diff") {
-            return `${JSON.stringify({
-              ok: true,
-              command: "diff",
-              result: { equal: true, differences: [] },
-            })}\n`;
-          }
-          throw new Error("unexpected command");
-        },
-        async verifyProject(root, identifier) {
-          verifiedRoot = root;
-          assert.equal(identifier, "portfolio");
-          return {
-            ok: true,
-            fixtures: ["portfolio"],
-            profiles: ["portfolio"],
-            checks: fixedChecks,
-          };
-        },
-      },
+      scaffold.adapters,
     );
 
     assert.deepEqual(result, {
@@ -622,7 +641,9 @@ test("Cloudflare deployment certification binds a fresh portfolio to the exact d
       ],
     });
     assert.deepEqual(
-      commands.map(({ arguments: arguments_ }) => arguments_.slice(1)),
+      scaffold.state.commands.map(({ arguments: arguments_ }) =>
+        arguments_.slice(1),
+      ),
       [
         [
           "create",
@@ -633,15 +654,15 @@ test("Cloudflare deployment certification binds a fresh portfolio to the exact d
           "--display-name",
           "Acme Portfolio",
           "--directory",
-          projectRoot,
+          scaffold.state.projectRoot,
         ],
-        ["infer", "--directory", projectRoot],
-        ["doctor", "--directory", projectRoot],
-        ["diff", "--directory", projectRoot],
+        ["infer", "--directory", scaffold.state.projectRoot],
+        ["doctor", "--directory", scaffold.state.projectRoot],
+        ["diff", "--directory", scaffold.state.projectRoot],
       ],
     );
-    assert.equal(verifiedRoot, projectRoot);
-    assert.equal(await pathExists(ownedPath), false);
+    assert.equal(scaffold.state.verifiedRoot, scaffold.state.projectRoot);
+    assert.equal(await pathExists(scaffold.state.ownedPath), false);
     assert.doesNotMatch(JSON.stringify(result), /PRIVATE_VALUE/u);
   } finally {
     if (previousToken === undefined) {
@@ -705,12 +726,49 @@ test("Cloudflare deployment certification requires a clean checkout", async () =
   }
 });
 
-test("Cloudflare deployment certification rejects a non-exact evidence revision", () => {
-  assert.throws(
-    () =>
+test("Cloudflare deployment certification rejects checkout drift after scaffold verification", async () => {
+  const revision = "a".repeat(40);
+  let revisionReads = 0;
+  const scaffold = createSuccessfulScaffoldAdapters({
+    inferredCapability: {
+      identifier: "deployment-cloudflare",
+      version: "0.3.0",
+    },
+    readCurrentRevision: async () => {
+      revisionReads += 1;
+      return revisionReads === 1 ? revision : "b".repeat(40);
+    },
+    postCreate: async (projectRoot) => {
+      await mkdir(join(projectRoot, ".egeria"), { recursive: true });
+      await writeFile(
+        join(projectRoot, ".egeria/project.yaml"),
+        "recipeVersion: 0.9.0\n",
+      );
+    },
+  });
+
+  await assert.rejects(
+    certifyCloudflareDeploymentForTesting(
+      { revision },
+      scaffold.adapters,
+    ),
+    (error) => {
+      assert.equal(error.name, "CloudflareDeploymentCertificationError");
+      assert.equal(error.code, "CERTIFICATION_REVISION_MISMATCH");
+      return true;
+    },
+  );
+  assert.equal(await pathExists(scaffold.state.ownedPath), false);
+});
+
+test("Cloudflare deployment certification rejects a non-exact evidence revision", async () => {
+  await assert.rejects(
+    async () =>
       certifyCloudflareDeploymentForTesting(
         { revision: "a".repeat(39) },
         {
+          readCurrentRevision: async () =>
+            assert.fail("invalid input must not read the revision"),
           runCommand: async () => assert.fail("invalid input must not run"),
           verifyProject: async () =>
             assert.fail("invalid input must not verify"),
@@ -719,6 +777,24 @@ test("Cloudflare deployment certification rejects a non-exact evidence revision"
     (error) => {
       assert.equal(error.name, "CloudflareDeploymentCertificationError");
       assert.equal(error.code, "CERTIFICATION_REVISION_INVALID");
+      return true;
+    },
+  );
+});
+
+test("Cloudflare deployment certification rejects a missing revision adapter", async () => {
+  await assert.rejects(
+    certifyCloudflareDeploymentForTesting(
+      { revision: "a".repeat(40) },
+      {
+        runCommand: async () => assert.fail("invalid adapters must not run"),
+        verifyProject: async () =>
+          assert.fail("invalid adapters must not verify"),
+      },
+    ),
+    (error) => {
+      assert.equal(error.name, "CloudflareDeploymentCertificationError");
+      assert.equal(error.code, "CERTIFICATION_ADAPTER_INVALID");
       return true;
     },
   );
@@ -801,89 +877,14 @@ test("the Cloudflare deployment certification entry accepts only its revision ar
 });
 
 test("generated testing certification binds a fresh portfolio to the exact standards subject", async () => {
-  const commands = [];
-  let ownedPath;
-  let projectRoot;
-  let verifiedRoot;
   const previousToken = process.env.NPM_TOKEN;
   process.env.NPM_TOKEN = "PRIVATE_VALUE";
+  const scaffold = createSuccessfulScaffoldAdapters({
+    inferredCapability: { identifier: "standards", version: "0.3.0" },
+  });
 
   try {
-    const result = await certifyGeneratedTestingForTesting({
-      async runCommand(input) {
-        commands.push(input);
-        assert.equal(input.executable, process.execPath);
-        assert.equal(input.environment.NPM_TOKEN, undefined);
-        assert.equal(input.environment.CLOUDFLARE_API_TOKEN, undefined);
-        assert.equal(input.environment.NODE_OPTIONS, undefined);
-        const command = input.arguments[1];
-
-        if (command === "create") {
-          projectRoot = input.arguments[
-            input.arguments.indexOf("--directory") + 1
-          ];
-          ownedPath = dirname(projectRoot);
-          assert.equal((await lstat(ownedPath)).mode & 0o777, 0o700);
-          return `${JSON.stringify({
-            ok: true,
-            command: "create",
-            destination: projectRoot,
-            profile: "portfolio",
-            capabilities: [
-              "standards",
-              "content-files",
-              "section-composition",
-              "deployment-cloudflare",
-              "observability",
-            ],
-          })}\n`;
-        }
-        if (command === "infer") {
-          return `${JSON.stringify({
-            ok: true,
-            command: "infer",
-            result: {
-              state: {
-                kind: "valid",
-                value: {
-                  installedCapabilities: [
-                    { identifier: "standards", version: "0.3.0" },
-                  ],
-                },
-              },
-              capabilities: [
-                { identifier: "standards", category: "confirmed" },
-              ],
-            },
-          })}\n`;
-        }
-        if (command === "doctor") {
-          return `${JSON.stringify({
-            ok: true,
-            command: "doctor",
-            result: { healthy: true, diagnostics: [] },
-          })}\n`;
-        }
-        if (command === "diff") {
-          return `${JSON.stringify({
-            ok: true,
-            command: "diff",
-            result: { equal: true, differences: [] },
-          })}\n`;
-        }
-        throw new Error("unexpected command");
-      },
-      async verifyProject(root, identifier) {
-        verifiedRoot = root;
-        assert.equal(identifier, "portfolio");
-        return {
-          ok: true,
-          fixtures: ["portfolio"],
-          profiles: ["portfolio"],
-          checks: fixedChecks,
-        };
-      },
-    });
+    const result = await certifyGeneratedTestingForTesting(scaffold.adapters);
 
     assert.deepEqual(result, {
       ok: true,
@@ -899,7 +900,9 @@ test("generated testing certification binds a fresh portfolio to the exact stand
       ],
     });
     assert.deepEqual(
-      commands.map(({ arguments: arguments_ }) => arguments_.slice(1)),
+      scaffold.state.commands.map(({ arguments: arguments_ }) =>
+        arguments_.slice(1),
+      ),
       [
         [
           "create",
@@ -910,15 +913,15 @@ test("generated testing certification binds a fresh portfolio to the exact stand
           "--display-name",
           "Acme Portfolio",
           "--directory",
-          projectRoot,
+          scaffold.state.projectRoot,
         ],
-        ["infer", "--directory", projectRoot],
-        ["doctor", "--directory", projectRoot],
-        ["diff", "--directory", projectRoot],
+        ["infer", "--directory", scaffold.state.projectRoot],
+        ["doctor", "--directory", scaffold.state.projectRoot],
+        ["diff", "--directory", scaffold.state.projectRoot],
       ],
     );
-    assert.equal(verifiedRoot, projectRoot);
-    assert.equal(await pathExists(ownedPath), false);
+    assert.equal(scaffold.state.verifiedRoot, scaffold.state.projectRoot);
+    assert.equal(await pathExists(scaffold.state.ownedPath), false);
     assert.doesNotMatch(JSON.stringify(result), /PRIVATE_VALUE/u);
   } finally {
     if (previousToken === undefined) {
