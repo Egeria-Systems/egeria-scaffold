@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { parseDocument } from "yaml";
 
+import { createTemplateCatalog } from "../dist/generation/template-catalog.js";
 import {
   deriveTemplateDestination,
   renderTemplateSource,
@@ -1127,6 +1130,55 @@ test("template destinations are safe and strip the template suffix exactly once"
   }
 });
 
+test("template catalogs declare the content kind of every current source", () => {
+  for (const profile of ["portfolio", "site"]) {
+    const entries = assertSuccess(createTemplateCatalog(profile));
+
+    assert.equal(entries.length > 0, true);
+    assert.equal(
+      entries.every(({ contentKind }) => contentKind === "text"),
+      true,
+    );
+  }
+});
+
+test("binary template entries preserve invalid UTF-8 and token-like bytes exactly", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-binary-template-"));
+  const source = "baseline.png";
+  const sourcePath = join(owner, source);
+  const bytes = Uint8Array.from([
+    0xff, 0xfe, 0x7b, 0x7b, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x4e,
+    0x61, 0x6d, 0x65, 0x7d, 0x7d, 0x00,
+  ]);
+
+  try {
+    await writeFile(sourcePath, bytes);
+    const module = await import("../dist/generation/render-skeleton.js");
+    assert.equal(typeof module.renderTemplateCatalogEntry, "function");
+
+    const rendered = assertSuccess(
+      await module.renderTemplateCatalogEntry(
+        {
+          source,
+          destination:
+            "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+          contentKind: "binary",
+        },
+        0,
+        pathToFileURL(`${owner}/`),
+        tokens,
+      ),
+    );
+
+    assert.deepEqual([...rendered.content], [...bytes]);
+    assert.notEqual(rendered.content.at(-1), 0x0a);
+    rendered.content[0] = 0;
+    assert.deepEqual([...(await readFile(sourcePath))], [...bytes]);
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+});
+
 test("portfolio and site render exact sorted deterministic file sets", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const request = {
@@ -1146,16 +1198,23 @@ test("portfolio and site render exact sorted deterministic file sets", async () 
   assert.deepEqual(snapshotBytes(first.files), snapshotBytes(second.files));
 
   for (const rendered of [first, site]) {
+    const catalog = assertSuccess(createTemplateCatalog(rendered.project.originProfile));
+    const contentKinds = new Map(
+      catalog.map(({ destination, contentKind }) => [destination, contentKind]),
+    );
+
     for (const { path, content } of rendered.files) {
       assert.equal(path.startsWith("/"), false);
       assert.equal(path.includes(".."), false);
       assert.equal(path.includes("\\"), false);
       assert.doesNotMatch(path, /[\u0000-\u001f\u007f]/);
 
-      const text = decoder.decode(content);
-      assert.equal(text.includes("\r"), false);
-      assert.equal(text.endsWith("\n"), true);
-      assert.equal(text.endsWith("\n\n"), false);
+      if (contentKinds.get(path) === "text") {
+        const text = decoder.decode(content);
+        assert.equal(text.includes("\r"), false);
+        assert.equal(text.endsWith("\n"), true);
+        assert.equal(text.endsWith("\n\n"), false);
+      }
     }
   }
 });

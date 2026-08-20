@@ -183,23 +183,46 @@ test("fixture inspection accepts only the exact portable generated trees", async
   );
 });
 
-test("generated fixture checkout bytes are pinned to LF", async () => {
+test("generated fixture text and visual baseline attributes are explicit", async () => {
   const fixturePaths = generatedFixtureContracts.map(
     ({ relativeRoot }) => `${relativeRoot}/package.json`,
   );
-  const { stdout } = await execFileAsync(
+  const { stdout: textAttributes } = await execFileAsync(
     "git",
     ["check-attr", "text", "eol", "--", ...fixturePaths],
     { cwd: repositoryRoot, encoding: "utf8" },
   );
 
-  assert.deepEqual(stdout.trimEnd().split("\n"), [
+  assert.deepEqual(textAttributes.trimEnd().split("\n"), [
     "fixtures/generated/portfolio/package.json: text: set",
     "fixtures/generated/portfolio/package.json: eol: lf",
     "fixtures/generated/portfolio-calendly/package.json: text: set",
     "fixtures/generated/portfolio-calendly/package.json: eol: lf",
     "fixtures/generated/site/package.json: text: set",
     "fixtures/generated/site/package.json: eol: lf",
+  ]);
+
+  const baselinePaths = [
+    "packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+    "packages/builder-core/templates/site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+    "fixtures/generated/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+    "fixtures/generated/site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+  ];
+  const { stdout: binaryAttributes } = await execFileAsync(
+    "git",
+    ["check-attr", "text", "binary", "--", ...baselinePaths],
+    { cwd: repositoryRoot, encoding: "utf8" },
+  );
+
+  assert.deepEqual(binaryAttributes.trimEnd().split("\n"), [
+    `${baselinePaths[0]}: text: unset`,
+    `${baselinePaths[0]}: binary: set`,
+    `${baselinePaths[1]}: text: unset`,
+    `${baselinePaths[1]}: binary: set`,
+    `${baselinePaths[2]}: text: unset`,
+    `${baselinePaths[2]}: binary: set`,
+    `${baselinePaths[3]}: text: unset`,
+    `${baselinePaths[3]}: binary: set`,
   ]);
 });
 
