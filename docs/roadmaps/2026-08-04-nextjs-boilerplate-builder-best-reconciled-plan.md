@@ -1208,8 +1208,8 @@ P10 Fleet hardening, package review, and portability evidence
 - separate Task 6D certification of the exact materially changed `standards` capability subject;
 - CI/deployment, visual, performance, and automated accessibility gates;
   - Task 7B's accepted deployment certification transition is integrated at `main@b46f5f59c7f98ed6be1fa569a2f4a1f23d1ca1ad`, and post-merge Repository quality run `32323617228` passed every applicable job;
-  - deterministic visual regression is implemented for four representative portfolio/site OpenNext screenshots under exact `standards@0.4.0` and recipe `0.10.0`; performance budgets remain a separate immediately following unimplemented increment;
-  - Task 8B remains the separate pending fresh-scaffold certification for exact `standards@0.4.0`; prior `standards@0.3.0` evidence cannot certify it;
+  - deterministic visual regression is implemented for four representative portfolio/site OpenNext screenshots under exact `standards@0.4.0` and recipe `0.10.0`, accepted at `main@8e5f376f32a95f87420fd82a61566c08c2db020e`; post-merge Repository quality run `32399819237` passed every applicable job as accepted-main integration evidence, not certification evidence; performance budgets remain a separate immediately following unimplemented increment;
+  - Task 8B is complete and exact `standards@0.4.0` is certified from accepted local `fresh-scaffold` evidence at revision `416e2c2441978ac86f3a17dee96a694141033e20`; prior `standards@0.3.0` evidence cannot certify it;
 - production-ready portfolio baseline retained as a P3 lifecycle input;
 - the real-client generation and migration-evidence requirement is fulfilled in P3B rather than waived or replaced.
 

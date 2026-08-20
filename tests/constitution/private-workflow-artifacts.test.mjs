@@ -15,6 +15,7 @@ const privateRoots = Object.freeze([
 const trackedAcceptedReceipts = Object.freeze([
   "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
   "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md",
+  "docs/implementation-evidence/2026-08-20-generated-visual-regression-certification-receipt.md",
 ]);
 const syntheticMacHome = (...segments) =>
   ["", "Users", ...segments, ""].join("/");

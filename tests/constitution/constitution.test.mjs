@@ -2283,7 +2283,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /standards@0\.4\.0[^\n]+pending[^\n]+booking-calendly@0\.1\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
+    /standards@0\.4\.0[^\n]+certified[^\n]+416e2c2441978ac86f3a17dee96a694141033e20[^\n]+booking-calendly@0\.1\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2291,7 +2291,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending standards/i,
+    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+passes[^\n]+all-certified[^\n]+rejects only[^\n]+three[^\n]+backfill-pending/i,
   );
 });
 
@@ -2451,9 +2451,21 @@ test("executable capability certification ownership is current", async () => {
     ),
   );
   assert.equal(observabilityRecord.status, "certified");
-  assert.equal(standardsRecord.status, "pending");
+  assert.equal(standardsRecord.status, "certified");
   assert.deepEqual(standardsRecord.requiredEvidence, ["fresh-scaffold"]);
-  assert.deepEqual(standardsRecord.evidence, []);
+  assert.deepEqual(standardsRecord.evidence, [
+    {
+      kind: "fresh-scaffold",
+      path: "docs/implementation-evidence/2026-08-20-generated-visual-regression-certification-receipt.md",
+      outcome: "passed",
+      revision: "416e2c2441978ac86f3a17dee96a694141033e20",
+      subject: {
+        descriptorVersion: "0.4.0",
+        behaviorContractDigest:
+          "sha256:8733f70cdc64134232912c691c6922b27defb8cb7c2871faa334cfad2b394643",
+      },
+    },
+  ]);
   assert.equal(
     standardsRecord.taskPlan,
     "docs/superpowers/plans/2026-08-19-generated-visual-regression-certification.md",
@@ -2533,7 +2545,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     packageOwnership,
-    /descriptor `standards@0\.4\.0` is pending separate fresh-scaffold certification[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
+    /descriptor `standards@0\.4\.0` is certified from accepted fresh-scaffold evidence at revision `416e2c2441978ac86f3a17dee96a694141033e20`[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
   );
   assert.deepEqual(
     bookingRecord.evidence.map(({ kind }) => kind),
@@ -2559,7 +2571,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending standards/iu,
+    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+passes[^\n]+all-certified[^\n]+rejects only[^\n]+three[^\n]+backfill-pending/iu,
   );
   assert.match(
     enforcementMap,
@@ -2628,6 +2640,12 @@ test("canonical documentation records the generated visual regression boundary",
       /b46f5f59c7f98ed6be1fa569a2f4a1f23d1ca1ad[^\n]+32323617228/iu,
     );
   }
+  for (const statusOwner of [sourcePlan, overview, roadmap]) {
+    assert.match(
+      statusOwner,
+      /8e5f376f32a95f87420fd82a61566c08c2db020e[^\n]+32399819237/iu,
+    );
+  }
   for (const currentOwner of [
     rootReadme,
     sourcePlan,
@@ -2639,7 +2657,16 @@ test("canonical documentation records the generated visual regression boundary",
     builderReadme,
   ]) {
     assert.match(currentOwner, /standards@0\.4\.0/iu);
+    assert.match(
+      currentOwner,
+      /standards@0\.4\.0[^\n]+certified|certified[^\n]+standards@0\.4\.0/iu,
+    );
   }
+
+  assert.match(
+    capabilityModel,
+    /compiled CLI[^\n]+fresh[^\n]+scaffold[^\n]+fixed generated-project verifier[^\n]+deterministic visual regression/iu,
+  );
 
   assert.match(
     capabilityModel,
@@ -2652,7 +2679,7 @@ test("canonical documentation records the generated visual regression boundary",
   assert.match(
     capabilityModel,
     new RegExp(
-      `${escapeRegularExpression(visualCertificationTask)}[^\\n]+pending[^\\n]+fresh-scaffold`,
+      `${escapeRegularExpression(visualCertificationTask)}[^\\n]+complete[^\\n]+standards@0\\.4\\.0[^\\n]+fresh-scaffold`,
       "iu",
     ),
   );
