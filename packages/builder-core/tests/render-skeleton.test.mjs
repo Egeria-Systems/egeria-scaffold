@@ -2961,6 +2961,11 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
   const job = workflow.jobs["verify-and-deploy"];
   assert.equal(job.if, "github.ref == 'refs/heads/main'");
   assert.equal(job["runs-on"], "ubuntu-24.04");
+  assert.deepEqual(job.container, {
+    image:
+      "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
+    options: "--shm-size=1g",
+  });
   assert.equal(job["timeout-minutes"], 45);
   assert.deepEqual(job.environment, {
     name: "production",
@@ -2984,6 +2989,7 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
     "Test OpenNext workerd preview",
     "Verify deployment target configured",
     "Deploy Cloudflare Worker",
+    "Wait for deployed application",
     "Test deployed application",
     "Upload deployment browser failure artifacts",
   ]);
@@ -3004,6 +3010,7 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
   });
 
   const revisionGuard = steps["Verify approved revision"];
+  assert.equal(revisionGuard.shell, "bash");
   assert.deepEqual(revisionGuard.env, {
     EXPECTED_REVISION: "${{ inputs.expected_revision }}",
   });
@@ -3082,7 +3089,7 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
   );
   assert.equal(
     steps["Install Chromium"].run,
-    "pnpm --dir apps/web run browser:install:ci",
+    "pnpm --dir apps/web exec playwright install chromium",
   );
   assert.equal(
     steps["Test Next.js development"].run,
@@ -3125,6 +3132,69 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
       ),
     ).length,
     1,
+  );
+  assert.deepEqual(steps["Wait for deployed application"].env, {
+    DEPLOY_URL: "${{ vars.DEPLOY_URL }}",
+  });
+  assert.equal(
+    steps["Wait for deployed application"].run,
+    `attempt=1
+while [ "$attempt" -le 12 ]; do
+  status="$(curl --connect-timeout 5 --max-time 10 --silent --output /dev/null --write-out '%{http_code}' "$DEPLOY_URL" || true)"
+  case "$status" in
+    2??) exit 0 ;;
+  esac
+  if [ "$attempt" -eq 12 ]; then
+    echo "Deployment did not become ready" >&2
+    exit 1
+  fi
+  sleep 5
+  attempt=$((attempt + 1))
+done
+`,
+  );
+  const runReadinessProbe = (curlFunction) =>
+    spawnSync(
+      "sh",
+      [
+        "-e",
+        "-c",
+        `${curlFunction}
+sleep() { :; }
+${steps["Wait for deployed application"].run}`,
+      ],
+      {
+        encoding: "utf8",
+        env: { DEPLOY_URL: "https://example.invalid" },
+      },
+    );
+  assert.equal(
+    runReadinessProbe(
+      'curl() { if [ "$attempt" -lt 3 ]; then printf 404; else printf 200; fi; }',
+    ).status,
+    0,
+  );
+  assert.equal(
+    runReadinessProbe(
+      'curl() { if [ "$attempt" -lt 3 ]; then return 28; else printf 200; fi; }',
+    ).status,
+    0,
+  );
+  const unavailableDeployment = runReadinessProbe(
+    "curl() { printf 404; }",
+  );
+  assert.notEqual(unavailableDeployment.status, 0);
+  assert.equal(
+    unavailableDeployment.stderr,
+    "Deployment did not become ready\n",
+  );
+  assert.ok(
+    job.steps.indexOf(steps["Deploy Cloudflare Worker"]) <
+      job.steps.indexOf(steps["Wait for deployed application"]),
+  );
+  assert.ok(
+    job.steps.indexOf(steps["Wait for deployed application"]) <
+      job.steps.indexOf(steps["Test deployed application"]),
   );
   assert.deepEqual(steps["Test deployed application"].env, {
     PLAYWRIGHT_DEPLOYED_URL: "${{ vars.DEPLOY_URL }}",
@@ -3305,7 +3375,11 @@ test("generated browser quality is environment-specific and content-agnostic", a
     /pnpm --dir apps\/web exec opennextjs-cloudflare build --skipNextBuild/u,
   );
   assert.doesNotMatch(workflow, /pnpm run build:cloudflare/u);
-  assert.match(workflow, /browser:install:ci/u);
+  assert.match(
+    workflow,
+    /pnpm --dir apps\/web exec playwright install chromium/u,
+  );
+  assert.doesNotMatch(workflow, /playwright install --with-deps/u);
   assert.match(workflow, /test:e2e:dev/u);
   assert.match(workflow, /test:e2e:preview/u);
   assert.match(workflow, /if: failure\(\)/u);
@@ -3319,6 +3393,11 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.deepEqual(workflowConfiguration.jobs, {
     verify: {
       "runs-on": "ubuntu-24.04",
+      container: {
+        image:
+          "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
+        options: "--shm-size=1g",
+      },
       "timeout-minutes": 30,
       steps: [
         {
@@ -3351,7 +3430,7 @@ test("generated browser quality is environment-specific and content-agnostic", a
         },
         {
           name: "Install Chromium",
-          run: "pnpm --dir apps/web run browser:install:ci",
+          run: "pnpm --dir apps/web exec playwright install chromium",
         },
         {
           name: "Test Next.js development",

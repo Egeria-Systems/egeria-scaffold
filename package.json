@@ -29,6 +29,7 @@
     "verify:builder-packages:quality": "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run lint:builder && pnpm run test:packages && pnpm run typecheck:builder",
     "verify:builder-packages": "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run lint:builder && pnpm run test:cli && pnpm run test:packages && pnpm run typecheck:builder && pnpm run changeset:status",
     "verify:booking-calendly-certification": "pnpm run build:builder && node scripts/certify-booking-calendly.mjs",
+    "verify:cloudflare-deployment-certification": "pnpm run build:builder && node scripts/certify-cloudflare-deployment.mjs",
     "verify:generated-testing-certification": "pnpm run build:builder && node scripts/certify-generated-testing.mjs",
     "verify:observability-error-diagnostics-certification": "pnpm run build:builder && node scripts/certify-observability-error-diagnostics.mjs",
     "verify:generated-skeletons": "node scripts/verify-generated-skeletons.mjs",

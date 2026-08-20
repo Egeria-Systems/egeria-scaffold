@@ -442,6 +442,64 @@ test("single-root verification runs the exact fixed checks against caller output
   }
 });
 
+test("single-root verification accepts an explicit generated project identity", async () => {
+  const ownerParent = await mkdtemp(
+    join(tmpdir(), "egeria-single-root-identity-"),
+  );
+  const canonicalRoot = resolve(repositoryRoot, "fixtures/generated/portfolio");
+  const canonicalBefore = await inspectGeneratedFixture(
+    canonicalRoot,
+    "portfolio",
+  );
+  const renamedRoot = await copyFixture(
+    ownerParent,
+    "portfolio",
+    "renamed-source",
+  );
+  let ownedPath;
+
+  try {
+    for (const [relativePath, name] of [
+      ["package.json", "acme-generated-project"],
+      ["apps/web/package.json", "acme-generated-project-web"],
+    ]) {
+      const manifestPath = join(renamedRoot, relativePath);
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+      await writeFile(
+        manifestPath,
+        `${JSON.stringify({ ...manifest, name }, null, 2)}\n`,
+        "utf8",
+      );
+    }
+
+    const result = await verifyGeneratedProjectForTesting(
+      renamedRoot,
+      "portfolio",
+      {
+        async createOwner() {
+          const identity = await createKnownOwner(ownerParent);
+          ownedPath = identity.path;
+          return identity;
+        },
+        async runCommand(input) {
+          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+        },
+      },
+      "acme-generated-project",
+    );
+
+    assert.deepEqual(result.fixtures, ["portfolio"]);
+    assert.deepEqual(result.profiles, ["portfolio"]);
+    assert.equal(await pathExists(ownedPath), false);
+    assert.deepEqual(
+      await inspectGeneratedFixture(canonicalRoot, "portfolio"),
+      canonicalBefore,
+    );
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
+});
+
 test("live verification uses fixed copies, a minimal environment, and exact commands", async () => {
   const ownerParent = await mkdtemp(join(tmpdir(), "egeria-fixture-harness-"));
   let ownedPath;

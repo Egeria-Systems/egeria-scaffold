@@ -12,8 +12,10 @@ const privateRoots = Object.freeze([
   "docs/review-packets/",
   "docs/superpowers/",
 ]);
-const trackedAcceptedReceipt =
-  "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md";
+const trackedAcceptedReceipts = Object.freeze([
+  "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
+  "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md",
+]);
 const syntheticMacHome = (...segments) =>
   ["", "Users", ...segments, ""].join("/");
 const syntheticUnixHome = (root, ...segments) =>
@@ -76,7 +78,7 @@ test("personal home-directory detection covers supported platform forms", () => 
   assert.deepEqual(detectPersonalHomePaths("docs/private-workflow.md"), []);
 });
 
-test("private workflow artifact roots keep only the accepted content-safe receipt tracked", async () => {
+test("private workflow artifact roots keep only accepted content-safe receipts tracked", async () => {
   const trackedPaths = await listTrackedPaths();
 
   for (const root of privateRoots) {
@@ -92,20 +94,22 @@ test("private workflow artifact roots keep only the accepted content-safe receip
     );
     assert.deepEqual(
       trackedWithinRoot,
-      root === "docs/implementation-evidence/" ? [trackedAcceptedReceipt] : [],
+      root === "docs/implementation-evidence/" ? trackedAcceptedReceipts : [],
       root,
     );
   }
 
-  await assert.rejects(
-    () =>
-      execFileAsync(
-        "git",
-        ["check-ignore", "--quiet", "--no-index", trackedAcceptedReceipt],
-        { cwd: repositoryRoot },
-      ),
-    (error) => Number(error.code) === 1,
-  );
+  for (const trackedAcceptedReceipt of trackedAcceptedReceipts) {
+    await assert.rejects(
+      () =>
+        execFileAsync(
+          "git",
+          ["check-ignore", "--quiet", "--no-index", trackedAcceptedReceipt],
+          { cwd: repositoryRoot },
+        ),
+      (error) => Number(error.code) === 1,
+    );
+  }
 });
 
 test("tracked text excludes personal home-directory paths", async () => {

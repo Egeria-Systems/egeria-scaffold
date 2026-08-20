@@ -77,9 +77,40 @@
         "deployed-application",
         "fresh-scaffold"
       ],
-      "status": "pending",
+      "status": "certified",
       "taskPlan": "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md",
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "cleanup-recovery",
+          "path": "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41"
+          }
+        },
+        {
+          "kind": "deployed-application",
+          "path": "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41"
+          }
+        },
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41"
+          }
+        }
+      ]
     },
     "observability": {
       "subject": {
@@ -159,7 +190,7 @@
           "kind": "fresh-scaffold",
           "path": "docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-verification.md",
           "outcome": "passed",
-          "revision": "d7c63b0aaa9bebd56c075f16f1e5d86519853698",
+          "revision": "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2",
           "subject": {
             "descriptorVersion": "0.3.0",
             "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"

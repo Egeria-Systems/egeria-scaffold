@@ -21,9 +21,13 @@ const standardsPlanPath =
 const standardsEvidencePath =
   "docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-verification.md";
 const standardsEvidenceRevision =
-  "d7c63b0aaa9bebd56c075f16f1e5d86519853698";
+  "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
+const deploymentEvidencePath =
+  "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md";
+const deploymentEvidenceRevision =
+  "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2";
 const committedRegistry = JSON.parse(
   readFileSync(
     new URL("../../../certifications/capabilities.json", import.meta.url),
@@ -427,7 +431,7 @@ test("material standards testing changes have exact reviewed certification evide
   });
 });
 
-test("material generated deployment changes create a new task-linked pending subject", () => {
+test("material generated deployment changes have exact reviewed certification evidence", () => {
   const deploymentRecord = committedRegistry.records["deployment-cloudflare"];
 
   assert.equal(deploymentRecord.subject.descriptorVersion, "0.3.0");
@@ -440,9 +444,24 @@ test("material generated deployment changes create a new task-linked pending sub
     "deployed-application",
     "fresh-scaffold",
   ]);
-  assert.equal(deploymentRecord.status, "pending");
+  assert.equal(deploymentRecord.status, "certified");
   assert.equal(deploymentRecord.taskPlan, deploymentPlanPath);
-  assert.deepEqual(deploymentRecord.evidence, []);
+  assert.deepEqual(
+    deploymentRecord.evidence.map(({ kind, path, outcome, revision }) => ({
+      kind,
+      path,
+      outcome,
+      revision,
+    })),
+    ["cleanup-recovery", "deployed-application", "fresh-scaffold"].map(
+      (kind) => ({
+        kind,
+        path: deploymentEvidencePath,
+        outcome: "passed",
+        revision: deploymentEvidenceRevision,
+      }),
+    ),
+  );
 });
 
 test("repository artifacts bind successful evidence to capability, subject, revision, and outcome", () => {
