@@ -2279,6 +2279,14 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
+    /INV-CAPABILITY-CERTIFICATION[^\n]+content-safe tracked receipts[^\n]+exact ignore exceptions/i,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-CAPABILITY-CERTIFICATION[^\n]+check:private-capability-certification[^\n]+private-workflow-artifacts\.test\.mjs/i,
+  );
+  assert.match(
+    enforcementMap,
     /documentation contract[^\n]+does not prove[^\n]+runtime or provider result/i,
   );
   assert.match(
