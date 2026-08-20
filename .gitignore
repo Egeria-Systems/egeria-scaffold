@@ -14,6 +14,7 @@ dist/
 .wrangler/
 playwright-report/
 test-results/
+generated-visual-artifacts/
 .superpowers/
 docs/implementation-evidence/*
 !docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md

@@ -503,6 +503,26 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     ).length,
     1,
   );
+  const generatedProjectSteps = workflow.jobs["generated-projects"].steps;
+  const visualVerificationIndex = generatedProjectSteps.findIndex(
+    ({ run }) => run === "pnpm run verify:generated-visuals",
+  );
+  const visualArtifactUploadIndex = generatedProjectSteps.findIndex(
+    ({ name }) => name === "Upload generated visual failure artifacts",
+  );
+  assert.ok(visualArtifactUploadIndex > visualVerificationIndex);
+  assert.deepEqual(generatedProjectSteps[visualArtifactUploadIndex], {
+    name: "Upload generated visual failure artifacts",
+    if: "failure()",
+    uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    with: {
+      name: "generated-visual-failure-artifacts",
+      path: "generated-visual-artifacts/",
+      "if-no-files-found": "ignore",
+      "include-hidden-files": false,
+      "retention-days": 7,
+    },
+  });
   for (const command of [
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run lint",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run typecheck",

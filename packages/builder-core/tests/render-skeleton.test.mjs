@@ -3532,7 +3532,6 @@ test("generated browser quality is environment-specific and content-agnostic", a
         },
         {
           name: "Compare OpenNext visual baselines",
-          if: "!cancelled()",
           run: "pnpm --dir apps/web run test:visual",
         },
         {
@@ -3639,6 +3638,21 @@ test("generated visual regression owns four deterministic preview baselines", as
   assert.match(readme, /--update-snapshots/u);
   assert.match(readme, /application-owned baselines/iu);
   assert.match(readme, /review the image diff/iu);
+  assert.match(readme, /git checkout-index --all --prefix=/u);
+  assert.match(readme, /\/source:ro/u);
+  assert.match(
+    readme,
+    /apps\/web\/tests\/visual\/home-visual\.spec\.ts-snapshots:\/baseline-output/u,
+  );
+  for (const baselineName of [
+    "home-desktop-chromium-linux.png",
+    "home-mobile-chromium-linux.png",
+  ]) {
+    assert.ok(readme.includes(baselineName));
+  }
+  assert.doesNotMatch(readme, /--volume "\$PWD:\/source"/u);
+  assert.doesNotMatch(readme, /\/source\/apps\/web\/tests\/visual/u);
+  assert.doesNotMatch(readme, /\*\.png/u);
   assert.match(readme, /does not establish visual quality/iu);
   assert.match(readme, /Playwright report and test-result artifacts/iu);
   assert.match(rootInstructions, /visual configuration is managed/iu);

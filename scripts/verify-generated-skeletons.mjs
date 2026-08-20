@@ -29,6 +29,20 @@ const versionTimeoutMilliseconds = 30 * 1000;
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const requiredPnpmVersion = "11.20.0";
 const publicRegistry = "https://registry.npmjs.org/";
+const generatedVisualArtifactsRoot = resolve(
+  repositoryRoot,
+  "generated-visual-artifacts",
+);
+const visualArtifactDirectories = Object.freeze([
+  Object.freeze({
+    destination: "playwright-report",
+    relativeSource: "apps/web/playwright-report",
+  }),
+  Object.freeze({
+    destination: "test-results",
+    relativeSource: "apps/web/test-results",
+  }),
+]);
 const codePointCompare = (left, right) =>
   left < right ? -1 : left > right ? 1 : 0;
 
@@ -705,6 +719,54 @@ async function defaultRunCommand(input) {
   return stdout;
 }
 
+async function captureVisualFailureArtifacts({
+  identifier,
+  validationRoot,
+  artifactRoot = generatedVisualArtifactsRoot,
+}) {
+  await mkdir(artifactRoot, {
+    recursive: true,
+    mode: 0o700,
+  });
+  const outputRoot = await mkdtemp(
+    join(artifactRoot, `${identifier}-`),
+  );
+  await chmod(outputRoot, 0o700);
+
+  for (const artifact of visualArtifactDirectories) {
+    const source = join(validationRoot, artifact.relativeSource);
+    let sourceStats;
+    try {
+      sourceStats = await lstat(source);
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
+    if (sourceStats.isSymbolicLink() || !sourceStats.isDirectory()) {
+      fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+    }
+    await snapshotTree(source);
+    await cp(source, join(outputRoot, artifact.destination), {
+      recursive: true,
+      force: false,
+      errorOnExist: true,
+      dereference: false,
+    });
+  }
+
+  await writeFile(
+    join(outputRoot, "failure.json"),
+    `${JSON.stringify({
+      code: "VISUAL_REGRESSION_FAILED",
+      fixture: identifier,
+    })}\n`,
+    { flag: "wx", mode: 0o600 },
+  );
+}
+
+export const captureVisualFailureArtifactsForTesting =
+  captureVisualFailureArtifacts;
+
 async function runExpectedCommand(runCommand, input, failureCode) {
   try {
     return await runCommand(input);
@@ -841,11 +903,29 @@ async function verifySourcesWithAdapters(
       ];
 
       for (const command of commands) {
-        await runExpectedCommand(
-          adapters.runCommand,
-          commandInput(command.arguments),
-          command.failureCode,
-        );
+        try {
+          await runExpectedCommand(
+            adapters.runCommand,
+            commandInput(command.arguments),
+            command.failureCode,
+          );
+        } catch (error) {
+          if (
+            error instanceof GeneratedFixtureVerificationError &&
+            error.code === "VISUAL_REGRESSION_FAILED" &&
+            adapters.captureVisualArtifacts !== undefined
+          ) {
+            try {
+              await adapters.captureVisualArtifacts({
+                identifier: source.contract.identifier,
+                validationRoot,
+              });
+            } catch {
+              fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+            }
+          }
+          throw error;
+        }
       }
     }
   } catch (error) {
@@ -903,6 +983,7 @@ async function verifySourcesWithAdapters(
 export function verifyGeneratedSkeletons(options = defaultVerificationOptions) {
   return verifyGeneratedSkeletonsForTesting(
     {
+      captureVisualArtifacts: captureVisualFailureArtifacts,
       createOwner: createGeneratedFixtureOwner,
       runCommand: defaultRunCommand,
     },
@@ -915,7 +996,9 @@ function requireAdapters(adapters) {
     adapters === null ||
     typeof adapters !== "object" ||
     typeof adapters.createOwner !== "function" ||
-    typeof adapters.runCommand !== "function"
+    typeof adapters.runCommand !== "function" ||
+    (adapters.captureVisualArtifacts !== undefined &&
+      typeof adapters.captureVisualArtifacts !== "function")
   ) {
     fail("VERIFICATION_ADAPTER_INVALID");
   }
@@ -953,6 +1036,7 @@ export function verifyGeneratedProject(
     root,
     identifier,
     {
+      captureVisualArtifacts: captureVisualFailureArtifacts,
       createOwner: createGeneratedFixtureOwner,
       runCommand: defaultRunCommand,
     },

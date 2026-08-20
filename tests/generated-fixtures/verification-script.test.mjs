@@ -4,8 +4,10 @@ import {
   access,
   cp,
   lstat,
+  mkdir,
   mkdtemp,
   readFile,
+  readdir,
   rm,
   symlink,
   writeFile,
@@ -17,6 +19,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 
 import {
+  captureVisualFailureArtifactsForTesting,
   generatedFixtureContracts,
   inspectGeneratedFixture,
   parseVerificationArguments,
@@ -485,6 +488,9 @@ test("visual verification is an exact opt-in after prepared preview behavior", a
   const ownerParent = await mkdtemp(join(tmpdir(), "egeria-visual-option-"));
   const sourceRoot = await copyFixture(ownerParent, "portfolio", "source");
   const commands = [];
+  let capturedVisualFailure;
+  let failedOwnerPath;
+  const failedArtifactRoot = join(ownerParent, "exported-artifacts");
 
   try {
     const result = await verifyGeneratedProjectForTesting(
@@ -542,19 +548,67 @@ test("visual verification is an exact opt-in after prepared preview behavior", a
           "portfolio",
           {
             async createOwner() {
-              return createKnownOwner(ownerParent);
+              const owner = await createKnownOwner(ownerParent);
+              failedOwnerPath = owner.path;
+              return owner;
             },
             async runCommand(input) {
               if (input.arguments.at(-1) === "test:visual") {
+                await mkdir(join(input.cwd, "apps/web/playwright-report"), {
+                  recursive: true,
+                });
+                await mkdir(join(input.cwd, "apps/web/test-results"), {
+                  recursive: true,
+                });
+                await writeFile(
+                  join(input.cwd, "apps/web/playwright-report/index.html"),
+                  "bounded report",
+                );
+                await writeFile(
+                  join(input.cwd, "apps/web/test-results/actual.png"),
+                  "bounded image",
+                );
                 throw new Error("PRIVATE_VALUE");
               }
               return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+            },
+            async captureVisualArtifacts(input) {
+              capturedVisualFailure = {
+                identifier: input.identifier,
+                ownerExists: await pathExists(failedOwnerPath),
+                validationRoot: input.validationRoot,
+              };
+              await captureVisualFailureArtifactsForTesting({
+                ...input,
+                artifactRoot: failedArtifactRoot,
+              });
             },
           },
           undefined,
           { includeVisual: true },
         ),
       "VISUAL_REGRESSION_FAILED",
+    );
+    assert.deepEqual(capturedVisualFailure, {
+      identifier: "portfolio",
+      ownerExists: true,
+      validationRoot: join(failedOwnerPath, "portfolio-project"),
+    });
+    assert.equal(await pathExists(failedOwnerPath), false);
+    const exportedDirectories = await readdir(failedArtifactRoot);
+    assert.equal(exportedDirectories.length, 1);
+    const exportedRoot = join(failedArtifactRoot, exportedDirectories[0]);
+    assert.equal(
+      await readFile(join(exportedRoot, "playwright-report/index.html"), "utf8"),
+      "bounded report",
+    );
+    assert.equal(
+      await readFile(join(exportedRoot, "test-results/actual.png"), "utf8"),
+      "bounded image",
+    );
+    assert.deepEqual(
+      JSON.parse(await readFile(join(exportedRoot, "failure.json"), "utf8")),
+      { code: "VISUAL_REGRESSION_FAILED", fixture: "portfolio" },
     );
   } finally {
     await rm(ownerParent, { recursive: true, force: true });
