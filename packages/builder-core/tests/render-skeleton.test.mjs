@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { parseDocument } from "yaml";
 
+import { createTemplateCatalog } from "../dist/generation/template-catalog.js";
 import {
   deriveTemplateDestination,
   renderTemplateSource,
@@ -15,6 +18,11 @@ const tokens = {
   displayNameJson: JSON.stringify('Acme "Studio"\nMontréal'),
   workerName: "acme-studio-web",
 };
+
+const visualBaselinePaths = [
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+];
 
 const portfolioPaths = [
   ".github/workflows/deploy.yml",
@@ -44,6 +52,7 @@ const portfolioPaths = [
   "apps/web/playwright.deployed.config.ts",
   "apps/web/playwright.dev.config.ts",
   "apps/web/playwright.preview.config.ts",
+  "apps/web/playwright.visual.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
@@ -61,6 +70,8 @@ const portfolioPaths = [
   "apps/web/tests/e2e/site-quality.spec.ts",
   "apps/web/tests/setup/component.ts",
   "apps/web/tests/unit/content-schema.test.ts",
+  "apps/web/tests/visual/home-visual.spec.ts",
+  ...visualBaselinePaths,
   "apps/web/tsconfig.json",
   "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
@@ -98,6 +109,7 @@ const sitePaths = [
   "apps/web/playwright.deployed.config.ts",
   "apps/web/playwright.dev.config.ts",
   "apps/web/playwright.preview.config.ts",
+  "apps/web/playwright.visual.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
@@ -115,6 +127,8 @@ const sitePaths = [
   "apps/web/tests/e2e/site-quality.spec.ts",
   "apps/web/tests/setup/component.ts",
   "apps/web/tests/unit/content-schema.test.ts",
+  "apps/web/tests/visual/home-visual.spec.ts",
+  ...visualBaselinePaths,
   "apps/web/tsconfig.json",
   "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
@@ -163,7 +177,17 @@ function assertFailureReason(result, reason) {
 }
 
 function indexFiles(files) {
-  return new Map(files.map((file) => [file.path, decoder.decode(file.content)]));
+  return new Map(
+    files.flatMap((file) =>
+      visualBaselinePaths.includes(file.path)
+        ? []
+        : [[file.path, decoder.decode(file.content)]],
+    ),
+  );
+}
+
+function indexFileBytes(files) {
+  return new Map(files.map(({ path, content }) => [path, content]));
 }
 
 async function findGeneratedTypeScriptDiagnostics(files, sourcePath, code) {
@@ -1127,6 +1151,61 @@ test("template destinations are safe and strip the template suffix exactly once"
   }
 });
 
+test("template catalogs declare text and exact visual baseline binary sources", () => {
+  for (const profile of ["portfolio", "site"]) {
+    const entries = assertSuccess(createTemplateCatalog(profile));
+    const binaryDestinations = entries
+      .filter(({ contentKind }) => contentKind === "binary")
+      .map(({ destination }) => destination);
+
+    assert.equal(entries.length > 0, true);
+    assert.equal(
+      entries.every(({ contentKind }) =>
+        ["text", "binary"].includes(contentKind),
+      ),
+      true,
+    );
+    assert.deepEqual(binaryDestinations, visualBaselinePaths);
+  }
+});
+
+test("binary template entries preserve invalid UTF-8 and token-like bytes exactly", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-binary-template-"));
+  const source = "baseline.png";
+  const sourcePath = join(owner, source);
+  const bytes = Uint8Array.from([
+    0xff, 0xfe, 0x7b, 0x7b, 0x70, 0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x4e,
+    0x61, 0x6d, 0x65, 0x7d, 0x7d, 0x00,
+  ]);
+
+  try {
+    await writeFile(sourcePath, bytes);
+    const module = await import("../dist/generation/render-skeleton.js");
+    assert.equal(typeof module.renderTemplateCatalogEntry, "function");
+
+    const rendered = assertSuccess(
+      await module.renderTemplateCatalogEntry(
+        {
+          source,
+          destination:
+            "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+          contentKind: "binary",
+        },
+        0,
+        pathToFileURL(`${owner}/`),
+        tokens,
+      ),
+    );
+
+    assert.deepEqual([...rendered.content], [...bytes]);
+    assert.notEqual(rendered.content.at(-1), 0x0a);
+    rendered.content[0] = 0;
+    assert.deepEqual([...(await readFile(sourcePath))], [...bytes]);
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+});
+
 test("portfolio and site render exact sorted deterministic file sets", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const request = {
@@ -1146,16 +1225,23 @@ test("portfolio and site render exact sorted deterministic file sets", async () 
   assert.deepEqual(snapshotBytes(first.files), snapshotBytes(second.files));
 
   for (const rendered of [first, site]) {
+    const catalog = assertSuccess(createTemplateCatalog(rendered.project.originProfile));
+    const contentKinds = new Map(
+      catalog.map(({ destination, contentKind }) => [destination, contentKind]),
+    );
+
     for (const { path, content } of rendered.files) {
       assert.equal(path.startsWith("/"), false);
       assert.equal(path.includes(".."), false);
       assert.equal(path.includes("\\"), false);
       assert.doesNotMatch(path, /[\u0000-\u001f\u007f]/);
 
-      const text = decoder.decode(content);
-      assert.equal(text.includes("\r"), false);
-      assert.equal(text.endsWith("\n"), true);
-      assert.equal(text.endsWith("\n\n"), false);
+      if (contentKinds.get(path) === "text") {
+        const text = decoder.decode(content);
+        assert.equal(text.includes("\r"), false);
+        assert.equal(text.endsWith("\n"), true);
+        assert.equal(text.endsWith("\n\n"), false);
+      }
     }
   }
 });
@@ -1211,7 +1297,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.9.0",
+    recipeVersion: "0.10.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -1281,6 +1367,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
       "test:e2e:preview":
         "playwright test --config playwright.preview.config.ts",
+      "test:visual": "playwright test --config playwright.visual.config.ts",
       "test:unit": "vitest run --project unit",
       "test:unit:watch": "vitest --project unit",
       "test:watch": "vitest",
@@ -2560,7 +2647,7 @@ test("rendering conditionally overlays the home route and materializes each Cale
     );
 
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, "0.9.0");
+    assert.equal(rendered.project.recipeVersion, "0.10.0");
     assert.equal(
       rendered.project.selectedCapabilities.at(-1),
       "booking-calendly",
@@ -3382,6 +3469,8 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.doesNotMatch(workflow, /playwright install --with-deps/u);
   assert.match(workflow, /test:e2e:dev/u);
   assert.match(workflow, /test:e2e:preview/u);
+  assert.match(workflow, /pnpm --dir apps\/web run test:visual/u);
+  assert.doesNotMatch(workflow, /--update-snapshots/u);
   assert.match(workflow, /if: failure\(\)/u);
   assert.match(workflow, /retention-days: 7/u);
   assert.doesNotMatch(workflow, /secrets\.|deploy|release|PLAYWRIGHT_DEPLOYED_URL/iu);
@@ -3442,6 +3531,10 @@ test("generated browser quality is environment-specific and content-agnostic", a
           run: "pnpm --dir apps/web run test:e2e:preview",
         },
         {
+          name: "Compare OpenNext visual baselines",
+          run: "pnpm --dir apps/web run test:visual",
+        },
+        {
           name: "Upload browser failure artifacts",
           if: "failure()",
           uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
@@ -3470,6 +3563,119 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.match(readme, /does not establish WCAG conformance/iu);
 });
 
+test("generated visual regression owns four deterministic preview baselines", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const portfolio = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const booking = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      bookingCalendly: {
+        destination: "https://calendly.com/acme/intro",
+        mode: "popup",
+      },
+      packageVersions,
+    }),
+  );
+  const site = assertSuccess(
+    await renderSkeleton({
+      profile: "site",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+  const portfolioFiles = indexFiles(portfolio.files);
+  const configuration = portfolioFiles.get(
+    "apps/web/playwright.visual.config.ts",
+  );
+  const specification = portfolioFiles.get(
+    "apps/web/tests/visual/home-visual.spec.ts",
+  );
+  const readme = portfolioFiles.get("README.md");
+  const rootInstructions = portfolioFiles.get("AGENTS.md");
+  const webInstructions = portfolioFiles.get("apps/web/AGENTS.md");
+
+  assert.match(configuration, /http:\/\/127\.0\.0\.1:3101/u);
+  assert.match(
+    configuration,
+    /pnpm exec opennextjs-cloudflare preview -- --ip 127\.0\.0\.1 --port 3101/u,
+  );
+  assert.match(configuration, /testDir: "\.\/tests\/visual"/u);
+  assert.match(configuration, /workers: 1/u);
+  assert.match(configuration, /locale: "en-CA"/u);
+  assert.match(configuration, /timezoneId: "America\/Toronto"/u);
+  assert.match(configuration, /colorScheme: "light"/u);
+  assert.match(configuration, /reducedMotion: "reduce"/u);
+  assert.match(configuration, /threshold: 0/u);
+  assert.match(configuration, /maxDiffPixels: 0/u);
+  assert.match(configuration, /animations: "disabled"/u);
+  assert.match(configuration, /caret: "hide"/u);
+  assert.match(configuration, /scale: "css"/u);
+  assert.doesNotMatch(configuration, /PLAYWRIGHT_DEPLOYED_URL|reuseExistingServer: true/u);
+
+  assert.match(specification, /page\.goto\("\/"\)/u);
+  assert.match(specification, /getByRole\("main"\)/u);
+  assert.match(specification, /getByRole\("heading", \{ level: 1 \}\)/u);
+  assert.match(specification, /element\.textContent = normalizedHeroHeading/u);
+  assert.match(specification, /width: 1440, height: 900/u);
+  assert.match(specification, /width: 320, height: 800/u);
+  assert.match(specification, /toHaveScreenshot\("home-desktop\.png"\)/u);
+  assert.match(specification, /toHaveScreenshot\("home-mobile\.png"\)/u);
+  assert.equal(specification.match(/page\.goto\(/gu)?.length, 1);
+  assert.doesNotMatch(specification, /Acme|Portfolio|About|Contact/u);
+
+  assert.match(readme, /pnpm --dir apps\/web run test:visual/u);
+  assert.match(readme, /--platform linux\/amd64/u);
+  assert.match(readme, /--update-snapshots/u);
+  assert.match(readme, /application-owned baselines/iu);
+  assert.match(readme, /review the image diff/iu);
+  assert.match(readme, /git checkout-index --all --prefix=/u);
+  assert.match(readme, /\/source:ro/u);
+  assert.match(
+    readme,
+    /apps\/web\/tests\/visual\/home-visual\.spec\.ts-snapshots:\/baseline-output/u,
+  );
+  for (const baselineName of [
+    "home-desktop-chromium-linux.png",
+    "home-mobile-chromium-linux.png",
+  ]) {
+    assert.ok(readme.includes(baselineName));
+  }
+  assert.doesNotMatch(readme, /--volume "\$PWD:\/source"/u);
+  assert.doesNotMatch(readme, /\/source\/apps\/web\/tests\/visual/u);
+  assert.doesNotMatch(readme, /\*\.png/u);
+  assert.match(readme, /does not establish visual quality/iu);
+  assert.match(readme, /Playwright report and test-result artifacts/iu);
+  assert.match(rootInstructions, /visual configuration is managed/iu);
+  assert.match(rootInstructions, /visual specifications and baselines are application-owned/iu);
+  assert.match(webInstructions, /application-owned visual specifications and baselines/iu);
+  assert.match(webInstructions, /does not establish visual quality/iu);
+
+  const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+  const portfolioBytes = indexFileBytes(portfolio.files);
+  const bookingBytes = indexFileBytes(booking.files);
+  const siteBytes = indexFileBytes(site.files);
+  for (const path of visualBaselinePaths) {
+    const portfolioBaseline = portfolioBytes.get(path);
+    const bookingBaseline = bookingBytes.get(path);
+    const siteBaseline = siteBytes.get(path);
+
+    assert.deepEqual([...portfolioBaseline.slice(0, 8)], pngSignature);
+    assert.deepEqual([...siteBaseline.slice(0, 8)], pngSignature);
+    assert.deepEqual(bookingBaseline, portfolioBaseline);
+    assert.notDeepEqual(siteBaseline, portfolioBaseline);
+  }
+});
+
 test("rendered files satisfy every inference probe in their resolved recipes", async () => {
   const core = await import("../dist/index.js");
 
@@ -3484,10 +3690,11 @@ test("rendered files satisfy every inference probe in their resolved recipes", a
     );
     const reader = core.createInMemoryRepositoryReader(
       Object.fromEntries(
-        rendered.files.map(({ path, content }) => [
-          path,
-          decoder.decode(content),
-        ]),
+        rendered.files.flatMap(({ path, content }) =>
+          visualBaselinePaths.includes(path)
+            ? []
+            : [[path, decoder.decode(content)]],
+        ),
       ),
     );
     const inference = await core.inferRepository({
@@ -3527,7 +3734,11 @@ test("rendered files satisfy every inference probe in their resolved recipes", a
   );
   const reader = core.createInMemoryRepositoryReader(
     Object.fromEntries(
-      selected.files.map(({ path, content }) => [path, decoder.decode(content)]),
+      selected.files.flatMap(({ path, content }) =>
+        visualBaselinePaths.includes(path)
+          ? []
+          : [[path, decoder.decode(content)]],
+      ),
     ),
   );
   const inference = await core.inferRepository({
@@ -4819,8 +5030,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 98],
-    ["site", 100],
+    ["portfolio", 103],
+    ["site", 105],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -4943,6 +5154,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       "/scripts/test:e2e:preview",
       "/scripts/test:unit",
       "/scripts/test:unit:watch",
+      "/scripts/test:visual",
       "/scripts/test:watch",
       "/scripts/typecheck",
       "/type",
@@ -4962,7 +5174,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       packageVersions,
     }),
   );
-  assert.equal(selected.surfaces.length, 103);
+  assert.equal(selected.surfaces.length, 108);
   assert.deepEqual(
     selected.surfaces
       .filter(

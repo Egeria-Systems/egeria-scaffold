@@ -547,8 +547,8 @@ test("restricted error diagnostics admission advances every direct owner togethe
       recipeVersion,
     })),
     [
-      { identifier: "portfolio", recipeVersion: "0.9.0" },
-      { identifier: "site", recipeVersion: "0.9.0" },
+      { identifier: "portfolio", recipeVersion: "0.10.0" },
+      { identifier: "site", recipeVersion: "0.10.0" },
     ],
   );
 
@@ -664,6 +664,7 @@ test("doctor and diff agree across the canonical portfolio composition", async (
         "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
         "test:e2e:preview":
           "playwright test --config playwright.preview.config.ts",
+        "test:visual": "playwright test --config playwright.visual.config.ts",
         "test:unit": "vitest run --project unit",
         "test:unit:watch": "vitest --project unit",
         "test:watch": "vitest",
@@ -718,10 +719,16 @@ test("doctor and diff agree across the canonical portfolio composition", async (
     "apps/web/playwright.deployed.config.ts": "export {};\n",
     "apps/web/playwright.dev.config.ts": "export {};\n",
     "apps/web/playwright.preview.config.ts": "export {};\n",
+    "apps/web/playwright.visual.config.ts": "export {};\n",
     "apps/web/tests/e2e/site-quality.spec.ts": "export {};\n",
     "apps/web/tests/component/content-page.test.tsx": "export {};\n",
     "apps/web/tests/setup/component.ts": "export {};\n",
     "apps/web/tests/unit/content-schema.test.ts": "export {};\n",
+    "apps/web/tests/visual/home-visual.spec.ts": "export {};\n",
+    "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png":
+      "desktop baseline\n",
+    "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png":
+      "mobile baseline\n",
     "apps/web/vitest.config.ts": "export {};\n",
   };
   const surfaceResult = core.materializeInstalledSurfaces({

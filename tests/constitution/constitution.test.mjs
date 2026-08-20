@@ -444,6 +444,11 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "needs.scope.outputs.generated-projects == 'true'",
   );
   assert.deepEqual(workflow.jobs["generated-projects"].needs, ["scope"]);
+  assert.deepEqual(workflow.jobs["generated-projects"].container, {
+    image:
+      "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
+    options: "--shm-size=1g",
+  });
   assert.equal(
     workflow.jobs["compatibility-proof"].if,
     "needs.scope.outputs.compatibility-proof == 'true'",
@@ -481,13 +486,43 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   );
   for (const command of [
     "pnpm run test:generated-fixtures",
-    "pnpm run verify:generated-skeletons",
+    "pnpm run verify:generated-visuals",
   ]) {
     assert.match(
       commandsByJob["generated-projects"],
       new RegExp(escapeRegularExpression(command), "u"),
     );
   }
+  assert.doesNotMatch(
+    commandsByJob["generated-projects"],
+    /verify:generated-skeletons|--update-snapshots/u,
+  );
+  assert.equal(
+    workflow.jobs["generated-projects"].steps.filter(
+      ({ run }) => run === "pnpm run verify:generated-visuals",
+    ).length,
+    1,
+  );
+  const generatedProjectSteps = workflow.jobs["generated-projects"].steps;
+  const visualVerificationIndex = generatedProjectSteps.findIndex(
+    ({ run }) => run === "pnpm run verify:generated-visuals",
+  );
+  const visualArtifactUploadIndex = generatedProjectSteps.findIndex(
+    ({ name }) => name === "Upload generated visual failure artifacts",
+  );
+  assert.ok(visualArtifactUploadIndex > visualVerificationIndex);
+  assert.deepEqual(generatedProjectSteps[visualArtifactUploadIndex], {
+    name: "Upload generated visual failure artifacts",
+    if: "failure()",
+    uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    with: {
+      name: "generated-visual-failure-artifacts",
+      path: "generated-visual-artifacts/",
+      "if-no-files-found": "ignore",
+      "include-hidden-files": false,
+      "retention-days": 7,
+    },
+  });
   for (const command of [
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run lint",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run typecheck",
@@ -687,7 +722,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
         candidate.jobs["generated-projects"].steps = candidate.jobs[
           "generated-projects"
         ].steps.filter(
-          ({ run }) => run !== "pnpm run verify:generated-skeletons",
+          ({ run }) => run !== "pnpm run verify:generated-visuals",
         );
       },
     },
@@ -717,6 +752,10 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
   );
 
   const rootManifest = JSON.parse(await readRepositoryFile("package.json"));
+  assert.equal(
+    rootManifest.scripts["verify:generated-visuals"],
+    "node scripts/verify-generated-skeletons.mjs --visual",
+  );
   const kernelCommands = rootManifest.scripts["verify:builder-kernel"].split(" && ");
   assert.ok(
     kernelCommands.indexOf("pnpm run build:builder") <
@@ -2244,7 +2283,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+observability@0\.3\.0[^\n]+certified[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
+    /standards@0\.4\.0[^\n]+pending[^\n]+booking-calendly@0\.1\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2252,7 +2291,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+passes[^\n]+all-certified[^\n]+three frozen backfills/i,
+    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending standards/i,
   );
 });
 
@@ -2412,7 +2451,13 @@ test("executable capability certification ownership is current", async () => {
     ),
   );
   assert.equal(observabilityRecord.status, "certified");
-  assert.equal(standardsRecord.status, "certified");
+  assert.equal(standardsRecord.status, "pending");
+  assert.deepEqual(standardsRecord.requiredEvidence, ["fresh-scaffold"]);
+  assert.deepEqual(standardsRecord.evidence, []);
+  assert.equal(
+    standardsRecord.taskPlan,
+    "docs/superpowers/plans/2026-08-19-generated-visual-regression-certification.md",
+  );
   assert.deepEqual(observabilityRecord.requiredEvidence, [
     "cleanup-recovery",
     "deployed-application",
@@ -2436,7 +2481,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     rootReadme,
-    /recipe `0\.9\.0`[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0/iu,
+    /recipe `0\.10\.0`[^\n]+standards@0\.4\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0/iu,
   );
   assert.match(
     capabilityModel,
@@ -2444,7 +2489,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /portfolio` and `site` recipes are `0\.9\.0`[^\n]+deployment-cloudflare@0\.3\.0[^\n]+observability@0\.3\.0/iu,
+    /portfolio` and `site` recipes are `0\.10\.0`[^\n]+standards@0\.4\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+observability@0\.3\.0/iu,
   );
   assert.match(
     capabilityModel,
@@ -2488,7 +2533,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     packageOwnership,
-    /descriptor `standards@0\.3\.0` is certified from its exact local subject-bound receipt[^\n]+public `0\.2\.0` availability alone does not alter the installed public package/iu,
+    /descriptor `standards@0\.4\.0` is pending separate fresh-scaffold certification[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
   );
   assert.deepEqual(
     bookingRecord.evidence.map(({ kind }) => kind),
@@ -2514,7 +2559,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+passes[^\n]+all-certified[^\n]+three frozen backfills/iu,
+    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending standards/iu,
   );
   assert.match(
     enforcementMap,
@@ -2544,6 +2589,104 @@ test("executable capability certification ownership is current", async () => {
     assert.match(document, /private certification registry/iu);
     assert.match(document, /descriptor admission/iu);
     assert.match(document, /closure/iu);
+  }
+});
+
+test("canonical documentation records the generated visual regression boundary", async () => {
+  const visualCertificationTask = namedLabel("Task", "8B");
+  const [
+    rootInstructions,
+    contributing,
+    rootReadme,
+    sourcePlan,
+    capabilityModel,
+    enforcementMap,
+    overview,
+    packageOwnership,
+    roadmap,
+    builderInstructions,
+    builderReadme,
+  ] = await Promise.all([
+    readRepositoryFile("AGENTS.md"),
+    readRepositoryFile("CONTRIBUTING.md"),
+    readRepositoryFile("README.md"),
+    readRepositoryFile(
+      "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+    ),
+    readRepositoryFile("docs/architecture/capability-model.md"),
+    readRepositoryFile("docs/architecture/enforcement-map.md"),
+    readRepositoryFile("docs/architecture/overview.md"),
+    readRepositoryFile("docs/architecture/package-ownership.md"),
+    readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+    readRepositoryFile("packages/builder-core/AGENTS.md"),
+    readRepositoryFile("packages/builder-core/README.md"),
+  ]);
+
+  for (const statusOwner of [sourcePlan, overview, roadmap]) {
+    assert.match(
+      statusOwner,
+      /b46f5f59c7f98ed6be1fa569a2f4a1f23d1ca1ad[^\n]+32323617228/iu,
+    );
+  }
+  for (const currentOwner of [
+    rootReadme,
+    sourcePlan,
+    capabilityModel,
+    enforcementMap,
+    overview,
+    packageOwnership,
+    roadmap,
+    builderReadme,
+  ]) {
+    assert.match(currentOwner, /standards@0\.4\.0/iu);
+  }
+
+  assert.match(
+    capabilityModel,
+    /managed visual configuration[^\n]+application-owned specification[^\n]+profile baselines/iu,
+  );
+  assert.match(capabilityModel, /OpenNext\/workerd preview/iu);
+  assert.match(capabilityModel, /1440[^\n]+900[^\n]+320[^\n]+800/iu);
+  assert.match(capabilityModel, /--update-snapshots[^\n]+causal source change/iu);
+  assert.match(capabilityModel, /failure-only[^\n]+seven days/iu);
+  assert.match(
+    capabilityModel,
+    new RegExp(
+      `${escapeRegularExpression(visualCertificationTask)}[^\\n]+pending[^\\n]+fresh-scaffold`,
+      "iu",
+    ),
+  );
+
+  assert.match(
+    enforcementMap,
+    /deterministic visual regression[^\n]+actual[^\n]+verify:generated-visuals/iu,
+  );
+  assert.match(enforcementMap, /binary[^\n]+PNG/iu);
+  assert.match(enforcementMap, /test:visual/iu);
+  assert.match(enforcementMap, /failure-only[^\n]+seven days/iu);
+  assert.match(
+    packageOwnership,
+    /standards@0\.4\.0[^\n]+public package pin `0\.1\.0`[^\n]+unchanged/iu,
+  );
+
+  for (const contributorSurface of [
+    rootInstructions,
+    contributing,
+    rootReadme,
+    builderInstructions,
+    builderReadme,
+  ]) {
+    assert.match(contributorSurface, /verify:generated-visuals|test:visual/iu);
+    assert.match(
+      contributorSurface,
+      /visual quality[^\n]+WCAG conformance/iu,
+    );
+  }
+  for (const sequencingOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      sequencingOwner,
+      /visual regression[^\n]+implemented[^\n]+performance budgets[^\n]+separate[^\n]+unimplemented/iu,
+    );
   }
 });
 

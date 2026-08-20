@@ -319,6 +319,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/playwright.deployed.config.ts",
       "common/apps/web/playwright.dev.config.ts",
       "common/apps/web/playwright.preview.config.ts",
+      "common/apps/web/playwright.visual.config.ts",
       "common/apps/web/postcss.config.mjs",
       "common/apps/web/src/content/content-schema.ts",
       "common/apps/web/src/content/content-source.d.ts",
@@ -336,6 +337,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/tests/e2e/site-quality.spec.ts",
       "common/apps/web/tests/setup/component.ts",
       "common/apps/web/tests/unit/content-schema.test.ts",
+      "common/apps/web/tests/visual/home-visual.spec.ts",
       "common/apps/web/tsconfig.json",
       "common/apps/web/vitest.config.ts",
       "common/apps/web/wrangler.jsonc.template",
@@ -343,10 +345,14 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/pnpm-workspace.yaml",
       "portfolio/apps/web/content/en-CA/long-form/introduction.md.template",
       "portfolio/apps/web/content/en-CA/site.yaml.template",
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
       "site/apps/web/app/about/page.tsx",
       "site/apps/web/content/en-CA/about.yaml.template",
       "site/apps/web/content/en-CA/long-form/introduction.md.template",
       "site/apps/web/content/en-CA/site.yaml.template",
+      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
     ],
   );
 });
@@ -382,14 +388,15 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /content-safe read-only diagnostics/);
   assert.match(builderInstructions, /neither authorize nor perform a repository change/);
   assert.match(builderInstructions, /deterministic in-memory rendering/);
-  assert.match(builderInstructions, /explicit allowlisted templates/);
+  assert.match(builderInstructions, /explicit allowlisted[^\n]+templates/);
   assert.match(builderInstructions, /YAML 1.2/);
   assert.match(builderInstructions, /Markdown with validated YAML front matter/);
-  assert.match(builderInstructions, /recipe `0.9.0`/);
+  assert.match(builderInstructions, /recipe `0.10.0`/);
   assert.match(builderInstructions, /source-owned typed section registry/);
   assert.match(builderInstructions, /Tailwind CSS and PostCSS/);
   assert.match(builderInstructions, /Vitest Node\/jsdom/);
   assert.match(builderInstructions, /Playwright\/axe/);
+  assert.match(builderInstructions, /verify:generated-visuals/);
   assert.match(builderInstructions, /state-last generation/);
   assert.match(builderInstructions, /exact verified public package versions/);
   assert.match(builderInstructions, /identity-recorded sibling temporary directory/);
@@ -402,14 +409,15 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /diffProject/);
   assert.match(builderReadme, /renderSkeleton/);
   assert.match(builderReadme, /deterministic in-memory rendering/);
-  assert.match(builderReadme, /explicit allowlisted templates/);
+  assert.match(builderReadme, /explicit allowlisted[^\n]+templates/);
   assert.match(builderReadme, /YAML 1.2/);
   assert.match(builderReadme, /Markdown with validated YAML front matter/);
-  assert.match(builderReadme, /recipe `0.9.0`/);
+  assert.match(builderReadme, /recipe `0.10.0`/);
   assert.match(builderReadme, /four source-registered typed section shapes/);
   assert.match(builderReadme, /Tailwind CSS and PostCSS/);
   assert.match(builderReadme, /named generated Vitest unit\/component projects/);
   assert.match(builderReadme, /Playwright\/axe/);
+  assert.match(builderReadme, /verify:generated-visuals/);
   assert.match(builderReadme, /generateProject/);
   assert.match(builderReadme, /previously absent destination/);
   assert.match(builderReadme, /installed state last/);

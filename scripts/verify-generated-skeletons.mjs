@@ -29,6 +29,21 @@ const versionTimeoutMilliseconds = 30 * 1000;
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const requiredPnpmVersion = "11.20.0";
 const publicRegistry = "https://registry.npmjs.org/";
+const generatedVisualArtifactsRoot = resolve(
+  repositoryRoot,
+  "generated-visual-artifacts",
+);
+const visualArtifactMaximumBytes = 16 * 1024 * 1024;
+const visualArtifactDirectories = Object.freeze([
+  Object.freeze({
+    destination: "playwright-report",
+    relativeSource: "apps/web/playwright-report",
+  }),
+  Object.freeze({
+    destination: "test-results",
+    relativeSource: "apps/web/test-results",
+  }),
+]);
 const codePointCompare = (left, right) =>
   left < right ? -1 : left > right ? 1 : 0;
 
@@ -63,6 +78,7 @@ const portfolioFiles = Object.freeze([
   "apps/web/playwright.deployed.config.ts",
   "apps/web/playwright.dev.config.ts",
   "apps/web/playwright.preview.config.ts",
+  "apps/web/playwright.visual.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
@@ -80,6 +96,9 @@ const portfolioFiles = Object.freeze([
   "apps/web/tests/component/content-page.test.tsx",
   "apps/web/tests/setup/component.ts",
   "apps/web/tests/unit/content-schema.test.ts",
+  "apps/web/tests/visual/home-visual.spec.ts",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
   "apps/web/tsconfig.json",
   "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
@@ -149,15 +168,15 @@ export const generatedFixtureContracts = Object.freeze([
       "deployment-cloudflare",
       "observability",
     ]),
-    expectedRecipeVersion: "0.9.0",
-    expectedStandardsVersion: "0.3.0",
+    expectedRecipeVersion: "0.10.0",
+    expectedStandardsVersion: "0.4.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
     expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: null,
-    expectedSurfaces: 101,
+    expectedSurfaces: 106,
   }),
   Object.freeze({
     identifier: "portfolio-calendly",
@@ -186,15 +205,15 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "booking-calendly",
     ]),
-    expectedRecipeVersion: "0.9.0",
-    expectedStandardsVersion: "0.3.0",
+    expectedRecipeVersion: "0.10.0",
+    expectedStandardsVersion: "0.4.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
     expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: "0.1.0",
-    expectedSurfaces: 106,
+    expectedSurfaces: 111,
   }),
   Object.freeze({
     identifier: "site",
@@ -221,15 +240,15 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "site-routing",
     ]),
-    expectedRecipeVersion: "0.9.0",
-    expectedStandardsVersion: "0.3.0",
+    expectedRecipeVersion: "0.10.0",
+    expectedStandardsVersion: "0.4.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
     expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: "0.3.0",
     expectedBookingCalendlyVersion: null,
-    expectedSurfaces: 103,
+    expectedSurfaces: 108,
   }),
 ]);
 
@@ -250,6 +269,9 @@ const verificationChecks = [
   "browser-development",
   "browser-preview",
 ];
+const visualVerificationCheck = "visual-regression";
+const defaultVerificationOptions = Object.freeze({ includeVisual: false });
+const visualVerificationOptions = Object.freeze({ includeVisual: true });
 
 const requiredPublicPackages = [
   {
@@ -383,6 +405,7 @@ function expectedWebManifest(projectName) {
       "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
       "test:e2e:preview":
         "playwright test --config playwright.preview.config.ts",
+      "test:visual": "playwright test --config playwright.visual.config.ts",
       "test:unit": "vitest run --project unit",
       "test:unit:watch": "vitest --project unit",
       "test:watch": "vitest",
@@ -403,6 +426,30 @@ export class GeneratedFixtureVerificationError extends Error {
 
 function fail(code) {
   throw new GeneratedFixtureVerificationError(code);
+}
+
+export function parseVerificationArguments(arguments_) {
+  if (!Array.isArray(arguments_)) {
+    fail("VERIFICATION_ARGUMENT_INVALID");
+  }
+  if (arguments_.length === 0) {
+    return defaultVerificationOptions;
+  }
+  if (arguments_.length === 1 && arguments_[0] === "--visual") {
+    return visualVerificationOptions;
+  }
+  fail("VERIFICATION_ARGUMENT_INVALID");
+}
+
+function requireVerificationOptions(options) {
+  if (
+    options === null ||
+    typeof options !== "object" ||
+    Object.keys(options).length !== 1 ||
+    typeof options.includeVisual !== "boolean"
+  ) {
+    fail("VERIFICATION_OPTION_INVALID");
+  }
 }
 
 function fingerprint(content) {
@@ -673,6 +720,118 @@ async function defaultRunCommand(input) {
   return stdout;
 }
 
+async function measureVisualArtifactTree(root, maximumBytes) {
+  let totalBytes = 0;
+
+  async function visit(directory) {
+    let entries;
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+    }
+    entries.sort((left, right) => codePointCompare(left.name, right.name));
+
+    for (const entry of entries) {
+      const path = join(directory, entry.name);
+      let stats;
+      try {
+        stats = await lstat(path);
+      } catch {
+        fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+      }
+      if (stats.isSymbolicLink()) {
+        fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+      }
+      if (stats.isDirectory()) {
+        await visit(path);
+      } else if (stats.isFile()) {
+        totalBytes += stats.size;
+        if (totalBytes > maximumBytes) {
+          fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+        }
+      } else {
+        fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+      }
+    }
+  }
+
+  await visit(root);
+  return totalBytes;
+}
+
+async function captureVisualFailureArtifacts({
+  identifier,
+  validationRoot,
+  artifactRoot = generatedVisualArtifactsRoot,
+  maximumBytes = visualArtifactMaximumBytes,
+}) {
+  await mkdir(artifactRoot, {
+    recursive: true,
+    mode: 0o700,
+  });
+  let artifactRootStats;
+  try {
+    artifactRootStats = await lstat(artifactRoot);
+  } catch {
+    fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+  }
+  if (artifactRootStats.isSymbolicLink() || !artifactRootStats.isDirectory()) {
+    fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+  }
+  await chmod(artifactRoot, 0o700);
+
+  let totalBytes = 0;
+  const availableArtifacts = [];
+
+  for (const artifact of visualArtifactDirectories) {
+    const source = join(validationRoot, artifact.relativeSource);
+    let sourceStats;
+    try {
+      sourceStats = await lstat(source);
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+    }
+    if (sourceStats.isSymbolicLink() || !sourceStats.isDirectory()) {
+      fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+    }
+
+    const bytes = await measureVisualArtifactTree(
+      source,
+      maximumBytes - totalBytes,
+    );
+    totalBytes += bytes;
+    availableArtifacts.push({ ...artifact, bytes, source });
+  }
+
+  const outputRoot = await mkdtemp(
+    join(artifactRoot, `${identifier}-`),
+  );
+  await chmod(outputRoot, 0o700);
+
+  for (const artifact of availableArtifacts) {
+    await cp(artifact.source, join(outputRoot, artifact.destination), {
+      recursive: true,
+      force: false,
+      errorOnExist: true,
+      dereference: false,
+    });
+  }
+
+  await writeFile(
+    join(outputRoot, "failure.json"),
+    `${JSON.stringify({
+      code: "VISUAL_REGRESSION_FAILED",
+      fixture: identifier,
+    })}\n`,
+    { flag: "wx", mode: 0o600 },
+  );
+}
+
+export const captureVisualFailureArtifactsForTesting =
+  captureVisualFailureArtifacts;
+
 async function runExpectedCommand(runCommand, input, failureCode) {
   try {
     return await runCommand(input);
@@ -681,7 +840,12 @@ async function runExpectedCommand(runCommand, input, failureCode) {
   }
 }
 
-async function verifySourcesWithAdapters(adapters, sourcesBefore) {
+async function verifySourcesWithAdapters(
+  adapters,
+  sourcesBefore,
+  options = defaultVerificationOptions,
+) {
+  requireVerificationOptions(options);
   let owner;
   try {
     owner = await adapters.createOwner();
@@ -793,14 +957,40 @@ async function verifySourcesWithAdapters(adapters, sourcesBefore) {
           arguments: ["--dir", "apps/web", "run", "test:e2e:preview"],
           failureCode: "BROWSER_PREVIEW_FAILED",
         },
+        ...(options.includeVisual
+          ? [
+              {
+                arguments: ["--dir", "apps/web", "run", "test:visual"],
+                failureCode: "VISUAL_REGRESSION_FAILED",
+              },
+            ]
+          : []),
       ];
 
       for (const command of commands) {
-        await runExpectedCommand(
-          adapters.runCommand,
-          commandInput(command.arguments),
-          command.failureCode,
-        );
+        try {
+          await runExpectedCommand(
+            adapters.runCommand,
+            commandInput(command.arguments),
+            command.failureCode,
+          );
+        } catch (error) {
+          if (
+            error instanceof GeneratedFixtureVerificationError &&
+            error.code === "VISUAL_REGRESSION_FAILED" &&
+            adapters.captureVisualArtifacts !== undefined
+          ) {
+            try {
+              await adapters.captureVisualArtifacts({
+                identifier: source.contract.identifier,
+                validationRoot,
+              });
+            } catch {
+              error.artifactExportCode = "VISUAL_ARTIFACT_EXPORT_FAILED";
+            }
+          }
+          throw error;
+        }
       }
     }
   } catch (error) {
@@ -849,15 +1039,21 @@ async function verifySourcesWithAdapters(adapters, sourcesBefore) {
     profiles: [
       ...new Set(sourcesBefore.map(({ contract }) => contract.profile)),
     ],
-    checks: verificationChecks,
+    checks: options.includeVisual
+      ? [...verificationChecks, visualVerificationCheck]
+      : verificationChecks,
   };
 }
 
-export function verifyGeneratedSkeletons() {
-  return verifyGeneratedSkeletonsForTesting({
-    createOwner: createGeneratedFixtureOwner,
-    runCommand: defaultRunCommand,
-  });
+export function verifyGeneratedSkeletons(options = defaultVerificationOptions) {
+  return verifyGeneratedSkeletonsForTesting(
+    {
+      captureVisualArtifacts: captureVisualFailureArtifacts,
+      createOwner: createGeneratedFixtureOwner,
+      runCommand: defaultRunCommand,
+    },
+    options,
+  );
 }
 
 function requireAdapters(adapters) {
@@ -865,7 +1061,9 @@ function requireAdapters(adapters) {
     adapters === null ||
     typeof adapters !== "object" ||
     typeof adapters.createOwner !== "function" ||
-    typeof adapters.runCommand !== "function"
+    typeof adapters.runCommand !== "function" ||
+    (adapters.captureVisualArtifacts !== undefined &&
+      typeof adapters.captureVisualArtifacts !== "function")
   ) {
     fail("VERIFICATION_ADAPTER_INVALID");
   }
@@ -880,25 +1078,35 @@ async function sourceForRoot(root, contract) {
   };
 }
 
-export async function verifyGeneratedSkeletonsForTesting(adapters) {
+export async function verifyGeneratedSkeletonsForTesting(
+  adapters,
+  options = defaultVerificationOptions,
+) {
   requireAdapters(adapters);
   const sources = await Promise.all(
     generatedFixtureContracts.map((contract) =>
       sourceForRoot(resolve(repositoryRoot, contract.relativeRoot), contract),
     ),
   );
-  return verifySourcesWithAdapters(adapters, sources);
+  return verifySourcesWithAdapters(adapters, sources, options);
 }
 
-export function verifyGeneratedProject(root, identifier, expectedProjectName) {
+export function verifyGeneratedProject(
+  root,
+  identifier,
+  expectedProjectName,
+  options = defaultVerificationOptions,
+) {
   return verifyGeneratedProjectForTesting(
     root,
     identifier,
     {
+      captureVisualArtifacts: captureVisualFailureArtifacts,
       createOwner: createGeneratedFixtureOwner,
       runCommand: defaultRunCommand,
     },
     expectedProjectName,
+    options,
   );
 }
 
@@ -907,6 +1115,7 @@ export async function verifyGeneratedProjectForTesting(
   identifier,
   adapters,
   expectedProjectName,
+  options = defaultVerificationOptions,
 ) {
   requireAdapters(adapters);
   const contract = contractForGeneratedProject(
@@ -914,12 +1123,13 @@ export async function verifyGeneratedProjectForTesting(
     expectedProjectName,
   );
   const source = await sourceForRoot(root, contract);
-  return verifySourcesWithAdapters(adapters, [source]);
+  return verifySourcesWithAdapters(adapters, [source], options);
 }
 
 async function runMain() {
   try {
-    const result = await verifyGeneratedSkeletons();
+    const options = parseVerificationArguments(process.argv.slice(2));
+    const result = await verifyGeneratedSkeletons(options);
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } catch (error) {
     const code =
@@ -930,6 +1140,9 @@ async function runMain() {
       `${JSON.stringify({
         ok: false,
         code,
+        ...(error?.artifactExportCode === undefined
+          ? {}
+          : { artifactExportCode: error.artifactExportCode }),
       })}\n`,
     );
     process.exitCode = 1;

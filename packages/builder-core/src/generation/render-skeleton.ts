@@ -109,12 +109,32 @@ function remapTokenIssues(
   }));
 }
 
-async function renderEntry(
+export async function renderTemplateCatalogEntry(
   entry: TemplateCatalogEntry,
   index: number,
   root: URL,
   tokens: TemplateTokens,
 ): Promise<ValidationResult<GeneratedFile>> {
+  if (entry.contentKind === "binary") {
+    try {
+      const source = await readFile(new URL(entry.source, root));
+
+      return {
+        ok: true,
+        value: {
+          path: entry.destination,
+          content: new Uint8Array(source),
+        },
+      };
+    } catch {
+      return generatedIssue(
+        "TEMPLATE_READ_FAILED",
+        ["templates", index, "source"],
+        "read-failed",
+      );
+    }
+  }
+
   let source: string;
 
   try {
@@ -407,7 +427,12 @@ export async function renderSkeleton(
   const files: GeneratedFile[] = [];
 
   for (const [index, entry] of templateCatalogResult.value.entries()) {
-    const result = await renderEntry(entry, index, templateRoot, tokens);
+    const result = await renderTemplateCatalogEntry(
+      entry,
+      index,
+      templateRoot,
+      tokens,
+    );
     if (!result.ok) {
       return result;
     }

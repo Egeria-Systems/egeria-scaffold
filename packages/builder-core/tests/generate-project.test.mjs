@@ -77,6 +77,7 @@ const portfolioRenderedPaths = [
   "apps/web/playwright.deployed.config.ts",
   "apps/web/playwright.dev.config.ts",
   "apps/web/playwright.preview.config.ts",
+  "apps/web/playwright.visual.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
@@ -94,6 +95,9 @@ const portfolioRenderedPaths = [
   "apps/web/tests/e2e/site-quality.spec.ts",
   "apps/web/tests/setup/component.ts",
   "apps/web/tests/unit/content-schema.test.ts",
+  "apps/web/tests/visual/home-visual.spec.ts",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
   "apps/web/tsconfig.json",
   "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
@@ -824,10 +828,10 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
-      assert.equal(generated.state.origin.recipeVersion, "0.9.0");
+      assert.equal(generated.state.origin.recipeVersion, "0.10.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 101 : 103,
+        profile === "portfolio" ? 106 : 108,
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -845,7 +849,7 @@ test("portfolio and site generation writes exact state-last repositories", async
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "standards",
         )?.version,
-        "0.3.0",
+        "0.4.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -1115,7 +1119,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
       accepted.state.installedCapabilities,
       core.createInstalledManifest(resolved),
     );
-    assert.equal(accepted.state.managedSurfaces.length, 106);
+    assert.equal(accepted.state.managedSurfaces.length, 111);
     assert.equal(
       accepted.state.managedSurfaces.filter(
         ({ owner }) =>

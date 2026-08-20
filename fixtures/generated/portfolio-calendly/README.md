@@ -44,6 +44,27 @@ Deployed mode rejects missing, malformed, non-HTTPS, credential-bearing, query-b
 
 Playwright reports and test results are ignored locally and uploaded for seven days when generated CI browser checks fail. Axe and browser checks provide bounded evidence for selected automated and interaction behaviors. Passing them does not establish WCAG conformance, assistive-technology compatibility, or human usability.
 
+## Visual regression checks
+
+The visual suite compares the generated home route at one desktop viewport and one narrow mobile viewport against reviewed application-owned baselines. It consumes prepared OpenNext output through the loopback workerd preview boundary:
+
+```sh
+pnpm run build
+pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild
+pnpm --dir apps/web run test:visual
+```
+
+Baseline updates are an explicit review action. Use a clean index, stage only the intended causal source and configuration changes, and inspect the staged diff for private inputs before continuing. The command below creates a read-only source snapshot from the index, exposes only the application-owned baseline directory as writable, and copies back only the two approved PNG names. Run it in the exact pinned Linux/amd64 environment, review the image diff together with the expected and actual images, and commit baseline bytes only beside their causal source change:
+
+```sh
+visual_baseline_source="$(mktemp -d)"
+trap 'rm -rf "$visual_baseline_source"' EXIT
+git checkout-index --all --prefix="$visual_baseline_source/"
+docker run --rm --platform linux/amd64 --shm-size=1g --workdir /work --env PNPM_HOME=/pnpm --env PATH=/pnpm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin --volume "${visual_baseline_source}:/source:ro" --volume "$PWD/apps/web/tests/visual/home-visual.spec.ts-snapshots:/baseline-output" mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e bash -lc 'cp -a /source/. /work/ && corepack pnpm runtime set node 22.23.2 -g && corepack enable --install-directory /pnpm/bin && node --version && pnpm --version && pnpm install --frozen-lockfile && pnpm run build && pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild && pnpm --dir apps/web run test:visual --update-snapshots && cp /work/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png /baseline-output/home-desktop-chromium-linux.png && cp /work/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png /baseline-output/home-mobile-chromium-linux.png'
+```
+
+Rerun the comparison without `--update-snapshots` before accepting the change. CI never updates baselines. On failure, the existing failure-only upload contains Playwright report and test-result artifacts, including expected, actual, and diff images when available, and retains them for seven days. Screenshot equality is narrow regression evidence for these selected pixels in the pinned environment; it does not establish visual quality, design quality, human usability, accessibility conformance, deployed behavior, or production readiness.
+
 ## Protected Cloudflare deployment
 
 The generated `.github/workflows/deploy.yml` is manual and accepts the exact lowercase 40-character `main` revision approved for deployment. Before enabling it, create a GitHub environment named `production`, restrict it to the protected `main` branch, add required reviewers where the repository plan supports them, and set its `DEPLOY_URL` variable to the public HTTPS root that the deployed browser check must exercise. Enable Prevent self-review when the selected GitHub plan and environment controls support it. Verify the control instead of assuming it exists; when unavailable, record that limitation in the deployment approval evidence and require an eligible reviewer other than the workflow initiator.

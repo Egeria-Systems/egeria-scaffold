@@ -4,7 +4,7 @@ export const profileRecipes: readonly ProfileRecipe[] = [
   {
     identifier: "portfolio",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.9.0",
+    recipeVersion: "0.10.0",
     defaultCapabilities: [
       "standards",
       "content-files",
@@ -16,7 +16,7 @@ export const profileRecipes: readonly ProfileRecipe[] = [
   {
     identifier: "site",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.9.0",
+    recipeVersion: "0.10.0",
     defaultCapabilities: [
       "standards",
       "content-files",
