@@ -2645,6 +2645,10 @@ test("canonical documentation records the generated visual regression boundary",
       statusOwner,
       /8e5f376f32a95f87420fd82a61566c08c2db020e[^\n]+32399819237/iu,
     );
+    assert.match(
+      statusOwner,
+      /8e5f376f32a95f87420fd82a61566c08c2db020e[^\n]+32399819237[^\n]+integration evidence[^\n]+not[^\n]+certification evidence/iu,
+    );
   }
   for (const currentOwner of [
     rootReadme,
@@ -2654,12 +2658,17 @@ test("canonical documentation records the generated visual regression boundary",
     overview,
     packageOwnership,
     roadmap,
+    builderInstructions,
     builderReadme,
   ]) {
     assert.match(currentOwner, /standards@0\.4\.0/iu);
     assert.match(
       currentOwner,
       /standards@0\.4\.0[^\n]+certified|certified[^\n]+standards@0\.4\.0/iu,
+    );
+    assert.match(
+      currentOwner,
+      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+416e2c2441978ac86f3a17dee96a694141033e20/iu,
     );
   }
 
