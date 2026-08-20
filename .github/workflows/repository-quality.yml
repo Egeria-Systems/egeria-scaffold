@@ -226,7 +226,7 @@ jobs:
       - name: Test generated fixture contracts and determinism
         run: pnpm run test:generated-fixtures
 
-      - name: Verify retained generated projects
+      - name: Verify generated visual regressions
         run: pnpm run verify:generated-visuals
 
       - name: Upload generated visual failure artifacts

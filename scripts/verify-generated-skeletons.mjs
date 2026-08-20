@@ -33,6 +33,7 @@ const generatedVisualArtifactsRoot = resolve(
   repositoryRoot,
   "generated-visual-artifacts",
 );
+const visualArtifactMaximumBytes = 16 * 1024 * 1024;
 const visualArtifactDirectories = Object.freeze([
   Object.freeze({
     destination: "playwright-report",
@@ -719,19 +720,69 @@ async function defaultRunCommand(input) {
   return stdout;
 }
 
+async function measureVisualArtifactTree(root, maximumBytes) {
+  let totalBytes = 0;
+
+  async function visit(directory) {
+    let entries;
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+    }
+    entries.sort((left, right) => codePointCompare(left.name, right.name));
+
+    for (const entry of entries) {
+      const path = join(directory, entry.name);
+      let stats;
+      try {
+        stats = await lstat(path);
+      } catch {
+        fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+      }
+      if (stats.isSymbolicLink()) {
+        fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+      }
+      if (stats.isDirectory()) {
+        await visit(path);
+      } else if (stats.isFile()) {
+        totalBytes += stats.size;
+        if (totalBytes > maximumBytes) {
+          fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+        }
+      } else {
+        fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+      }
+    }
+  }
+
+  await visit(root);
+  return totalBytes;
+}
+
 async function captureVisualFailureArtifacts({
   identifier,
   validationRoot,
   artifactRoot = generatedVisualArtifactsRoot,
+  maximumBytes = visualArtifactMaximumBytes,
 }) {
   await mkdir(artifactRoot, {
     recursive: true,
     mode: 0o700,
   });
-  const outputRoot = await mkdtemp(
-    join(artifactRoot, `${identifier}-`),
-  );
-  await chmod(outputRoot, 0o700);
+  let artifactRootStats;
+  try {
+    artifactRootStats = await lstat(artifactRoot);
+  } catch {
+    fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+  }
+  if (artifactRootStats.isSymbolicLink() || !artifactRootStats.isDirectory()) {
+    fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+  }
+  await chmod(artifactRoot, 0o700);
+
+  let totalBytes = 0;
+  const availableArtifacts = [];
 
   for (const artifact of visualArtifactDirectories) {
     const source = join(validationRoot, artifact.relativeSource);
@@ -740,13 +791,27 @@ async function captureVisualFailureArtifacts({
       sourceStats = await lstat(source);
     } catch (error) {
       if (error?.code === "ENOENT") continue;
-      throw error;
+      fail("VISUAL_ARTIFACT_EXPORT_FAILED");
     }
     if (sourceStats.isSymbolicLink() || !sourceStats.isDirectory()) {
       fail("VISUAL_ARTIFACT_EXPORT_FAILED");
     }
-    await snapshotTree(source);
-    await cp(source, join(outputRoot, artifact.destination), {
+
+    const bytes = await measureVisualArtifactTree(
+      source,
+      maximumBytes - totalBytes,
+    );
+    totalBytes += bytes;
+    availableArtifacts.push({ ...artifact, bytes, source });
+  }
+
+  const outputRoot = await mkdtemp(
+    join(artifactRoot, `${identifier}-`),
+  );
+  await chmod(outputRoot, 0o700);
+
+  for (const artifact of availableArtifacts) {
+    await cp(artifact.source, join(outputRoot, artifact.destination), {
       recursive: true,
       force: false,
       errorOnExist: true,
@@ -921,7 +986,7 @@ async function verifySourcesWithAdapters(
                 validationRoot,
               });
             } catch {
-              fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+              error.artifactExportCode = "VISUAL_ARTIFACT_EXPORT_FAILED";
             }
           }
           throw error;
@@ -1075,6 +1140,9 @@ async function runMain() {
       `${JSON.stringify({
         ok: false,
         code,
+        ...(error?.artifactExportCode === undefined
+          ? {}
+          : { artifactExportCode: error.artifactExportCode }),
       })}\n`,
     );
     process.exitCode = 1;
