@@ -1,6 +1,6 @@
 # Architecture Overview
 
-**Status:** Controlling architecture summary for the approved P1 builder kernel and in-progress P2 portfolio, including generated restricted error diagnostics awaiting implementation review and later certification
+**Status:** Controlling architecture summary for the approved P1 builder kernel and in-progress P2 portfolio, including accepted restricted-error-diagnostics and generated-deployment certifications
 
 **Source:** [Approved reconciled program plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md)
 

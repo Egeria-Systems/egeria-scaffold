@@ -58,7 +58,7 @@ Result: `passed`; human acceptance: `accepted`.
 
 Synthetic traffic and polling stopped. No restoring mutation was needed because the successful exact deployment is the approved retained baseline. Final readback confirmed the exact generated source/tree, current version at 100 percent traffic, zero errors, only the two declared bindings, and no Worker secret, service binding, queue, storage binding, custom domain, route, data set, or capability-specific provider resource.
 
-The GitHub `production` environment retained only public variable `DEPLOY_URL`, only secret names `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, the `main` deployment-branch policy, and the existing reviewer, prevent-self-review, and administrator-bypass controls. No secret value was read. The dedicated token remains owned by `CoveMB`, with review/rotation due `2026-11-19`.
+The GitHub `production` environment retained only public variable `DEPLOY_URL`, only secret names `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, the `main` deployment-branch policy, and the existing reviewer, prevent-self-review, and administrator-bypass controls. No secret value was read. The dedicated token remains retained under the approved credential owner, with review/rotation due `2026-11-19`.
 
 The account remained on the Free plan at `53 / 100,000` requests today and one Worker build minute. No upgrade or incremental-spend action occurred. The successful run produced no artifact. Prior negative-evidence artifact `9378214606`, digest `sha256:3d583a1075f59fbabd4f8b4e0e8837156a170aebae1086a5a674d0f4277cfa8e`, remains retained until `2026-08-26`. Ephemeral hosted-run material was destroyed by the runner, and the bounded local HTTPS response file was removed.
 
