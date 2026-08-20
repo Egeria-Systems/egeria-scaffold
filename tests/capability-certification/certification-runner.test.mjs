@@ -436,7 +436,7 @@ async function runCheck(
   }
 }
 
-test("the repository registry admits current descriptors and rejects closure while deployment is pending", async () => {
+test("the repository registry admits current descriptors and closes all current certification tasks", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -450,18 +450,11 @@ test("the repository registry admits current descriptors and rejects closure whi
 
   const closure = await runCheck(["--closure", "legacy-backfill-exempt"]);
   assert.deepEqual(closure, {
-    exitCode: 1,
+    exitCode: 0,
     stdout: `${JSON.stringify({
-      ok: false,
+      ok: true,
       gate: "closure",
       policy: "legacy-backfill-exempt",
-      issues: [
-        {
-          code: "CAPABILITY_CERTIFICATION_PENDING",
-          path: ["records", "deployment-cloudflare", "status"],
-          context: { reason: "pending" },
-        },
-      ],
     })}\n`,
     stderr: "",
   });
@@ -475,7 +468,6 @@ test("the repository registry admits current descriptors and rejects closure whi
       policy: "all-certified",
       issues: [
         ["content-files", "backfill-pending"],
-        ["deployment-cloudflare", "pending"],
         ["section-composition", "backfill-pending"],
         ["site-routing", "backfill-pending"],
       ].map(([capabilityIdentifier, reason]) => ({

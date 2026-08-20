@@ -2244,7 +2244,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+observability@0\.3\.0[^\n]+certified[^\n]+deployment-cloudflare@0\.3\.0[^\n]+pending[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+observability@0\.3\.0[^\n]+certified[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2252,7 +2252,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+rejects the pending deployment subject[^\n]+all-certified[^\n]+three frozen backfills/i,
+    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+passes[^\n]+all-certified[^\n]+three frozen backfills/i,
   );
 });
 
@@ -2394,8 +2394,23 @@ test("executable capability certification ownership is current", async () => {
   const observabilityRecord = registry.records.observability;
   const standardsRecord = registry.records.standards;
   assert.equal(bookingRecord.status, "certified");
-  assert.equal(deploymentRecord.status, "pending");
-  assert.deepEqual(deploymentRecord.evidence, []);
+  assert.equal(deploymentRecord.status, "certified");
+  assert.deepEqual(
+    deploymentRecord.evidence.map(({ kind, path, outcome, revision }) => ({
+      kind,
+      path,
+      outcome,
+      revision,
+    })),
+    ["cleanup-recovery", "deployed-application", "fresh-scaffold"].map(
+      (kind) => ({
+        kind,
+        path: "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md",
+        outcome: "passed",
+        revision: "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2",
+      }),
+    ),
+  );
   assert.equal(observabilityRecord.status, "certified");
   assert.equal(standardsRecord.status, "certified");
   assert.deepEqual(observabilityRecord.requiredEvidence, [
@@ -2499,7 +2514,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+rejects the pending deployment subject[^\n]+all-certified[^\n]+three frozen backfills/iu,
+    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+passes[^\n]+all-certified[^\n]+three frozen backfills/iu,
   );
   assert.match(
     enforcementMap,
@@ -2806,7 +2821,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     readme,
-    /standards@0\.3\.0[^\n]+renewed eight-outcome private receipt[^\n]+d7c63b0aaa9bebd56c075f16f1e5d86519853698/iu,
+    /standards@0\.3\.0[^\n]+renewed eight-outcome private receipt[^\n]+ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2/iu,
   );
   assert.match(
     roadmap,
