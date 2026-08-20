@@ -27,7 +27,13 @@ const expectedVerificationChecks = Object.freeze([
   "browser-install",
   "browser-development",
   "browser-preview",
+  "visual-regression",
 ]);
+const subject = Object.freeze({
+  descriptorVersion: "0.4.0",
+  behaviorContractDigest:
+    "sha256:8733f70cdc64134232912c691c6922b27defb8cb7c2871faa334cfad2b394643",
+});
 
 export class GeneratedTestingCertificationError extends Error {
   constructor(code) {
@@ -44,10 +50,15 @@ const configuration = Object.freeze({
   createArguments: Object.freeze([]),
   expectedCapabilities,
   capabilityIdentifier: "standards",
-  capabilityVersion: "0.3.0",
+  capabilityVersion: "0.4.0",
+  expectedRecipeVersion: "0.10.0",
   verifierIdentifier: "portfolio",
+  verificationOptions: Object.freeze({ includeVisual: true }),
   expectedVerificationChecks,
-  receipt: Object.freeze({}),
+  receipt: Object.freeze({
+    subject,
+    recipeVersion: "0.10.0",
+  }),
   createError: (code) => new GeneratedTestingCertificationError(code),
   isCertificationError: (error) =>
     error instanceof GeneratedTestingCertificationError,

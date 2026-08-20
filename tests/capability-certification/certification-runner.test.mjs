@@ -85,6 +85,7 @@ const fixedChecks = Object.freeze([
   "browser-development",
   "browser-preview",
 ]);
+const visualChecks = Object.freeze([...fixedChecks, "visual-regression"]);
 
 function createCertificationCliRuntime(arguments_ = []) {
   const scriptPath = resolve(
@@ -230,9 +231,13 @@ async function pathExists(path) {
 }
 
 function createSuccessfulScaffoldAdapters({
+  diagnostics = Object.freeze({ healthy: true, diagnostics: [] }),
+  differences = Object.freeze({ equal: true, differences: [] }),
   inferredCapability,
   readCurrentRevision,
   postCreate = async () => {},
+  verificationChecks = fixedChecks,
+  verificationFixtures,
   verifierIdentifier = "portfolio",
 }) {
   const state = {
@@ -241,6 +246,7 @@ function createSuccessfulScaffoldAdapters({
     projectRoot: undefined,
     verifiedProjectName: undefined,
     verifiedRoot: undefined,
+    verificationOptions: undefined,
   };
 
   return {
@@ -299,31 +305,40 @@ function createSuccessfulScaffoldAdapters({
           return `${JSON.stringify({
             ok: true,
             command: "doctor",
-            result: { healthy: true, diagnostics: [] },
+            result: diagnostics,
           })}\n`;
         }
         if (command === "diff") {
           return `${JSON.stringify({
             ok: true,
             command: "diff",
-            result: { equal: true, differences: [] },
+            result: differences,
           })}\n`;
         }
         throw new Error("unexpected command");
       },
-      async verifyProject(root, identifier, expectedProjectName) {
+      async verifyProject(root, identifier, expectedProjectName, options) {
         state.verifiedRoot = root;
         state.verifiedProjectName = expectedProjectName;
+        state.verificationOptions = options;
         assert.equal(identifier, verifierIdentifier);
         return {
           ok: true,
-          fixtures: [verifierIdentifier],
+          fixtures: verificationFixtures ?? [verifierIdentifier],
           profiles: ["portfolio"],
-          checks: fixedChecks,
+          checks: verificationChecks,
         };
       },
     },
   };
+}
+
+async function writeRecipeVersion(projectRoot, version) {
+  await mkdir(join(projectRoot, ".egeria"), { recursive: true });
+  await writeFile(
+    join(projectRoot, ".egeria/project.yaml"),
+    `recipeVersion: ${version}\n`,
+  );
 }
 
 async function copyCertificationRuntime(cleanRoot) {
@@ -668,6 +683,7 @@ test("Cloudflare deployment certification binds a fresh portfolio to the exact d
       scaffold.state.verifiedProjectName,
       "acme-generated-project",
     );
+    assert.equal(scaffold.state.verificationOptions, undefined);
     assert.equal(await pathExists(scaffold.state.ownedPath), false);
     assert.doesNotMatch(JSON.stringify(result), /PRIVATE_VALUE/u);
   } finally {
@@ -886,7 +902,9 @@ test("generated testing certification binds a fresh portfolio to the exact stand
   const previousToken = process.env.NPM_TOKEN;
   process.env.NPM_TOKEN = "PRIVATE_VALUE";
   const scaffold = createSuccessfulScaffoldAdapters({
-    inferredCapability: { identifier: "standards", version: "0.3.0" },
+    inferredCapability: { identifier: "standards", version: "0.4.0" },
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+    verificationChecks: visualChecks,
   });
 
   try {
@@ -895,14 +913,20 @@ test("generated testing certification binds a fresh portfolio to the exact stand
     assert.deepEqual(result, {
       ok: true,
       capability: "standards",
-      version: "0.3.0",
+      version: "0.4.0",
       profile: "portfolio",
+      subject: {
+        descriptorVersion: "0.4.0",
+        behaviorContractDigest:
+          "sha256:8733f70cdc64134232912c691c6922b27defb8cb7c2871faa334cfad2b394643",
+      },
+      recipeVersion: "0.10.0",
       checks: [
         "compiled-cli-create",
         "state-inference",
         "healthy-diagnostics",
         "exact-diff",
-        ...fixedChecks,
+        ...visualChecks,
       ],
     });
     assert.deepEqual(
@@ -927,6 +951,9 @@ test("generated testing certification binds a fresh portfolio to the exact stand
       ],
     );
     assert.equal(scaffold.state.verifiedRoot, scaffold.state.projectRoot);
+    assert.deepEqual(scaffold.state.verificationOptions, {
+      includeVisual: true,
+    });
     assert.equal(await pathExists(scaffold.state.ownedPath), false);
     assert.doesNotMatch(JSON.stringify(result), /PRIVATE_VALUE/u);
   } finally {
@@ -938,81 +965,96 @@ test("generated testing certification binds a fresh portfolio to the exact stand
   }
 });
 
-test("generated testing certification rejects incomplete, extra, or reordered verifier checks", async () => {
-  const commandOutput = (input) => {
-    const command = input.arguments[1];
-    if (command === "create") {
-      return `${JSON.stringify({
-        ok: true,
-        command,
-        profile: "portfolio",
-        capabilities: [
-          "standards",
-          "content-files",
-          "section-composition",
-          "deployment-cloudflare",
-          "observability",
-        ],
-      })}\n`;
-    }
-    if (command === "infer") {
-      return `${JSON.stringify({
-        ok: true,
-        command,
-        result: {
-          state: {
-            kind: "valid",
-            value: {
-              installedCapabilities: [
-                { identifier: "standards", version: "0.3.0" },
-              ],
-            },
-          },
-          capabilities: [
-            { identifier: "standards", category: "confirmed" },
-          ],
-        },
-      })}\n`;
-    }
-    if (command === "doctor") {
-      return `${JSON.stringify({
-        ok: true,
-        command,
-        result: { healthy: true, diagnostics: [] },
-      })}\n`;
-    }
-    if (command === "diff") {
-      return `${JSON.stringify({
-        ok: true,
-        command,
-        result: { equal: true, differences: [] },
-      })}\n`;
-    }
-    throw new Error("unexpected command");
-  };
+test("generated testing certification rejects missing, extra, or reordered visual verifier checks", async () => {
   const invalidChecks = [
-    fixedChecks.slice(0, -1),
-    [...fixedChecks, "unexpected"],
-    [...fixedChecks].reverse(),
+    visualChecks.slice(0, -2),
+    fixedChecks,
+    [...visualChecks, "unexpected"],
+    [...visualChecks].reverse(),
   ];
 
   for (const checks of invalidChecks) {
+    const scaffold = createSuccessfulScaffoldAdapters({
+      inferredCapability: { identifier: "standards", version: "0.4.0" },
+      postCreate: (projectRoot) =>
+        writeRecipeVersion(projectRoot, "0.10.0"),
+      verificationChecks: checks,
+    });
     await assert.rejects(
-      certifyGeneratedTestingForTesting({
-        runCommand: async (input) => commandOutput(input),
-        verifyProject: async () => ({
-          ok: true,
-          fixtures: ["portfolio"],
-          profiles: ["portfolio"],
-          checks,
-        }),
-      }),
+      certifyGeneratedTestingForTesting(scaffold.adapters),
       (error) => {
         assert.equal(error.name, "GeneratedTestingCertificationError");
         assert.equal(error.code, "GENERATED_PROJECT_VERIFICATION_INVALID");
         return true;
       },
     );
+  }
+});
+
+test("generated testing certification rejects stale state, recipe, diagnostics, diff, and verifier identity", async (context) => {
+  const validInput = Object.freeze({
+    inferredCapability: Object.freeze({
+      identifier: "standards",
+      version: "0.4.0",
+    }),
+    postCreate: (projectRoot) =>
+      writeRecipeVersion(projectRoot, "0.10.0"),
+    verificationChecks: visualChecks,
+  });
+  const cases = [
+    [
+      "stale installed standards",
+      {
+        ...validInput,
+        inferredCapability: { identifier: "standards", version: "0.3.0" },
+      },
+      "FRESH_SCAFFOLD_INFERENCE_INVALID",
+    ],
+    [
+      "stale recipe",
+      {
+        ...validInput,
+        postCreate: (projectRoot) =>
+          writeRecipeVersion(projectRoot, "0.9.0"),
+      },
+      "FRESH_SCAFFOLD_RECIPE_INVALID",
+    ],
+    [
+      "unhealthy diagnostics",
+      {
+        ...validInput,
+        diagnostics: { healthy: false, diagnostics: [{ code: "DRIFT" }] },
+      },
+      "FRESH_SCAFFOLD_DIAGNOSTICS_INVALID",
+    ],
+    [
+      "non-empty diff",
+      {
+        ...validInput,
+        differences: { equal: false, differences: [{ code: "DRIFT" }] },
+      },
+      "FRESH_SCAFFOLD_DIFF_INVALID",
+    ],
+    [
+      "wrong verifier identity",
+      { ...validInput, verificationFixtures: ["site"] },
+      "GENERATED_PROJECT_VERIFICATION_INVALID",
+    ],
+  ];
+
+  for (const [name, input, expectedCode] of cases) {
+    await context.test(name, async () => {
+      const scaffold = createSuccessfulScaffoldAdapters(input);
+      await assert.rejects(
+        certifyGeneratedTestingForTesting(scaffold.adapters),
+        (error) => {
+          assert.equal(error.name, "GeneratedTestingCertificationError");
+          assert.equal(error.code, expectedCode);
+          return true;
+        },
+      );
+      assert.equal(await pathExists(scaffold.state.ownedPath), false);
+    });
   }
 });
 
