@@ -18,6 +18,10 @@ const observabilityEvidenceRevision =
   "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad";
 const standardsPlanPath =
   "docs/superpowers/plans/2026-08-19-generated-visual-regression-certification.md";
+const standardsEvidencePath =
+  "docs/implementation-evidence/2026-08-20-generated-visual-regression-certification-receipt.md";
+const standardsEvidenceRevision =
+  "416e2c2441978ac86f3a17dee96a694141033e20";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const deploymentEvidencePath =
@@ -407,7 +411,7 @@ test("material observability diagnostics have exact reviewed certification evide
   );
 });
 
-test("material visual testing changes require a new pending standards certification", () => {
+test("material visual testing changes have exact accepted certification evidence", () => {
   const standardsDescriptor = descriptorsByIdentifier.get("standards");
   assert.notEqual(standardsDescriptor, undefined);
 
@@ -423,10 +427,62 @@ test("material visual testing changes require a new pending standards certificat
   assert.deepEqual(committedRegistry.records.standards, {
     subject,
     requiredEvidence: ["fresh-scaffold"],
-    status: "pending",
+    status: "certified",
     taskPlan: standardsPlanPath,
-    evidence: [],
+    evidence: [
+      {
+        kind: "fresh-scaffold",
+        path: standardsEvidencePath,
+        outcome: "passed",
+        revision: standardsEvidenceRevision,
+        subject,
+      },
+    ],
   });
+});
+
+test("accepted visual standards receipt binds the reviewed fresh-scaffold outcome", () => {
+  const standardsDescriptor = descriptorsByIdentifier.get("standards");
+  assert.notEqual(standardsDescriptor, undefined);
+
+  const subject = core.createCertificationSubject(standardsDescriptor, [
+    "fresh-scaffold",
+  ]);
+  const acceptedRecord = {
+    subject,
+    requiredEvidence: ["fresh-scaffold"],
+    status: "certified",
+    taskPlan: standardsPlanPath,
+    evidence: [
+      {
+        kind: "fresh-scaffold",
+        path: standardsEvidencePath,
+        outcome: "passed",
+        revision: standardsEvidenceRevision,
+        subject,
+      },
+    ],
+  };
+  const acceptedReceiptUrl = new URL(
+    `../../../${standardsEvidencePath}`,
+    import.meta.url,
+  );
+
+  assert.equal(existsSync(acceptedReceiptUrl), true, standardsEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { standards: acceptedRecord },
+      },
+      artifacts: {
+        [standardsPlanPath]: "# approved plan",
+        [standardsEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [standardsEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
 });
 
 test("material generated deployment changes have exact reviewed certification evidence", () => {
