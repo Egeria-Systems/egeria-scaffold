@@ -38,6 +38,7 @@ const commonTemplateSources = textTemplateSources([
   "common/apps/web/playwright.deployed.config.ts",
   "common/apps/web/playwright.dev.config.ts",
   "common/apps/web/playwright.preview.config.ts",
+  "common/apps/web/playwright.visual.config.ts",
   "common/apps/web/wrangler.jsonc.template",
   "common/apps/web/app/globals.css",
   "common/apps/web/app/layout.tsx",
@@ -63,20 +64,45 @@ const commonTemplateSources = textTemplateSources([
   "common/apps/web/tests/e2e/site-quality.spec.ts",
   "common/apps/web/tests/setup/component.ts",
   "common/apps/web/tests/unit/content-schema.test.ts",
+  "common/apps/web/tests/visual/home-visual.spec.ts",
   "common/apps/web/vitest.config.ts",
 ] as const);
 
-const portfolioTemplateSources = textTemplateSources([
-  "portfolio/apps/web/content/en-CA/long-form/introduction.md.template",
-  "portfolio/apps/web/content/en-CA/site.yaml.template",
-] as const);
+const portfolioTemplateSources: readonly TemplateSource[] = [
+  ...textTemplateSources([
+    "portfolio/apps/web/content/en-CA/long-form/introduction.md.template",
+    "portfolio/apps/web/content/en-CA/site.yaml.template",
+  ] as const),
+  {
+    source:
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+    contentKind: "binary",
+  },
+  {
+    source:
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+    contentKind: "binary",
+  },
+];
 
-const siteTemplateSources = textTemplateSources([
-  "site/apps/web/content/en-CA/site.yaml.template",
-  "site/apps/web/content/en-CA/about.yaml.template",
-  "site/apps/web/content/en-CA/long-form/introduction.md.template",
-  "site/apps/web/app/about/page.tsx",
-] as const);
+const siteTemplateSources: readonly TemplateSource[] = [
+  ...textTemplateSources([
+    "site/apps/web/content/en-CA/site.yaml.template",
+    "site/apps/web/content/en-CA/about.yaml.template",
+    "site/apps/web/content/en-CA/long-form/introduction.md.template",
+    "site/apps/web/app/about/page.tsx",
+  ] as const),
+  {
+    source:
+      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+    contentKind: "binary",
+  },
+  {
+    source:
+      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+    contentKind: "binary",
+  },
+];
 
 const bookingCalendlyTemplateSources = textTemplateSources([
   "booking-calendly/apps/web/app/page.tsx",

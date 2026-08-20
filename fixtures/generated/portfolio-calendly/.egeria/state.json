@@ -15,7 +15,7 @@
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.3.0"
+      "version": "0.4.0"
     },
     {
       "deliveryMode": "source-generated",
@@ -218,7 +218,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:0d216be577bca70e417de10632acc6ee835cb2caedba83a735ce58966e1aa183",
+      "fingerprint": "sha256:364c722bbf1b3832171c87dfd0a33619f8f8746499bf4ec503ba4d4a7850e192",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -231,7 +231,7 @@
       "path": ".egeria/project.yaml"
     },
     {
-      "fingerprint": "sha256:636ec1afdaec71a85de8df210acf411a502ae90d6995ed33db9c75a2171f00c2",
+      "fingerprint": "sha256:ddd5ade6d26255b7250649a294eb189a9408c00fe797755086835d3ee5f507ea",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -244,7 +244,7 @@
       "path": "README.md"
     },
     {
-      "fingerprint": "sha256:bbde382a7ccec8de4f728ebb8c83de365c57b1f8832948041ed47c927a76edec",
+      "fingerprint": "sha256:b8c054a5eba8651676f7dd9e6df8a0fb815f662a00adfbd470ba466ee1d25bdb",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -339,7 +339,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:f6859ff1a2be5134656f1022c3c000cebe80fe142b53edcaffda61b5adee70c9",
+      "fingerprint": "sha256:960bfb3fc590354aa483bafab022107183b00846b27eafdb8d5fc8897fce24fd",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1393,6 +1393,20 @@
       "path": "apps/web/playwright.config.shared.ts"
     },
     {
+      "fingerprint": "sha256:eacad1190c4dec110b823210773f670b017822237afbd1c21889f0fc489de879",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-playwright-visual-configuration",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/playwright.visual.config.ts"
+    },
+    {
       "fingerprint": "sha256:be381fd0767cc44566010e2f4c8936e50eeb0470eaa5a69082d52100dce4b3e8",
       "fingerprintTarget": {
         "kind": "json-value",
@@ -1540,6 +1554,63 @@
       "path": "apps/web/package.json"
     },
     {
+      "fingerprint": "sha256:75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-visual-regression-desktop-baseline",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png"
+    },
+    {
+      "fingerprint": "sha256:455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-visual-regression-mobile-baseline",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png"
+    },
+    {
+      "fingerprint": "sha256:566990fcd546fa8f1ec43ca64456e3b6eddd5ff90948d21085074dda98a56eac",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-visual-regression-specification",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/visual/home-visual.spec.ts"
+    },
+    {
+      "fingerprint": "sha256:ed74e7af1aa0e964e79c6884ee8d8c72b2ba76d99c6f903e285f4dba6cbd5d17",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/test:visual"
+      },
+      "identifier": "standards-visual-regression-test-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
       "fingerprint": "sha256:407c0a101a59d2b970f8a4ee46a82f521d5059c0da5415fffd68fc8576c967e1",
       "fingerprintTarget": {
         "kind": "json-value",
@@ -1586,7 +1657,7 @@
   ],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.9.0"
+    "recipeVersion": "0.10.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

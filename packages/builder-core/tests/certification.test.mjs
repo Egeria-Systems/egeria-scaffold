@@ -17,11 +17,7 @@ const observabilityEvidencePath =
 const observabilityEvidenceRevision =
   "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad";
 const standardsPlanPath =
-  "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md";
-const standardsEvidencePath =
-  "docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-verification.md";
-const standardsEvidenceRevision =
-  "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2";
+  "docs/superpowers/plans/2026-08-19-generated-visual-regression-certification.md";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const deploymentEvidencePath =
@@ -108,7 +104,13 @@ function createRecord(identifier) {
   return {
     subject: {
       descriptorVersion: descriptor.version,
-      behaviorContractDigest: descriptorDigests[identifier],
+      behaviorContractDigest:
+        identifier === "standards"
+          ? core.createCertificationSubject(
+              descriptor,
+              requiredEvidence[identifier],
+            ).behaviorContractDigest
+          : descriptorDigests[identifier],
     },
     requiredEvidence: requiredEvidence[identifier],
     status:
@@ -405,29 +407,25 @@ test("material observability diagnostics have exact reviewed certification evide
   );
 });
 
-test("material standards testing changes have exact reviewed certification evidence", () => {
+test("material visual testing changes require a new pending standards certification", () => {
   const standardsDescriptor = descriptorsByIdentifier.get("standards");
   assert.notEqual(standardsDescriptor, undefined);
 
-  assert.equal(standardsDescriptor.version, "0.3.0");
+  const subject = core.createCertificationSubject(standardsDescriptor, [
+    "fresh-scaffold",
+  ]);
+
+  assert.equal(standardsDescriptor.version, "0.4.0");
+  assert.notEqual(
+    subject.behaviorContractDigest,
+    descriptorDigests.standards,
+  );
   assert.deepEqual(committedRegistry.records.standards, {
-    subject: core.createCertificationSubject(standardsDescriptor, [
-      "fresh-scaffold",
-    ]),
+    subject,
     requiredEvidence: ["fresh-scaffold"],
-    status: "certified",
+    status: "pending",
     taskPlan: standardsPlanPath,
-    evidence: [
-      {
-        kind: "fresh-scaffold",
-        path: standardsEvidencePath,
-        outcome: "passed",
-        revision: standardsEvidenceRevision,
-        subject: core.createCertificationSubject(standardsDescriptor, [
-          "fresh-scaffold",
-        ]),
-      },
-    ],
+    evidence: [],
   });
 });
 

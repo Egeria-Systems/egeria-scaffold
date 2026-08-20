@@ -298,6 +298,12 @@ function createDescriptors(
       "managed",
     ),
     createFileEvidencePoint(
+      "standards-playwright-visual-configuration",
+      "standards",
+      "apps/web/playwright.visual.config.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
       "standards-playwright-shared-configuration",
       "standards",
       "apps/web/playwright.config.shared.ts",
@@ -384,6 +390,33 @@ function createDescriptors(
       "devDependencies",
       "vitest",
       "4.1.10",
+    ),
+    createFileEvidencePoint(
+      "standards-visual-regression-specification",
+      "standards",
+      "apps/web/tests/visual/home-visual.spec.ts",
+      "application-owned",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-visual-regression-test-script",
+      "standards",
+      "/scripts/test:visual",
+      "playwright test --config playwright.visual.config.ts",
+    ),
+  ] as const;
+
+  const standardsVisualBaselineSurfaces = [
+    createFileSurface(
+      "standards-visual-regression-desktop-baseline",
+      "standards",
+      "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "application-owned",
+    ),
+    createFileSurface(
+      "standards-visual-regression-mobile-baseline",
+      "standards",
+      "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "application-owned",
     ),
   ] as const;
 
@@ -664,7 +697,7 @@ function createDescriptors(
   return [
     {
       identifier: "standards",
-      version: "0.3.0",
+      version: "0.4.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -697,7 +730,11 @@ function createDescriptors(
       threatReviewLevel: "elevated",
       platformResources: [],
       adapterSemanticRequirements: [],
-      ...projectEvidencePoints(standardsEvidencePoints),
+      managedSurfaces: [
+        ...projectManagedSurfaces(standardsEvidencePoints),
+        ...standardsVisualBaselineSurfaces,
+      ],
+      inferenceProbes: projectInferenceProbes(standardsEvidencePoints),
       verificationPlan: [
         "package-resolution",
         "lint",
@@ -707,17 +744,20 @@ function createDescriptors(
         "browser-development",
         "browser-preview",
         "deployed-configuration",
+        "visual-regression",
         "workflow-contracts",
       ],
       documentationEvidenceRequirements: [
         "public-package-version-and-provenance",
         "unit-and-component-testing-claim-boundaries",
         "browser-testing-claim-boundaries",
+        "visual-regression-baseline-and-claim-boundaries",
       ],
       removalAndRecoveryRequirements: [
         "review-package-and-configuration-removal",
         "review-generated-test-surface-removal",
         "review-generated-quality-surface-removal",
+        "review-visual-regression-configuration-and-baselines",
       ],
     },
     {
