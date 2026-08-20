@@ -3469,6 +3469,8 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.doesNotMatch(workflow, /playwright install --with-deps/u);
   assert.match(workflow, /test:e2e:dev/u);
   assert.match(workflow, /test:e2e:preview/u);
+  assert.match(workflow, /pnpm --dir apps\/web run test:visual/u);
+  assert.doesNotMatch(workflow, /--update-snapshots/u);
   assert.match(workflow, /if: failure\(\)/u);
   assert.match(workflow, /retention-days: 7/u);
   assert.doesNotMatch(workflow, /secrets\.|deploy|release|PLAYWRIGHT_DEPLOYED_URL/iu);
@@ -3527,6 +3529,11 @@ test("generated browser quality is environment-specific and content-agnostic", a
           name: "Test OpenNext workerd preview",
           if: "!cancelled()",
           run: "pnpm --dir apps/web run test:e2e:preview",
+        },
+        {
+          name: "Compare OpenNext visual baselines",
+          if: "!cancelled()",
+          run: "pnpm --dir apps/web run test:visual",
         },
         {
           name: "Upload browser failure artifacts",

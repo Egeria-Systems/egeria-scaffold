@@ -19,6 +19,7 @@ import test from "node:test";
 import {
   generatedFixtureContracts,
   inspectGeneratedFixture,
+  parseVerificationArguments,
   verifyGeneratedProjectForTesting,
   verifyGeneratedSkeletonsForTesting,
 } from "../../scripts/verify-generated-skeletons.mjs";
@@ -459,6 +460,101 @@ test("single-root verification runs the exact fixed checks against caller output
           },
         }),
       "FIXTURE_IDENTIFIER_INVALID",
+    );
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
+});
+
+test("visual verification is an exact opt-in after prepared preview behavior", async () => {
+  assert.deepEqual(parseVerificationArguments([]), { includeVisual: false });
+  assert.deepEqual(parseVerificationArguments(["--visual"]), {
+    includeVisual: true,
+  });
+  for (const arguments_ of [
+    ["--unknown"],
+    ["--visual", "--visual"],
+    ["--visual=true"],
+  ]) {
+    assert.throws(() => parseVerificationArguments(arguments_), {
+      name: "GeneratedFixtureVerificationError",
+      code: "VERIFICATION_ARGUMENT_INVALID",
+    });
+  }
+
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-visual-option-"));
+  const sourceRoot = await copyFixture(ownerParent, "portfolio", "source");
+  const commands = [];
+
+  try {
+    const result = await verifyGeneratedProjectForTesting(
+      sourceRoot,
+      "portfolio",
+      {
+        async createOwner() {
+          return createKnownOwner(ownerParent);
+        },
+        async runCommand(input) {
+          commands.push(input.arguments);
+          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+        },
+      },
+      undefined,
+      { includeVisual: true },
+    );
+
+    assert.deepEqual(result.checks, [
+      "pnpm-version",
+      "frozen-install",
+      "peer-dependencies",
+      "dependency-audit",
+      "registry-signatures",
+      "lint",
+      "cloudflare-types",
+      "typecheck",
+      "unit-tests",
+      "component-tests",
+      "next-build",
+      "opennext-build",
+      "browser-install",
+      "browser-development",
+      "browser-preview",
+      "visual-regression",
+    ]);
+    assert.equal(commands.length, 16);
+    assert.deepEqual(commands.at(-2), [
+      "--dir",
+      "apps/web",
+      "run",
+      "test:e2e:preview",
+    ]);
+    assert.deepEqual(commands.at(-1), [
+      "--dir",
+      "apps/web",
+      "run",
+      "test:visual",
+    ]);
+
+    await expectFixtureError(
+      () =>
+        verifyGeneratedProjectForTesting(
+          sourceRoot,
+          "portfolio",
+          {
+            async createOwner() {
+              return createKnownOwner(ownerParent);
+            },
+            async runCommand(input) {
+              if (input.arguments.at(-1) === "test:visual") {
+                throw new Error("PRIVATE_VALUE");
+              }
+              return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+            },
+          },
+          undefined,
+          { includeVisual: true },
+        ),
+      "VISUAL_REGRESSION_FAILED",
     );
   } finally {
     await rm(ownerParent, { recursive: true, force: true });

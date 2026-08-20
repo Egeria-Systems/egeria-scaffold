@@ -1422,7 +1422,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:545e8da83040b719bd04a360de3078dda6a1db1c1ca3cf7f235155a79c02cbdc",
+      "fingerprint": "sha256:97074322638f55d805fcba142606be6859c1d702fc82a1e682d539d476c2e922",
       "fingerprintTarget": {
         "kind": "file"
       },

@@ -32,6 +32,7 @@
     "verify:cloudflare-deployment-certification": "pnpm run build:builder && node scripts/certify-cloudflare-deployment.mjs",
     "verify:generated-testing-certification": "pnpm run build:builder && node scripts/certify-generated-testing.mjs",
     "verify:observability-error-diagnostics-certification": "pnpm run build:builder && node scripts/certify-observability-error-diagnostics.mjs",
+    "verify:generated-visuals": "node scripts/verify-generated-skeletons.mjs --visual",
     "verify:generated-skeletons": "node scripts/verify-generated-skeletons.mjs",
     "verify:package-release-candidate": "pnpm run verify:builder-packages:quality && pnpm run check:package-release local",
     "version-packages": "changeset version"

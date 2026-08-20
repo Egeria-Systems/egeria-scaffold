@@ -254,6 +254,9 @@ const verificationChecks = [
   "browser-development",
   "browser-preview",
 ];
+const visualVerificationCheck = "visual-regression";
+const defaultVerificationOptions = Object.freeze({ includeVisual: false });
+const visualVerificationOptions = Object.freeze({ includeVisual: true });
 
 const requiredPublicPackages = [
   {
@@ -408,6 +411,30 @@ export class GeneratedFixtureVerificationError extends Error {
 
 function fail(code) {
   throw new GeneratedFixtureVerificationError(code);
+}
+
+export function parseVerificationArguments(arguments_) {
+  if (!Array.isArray(arguments_)) {
+    fail("VERIFICATION_ARGUMENT_INVALID");
+  }
+  if (arguments_.length === 0) {
+    return defaultVerificationOptions;
+  }
+  if (arguments_.length === 1 && arguments_[0] === "--visual") {
+    return visualVerificationOptions;
+  }
+  fail("VERIFICATION_ARGUMENT_INVALID");
+}
+
+function requireVerificationOptions(options) {
+  if (
+    options === null ||
+    typeof options !== "object" ||
+    Object.keys(options).length !== 1 ||
+    typeof options.includeVisual !== "boolean"
+  ) {
+    fail("VERIFICATION_OPTION_INVALID");
+  }
 }
 
 function fingerprint(content) {
@@ -686,7 +713,12 @@ async function runExpectedCommand(runCommand, input, failureCode) {
   }
 }
 
-async function verifySourcesWithAdapters(adapters, sourcesBefore) {
+async function verifySourcesWithAdapters(
+  adapters,
+  sourcesBefore,
+  options = defaultVerificationOptions,
+) {
+  requireVerificationOptions(options);
   let owner;
   try {
     owner = await adapters.createOwner();
@@ -798,6 +830,14 @@ async function verifySourcesWithAdapters(adapters, sourcesBefore) {
           arguments: ["--dir", "apps/web", "run", "test:e2e:preview"],
           failureCode: "BROWSER_PREVIEW_FAILED",
         },
+        ...(options.includeVisual
+          ? [
+              {
+                arguments: ["--dir", "apps/web", "run", "test:visual"],
+                failureCode: "VISUAL_REGRESSION_FAILED",
+              },
+            ]
+          : []),
       ];
 
       for (const command of commands) {
@@ -854,15 +894,20 @@ async function verifySourcesWithAdapters(adapters, sourcesBefore) {
     profiles: [
       ...new Set(sourcesBefore.map(({ contract }) => contract.profile)),
     ],
-    checks: verificationChecks,
+    checks: options.includeVisual
+      ? [...verificationChecks, visualVerificationCheck]
+      : verificationChecks,
   };
 }
 
-export function verifyGeneratedSkeletons() {
-  return verifyGeneratedSkeletonsForTesting({
-    createOwner: createGeneratedFixtureOwner,
-    runCommand: defaultRunCommand,
-  });
+export function verifyGeneratedSkeletons(options = defaultVerificationOptions) {
+  return verifyGeneratedSkeletonsForTesting(
+    {
+      createOwner: createGeneratedFixtureOwner,
+      runCommand: defaultRunCommand,
+    },
+    options,
+  );
 }
 
 function requireAdapters(adapters) {
@@ -885,17 +930,25 @@ async function sourceForRoot(root, contract) {
   };
 }
 
-export async function verifyGeneratedSkeletonsForTesting(adapters) {
+export async function verifyGeneratedSkeletonsForTesting(
+  adapters,
+  options = defaultVerificationOptions,
+) {
   requireAdapters(adapters);
   const sources = await Promise.all(
     generatedFixtureContracts.map((contract) =>
       sourceForRoot(resolve(repositoryRoot, contract.relativeRoot), contract),
     ),
   );
-  return verifySourcesWithAdapters(adapters, sources);
+  return verifySourcesWithAdapters(adapters, sources, options);
 }
 
-export function verifyGeneratedProject(root, identifier, expectedProjectName) {
+export function verifyGeneratedProject(
+  root,
+  identifier,
+  expectedProjectName,
+  options = defaultVerificationOptions,
+) {
   return verifyGeneratedProjectForTesting(
     root,
     identifier,
@@ -904,6 +957,7 @@ export function verifyGeneratedProject(root, identifier, expectedProjectName) {
       runCommand: defaultRunCommand,
     },
     expectedProjectName,
+    options,
   );
 }
 
@@ -912,6 +966,7 @@ export async function verifyGeneratedProjectForTesting(
   identifier,
   adapters,
   expectedProjectName,
+  options = defaultVerificationOptions,
 ) {
   requireAdapters(adapters);
   const contract = contractForGeneratedProject(
@@ -919,12 +974,13 @@ export async function verifyGeneratedProjectForTesting(
     expectedProjectName,
   );
   const source = await sourceForRoot(root, contract);
-  return verifySourcesWithAdapters(adapters, [source]);
+  return verifySourcesWithAdapters(adapters, [source], options);
 }
 
 async function runMain() {
   try {
-    const result = await verifyGeneratedSkeletons();
+    const options = parseVerificationArguments(process.argv.slice(2));
+    const result = await verifyGeneratedSkeletons(options);
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } catch (error) {
     const code =

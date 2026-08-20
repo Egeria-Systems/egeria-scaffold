@@ -444,6 +444,11 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "needs.scope.outputs.generated-projects == 'true'",
   );
   assert.deepEqual(workflow.jobs["generated-projects"].needs, ["scope"]);
+  assert.deepEqual(workflow.jobs["generated-projects"].container, {
+    image:
+      "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
+    options: "--shm-size=1g",
+  });
   assert.equal(
     workflow.jobs["compatibility-proof"].if,
     "needs.scope.outputs.compatibility-proof == 'true'",
@@ -481,13 +486,23 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   );
   for (const command of [
     "pnpm run test:generated-fixtures",
-    "pnpm run verify:generated-skeletons",
+    "pnpm run verify:generated-visuals",
   ]) {
     assert.match(
       commandsByJob["generated-projects"],
       new RegExp(escapeRegularExpression(command), "u"),
     );
   }
+  assert.doesNotMatch(
+    commandsByJob["generated-projects"],
+    /verify:generated-skeletons|--update-snapshots/u,
+  );
+  assert.equal(
+    workflow.jobs["generated-projects"].steps.filter(
+      ({ run }) => run === "pnpm run verify:generated-visuals",
+    ).length,
+    1,
+  );
   for (const command of [
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run lint",
     "pnpm --filter @egeria-systems/nextjs-cloudflare-proof run typecheck",
@@ -687,7 +702,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
         candidate.jobs["generated-projects"].steps = candidate.jobs[
           "generated-projects"
         ].steps.filter(
-          ({ run }) => run !== "pnpm run verify:generated-skeletons",
+          ({ run }) => run !== "pnpm run verify:generated-visuals",
         );
       },
     },
@@ -717,6 +732,10 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
   );
 
   const rootManifest = JSON.parse(await readRepositoryFile("package.json"));
+  assert.equal(
+    rootManifest.scripts["verify:generated-visuals"],
+    "node scripts/verify-generated-skeletons.mjs --visual",
+  );
   const kernelCommands = rootManifest.scripts["verify:builder-kernel"].split(" && ");
   assert.ok(
     kernelCommands.indexOf("pnpm run build:builder") <
@@ -2412,7 +2431,13 @@ test("executable capability certification ownership is current", async () => {
     ),
   );
   assert.equal(observabilityRecord.status, "certified");
-  assert.equal(standardsRecord.status, "certified");
+  assert.equal(standardsRecord.status, "pending");
+  assert.deepEqual(standardsRecord.requiredEvidence, ["fresh-scaffold"]);
+  assert.deepEqual(standardsRecord.evidence, []);
+  assert.equal(
+    standardsRecord.taskPlan,
+    "docs/superpowers/plans/2026-08-19-generated-visual-regression-certification.md",
+  );
   assert.deepEqual(observabilityRecord.requiredEvidence, [
     "cleanup-recovery",
     "deployed-application",
