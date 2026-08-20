@@ -105,6 +105,8 @@ For each independently reviewable task:
 
 Configuration and documentation changes use dependency-free contract tests where practical. Static checks remain static evidence; they do not substitute for runtime, deployment, accessibility, security, translation, or human evaluation.
 
+For generated visual changes, run `pnpm run verify:generated-visuals` only in the pinned Linux/Chromium boundary after the generated OpenNext output is prepared. CI comparison is flag-free. Baseline updates require a causal source change, human review of expected, actual, and diff images, and a second comparison without update mode; they are never an automatic repair for a failing check. Screenshot equality does not establish visual quality, human accessibility, deployed behavior, production readiness, or WCAG conformance.
+
 ## Independent review
 
 After the coherent increment, dispatch three non-overlapping read-only reviewers:

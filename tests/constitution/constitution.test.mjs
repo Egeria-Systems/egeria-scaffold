@@ -2263,7 +2263,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+standards@0\.3\.0[^\n]+certified[^\n]+observability@0\.3\.0[^\n]+certified[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
+    /standards@0\.4\.0[^\n]+pending[^\n]+booking-calendly@0\.1\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2271,7 +2271,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+passes[^\n]+all-certified[^\n]+three frozen backfills/i,
+    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending standards/i,
   );
 });
 
@@ -2461,7 +2461,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     rootReadme,
-    /recipe `0\.9\.0`[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0/iu,
+    /recipe `0\.10\.0`[^\n]+standards@0\.4\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0/iu,
   );
   assert.match(
     capabilityModel,
@@ -2469,7 +2469,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /portfolio` and `site` recipes are `0\.9\.0`[^\n]+deployment-cloudflare@0\.3\.0[^\n]+observability@0\.3\.0/iu,
+    /portfolio` and `site` recipes are `0\.10\.0`[^\n]+standards@0\.4\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+observability@0\.3\.0/iu,
   );
   assert.match(
     capabilityModel,
@@ -2513,7 +2513,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     packageOwnership,
-    /descriptor `standards@0\.3\.0` is certified from its exact local subject-bound receipt[^\n]+public `0\.2\.0` availability alone does not alter the installed public package/iu,
+    /descriptor `standards@0\.4\.0` is pending separate fresh-scaffold certification[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
   );
   assert.deepEqual(
     bookingRecord.evidence.map(({ kind }) => kind),
@@ -2539,7 +2539,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+passes[^\n]+all-certified[^\n]+three frozen backfills/iu,
+    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending standards/iu,
   );
   assert.match(
     enforcementMap,
@@ -2569,6 +2569,104 @@ test("executable capability certification ownership is current", async () => {
     assert.match(document, /private certification registry/iu);
     assert.match(document, /descriptor admission/iu);
     assert.match(document, /closure/iu);
+  }
+});
+
+test("canonical documentation records the generated visual regression boundary", async () => {
+  const visualCertificationTask = namedLabel("Task", "8B");
+  const [
+    rootInstructions,
+    contributing,
+    rootReadme,
+    sourcePlan,
+    capabilityModel,
+    enforcementMap,
+    overview,
+    packageOwnership,
+    roadmap,
+    builderInstructions,
+    builderReadme,
+  ] = await Promise.all([
+    readRepositoryFile("AGENTS.md"),
+    readRepositoryFile("CONTRIBUTING.md"),
+    readRepositoryFile("README.md"),
+    readRepositoryFile(
+      "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+    ),
+    readRepositoryFile("docs/architecture/capability-model.md"),
+    readRepositoryFile("docs/architecture/enforcement-map.md"),
+    readRepositoryFile("docs/architecture/overview.md"),
+    readRepositoryFile("docs/architecture/package-ownership.md"),
+    readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+    readRepositoryFile("packages/builder-core/AGENTS.md"),
+    readRepositoryFile("packages/builder-core/README.md"),
+  ]);
+
+  for (const statusOwner of [sourcePlan, overview, roadmap]) {
+    assert.match(
+      statusOwner,
+      /b46f5f59c7f98ed6be1fa569a2f4a1f23d1ca1ad[^\n]+32323617228/iu,
+    );
+  }
+  for (const currentOwner of [
+    rootReadme,
+    sourcePlan,
+    capabilityModel,
+    enforcementMap,
+    overview,
+    packageOwnership,
+    roadmap,
+    builderReadme,
+  ]) {
+    assert.match(currentOwner, /standards@0\.4\.0/iu);
+  }
+
+  assert.match(
+    capabilityModel,
+    /managed visual configuration[^\n]+application-owned specification[^\n]+profile baselines/iu,
+  );
+  assert.match(capabilityModel, /OpenNext\/workerd preview/iu);
+  assert.match(capabilityModel, /1440[^\n]+900[^\n]+320[^\n]+800/iu);
+  assert.match(capabilityModel, /--update-snapshots[^\n]+causal source change/iu);
+  assert.match(capabilityModel, /failure-only[^\n]+seven days/iu);
+  assert.match(
+    capabilityModel,
+    new RegExp(
+      `${escapeRegularExpression(visualCertificationTask)}[^\\n]+pending[^\\n]+fresh-scaffold`,
+      "iu",
+    ),
+  );
+
+  assert.match(
+    enforcementMap,
+    /deterministic visual regression[^\n]+actual[^\n]+verify:generated-visuals/iu,
+  );
+  assert.match(enforcementMap, /binary[^\n]+PNG/iu);
+  assert.match(enforcementMap, /test:visual/iu);
+  assert.match(enforcementMap, /failure-only[^\n]+seven days/iu);
+  assert.match(
+    packageOwnership,
+    /standards@0\.4\.0[^\n]+public package pin `0\.1\.0`[^\n]+unchanged/iu,
+  );
+
+  for (const contributorSurface of [
+    rootInstructions,
+    contributing,
+    rootReadme,
+    builderInstructions,
+    builderReadme,
+  ]) {
+    assert.match(contributorSurface, /verify:generated-visuals|test:visual/iu);
+    assert.match(
+      contributorSurface,
+      /visual quality[^\n]+WCAG conformance/iu,
+    );
+  }
+  for (const sequencingOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      sequencingOwner,
+      /visual regression[^\n]+implemented[^\n]+performance budgets[^\n]+separate[^\n]+unimplemented/iu,
+    );
   }
 });
 
