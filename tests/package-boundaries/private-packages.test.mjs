@@ -221,7 +221,7 @@ test("the root copy lint covers integration presentation templates", async () =>
   );
 });
 
-test("the CLI is a thin command adapter while builder-core owns generation and planning", async () => {
+test("the CLI is a thin command adapter while builder-core owns generation and the addition lifecycle", async () => {
   const expectedEntry = `#!/usr/bin/env node
 
 import { runCli } from "./run-cli.js";
@@ -275,6 +275,8 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "index.ts",
       "inference/evaluate-probe.ts",
       "inference/infer-repository.ts",
+      "lifecycle/apply-capability-addition.ts",
+      "lifecycle/capability-addition-writer.ts",
       "lifecycle/git-worktree-inspection.ts",
       "lifecycle/plan-capability-addition.ts",
       "manifest/create-installed-manifest.ts",
@@ -416,7 +418,9 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /absent but Git-ignored create targets/);
   assert.match(builderInstructions, /every installed application-owned surface/);
   assert.match(builderInstructions, /canonical managed-surface inventory/);
-  assert.match(builderInstructions, /Git preflight and addition-planning policy/);
+  assert.match(builderInstructions, /Git preflight, deterministic addition planning, exact-diff inspection/);
+  assert.match(builderInstructions, /`applyCapabilityAddition`/);
+  assert.match(builderInstructions, /persist state last/);
   assert.match(builderInstructions, /no transform, migration, state update, or provider action/);
 
   assert.match(builderReadme, /1 MiB/);
@@ -441,6 +445,8 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /Child processes receive only a narrow/);
   assert.match(builderReadme, /child output is never returned/i);
   assert.match(builderReadme, /planCapabilityAddition/);
+  assert.match(builderReadme, /applyCapabilityAddition/);
+  assert.match(builderReadme, /verified-final-diff approval/);
   assert.match(builderReadme, /clean attached linked worktree/);
   assert.match(builderReadme, /all non-ignored untracked files/);
   assert.match(builderReadme, /`assume-unchanged` and `skip-worktree`/);
@@ -448,13 +454,15 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /every installed application-owned surface/);
   assert.match(builderReadme, /canonical managed-surface inventory/);
   assert.match(builderReadme, /redacts settings and repository metadata/);
-  assert.match(builderReadme, /no transform, migration, state update, or provider action/);
+  assert.match(builderReadme, /never resets, cleans, commits, creates a branch\/worktree, auto-rolls back, or contacts a provider/);
   assert.doesNotMatch(builderReadme, /The CLI remains empty/);
-  assert.match(cliInstructions, /five commands exact/);
+  assert.match(cliInstructions, /six commands exact/);
   assert.match(cliInstructions, /`plan-add` remains read-only/);
+  assert.match(cliInstructions, /`apply-add` is limited/);
   assert.match(cliInstructions, /remain read-only/);
   assert.match(cliInstructions, /does not add overwrite/);
-  assert.match(cliReadme, /five exact commands/);
+  assert.match(cliReadme, /six exact commands/);
+  assert.match(cliReadme, /`apply-add` accepts/);
   assert.match(cliReadme, /clean attached linked worktree/);
   assert.match(cliReadme, /never creates the worktree or branch/);
   assert.match(cliReadme, /`assume-unchanged` and `skip-worktree`/);
@@ -463,21 +471,21 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliReadme, /one content-safe JSON line/);
   assert.match(cliReadme, /no prompt, overwrite mode/);
 
-  assert.match(packageOwnership, /through verified new-directory generation/);
+  assert.match(packageOwnership, /exact approval-gated Calendly addition transaction/);
   assert.match(packageOwnership, /canonical private owner/i);
   assert.match(packageOwnership, /deterministic in-memory rendering/);
   assert.match(packageOwnership, /explicit allowlisted templates/);
   assert.match(packageOwnership, /YAML 1.2/);
   assert.match(packageOwnership, /Markdown with validated YAML front matter/);
   assert.match(packageOwnership, /strict `.egeria` codecs/);
-  assert.match(packageOwnership, /read-only repository inference/);
+  assert.match(packageOwnership, /fixed-root repository inference/);
   assert.match(packageOwnership, /doctorRepository/);
   assert.match(packageOwnership, /diffProject/);
   assert.match(packageOwnership, /state-last new-directory generation/);
   assert.match(packageOwnership, /portable-rename race limit/);
   assert.match(packageOwnership, /pnpm `11.20.0`/);
   assert.match(packageOwnership, /disabled Next telemetry/);
-  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, and `plan-add`/);
+  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, `plan-add`, and `apply-add`/);
   assert.match(packageOwnership, /one-line JSON output/);
   assert.match(packageOwnership, /clean attached linked worktree/);
   assert.match(packageOwnership, /all non-ignored untracked files/);
@@ -485,15 +493,15 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /absent but Git-ignored create targets/);
   assert.match(packageOwnership, /every installed application-owned surface/);
   assert.match(packageOwnership, /canonical managed-surface inventory/);
-  assert.match(packageOwnership, /redacts settings and repository metadata/);
-  assert.match(packageOwnership, /no transform, migration, state update, or provider action/);
+  assert.match(packageOwnership, /redact settings and repository metadata/);
+  assert.match(packageOwnership, /writes state last/);
   assert.doesNotMatch(packageOwnership, /future CLI consumer/);
   assert.match(packageOwnership, /existing-repository transformation/);
-  assert.match(rootReadme, /five exact commands/);
-  assert.match(rootReadme, /local eligibility and planning evidence/);
+  assert.match(rootReadme, /six exact commands/);
+  assert.match(rootReadme, /transaction evidence awaiting verified-final-diff approval/);
   assert.match(rootReadme, /`assume-unchanged` and `skip-worktree`/);
   assert.match(rootReadme, /canonical managed-surface inventory/);
-  assert.match(rootReadme, /not transformation, migration, recovery, certification, deployment/);
+  assert.match(rootReadme, /Neither lifecycle command creates the branch\/worktree/);
   assert.match(enforcementMap, /desired, installed, and inferred/);
   assert.match(enforcementMap, /read-only diagnostics/);
   assert.match(enforcementMap, /exact source and template allowlists/);
@@ -501,7 +509,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(enforcementMap, /deterministic in-memory rendering/);
   assert.match(enforcementMap, /YAML 1.2/);
   assert.match(enforcementMap, /new-directory manifest\/pre-state\/post-state agreement/);
-  assert.match(enforcementMap, /state-last failure-injection/);
+  assert.match(enforcementMap, /state-last failure injection/);
   assert.match(enforcementMap, /public installed generated-repository/);
   assert.match(enforcementMap, /execution-time moderate advisory/);
   assert.doesNotMatch(

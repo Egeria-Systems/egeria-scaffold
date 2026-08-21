@@ -1,4 +1,5 @@
 import {
+  applyCapabilityAddition as applyCapabilityAdditionDefault,
   createFileSystemRepositoryReader,
   createPnpmGeneratedProjectVerifier,
   createVerifiedCapabilityCatalog,
@@ -11,6 +12,7 @@ import {
   planCapabilityAddition,
   profileRecipes,
   type CapabilityAdditionPlan,
+  type CapabilityAdditionExecutionResult,
   type GeneratedProjectVerifier,
   type GitCreateTargetInspection,
   type GitWorktreeInspection,
@@ -28,6 +30,9 @@ export type CliOutput = Readonly<{
 
 type CliRunnerDependencies = Readonly<{
   createVerifier(): GeneratedProjectVerifier;
+  applyCapabilityAddition?(input: Parameters<
+    typeof applyCapabilityAdditionDefault
+  >[0]): Promise<CapabilityAdditionExecutionResult>;
   createReader?(root: string): RepositoryReader;
   inspectGitCreateTargets?(input: Readonly<{
     root: string;
@@ -282,6 +287,52 @@ async function runPlanAdd(
   return 0;
 }
 
+async function runApplyAdd(
+  command: Extract<CliCommand, Readonly<{ kind: "apply-add" }>>,
+  output: CliOutput,
+  dependencies: CliRunnerDependencies,
+): Promise<0 | 1> {
+  let result: CapabilityAdditionExecutionResult;
+  try {
+    result = await (
+      dependencies.applyCapabilityAddition ?? applyCapabilityAdditionDefault
+    )({
+      root: resolve(command.directory),
+      capability: command.capability,
+      settings: command.settings,
+      approvedPlanFingerprint: command.approvedPlanFingerprint,
+      verifier: dependencies.createVerifier(),
+    });
+  } catch {
+    writeJson(output.writeError, {
+      ok: false,
+      command: "apply-add",
+      code: "CAPABILITY_EXECUTION_FAILED",
+      phase: "precondition",
+      recovery: "not-required",
+    });
+    return 1;
+  }
+
+  if (!result.ok) {
+    writeJson(output.writeError, {
+      ok: false,
+      command: "apply-add",
+      code: result.code,
+      phase: result.phase,
+      recovery: result.recovery,
+    });
+    return 1;
+  }
+
+  writeJson(output.write, {
+    ok: true,
+    command: "apply-add",
+    result: result.value,
+  });
+  return 0;
+}
+
 export function createCliRunner(
   dependencies: CliRunnerDependencies,
 ): CliRunner {
@@ -310,6 +361,10 @@ export function createCliRunner(
 
     if (parsed.value.kind === "plan-add") {
       return runPlanAdd(parsed.value, output, dependencies);
+    }
+
+    if (parsed.value.kind === "apply-add") {
+      return runApplyAdd(parsed.value, output, dependencies);
     }
 
     const catalog = createVerifiedCapabilityCatalog();

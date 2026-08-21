@@ -26,6 +26,13 @@ export type CliCommand =
       directory: string;
       capability: "booking-calendly";
       settings: CalendlyBookingSettings;
+    }>
+  | Readonly<{
+      kind: "apply-add";
+      directory: string;
+      capability: "booking-calendly";
+      settings: CalendlyBookingSettings;
+      approvedPlanFingerprint: string;
     }>;
 
 const projectFields = projectConfigurationSchema
@@ -216,6 +223,63 @@ function parsePlanAdd(
   }
 }
 
+function parseApplyAdd(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        capability: { type: "string" },
+        "calendly-url": { type: "string" },
+        "calendly-mode": { type: "string" },
+        "approved-plan": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const capability = values.capability;
+    const approvedPlanFingerprint = values["approved-plan"];
+    const settings = calendlyBookingSettingsSchema.safeParse({
+      destination: values["calendly-url"],
+      mode: values["calendly-mode"],
+    });
+
+    if (
+      !hasExactOptions(tokens, [
+        "directory",
+        "capability",
+        "calendly-url",
+        "calendly-mode",
+        "approved-plan",
+      ]) ||
+      !validDirectory(directory) ||
+      capability !== "booking-calendly" ||
+      !settings.success ||
+      approvedPlanFingerprint === undefined ||
+      !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "apply-add",
+        directory,
+        capability,
+        settings: settings.data,
+        approvedPlanFingerprint,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
 export function parseCliArguments(
   arguments_: readonly string[],
 ): ValidationResult<CliCommand> {
@@ -230,6 +294,8 @@ export function parseCliArguments(
       return parseReadOnly(command, commandArguments);
     case "plan-add":
       return parsePlanAdd(commandArguments);
+    case "apply-add":
+      return parseApplyAdd(commandArguments);
     default:
       return invalidArguments();
   }
