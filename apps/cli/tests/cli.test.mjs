@@ -1255,14 +1255,13 @@ test("the compiled plan-add command refuses unsafe repository states without wri
       code: "PROJECT_DRIFT_DETECTED",
     },
     {
-      name: "missing surface omitted from installed inventory",
+      name: "surface omitted from installed inventory",
       fixture: "portfolio",
       select: ({ linked }) => linked,
       prepare: async (root) => {
         const statePath = join(root, ".egeria/state.json");
         const parsed = core.parseStateJson(await readFile(statePath, "utf8"));
         assert.equal(parsed.ok, true);
-        await rm(join(root, "apps/web/app/layout.tsx"));
         await writeFile(
           statePath,
           core.serializeStateJson({
@@ -1272,7 +1271,7 @@ test("the compiled plan-add command refuses unsafe repository states without wri
             ),
           }),
         );
-        await commitAll(root, "omit missing application layout from state");
+        await commitAll(root, "omit application layout from state");
       },
       code: "PROJECT_DRIFT_DETECTED",
     },

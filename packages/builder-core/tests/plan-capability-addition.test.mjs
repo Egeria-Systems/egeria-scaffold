@@ -330,7 +330,6 @@ test("capability addition plan refuses incomplete or contradictory surface inven
 
   for (const managedSurfaces of cases) {
     const entries = new Map(base);
-    entries.delete("apps/web/app/layout.tsx");
     entries.set(
       ".egeria/state.json",
       core.serializeStateJson({ ...stateResult.value, managedSurfaces }),
