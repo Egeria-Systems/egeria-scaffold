@@ -1278,7 +1278,7 @@ test("package ownership documentation records the approved release boundary", as
   );
   assert.match(
     readme,
-    /builder kernel has received verified-final-diff approval.*client-ready portfolio stage is in progress/iu,
+    /builder kernel has received verified-final-diff approval.*client-ready portfolio stage is completed through an unnumbered closure amendment/iu,
   );
   assert.match(contributing, /pnpm run verify:builder-packages/);
 
@@ -2612,8 +2612,11 @@ test("executable capability certification ownership is current", async () => {
   }
 });
 
-test("canonical documentation records the generated visual regression boundary", async () => {
+test("canonical documentation records visual regression and the client-ready closure boundary", async () => {
   const visualCertificationTask = namedLabel("Task", "8B");
+  const clientReadyPhase = compactLabel("P", "2");
+  const lifecyclePhase = compactLabel("P", "3");
+  const clientExpansionPhase = compactLabel("P", "3B");
   const [
     rootInstructions,
     contributing,
@@ -2726,12 +2729,65 @@ test("canonical documentation records the generated visual regression boundary",
       /visual quality[^\n]+WCAG conformance/iu,
     );
   }
-  for (const sequencingOwner of [sourcePlan, roadmap]) {
+  for (const closureOwner of [
+    rootReadme,
+    sourcePlan,
+    capabilityModel,
+    enforcementMap,
+    overview,
+    roadmap,
+  ]) {
     assert.match(
-      sequencingOwner,
-      /visual regression[^\n]+implemented[^\n]+performance budgets[^\n]+separate[^\n]+unimplemented/iu,
+      closureOwner,
+      /performance budgets[^\n]+deferred[^\n]+no performance claim/iu,
     );
   }
+  for (const sequencingOwner of [sourcePlan, roadmap]) {
+    assert.match(sequencingOwner, /unnumbered closure amendment/iu);
+    assert.match(
+      sequencingOwner,
+      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+416e2c2441978ac86f3a17dee96a694141033e20/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /visual regression[^\n]+claim limits[^\n]+unchanged/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      new RegExp(
+        `${escapeRegularExpression(lifecyclePhase)}[^\\n]+eligible[^\\n]+verified-final-diff approval[^\\n]+accepted-main integration`,
+        "iu",
+      ),
+    );
+    assert.match(
+      sequencingOwner,
+      new RegExp(
+        `${escapeRegularExpression(clientExpansionPhase)}[^\\n]+not begin`,
+        "iu",
+      ),
+    );
+  }
+  assert.doesNotMatch(
+    overview,
+    new RegExp(
+      `in-progress ${escapeRegularExpression(clientReadyPhase)} portfolio`,
+      "iu",
+    ),
+  );
+  assert.doesNotMatch(
+    sourcePlan,
+    new RegExp(
+      `${escapeRegularExpression(clientReadyPhase)}\\s+Production-ready portfolio`,
+      "iu",
+    ),
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `backfill-pending[^\\n]+exempt from ${escapeRegularExpression(clientReadyPhase)} closure[^\\n]+${escapeRegularExpression(lifecyclePhase)} closure[^\\n]+rejects`,
+      "iu",
+    ),
+  );
 });
 
 test("execution plans enforce direct predecessors and bounded independent-work exceptions", async () => {
@@ -2927,7 +2983,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     readme,
-    /builder kernel has received verified-final-diff approval.*committed golden fixtures.*client-ready portfolio stage is in progress/iu,
+    /builder kernel has received verified-final-diff approval.*committed golden fixtures.*client-ready portfolio stage is completed through an unnumbered closure amendment/iu,
   );
   assert.match(readme, /retained `portfolio-calendly` fixture/iu);
   assert.match(
