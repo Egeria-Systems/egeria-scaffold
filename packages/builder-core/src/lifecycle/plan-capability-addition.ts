@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { createVerifiedCapabilityCatalog, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
@@ -20,6 +22,7 @@ import { createBuilderStateSurfaces } from "../generation/builder-state-surfaces
 import { profileRecipes } from "../profiles/profile-recipes.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
 import { serializeProjectYaml } from "../state/codecs.js";
+import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
 import type { GitWorktreeInspection } from "./git-worktree-inspection.js";
 
 export type CapabilityAdditionAction = Readonly<{
@@ -32,6 +35,7 @@ export type CapabilityAdditionAction = Readonly<{
 export type CapabilityAdditionPlan = Readonly<{
   operation: "add-capability";
   status: "approval-required";
+  planFingerprint: `sha256:${string}`;
   baseRevision: string;
   profile: "portfolio" | "site";
   capability: Readonly<{
@@ -54,7 +58,12 @@ export type CapabilityAdditionPlan = Readonly<{
     "persist-state",
     "verify-state-and-inference",
   ];
-}>;
+}>; 
+
+type CapabilityAdditionPlanBody = Omit<
+  CapabilityAdditionPlan,
+  "planFingerprint"
+>;
 
 export type PlanningFailureCode =
   | "PROJECT_INSPECTION_INVALID"
@@ -114,6 +123,25 @@ function sameOrderedValues(
     left.length === right.length &&
     left.every((value, index) => value === right[index])
   );
+}
+
+function fingerprintPlan(input: Readonly<{
+  plan: CapabilityAdditionPlanBody;
+  settings: CalendlyBookingSettings;
+  git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
+}>): `sha256:${string}` {
+  const digest = createHash("sha256")
+    .update(
+      stringifyCanonicalJson({
+        plan: input.plan,
+        settings: input.settings,
+        gitIdentity: input.git.identity,
+      }),
+      "utf8",
+    )
+    .digest("hex");
+
+  return `sha256:${digest}`;
 }
 
 function validatedInspection(
@@ -548,9 +576,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     .map(({ identifier }) => identifier)
     .sort(compareText);
 
-  return {
-    ok: true,
-    value: {
+  const plan: CapabilityAdditionPlanBody = {
       operation: "add-capability",
       status: "approval-required",
       baseRevision: input.git.identity.revision,
@@ -575,6 +601,17 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
         "persist-state",
         "verify-state-and-inference",
       ],
+  };
+
+  return {
+    ok: true,
+    value: {
+      ...plan,
+      planFingerprint: fingerprintPlan({
+        plan,
+        settings: settingsResult.data,
+        git: input.git,
+      }),
     },
   };
 }

@@ -128,7 +128,7 @@ async function planFromEntries(entries, options = {}) {
   try {
     return await core.planCapabilityAddition({
       reader: snapshotReader.reader,
-      git,
+      git: options.git ?? git,
       capability: options.capability ?? "booking-calendly",
       settings: options.settings ?? settings,
     });
@@ -184,7 +184,7 @@ function expectedActions() {
   ];
 }
 
-function expectedPlan(profile) {
+function expectedPlan(profile, planFingerprint) {
   const currentCapabilities = [
     "content-files",
     "deployment-cloudflare",
@@ -197,6 +197,7 @@ function expectedPlan(profile) {
   return {
     operation: "add-capability",
     status: "approval-required",
+    planFingerprint,
     baseRevision: git.identity.revision,
     profile,
     capability: {
@@ -228,7 +229,11 @@ test("capability addition plan is exact and read-only for portfolio and site", a
   for (const profile of ["portfolio", "site"]) {
     const result = await planFromEntries(await fixtureEntries(profile));
     assert.equal(result.ok, true, JSON.stringify(result.issues));
-    assert.deepEqual(result.value, expectedPlan(profile));
+    assert.match(result.value.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
+    assert.deepEqual(
+      result.value,
+      expectedPlan(profile, result.value.planFingerprint),
+    );
     assert.doesNotMatch(JSON.stringify(result.value), /calendly\.com|refs\/heads|\/generated\//u);
   }
 });
@@ -445,7 +450,7 @@ test("capability addition plan refuses unsupported requests before repository ac
   }
 });
 
-test("capability addition plan is deterministic, order-independent, and destination-redacted", async () => {
+test("capability addition plan binds private settings and exact Git identity without disclosure", async () => {
   const base = await fixtureEntries("portfolio");
   const reordered = new Map(base);
   const projectResult = core.parseProjectYaml(reordered.get(".egeria/project.yaml"));
@@ -484,14 +489,43 @@ test("capability addition plan is deterministic, order-independent, and destinat
       destination: "https://www.calendly.com/example/another-secret",
     },
   });
+  const differentGitIdentity = await planFromEntries(base, {
+    git: {
+      ...git,
+      identity: {
+        ...git.identity,
+        attachedRef: "refs/heads/another-transactional-change",
+      },
+    },
+  });
   assert.equal(first.ok, true);
   assert.equal(repeated.ok, true);
   assert.equal(differentDestination.ok, true);
+  assert.equal(differentGitIdentity.ok, true);
   assert.deepEqual(repeated.value, first.value);
-  assert.deepEqual(differentDestination.value, first.value);
+  assert.notEqual(
+    differentDestination.value.planFingerprint,
+    first.value.planFingerprint,
+  );
+  assert.notEqual(
+    differentGitIdentity.value.planFingerprint,
+    first.value.planFingerprint,
+  );
+  assert.deepEqual(
+    { ...differentDestination.value, planFingerprint: first.value.planFingerprint },
+    first.value,
+  );
+  assert.deepEqual(
+    { ...differentGitIdentity.value, planFingerprint: first.value.planFingerprint },
+    first.value,
+  );
   assert.doesNotMatch(
-    JSON.stringify(first.value),
-    /discovery|another-secret|calendly\.com/iu,
+    JSON.stringify([
+      first.value,
+      differentDestination.value,
+      differentGitIdentity.value,
+    ]),
+    /discovery|another-secret|another-transactional-change|calendly\.com/iu,
   );
 });
 
