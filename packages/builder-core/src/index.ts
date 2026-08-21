@@ -3,6 +3,7 @@ export * from "./catalog/verified-package-versions.js";
 export * from "./certification/capability-certification.js";
 export * from "./contracts/capability.js";
 export * from "./contracts/certification.js";
+export * from "./contracts/generation-verification.js";
 export * from "./contracts/identifiers.js";
 export * from "./contracts/json-schemas.js";
 export * from "./contracts/migration.js";
@@ -31,6 +32,8 @@ export type {
   ProjectGenerationRequest,
 } from "./generation/write-generated-project.js";
 export * from "./lifecycle/git-worktree-inspection.js";
+export * from "./lifecycle/apply-capability-addition.js";
+export * from "./lifecycle/capability-addition-writer.js";
 export * from "./lifecycle/plan-capability-addition.js";
 export type {
   ProbeEvidence,
