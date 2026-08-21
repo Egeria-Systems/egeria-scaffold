@@ -1127,7 +1127,7 @@ P0  Architecture materialization and deployed compatibility proof
  ↓
 P1  Builder kernel, state, ownership, delivery modes, portfolio/site skeletons
  ↓
-P2  Production-ready portfolio + Calendly + observability
+P2  Client-ready portfolio + Calendly + observability
  ↓
 P3  Transactional lifecycle, drift handling, and supported upgrades
  ↓
@@ -1158,7 +1158,7 @@ P10 Fleet hardening, package review, and portability evidence
 
 ### Sequencing rules
 
-- P2 retains every approved portfolio, Calendly, observability, CI/deployment, visual, performance, and automated-accessibility task and closes a production-ready portfolio baseline; it does not generate the real client project early.
+- The unnumbered P2 closure amendment retains every accepted portfolio, Calendly, observability, CI/deployment, visual, and automated-accessibility increment while deferring performance budgets and making no performance or production-readiness claim; it closes an accepted client-ready portfolio baseline and does not generate the real client project early.
 - P2 Task 6C normally begins only after production-observability implementation and separate Task 6B certification are integrated and approved. The explicit 2026-08-11 exception permits only Task 6C's isolated implementation from the accepted Task 6 base while Task 6B remains pending, with non-overlapping ownership and separate later reconciliation. Separate Task 6D then certifies the materially changed `standards` capability before P2 can close. Existing later task numbers remain unchanged.
 - Automatic-CI Plan A is accepted maintenance at `main@368b9491fd2f813f83f1e456823d8c7546f6762c`, not a new capability task or replacement for Task 6D. The separately resumed Task 6D stream recomputed the unchanged standards subject and renewed generated-build, browser, fixture, state, and CI evidence at descendant `d7c63b0aaa9bebd56c075f16f1e5d86519853698`; that renewal is integrated at accepted `main@7b5324cfcffc7eb94f48cc304cbfe0ceb08c3486`, and standards stayed certified throughout.
 - The exact `deployment-cloudflare@0.3.0` certification transition binds accepted fresh-scaffold, deployed-application, and cleanup-recovery evidence while retaining the reusable repository, environment, credential, and Worker baseline. It does not authorize another workflow, provider mutation, production action, merge, or successor work.
@@ -1206,11 +1206,12 @@ P10 Fleet hardening, package review, and portability evidence
 - production observability;
 - Task 6C generated Vitest Node and React Testing Library/jsdom foundations, semantic run/watch commands, starter unit/component specifications, state and receipt integration, generated and builder-repository CI coverage, and context-specific root/scoped testing instructions;
 - separate Task 6D certification of the exact materially changed `standards` capability subject;
-- CI/deployment, visual, performance, and automated accessibility gates;
+- CI/deployment, visual, and automated accessibility gates within their accepted claim limits;
   - Task 7B's accepted deployment certification transition is integrated at `main@b46f5f59c7f98ed6be1fa569a2f4a1f23d1ca1ad`, and post-merge Repository quality run `32323617228` passed every applicable job;
-  - deterministic visual regression is implemented for four representative portfolio/site OpenNext screenshots under exact `standards@0.4.0` and recipe `0.10.0`, accepted at `main@8e5f376f32a95f87420fd82a61566c08c2db020e`; post-merge Repository quality run `32399819237` passed every applicable job as accepted-main integration evidence, not certification evidence; performance budgets remain a separate immediately following unimplemented increment;
+  - deterministic visual regression is implemented for four representative portfolio/site OpenNext screenshots under exact `standards@0.4.0` and recipe `0.10.0`, accepted at `main@8e5f376f32a95f87420fd82a61566c08c2db020e`; post-merge Repository quality run `32399819237` passed every applicable job as accepted-main integration evidence, not certification evidence; performance budgets are deferred by the unnumbered closure amendment and no performance claim is made, while the Task 8 and Task 8B visual regression claim limits remain unchanged;
   - Task 8B is complete and exact `standards@0.4.0` is certified from accepted local `fresh-scaffold` evidence at revision `416e2c2441978ac86f3a17dee96a694141033e20`; prior `standards@0.3.0` evidence cannot certify it;
-- production-ready portfolio baseline retained as a P3 lifecycle input;
+- accepted client-ready portfolio baseline retained as a P3 lifecycle input within the recorded claim limits;
+- P3 is eligible only after verified-final-diff approval and accepted-main integration of the unnumbered closure amendment; P3B must not begin before P3 closes;
 - the real-client generation and migration-evidence requirement is fulfilled in P3B rather than waived or replaced.
 
 #### P3 — Lifecycle hardening
