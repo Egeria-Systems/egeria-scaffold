@@ -30,6 +30,8 @@ export type {
   GeneratedProject,
   ProjectGenerationRequest,
 } from "./generation/write-generated-project.js";
+export * from "./lifecycle/git-worktree-inspection.js";
+export * from "./lifecycle/plan-capability-addition.js";
 export type {
   ProbeEvidence,
   ProbeEvidenceStatus,

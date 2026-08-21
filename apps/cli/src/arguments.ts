@@ -20,6 +20,12 @@ export type CliCommand =
   | Readonly<{
       kind: "infer" | "doctor" | "diff";
       directory: string;
+    }>
+  | Readonly<{
+      kind: "plan-add";
+      directory: string;
+      capability: "booking-calendly";
+      settings: CalendlyBookingSettings;
     }>;
 
 const projectFields = projectConfigurationSchema
@@ -159,6 +165,57 @@ function parseReadOnly(
   }
 }
 
+function parsePlanAdd(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        capability: { type: "string" },
+        "calendly-url": { type: "string" },
+        "calendly-mode": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const capability = values.capability;
+    const settings = calendlyBookingSettingsSchema.safeParse({
+      destination: values["calendly-url"],
+      mode: values["calendly-mode"],
+    });
+
+    if (
+      !hasExactOptions(tokens, [
+        "directory",
+        "capability",
+        "calendly-url",
+        "calendly-mode",
+      ]) ||
+      !validDirectory(directory) ||
+      capability !== "booking-calendly" ||
+      !settings.success
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "plan-add",
+        directory,
+        capability,
+        settings: settings.data,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
 export function parseCliArguments(
   arguments_: readonly string[],
 ): ValidationResult<CliCommand> {
@@ -171,6 +228,8 @@ export function parseCliArguments(
     case "doctor":
     case "diff":
       return parseReadOnly(command, commandArguments);
+    case "plan-add":
+      return parsePlanAdd(commandArguments);
     default:
       return invalidArguments();
   }

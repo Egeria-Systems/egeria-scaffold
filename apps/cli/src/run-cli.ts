@@ -5,9 +5,16 @@ import {
   diffProject,
   doctorRepository,
   generateProject,
+  inspectGitCreateTargets as inspectGitCreateTargetsDefault,
   inferRepository,
+  inspectGitWorktree as inspectGitWorktreeDefault,
+  planCapabilityAddition,
   profileRecipes,
+  type CapabilityAdditionPlan,
   type GeneratedProjectVerifier,
+  type GitCreateTargetInspection,
+  type GitWorktreeInspection,
+  type PlanningFailureCode,
   type RepositoryReader,
 } from "@egeria-systems/builder-core";
 import { resolve } from "node:path";
@@ -22,12 +29,36 @@ export type CliOutput = Readonly<{
 type CliRunnerDependencies = Readonly<{
   createVerifier(): GeneratedProjectVerifier;
   createReader?(root: string): RepositoryReader;
+  inspectGitCreateTargets?(input: Readonly<{
+    root: string;
+    paths: readonly string[];
+  }>): Promise<GitCreateTargetInspection>;
+  inspectGitWorktree?(input: Readonly<{ root: string }>): Promise<GitWorktreeInspection>;
 }>;
 
 type CliRunner = (
   arguments_: readonly string[],
   output: CliOutput,
 ) => Promise<0 | 1 | 2>;
+
+type PlanAddSuccess = Readonly<{
+  ok: true;
+  command: "plan-add";
+  result: CapabilityAdditionPlan;
+}>;
+
+const plannerRefusalCodes = new Set<PlanningFailureCode>([
+  "PROJECT_INSPECTION_INVALID",
+  "PROJECT_DRIFT_DETECTED",
+  "PROJECT_EJECTION_UNSUPPORTED",
+  "CAPABILITY_ACTION_CONFLICT",
+  "CAPABILITY_ALREADY_INSTALLED",
+  "CAPABILITY_ADDITION_UNSUPPORTED",
+]);
+
+function isPlannerRefusalCode(code: string): code is PlanningFailureCode {
+  return plannerRefusalCodes.has(code as PlanningFailureCode);
+}
 
 function writeJson(
   write: (value: string) => void,
@@ -134,6 +165,123 @@ async function runReadOnly(
   }
 }
 
+function writePlanAddRefusal(output: CliOutput, code: string): 1 {
+  writeJson(output.writeError, {
+    ok: false,
+    command: "plan-add",
+    code,
+  });
+  return 1;
+}
+
+function sameGitIdentity(
+  left: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>,
+  right: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>,
+): boolean {
+  return (
+    left.identity.root === right.identity.root &&
+    left.identity.revision === right.identity.revision &&
+    left.identity.attachedRef === right.identity.attachedRef &&
+    left.identity.gitDirectory === right.identity.gitDirectory &&
+    left.identity.commonDirectory === right.identity.commonDirectory
+  );
+}
+
+async function inspectForPlan(
+  root: string,
+  dependencies: CliRunnerDependencies,
+): Promise<GitWorktreeInspection> {
+  try {
+    return await (dependencies.inspectGitWorktree ?? inspectGitWorktreeDefault)({
+      root,
+    });
+  } catch {
+    return { ok: false, code: "GIT_WORKTREE_IDENTITY_INVALID" };
+  }
+}
+
+async function inspectCreateTargetsForPlan(
+  root: string,
+  paths: readonly string[],
+  dependencies: CliRunnerDependencies,
+): Promise<GitCreateTargetInspection> {
+  try {
+    return await (
+      dependencies.inspectGitCreateTargets ?? inspectGitCreateTargetsDefault
+    )({ root, paths });
+  } catch {
+    return { ok: false, code: "GIT_WORKTREE_IDENTITY_INVALID" };
+  }
+}
+
+async function runPlanAdd(
+  command: Extract<CliCommand, Readonly<{ kind: "plan-add" }>>,
+  output: CliOutput,
+  dependencies: CliRunnerDependencies,
+): Promise<0 | 1> {
+  const root = resolve(command.directory);
+  const initialGit = await inspectForPlan(root, dependencies);
+
+  if (!initialGit.ok) {
+    return writePlanAddRefusal(output, initialGit.code);
+  }
+
+  let result;
+
+  try {
+    const reader = (dependencies.createReader ?? createCliRepositoryReader)(root);
+    result = await planCapabilityAddition({
+      reader,
+      git: initialGit,
+      capability: command.capability,
+      settings: command.settings,
+    });
+  } catch {
+    return writePlanAddRefusal(output, "REPOSITORY_OPEN_FAILED");
+  }
+
+  if (!result.ok) {
+    const code = result.issues[0]?.code;
+    return writePlanAddRefusal(
+      output,
+      code !== undefined && isPlannerRefusalCode(code)
+        ? code
+        : "REPOSITORY_OPEN_FAILED",
+    );
+  }
+
+  const createTargets = result.value.actions.flatMap((action) =>
+    action.kind === "create-file" ? [action.path] : [],
+  );
+  const targetInspection = await inspectCreateTargetsForPlan(
+    root,
+    createTargets,
+    dependencies,
+  );
+
+  if (!targetInspection.ok) {
+    return writePlanAddRefusal(output, targetInspection.code);
+  }
+
+  const finalGit = await inspectForPlan(root, dependencies);
+
+  if (!finalGit.ok) {
+    return writePlanAddRefusal(output, finalGit.code);
+  }
+
+  if (!sameGitIdentity(initialGit, finalGit)) {
+    return writePlanAddRefusal(output, "GIT_WORKTREE_CHANGED");
+  }
+
+  const success: PlanAddSuccess = {
+    ok: true,
+    command: "plan-add",
+    result: result.value,
+  };
+  writeJson(output.write, success);
+  return 0;
+}
+
 export function createCliRunner(
   dependencies: CliRunnerDependencies,
 ): CliRunner {
@@ -158,6 +306,10 @@ export function createCliRunner(
         });
         return 1;
       }
+    }
+
+    if (parsed.value.kind === "plan-add") {
+      return runPlanAdd(parsed.value, output, dependencies);
     }
 
     const catalog = createVerifiedCapabilityCatalog();

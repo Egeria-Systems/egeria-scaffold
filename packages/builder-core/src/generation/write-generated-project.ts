@@ -14,7 +14,6 @@ import {
 } from "../catalog/verified-package-versions.js";
 import type {
   CapabilityDescriptor,
-  ManagedSurfaceDescriptor,
 } from "../contracts/capability.js";
 import { safeRelativePathSchema } from "../contracts/identifiers.js";
 import type {
@@ -26,7 +25,6 @@ import {
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
 import { validateContract } from "../contracts/result.js";
-import { createFileSurfaceDescriptor } from "../contracts/surface-target.js";
 import {
   installedStateSchema,
   type InstalledState,
@@ -36,6 +34,9 @@ import { createInstalledManifest } from "../manifest/create-installed-manifest.j
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
 import { createFileSystemRepositoryReader } from "../repository/repository-reader.js";
 import { serializeProjectYaml, serializeStateJson } from "../state/codecs.js";
+import {
+  createBuilderStateSurfaces,
+} from "./builder-state-surfaces.js";
 import {
   renderSkeleton,
   type GenerationRequest,
@@ -355,29 +356,6 @@ function verificationIsExact(value: unknown): value is GeneratedProjectVerificat
       (expectedCheck, index) => checks[index] === expectedCheck,
     )
   );
-}
-
-function createBuilderStateSurfaces(): readonly ManagedSurfaceDescriptor[] {
-  return [
-    createFileSurfaceDescriptor({
-      identifier: "builder-project-configuration",
-      owner: { kind: "builder-kernel" },
-      path: ".egeria/project.yaml",
-      ownership: "managed",
-    }),
-    createFileSurfaceDescriptor({
-      identifier: "builder-dependency-lockfile",
-      owner: { kind: "builder-kernel" },
-      path: "pnpm-lock.yaml",
-      ownership: "managed",
-    }),
-    createFileSurfaceDescriptor({
-      identifier: "builder-migration-log",
-      owner: { kind: "builder-kernel" },
-      path: ".egeria/migrations.jsonl",
-      ownership: "managed",
-    }),
-  ];
 }
 
 async function createInstalledState(input: Readonly<{

@@ -221,7 +221,7 @@ test("the root copy lint covers integration presentation templates", async () =>
   );
 });
 
-test("the CLI is a thin command adapter while builder-core owns generation", async () => {
+test("the CLI is a thin command adapter while builder-core owns generation and planning", async () => {
   const expectedEntry = `#!/usr/bin/env node
 
 import { runCli } from "./run-cli.js";
@@ -265,6 +265,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "diagnostics/diff-project.ts",
       "diagnostics/doctor.ts",
       "diagnostics/project-inspection.ts",
+      "generation/builder-state-surfaces.ts",
       "generation/render-skeleton.ts",
       "generation/render-template.ts",
       "generation/source-tree-safety.ts",
@@ -274,6 +275,8 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "index.ts",
       "inference/evaluate-probe.ts",
       "inference/infer-repository.ts",
+      "lifecycle/git-worktree-inspection.ts",
+      "lifecycle/plan-capability-addition.ts",
       "manifest/create-installed-manifest.ts",
       "ownership/fingerprint.ts",
       "ownership/materialize-surfaces.ts",
@@ -378,6 +381,10 @@ test("builder-core direct consumers describe the private generation boundary", a
     resolve(repositoryRoot, "docs/architecture/package-ownership.md"),
     "utf8",
   );
+  const rootReadme = await readFile(
+    resolve(repositoryRoot, "README.md"),
+    "utf8",
+  );
   const enforcementMap = await readFile(
     resolve(repositoryRoot, "docs/architecture/enforcement-map.md"),
     "utf8",
@@ -403,6 +410,14 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /portable rename/);
   assert.match(builderInstructions, /disabled Next telemetry/);
   assert.match(builderInstructions, /argument-array `execFile`/);
+  assert.match(builderInstructions, /clean attached linked worktree/);
+  assert.match(builderInstructions, /all non-ignored untracked files/);
+  assert.match(builderInstructions, /`assume-unchanged` and `skip-worktree`/);
+  assert.match(builderInstructions, /absent but Git-ignored create targets/);
+  assert.match(builderInstructions, /every installed application-owned surface/);
+  assert.match(builderInstructions, /canonical managed-surface inventory/);
+  assert.match(builderInstructions, /Git preflight and addition-planning policy/);
+  assert.match(builderInstructions, /no transform, migration, state update, or provider action/);
 
   assert.match(builderReadme, /1 MiB/);
   assert.match(builderReadme, /doctorRepository/);
@@ -425,11 +440,26 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /createPnpmGeneratedProjectVerifier/);
   assert.match(builderReadme, /Child processes receive only a narrow/);
   assert.match(builderReadme, /child output is never returned/i);
+  assert.match(builderReadme, /planCapabilityAddition/);
+  assert.match(builderReadme, /clean attached linked worktree/);
+  assert.match(builderReadme, /all non-ignored untracked files/);
+  assert.match(builderReadme, /`assume-unchanged` and `skip-worktree`/);
+  assert.match(builderReadme, /absent but Git-ignored create target/);
+  assert.match(builderReadme, /every installed application-owned surface/);
+  assert.match(builderReadme, /canonical managed-surface inventory/);
+  assert.match(builderReadme, /redacts settings and repository metadata/);
+  assert.match(builderReadme, /no transform, migration, state update, or provider action/);
   assert.doesNotMatch(builderReadme, /The CLI remains empty/);
-  assert.match(cliInstructions, /four commands exact/);
+  assert.match(cliInstructions, /five commands exact/);
+  assert.match(cliInstructions, /`plan-add` remains read-only/);
   assert.match(cliInstructions, /remain read-only/);
   assert.match(cliInstructions, /does not add overwrite/);
-  assert.match(cliReadme, /four exact commands/);
+  assert.match(cliReadme, /five exact commands/);
+  assert.match(cliReadme, /clean attached linked worktree/);
+  assert.match(cliReadme, /never creates the worktree or branch/);
+  assert.match(cliReadme, /`assume-unchanged` and `skip-worktree`/);
+  assert.match(cliReadme, /absent but ignored create targets/);
+  assert.match(cliReadme, /canonical managed-surface inventory/);
   assert.match(cliReadme, /one content-safe JSON line/);
   assert.match(cliReadme, /no prompt, overwrite mode/);
 
@@ -447,10 +477,23 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /portable-rename race limit/);
   assert.match(packageOwnership, /pnpm `11.20.0`/);
   assert.match(packageOwnership, /disabled Next telemetry/);
-  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, and `diff`/);
+  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, and `plan-add`/);
   assert.match(packageOwnership, /one-line JSON output/);
+  assert.match(packageOwnership, /clean attached linked worktree/);
+  assert.match(packageOwnership, /all non-ignored untracked files/);
+  assert.match(packageOwnership, /`assume-unchanged` and `skip-worktree`/);
+  assert.match(packageOwnership, /absent but Git-ignored create targets/);
+  assert.match(packageOwnership, /every installed application-owned surface/);
+  assert.match(packageOwnership, /canonical managed-surface inventory/);
+  assert.match(packageOwnership, /redacts settings and repository metadata/);
+  assert.match(packageOwnership, /no transform, migration, state update, or provider action/);
   assert.doesNotMatch(packageOwnership, /future CLI consumer/);
   assert.match(packageOwnership, /existing-repository transformation/);
+  assert.match(rootReadme, /five exact commands/);
+  assert.match(rootReadme, /local eligibility and planning evidence/);
+  assert.match(rootReadme, /`assume-unchanged` and `skip-worktree`/);
+  assert.match(rootReadme, /canonical managed-surface inventory/);
+  assert.match(rootReadme, /not transformation, migration, recovery, certification, deployment/);
   assert.match(enforcementMap, /desired, installed, and inferred/);
   assert.match(enforcementMap, /read-only diagnostics/);
   assert.match(enforcementMap, /exact source and template allowlists/);
