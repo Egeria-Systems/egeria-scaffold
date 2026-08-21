@@ -41,6 +41,57 @@ const verificationChecks = [
   "post-state-inference",
 ];
 
+function assertReviewedPerformanceLockGraph(lockfile) {
+  assert.match(lockfile, /'@lhci\/cli':\n\s+specifier: 0\.15\.1\n\s+version: 0\.15\.1/u);
+  assert.match(lockfile, /lighthouse@13\.4\.1/u);
+  for (const [packageIdentifier, integrity] of [
+    [
+      "@lhci/cli@0.15.1",
+      "sha512-yhC0oXnXqGHYy1xl4D8YqaydMZ/khFAnXGY/o2m/J3PqPa/D0nj3V6TLoH02oVMFeEF2AQim7UbmdXMiXx2tOw==",
+    ],
+    [
+      "@lhci/utils@0.15.1",
+      "sha512-WclJnUQJeOMY271JSuaOjCv/aA0pgvuHZS29NFNdIeI14id8eiFsjith85EGKYhljgoQhJ2SiW4PsVfFiakNNw==",
+    ],
+    [
+      "lighthouse@13.4.1",
+      "sha512-fDu8lt3QLK/lTqIxtp1HkzQNJ32rsFHhbadYOepcMZFLgA8oINhxutMbMv8XXnpTOvZ0TXCo4JCk1LDTWaRLnA==",
+    ],
+    [
+      "tmp@0.2.7",
+      "sha512-e0votIpp4Uo2AJYSzVHV6xCcawuiez3DzqDAbrTc3YxBkplN6e+dM13ZeIcZnDg/QpSuU2zfZ3rzwY8ukEnaXw==",
+    ],
+    [
+      "uuid@11.1.1",
+      "sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==",
+    ],
+  ]) {
+    const lockKey = packageIdentifier.startsWith("@")
+      ? `'${packageIdentifier}'`
+      : packageIdentifier;
+    assert.equal(
+      lockfile.includes(
+        `  ${lockKey}:\n    resolution: {integrity: ${integrity}}`,
+      ),
+      true,
+      packageIdentifier,
+    );
+  }
+  assert.match(
+    lockfile,
+    /'@lhci\/cli@0\.15\.1[^']*':\n\s+dependencies:[\s\S]*?lighthouse: 13\.4\.1[^\n]*\n[\s\S]*?tmp: 0\.2\.7\n\s+uuid: 11\.1\.1/u,
+  );
+  assert.match(
+    lockfile,
+    /'@lhci\/utils@0\.15\.1[^']*':\n\s+dependencies:[\s\S]*?lighthouse: 13\.4\.1/u,
+  );
+  assert.match(
+    lockfile,
+    /external-editor@3\.1\.0:\n\s+dependencies:[\s\S]*?tmp: 0\.2\.7/u,
+  );
+  assert.doesNotMatch(lockfile, /:\s+(?:file|link|workspace):/u);
+}
+
 function createDescriptor(
   identifier = "standards",
   probes = [{ kind: "file", path: "managed.txt" }],
@@ -547,8 +598,8 @@ test("restricted error diagnostics admission advances every direct owner togethe
       recipeVersion,
     })),
     [
-      { identifier: "portfolio", recipeVersion: "0.10.0" },
-      { identifier: "site", recipeVersion: "0.10.0" },
+      { identifier: "portfolio", recipeVersion: "0.11.0" },
+      { identifier: "site", recipeVersion: "0.11.0" },
     ],
   );
 
@@ -587,7 +638,7 @@ test("restricted error diagnostics admission advances every direct owner togethe
       "utf8",
     ),
     readFile(
-      new URL("../lockfiles/web-recipe-0.8.0/pnpm-lock.yaml", import.meta.url),
+      new URL("../lockfiles/web-recipe-0.11.0/pnpm-lock.yaml", import.meta.url),
       "utf8",
     ),
   ]);
@@ -606,6 +657,80 @@ test("restricted error diagnostics admission advances every direct owner togethe
     lockfile,
     /@egeria-systems\/observability@(?:file:|link:|workspace:)|(?:file:|link:|workspace:).*observability/u,
   );
+});
+
+test("generated performance admission advances recipes, standards subject, manifest, and lockfile together", async () => {
+  const catalog = core.createVerifiedCapabilityCatalog();
+  assert.equal(catalog.ok, true);
+  const descriptor = catalog.value.find(
+    ({ identifier }) => identifier === "standards",
+  );
+  assert.notEqual(descriptor, undefined);
+  assert.equal(descriptor.version, "0.5.0");
+  assert.deepEqual(
+    core.profileRecipes.map(({ identifier, recipeVersion }) => ({
+      identifier,
+      recipeVersion,
+    })),
+    [
+      { identifier: "portfolio", recipeVersion: "0.11.0" },
+      { identifier: "site", recipeVersion: "0.11.0" },
+    ],
+  );
+
+  const registry = JSON.parse(
+    await readFile(
+      new URL("../../../certifications/capabilities.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  const subject = core.createCertificationSubject(
+    descriptor,
+    requiredEvidence.standards,
+  );
+  assert.deepEqual(registry.records.standards, {
+    subject,
+    requiredEvidence: ["fresh-scaffold"],
+    status: "pending",
+    taskPlan:
+      "docs/superpowers/plans/2026-08-20-generated-performance-budgets-certification.md",
+    evidence: [],
+  });
+  assert.deepEqual(
+    core.validateCertificationAdmission({ catalog: catalog.value, registry }),
+    { ok: true, value: undefined },
+  );
+
+  const [packageTemplate, lockfile] = await Promise.all([
+    readFile(
+      new URL("../templates/common/apps/web/package.json.template", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../lockfiles/web-recipe-0.11.0/pnpm-lock.yaml", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  const manifest = JSON.parse(packageTemplate);
+  assert.equal(manifest.devDependencies["@lhci/cli"], "0.15.1");
+  assert.equal(
+    manifest.scripts["test:performance"],
+    "node scripts/run-performance-budgets.mjs",
+  );
+  assert.match(
+    lockfile,
+    /'@egeria-systems\/standards':\n\s+specifier: 0\.1\.0/u,
+  );
+  assertReviewedPerformanceLockGraph(lockfile);
+});
+
+test("reviewed performance lock fixes the exact public integrity graph", async () => {
+  const lockfile = await readFile(
+    new URL("../lockfiles/web-recipe-0.11.0/pnpm-lock.yaml", import.meta.url),
+    "utf8",
+  );
+
+  assertReviewedPerformanceLockGraph(lockfile);
 });
 
 test("doctor and diff agree across the canonical portfolio composition", async () => {

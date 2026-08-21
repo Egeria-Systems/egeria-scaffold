@@ -70,7 +70,7 @@ const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const requiredPnpmVersion = "11.20.0";
 const publicRegistry = "https://registry.npmjs.org/";
 const recipeLockfile = new URL(
-  "../../lockfiles/web-recipe-0.8.0/pnpm-lock.yaml",
+  "../../lockfiles/web-recipe-0.11.0/pnpm-lock.yaml",
   import.meta.url,
 );
 const exclusiveFileOperations: ExclusiveFileOperations = {

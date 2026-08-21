@@ -137,6 +137,7 @@ const readableRecipeVersions = [
   "0.8.0",
   "0.9.0",
   "0.10.0",
+  "0.11.0",
 ];
 
 const validState = {
@@ -457,7 +458,7 @@ test("project configuration is strict and materializes safe capability identifie
     ...validProfile,
     identifier: "app",
   });
-  for (const recipeVersion of ["0.11.0", "0.10", "latest"]) {
+  for (const recipeVersion of ["0.12.0", "0.11", "latest"]) {
     assertRejects(contracts.projectConfigurationSchema, {
       ...validProject,
       recipeVersion,
@@ -662,6 +663,10 @@ test("installed state is strict and records the exact successful generation chec
     ...validState,
     origin: { ...validState.origin, recipeVersion: "0.10.0" },
   });
+  assertAccepts(contracts.installedStateSchema, {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.11.0" },
+  });
   assertRejects(contracts.installedStateSchema, {
     ...validState,
     lastSuccessfulVerification: {
@@ -693,6 +698,20 @@ test("installed state is strict and records the exact successful generation chec
       checks: legacyVerificationChecks,
     },
   });
+  assertRejects(contracts.installedStateSchema, {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.11.0" },
+    lastSuccessfulVerification: {
+      kind: "generation",
+      checks: legacyVerificationChecks,
+    },
+  });
+  for (const recipeVersion of ["0.12.0", "1.0.0", "0.11", "latest"]) {
+    assertRejects(contracts.installedStateSchema, {
+      ...validState,
+      origin: { ...validState.origin, recipeVersion },
+    });
+  }
   for (const surface of [
     { ...validInstalledSurface, mergeStrategy: "json-property" },
     {

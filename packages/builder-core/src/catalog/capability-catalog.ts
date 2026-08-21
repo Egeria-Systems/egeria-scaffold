@@ -266,6 +266,43 @@ function createDescriptors(
       "30.0.1",
     ),
     createPackageEvidencePoint(
+      "standards-lighthouse-ci-package",
+      "standards",
+      "devDependencies",
+      "@lhci/cli",
+      "0.15.1",
+    ),
+    createFileEvidencePoint(
+      "standards-performance-policy",
+      "standards",
+      "apps/web/performance-policy.json",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "standards-performance-budget",
+      "standards",
+      "apps/web/performance-budget.json",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "standards-performance-baseline",
+      "standards",
+      "apps/web/performance-baseline.json",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "standards-performance-runner",
+      "standards",
+      "apps/web/scripts/run-performance-budgets.mjs",
+      "managed",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-performance-test-script",
+      "standards",
+      "/scripts/test:performance",
+      "node scripts/run-performance-budgets.mjs",
+    ),
+    createPackageEvidencePoint(
       "standards-package",
       "standards",
       "devDependencies",
@@ -697,7 +734,7 @@ function createDescriptors(
   return [
     {
       identifier: "standards",
-      version: "0.4.0",
+      version: "0.5.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -707,6 +744,7 @@ function createDescriptors(
       requiredPackages: [
         "@axe-core/playwright",
         "@egeria-systems/standards",
+        "@lhci/cli",
         "@playwright/test",
         "@testing-library/dom",
         "@testing-library/jest-dom",
@@ -745,6 +783,7 @@ function createDescriptors(
         "browser-preview",
         "deployed-configuration",
         "visual-regression",
+        "performance-budgets",
         "workflow-contracts",
       ],
       documentationEvidenceRequirements: [
@@ -752,12 +791,14 @@ function createDescriptors(
         "unit-and-component-testing-claim-boundaries",
         "browser-testing-claim-boundaries",
         "visual-regression-baseline-and-claim-boundaries",
+        "performance-budget-baseline-and-claim-boundaries",
       ],
       removalAndRecoveryRequirements: [
         "review-package-and-configuration-removal",
         "review-generated-test-surface-removal",
         "review-generated-quality-surface-removal",
         "review-visual-regression-configuration-and-baselines",
+        "review-performance-policy-budget-baseline-and-runner",
       ],
     },
     {

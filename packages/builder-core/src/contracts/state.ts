@@ -156,7 +156,8 @@ export const installedStateSchema = z
       state.origin.recipeVersion === "0.7.0" ||
       state.origin.recipeVersion === "0.8.0" ||
       state.origin.recipeVersion === "0.9.0" ||
-      state.origin.recipeVersion === "0.10.0"
+      state.origin.recipeVersion === "0.10.0" ||
+      state.origin.recipeVersion === "0.11.0"
         ? currentVerificationChecks
         : legacyVerificationChecks;
 

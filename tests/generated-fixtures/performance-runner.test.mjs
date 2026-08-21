@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import {
   access,
   mkdir,
@@ -100,7 +100,7 @@ function createBaseline() {
       node: "22.23.2",
       pnpm: "11.20.0",
       lighthouseCi: "0.15.1",
-      lighthouse: "12.6.1",
+      lighthouse: "13.4.1",
       playwright: "1.62.1",
       chromium: "chromium-123456",
       cpuQuota: 2,
@@ -132,7 +132,7 @@ function createLighthouseReport(url, index, overrides = {}) {
     { resourceType: "third-party", transferSize: 0, requestCount: 0 },
   ];
   return {
-    lighthouseVersion: "12.6.1",
+    lighthouseVersion: "13.4.1",
     requestedUrl: url,
     finalUrl: url,
     fetchTime: `2026-08-20T00:00:${String(index).padStart(2, "0")}.000Z`,
@@ -145,13 +145,64 @@ function createLighthouseReport(url, index, overrides = {}) {
       "cumulative-layout-shift": { numericValue: 0.01 + index / 100 },
       "speed-index": { numericValue: 2500 + increment },
       "server-response-time": { numericValue: 50 + increment },
-      "largest-contentful-paint-element": {
-        details: { items: [{ node: { selector: "main h1" } }] },
+      "lcp-breakdown-insight": {
+        details: {
+          type: "list",
+          items: [
+            {
+              type: "table",
+              headings: [
+                { key: "label", valueType: "text", label: "Subpart" },
+                { key: "duration", valueType: "ms", label: "Duration" },
+              ],
+              items: [
+                {
+                  subpart: "timeToFirstByte",
+                  label: "Time to first byte",
+                  duration: 50 + increment,
+                },
+              ],
+            },
+            {
+              type: "node",
+              lhId: "page-0-H1",
+              path: "1,HTML,1,BODY,0,MAIN,0,H1",
+              selector: "main h1",
+              boundingRect: {
+                top: 100,
+                bottom: 140,
+                left: 20,
+                right: 392,
+                width: 372,
+                height: 40,
+              },
+              snippet: "<h1>Example heading</h1>",
+              nodeLabel: "Example heading",
+            },
+          ],
+        },
       },
       "resource-summary": { details: { items: resourceItems } },
     },
     ...overrides,
   };
+}
+
+function createSiteLighthouseReportEntries(transform = (report) => report) {
+  let reportIndex = 0;
+  return [
+    "http://127.0.0.1:3102/",
+    "http://127.0.0.1:3102/about",
+  ].flatMap((url) =>
+    [0, 1, 2, 3, 4].map((index) => {
+      const sourcePath = `lhr-${reportIndex}.json`;
+      reportIndex += 1;
+      return {
+        sourcePath,
+        report: transform(createLighthouseReport(url, index)),
+      };
+    }),
+  );
 }
 
 async function readPolicy() {
@@ -168,12 +219,50 @@ async function expectRunnerError(callback, expectedCode) {
   });
 }
 
+function processGroupExists(processGroupId) {
+  try {
+    process.kill(-processGroupId, 0);
+    return true;
+  } catch (error) {
+    if (error?.code === "ESRCH") return false;
+    throw error;
+  }
+}
+
+async function waitForFile(path, timeoutMilliseconds) {
+  const deadline = Date.now() + timeoutMilliseconds;
+  while (Date.now() <= deadline) {
+    try {
+      await access(path);
+      return;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
+  }
+  assert.fail(`Timed out waiting for ${path}`);
+}
+
+async function terminateTestProcessGroup(processGroupId) {
+  if (!processGroupExists(processGroupId)) return;
+  try {
+    process.kill(-processGroupId, "SIGKILL");
+  } catch (error) {
+    if (error?.code !== "ESRCH") throw error;
+  }
+  const deadline = Date.now() + 2_000;
+  while (processGroupExists(processGroupId) && Date.now() <= deadline) {
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
+  }
+  assert.equal(processGroupExists(processGroupId), false);
+}
+
 test("managed policy fixes the approved toolchain, execution, and hard ceilings", async () => {
   const policy = decodePerformancePolicy(await readPolicy());
 
   assert.deepEqual(policy.toolchain, {
     lighthouseCi: "0.15.1",
-    lighthouse: "12.6.1",
+    lighthouse: "13.4.1",
     playwright: "1.62.1",
   });
   assert.deepEqual(policy.execution, {
@@ -359,6 +448,52 @@ test("budget decoder accepts only the complete portfolio or site route matrix", 
   assert.throws(() => decodePerformanceBudget(mixedProfileBudget), {
     code: "PERFORMANCE_BUDGET_INVALID",
   });
+});
+
+test("retained profile budgets and observed baselines integrate with the runner", async () => {
+  const policy = decodePerformancePolicy(await readPolicy());
+
+  for (const [profile, expectedRows] of [
+    ["portfolio", ["portfolio:/", "portfolio-calendly:/"]],
+    ["site", ["site:/", "site:/about"]],
+  ]) {
+    const profileRoot = resolve(
+      repositoryRoot,
+      `packages/builder-core/templates/${profile}/apps/web`,
+    );
+    const [budgetSource, baselineSource] = await Promise.all([
+      readFile(join(profileRoot, "performance-budget.json"), "utf8"),
+      readFile(join(profileRoot, "performance-baseline.json"), "utf8"),
+    ]);
+    const budget = decodePerformanceBudget(JSON.parse(budgetSource));
+    const baseline = decodePerformanceBaseline(JSON.parse(baselineSource), {
+      policy,
+      budget,
+    });
+
+    assert.equal(baseline.measurements.length, 22);
+    assert.deepEqual(
+      [...new Set(baseline.measurements.map(({ variant, path }) => `${variant}:${path}`))],
+      expectedRows,
+    );
+    assert.equal(
+      baseline.measurements.every(
+        ({ batchMedians, acceptedMedian }) =>
+          batchMedians.length === 2 &&
+          batchMedians.every(Number.isFinite) &&
+          acceptedMedian === Math.max(...batchMedians),
+      ),
+      true,
+    );
+    assert.doesNotThrow(() =>
+      derivePerformanceThresholds({
+        policy,
+        budget,
+        baseline,
+        currentDate: baseline.calibratedOn,
+      }),
+    );
+  }
 });
 
 test("threshold derivation uses the exact formula, rounding, caps, and exceptions", async () => {
@@ -639,6 +774,66 @@ test("Lighthouse summaries require five valid, unique, exact-route reports", asy
   }
 });
 
+test("Lighthouse 13 diagnostics use the direct LCP breakdown node with bounded snippet fallback", async () => {
+  const policy = decodePerformancePolicy(await readPolicy());
+  const budget = decodePerformanceBudget(createBudget());
+  const baseline = decodePerformanceBaseline(createBaseline(), { policy, budget });
+
+  const directSummary = summarizeLighthouseReports({
+    policy,
+    budget,
+    baseline,
+    reports: createSiteLighthouseReportEntries(),
+    currentDate: "2026-08-20",
+  });
+  assert.equal(
+    directSummary.routes[0].diagnostics.largestContentfulElement,
+    "main h1",
+  );
+
+  const snippetSummary = summarizeLighthouseReports({
+    policy,
+    budget,
+    baseline,
+    reports: createSiteLighthouseReportEntries((report) => {
+      const node = report.audits["lcp-breakdown-insight"].details.items[1];
+      node.selector = "x".repeat(2049);
+      node.snippet = "<h1>Snippet fallback</h1>";
+      return report;
+    }),
+    currentDate: "2026-08-20",
+  });
+  assert.equal(
+    snippetSummary.routes[0].diagnostics.largestContentfulElement,
+    "<h1>Snippet fallback</h1>",
+  );
+});
+
+test("Lighthouse 13 reports reject the removed legacy-only LCP element audit", async () => {
+  const policy = decodePerformancePolicy(await readPolicy());
+  const budget = decodePerformanceBudget(createBudget());
+  const baseline = decodePerformanceBaseline(createBaseline(), { policy, budget });
+  const reports = createSiteLighthouseReportEntries((report) => {
+    delete report.audits["lcp-breakdown-insight"];
+    report.audits["largest-contentful-paint-element"] = {
+      details: { items: [{ node: { selector: "main h1" } }] },
+    };
+    return report;
+  });
+
+  assert.throws(
+    () =>
+      summarizeLighthouseReports({
+        policy,
+        budget,
+        baseline,
+        reports,
+        currentDate: "2026-08-20",
+      }),
+    { code: "PERFORMANCE_EVIDENCE_METRIC_INVALID" },
+  );
+});
+
 test("evidence loading rejects symlinks and oversized reports", async () => {
   const owner = await mkdtemp(join(tmpdir(), "performance-evidence-"));
   try {
@@ -847,7 +1042,7 @@ test("runner is import-inert and uses fixed shell-free processes with owned clea
     assert.deepEqual(manifest.reports[0], {
       jsonPath: "lhr-0.json",
       htmlPath: "lhr-0.html",
-      lighthouseVersion: "12.6.1",
+      lighthouseVersion: "13.4.1",
       requestedUrl: "http://127.0.0.1:3102/",
       finalUrl: "http://127.0.0.1:3102/",
       fetchTime: "2026-08-20T00:00:00.000Z",
@@ -955,8 +1150,199 @@ test("runner maps child failures to redacted stable codes and still stops its pr
   }
 });
 
-test("runner reports primary and cleanup failures together in stable order", async () => {
+test(
+  "default POSIX cleanup terminates the exact detached preview group before runtime removal",
+  {
+    skip: process.platform === "win32" ? "POSIX process groups only" : false,
+    timeout: 15_000,
+  },
+  async () => {
+    const webRoot = await mkdtemp(join(tmpdir(), "performance-runner-process-group-"));
+    const readyPath = join(webRoot, "preview-processes.json");
+    const grandchildReadyPath = join(webRoot, "preview-grandchild-ready.txt");
+    const removalViolationPath = join(webRoot, "runtime-removal-violation.txt");
+    let processGroupId;
+    let previewRequestedDetached;
+    try {
+      await writeFile(
+        join(webRoot, "performance-policy.json"),
+        JSON.stringify(await readPolicy()),
+      );
+      await writeFile(
+        join(webRoot, "performance-budget.json"),
+        JSON.stringify(createBudget()),
+      );
+      await writeFile(
+        join(webRoot, "performance-baseline.json"),
+        JSON.stringify(createBaseline()),
+      );
+
+      let failure;
+      try {
+        await runPerformanceBudgets(
+          { webRoot, currentDate: "2026-08-20" },
+          {
+            async resolveChromiumPath() {
+              return "/ms-playwright/chromium/chrome";
+            },
+            async startPreview(input) {
+              previewRequestedDetached = input.detached;
+              const grandchildSource = `
+                const { existsSync, writeFileSync } = require("node:fs");
+                const runtimePath = process.env.PERFORMANCE_TEST_RUNTIME_PATH;
+                const violationPath = process.env.PERFORMANCE_TEST_VIOLATION_PATH;
+                process.on("SIGTERM", () => {});
+                writeFileSync(
+                  process.env.PERFORMANCE_TEST_GRANDCHILD_READY_PATH,
+                  "ready",
+                  { mode: 0o600 },
+                );
+                setInterval(() => {
+                  if (!existsSync(runtimePath)) {
+                    try {
+                      writeFileSync(violationPath, "runtime removed before process group exit", {
+                        flag: "wx",
+                        mode: 0o600,
+                      });
+                    } catch {}
+                  }
+                }, 10);
+              `;
+              const parentSource = `
+                const { spawn } = require("node:child_process");
+                const { writeFileSync } = require("node:fs");
+                const grandchild = spawn(process.execPath, ["--eval", ${JSON.stringify(
+                  grandchildSource,
+                )}], { stdio: "ignore" });
+                writeFileSync(
+                  process.env.PERFORMANCE_TEST_READY_PATH,
+                  JSON.stringify({
+                    parentPid: process.pid,
+                    grandchildPid: grandchild.pid,
+                    processGroupId: process.pid,
+                  }),
+                  { mode: 0o600 },
+                );
+                setInterval(() => {}, 1000);
+              `;
+              const child = spawn(process.execPath, ["--eval", parentSource], {
+                cwd: input.cwd,
+                env: {
+                  ...input.environment,
+                  PERFORMANCE_TEST_READY_PATH: readyPath,
+                  PERFORMANCE_TEST_GRANDCHILD_READY_PATH: grandchildReadyPath,
+                  PERFORMANCE_TEST_RUNTIME_PATH: input.environment.HOME,
+                  PERFORMANCE_TEST_VIOLATION_PATH: removalViolationPath,
+                },
+                detached: true,
+                shell: false,
+                stdio: "ignore",
+              });
+              processGroupId = child.pid;
+              child.performanceProcessGroupId = processGroupId;
+              await waitForFile(readyPath, 2_000);
+              await waitForFile(grandchildReadyPath, 2_000);
+              const identities = JSON.parse(await readFile(readyPath, "utf8"));
+              assert.equal(identities.parentPid, child.pid);
+              assert.equal(identities.processGroupId, child.pid);
+              assert.equal(Number.isInteger(identities.grandchildPid), true);
+              return child;
+            },
+            async probeRoute(url) {
+              return { ok: true, status: 200, finalUrl: url };
+            },
+            async runCommand() {
+              throw new Error("PRIVATE_VALUE");
+            },
+          },
+        );
+      } catch (error) {
+        failure = error;
+      }
+
+      assert.equal(failure?.name, "PerformanceBudgetRunnerError");
+      assert.equal(failure?.code, "PERFORMANCE_COLLECTION_FAILED");
+      assert.deepEqual(failure?.codes, ["PERFORMANCE_COLLECTION_FAILED"]);
+      assert.equal(Number.isInteger(processGroupId), true);
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+      assert.equal(processGroupExists(processGroupId), false);
+      assert.equal(previewRequestedDetached, true);
+      await assert.rejects(access(removalViolationPath), { code: "ENOENT" });
+      assert.equal(
+        (await readdir(join(webRoot, ".lighthouseci"))).some((name) =>
+          name.startsWith("runtime-"),
+        ),
+        false,
+      );
+    } finally {
+      if (Number.isInteger(processGroupId)) {
+        await terminateTestProcessGroup(processGroupId);
+      }
+      await rm(webRoot, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  "production default start adapter creates the exact owned POSIX preview group",
+  {
+    skip: process.platform === "win32" ? "POSIX process groups only" : false,
+    timeout: 10_000,
+  },
+  async () => {
+    const webRoot = await mkdtemp(join(tmpdir(), "performance-runner-default-start-"));
+    const readyPath = join(webRoot, "preview-processes.json");
+    let processGroupId;
+    try {
+      const runnerModule = await import(pathToFileURL(runnerPath).href);
+      assert.equal(typeof runnerModule.startPreviewProcess, "function");
+      const parentSource = `
+        const { spawn } = require("node:child_process");
+        const { writeFileSync } = require("node:fs");
+        const grandchild = spawn(
+          process.execPath,
+          ["--eval", "setInterval(() => {}, 1000);"],
+          { stdio: "ignore" },
+        );
+        writeFileSync(
+          process.env.PERFORMANCE_TEST_READY_PATH,
+          JSON.stringify({ parentPid: process.pid, grandchildPid: grandchild.pid }),
+          { mode: 0o600 },
+        );
+        setInterval(() => {}, 1000);
+      `;
+      const child = await runnerModule.startPreviewProcess({
+        executable: process.execPath,
+        arguments: ["--eval", parentSource],
+        cwd: webRoot,
+        environment: {
+          ...process.env,
+          PERFORMANCE_TEST_READY_PATH: readyPath,
+        },
+        detached: true,
+        shell: false,
+      });
+      processGroupId = child.pid;
+      await waitForFile(readyPath, 2_000);
+      const identities = JSON.parse(await readFile(readyPath, "utf8"));
+
+      assert.equal(child.performanceStartupError, false);
+      assert.equal(child.performanceProcessGroupId, child.pid);
+      assert.equal(identities.parentPid, child.pid);
+      assert.equal(Number.isInteger(identities.grandchildPid), true);
+      assert.equal(processGroupExists(child.pid), true);
+    } finally {
+      if (Number.isInteger(processGroupId)) {
+        await terminateTestProcessGroup(processGroupId);
+      }
+      await rm(webRoot, { recursive: true, force: true });
+    }
+  },
+);
+
+test("runner retains diagnosable runtime state after ordered primary and cleanup failures", async () => {
   const webRoot = await mkdtemp(join(tmpdir(), "performance-runner-dual-failure-"));
+  let runtimePath;
   try {
     await writeFile(join(webRoot, "performance-policy.json"), JSON.stringify(await readPolicy()));
     await writeFile(join(webRoot, "performance-budget.json"), JSON.stringify(createBudget()));
@@ -970,7 +1356,8 @@ test("runner reports primary and cleanup failures together in stable order", asy
             async resolveChromiumPath() {
               return "/ms-playwright/chromium/chrome";
             },
-            async startPreview() {
+            async startPreview(input) {
+              runtimePath = input.environment.HOME;
               return { pid: 12345, exitCode: null };
             },
             async probeRoute(url) {
@@ -998,6 +1385,16 @@ test("runner reports primary and cleanup failures together in stable order", asy
         assert.doesNotMatch(String(error), /PRIVATE_VALUE/u);
         return true;
       },
+    );
+    assert.equal(typeof runtimePath, "string");
+    await access(runtimePath);
+    assert.equal(
+      (await readdir(join(webRoot, ".lighthouseci"))).some(
+        (name) =>
+          name.startsWith("runtime-") &&
+          join(webRoot, ".lighthouseci", name) === runtimePath,
+      ),
+      true,
     );
   } finally {
     await rm(webRoot, { recursive: true, force: true });

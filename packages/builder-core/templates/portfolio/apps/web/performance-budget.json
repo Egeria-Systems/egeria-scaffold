@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "scenarios": [
+    {
+      "identifier": "home",
+      "path": "/",
+      "baselineVariants": [
+        "portfolio",
+        "portfolio-calendly"
+      ]
+    }
+  ],
+  "exceptions": []
+}

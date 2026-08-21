@@ -11,6 +11,11 @@ resolutionMode: time-based
 
 overrides:
   "miniflare>undici": 7.29.0
+  "@lhci/cli>lighthouse": 13.4.1
+  "@lhci/utils>lighthouse": 13.4.1
+  "@lhci/cli>tmp": 0.2.7
+  "external-editor>tmp": 0.2.7
+  "@lhci/cli>uuid": 11.1.1
 
 allowBuilds:
   "@parcel/watcher": true

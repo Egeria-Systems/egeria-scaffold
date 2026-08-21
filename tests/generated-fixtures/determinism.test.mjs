@@ -19,6 +19,25 @@ const maximumOutputBytes = 1024 * 1024;
 const commandTimeoutMilliseconds = 45 * 60 * 1000;
 const codePointCompare = (left, right) =>
   left < right ? -1 : left > right ? 1 : 0;
+const generatedPerformanceFiles = Object.freeze([
+  "apps/web/performance-baseline.json",
+  "apps/web/performance-budget.json",
+  "apps/web/performance-policy.json",
+  "apps/web/scripts/run-performance-budgets.mjs",
+]);
+const successorFixtureContracts = generatedFixtureContracts.map((contract) =>
+  Object.freeze({
+    ...contract,
+    expectedFiles: Object.freeze(
+      [...contract.expectedFiles, ...generatedPerformanceFiles].sort(
+        codePointCompare,
+      ),
+    ),
+    expectedRecipeVersion: "0.11.0",
+    expectedStandardsVersion: "0.5.0",
+    expectedSurfaces: contract.expectedSurfaces + 6,
+  }),
+);
 
 const childEnvironment = Object.fromEntries(
   ["PATH", "LANG", "SystemRoot", "ComSpec", "PATHEXT"]
@@ -131,6 +150,15 @@ function assertPortablePublicLockfile(lockfile) {
   assert.match(lockfile, /@egeria-systems\/observability@0\.3\.0/u);
   assert.match(lockfile, /@axe-core\/playwright@4\.12\.1/u);
   assert.match(lockfile, /@playwright\/test@1\.62\.1/u);
+  assert.match(lockfile, /@lhci\/cli@0\.15\.1/u);
+  assert.match(
+    lockfile,
+    /@lhci\/cli@0\.15\.1:\n\s+resolution: \{integrity: sha512-yhC0oXnXqGHYy1xl4D8YqaydMZ\/khFAnXGY\/o2m\/J3PqPa\/D0nj3V6TLoH02oVMFeEF2AQim7UbmdXMiXx2tOw==\}/u,
+  );
+  assert.match(
+    lockfile,
+    /lighthouse@12\.6\.1:\n\s+resolution: \{integrity: sha512-85WDkjcXAVdlFem9Y6SSxqoKiz\/89UsDZhLpeLJIsJ4LlHxw047XTZhlFJmjYCB7K5S1erSBAf5cYLcfyNbH3A==\}/u,
+  );
   assert.match(lockfile, /@testing-library\/dom@10\.4\.1/u);
   assert.match(lockfile, /@testing-library\/jest-dom@7\.0\.1/u);
   assert.match(lockfile, /@testing-library\/react@16\.3\.2/u);
@@ -145,7 +173,7 @@ function assertPortablePublicLockfile(lockfile) {
 }
 
 test("compiled project generation matches every committed fixture identifier", async (context) => {
-  for (const fixtureCase of generatedFixtureContracts) {
+  for (const fixtureCase of successorFixtureContracts) {
     assert.equal(
       await pathExists(resolve(repositoryRoot, fixtureCase.relativeRoot)),
       true,
@@ -156,7 +184,7 @@ test("compiled project generation matches every committed fixture identifier", a
   const owner = await mkdtemp(join(tmpdir(), "egeria-fixture-determinism-"));
 
   try {
-    for (const fixtureCase of generatedFixtureContracts) {
+    for (const fixtureCase of successorFixtureContracts) {
       const generatedRoots = [
         join(owner, `${fixtureCase.identifier}-first`),
         join(owner, `${fixtureCase.identifier}-second`),
@@ -295,6 +323,23 @@ test("compiled project generation matches every committed fixture identifier", a
       assert.deepEqual(committedSnapshot, generatedSnapshots[0]);
       context.diagnostic(
         `${fixtureCase.identifier}: ${committedSnapshot.length} byte-stable files`,
+      );
+    }
+
+    const portfolioRoot = resolve(repositoryRoot, "fixtures/generated/portfolio");
+    const bookingRoot = resolve(
+      repositoryRoot,
+      "fixtures/generated/portfolio-calendly",
+    );
+    for (const path of [
+      "apps/web/performance-policy.json",
+      "apps/web/performance-budget.json",
+      "apps/web/performance-baseline.json",
+    ]) {
+      assert.deepEqual(
+        await readFile(join(bookingRoot, path)),
+        await readFile(join(portfolioRoot, path)),
+        path,
       );
     }
   } finally {

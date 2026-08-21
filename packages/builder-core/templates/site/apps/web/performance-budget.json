@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0.0",
+  "scenarios": [
+    {
+      "identifier": "home",
+      "path": "/",
+      "baselineVariants": [
+        "site"
+      ]
+    },
+    {
+      "identifier": "about",
+      "path": "/about",
+      "baselineVariants": [
+        "site"
+      ]
+    }
+  ],
+  "exceptions": []
+}

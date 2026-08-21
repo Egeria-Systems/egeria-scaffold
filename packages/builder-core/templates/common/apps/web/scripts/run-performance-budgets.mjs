@@ -76,7 +76,7 @@ const expectedPolicy = Object.freeze({
   schemaVersion: "1.0.0",
   toolchain: Object.freeze({
     lighthouseCi: "0.15.1",
-    lighthouse: "12.6.1",
+    lighthouse: "13.4.1",
     playwright: "1.62.1",
   }),
   execution: Object.freeze({
@@ -609,16 +609,23 @@ function extractMetrics(report) {
   );
 }
 
-function extractDiagnostics(report) {
-  const items = resourceSummaryItems(report);
-  const largestContentfulElement =
-    report?.audits?.["largest-contentful-paint-element"]?.details?.items?.[0]?.node
-      ?.selector ??
-    report?.audits?.["largest-contentful-paint-element"]?.details?.items?.[0]?.node
-      ?.snippet;
-  if (!isNonemptyBoundedString(largestContentfulElement, 2048)) {
+function extractLargestContentfulElement(report) {
+  const details = report?.audits?.["lcp-breakdown-insight"]?.details;
+  if (details?.type !== "list" || !Array.isArray(details.items)) {
     fail("PERFORMANCE_EVIDENCE_METRIC_INVALID");
   }
+  const nodes = details.items.filter(
+    (item) => isObject(item) && item.type === "node",
+  );
+  if (nodes.length !== 1) fail("PERFORMANCE_EVIDENCE_METRIC_INVALID");
+  const [node] = nodes;
+  if (isNonemptyBoundedString(node.selector, 2048)) return node.selector;
+  if (isNonemptyBoundedString(node.snippet, 2048)) return node.snippet;
+  fail("PERFORMANCE_EVIDENCE_METRIC_INVALID");
+}
+
+function extractDiagnostics(report) {
+  const items = resourceSummaryItems(report);
   return {
     performanceScore: requireDiagnosticNumber(report?.categories?.performance?.score),
     timeToFirstByte: requireDiagnosticNumber(
@@ -628,7 +635,7 @@ function extractDiagnostics(report) {
       oneResourceItem(items, "total")?.requestCount,
     ),
     benchmarkIndex: requireDiagnosticNumber(report?.environment?.benchmarkIndex),
-    largestContentfulElement,
+    largestContentfulElement: extractLargestContentfulElement(report),
   };
 }
 
@@ -1001,15 +1008,18 @@ async function defaultResolveChromiumPath() {
   }
 }
 
-async function defaultStartPreview(input) {
+export async function startPreviewProcess(input) {
   try {
     const child = spawn(input.executable, input.arguments, {
       cwd: input.cwd,
       env: input.environment,
+      detached: input.detached,
       shell: false,
       stdio: "ignore",
     });
     child.performanceStartupError = false;
+    child.performanceProcessGroupId =
+      input.detached === true && Number.isInteger(child.pid) ? child.pid : undefined;
     child.once("error", () => {
       child.performanceStartupError = true;
     });
@@ -1057,7 +1067,80 @@ function waitForExit(child, timeoutMilliseconds) {
   });
 }
 
+function signalProcessGroup(processGroupId, signal) {
+  try {
+    process.kill(-processGroupId, signal);
+    return true;
+  } catch (error) {
+    if (error?.code === "ESRCH") return false;
+    fail("PERFORMANCE_CLEANUP_FAILED");
+  }
+}
+
+function processGroupExists(processGroupId) {
+  try {
+    process.kill(-processGroupId, 0);
+    return true;
+  } catch (error) {
+    if (error?.code === "ESRCH") return false;
+    fail("PERFORMANCE_CLEANUP_FAILED");
+  }
+}
+
+async function waitForProcessGroupExit(processGroupId, timeoutMilliseconds) {
+  const deadline = Date.now() + timeoutMilliseconds;
+  while (processGroupExists(processGroupId)) {
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
+  }
+  return true;
+}
+
+async function waitForTopChildExit(child, timeoutMilliseconds) {
+  try {
+    await waitForExit(child, timeoutMilliseconds);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function defaultStopPreview(child) {
+  const processGroupId = child?.performanceProcessGroupId;
+  if (
+    process.platform !== "win32" &&
+    Number.isInteger(processGroupId) &&
+    processGroupId > 0
+  ) {
+    const termSent = signalProcessGroup(processGroupId, "SIGTERM");
+    let [groupExited, topChildExited] = await Promise.all([
+      termSent
+        ? waitForProcessGroupExit(processGroupId, cleanupTimeoutMilliseconds)
+        : Promise.resolve(true),
+      waitForTopChildExit(child, cleanupTimeoutMilliseconds),
+    ]);
+    if (!groupExited || !topChildExited) {
+      const killSent = signalProcessGroup(processGroupId, "SIGKILL");
+      const [killedGroupExited, killedTopChildExited] = await Promise.all([
+        killSent
+          ? waitForProcessGroupExit(processGroupId, cleanupTimeoutMilliseconds)
+          : Promise.resolve(true),
+        topChildExited
+          ? Promise.resolve(true)
+          : waitForTopChildExit(child, cleanupTimeoutMilliseconds),
+      ]);
+      groupExited = killedGroupExited;
+      topChildExited ||= killedTopChildExited;
+    }
+    if (
+      !groupExited ||
+      !topChildExited ||
+      processGroupExists(processGroupId)
+    ) {
+      fail("PERFORMANCE_CLEANUP_FAILED");
+    }
+    return;
+  }
   if (child.exitCode !== null) return;
   child.kill("SIGTERM");
   try {
@@ -1191,7 +1274,7 @@ export async function runPerformanceBudgets(
   );
   const adapters = {
     resolveChromiumPath: defaultResolveChromiumPath,
-    startPreview: defaultStartPreview,
+    startPreview: startPreviewProcess,
     probeRoute: defaultProbeRoute,
     runCommand: defaultRunCommand,
     stopPreview: defaultStopPreview,
@@ -1235,6 +1318,7 @@ export async function runPerformanceBudgets(
         ],
         cwd: canonicalWebRoot,
         environment,
+        detached: process.platform !== "win32",
         shell: false,
       });
     } catch (error) {
@@ -1316,17 +1400,21 @@ export async function runPerformanceBudgets(
     failure = normalizeFailure(error, "PERFORMANCE_RUNNER_FAILED");
   } finally {
     let cleanupFailed = false;
+    let previewStopped = preview === undefined;
     if (preview !== undefined) {
       try {
         await adapters.stopPreview(preview);
+        previewStopped = true;
       } catch {
         cleanupFailed = true;
       }
     }
-    try {
-      await removeRuntimeOwner(runtimeOwner);
-    } catch {
-      cleanupFailed = true;
+    if (previewStopped) {
+      try {
+        await removeRuntimeOwner(runtimeOwner);
+      } catch {
+        cleanupFailed = true;
+      }
     }
     if (cleanupFailed) {
       if (failure === undefined) {

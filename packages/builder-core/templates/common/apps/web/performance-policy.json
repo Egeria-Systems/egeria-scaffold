@@ -2,7 +2,7 @@
   "schemaVersion": "1.0.0",
   "toolchain": {
     "lighthouseCi": "0.15.1",
-    "lighthouse": "12.6.1",
+    "lighthouse": "13.4.1",
     "playwright": "1.62.1"
   },
   "execution": {

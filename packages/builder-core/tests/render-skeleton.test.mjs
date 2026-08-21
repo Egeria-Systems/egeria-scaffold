@@ -48,12 +48,16 @@ const portfolioPaths = [
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
+  "apps/web/performance-baseline.json",
+  "apps/web/performance-budget.json",
+  "apps/web/performance-policy.json",
   "apps/web/playwright.config.shared.ts",
   "apps/web/playwright.deployed.config.ts",
   "apps/web/playwright.dev.config.ts",
   "apps/web/playwright.preview.config.ts",
   "apps/web/playwright.visual.config.ts",
   "apps/web/postcss.config.mjs",
+  "apps/web/scripts/run-performance-budgets.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
@@ -105,12 +109,16 @@ const sitePaths = [
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
+  "apps/web/performance-baseline.json",
+  "apps/web/performance-budget.json",
+  "apps/web/performance-policy.json",
   "apps/web/playwright.config.shared.ts",
   "apps/web/playwright.deployed.config.ts",
   "apps/web/playwright.dev.config.ts",
   "apps/web/playwright.preview.config.ts",
   "apps/web/playwright.visual.config.ts",
   "apps/web/postcss.config.mjs",
+  "apps/web/scripts/run-performance-budgets.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
@@ -1297,7 +1305,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.10.0",
+    recipeVersion: "0.11.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -1367,6 +1375,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
       "test:e2e:preview":
         "playwright test --config playwright.preview.config.ts",
+      "test:performance": "node scripts/run-performance-budgets.mjs",
       "test:visual": "playwright test --config playwright.visual.config.ts",
       "test:unit": "vitest run --project unit",
       "test:unit:watch": "vitest --project unit",
@@ -1384,6 +1393,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
     devDependencies: {
       "@axe-core/playwright": "4.12.1",
       "@egeria-systems/standards": "0.1.0",
+      "@lhci/cli": "0.15.1",
       "@playwright/test": "1.62.1",
       "@tailwindcss/postcss": "4.3.3",
       "@testing-library/dom": "10.4.1",
@@ -1405,6 +1415,153 @@ test("rendered manifests and desired project match the approved resolved recipe"
       vitest: "4.1.10",
       wrangler: "4.118.0",
     },
+  });
+});
+
+test("generated performance inputs are profile-aware and retain observed baseline medians", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const request = {
+    profile: "portfolio",
+    projectName: "acme-studio",
+    displayName: "Acme Studio",
+    packageVersions,
+  };
+  const portfolio = assertSuccess(await renderSkeleton(request));
+  const booking = assertSuccess(
+    await renderSkeleton({
+      ...request,
+      bookingCalendly: {
+        destination: "https://calendly.com/acme/intro",
+        mode: "popup",
+      },
+    }),
+  );
+  const site = assertSuccess(
+    await renderSkeleton({ ...request, profile: "site" }),
+  );
+  const portfolioFiles = indexFiles(portfolio.files);
+  const bookingFiles = indexFiles(booking.files);
+  const siteFiles = indexFiles(site.files);
+  const commonPolicy = await readFile(
+    new URL(
+      "../templates/common/apps/web/performance-policy.json",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const commonRunner = await readFile(
+    new URL(
+      "../templates/common/apps/web/scripts/run-performance-budgets.mjs",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.equal(
+    portfolioFiles.get("apps/web/performance-policy.json"),
+    commonPolicy,
+  );
+  assert.equal(
+    siteFiles.get("apps/web/scripts/run-performance-budgets.mjs"),
+    commonRunner,
+  );
+  for (const path of [
+    "apps/web/performance-policy.json",
+    "apps/web/performance-budget.json",
+    "apps/web/performance-baseline.json",
+  ]) {
+    assert.equal(bookingFiles.get(path), portfolioFiles.get(path), path);
+  }
+
+  assert.deepEqual(
+    JSON.parse(portfolioFiles.get("apps/web/performance-budget.json")),
+    {
+      schemaVersion: "1.0.0",
+      scenarios: [
+        {
+          identifier: "home",
+          path: "/",
+          baselineVariants: ["portfolio", "portfolio-calendly"],
+        },
+      ],
+      exceptions: [],
+    },
+  );
+  assert.deepEqual(JSON.parse(siteFiles.get("apps/web/performance-budget.json")), {
+    schemaVersion: "1.0.0",
+    scenarios: [
+      { identifier: "home", path: "/", baselineVariants: ["site"] },
+      { identifier: "about", path: "/about", baselineVariants: ["site"] },
+    ],
+    exceptions: [],
+  });
+
+  for (const [files, expectedRows] of [
+    [portfolioFiles, ["portfolio:/", "portfolio-calendly:/"]],
+    [siteFiles, ["site:/", "site:/about"]],
+  ]) {
+    const baseline = JSON.parse(files.get("apps/web/performance-baseline.json"));
+    assert.equal(baseline.schemaVersion, "1.0.0");
+    assert.equal(baseline.calibratedOn, "2026-08-20");
+    assert.deepEqual(
+      {
+        ...baseline.environment,
+        chromium: "<observed>",
+      },
+      {
+        image:
+          "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
+        platform: "linux/amd64",
+        node: "22.23.2",
+        pnpm: "11.20.0",
+        lighthouseCi: "0.15.1",
+        lighthouse: "13.4.1",
+        playwright: "1.62.1",
+        chromium: "<observed>",
+        cpuQuota: 2,
+        memoryBytes: 4294967296,
+      },
+    );
+    assert.equal(typeof baseline.environment.chromium, "string");
+    assert.notEqual(baseline.environment.chromium.length, 0);
+    assert.equal(baseline.measurements.length, 22);
+    assert.deepEqual(
+      [...new Set(baseline.measurements.map(({ variant, path }) => `${variant}:${path}`))],
+      expectedRows,
+    );
+    for (const measurement of baseline.measurements) {
+      assert.equal(measurement.batchMedians.length, 2);
+      assert.equal(
+        measurement.batchMedians.every(Number.isFinite),
+        true,
+      );
+      assert.equal(
+        measurement.acceptedMedian,
+        Math.max(...measurement.batchMedians),
+      );
+    }
+  }
+
+  assert.match(portfolioFiles.get(".gitignore"), /^\.lighthouseci\/$/mu);
+});
+
+test("generated performance dependency overrides replace only the reviewed vulnerable paths", async () => {
+  const workspace = parseDocument(
+    await readFile(
+      new URL("../templates/common/pnpm-workspace.yaml", import.meta.url),
+      "utf8",
+    ),
+    { prettyErrors: false, strict: true, uniqueKeys: true },
+  );
+  assert.equal(workspace.errors.length, 0);
+
+  assert.deepEqual(workspace.toJS().overrides, {
+    "miniflare>undici": "7.29.0",
+    "@lhci/cli>lighthouse": "13.4.1",
+    "@lhci/utils>lighthouse": "13.4.1",
+    "@lhci/cli>tmp": "0.2.7",
+    "external-editor>tmp": "0.2.7",
+    "@lhci/cli>uuid": "11.1.1",
   });
 });
 
@@ -2647,7 +2804,7 @@ test("rendering conditionally overlays the home route and materializes each Cale
     );
 
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, "0.10.0");
+    assert.equal(rendered.project.recipeVersion, "0.11.0");
     assert.equal(
       rendered.project.selectedCapabilities.at(-1),
       "booking-calendly",

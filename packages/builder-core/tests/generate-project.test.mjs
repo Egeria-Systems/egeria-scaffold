@@ -21,7 +21,7 @@ import test from "node:test";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const reviewedRecipeLockfile = resolve(
   packageRoot,
-  "lockfiles/web-recipe-0.8.0/pnpm-lock.yaml",
+  "lockfiles/web-recipe-0.11.0/pnpm-lock.yaml",
 );
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
 const verifierModule = await import(
@@ -73,12 +73,16 @@ const portfolioRenderedPaths = [
   "apps/web/next.config.ts",
   "apps/web/open-next.config.ts",
   "apps/web/package.json",
+  "apps/web/performance-baseline.json",
+  "apps/web/performance-budget.json",
+  "apps/web/performance-policy.json",
   "apps/web/playwright.config.shared.ts",
   "apps/web/playwright.deployed.config.ts",
   "apps/web/playwright.dev.config.ts",
   "apps/web/playwright.preview.config.ts",
   "apps/web/playwright.visual.config.ts",
   "apps/web/postcss.config.mjs",
+  "apps/web/scripts/run-performance-budgets.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
@@ -313,6 +317,36 @@ test("lockfile-only transition classification preserves inventory and source-cha
       scenario.name,
     );
   }
+});
+
+test("reviewed generated lockfile pins the exact public LHCI and Lighthouse graph", async () => {
+  const lockfile = await readFile(reviewedRecipeLockfile, "utf8");
+  const obsoleteLockfile = resolve(
+    packageRoot,
+    "lockfiles/web-recipe-0.8.0/pnpm-lock.yaml",
+  );
+
+  assert.match(
+    lockfile,
+    /'@lhci\/cli':\n\s+specifier: 0\.15\.1\n\s+version: 0\.15\.1/u,
+  );
+  assert.match(
+    lockfile,
+    /'@lhci\/cli@0\.15\.1':\n\s+resolution: \{integrity: sha512-yhC0oXnXqGHYy1xl4D8YqaydMZ\/khFAnXGY\/o2m\/J3PqPa\/D0nj3V6TLoH02oVMFeEF2AQim7UbmdXMiXx2tOw==\}/u,
+  );
+  assert.match(
+    lockfile,
+    /lighthouse@13\.4\.1:\n\s+resolution: \{integrity: sha512-fDu8lt3QLK\/lTqIxtp1HkzQNJ32rsFHhbadYOepcMZFLgA8oINhxutMbMv8XXnpTOvZ0TXCo4JCk1LDTWaRLnA==\}/u,
+  );
+  assert.doesNotMatch(
+    lockfile,
+    /^\s+(?:specifier|version):\s+(?:file|link|workspace):/mu,
+  );
+  assert.doesNotMatch(
+    lockfile,
+    /^\s+['"]?(?:file|link|workspace):/mu,
+  );
+  assert.equal(await exists(obsoleteLockfile), false);
 });
 
 async function listFiles(root) {
@@ -828,10 +862,10 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
-      assert.equal(generated.state.origin.recipeVersion, "0.10.0");
+      assert.equal(generated.state.origin.recipeVersion, "0.11.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 106 : 108,
+        profile === "portfolio" ? 112 : 114,
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -849,7 +883,7 @@ test("portfolio and site generation writes exact state-last repositories", async
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "standards",
         )?.version,
-        "0.4.0",
+        "0.5.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -950,6 +984,11 @@ test("portfolio and site generation writes exact state-last repositories", async
       assert.equal(
         webManifest.devDependencies["@playwright/test"],
         "1.62.1",
+      );
+      assert.equal(webManifest.devDependencies["@lhci/cli"], "0.15.1");
+      assert.equal(
+        webManifest.scripts["test:performance"],
+        "node scripts/run-performance-budgets.mjs",
       );
       assert.deepEqual(
         Object.fromEntries(
@@ -1119,7 +1158,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
       accepted.state.installedCapabilities,
       core.createInstalledManifest(resolved),
     );
-    assert.equal(accepted.state.managedSurfaces.length, 111);
+    assert.equal(accepted.state.managedSurfaces.length, 117);
     assert.equal(
       accepted.state.managedSurfaces.filter(
         ({ owner }) =>

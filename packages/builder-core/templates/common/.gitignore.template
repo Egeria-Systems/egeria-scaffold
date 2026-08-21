@@ -9,6 +9,7 @@ cloudflare-env.d.ts
 coverage/
 playwright-report/
 test-results/
+.lighthouseci/
 .DS_Store
 .idea/
 .vscode/

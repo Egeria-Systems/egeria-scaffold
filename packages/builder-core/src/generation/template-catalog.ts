@@ -32,6 +32,7 @@ const commonTemplateSources = textTemplateSources([
   "common/apps/web/eslint.config.mjs",
   "common/apps/web/next.config.ts",
   "common/apps/web/open-next.config.ts",
+  "common/apps/web/performance-policy.json",
   "common/apps/web/instrumentation-client.ts",
   "common/apps/web/instrumentation.ts",
   "common/apps/web/playwright.config.shared.ts",
@@ -39,6 +40,7 @@ const commonTemplateSources = textTemplateSources([
   "common/apps/web/playwright.dev.config.ts",
   "common/apps/web/playwright.preview.config.ts",
   "common/apps/web/playwright.visual.config.ts",
+  "common/apps/web/scripts/run-performance-budgets.mjs",
   "common/apps/web/wrangler.jsonc.template",
   "common/apps/web/app/globals.css",
   "common/apps/web/app/layout.tsx",
@@ -70,6 +72,8 @@ const commonTemplateSources = textTemplateSources([
 
 const portfolioTemplateSources: readonly TemplateSource[] = [
   ...textTemplateSources([
+    "portfolio/apps/web/performance-baseline.json",
+    "portfolio/apps/web/performance-budget.json",
     "portfolio/apps/web/content/en-CA/long-form/introduction.md.template",
     "portfolio/apps/web/content/en-CA/site.yaml.template",
   ] as const),
@@ -87,6 +91,8 @@ const portfolioTemplateSources: readonly TemplateSource[] = [
 
 const siteTemplateSources: readonly TemplateSource[] = [
   ...textTemplateSources([
+    "site/apps/web/performance-baseline.json",
+    "site/apps/web/performance-budget.json",
     "site/apps/web/content/en-CA/site.yaml.template",
     "site/apps/web/content/en-CA/about.yaml.template",
     "site/apps/web/content/en-CA/long-form/introduction.md.template",

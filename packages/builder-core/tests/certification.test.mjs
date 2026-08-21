@@ -16,12 +16,19 @@ const observabilityEvidencePath =
   "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md";
 const observabilityEvidenceRevision =
   "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad";
-const standardsPlanPath =
+const historicalStandardsPlanPath =
   "docs/superpowers/plans/2026-08-19-generated-visual-regression-certification.md";
+const standardsPlanPath =
+  "docs/superpowers/plans/2026-08-20-generated-performance-budgets-certification.md";
 const standardsEvidencePath =
   "docs/implementation-evidence/2026-08-20-generated-visual-regression-certification-receipt.md";
 const standardsEvidenceRevision =
   "416e2c2441978ac86f3a17dee96a694141033e20";
+const historicalStandardsSubject = Object.freeze({
+  descriptorVersion: "0.4.0",
+  behaviorContractDigest:
+    "sha256:8733f70cdc64134232912c691c6922b27defb8cb7c2871faa334cfad2b394643",
+});
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const deploymentEvidencePath =
@@ -411,7 +418,7 @@ test("material observability diagnostics have exact reviewed certification evide
   );
 });
 
-test("material visual testing changes have exact accepted certification evidence", () => {
+test("material performance changes create a distinct pending standards subject", () => {
   const standardsDescriptor = descriptorsByIdentifier.get("standards");
   assert.notEqual(standardsDescriptor, undefined);
 
@@ -419,40 +426,92 @@ test("material visual testing changes have exact accepted certification evidence
     "fresh-scaffold",
   ]);
 
-  assert.equal(standardsDescriptor.version, "0.4.0");
+  assert.equal(standardsDescriptor.version, "0.5.0");
   assert.notEqual(
     subject.behaviorContractDigest,
-    descriptorDigests.standards,
+    historicalStandardsSubject.behaviorContractDigest,
   );
   assert.deepEqual(committedRegistry.records.standards, {
     subject,
     requiredEvidence: ["fresh-scaffold"],
-    status: "certified",
+    status: "pending",
     taskPlan: standardsPlanPath,
+    evidence: [],
+  });
+  assert.deepEqual(
+    core.validateCertificationAdmission({
+      catalog,
+      registry: committedRegistry,
+    }),
+    { ok: true, value: undefined },
+  );
+
+  const historicalEvidenceDoesNotSatisfySuccessor = structuredClone(
+    committedRegistry,
+  );
+  historicalEvidenceDoesNotSatisfySuccessor.records.standards = {
+    subject: historicalStandardsSubject,
+    requiredEvidence: ["fresh-scaffold"],
+    status: "certified",
+    taskPlan: historicalStandardsPlanPath,
     evidence: [
       {
         kind: "fresh-scaffold",
         path: standardsEvidencePath,
         outcome: "passed",
         revision: standardsEvidenceRevision,
-        subject,
+        subject: historicalStandardsSubject,
       },
     ],
-  });
+  };
+  assert.deepEqual(
+    core.validateCertificationAdmission({
+      catalog,
+      registry: historicalEvidenceDoesNotSatisfySuccessor,
+    }).issues,
+    [
+      {
+        code: "CERTIFICATION_SUBJECT_VERSION_MISMATCH",
+        path: ["records", "standards", "subject", "descriptorVersion"],
+        context: { reason: "stale" },
+      },
+      {
+        code: "CERTIFICATION_SUBJECT_DIGEST_MISMATCH",
+        path: ["records", "standards", "subject", "behaviorContractDigest"],
+        context: { reason: "stale" },
+      },
+    ],
+  );
+
+  assert.deepEqual(
+    core.validateCertificationClosure({
+      registry: committedRegistry,
+      policy: "legacy-backfill-exempt",
+    }).issues,
+    [
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "standards", "status"],
+        context: { reason: "pending" },
+      },
+    ],
+  );
+  assert.equal(
+    core.validateCertificationClosure({
+      registry: committedRegistry,
+      policy: "all-certified",
+    }).issues.length,
+    4,
+  );
 });
 
-test("accepted visual standards receipt binds the reviewed fresh-scaffold outcome", () => {
-  const standardsDescriptor = descriptorsByIdentifier.get("standards");
-  assert.notEqual(standardsDescriptor, undefined);
-
-  const subject = core.createCertificationSubject(standardsDescriptor, [
-    "fresh-scaffold",
-  ]);
+test("accepted visual standards receipt remains bound to the historical subject", () => {
+  const subject = historicalStandardsSubject;
   const acceptedRecord = {
     subject,
     requiredEvidence: ["fresh-scaffold"],
     status: "certified",
-    taskPlan: standardsPlanPath,
+    taskPlan: historicalStandardsPlanPath,
     evidence: [
       {
         kind: "fresh-scaffold",
@@ -476,7 +535,7 @@ test("accepted visual standards receipt binds the reviewed fresh-scaffold outcom
         records: { standards: acceptedRecord },
       },
       artifacts: {
-        [standardsPlanPath]: "# approved plan",
+        [historicalStandardsPlanPath]: "# approved plan",
         [standardsEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
       },
       validRevisions: [standardsEvidenceRevision],

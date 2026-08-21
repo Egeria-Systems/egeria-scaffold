@@ -39,17 +39,18 @@ function resolveRequest(
   return core.resolveCapabilities(request, catalog, profiles);
 }
 
-test("standards hybrid ownership declares generated unit, component, browser, and visual quality", () => {
+test("standards 0.5.0 hybrid ownership adds generated performance without changing visual quality", () => {
   const standards = createCatalog().find(
     ({ identifier }) => identifier === "standards",
   );
 
   assert.notEqual(standards, undefined);
-  assert.equal(standards.version, "0.4.0");
+  assert.equal(standards.version, "0.5.0");
   assert.equal(standards.deliveryMode, "hybrid");
   assert.deepEqual(standards.requiredPackages, [
     "@axe-core/playwright",
     "@egeria-systems/standards",
+    "@lhci/cli",
     "@playwright/test",
     "@testing-library/dom",
     "@testing-library/jest-dom",
@@ -93,6 +94,12 @@ test("standards hybrid ownership declares generated unit, component, browser, an
       "standards-eslint-configuration",
       "standards-jest-dom-package",
       "standards-jsdom-package",
+      "standards-lighthouse-ci-package",
+      "standards-performance-baseline",
+      "standards-performance-budget",
+      "standards-performance-policy",
+      "standards-performance-runner",
+      "standards-performance-test-script",
       "standards-playwright-deployed-configuration",
       "standards-playwright-development-configuration",
       "standards-playwright-package",
@@ -119,7 +126,7 @@ test("standards hybrid ownership declares generated unit, component, browser, an
       "standards-vitest-package",
     ].toSorted(),
   );
-  assert.equal(standards.inferenceProbes.length, 36);
+  assert.equal(standards.inferenceProbes.length, 42);
   const visualSurfaces = new Map(
     standards.managedSurfaces
       .filter(({ identifier }) => identifier.includes("visual"))
@@ -174,6 +181,63 @@ test("standards hybrid ownership declares generated unit, component, browser, an
       },
     ],
   );
+  const performanceSurfaces = new Map(
+    standards.managedSurfaces
+      .filter(({ identifier }) => identifier.includes("performance") || identifier === "standards-lighthouse-ci-package")
+      .map((surface) => [surface.identifier, surface]),
+  );
+  assert.deepEqual(
+    [...performanceSurfaces].map(([identifier, surface]) => ({
+      identifier,
+      path: surface.path,
+      ownership: surface.ownership,
+      target: surface.fingerprintTarget,
+    })),
+    [
+      {
+        identifier: "standards-lighthouse-ci-package",
+        path: "apps/web/package.json",
+        ownership: "merge-managed",
+        target: {
+          kind: "json-value",
+          pointer: "/devDependencies/@lhci~1cli",
+        },
+      },
+      {
+        identifier: "standards-performance-policy",
+        path: "apps/web/performance-policy.json",
+        ownership: "managed",
+        target: { kind: "file" },
+      },
+      {
+        identifier: "standards-performance-budget",
+        path: "apps/web/performance-budget.json",
+        ownership: "application-owned",
+        target: { kind: "file" },
+      },
+      {
+        identifier: "standards-performance-baseline",
+        path: "apps/web/performance-baseline.json",
+        ownership: "application-owned",
+        target: { kind: "file" },
+      },
+      {
+        identifier: "standards-performance-runner",
+        path: "apps/web/scripts/run-performance-budgets.mjs",
+        ownership: "managed",
+        target: { kind: "file" },
+      },
+      {
+        identifier: "standards-performance-test-script",
+        path: "apps/web/package.json",
+        ownership: "merge-managed",
+        target: {
+          kind: "json-value",
+          pointer: "/scripts/test:performance",
+        },
+      },
+    ],
+  );
   assert.deepEqual(standards.verificationPlan, [
     "package-resolution",
     "lint",
@@ -184,6 +248,7 @@ test("standards hybrid ownership declares generated unit, component, browser, an
     "browser-preview",
     "deployed-configuration",
     "visual-regression",
+    "performance-budgets",
     "workflow-contracts",
   ]);
   assert.deepEqual(standards.documentationEvidenceRequirements, [
@@ -191,12 +256,14 @@ test("standards hybrid ownership declares generated unit, component, browser, an
     "unit-and-component-testing-claim-boundaries",
     "browser-testing-claim-boundaries",
     "visual-regression-baseline-and-claim-boundaries",
+    "performance-budget-baseline-and-claim-boundaries",
   ]);
   assert.deepEqual(standards.removalAndRecoveryRequirements, [
     "review-package-and-configuration-removal",
     "review-generated-test-surface-removal",
     "review-generated-quality-surface-removal",
     "review-visual-regression-configuration-and-baselines",
+    "review-performance-policy-budget-baseline-and-runner",
   ]);
 });
 
@@ -1162,7 +1229,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.10.0",
+      recipeVersion: "0.11.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1174,7 +1241,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.10.0",
+      recipeVersion: "0.11.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1205,7 +1272,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.10.0");
+  assert.equal(portfolio.recipeVersion, "0.11.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1239,7 +1306,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
       ({ identifier }) => identifier,
     );
 
-    assert.equal(selected.recipeVersion, "0.10.0");
+    assert.equal(selected.recipeVersion, "0.11.0");
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
         selectedIdentifiers.indexOf("booking-calendly"),
@@ -1258,7 +1325,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   assert.deepEqual(core.createInstalledManifest(site), [
     {
       identifier: "standards",
-      version: "0.4.0",
+      version: "0.5.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
