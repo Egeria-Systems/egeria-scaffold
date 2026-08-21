@@ -5,8 +5,9 @@ import {
   mkdir,
   open,
   readFile,
+  realpath,
 } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
 
 import { ordinaryGenerationVerificationChecks } from "../contracts/generation-verification.js";
@@ -92,7 +93,10 @@ function findEnvironmentValue(name: string): string | undefined {
   )?.[1];
 }
 
-function createChildEnvironment(support: SupportPaths): NodeJS.ProcessEnv {
+function createChildEnvironment(
+  support: SupportPaths,
+  toolEnvironment: Readonly<Record<string, string>> = {},
+): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = {};
 
   for (const key of ["PATH", "SystemRoot", "ComSpec", "PATHEXT", "LANG"] as const) {
@@ -107,6 +111,7 @@ function createChildEnvironment(support: SupportPaths): NodeJS.ProcessEnv {
 
   return {
     ...environment,
+    ...toolEnvironment,
     CI: "true",
     NEXT_TELEMETRY_DISABLED: "1",
     HOME: support.home,
@@ -117,6 +122,55 @@ function createChildEnvironment(support: SupportPaths): NodeJS.ProcessEnv {
     NPM_CONFIG_REGISTRY: publicRegistry,
     NPM_CONFIG_USERCONFIG: support.userConfiguration,
   };
+}
+
+async function resolveExecutablePath(
+  executable: string,
+): Promise<string | undefined> {
+  const candidates = isAbsolute(executable)
+    ? [executable]
+    : (findEnvironmentValue("PATH") ?? "")
+        .split(delimiter)
+        .filter((entry) => entry.length > 0)
+        .map((entry) => join(entry, executable));
+
+  for (const candidate of candidates) {
+    try {
+      const stats = await lstat(candidate);
+      if (stats.isFile() || stats.isSymbolicLink()) {
+        return resolve(candidate);
+      }
+    } catch {
+      // Continue to the next fixed PATH candidate.
+    }
+  }
+
+  return undefined;
+}
+
+async function derivePnpmToolEnvironment(
+  executable: string,
+): Promise<Readonly<Record<string, string>>> {
+  const executablePath = await resolveExecutablePath(executable);
+  if (executablePath === undefined) {
+    return {};
+  }
+
+  try {
+    const bin = await realpath(dirname(executablePath));
+    const shim = await realpath(executablePath);
+    if (shim !== join(bin, "volta-shim")) {
+      return {};
+    }
+
+    const voltaHome = await realpath(dirname(bin));
+    const stats = await lstat(voltaHome);
+    return stats.isDirectory() && !stats.isSymbolicLink()
+      ? { VOLTA_HOME: voltaHome, VOLTA_FEATURE_PNPM: "1" }
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 export async function writeExclusive(
@@ -344,7 +398,10 @@ async function verifyInIsolatedCopy(
     if (!support.ok) {
       result = issue("FROZEN_INSTALL_FAILED", "support-creation-failed");
     } else {
-      const environment = createChildEnvironment(support.value);
+      const environment = createChildEnvironment(
+        support.value,
+        await derivePnpmToolEnvironment(executable),
+      );
       const version = await requirePnpmVersion({
         executable,
         cwd: validationRoot,

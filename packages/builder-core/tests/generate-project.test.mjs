@@ -6,9 +6,9 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  rename,
   readdir,
   realpath,
-  rename,
   rm,
   symlink,
   writeFile,
@@ -448,6 +448,18 @@ if (operation === "--version") {
   };
 }
 
+async function createFakeVoltaPnpmExecutable(owner) {
+  const fake = await createFakePnpmExecutable(owner);
+  const voltaHome = join(owner, ".volta");
+  const bin = join(voltaHome, "bin");
+  const shim = join(bin, "volta-shim");
+  const executable = join(bin, "pnpm");
+  await mkdir(bin, { recursive: true });
+  await rename(fake.executable, shim);
+  await symlink("volta-shim", executable);
+  return { ...fake, executable, voltaHome };
+}
+
 async function createVerifierSource(owner, name = "source") {
   const root = join(owner, name);
   await mkdir(root);
@@ -658,6 +670,28 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
       commandText,
       /preview|deploy|upload|wrangler|git|npm publish|--force|--update-checksums|[;&|`$<>]/i,
     );
+  });
+});
+
+test("the pnpm verifier preserves only derived Volta tool resolution with an isolated home", async () => {
+  await withTestRoot(async (owner) => {
+    const fakePnpm = await createFakeVoltaPnpmExecutable(owner);
+    const source = await createVerifierSource(owner);
+    const verifier = core.createPnpmGeneratedProjectVerifier({
+      pnpmExecutable: fakePnpm.executable,
+    });
+
+    assert.deepEqual(assertSuccess(await verifier.verifyInIsolatedCopy(source)), {
+      checks: generatedChecks,
+    });
+    const calls = await fakePnpm.readCalls();
+    const canonicalVoltaHome = await realpath(fakePnpm.voltaHome);
+    assert.equal(calls.length, 8);
+    for (const { environment } of calls) {
+      assert.equal(environment.VOLTA_HOME, canonicalVoltaHome);
+      assert.equal(environment.VOLTA_FEATURE_PNPM, "1");
+      assert.notEqual(environment.HOME, canonicalVoltaHome);
+    }
   });
 });
 
