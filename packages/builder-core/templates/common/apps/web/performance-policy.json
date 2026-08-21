@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1.0.0",
+  "toolchain": {
+    "lighthouseCi": "0.15.1",
+    "lighthouse": "12.6.1",
+    "playwright": "1.62.1"
+  },
+  "execution": {
+    "runs": 5,
+    "aggregation": "median",
+    "origin": "http://127.0.0.1:3102",
+    "formFactor": "mobile"
+  },
+  "metrics": {
+    "first-contentful-paint": {
+      "hardMaximum": 1800,
+      "relativeHeadroom": 0.2,
+      "absoluteHeadroom": 100,
+      "roundingQuantum": 50
+    },
+    "largest-contentful-paint": {
+      "hardMaximum": 2500,
+      "relativeHeadroom": 0.2,
+      "absoluteHeadroom": 100,
+      "roundingQuantum": 50
+    },
+    "total-blocking-time": {
+      "hardMaximum": 200,
+      "relativeHeadroom": 0.2,
+      "absoluteHeadroom": 25,
+      "roundingQuantum": 25
+    },
+    "cumulative-layout-shift": {
+      "hardMaximum": 0.1,
+      "relativeHeadroom": 0,
+      "absoluteHeadroom": 0.02,
+      "roundingQuantum": 0.01
+    },
+    "speed-index": {
+      "hardMaximum": 3400,
+      "relativeHeadroom": 0.2,
+      "absoluteHeadroom": 100,
+      "roundingQuantum": 50
+    },
+    "resource-summary:total:size": {
+      "hardMaximum": 353280,
+      "relativeHeadroom": 0.1,
+      "absoluteHeadroom": 8192,
+      "roundingQuantum": 8192
+    },
+    "resource-summary:script:size": {
+      "hardMaximum": 204800,
+      "relativeHeadroom": 0.1,
+      "absoluteHeadroom": 8192,
+      "roundingQuantum": 8192
+    },
+    "resource-summary:stylesheet:size": {
+      "hardMaximum": 35840,
+      "relativeHeadroom": 0.1,
+      "absoluteHeadroom": 8192,
+      "roundingQuantum": 8192
+    },
+    "resource-summary:font:size": {
+      "hardMaximum": 30720,
+      "relativeHeadroom": 0.1,
+      "absoluteHeadroom": 8192,
+      "roundingQuantum": 8192
+    },
+    "resource-summary:image:size": {
+      "hardMaximum": 51200,
+      "relativeHeadroom": 0.1,
+      "absoluteHeadroom": 8192,
+      "roundingQuantum": 8192
+    },
+    "resource-summary:third-party:count": {
+      "hardMaximum": 0,
+      "relativeHeadroom": 0,
+      "absoluteHeadroom": 0,
+      "roundingQuantum": 1
+    }
+  }
+}
