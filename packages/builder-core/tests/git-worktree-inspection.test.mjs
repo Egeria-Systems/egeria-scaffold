@@ -302,6 +302,22 @@ test("Git worktree inspection retains clean linked-worktree identity in fixed co
   ]);
 });
 
+test("Git worktree inspection accepts 64-character revisions with portable line endings", async () => {
+  const revision =
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+  for (const lineEnding of ["\n", "\r\n"]) {
+    const script = scriptedInspection({
+      revision,
+      revisionResult: commandResult(`${revision}${lineEnding}`),
+    });
+    const result = await inspectScript(script);
+
+    assert.equal(result.ok, true);
+    assert.equal(result.identity.revision, revision);
+  }
+});
+
 test("Git worktree inspection applies stable refusal precedence", async () => {
   const cases = [
     {

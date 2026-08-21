@@ -420,6 +420,31 @@ test("capability addition plan refuses installed and unsupported capabilities", 
   );
 });
 
+test("capability addition plan refuses unsupported requests before repository access", async () => {
+  const reader = {
+    async readText() {
+      throw new Error("repository access must not occur");
+    },
+  };
+  const cases = [
+    {
+      capability: "invented-capability",
+      settings,
+    },
+    {
+      capability: "booking-calendly",
+      settings: { ...settings, mode: "invented-mode" },
+    },
+  ];
+
+  for (const request of cases) {
+    assertFailure(
+      await core.planCapabilityAddition({ reader, git, ...request }),
+      "CAPABILITY_ADDITION_UNSUPPORTED",
+    );
+  }
+});
+
 test("capability addition plan is deterministic, order-independent, and destination-redacted", async () => {
   const base = await fixtureEntries("portfolio");
   const reordered = new Map(base);

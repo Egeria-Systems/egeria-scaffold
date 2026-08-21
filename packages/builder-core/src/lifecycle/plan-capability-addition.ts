@@ -56,7 +56,7 @@ export type CapabilityAdditionPlan = Readonly<{
   ];
 }>;
 
-type PlanningFailureCode =
+export type PlanningFailureCode =
   | "PROJECT_INSPECTION_INVALID"
   | "PROJECT_DRIFT_DETECTED"
   | "PROJECT_EJECTION_UNSUPPORTED"
@@ -182,7 +182,6 @@ function hasUnsupportedEjection(inspection: ValidInspection): boolean {
   return (
     projectEjections.length > 0 ||
     stateEjections.length > 0 ||
-    !sameOrderedValues(projectEjections, stateEjections) ||
     inspection.inference.surfaces.some(({ status }) => status === "ejected")
   );
 }
@@ -426,6 +425,18 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   capability: "booking-calendly";
   settings: CalendlyBookingSettings;
 }>): Promise<ValidationResult<CapabilityAdditionPlan>> {
+  const capabilityValue: unknown = Reflect.get(input, "capability");
+
+  if (capabilityValue !== "booking-calendly") {
+    return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
+  }
+
+  const settingsResult = calendlyBookingSettingsSchema.safeParse(input.settings);
+
+  if (!settingsResult.success) {
+    return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
+  }
+
   const catalogResult = createVerifiedCapabilityCatalog();
 
   if (!catalogResult.ok) {
@@ -490,18 +501,6 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     )
   ) {
     return planningFailure("PROJECT_DRIFT_DETECTED");
-  }
-
-  const capabilityValue: unknown = Reflect.get(input, "capability");
-
-  if (capabilityValue !== "booking-calendly") {
-    return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
-  }
-
-  const settingsResult = calendlyBookingSettingsSchema.safeParse(input.settings);
-
-  if (!settingsResult.success) {
-    return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
 
   const bookingDescriptor = catalogResult.value.find(

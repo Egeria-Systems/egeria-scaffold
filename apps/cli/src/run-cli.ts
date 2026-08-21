@@ -14,6 +14,7 @@ import {
   type GeneratedProjectVerifier,
   type GitCreateTargetInspection,
   type GitWorktreeInspection,
+  type PlanningFailureCode,
   type RepositoryReader,
 } from "@egeria-systems/builder-core";
 import { resolve } from "node:path";
@@ -46,7 +47,7 @@ type PlanAddSuccess = Readonly<{
   result: CapabilityAdditionPlan;
 }>;
 
-const plannerRefusalCodes = new Set([
+const plannerRefusalCodes = new Set<PlanningFailureCode>([
   "PROJECT_INSPECTION_INVALID",
   "PROJECT_DRIFT_DETECTED",
   "PROJECT_EJECTION_UNSUPPORTED",
@@ -54,6 +55,10 @@ const plannerRefusalCodes = new Set([
   "CAPABILITY_ALREADY_INSTALLED",
   "CAPABILITY_ADDITION_UNSUPPORTED",
 ]);
+
+function isPlannerRefusalCode(code: string): code is PlanningFailureCode {
+  return plannerRefusalCodes.has(code as PlanningFailureCode);
+}
 
 function writeJson(
   write: (value: string) => void,
@@ -239,7 +244,7 @@ async function runPlanAdd(
     const code = result.issues[0]?.code;
     return writePlanAddRefusal(
       output,
-      code !== undefined && plannerRefusalCodes.has(code)
+      code !== undefined && isPlannerRefusalCode(code)
         ? code
         : "REPOSITORY_OPEN_FAILED",
     );

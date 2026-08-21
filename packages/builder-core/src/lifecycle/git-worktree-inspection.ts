@@ -589,7 +589,7 @@ export async function inspectGitWorktree(
     return refusal("GIT_WORKTREE_IDENTITY_INVALID");
   }
 
-  const revision = decodeSingleLine(revisionResult.stdout, 64);
+  const revision = decodeSingleLine(revisionResult.stdout, 66);
   const gitDirectory = decodeAbsolutePath(gitDirectoryResult.stdout);
   const commonDirectory = decodeAbsolutePath(commonDirectoryResult.stdout);
 
