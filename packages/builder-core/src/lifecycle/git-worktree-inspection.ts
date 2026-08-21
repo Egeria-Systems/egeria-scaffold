@@ -3,6 +3,8 @@ import { lstat } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { TextDecoder } from "node:util";
 
+import { safeRelativePathSchema } from "../contracts/identifiers.js";
+
 const commandTimeoutMilliseconds = 10_000;
 const maximumCommandOutputBytes = 1024 * 1024;
 const maximumIdentityBytes = 64 * 1024;
@@ -100,6 +102,13 @@ export type GitWorktreeInspection =
       }>;
     }>
   | Readonly<{ ok: false; code: GitWorktreeRefusalCode }>;
+
+export type GitCreateTargetInspection =
+  | Readonly<{ ok: true }>
+  | Readonly<{
+      ok: false;
+      code: "CAPABILITY_ACTION_CONFLICT" | "GIT_WORKTREE_IDENTITY_INVALID";
+    }>;
 
 class GitProcessFailure extends Error {
   constructor() {
@@ -324,6 +333,7 @@ async function readGitMetadata(
 }
 
 type StatusInspection = "clean" | "dirty" | "conflicted" | "invalid";
+type IndexVisibilityInspection = "visible" | "hidden" | "invalid";
 
 function findNul(output: Uint8Array, start: number): number {
   for (let index = start; index < output.length; index += 1) {
@@ -406,6 +416,46 @@ function inspectStatus(output: Uint8Array): StatusInspection {
   return dirty ? "dirty" : "clean";
 }
 
+function inspectIndexVisibility(output: Uint8Array): IndexVisibilityInspection {
+  if (output.length === 0) {
+    return "visible";
+  }
+
+  if (
+    output.length > maximumCommandOutputBytes ||
+    output[output.length - 1] !== 0
+  ) {
+    return "invalid";
+  }
+
+  let offset = 0;
+  let hidden = false;
+
+  while (offset < output.length) {
+    const recordEnd = findNul(output, offset);
+
+    if (recordEnd < offset + 3 || output[offset + 1] !== 0x20) {
+      return "invalid";
+    }
+
+    const tag = output[offset];
+
+    if (tag === undefined) {
+      return "invalid";
+    }
+
+    if (tag === 0x53 || (tag >= 0x61 && tag <= 0x7a)) {
+      hidden = true;
+    } else if (![0x48, 0x4d, 0x52, 0x43, 0x4b, 0x3f, 0x55].includes(tag)) {
+      return "invalid";
+    }
+
+    offset = recordEnd + 1;
+  }
+
+  return hidden ? "hidden" : "visible";
+}
+
 async function runInspectionCommand(
   runGit: GitCommandRunner,
   root: string,
@@ -427,6 +477,51 @@ async function runInspectionCommand(
   } catch {
     return undefined;
   }
+}
+
+export async function inspectGitCreateTargets(
+  input: Readonly<{
+    root: string;
+    paths: readonly string[];
+    runGit?: GitCommandRunner;
+  }>,
+): Promise<GitCreateTargetInspection> {
+  if (
+    !isAbsolute(input.root) ||
+    resolve(input.root) !== input.root ||
+    input.paths.some(
+      (path) => !safeRelativePathSchema.safeParse(path).success,
+    )
+  ) {
+    return { ok: false, code: "GIT_WORKTREE_IDENTITY_INVALID" };
+  }
+
+  const runGit = input.runGit ?? createGitCommandRunner();
+  const paths = [...new Set(input.paths)].sort();
+
+  for (const path of paths) {
+    const result = await runInspectionCommand(runGit, input.root, [
+      "check-ignore",
+      "--no-index",
+      "--quiet",
+      "--",
+      path,
+    ]);
+
+    if (result?.stdout.length !== 0) {
+      return { ok: false, code: "GIT_WORKTREE_IDENTITY_INVALID" };
+    }
+
+    if (result.exitCode === 0) {
+      return { ok: false, code: "CAPABILITY_ACTION_CONFLICT" };
+    }
+
+    if (result.exitCode !== 1) {
+      return { ok: false, code: "GIT_WORKTREE_IDENTITY_INVALID" };
+    }
+  }
+
+  return { ok: true };
 }
 
 export async function inspectGitWorktree(
@@ -511,8 +606,15 @@ export async function inspectGitWorktree(
     return refusal("GIT_WORKTREE_NOT_ISOLATED");
   }
 
-  if (attachedRefResult.exitCode !== 0) {
+  if (
+    attachedRefResult.exitCode === 1 &&
+    attachedRefResult.stdout.length === 0
+  ) {
     return refusal("GIT_BRANCH_REQUIRED");
+  }
+
+  if (attachedRefResult.exitCode !== 0) {
+    return refusal("GIT_WORKTREE_IDENTITY_INVALID");
   }
 
   const attachedRef = decodeSingleLine(attachedRefResult.stdout);
@@ -573,6 +675,22 @@ export async function inspectGitWorktree(
     return refusal("GIT_OPERATION_IN_PROGRESS");
   }
 
+  const indexResult = await runInspectionCommand(runGit, root, [
+    "ls-files",
+    "-v",
+    "-z",
+  ]);
+
+  if (indexResult?.exitCode !== 0) {
+    return refusal("GIT_WORKTREE_IDENTITY_INVALID");
+  }
+
+  const indexVisibility = inspectIndexVisibility(indexResult.stdout);
+
+  if (indexVisibility === "invalid") {
+    return refusal("GIT_WORKTREE_IDENTITY_INVALID");
+  }
+
   const statusResult = await runInspectionCommand(runGit, root, [
     "status",
     "--porcelain=v1",
@@ -594,7 +712,7 @@ export async function inspectGitWorktree(
     return refusal("GIT_WORKTREE_CONFLICTED");
   }
 
-  if (status === "dirty") {
+  if (status === "dirty" || indexVisibility === "hidden") {
     return refusal("GIT_WORKTREE_DIRTY");
   }
 

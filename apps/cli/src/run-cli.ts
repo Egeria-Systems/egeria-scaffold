@@ -5,12 +5,14 @@ import {
   diffProject,
   doctorRepository,
   generateProject,
+  inspectGitCreateTargets as inspectGitCreateTargetsDefault,
   inferRepository,
   inspectGitWorktree as inspectGitWorktreeDefault,
   planCapabilityAddition,
   profileRecipes,
   type CapabilityAdditionPlan,
   type GeneratedProjectVerifier,
+  type GitCreateTargetInspection,
   type GitWorktreeInspection,
   type RepositoryReader,
 } from "@egeria-systems/builder-core";
@@ -26,6 +28,10 @@ export type CliOutput = Readonly<{
 type CliRunnerDependencies = Readonly<{
   createVerifier(): GeneratedProjectVerifier;
   createReader?(root: string): RepositoryReader;
+  inspectGitCreateTargets?(input: Readonly<{
+    root: string;
+    paths: readonly string[];
+  }>): Promise<GitCreateTargetInspection>;
   inspectGitWorktree?(input: Readonly<{ root: string }>): Promise<GitWorktreeInspection>;
 }>;
 
@@ -189,6 +195,20 @@ async function inspectForPlan(
   }
 }
 
+async function inspectCreateTargetsForPlan(
+  root: string,
+  paths: readonly string[],
+  dependencies: CliRunnerDependencies,
+): Promise<GitCreateTargetInspection> {
+  try {
+    return await (
+      dependencies.inspectGitCreateTargets ?? inspectGitCreateTargetsDefault
+    )({ root, paths });
+  } catch {
+    return { ok: false, code: "GIT_WORKTREE_IDENTITY_INVALID" };
+  }
+}
+
 async function runPlanAdd(
   command: Extract<CliCommand, Readonly<{ kind: "plan-add" }>>,
   output: CliOutput,
@@ -223,6 +243,19 @@ async function runPlanAdd(
         ? code
         : "REPOSITORY_OPEN_FAILED",
     );
+  }
+
+  const createTargets = result.value.actions.flatMap((action) =>
+    action.kind === "create-file" ? [action.path] : [],
+  );
+  const targetInspection = await inspectCreateTargetsForPlan(
+    root,
+    createTargets,
+    dependencies,
+  );
+
+  if (!targetInspection.ok) {
+    return writePlanAddRefusal(output, targetInspection.code);
   }
 
   const finalGit = await inspectForPlan(root, dependencies);

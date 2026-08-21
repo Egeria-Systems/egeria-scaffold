@@ -54,7 +54,8 @@ async function loadTextEntries(root) {
         const path = relative(root, absolutePath).split(sep).join("/");
         entries.set(path, decoder.decode(content));
       } catch {
-        // Binary application-owned visual baselines are never text-reader inputs.
+        const path = relative(root, absolutePath).split(sep).join("/");
+        entries.set(path, { kind: "error", code: "FILE_ENCODING_INVALID" });
       }
     }
   }
@@ -94,9 +95,13 @@ function createSnapshotReader(entries, overrides = new Map()) {
         }
 
         const content = files.get(path);
-        return content === undefined
-          ? { kind: "missing" }
-          : { kind: "file", content };
+        if (content === undefined) {
+          return { kind: "missing" };
+        }
+
+        return typeof content === "string"
+          ? { kind: "file", content }
+          : structuredClone(content);
       },
     },
     snapshot,
@@ -120,14 +125,16 @@ function assertFailure(result, code) {
 async function planFromEntries(entries, options = {}) {
   const snapshotReader = createSnapshotReader(entries, options.overrides);
   const before = snapshotReader.snapshot();
-  const result = await core.planCapabilityAddition({
-    reader: snapshotReader.reader,
-    git,
-    capability: options.capability ?? "booking-calendly",
-    settings: options.settings ?? settings,
-  });
-  assert.equal(snapshotReader.snapshot(), before);
-  return result;
+  try {
+    return await core.planCapabilityAddition({
+      reader: snapshotReader.reader,
+      git,
+      capability: options.capability ?? "booking-calendly",
+      settings: options.settings ?? settings,
+    });
+  } finally {
+    assert.equal(snapshotReader.snapshot(), before);
+  }
 }
 
 function expectedActions() {
@@ -280,6 +287,7 @@ test("capability addition plan refuses inference drift and replacement drift", a
       ],
     ]),
     new Map([["apps/web/app/page.tsx", { kind: "missing" }]]),
+    new Map([["apps/web/app/layout.tsx", { kind: "missing" }]]),
     new Map([
       [
         "apps/web/app/page.tsx",
@@ -425,10 +433,10 @@ test("capability addition plan is deterministic, order-independent, and destinat
   );
 });
 
-test("capability addition plan contains thrown reader details and preserves reader state", async () => {
-  const result = await planFromEntries(await fixtureEntries("portfolio"), {
-    overrides: new Map([[".egeria/project.yaml", "throw"]]),
-  });
-  assertFailure(result, "PROJECT_INSPECTION_INVALID");
-  assert.doesNotMatch(JSON.stringify(result), /private reader failure detail/iu);
+test("capability addition plan propagates unexpected reader failures for boundary containment", async () => {
+  await assert.rejects(
+    planFromEntries(await fixtureEntries("portfolio"), {
+      overrides: new Map([[".egeria/project.yaml", "throw"]]),
+    }),
+  );
 });

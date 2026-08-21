@@ -815,6 +815,7 @@ test("plan-add emits the complete approval-required envelope after two matching 
         resolve(repositoryRoot, "fixtures/generated/portfolio"),
       ),
     inspectGitWorktree: () => Promise.resolve(inspections.shift()),
+    inspectGitCreateTargets: () => Promise.resolve({ ok: true }),
   });
   const captured = captureOutput();
 
@@ -897,6 +898,7 @@ test("plan-add contains final inspection changes and never leaks a completed pla
           resolve(repositoryRoot, "fixtures/generated/portfolio"),
         ),
       inspectGitWorktree: () => Promise.resolve(inspections.shift()),
+      inspectGitCreateTargets: () => Promise.resolve({ ok: true }),
     });
     const captured = captureOutput();
 
@@ -931,6 +933,7 @@ test("plan-add contains final inspection changes and never leaks a completed pla
       core.createFileSystemRepositoryReader(
         resolve(repositoryRoot, "fixtures/generated/portfolio"),
       ),
+    inspectGitCreateTargets: () => Promise.resolve({ ok: true }),
     inspectGitWorktree() {
       const next = inspections.shift();
       if (next === "throw") {
@@ -956,6 +959,64 @@ test("plan-add contains final inspection changes and never leaks a completed pla
     }),
   ]);
   assert.doesNotMatch(captured.error[0], /private Git failure|approval-required/u);
+
+  const readerFailureRunner = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    createReader: () => ({
+      readText() {
+        throw new Error("private repository reader failure");
+      },
+    }),
+    inspectGitCreateTargets: () => Promise.resolve({ ok: true }),
+    inspectGitWorktree: () => Promise.resolve(structuredClone(initial)),
+  });
+  const readerFailure = captureOutput();
+  assert.equal(
+    await readerFailureRunner(
+      planAddArguments("/private/ignored-input"),
+      readerFailure.output,
+    ),
+    1,
+  );
+  assert.deepEqual(readerFailure.standard, []);
+  assert.deepEqual(readerFailure.error, [
+    JSON.stringify({
+      ok: false,
+      command: "plan-add",
+      code: "REPOSITORY_OPEN_FAILED",
+    }),
+  ]);
+  assert.doesNotMatch(
+    readerFailure.error[0],
+    /private repository reader failure|approval-required/u,
+  );
+
+  const ignoredTargetRunner = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    createReader: () =>
+      core.createFileSystemRepositoryReader(
+        resolve(repositoryRoot, "fixtures/generated/portfolio"),
+      ),
+    inspectGitCreateTargets: () =>
+      Promise.resolve({ ok: false, code: "CAPABILITY_ACTION_CONFLICT" }),
+    inspectGitWorktree: () => Promise.resolve(structuredClone(initial)),
+  });
+  const ignoredTarget = captureOutput();
+  assert.equal(
+    await ignoredTargetRunner(
+      planAddArguments("/private/ignored-input"),
+      ignoredTarget.output,
+    ),
+    1,
+  );
+  assert.deepEqual(ignoredTarget.standard, []);
+  assert.deepEqual(ignoredTarget.error, [
+    JSON.stringify({
+      ok: false,
+      command: "plan-add",
+      code: "CAPABILITY_ACTION_CONFLICT",
+    }),
+  ]);
 });
 
 async function executeGit(root, arguments_, readOnly = false) {
@@ -1073,7 +1134,7 @@ async function operationSnapshot(root) {
 }
 
 async function gitRepositorySnapshot(root) {
-  const [head, refs, status, tree, operations] = await Promise.all([
+  const [head, refs, status, indexVisibility, tree, operations] = await Promise.all([
     executeGit(root, ["rev-parse", "HEAD"], true),
     executeGit(root, ["show-ref"], true),
     executeGit(
@@ -1081,6 +1142,7 @@ async function gitRepositorySnapshot(root) {
       ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
       true,
     ),
+    executeGit(root, ["ls-files", "-v", "-z"], true),
     listTree(root),
     operationSnapshot(root),
   ]);
@@ -1089,6 +1151,7 @@ async function gitRepositorySnapshot(root) {
     head,
     refs,
     status,
+    indexVisibility,
     tree: tree.filter(
       ({ path }) => path !== ".git" && !path.startsWith(".git/"),
     ),
@@ -1182,6 +1245,16 @@ test("the compiled plan-add command refuses unsafe repository states without wri
       code: "PROJECT_DRIFT_DETECTED",
     },
     {
+      name: "missing unrelated application-owned surface",
+      fixture: "portfolio",
+      select: ({ linked }) => linked,
+      prepare: async (root) => {
+        await rm(join(root, "apps/web/app/layout.tsx"));
+        await commitAll(root, "delete application layout");
+      },
+      code: "PROJECT_DRIFT_DETECTED",
+    },
+    {
       name: "committed ejection",
       fixture: "portfolio",
       select: ({ linked }) => linked,
@@ -1218,6 +1291,33 @@ test("the compiled plan-add command refuses unsafe repository states without wri
       },
       code: "CAPABILITY_ACTION_CONFLICT",
     },
+    {
+      name: "absent ignored create target",
+      fixture: "portfolio",
+      select: ({ linked }) => linked,
+      prepare: async (root) => {
+        const ignorePath = join(root, ".gitignore");
+        await writeFile(
+          ignorePath,
+          `${await readFile(ignorePath, "utf8")}apps/web/content/en-CA/booking-calendly.yaml\n`,
+        );
+        await commitAll(root, "ignore absent create target");
+      },
+      code: "CAPABILITY_ACTION_CONFLICT",
+    },
+    ...[
+      ["assume-unchanged", "--assume-unchanged"],
+      ["skip-worktree", "--skip-worktree"],
+    ].map(([name, flag]) => ({
+      name: `hidden tracked change with ${name}`,
+      fixture: "portfolio",
+      select: ({ linked }) => linked,
+      prepare: async (root) => {
+        await executeGit(root, ["update-index", flag, ".gitignore"]);
+        await writeFile(join(root, ".gitignore"), `hidden ${name} change\n`);
+      },
+      code: "GIT_WORKTREE_DIRTY",
+    })),
     {
       name: "already installed capability",
       fixture: "portfolio-calendly",

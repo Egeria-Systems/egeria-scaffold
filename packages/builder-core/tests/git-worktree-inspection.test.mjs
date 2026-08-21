@@ -93,6 +93,9 @@ function scriptedInspection(overrides = {}) {
         commandResult(`${markerPaths.get(marker)}\n`)
       );
     }
+    if (key === "ls-files\0-v\0-z") {
+      return overrides.indexResult ?? commandResult("H tracked.txt\0");
+    }
     if (key === "status\0--porcelain=v1\0-z\0--untracked-files=all") {
       return overrides.statusResult ?? commandResult();
     }
@@ -294,6 +297,7 @@ test("Git worktree inspection retains clean linked-worktree identity in fixed co
     ["rev-parse", "--path-format=absolute", "--git-dir"],
     ["rev-parse", "--path-format=absolute", "--git-common-dir"],
     ...operationMarkers.map((marker) => ["rev-parse", "--git-path", marker]),
+    ["ls-files", "-v", "-z"],
     ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
   ]);
 });
@@ -327,6 +331,16 @@ test("Git worktree inspection applies stable refusal precedence", async () => {
       code: "GIT_BRANCH_REQUIRED",
     },
     {
+      name: "unexpected symbolic-ref exit",
+      script: scriptedInspection({ refResult: commandResult("", 2) }),
+      code: "GIT_WORKTREE_IDENTITY_INVALID",
+    },
+    {
+      name: "detached result with malformed output",
+      script: scriptedInspection({ refResult: commandResult("unexpected\n", 1) }),
+      code: "GIT_WORKTREE_IDENTITY_INVALID",
+    },
+    {
       name: "invalid revision identity",
       script: scriptedInspection({ revisionResult: commandResult("not-a-revision\n") }),
       code: "GIT_WORKTREE_IDENTITY_INVALID",
@@ -344,6 +358,28 @@ test("Git worktree inspection applies stable refusal precedence", async () => {
         statusResult: commandResult(" M tracked\0UU conflict\0?? untracked\0"),
       }),
       code: "GIT_WORKTREE_CONFLICTED",
+    },
+    ...[
+      "h assume-unchanged.txt\0",
+      "S skip-worktree.txt\0",
+      "s both-hidden.txt\0",
+    ].map((indexOutput) => ({
+      name: `hidden index entry ${JSON.stringify(indexOutput)}`,
+      script: scriptedInspection({ indexResult: commandResult(indexOutput) }),
+      code: "GIT_WORKTREE_DIRTY",
+    })),
+    {
+      name: "hidden index entry does not mask a conflict",
+      script: scriptedInspection({
+        indexResult: commandResult("S skip-worktree.txt\0"),
+        statusResult: commandResult("UU conflict\0"),
+      }),
+      code: "GIT_WORKTREE_CONFLICTED",
+    },
+    {
+      name: "malformed index visibility output",
+      script: scriptedInspection({ indexResult: commandResult("H missing-nul") }),
+      code: "GIT_WORKTREE_IDENTITY_INVALID",
     },
     ...[
       "M  staged\0",
@@ -440,6 +476,56 @@ test("Git worktree inspection contains every operation marker without following 
   });
 });
 
+test("Git create-target inspection refuses ignored paths and contains Git failures", async () => {
+  const calls = [];
+  const runGit = async (_root, arguments_) => {
+    calls.push([...arguments_]);
+    const path = arguments_.at(-1);
+
+    if (path === "ignored/target.txt") {
+      return commandResult("", 0);
+    }
+
+    return commandResult("", 1);
+  };
+
+  assert.deepEqual(
+    await core.inspectGitCreateTargets({
+      root: "/repository/worktree",
+      paths: ["visible/target.txt", "ignored/target.txt"],
+      runGit,
+    }),
+    { ok: false, code: "CAPABILITY_ACTION_CONFLICT" },
+  );
+  assert.deepEqual(calls, [
+    ["check-ignore", "--no-index", "--quiet", "--", "ignored/target.txt"],
+  ]);
+  assert.deepEqual(
+    await core.inspectGitCreateTargets({
+      root: "/repository/worktree",
+      paths: ["visible/target.txt"],
+      runGit,
+    }),
+    { ok: true },
+  );
+  assert.deepEqual(
+    await core.inspectGitCreateTargets({
+      root: "/repository/worktree",
+      paths: ["../unsafe"],
+      runGit,
+    }),
+    { ok: false, code: "GIT_WORKTREE_IDENTITY_INVALID" },
+  );
+  assert.deepEqual(
+    await core.inspectGitCreateTargets({
+      root: "/repository/worktree",
+      paths: ["failed/target.txt"],
+      runGit: async () => commandResult("", 2),
+    }),
+    { ok: false, code: "GIT_WORKTREE_IDENTITY_INVALID" },
+  );
+});
+
 async function createDisposableDirectory(context) {
   const createdPath = await mkdtemp(join(tmpdir(), "egeria-git-inspection-"));
   const path = await realpath(createdPath);
@@ -468,10 +554,11 @@ async function runGit(root, arguments_) {
 }
 
 async function repositorySnapshot(root) {
-  const [head, refs, status, files] = await Promise.all([
+  const [head, refs, status, indexVisibility, files] = await Promise.all([
     runGit(root, ["rev-parse", "HEAD"]),
     runGit(root, ["show-ref"]),
     runGit(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]),
+    runGit(root, ["ls-files", "-v", "-z"]),
     runGit(root, ["ls-files", "-co", "--exclude-standard", "-z"]),
   ]);
   const paths = Buffer.from(files.stdout)
@@ -488,6 +575,7 @@ async function repositorySnapshot(root) {
     head: new Uint8Array(head.stdout),
     refs: new Uint8Array(refs.stdout),
     status: new Uint8Array(status.stdout),
+    indexVisibility: new Uint8Array(indexVisibility.stdout),
     entries,
   };
 }
@@ -528,4 +616,27 @@ test("Git worktree inspection is read-only for a real clean and dirty linked wor
     code: "GIT_WORKTREE_DIRTY",
   });
   assert.deepEqual(await repositorySnapshot(linked), dirtyBefore);
+
+  await rm(join(linked, "untracked.txt"));
+  await runGit(linked, ["update-index", "--assume-unchanged", "tracked.txt"]);
+  await writeFile(join(linked, "tracked.txt"), "hidden assume change\n", "utf8");
+  const assumeBefore = await repositorySnapshot(linked);
+  assert.equal(Buffer.from(assumeBefore.status).length, 0);
+  assert.deepEqual(await core.inspectGitWorktree({ root: linked }), {
+    ok: false,
+    code: "GIT_WORKTREE_DIRTY",
+  });
+  assert.deepEqual(await repositorySnapshot(linked), assumeBefore);
+
+  await runGit(linked, ["update-index", "--no-assume-unchanged", "tracked.txt"]);
+  await writeFile(join(linked, "tracked.txt"), "tracked\n", "utf8");
+  await runGit(linked, ["update-index", "--skip-worktree", "tracked.txt"]);
+  await writeFile(join(linked, "tracked.txt"), "hidden skip change\n", "utf8");
+  const skipBefore = await repositorySnapshot(linked);
+  assert.equal(Buffer.from(skipBefore.status).length, 0);
+  assert.deepEqual(await core.inspectGitWorktree({ root: linked }), {
+    ok: false,
+    code: "GIT_WORKTREE_DIRTY",
+  });
+  assert.deepEqual(await repositorySnapshot(linked), skipBefore);
 });

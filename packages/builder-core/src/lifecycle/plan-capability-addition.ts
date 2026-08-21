@@ -184,6 +184,36 @@ function hasUnsupportedEjection(inspection: ValidInspection): boolean {
   );
 }
 
+async function hasUnavailableApplicationOwnedSurface(
+  reader: RepositoryReader,
+  inspection: ValidInspection,
+): Promise<boolean> {
+  const paths = [
+    ...new Set(
+      inspection.inference.state.value.managedSurfaces
+        .filter(({ ownership }) => ownership === "application-owned")
+        .map(({ path }) => path),
+    ),
+  ].sort(compareText);
+
+  for (const path of paths) {
+    const result = await reader.readText(path);
+
+    if (
+      result.kind === "file" ||
+      (result.kind === "error" &&
+        (result.code === "FILE_ENCODING_INVALID" ||
+          result.code === "FILE_TOO_LARGE"))
+    ) {
+      continue;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
   return (
     left.length === right.length &&
@@ -364,6 +394,10 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("PROJECT_EJECTION_UNSUPPORTED");
   }
 
+  if (await hasUnavailableApplicationOwnedSurface(input.reader, inspection)) {
+    return planningFailure("PROJECT_DRIFT_DETECTED");
+  }
+
   const project = inspection.project.value;
   const state = inspection.inference.state.value;
   const bookingInstalled =
@@ -476,9 +510,5 @@ export async function planCapabilityAddition(input: Readonly<{
   capability: "booking-calendly";
   settings: CalendlyBookingSettings;
 }>): Promise<ValidationResult<CapabilityAdditionPlan>> {
-  try {
-    return await planCapabilityAdditionUnchecked(input);
-  } catch {
-    return planningFailure("PROJECT_INSPECTION_INVALID");
-  }
+  return planCapabilityAdditionUnchecked(input);
 }
