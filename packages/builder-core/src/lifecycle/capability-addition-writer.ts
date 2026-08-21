@@ -68,17 +68,59 @@ async function identityMatches(identity: PathIdentity): Promise<boolean> {
 async function ensureParentDirectories(
   rootIdentity: PathIdentity,
   path: string,
-): Promise<boolean> {
+): Promise<Readonly<{ ok: boolean; sourceChanged: boolean }>> {
   const parent = dirname(path);
   const relativeParent = parent.slice(rootIdentity.path.length).replace(/^[/\\]/u, "");
   let current = rootIdentity.path;
+  let sourceChanged = false;
 
   if (relativeParent.length === 0) {
-    return identityMatches(rootIdentity);
+    return (await identityMatches(rootIdentity))
+      ? { ok: true, sourceChanged }
+      : { ok: false, sourceChanged };
   }
 
   for (const segment of relativeParent.split(sep)) {
     current = join(current, segment);
+    try {
+      const stats = await lstat(current);
+      if (stats.isSymbolicLink() || !stats.isDirectory()) {
+        return { ok: false, sourceChanged };
+      }
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) {
+        return { ok: false, sourceChanged };
+      }
+      try {
+        await mkdir(current, { mode: 0o755 });
+        sourceChanged = true;
+      } catch {
+        return { ok: false, sourceChanged };
+      }
+    }
+  }
+
+  return (await identityMatches(rootIdentity))
+    ? { ok: true, sourceChanged }
+    : { ok: false, sourceChanged };
+}
+
+async function parentDirectoriesAreSafe(
+  rootIdentity: PathIdentity,
+  path: string,
+): Promise<boolean> {
+  const parent = dirname(path);
+  const relativeParent = parent.slice(rootIdentity.path.length).replace(/^[/\\]/u, "");
+  let current = rootIdentity.path;
+  let missingAncestor = false;
+
+  for (const segment of relativeParent.length === 0
+    ? []
+    : relativeParent.split(sep)) {
+    current = join(current, segment);
+    if (missingAncestor) {
+      continue;
+    }
     try {
       const stats = await lstat(current);
       if (stats.isSymbolicLink() || !stats.isDirectory()) {
@@ -88,11 +130,7 @@ async function ensureParentDirectories(
       if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) {
         return false;
       }
-      try {
-        await mkdir(current, { mode: 0o755 });
-      } catch {
-        return false;
-      }
+      missingAncestor = true;
     }
   }
 
@@ -104,7 +142,7 @@ async function prepareChange(
   change: CapabilityAdditionFileChange,
 ): Promise<PreparedChange | undefined> {
   const target = join(rootIdentity.path, change.path);
-  if (!(await ensureParentDirectories(rootIdentity, target))) {
+  if (!(await parentDirectoriesAreSafe(rootIdentity, target))) {
     return undefined;
   }
 
@@ -142,12 +180,24 @@ async function prepareChange(
 }
 
 async function writePreparedChange(
+  rootIdentity: PathIdentity,
   prepared: PreparedChange,
-): Promise<boolean> {
+): Promise<CapabilityAdditionWriteResult> {
   let handle;
+  let sourceChanged = false;
   try {
+    const parentResult = await ensureParentDirectories(
+      rootIdentity,
+      prepared.target,
+    );
+    if (!parentResult.ok) {
+      return parentResult;
+    }
+    sourceChanged = parentResult.sourceChanged;
+
     if (prepared.change.expected.kind === "missing") {
       handle = await open(prepared.target, "wx", 0o644);
+      sourceChanged = true;
     } else {
       handle = await open(
         prepared.target,
@@ -160,15 +210,16 @@ async function writePreparedChange(
         stats.dev !== prepared.identity.device ||
         stats.ino !== prepared.identity.inode
       ) {
-        return false;
+        return { ok: false, sourceChanged };
       }
       await handle.truncate(0);
+      sourceChanged = true;
     }
     await handle.writeFile(prepared.change.content);
     await handle.sync();
-    return true;
+    return { ok: true };
   } catch {
-    return false;
+    return { ok: false, sourceChanged };
   } finally {
     await handle?.close().catch(() => undefined);
   }
@@ -208,10 +259,16 @@ export function createFileSystemCapabilityAdditionWriter(
         prepared.push(result);
       }
 
+      let sourceChanged = false;
       for (const change of prepared) {
-        if (!(await writePreparedChange(change))) {
-          return { ok: false, sourceChanged: true };
+        const result = await writePreparedChange(rootIdentity, change);
+        if (!result.ok) {
+          return {
+            ok: false,
+            sourceChanged: sourceChanged || result.sourceChanged,
+          };
         }
+        sourceChanged = true;
       }
 
       return (await identityMatches(rootIdentity))

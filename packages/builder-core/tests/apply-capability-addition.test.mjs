@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  lstat,
   mkdtemp,
   readFile,
   readdir,
@@ -327,6 +328,26 @@ test("filesystem addition writer replaces expected files and exclusively creates
     { ok: false, sourceChanged: false },
   );
   assert.equal(await readFile(join(temporaryRoot, "existing.txt"), "utf8"), "after\n");
+
+  assert.deepEqual(
+    await writer.write([
+      {
+        path: "not-created/nested.txt",
+        expected: { kind: "missing" },
+        content: encoder.encode("must-not-create\n"),
+      },
+      {
+        path: "existing.txt",
+        expected: { kind: "file", content: encoder.encode("stale\n") },
+        content: encoder.encode("must-not-write\n"),
+      },
+    ]),
+    { ok: false, sourceChanged: false },
+  );
+  await assert.rejects(
+    lstat(join(temporaryRoot, "not-created")),
+    (error) => error?.code === "ENOENT",
+  );
 
   await symlink(join(temporaryRoot, "existing.txt"), join(temporaryRoot, "link.txt"));
   assert.deepEqual(
