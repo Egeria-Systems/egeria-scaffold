@@ -2734,6 +2734,83 @@ test("canonical documentation records the generated visual regression boundary",
   }
 });
 
+test("canonical documentation records the transactional capability-planning start", async () => {
+  const portfolioPhase = compactLabel("P", "2");
+  const lifecyclePhase = compactLabel("P", "3");
+  const clientExpansionPhase = compactLabel("P", "3B");
+  const [sourcePlan, roadmap, overview, capabilityModel, enforcementMap] =
+    await Promise.all([
+      readRepositoryFile(
+        "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+      ),
+      readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+      readRepositoryFile("docs/architecture/overview.md"),
+      readRepositoryFile("docs/architecture/capability-model.md"),
+      readRepositoryFile("docs/architecture/enforcement-map.md"),
+    ]);
+
+  for (const statusOwner of [sourcePlan, roadmap, overview]) {
+    assert.match(
+      statusOwner,
+      /7ba461ac20d4a1d708e9f7b940e15cda0fce3295[^\n]+32429352322/iu,
+    );
+  }
+
+  for (const sequencingOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      sequencingOwner,
+      new RegExp(
+        `${escapeRegularExpression(portfolioPhase)}[^\\n]+performance budgets[^\\n]+deferred[^\\n]+unimplemented[^\\n]+unclaimed`,
+        "iu",
+      ),
+    );
+    assert.match(
+      sequencingOwner,
+      new RegExp(
+        `${escapeRegularExpression(lifecyclePhase)}[^\\n]+may begin[^\\n]+without[^\\n]+performance`,
+        "iu",
+      ),
+    );
+    assert.match(
+      sequencingOwner,
+      new RegExp(
+        `${escapeRegularExpression(clientExpansionPhase)}[^\\n]+not[^\\n]+authorized`,
+        "iu",
+      ),
+    );
+  }
+
+  for (const boundaryOwner of [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+    enforcementMap,
+  ]) {
+    assert.match(
+      boundaryOwner,
+      /read-only[^\n]+plan-add[^\n]+booking-calendly@0\.1\.0/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /transformation[^\n]+migration[^\n]+state[^\n]+remain[^\n]+planned/iu,
+    );
+  }
+
+  assert.match(
+    capabilityModel,
+    /eligibility planning[^\n]+no existing-repository transformation[^\n]+no later-add certification/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-CLEAN-ISOLATED-MIGRATION[^\n]+actual read-only planning[^\n]+mutation planned/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-STATE-UPDATE-ORDER[^\n]+existing-repository[^\n]+planned/iu,
+  );
+});
+
 test("execution plans enforce direct predecessors and bounded independent-work exceptions", async () => {
   const [reviewProtocol, sourcePlan, roadmap] =
     await Promise.all([

@@ -1163,6 +1163,8 @@ P10 Fleet hardening, package review, and portability evidence
 - Automatic-CI Plan A is accepted maintenance at `main@368b9491fd2f813f83f1e456823d8c7546f6762c`, not a new capability task or replacement for Task 6D. The separately resumed Task 6D stream recomputed the unchanged standards subject and renewed generated-build, browser, fixture, state, and CI evidence at descendant `d7c63b0aaa9bebd56c075f16f1e5d86519853698`; that renewal is integrated at accepted `main@7b5324cfcffc7eb94f48cc304cbfe0ceb08c3486`, and standards stayed certified throughout.
 - The exact `deployment-cloudflare@0.3.0` certification transition binds accepted fresh-scaffold, deployed-application, and cleanup-recovery evidence while retaining the reusable repository, environment, credential, and Worker baseline. It does not authorize another workflow, provider mutation, production action, merge, or successor work.
 - The diagnostics package-release Task 5 is selected as the next capability increment only after the amended observability certification transition is reviewed, approved, and integrated, the diagnostics branch is reconciled, and every other Gate B condition passes. Selection does not authorize a Task 5 push or package publication.
+- The first transactional-lifecycle implementation base is accepted `main@7ba461ac20d4a1d708e9f7b940e15cda0fce3295`; post-merge Repository quality run `32429352322` passed every applicable job.
+- P2 performance budgets remain deferred, unimplemented, and unclaimed; P3 may begin without the performance-budgets increment under an explicit exception; P3B is not authorized by that exception.
 - P3 retains its clean-state, isolated-worktree, migration, drift, upgrade, recovery, compiled-CLI lifecycle, and capability-certification backfill requirements and adds `fast-check` only at that lifecycle-invariant boundary. P3 must close before P3B begins.
 - P3B relocates only the production-complete `site` work formerly assigned to P4 and the P5A `multilingual` and P5B `analytics` capability task pairs. It changes no default recipe, creates no composite client profile or capability, and does not waive or merge any implementation, certification, deployment, provider, privacy, recovery, or approval gate.
 - P3B work is delivered sequentially: production `site`, `multilingual`, `analytics`, then the combined real-client journey. The three capability changes use the P3 lifecycle for initial creation and later addition, upgrade, removal, refusal, and recovery evidence.
@@ -1215,6 +1217,7 @@ P10 Fleet hardening, package review, and portability evidence
 
 #### P3 — Lifecycle hardening
 
+- The first implemented boundary is the read-only `plan-add` eligibility plan for `booking-calendly@0.1.0`; existing-repository transformation, migration, and state persistence remain planned.
 - clean-state enforcement;
 - isolated migration branches/worktrees;
 - plan and final-diff approval;
