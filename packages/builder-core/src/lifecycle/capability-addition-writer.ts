@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { constants, lstatSync } from "node:fs";
-import { lstat, mkdir, open } from "node:fs/promises";
+import { link, lstat, mkdir, open, rename, unlink } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 
 import { safeRelativePathSchema } from "../contracts/identifiers.js";
@@ -28,10 +29,16 @@ type PathIdentity = Readonly<{
   inode: bigint;
 }>;
 
+type FileIdentity = PathIdentity & Readonly<{ mode: number }>;
+
 type PreparedChange = Readonly<{
   change: CapabilityAdditionFileChange;
   target: string;
-  identity?: PathIdentity;
+  identity?: FileIdentity;
+}>;
+
+type CapabilityAdditionWriterHooks = Readonly<{
+  beforeCommit?: (path: string) => Promise<unknown>;
 }>;
 
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
@@ -169,7 +176,12 @@ async function prepareChange(
       ? {
           change,
           target,
-          identity: { path: target, device: stats.dev, inode: stats.ino },
+          identity: {
+            path: target,
+            device: stats.dev,
+            inode: stats.ino,
+            mode: Number(stats.mode & 0o777n),
+          },
         }
       : undefined;
   } catch {
@@ -179,54 +191,143 @@ async function prepareChange(
   }
 }
 
+async function removeOwnedTemporary(identity: FileIdentity): Promise<boolean> {
+  if (!(await identityMatches(identity))) {
+    return false;
+  }
+
+  try {
+    await unlink(identity.path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function createTemporaryFile(
+  prepared: PreparedChange,
+): Promise<
+  | Readonly<{ ok: true; identity: FileIdentity }>
+  | Readonly<{ ok: false; sourceChanged: boolean }>
+> {
+  const mode = prepared.identity?.mode ?? 0o644;
+
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const path = join(
+      dirname(prepared.target),
+      `.egeria-addition-${randomUUID()}.tmp`,
+    );
+    let handle;
+    try {
+      handle = await open(path, "wx", mode);
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "EEXIST") {
+        continue;
+      }
+      return { ok: false, sourceChanged: false };
+    }
+
+    let identity: FileIdentity | undefined;
+    try {
+      const stats = await handle.stat({ bigint: true });
+      if (stats.isSymbolicLink() || !stats.isFile()) {
+        throw new Error("temporary-file-invalid");
+      }
+      identity = {
+        path,
+        device: stats.dev,
+        inode: stats.ino,
+        mode,
+      };
+      await handle.chmod(mode);
+      await handle.writeFile(prepared.change.content);
+      await handle.sync();
+      await handle.close();
+      handle = undefined;
+      return { ok: true, identity };
+    } catch {
+      await handle?.close().catch(() => undefined);
+      return {
+        ok: false,
+        sourceChanged:
+          identity === undefined || !(await removeOwnedTemporary(identity)),
+      };
+    }
+  }
+
+  return { ok: false, sourceChanged: false };
+}
+
+function samePreparedIdentity(
+  initial: PreparedChange,
+  current: PreparedChange,
+): boolean {
+  return initial.identity === undefined
+    ? current.identity === undefined
+    : current.identity !== undefined &&
+        initial.identity.device === current.identity.device &&
+        initial.identity.inode === current.identity.inode &&
+        initial.identity.mode === current.identity.mode;
+}
+
 async function writePreparedChange(
   rootIdentity: PathIdentity,
   prepared: PreparedChange,
+  hooks: CapabilityAdditionWriterHooks,
 ): Promise<CapabilityAdditionWriteResult> {
-  let handle;
-  let sourceChanged = false;
+  const parentResult = await ensureParentDirectories(
+    rootIdentity,
+    prepared.target,
+  );
+  if (!parentResult.ok) {
+    return parentResult;
+  }
+
+  const temporary = await createTemporaryFile(prepared);
+  if (!temporary.ok) {
+    return {
+      ok: false,
+      sourceChanged:
+        parentResult.sourceChanged || temporary.sourceChanged,
+    };
+  }
+
+  const failBeforeInstall = async (): Promise<CapabilityAdditionWriteResult> => ({
+    ok: false,
+    sourceChanged:
+      parentResult.sourceChanged ||
+      !(await removeOwnedTemporary(temporary.identity)),
+  });
+
   try {
-    const parentResult = await ensureParentDirectories(
-      rootIdentity,
-      prepared.target,
-    );
-    if (!parentResult.ok) {
-      return parentResult;
+    await hooks.beforeCommit?.(prepared.change.path);
+    const current = await prepareChange(rootIdentity, prepared.change);
+    if (
+      current === undefined ||
+      !samePreparedIdentity(prepared, current) ||
+      !(await parentDirectoriesAreSafe(rootIdentity, prepared.target))
+    ) {
+      return failBeforeInstall();
     }
-    sourceChanged = parentResult.sourceChanged;
 
     if (prepared.change.expected.kind === "missing") {
-      handle = await open(prepared.target, "wx", 0o644);
-      sourceChanged = true;
-    } else {
-      handle = await open(
-        prepared.target,
-        constants.O_WRONLY | constants.O_NOFOLLOW,
-      );
-      const stats = await handle.stat({ bigint: true });
-      if (
-        prepared.identity === undefined ||
-        !stats.isFile() ||
-        stats.dev !== prepared.identity.device ||
-        stats.ino !== prepared.identity.inode
-      ) {
-        return { ok: false, sourceChanged };
+      await link(temporary.identity.path, prepared.target);
+      if (!(await removeOwnedTemporary(temporary.identity))) {
+        return { ok: false, sourceChanged: true };
       }
-      await handle.truncate(0);
-      sourceChanged = true;
+      return { ok: true };
     }
-    await handle.writeFile(prepared.change.content);
-    await handle.sync();
+
+    await rename(temporary.identity.path, prepared.target);
     return { ok: true };
   } catch {
-    return { ok: false, sourceChanged };
-  } finally {
-    await handle?.close().catch(() => undefined);
+    return failBeforeInstall();
   }
 }
 
 export function createFileSystemCapabilityAdditionWriter(
   root: string,
+  hooks: CapabilityAdditionWriterHooks = {},
 ): CapabilityAdditionWriter {
   const fixedRoot = resolve(root);
   const rootIdentity =
@@ -261,7 +362,7 @@ export function createFileSystemCapabilityAdditionWriter(
 
       let sourceChanged = false;
       for (const change of prepared) {
-        const result = await writePreparedChange(rootIdentity, change);
+        const result = await writePreparedChange(rootIdentity, change, hooks);
         if (!result.ok) {
           return {
             ok: false,

@@ -398,15 +398,20 @@ async function createFakePnpmExecutable(owner) {
   const executable = join(owner, "fake-pnpm");
   const controlPath = join(owner, "fake-pnpm-control.json");
   const logPath = join(owner, "fake-pnpm-log.jsonl");
-  const source = `#!${process.execPath}
-import { appendFileSync, readFileSync } from "node:fs";
+const source = `#!${process.execPath}
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 const control = JSON.parse(readFileSync(${JSON.stringify(controlPath)}, "utf8"));
 const arguments_ = process.argv.slice(2);
 const operation = arguments_.join(" ");
 appendFileSync(
   ${JSON.stringify(logPath)},
-  JSON.stringify({ arguments: arguments_, cwd: process.cwd(), environment: process.env }) + "\\n",
+  JSON.stringify({
+    arguments: arguments_,
+    cwd: process.cwd(),
+    environment: process.env,
+    gitControlPresent: existsSync(".git"),
+  }) + "\\n",
 );
 
 if (control.overflowOperation === operation) {
@@ -576,6 +581,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
   await withTestRoot(async (owner) => {
     const fakePnpm = await createFakePnpmExecutable(owner);
     const source = await createVerifierSource(owner);
+    await writeFile(join(source, ".git"), "gitdir: /private/shared-git-authority\n");
     const canonicalSource = await realpath(source);
     const verifier = core.createPnpmGeneratedProjectVerifier({
       pnpmExecutable: fakePnpm.executable,
@@ -621,6 +627,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
     );
     assert.notEqual(calls[0].cwd, canonicalSource);
     assert.ok(calls.every(({ cwd }) => cwd === calls[0].cwd));
+    assert.ok(calls.every(({ gitControlPresent }) => gitControlPresent === false));
 
     const forbiddenEnvironmentKeys = [
       "TOKEN",

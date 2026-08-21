@@ -18,6 +18,13 @@ const repositoryRoot = resolve(packageRoot, "../..");
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const encoder = new TextEncoder();
+const persistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  ...core.ordinaryGenerationVerificationChecks,
+  "post-change-inference",
+];
 const root = "/generated/project";
 const settings = Object.freeze({
   destination: "https://calendly.com/private/discovery",
@@ -57,7 +64,7 @@ async function fixtureEntries(profile = "portfolio") {
   return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
 }
 
-function createRepository(entries, failBatch) {
+function createRepository(entries, failBatch, afterWrite) {
   const files = new Map(entries);
   const writes = [];
 
@@ -91,6 +98,7 @@ function createRepository(entries, failBatch) {
           files.set(change.path, decoder.decode(change.content));
         }
         writes.push(changes.map(({ path }) => path));
+        await afterWrite?.({ batch, changes, files });
         return { ok: true };
       },
     },
@@ -146,7 +154,7 @@ async function runApply(repository, overrides = {}) {
         expectedInspections.push(input);
         return Promise.resolve({ ok: true });
       }),
-    now: () => "2026-08-21T15:00:00.000Z",
+    now: overrides.now ?? (() => "2026-08-21T15:00:00.000Z"),
   });
   return { expectedInspections, plan, result, verifierCalls };
 }
@@ -189,10 +197,14 @@ test("capability addition applies, verifies, re-infers, and persists migration t
     ]);
     assert.deepEqual(state.value.lastSuccessfulVerification, {
       kind: "capability-addition",
-      checks: core.capabilityAdditionVerificationChecks,
+      checks: persistedVerificationChecks,
     });
     assert.equal(migrations.value.length, 1);
     assert.equal(migrations.value[0].identifier, "add-booking-calendly-0-1-0");
+    assert.deepEqual(
+      migrations.value[0].verificationChecks,
+      persistedVerificationChecks,
+    );
     assert.deepEqual(expectedInspections, [
       {
         root,
@@ -226,6 +238,7 @@ test("capability addition preserves prior control state when verification fails"
   const repository = createRepository(await fixtureEntries());
   const initialState = repository.files.get(".egeria/state.json");
   const initialMigrations = repository.files.get(".egeria/migrations.jsonl");
+  let clockCalls = 0;
   const { result } = await runApply(repository, {
     verifier: {
       prepareLockfile() {
@@ -244,6 +257,10 @@ test("capability addition preserves prior control state when verification fails"
         });
       },
     },
+    now: () => {
+      clockCalls += 1;
+      return "2026-08-21T15:00:00.000Z";
+    },
   });
 
   assert.deepEqual(result, {
@@ -258,7 +275,40 @@ test("capability addition preserves prior control state when verification fails"
     initialMigrations,
   );
   assert.equal(repository.writes.length, 1);
+  assert.equal(clockCalls, 0);
   assert.doesNotMatch(JSON.stringify(result), /private verifier detail/u);
+});
+
+test("capability addition refuses changed output bytes before persistence", async () => {
+  const repository = createRepository(await fixtureEntries());
+  const initialState = repository.files.get(".egeria/state.json");
+  const initialMigrations = repository.files.get(".egeria/migrations.jsonl");
+  const { result } = await runApply(repository, {
+    verifier: {
+      prepareLockfile() {
+        throw new Error("not used");
+      },
+      verifyInIsolatedCopy() {
+        repository.files.set("apps/web/app/page.tsx", "concurrent edit\n");
+        return Promise.resolve({
+          ok: true,
+          value: { checks: core.ordinaryGenerationVerificationChecks },
+        });
+      },
+    },
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    code: "CAPABILITY_REINFERENCE_FAILED",
+    phase: "re-infer",
+    recovery: "inspect-worktree",
+  });
+  assert.equal(repository.files.get(".egeria/state.json"), initialState);
+  assert.equal(
+    repository.files.get(".egeria/migrations.jsonl"),
+    initialMigrations,
+  );
 });
 
 test("capability addition reports bounded recovery when persistence or final diff fails", async () => {
@@ -275,6 +325,57 @@ test("capability addition reports bounded recovery when persistence or final dif
     migrationFailureRepository.files.get(".egeria/state.json"),
     initialState,
   );
+
+  const stateFailureRepository = createRepository(await fixtureEntries(), 3);
+  const stateFailure = await runApply(stateFailureRepository);
+  assert.deepEqual(stateFailure.result, {
+    ok: false,
+    code: "CAPABILITY_STATE_WRITE_FAILED",
+    phase: "persist-state",
+    recovery: "inspect-worktree",
+  });
+  const stateFailureMigrations = core.parseMigrationLog(
+    stateFailureRepository.files.get(".egeria/migrations.jsonl"),
+  );
+  assert.equal(stateFailureMigrations.ok, true);
+  assert.deepEqual(
+    stateFailureMigrations.value.at(-1).verificationChecks,
+    persistedVerificationChecks,
+  );
+  assert.equal(
+    stateFailureMigrations.value.at(-1).completedAt,
+    "2026-08-21T15:00:00.000Z",
+  );
+
+  const postStateRepository = createRepository(
+    await fixtureEntries(),
+    undefined,
+    ({ batch, files }) => {
+      if (batch === 3) {
+        files.set(
+          ".egeria/migrations.jsonl",
+          files
+            .get(".egeria/migrations.jsonl")
+            .replace("15:00:00.000Z", "15:00:00.001Z"),
+        );
+      }
+    },
+  );
+  const postStateFailure = await runApply(postStateRepository);
+  assert.deepEqual(postStateFailure.result, {
+    ok: false,
+    code: "CAPABILITY_POST_STATE_FAILED",
+    phase: "post-state",
+    recovery: "inspect-worktree",
+  });
+  const postState = core.parseStateJson(
+    postStateRepository.files.get(".egeria/state.json"),
+  );
+  assert.equal(postState.ok, true);
+  assert.deepEqual(postState.value.lastSuccessfulVerification, {
+    kind: "capability-addition",
+    checks: persistedVerificationChecks,
+  });
 
   const finalDiffRepository = createRepository(await fixtureEntries());
   const finalDiffFailure = await runApply(finalDiffRepository, {
@@ -361,4 +462,49 @@ test("filesystem addition writer replaces expected files and exclusively creates
     { ok: false, sourceChanged: false },
   );
   assert.equal(await readFile(join(temporaryRoot, "existing.txt"), "utf8"), "after\n");
+});
+
+test("filesystem addition writer preserves live files across commit races and staged-write failure", async (context) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "egeria-addition-race-"));
+  context.after(() => rm(temporaryRoot, { recursive: true, force: false }));
+  const target = join(temporaryRoot, "existing.txt");
+  await writeFile(target, "before\n", "utf8");
+
+  const concurrentWriter = core.createFileSystemCapabilityAdditionWriter(
+    temporaryRoot,
+    {
+      beforeCommit: async () => writeFile(target, "concurrent\n", "utf8"),
+    },
+  );
+  assert.deepEqual(
+    await concurrentWriter.write([
+      {
+        path: "existing.txt",
+        expected: { kind: "file", content: encoder.encode("before\n") },
+        content: encoder.encode("after\n"),
+      },
+    ]),
+    { ok: false, sourceChanged: false },
+  );
+  assert.equal(await readFile(target, "utf8"), "concurrent\n");
+
+  await writeFile(target, "before\n", "utf8");
+  const failingWriter = core.createFileSystemCapabilityAdditionWriter(
+    temporaryRoot,
+    {
+      beforeCommit: () => Promise.reject(new Error("injected failure")),
+    },
+  );
+  assert.deepEqual(
+    await failingWriter.write([
+      {
+        path: "existing.txt",
+        expected: { kind: "file", content: encoder.encode("before\n") },
+        content: encoder.encode("after\n"),
+      },
+    ]),
+    { ok: false, sourceChanged: false },
+  );
+  assert.equal(await readFile(target, "utf8"), "before\n");
+  assert.deepEqual(await readdir(temporaryRoot), ["existing.txt"]);
 });

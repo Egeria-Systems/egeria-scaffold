@@ -12,6 +12,7 @@ import {
 } from "../contracts/migration.js";
 import type { CalendlyBookingSettings } from "../contracts/project.js";
 import {
+  capabilityAdditionPersistedVerificationChecks,
   capabilityAdditionVerificationChecks,
   installedStateSchema,
   type InstalledState,
@@ -130,6 +131,37 @@ function sameValues(left: readonly string[], right: readonly string[]): boolean 
     left.length === right.length &&
     left.every((value, index) => value === right[index])
   );
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  return (
+    left.length === right.length &&
+    left.every((byte, index) => byte === right[index])
+  );
+}
+
+async function readExactFileBytes(
+  reader: RepositoryReader,
+  expected: ReadonlyMap<string, Uint8Array>,
+  paths: readonly string[],
+): Promise<Map<string, Uint8Array> | undefined> {
+  const actual = new Map<string, Uint8Array>();
+
+  for (const path of paths) {
+    const expectedContent = expected.get(path);
+    const result = await reader.readText(path);
+    if (expectedContent === undefined || result.kind !== "file") {
+      return undefined;
+    }
+
+    const content = encoder.encode(result.content);
+    if (!sameBytes(content, expectedContent)) {
+      return undefined;
+    }
+    actual.set(path, content);
+  }
+
+  return actual;
 }
 
 function sameGitIdentity(
@@ -328,7 +360,7 @@ function createNextState(input: Readonly<{
     managedSurfaces,
     lastSuccessfulVerification: {
       kind: "capability-addition",
-      checks: capabilityAdditionVerificationChecks,
+      checks: capabilityAdditionPersistedVerificationChecks,
     },
   });
   return parsed.success ? parsed.data : undefined;
@@ -465,27 +497,6 @@ export async function applyCapabilityAddition(input: Readonly<{
     });
   }
 
-  const migration = migrationRecordSchema.safeParse({
-    schemaVersion: "1.0.0",
-    identifier: migrationIdentifier,
-    kind: "migration",
-    outcome: "succeeded",
-    completedAt: (input.now ?? (() => new Date().toISOString()))(),
-    fromBuilderVersion: controls.state.value.builderVersion,
-    toBuilderVersion: controls.state.value.builderVersion,
-    capabilities: plan.desiredCapabilities,
-    persistentDataAuthorizations: [],
-    remainingKnownDrift: [],
-    verificationChecks: capabilityAdditionVerificationChecks,
-  });
-  if (!migration.success) {
-    return failure(
-      "CAPABILITY_MIGRATION_RECORD_INVALID",
-      "precondition",
-      "not-required",
-    );
-  }
-
   const createPaths = plan.actions.flatMap((action) =>
     action.kind === "create-file" ? [action.path] : [],
   );
@@ -565,16 +576,61 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
+  const actionPaths = plan.actions.map(({ path }) => path);
+  const actualFiles = await readExactFileBytes(
+    reader,
+    desiredFiles,
+    actionPaths,
+  );
+  if (actualFiles === undefined) {
+    return failure(
+      "CAPABILITY_REINFERENCE_FAILED",
+      "re-infer",
+      "inspect-worktree",
+    );
+  }
+
+  let completedAt: string;
+  try {
+    completedAt = (input.now ?? (() => new Date().toISOString()))();
+  } catch {
+    return failure(
+      "CAPABILITY_MIGRATION_RECORD_INVALID",
+      "re-infer",
+      "inspect-worktree",
+    );
+  }
+  const migration = migrationRecordSchema.safeParse({
+    schemaVersion: "1.0.0",
+    identifier: migrationIdentifier,
+    kind: "migration",
+    outcome: "succeeded",
+    completedAt,
+    fromBuilderVersion: controls.state.value.builderVersion,
+    toBuilderVersion: controls.state.value.builderVersion,
+    capabilities: plan.desiredCapabilities,
+    persistentDataAuthorizations: [],
+    remainingKnownDrift: [],
+    verificationChecks: capabilityAdditionPersistedVerificationChecks,
+  });
+  if (!migration.success) {
+    return failure(
+      "CAPABILITY_MIGRATION_RECORD_INVALID",
+      "re-infer",
+      "inspect-worktree",
+    );
+  }
+
   const migrationSource = appendMigrationSource(
     controls.migrationSource,
     migration.data,
   );
-  desiredFiles.set(".egeria/migrations.jsonl", encoder.encode(migrationSource));
+  actualFiles.set(".egeria/migrations.jsonl", encoder.encode(migrationSource));
   const nextState = createNextState({
     current: controls.state.value,
     desired,
-    actionPaths: plan.actions.map(({ path }) => path),
-    files: desiredFiles,
+    actionPaths,
+    files: actualFiles,
     migration: migration.data,
   });
   if (nextState === undefined) {
@@ -609,6 +665,8 @@ export async function applyCapabilityAddition(input: Readonly<{
       ? parseMigrationLog(writtenMigration.content)
       : undefined;
   if (
+    writtenMigration.kind !== "file" ||
+    writtenMigration.content !== migrationSource ||
     parsedWrittenMigration?.ok !== true ||
     !sameValues(
       parsedWrittenMigration.value.map(({ identifier }) => identifier),
@@ -622,6 +680,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
+  const stateSource = serializeStateJson(nextState);
   const stateWrite = await writer.write([
     {
       path: ".egeria/state.json",
@@ -629,7 +688,7 @@ export async function applyCapabilityAddition(input: Readonly<{
         kind: "file",
         content: encoder.encode(controls.stateSource),
       },
-      content: encoder.encode(serializeStateJson(nextState)),
+      content: encoder.encode(stateSource),
     },
   ]);
   if (!stateWrite.ok) {
@@ -639,6 +698,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       "inspect-worktree",
     );
   }
+  actualFiles.set(".egeria/state.json", encoder.encode(stateSource));
 
   const finalInference = await inferRepository({ reader, catalog: catalog.value });
   if (
@@ -656,10 +716,19 @@ export async function applyCapabilityAddition(input: Readonly<{
   }
 
   const changedPaths = [
-    ...plan.actions.map(({ path }) => path),
+    ...actionPaths,
     ".egeria/migrations.jsonl",
     ".egeria/state.json",
   ].sort();
+  if (
+    (await readExactFileBytes(reader, actualFiles, changedPaths)) === undefined
+  ) {
+    return failure(
+      "CAPABILITY_POST_STATE_FAILED",
+      "post-state",
+      "inspect-worktree",
+    );
+  }
   let finalDiff: GitExpectedChangesInspection;
   try {
     finalDiff = await inspectExpectedChangesValue({

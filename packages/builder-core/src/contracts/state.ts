@@ -74,12 +74,16 @@ const currentVerificationChecks = [
   "post-state-inference",
 ] as const;
 
-export const capabilityAdditionVerificationChecks = [
+export const capabilityAdditionPersistedVerificationChecks = [
   "contracts",
   "plan-approval",
   "pre-state-inference",
   ...ordinaryGenerationVerificationChecks,
   "post-change-inference",
+] as const;
+
+export const capabilityAdditionVerificationChecks = [
+  ...capabilityAdditionPersistedVerificationChecks,
   "migration-record",
   "post-state-inference",
 ] as const;
@@ -113,7 +117,7 @@ const currentVerificationChecksSchema = createLiteralTupleSchema(
 ).readonly();
 
 const capabilityAdditionVerificationChecksSchema = createLiteralTupleSchema(
-  capabilityAdditionVerificationChecks,
+  capabilityAdditionPersistedVerificationChecks,
 ).readonly();
 
 const verificationChecksSchema = z
@@ -174,7 +178,7 @@ export const installedStateSchema = z
   .superRefine((state, context) => {
     const expectedChecks = state.lastSuccessfulVerification.kind ===
       "capability-addition"
-      ? capabilityAdditionVerificationChecks
+      ? capabilityAdditionPersistedVerificationChecks
       : state.origin.recipeVersion === "0.7.0" ||
           state.origin.recipeVersion === "0.8.0" ||
           state.origin.recipeVersion === "0.9.0" ||

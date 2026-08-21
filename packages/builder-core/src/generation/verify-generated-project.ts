@@ -7,7 +7,15 @@ import {
   readFile,
   realpath,
 } from "node:fs/promises";
-import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
+import {
+  delimiter,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 import { promisify } from "node:util";
 
 import { ordinaryGenerationVerificationChecks } from "../contracts/generation-verification.js";
@@ -386,6 +394,8 @@ async function verifyInIsolatedCopy(
       force: false,
       errorOnExist: true,
       dereference: false,
+      filter: (source) =>
+        !relative(fixedRoot, source).split(sep).includes(".git"),
     });
     await mkdir(supportRoot, { mode: 0o700 });
     const supportStats = await lstat(supportRoot, { bigint: true });

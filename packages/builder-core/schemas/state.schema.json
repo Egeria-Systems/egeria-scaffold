@@ -247,8 +247,8 @@
           "additionalProperties": false,
           "properties": {
             "checks": {
-              "maxItems": 14,
-              "minItems": 14,
+              "maxItems": 12,
+              "minItems": 12,
               "prefixItems": [
                 {
                   "const": "contracts",
@@ -296,14 +296,6 @@
                 },
                 {
                   "const": "post-change-inference",
-                  "type": "string"
-                },
-                {
-                  "const": "migration-record",
-                  "type": "string"
-                },
-                {
-                  "const": "post-state-inference",
                   "type": "string"
                 }
               ],

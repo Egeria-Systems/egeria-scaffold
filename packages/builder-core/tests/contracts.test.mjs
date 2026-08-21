@@ -139,8 +139,6 @@ const capabilityAdditionVerificationChecks = [
   "next-build",
   "opennext-build",
   "post-change-inference",
-  "migration-record",
-  "post-state-inference",
 ];
 
 const readableRecipeVersions = [
