@@ -327,6 +327,40 @@ test("policy, budget, and baseline decoders reject non-exact or inconsistent dat
   );
 });
 
+test("budget decoder accepts only the complete portfolio or site route matrix", () => {
+  const portfolioBudget = {
+    schemaVersion: "1.0.0",
+    scenarios: [
+      {
+        identifier: "home",
+        path: "/",
+        baselineVariants: ["portfolio", "portfolio-calendly"],
+      },
+    ],
+    exceptions: [],
+  };
+  assert.deepEqual(decodePerformanceBudget(portfolioBudget), portfolioBudget);
+  assert.deepEqual(decodePerformanceBudget(createBudget()), createBudget());
+
+  const incompleteSiteBudget = createBudget();
+  incompleteSiteBudget.scenarios.pop();
+  assert.throws(() => decodePerformanceBudget(incompleteSiteBudget), {
+    code: "PERFORMANCE_BUDGET_INVALID",
+  });
+
+  const incompletePortfolioBudget = clone(portfolioBudget);
+  incompletePortfolioBudget.scenarios[0].baselineVariants.pop();
+  assert.throws(() => decodePerformanceBudget(incompletePortfolioBudget), {
+    code: "PERFORMANCE_BUDGET_INVALID",
+  });
+
+  const mixedProfileBudget = createBudget();
+  mixedProfileBudget.scenarios[0].baselineVariants = ["portfolio", "site"];
+  assert.throws(() => decodePerformanceBudget(mixedProfileBudget), {
+    code: "PERFORMANCE_BUDGET_INVALID",
+  });
+});
+
 test("threshold derivation uses the exact formula, rounding, caps, and exceptions", async () => {
   const policy = decodePerformancePolicy(await readPolicy());
   const budget = decodePerformanceBudget(createBudget());
@@ -839,6 +873,45 @@ test("runner is import-inert and uses fixed shell-free processes with owned clea
   }
 });
 
+test("an early output failure removes identity-owned runtime state", async () => {
+  const webRoot = await mkdtemp(join(tmpdir(), "performance-runner-output-failure-"));
+  let previewStarted = false;
+  try {
+    await writeFile(join(webRoot, "performance-policy.json"), JSON.stringify(await readPolicy()));
+    await writeFile(join(webRoot, "performance-budget.json"), JSON.stringify(createBudget()));
+    await writeFile(join(webRoot, "performance-baseline.json"), JSON.stringify(createBaseline()));
+
+    await expectRunnerError(
+      () =>
+        runPerformanceBudgets(
+          { webRoot, currentDate: "2026-08-20" },
+          {
+            async resolveChromiumPath() {
+              return "/ms-playwright/chromium/chrome";
+            },
+            async writeJson() {
+              throw new Error("PRIVATE_VALUE");
+            },
+            async startPreview() {
+              previewStarted = true;
+              throw new Error("PRIVATE_VALUE");
+            },
+          },
+        ),
+      "PERFORMANCE_OUTPUT_INVALID",
+    );
+    assert.equal(previewStarted, false);
+    assert.equal(
+      (await readdir(join(webRoot, ".lighthouseci"))).some((name) =>
+        name.startsWith("runtime-"),
+      ),
+      false,
+    );
+  } finally {
+    await rm(webRoot, { recursive: true, force: true });
+  }
+});
+
 test("runner maps child failures to redacted stable codes and still stops its process", async () => {
   const webRoot = await mkdtemp(join(tmpdir(), "performance-runner-failure-"));
   let stopped = false;
@@ -876,6 +949,55 @@ test("runner maps child failures to redacted stable codes and still stops its pr
         name.startsWith("runtime-"),
       ),
       false,
+    );
+  } finally {
+    await rm(webRoot, { recursive: true, force: true });
+  }
+});
+
+test("runner reports primary and cleanup failures together in stable order", async () => {
+  const webRoot = await mkdtemp(join(tmpdir(), "performance-runner-dual-failure-"));
+  try {
+    await writeFile(join(webRoot, "performance-policy.json"), JSON.stringify(await readPolicy()));
+    await writeFile(join(webRoot, "performance-budget.json"), JSON.stringify(createBudget()));
+    await writeFile(join(webRoot, "performance-baseline.json"), JSON.stringify(createBaseline()));
+
+    await assert.rejects(
+      () =>
+        runPerformanceBudgets(
+          { webRoot, currentDate: "2026-08-20" },
+          {
+            async resolveChromiumPath() {
+              return "/ms-playwright/chromium/chrome";
+            },
+            async startPreview() {
+              return { pid: 12345, exitCode: null };
+            },
+            async probeRoute(url) {
+              return { ok: true, status: 200, finalUrl: url };
+            },
+            async runCommand() {
+              throw new Error("PRIVATE_VALUE");
+            },
+            async stopPreview() {
+              throw new Error("PRIVATE_VALUE");
+            },
+          },
+        ),
+      (error) => {
+        assert.equal(error?.name, "PerformanceBudgetRunnerError");
+        assert.equal(error?.code, "PERFORMANCE_COLLECTION_FAILED");
+        assert.deepEqual(error?.codes, [
+          "PERFORMANCE_COLLECTION_FAILED",
+          "PERFORMANCE_CLEANUP_FAILED",
+        ]);
+        assert.equal(
+          String(error),
+          "PerformanceBudgetRunnerError: PERFORMANCE_COLLECTION_FAILED\nPERFORMANCE_CLEANUP_FAILED",
+        );
+        assert.doesNotMatch(String(error), /PRIVATE_VALUE/u);
+        return true;
+      },
     );
   } finally {
     await rm(webRoot, { recursive: true, force: true });

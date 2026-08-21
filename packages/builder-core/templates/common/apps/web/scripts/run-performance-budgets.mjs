@@ -88,10 +88,12 @@ const expectedPolicy = Object.freeze({
 });
 
 export class PerformanceBudgetRunnerError extends Error {
-  constructor(code) {
-    super(code);
+  constructor(code, relatedCodes = []) {
+    const codes = Object.freeze([...new Set([code, ...relatedCodes])]);
+    super(codes.join("\n"));
     this.name = "PerformanceBudgetRunnerError";
     this.code = code;
+    this.codes = codes;
   }
 }
 
@@ -208,6 +210,37 @@ function validateScenario(scenario) {
   );
 }
 
+function hasExactBaselineVariants(scenario, expectedVariants) {
+  return (
+    scenario.baselineVariants.length === expectedVariants.length &&
+    scenario.baselineVariants.every(
+      (variant, index) => variant === expectedVariants[index],
+    )
+  );
+}
+
+function validateScenarioMatrix(scenarios) {
+  if (scenarios.length === 1) {
+    return (
+      scenarios[0].identifier === "home" &&
+      scenarios[0].path === "/" &&
+      hasExactBaselineVariants(scenarios[0], [
+        "portfolio",
+        "portfolio-calendly",
+      ])
+    );
+  }
+  return (
+    scenarios.length === 2 &&
+    scenarios[0].identifier === "home" &&
+    scenarios[0].path === "/" &&
+    hasExactBaselineVariants(scenarios[0], ["site"]) &&
+    scenarios[1].identifier === "about" &&
+    scenarios[1].path === "/about" &&
+    hasExactBaselineVariants(scenarios[1], ["site"])
+  );
+}
+
 function validateException(exception) {
   return (
     hasExactKeys(exception, [
@@ -236,11 +269,8 @@ export function decodePerformanceBudget(value) {
     !hasExactKeys(value, ["schemaVersion", "scenarios", "exceptions"]) ||
     value.schemaVersion !== "1.0.0" ||
     !Array.isArray(value.scenarios) ||
-    value.scenarios.length < 1 ||
-    value.scenarios.length > 2 ||
     !value.scenarios.every(validateScenario) ||
-    value.scenarios[0].identifier !== "home" ||
-    (value.scenarios.length === 2 && value.scenarios[1].identifier !== "about") ||
+    !validateScenarioMatrix(value.scenarios) ||
     !Array.isArray(value.exceptions) ||
     !value.exceptions.every(validateException)
   ) {
@@ -1124,6 +1154,14 @@ async function writeJson(path, value) {
   }
 }
 
+async function writeOutputJson(adapters, path, value) {
+  try {
+    await adapters.writeJson(path, value);
+  } catch (error) {
+    throw normalizeFailure(error, "PERFORMANCE_OUTPUT_INVALID");
+  }
+}
+
 export async function runPerformanceBudgets(
   {
     webRoot = process.cwd(),
@@ -1158,6 +1196,7 @@ export async function runPerformanceBudgets(
     runCommand: defaultRunCommand,
     stopPreview: defaultStopPreview,
     delay: defaultDelay,
+    writeJson,
     ...injectedAdapters,
   };
   const chromiumPath = await adapters.resolveChromiumPath();
@@ -1170,14 +1209,17 @@ export async function runPerformanceBudgets(
   });
   const artifactOwner = await createArtifactDirectory(canonicalWebRoot);
   const runtimeOwner = await createRuntimeOwner(artifactOwner.path);
-  const environment = createChildEnvironment(runtimeOwner);
-  const configurationPath = join(artifactOwner.path, assertionConfigurationName);
-  await writeJson(configurationPath, configuration);
-
   let preview;
   let summary;
   let failure;
   try {
+    const environment = createChildEnvironment(runtimeOwner);
+    const configurationPath = join(
+      artifactOwner.path,
+      assertionConfigurationName,
+    );
+    await writeOutputJson(adapters, configurationPath, configuration);
+
     try {
       preview = await adapters.startPreview({
         executable: "pnpm",
@@ -1226,12 +1268,13 @@ export async function runPerformanceBudgets(
       reports,
       currentDate,
     });
-    await writeJson(
+    await writeOutputJson(
+      adapters,
       join(artifactOwner.path, "manifest.json"),
       createPerformanceManifest(reports),
     );
     const summaryPath = join(artifactOwner.path, summaryName);
-    await writeJson(summaryPath, summary);
+    await writeOutputJson(adapters, summaryPath, summary);
     try {
       await adapters.runCommand({
         executable: "pnpm",
@@ -1289,7 +1332,10 @@ export async function runPerformanceBudgets(
       if (failure === undefined) {
         failure = new PerformanceBudgetRunnerError("PERFORMANCE_CLEANUP_FAILED");
       } else {
-        failure.cleanupCode = "PERFORMANCE_CLEANUP_FAILED";
+        failure = new PerformanceBudgetRunnerError(failure.code, [
+          ...failure.codes.slice(1),
+          "PERFORMANCE_CLEANUP_FAILED",
+        ]);
       }
     }
   }
@@ -1312,11 +1358,11 @@ if (isDirectExecution(import.meta.url)) {
   try {
     await runPerformanceBudgets();
   } catch (error) {
-    const code =
+    const message =
       error instanceof PerformanceBudgetRunnerError
-        ? error.code
+        ? error.message
         : "PERFORMANCE_RUNNER_FAILED";
-    process.stderr.write(`${code}\n`);
+    process.stderr.write(`${message}\n`);
     process.exitCode = 1;
   }
 }
