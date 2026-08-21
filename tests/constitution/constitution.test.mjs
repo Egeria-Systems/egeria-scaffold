@@ -2739,7 +2739,7 @@ test("canonical documentation records visual regression and the client-ready clo
   ]) {
     assert.match(
       closureOwner,
-      /performance budgets[^\n]+deferred[^\n]+no performance claim/iu,
+      /(?:deferring performance budgets[^\n]+no performance or production-readiness claim|performance budgets[^\n]+deferred[^\n]+no performance claim)/iu,
     );
   }
   for (const sequencingOwner of [sourcePlan, roadmap]) {
