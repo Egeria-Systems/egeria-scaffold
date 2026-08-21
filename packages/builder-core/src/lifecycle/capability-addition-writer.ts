@@ -264,8 +264,7 @@ function samePreparedIdentity(
 ): boolean {
   return initial.identity === undefined
     ? current.identity === undefined
-    : current.identity !== undefined &&
-        initial.identity.device === current.identity.device &&
+    : current.identity?.device === initial.identity.device &&
         initial.identity.inode === current.identity.inode &&
         initial.identity.mode === current.identity.mode;
 }
@@ -307,7 +306,7 @@ async function writePreparedChange(
       !samePreparedIdentity(prepared, current) ||
       !(await parentDirectoriesAreSafe(rootIdentity, prepared.target))
     ) {
-      return failBeforeInstall();
+      return await failBeforeInstall();
     }
 
     if (prepared.change.expected.kind === "missing") {
