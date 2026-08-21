@@ -720,15 +720,6 @@ export async function applyCapabilityAddition(input: Readonly<{
     ".egeria/migrations.jsonl",
     ".egeria/state.json",
   ].sort();
-  if (
-    (await readExactFileBytes(reader, actualFiles, changedPaths)) === undefined
-  ) {
-    return failure(
-      "CAPABILITY_POST_STATE_FAILED",
-      "post-state",
-      "inspect-worktree",
-    );
-  }
   let finalDiff: GitExpectedChangesInspection;
   try {
     finalDiff = await inspectExpectedChangesValue({
@@ -745,6 +736,15 @@ export async function applyCapabilityAddition(input: Readonly<{
   }
   if (!finalDiff.ok) {
     return failure(finalDiff.code, "final-diff", "inspect-worktree");
+  }
+  if (
+    (await readExactFileBytes(reader, actualFiles, changedPaths)) === undefined
+  ) {
+    return failure(
+      "CAPABILITY_POST_STATE_FAILED",
+      "post-state",
+      "inspect-worktree",
+    );
   }
 
   return {

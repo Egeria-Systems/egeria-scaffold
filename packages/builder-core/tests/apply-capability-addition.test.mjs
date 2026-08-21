@@ -389,6 +389,48 @@ test("capability addition reports bounded recovery when persistence or final dif
     recovery: "inspect-worktree",
   });
   assert.equal(finalDiffRepository.writes.length, 3);
+
+  const finalBytesRepository = createRepository(await fixtureEntries());
+  const finalBytesFailure = await runApply(finalBytesRepository, {
+    inspectExpectedChanges: () => {
+      finalBytesRepository.files.set(
+        "apps/web/app/page.tsx",
+        "concurrent final edit\n",
+      );
+      return Promise.resolve({ ok: true });
+    },
+  });
+  assert.deepEqual(finalBytesFailure.result, {
+    ok: false,
+    code: "CAPABILITY_POST_STATE_FAILED",
+    phase: "post-state",
+    recovery: "inspect-worktree",
+  });
+});
+
+test("capability addition requires inspection for a retained partial transform prefix", async () => {
+  const repository = createRepository(await fixtureEntries());
+  const before = new Map(repository.files);
+  repository.writer.write = async (changes) => {
+    const first = changes[0];
+    repository.files.set(first.path, decoder.decode(first.content));
+    return { ok: false, sourceChanged: true };
+  };
+
+  const { plan, result } = await runApply(repository);
+  assert.deepEqual(result, {
+    ok: false,
+    code: "CAPABILITY_TRANSFORM_FAILED",
+    phase: "transform",
+    recovery: "inspect-worktree",
+  });
+  assert.notEqual(
+    repository.files.get(plan.actions[0].path),
+    before.get(plan.actions[0].path),
+  );
+  for (const action of plan.actions.slice(1)) {
+    assert.equal(repository.files.get(action.path), before.get(action.path));
+  }
 });
 
 test("filesystem addition writer replaces expected files and exclusively creates targets", async (context) => {
@@ -507,4 +549,46 @@ test("filesystem addition writer preserves live files across commit races and st
   );
   assert.equal(await readFile(target, "utf8"), "before\n");
   assert.deepEqual(await readdir(temporaryRoot), ["existing.txt"]);
+
+  const firstTarget = join(temporaryRoot, "first.txt");
+  const secondTarget = join(temporaryRoot, "second.txt");
+  await writeFile(firstTarget, "first before\n", "utf8");
+  await writeFile(secondTarget, "second before\n", "utf8");
+  const partialWriter = core.createFileSystemCapabilityAdditionWriter(
+    temporaryRoot,
+    {
+      beforeCommit: (path) =>
+        path === "second.txt"
+          ? Promise.reject(new Error("injected second commit failure"))
+          : Promise.resolve(),
+    },
+  );
+  assert.deepEqual(
+    await partialWriter.write([
+      {
+        path: "first.txt",
+        expected: {
+          kind: "file",
+          content: encoder.encode("first before\n"),
+        },
+        content: encoder.encode("first after\n"),
+      },
+      {
+        path: "second.txt",
+        expected: {
+          kind: "file",
+          content: encoder.encode("second before\n"),
+        },
+        content: encoder.encode("second after\n"),
+      },
+    ]),
+    { ok: false, sourceChanged: true },
+  );
+  assert.equal(await readFile(firstTarget, "utf8"), "first after\n");
+  assert.equal(await readFile(secondTarget, "utf8"), "second before\n");
+  assert.deepEqual((await readdir(temporaryRoot)).sort(), [
+    "existing.txt",
+    "first.txt",
+    "second.txt",
+  ]);
 });
