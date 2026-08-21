@@ -265,6 +265,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "diagnostics/diff-project.ts",
       "diagnostics/doctor.ts",
       "diagnostics/project-inspection.ts",
+      "generation/builder-state-surfaces.ts",
       "generation/render-skeleton.ts",
       "generation/render-template.ts",
       "generation/source-tree-safety.ts",
@@ -414,6 +415,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /`assume-unchanged` and `skip-worktree`/);
   assert.match(builderInstructions, /absent but Git-ignored create targets/);
   assert.match(builderInstructions, /every installed application-owned surface/);
+  assert.match(builderInstructions, /canonical managed-surface inventory/);
   assert.match(builderInstructions, /Git preflight and addition-planning policy/);
   assert.match(builderInstructions, /no transform, migration, state update, or provider action/);
 
@@ -444,6 +446,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /`assume-unchanged` and `skip-worktree`/);
   assert.match(builderReadme, /absent but Git-ignored create target/);
   assert.match(builderReadme, /every installed application-owned surface/);
+  assert.match(builderReadme, /canonical managed-surface inventory/);
   assert.match(builderReadme, /redacts settings and repository metadata/);
   assert.match(builderReadme, /no transform, migration, state update, or provider action/);
   assert.doesNotMatch(builderReadme, /The CLI remains empty/);
@@ -456,6 +459,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliReadme, /never creates the worktree or branch/);
   assert.match(cliReadme, /`assume-unchanged` and `skip-worktree`/);
   assert.match(cliReadme, /absent but ignored create targets/);
+  assert.match(cliReadme, /canonical managed-surface inventory/);
   assert.match(cliReadme, /one content-safe JSON line/);
   assert.match(cliReadme, /no prompt, overwrite mode/);
 
@@ -480,6 +484,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /`assume-unchanged` and `skip-worktree`/);
   assert.match(packageOwnership, /absent but Git-ignored create targets/);
   assert.match(packageOwnership, /every installed application-owned surface/);
+  assert.match(packageOwnership, /canonical managed-surface inventory/);
   assert.match(packageOwnership, /redacts settings and repository metadata/);
   assert.match(packageOwnership, /no transform, migration, state update, or provider action/);
   assert.doesNotMatch(packageOwnership, /future CLI consumer/);
@@ -487,6 +492,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(rootReadme, /five exact commands/);
   assert.match(rootReadme, /local eligibility and planning evidence/);
   assert.match(rootReadme, /`assume-unchanged` and `skip-worktree`/);
+  assert.match(rootReadme, /canonical managed-surface inventory/);
   assert.match(rootReadme, /not transformation, migration, recovery, certification, deployment/);
   assert.match(enforcementMap, /desired, installed, and inferred/);
   assert.match(enforcementMap, /read-only diagnostics/);

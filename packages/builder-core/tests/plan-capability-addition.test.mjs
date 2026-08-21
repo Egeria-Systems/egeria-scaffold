@@ -304,6 +304,44 @@ test("capability addition plan refuses inference drift and replacement drift", a
   }
 });
 
+test("capability addition plan refuses incomplete or contradictory surface inventories", async () => {
+  const base = await fixtureEntries("portfolio");
+  const stateResult = core.parseStateJson(base.get(".egeria/state.json"));
+  assert.equal(stateResult.ok, true);
+  const rootLayout = stateResult.value.managedSurfaces.find(
+    ({ identifier }) => identifier === "builder-root-layout",
+  );
+  assert.notEqual(rootLayout, undefined);
+
+  const cases = [
+    stateResult.value.managedSurfaces.filter(
+      ({ identifier }) => identifier !== "builder-root-layout",
+    ),
+    [
+      ...stateResult.value.managedSurfaces,
+      { ...rootLayout, identifier: "invented-application-surface" },
+    ],
+    stateResult.value.managedSurfaces.map((surface) =>
+      surface.identifier === "builder-root-layout"
+        ? { ...surface, path: "apps/web/app/page.tsx" }
+        : surface,
+    ),
+  ];
+
+  for (const managedSurfaces of cases) {
+    const entries = new Map(base);
+    entries.delete("apps/web/app/layout.tsx");
+    entries.set(
+      ".egeria/state.json",
+      core.serializeStateJson({ ...stateResult.value, managedSurfaces }),
+    );
+    assertFailure(
+      await planFromEntries(entries),
+      "PROJECT_DRIFT_DETECTED",
+    );
+  }
+});
+
 function setEjections(entries, projectEjections, stateEjections) {
   const next = new Map(entries);
   const projectResult = core.parseProjectYaml(next.get(".egeria/project.yaml"));

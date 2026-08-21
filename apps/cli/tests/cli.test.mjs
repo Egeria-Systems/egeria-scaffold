@@ -1255,6 +1255,28 @@ test("the compiled plan-add command refuses unsafe repository states without wri
       code: "PROJECT_DRIFT_DETECTED",
     },
     {
+      name: "missing surface omitted from installed inventory",
+      fixture: "portfolio",
+      select: ({ linked }) => linked,
+      prepare: async (root) => {
+        const statePath = join(root, ".egeria/state.json");
+        const parsed = core.parseStateJson(await readFile(statePath, "utf8"));
+        assert.equal(parsed.ok, true);
+        await rm(join(root, "apps/web/app/layout.tsx"));
+        await writeFile(
+          statePath,
+          core.serializeStateJson({
+            ...parsed.value,
+            managedSurfaces: parsed.value.managedSurfaces.filter(
+              ({ identifier }) => identifier !== "builder-root-layout",
+            ),
+          }),
+        );
+        await commitAll(root, "omit missing application layout from state");
+      },
+      code: "PROJECT_DRIFT_DETECTED",
+    },
+    {
       name: "committed ejection",
       fixture: "portfolio",
       select: ({ linked }) => linked,

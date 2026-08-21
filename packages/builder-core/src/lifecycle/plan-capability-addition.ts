@@ -1,9 +1,11 @@
 import { createVerifiedCapabilityCatalog, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
+import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
   calendlyBookingSettingsSchema,
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
 import type { ContractIssue, ValidationResult } from "../contracts/result.js";
+import type { InstalledSurface } from "../contracts/state.js";
 import {
   deriveProjectDiscrepancies,
   inspectProject,
@@ -14,6 +16,7 @@ import {
   type GeneratedFile,
   type RenderedSkeleton,
 } from "../generation/render-skeleton.js";
+import { createBuilderStateSurfaces } from "../generation/builder-state-surfaces.js";
 import { profileRecipes } from "../profiles/profile-recipes.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
 import { serializeProjectYaml } from "../state/codecs.js";
@@ -186,11 +189,11 @@ function hasUnsupportedEjection(inspection: ValidInspection): boolean {
 
 async function hasUnavailableApplicationOwnedSurface(
   reader: RepositoryReader,
-  inspection: ValidInspection,
+  rendered: RenderedSkeleton,
 ): Promise<boolean> {
   const paths = [
     ...new Set(
-      inspection.inference.state.value.managedSurfaces
+      rendered.surfaces
         .filter(({ ownership }) => ownership === "application-owned")
         .map(({ path }) => path),
     ),
@@ -212,6 +215,61 @@ async function hasUnavailableApplicationOwnedSurface(
   }
 
   return false;
+}
+
+function sameSurfaceOwner(
+  installed: InstalledSurface["owner"],
+  expected: ManagedSurfaceDescriptor["owner"],
+): boolean {
+  return (
+    installed.kind === expected.kind &&
+    (installed.kind === "builder-kernel" ||
+      (expected.kind === "capability" &&
+        installed.identifier === expected.identifier))
+  );
+}
+
+function sameFingerprintTarget(
+  installed: InstalledSurface["fingerprintTarget"],
+  expected: ManagedSurfaceDescriptor["fingerprintTarget"],
+): boolean {
+  return (
+    installed.kind === expected.kind &&
+    (installed.kind === "file" ||
+      (expected.kind === "json-value" &&
+        installed.pointer === expected.pointer))
+  );
+}
+
+function hasSurfaceInventoryDrift(
+  installed: readonly InstalledSurface[],
+  expected: readonly ManagedSurfaceDescriptor[],
+): boolean {
+  const installedByIdentifier = new Map(
+    installed.map((surface) => [surface.identifier, surface]),
+  );
+
+  return (
+    installed.length !== expected.length ||
+    expected.some((surface) => {
+      const installedSurface = installedByIdentifier.get(surface.identifier);
+
+      if (installedSurface === undefined) {
+        return true;
+      }
+
+      return (
+        installedSurface.path !== surface.path ||
+        installedSurface.ownership !== surface.ownership ||
+        installedSurface.mergeStrategy !== surface.mergeStrategy ||
+        !sameSurfaceOwner(installedSurface.owner, surface.owner) ||
+        !sameFingerprintTarget(
+          installedSurface.fingerprintTarget,
+          surface.fingerprintTarget,
+        )
+      );
+    })
+  );
 }
 
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
@@ -394,10 +452,6 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("PROJECT_EJECTION_UNSUPPORTED");
   }
 
-  if (await hasUnavailableApplicationOwnedSurface(input.reader, inspection)) {
-    return planningFailure("PROJECT_DRIFT_DETECTED");
-  }
-
   const project = inspection.project.value;
   const state = inspection.inference.state.value;
   const bookingInstalled =
@@ -408,6 +462,34 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 
   if (bookingInstalled) {
     return planningFailure("CAPABILITY_ALREADY_INSTALLED");
+  }
+
+  const renderRequest = {
+    profile: project.originProfile,
+    projectName: project.project.name,
+    displayName: project.project.displayName,
+    packageVersions: verifiedCapabilityPackageVersions,
+  } as const;
+  const currentResult = await renderSkeleton(renderRequest);
+
+  if (!currentResult.ok) {
+    return planningFailure("PROJECT_INSPECTION_INVALID");
+  }
+
+  if (
+    hasSurfaceInventoryDrift(
+      state.managedSurfaces,
+      [
+        ...currentResult.value.surfaces,
+        ...createBuilderStateSurfaces(),
+      ],
+    ) ||
+    await hasUnavailableApplicationOwnedSurface(
+      input.reader,
+      currentResult.value,
+    )
+  ) {
+    return planningFailure("PROJECT_DRIFT_DETECTED");
   }
 
   const capabilityValue: unknown = Reflect.get(input, "capability");
@@ -430,18 +512,12 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
-  const renderRequest = {
-    profile: project.originProfile,
-    projectName: project.project.name,
-    displayName: project.project.displayName,
-    packageVersions: verifiedCapabilityPackageVersions,
-  } as const;
-  const [currentResult, desiredResult] = await Promise.all([
-    renderSkeleton(renderRequest),
-    renderSkeleton({ ...renderRequest, bookingCalendly: settingsResult.data }),
-  ]);
+  const desiredResult = await renderSkeleton({
+    ...renderRequest,
+    bookingCalendly: settingsResult.data,
+  });
 
-  if (!currentResult.ok || !desiredResult.ok) {
+  if (!desiredResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
