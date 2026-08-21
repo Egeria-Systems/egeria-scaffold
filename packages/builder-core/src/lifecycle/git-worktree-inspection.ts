@@ -64,7 +64,7 @@ export type GitExecFile = (
     error: Readonly<{
       code?: string | number | null;
       killed?: boolean;
-      signal?: string;
+      signal?: string | null;
     }> | null,
     stdout: string | Uint8Array,
     stderr: string | Uint8Array,
@@ -139,7 +139,7 @@ export function createGitProcessExecutor(
             if (
               typeof exitCode === "number" &&
               error.killed !== true &&
-              error.signal === undefined
+              (error.signal === null || error.signal === undefined)
             ) {
               resolvePromise({ exitCode, stdout: output });
               return;
