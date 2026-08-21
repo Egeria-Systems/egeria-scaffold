@@ -56,6 +56,25 @@ export type GitProcessExecutor = (
   request: GitProcessRequest,
 ) => Promise<GitCommandResult>;
 
+export type GitExecFile = (
+  executable: string,
+  arguments_: readonly string[],
+  options: GitProcessRequest["options"],
+  callback: (
+    error: Readonly<{
+      code?: string | number | null;
+      killed?: boolean;
+      signal?: string;
+    }> | null,
+    stdout: string | Uint8Array,
+    stderr: string | Uint8Array,
+  ) => void,
+) => unknown;
+
+export type GitSourceEnvironment = Readonly<
+  Record<string, string | undefined>
+>;
+
 export type GitMetadataReader = (
   path: string,
 ) => Promise<"missing" | "present" | "symlink" | "error">;
@@ -89,7 +108,7 @@ class GitProcessFailure extends Error {
   }
 }
 
-function copyOutput(stdout: string | Buffer): Uint8Array {
+function copyOutput(stdout: string | Uint8Array): Uint8Array {
   if (!(stdout instanceof Uint8Array)) {
     throw new GitProcessFailure();
   }
@@ -98,7 +117,7 @@ function copyOutput(stdout: string | Buffer): Uint8Array {
 }
 
 export function createGitProcessExecutor(
-  executeFile: typeof execFile = execFile,
+  executeFile: GitExecFile = execFile,
 ): GitProcessExecutor {
   return (request) =>
     new Promise((resolvePromise, rejectPromise) => {
@@ -136,7 +155,7 @@ export function createGitProcessExecutor(
 }
 
 function readPlatformVariable(
-  sourceEnvironment: NodeJS.ProcessEnv,
+  sourceEnvironment: GitSourceEnvironment,
   name: string,
 ): string | undefined {
   const exactValue = sourceEnvironment[name];
@@ -154,8 +173,8 @@ function readPlatformVariable(
 }
 
 function createGitEnvironment(
-  sourceEnvironment: NodeJS.ProcessEnv,
-  platform: NodeJS.Platform,
+  sourceEnvironment: GitSourceEnvironment,
+  platform: string,
 ): Readonly<Record<string, string>> {
   const environment: Record<string, string> = {};
   const path = readPlatformVariable(sourceEnvironment, "PATH");
@@ -185,8 +204,8 @@ function createGitEnvironment(
 export function createGitCommandRunner(
   input: Readonly<{
     execute?: GitProcessExecutor;
-    sourceEnvironment?: NodeJS.ProcessEnv;
-    platform?: NodeJS.Platform;
+    sourceEnvironment?: GitSourceEnvironment;
+    platform?: string;
   }> = {},
 ): GitCommandRunner {
   const execute = input.execute ?? createGitProcessExecutor();
