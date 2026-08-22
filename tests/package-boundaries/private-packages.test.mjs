@@ -475,7 +475,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliInstructions, /`plan-add` remains read-only/);
   assert.match(cliInstructions, /`apply-add` is limited/);
   assert.match(cliInstructions, /`plan-remove` remains read-only/);
-  assert.match(cliInstructions, /`apply-remove` is the approved next command/);
+  assert.match(cliInstructions, /`apply-remove` is the exact current removal command/);
   assert.match(cliInstructions, /exact `plan-remove` fingerprint/);
   assert.match(cliInstructions, /modified[^\n]+application-owned[^\n]+preserv[^\n]+eject/);
   assert.match(cliInstructions, /remain read-only/);
@@ -483,7 +483,10 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliReadme, /eight exact commands/);
   assert.match(cliReadme, /`apply-add` accepts/);
   assert.match(cliReadme, /`plan-remove` is also read-only/);
-  assert.match(cliReadme, /`apply-remove` is the approved next command/);
+  assert.match(cliReadme, /`apply-remove` is the exact current removal command/);
+  assert.match(cliReadme, /migration append[^\n]+state-last persistence/);
+  assert.match(cliReadme, /preserve[^\n]+eject/);
+  assert.match(cliReadme, /verified-final-diff approval/);
   assert.match(cliReadme, /CAPABILITY_NOT_INSTALLED/);
   assert.match(cliReadme, /clean attached linked worktree/);
   assert.match(cliReadme, /never creates the worktree or branch/);
@@ -493,7 +496,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliReadme, /one content-safe JSON line/);
   assert.match(cliReadme, /no prompt, overwrite mode/);
 
-  assert.match(packageOwnership, /exact approval-gated Calendly addition transaction/);
+  assert.match(packageOwnership, /exact approval-gated Calendly addition and removal transactions/);
   assert.match(packageOwnership, /canonical private owner/i);
   assert.match(packageOwnership, /deterministic in-memory rendering/);
   assert.match(packageOwnership, /explicit allowlisted templates/);
@@ -507,7 +510,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /portable-rename race limit/);
   assert.match(packageOwnership, /pnpm `11.20.0`/);
   assert.match(packageOwnership, /disabled Next telemetry/);
-  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, `plan-remove`, and planned `apply-remove`/);
+  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, `plan-remove`, and `apply-remove`/);
   assert.match(packageOwnership, /one-line JSON output/);
   assert.match(packageOwnership, /clean attached linked worktree/);
   assert.match(packageOwnership, /all non-ignored untracked files/);
@@ -521,7 +524,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.doesNotMatch(packageOwnership, /future CLI consumer/);
   assert.match(packageOwnership, /existing-repository transformation/);
   assert.match(rootReadme, /eight exact commands/);
-  assert.match(rootReadme, /`apply-remove` is the approved next command/);
+  assert.match(rootReadme, /`apply-remove` is the exact current removal command/);
   assert.match(rootReadme, /transaction evidence awaiting verified-final-diff approval/);
   assert.match(rootReadme, /`plan-remove`/);
   assert.match(rootReadme, /`assume-unchanged` and `skip-worktree`/);
