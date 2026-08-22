@@ -2790,7 +2790,7 @@ test("canonical documentation records visual regression and the client-ready clo
   );
 });
 
-test("canonical documentation distinguishes the accepted planning base from the exact addition transaction", async () => {
+test("canonical documentation distinguishes accepted addition execution from read-only removal planning", async () => {
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3B");
   const [sourcePlan, roadmap, overview, capabilityModel, enforcementMap] =
@@ -2808,6 +2808,10 @@ test("canonical documentation distinguishes the accepted planning base from the 
     assert.match(
       statusOwner,
       /7ba461ac20d4a1d708e9f7b940e15cda0fce3295[^\n]+32429352322/iu,
+    );
+    assert.match(
+      statusOwner,
+      /31e1bab38496c87dc2e6084c958bd9300a141508[^\n]+32577925329/iu,
     );
   }
 
@@ -2847,11 +2851,15 @@ test("canonical documentation distinguishes the accepted planning base from the 
     );
     assert.match(
       boundaryOwner,
+      /read-only[^\n]+plan-remove[^\n]+booking-calendly@0\.1\.0/iu,
+    );
+    assert.match(
+      boundaryOwner,
       /existing-repository transformation[^\n]+migration append[^\n]+state-last persistence/iu,
     );
     assert.match(
       boundaryOwner,
-      /Generic transformation[^\n]+upgrades[^\n]+removals[^\n]+automated recovery[^\n]+later-add certification remain planned/iu,
+      /removal execution[^\n]+Generic transformation[^\n]+upgrades[^\n]+automated recovery[^\n]+later-add certification remain planned/iu,
     );
   }
 
@@ -2866,7 +2874,7 @@ test("canonical documentation distinguishes the accepted planning base from the 
 
   assert.match(
     capabilityModel,
-    /read-only `plan-add`[^\n]+fingerprint-gated `apply-add`[^\n]+booking-calendly@0\.1\.0/iu,
+    /read-only `plan-add`[^\n]+fingerprint-gated `apply-add`[^\n]+read-only `plan-remove`[^\n]+booking-calendly@0\.1\.0/iu,
   );
   assert.match(
     capabilityModel,
@@ -2874,11 +2882,15 @@ test("canonical documentation distinguishes the accepted planning base from the 
   );
   assert.match(
     capabilityModel,
-    /Generic transformation[^\n]+upgrades[^\n]+removals[^\n]+automated recovery[^\n]+later-add certification remain planned/iu,
+    /removal execution[^\n]+Generic transformation[^\n]+upgrades[^\n]+automated recovery[^\n]+later-add certification remain planned/iu,
   );
   assert.match(
     enforcementMap,
-    /INV-CLEAN-ISOLATED-MIGRATION[^\n]+booking-calendly@0\.1\.0[^\n]+plan-add[^\n]+apply-add[^\n]+exact plan fingerprint[^\n]+exact expected dirty paths/iu,
+    /INV-CLEAN-ISOLATED-MIGRATION[^\n]+booking-calendly@0\.1\.0[^\n]+plan-add[^\n]+apply-add[^\n]+plan-remove[^\n]+exact plan fingerprint[^\n]+exact expected dirty paths/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /plan-remove[^\n]+ownership-aware[^\n]+delete[^\n]+preserve[^\n]+eject[^\n]+redact[^\n]+no write/iu,
   );
   assert.match(
     enforcementMap,
