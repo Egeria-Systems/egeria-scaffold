@@ -10,9 +10,12 @@ import {
   inferRepository,
   inspectGitWorktree as inspectGitWorktreeDefault,
   planCapabilityAddition,
+  planCapabilityRemoval,
   profileRecipes,
   type CapabilityAdditionPlan,
   type CapabilityAdditionExecutionResult,
+  type CapabilityRemovalPlan,
+  type CapabilityRemovalPlanningFailureCode,
   type GeneratedProjectVerifier,
   type GitCreateTargetInspection,
   type GitWorktreeInspection,
@@ -52,6 +55,12 @@ type PlanAddSuccess = Readonly<{
   result: CapabilityAdditionPlan;
 }>;
 
+type PlanRemoveSuccess = Readonly<{
+  ok: true;
+  command: "plan-remove";
+  plan: CapabilityRemovalPlan;
+}>;
+
 const plannerRefusalCodes = new Set<PlanningFailureCode>([
   "PROJECT_INSPECTION_INVALID",
   "PROJECT_DRIFT_DETECTED",
@@ -61,8 +70,25 @@ const plannerRefusalCodes = new Set<PlanningFailureCode>([
   "CAPABILITY_ADDITION_UNSUPPORTED",
 ]);
 
+const removalPlannerRefusalCodes =
+  new Set<CapabilityRemovalPlanningFailureCode>([
+    "PROJECT_INSPECTION_INVALID",
+    "PROJECT_DRIFT_DETECTED",
+    "PROJECT_EJECTION_INVALID",
+    "CAPABILITY_NOT_INSTALLED",
+    "CAPABILITY_REMOVAL_UNSUPPORTED",
+  ]);
+
 function isPlannerRefusalCode(code: string): code is PlanningFailureCode {
   return plannerRefusalCodes.has(code as PlanningFailureCode);
+}
+
+function isRemovalPlannerRefusalCode(
+  code: string,
+): code is CapabilityRemovalPlanningFailureCode {
+  return removalPlannerRefusalCodes.has(
+    code as CapabilityRemovalPlanningFailureCode,
+  );
 }
 
 function writeJson(
@@ -179,6 +205,18 @@ function writePlanAddRefusal(output: CliOutput, code: string): 1 {
   return 1;
 }
 
+function writePlanRemoveRefusal(output: CliOutput, code: string): 1 {
+  writeJson(output.writeError, {
+    ok: false,
+    command: "plan-remove",
+    code,
+    ...(code === "CAPABILITY_NOT_INSTALLED"
+      ? { capability: "booking-calendly" }
+      : {}),
+  });
+  return 1;
+}
+
 function sameGitIdentity(
   left: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>,
   right: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>,
@@ -287,6 +325,60 @@ async function runPlanAdd(
   return 0;
 }
 
+async function runPlanRemove(
+  command: Extract<CliCommand, Readonly<{ kind: "plan-remove" }>>,
+  output: CliOutput,
+  dependencies: CliRunnerDependencies,
+): Promise<0 | 1> {
+  const root = resolve(command.directory);
+  const initialGit = await inspectForPlan(root, dependencies);
+
+  if (!initialGit.ok) {
+    return writePlanRemoveRefusal(output, initialGit.code);
+  }
+
+  let result;
+
+  try {
+    const reader = (dependencies.createReader ?? createCliRepositoryReader)(root);
+    result = await planCapabilityRemoval({
+      reader,
+      git: initialGit,
+      capability: command.capability,
+    });
+  } catch {
+    return writePlanRemoveRefusal(output, "REPOSITORY_OPEN_FAILED");
+  }
+
+  if (!result.ok) {
+    const code = result.issues[0]?.code;
+    return writePlanRemoveRefusal(
+      output,
+      code !== undefined && isRemovalPlannerRefusalCode(code)
+        ? code
+        : "REPOSITORY_OPEN_FAILED",
+    );
+  }
+
+  const finalGit = await inspectForPlan(root, dependencies);
+
+  if (!finalGit.ok) {
+    return writePlanRemoveRefusal(output, finalGit.code);
+  }
+
+  if (!sameGitIdentity(initialGit, finalGit)) {
+    return writePlanRemoveRefusal(output, "GIT_WORKTREE_CHANGED");
+  }
+
+  const success: PlanRemoveSuccess = {
+    ok: true,
+    command: "plan-remove",
+    plan: result.value,
+  };
+  writeJson(output.write, success);
+  return 0;
+}
+
 async function runApplyAdd(
   command: Extract<CliCommand, Readonly<{ kind: "apply-add" }>>,
   output: CliOutput,
@@ -361,6 +453,10 @@ export function createCliRunner(
 
     if (parsed.value.kind === "plan-add") {
       return runPlanAdd(parsed.value, output, dependencies);
+    }
+
+    if (parsed.value.kind === "plan-remove") {
+      return runPlanRemove(parsed.value, output, dependencies);
     }
 
     if (parsed.value.kind === "apply-add") {

@@ -28,6 +28,11 @@ export type CliCommand =
       settings: CalendlyBookingSettings;
     }>
   | Readonly<{
+      kind: "plan-remove";
+      directory: string;
+      capability: "booking-calendly";
+    }>
+  | Readonly<{
       kind: "apply-add";
       directory: string;
       capability: "booking-calendly";
@@ -223,6 +228,40 @@ function parsePlanAdd(
   }
 }
 
+function parsePlanRemove(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        capability: { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const capability = values.capability;
+
+    if (
+      !hasExactOptions(tokens, ["directory", "capability"]) ||
+      !validDirectory(directory) ||
+      capability !== "booking-calendly"
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: { kind: "plan-remove", directory, capability },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
 function parseApplyAdd(
   arguments_: readonly string[],
 ): ValidationResult<CliCommand> {
@@ -294,6 +333,8 @@ export function parseCliArguments(
       return parseReadOnly(command, commandArguments);
     case "plan-add":
       return parsePlanAdd(commandArguments);
+    case "plan-remove":
+      return parsePlanRemove(commandArguments);
     case "apply-add":
       return parseApplyAdd(commandArguments);
     default:
