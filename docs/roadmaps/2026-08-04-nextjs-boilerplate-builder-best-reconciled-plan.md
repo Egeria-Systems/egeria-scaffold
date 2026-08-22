@@ -1170,6 +1170,7 @@ P10 Fleet hardening, package review, and portability evidence
 - The diagnostics package-release Task 5 is selected as the next capability increment only after the amended observability certification transition is reviewed, approved, and integrated, the diagnostics branch is reconciled, and every other Gate B condition passes. Selection does not authorize a Task 5 push or package publication.
 - The unnumbered closure amendment is integrated at accepted `main@94a1d88f500b145366e065797633788a415c00ef`, satisfying the P3 entry gate.
 - The first transactional-lifecycle implementation base is accepted `main@7ba461ac20d4a1d708e9f7b940e15cda0fce3295`; post-merge Repository quality run `32429352322` passed every applicable job.
+- The exact Calendly addition-execution predecessor is accepted `main@31e1bab38496c87dc2e6084c958bd9300a141508`; post-merge Repository quality run `32577925329` passed every applicable job.
 - P2 performance budgets remain deferred and no performance claim is made; P3 may proceed because P2 is closed, while P3B must not begin before P3 closes.
 - P3 retains its clean-state, isolated-worktree, migration, drift, upgrade, recovery, compiled-CLI lifecycle, and capability-certification backfill requirements and adds `fast-check` only at that lifecycle-invariant boundary. P3 must close before P3B begins.
 - P3B relocates only the production-complete `site` work formerly assigned to P4 and the P5A `multilingual` and P5B `analytics` capability task pairs. It changes no default recipe, creates no composite client profile or capability, and does not waive or merge any implementation, certification, deployment, provider, privacy, recovery, or approval gate.
@@ -1224,7 +1225,7 @@ P10 Fleet hardening, package review, and portability evidence
 
 #### P3 — Lifecycle hardening
 
-- The currently implemented boundaries are read-only `plan-add` for exact `booking-calendly@0.1.0` and fingerprint-gated `apply-add` for exact `booking-calendly@0.1.0`; application performs existing-repository transformation, migration append, and state-last persistence before stopping for verified-final-diff approval. Generic transformation, upgrades, removals, automated recovery, and later-add certification remain planned.
+- The currently implemented boundaries are read-only `plan-add`, fingerprint-gated `apply-add`, and read-only `plan-remove` for exact `booking-calendly@0.1.0`; application performs existing-repository transformation, migration append, and state-last persistence before stopping for verified-final-diff approval, while removal planning only classifies ownership-aware dispositions and produces a redacted fingerprinted approval plan with no write. Removal execution, Generic transformation, upgrades, automated recovery, and later-add certification remain planned.
 - clean-state enforcement;
 - isolated migration branches/worktrees;
 - plan and final-diff approval;
