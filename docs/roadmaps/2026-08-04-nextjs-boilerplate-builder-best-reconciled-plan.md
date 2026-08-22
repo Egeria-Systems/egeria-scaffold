@@ -1142,6 +1142,8 @@ P3B Production site profile + independently selected multilingual and analytics
  ↓
     FIRST CLIENT-READY MILESTONE
  ↓
+P3C Automated removal-reference hardening
+ ↓
 P4  App profile/app-foundation
  ↓
 ├─ P5C Application persistence
@@ -1268,6 +1270,18 @@ No task, requirement, gate, or identifier is deleted or renumbered:
 | P5C–P5F | Persistence, Resend email, Cloudflare job delivery, and durable contact submissions | P5 unchanged and not renumbered |
 
 P5A and P5B are therefore not deleted and not renumbered.
+
+#### P3C — Automated removal-reference hardening
+
+P3C begins only after P3B closes. It strengthens the accepted removal lifecycle without reopening or weakening P3 or P3B acceptance. Existing fingerprint-bound repository-wide review and exact preserved/ejected-path reconciliation remain mandatory.
+
+Add a bounded Git-identity-bound repository inventory and capability-specific guards for surviving code, route, configuration, script, dynamic-loading, and package consumers. Exact resolved references and descriptor-specific exact guards require refusal or explicit reconciliation. Heuristic matches produce review warnings. Finding no detected match must never be represented as proof that no surviving dependency exists or that removal is complete.
+
+Begin with exact `booking-calendly@0.1.0`. At P3C entry, use an accepted P3B capability that declares removable packages for the first package-backed guard when one exists; otherwise attach that guard to the first later concrete package-backed removal. Extract a reusable analyzer only after at least two executable capability guards demonstrate a stable common boundary.
+
+The accepted removal executor recomputes the complete guarded plan and fingerprint before its first write. Repository transformation, state-last persistence, recovery, provider resources, credentials, and persistent data retain their existing separate ownership, disposition, evidence, and claim boundaries.
+
+**Stop gate:** Calendly exact-reference refusals, heuristic and coverage warnings, deterministic inventory, repository-identity refusal, privacy-safe output, executor revalidation, and no-mutation refusal evidence pass. Package-backed or reusable-analysis claims require their separately named concrete evidence gates.
 
 #### P4 — App foundation
 
