@@ -2843,7 +2843,15 @@ test("canonical documentation distinguishes the accepted planning base from the 
     );
     assert.match(
       boundaryOwner,
-      /transformation[^\n]+migration[^\n]+state[^\n]+remain[^\n]+planned/iu,
+      /fingerprint-gated[^\n]+apply-add[^\n]+booking-calendly@0\.1\.0/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /existing-repository transformation[^\n]+migration append[^\n]+state-last persistence/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /Generic transformation[^\n]+upgrades[^\n]+removals[^\n]+automated recovery[^\n]+later-add certification remain planned/iu,
     );
   }
 

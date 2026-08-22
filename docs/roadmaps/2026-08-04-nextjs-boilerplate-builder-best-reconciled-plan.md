@@ -1219,7 +1219,7 @@ P10 Fleet hardening, package review, and portability evidence
 
 #### P3 — Lifecycle hardening
 
-- The first implemented boundary is the read-only `plan-add` eligibility plan for `booking-calendly@0.1.0`; existing-repository transformation, migration, and state persistence remain planned.
+- The currently implemented boundaries are read-only `plan-add` for exact `booking-calendly@0.1.0` and fingerprint-gated `apply-add` for exact `booking-calendly@0.1.0`; application performs existing-repository transformation, migration append, and state-last persistence before stopping for verified-final-diff approval. Generic transformation, upgrades, removals, automated recovery, and later-add certification remain planned.
 - clean-state enforcement;
 - isolated migration branches/worktrees;
 - plan and final-diff approval;
