@@ -2900,7 +2900,7 @@ test("canonical documentation records the exact Calendly removal candidate after
 
   assert.match(
     overview,
-    /Generic existing-repository mutation[^\n]+migration orchestration remain deferred/iu,
+    /Existing-repository mutation[^\n]+implemented only[^\n]+exact Calendly addition and removal transactions[^\n]+generic transformation[^\n]+upgrades[^\n]+automated recovery[^\n]+certification backfill[^\n]+provider\/data cleanup[^\n]+remain planned/iu,
   );
   assert.match(
     overview,
