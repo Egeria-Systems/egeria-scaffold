@@ -435,6 +435,48 @@ test("capability removal plan preserves modified and already-ejected application
   assert.deepEqual(unrelatedResult.value.actions, expectedActions());
 });
 
+test("capability removal plan reconciles every preserved path in deterministic order", async () => {
+  const alreadyEjectedPath =
+    "apps/web/src/integrations/booking-calendly/booking-content.ts";
+  const modifiedPath =
+    "apps/web/src/integrations/booking-calendly/calendly-booking.tsx";
+  const entries = updateEjections(
+    await installedEntries("portfolio"),
+    [alreadyEjectedPath],
+  );
+  entries.set(modifiedPath, "private application customization\n");
+
+  const result = await planFromEntries(entries);
+  assert.equal(result.ok, true, JSON.stringify(result.issues));
+  const preservedAction = (path) => ({
+    kind: "preserve-file-and-eject",
+    path,
+    ownership: "ejected",
+    owner: "booking-calendly",
+  });
+  assert.deepEqual(
+    result.value,
+    expectedPlan(
+      "portfolio",
+      result.value,
+      new Map([
+        [alreadyEjectedPath, preservedAction(alreadyEjectedPath)],
+        [modifiedPath, preservedAction(modifiedPath)],
+      ]),
+      [
+        {
+          code: "review-surviving-references-to-removed-surfaces",
+          scope: "repository",
+        },
+        {
+          code: "reconcile-preserved-capability-surfaces",
+          paths: [alreadyEjectedPath, modifiedPath],
+        },
+      ],
+    ),
+  );
+});
+
 test("capability removal plan distinguishes not-installed state from removal drift", async () => {
   for (const profile of ["portfolio", "site"]) {
     assertFailure(
@@ -686,5 +728,31 @@ test("capability removal plan binds private controls and Git identity without di
   assert.doesNotMatch(
     JSON.stringify([first, second, changedGit]),
     /calendly\.com|refs\/heads|\/generated\//u,
+  );
+});
+
+test("capability removal plan fingerprint binds its review requirements", async () => {
+  const entries = await installedEntries("portfolio");
+  const result = await planFromEntries(entries);
+  assert.equal(result.ok, true, JSON.stringify(result.issues));
+  const project = core.parseProjectYaml(entries.get(".egeria/project.yaml"));
+  const state = core.parseStateJson(entries.get(".egeria/state.json"));
+  assert.equal(project.ok, true, JSON.stringify(project.issues));
+  assert.equal(state.ok, true, JSON.stringify(state.issues));
+  const { planFingerprint, ...plan } = result.value;
+  const fingerprintInput = {
+    plan,
+    project: project.value,
+    state: state.value,
+    gitIdentity: git.identity,
+  };
+
+  assert.equal(planFingerprint, core.fingerprintJsonValue(fingerprintInput));
+  assert.notEqual(
+    planFingerprint,
+    core.fingerprintJsonValue({
+      ...fingerprintInput,
+      plan: { ...plan, reviewRequirements: [] },
+    }),
   );
 });
