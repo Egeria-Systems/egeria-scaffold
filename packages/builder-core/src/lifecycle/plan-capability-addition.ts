@@ -1,10 +1,12 @@
+import { createHash } from "node:crypto";
+
 import { createVerifiedCapabilityCatalog, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
   calendlyBookingSettingsSchema,
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
-import type { ContractIssue, ValidationResult } from "../contracts/result.js";
+import type { ContractIssue } from "../contracts/result.js";
 import type { InstalledSurface } from "../contracts/state.js";
 import {
   deriveProjectDiscrepancies,
@@ -20,6 +22,7 @@ import { createBuilderStateSurfaces } from "../generation/builder-state-surfaces
 import { profileRecipes } from "../profiles/profile-recipes.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
 import { serializeProjectYaml } from "../state/codecs.js";
+import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
 import type { GitWorktreeInspection } from "./git-worktree-inspection.js";
 
 export type CapabilityAdditionAction = Readonly<{
@@ -32,6 +35,7 @@ export type CapabilityAdditionAction = Readonly<{
 export type CapabilityAdditionPlan = Readonly<{
   operation: "add-capability";
   status: "approval-required";
+  planFingerprint: `sha256:${string}`;
   baseRevision: string;
   profile: "portfolio" | "site";
   capability: Readonly<{
@@ -54,7 +58,12 @@ export type CapabilityAdditionPlan = Readonly<{
     "persist-state",
     "verify-state-and-inference",
   ];
-}>;
+}>; 
+
+type CapabilityAdditionPlanBody = Omit<
+  CapabilityAdditionPlan,
+  "planFingerprint"
+>;
 
 export type PlanningFailureCode =
   | "PROJECT_INSPECTION_INVALID"
@@ -63,6 +72,16 @@ export type PlanningFailureCode =
   | "CAPABILITY_ACTION_CONFLICT"
   | "CAPABILITY_ALREADY_INSTALLED"
   | "CAPABILITY_ADDITION_UNSUPPORTED";
+
+type PlanningIssue = Omit<ContractIssue, "code"> &
+  Readonly<{ code: PlanningFailureCode }>;
+
+type PlanningResult<T> =
+  | Readonly<{ ok: true; value: T }>
+  | Readonly<{
+      ok: false;
+      issues: readonly PlanningIssue[];
+    }>;
 
 type ValidInspection = ProjectInspection &
   Readonly<{
@@ -97,8 +116,8 @@ function compareText(left: string, right: string): number {
 
 function planningFailure(
   code: PlanningFailureCode,
-): ValidationResult<never> {
-  const issue: ContractIssue = {
+): PlanningResult<never> {
+  const issue: PlanningIssue = {
     code,
     path: [],
     context: { reason: "precondition-refused" },
@@ -114,6 +133,25 @@ function sameOrderedValues(
     left.length === right.length &&
     left.every((value, index) => value === right[index])
   );
+}
+
+function fingerprintPlan(input: Readonly<{
+  plan: CapabilityAdditionPlanBody;
+  settings: CalendlyBookingSettings;
+  git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
+}>): `sha256:${string}` {
+  const digest = createHash("sha256")
+    .update(
+      stringifyCanonicalJson({
+        plan: input.plan,
+        settings: input.settings,
+        gitIdentity: input.git.identity,
+      }),
+      "utf8",
+    )
+    .digest("hex");
+
+  return `sha256:${digest}`;
 }
 
 function validatedInspection(
@@ -353,7 +391,7 @@ async function deriveActions(input: Readonly<{
   reader: RepositoryReader;
   current: RenderedSkeleton;
   desired: RenderedSkeleton;
-}>): Promise<ValidationResult<readonly CapabilityAdditionAction[]>> {
+}>): Promise<PlanningResult<readonly CapabilityAdditionAction[]>> {
   const differences = changedFiles(input.current, input.desired);
 
   if (differences === undefined) {
@@ -424,7 +462,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: "booking-calendly";
   settings: CalendlyBookingSettings;
-}>): Promise<ValidationResult<CapabilityAdditionPlan>> {
+}>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
 
   if (capabilityValue !== "booking-calendly") {
@@ -548,9 +586,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     .map(({ identifier }) => identifier)
     .sort(compareText);
 
-  return {
-    ok: true,
-    value: {
+  const plan: CapabilityAdditionPlanBody = {
       operation: "add-capability",
       status: "approval-required",
       baseRevision: input.git.identity.revision,
@@ -575,6 +611,17 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
         "persist-state",
         "verify-state-and-inference",
       ],
+  };
+
+  return {
+    ok: true,
+    value: {
+      ...plan,
+      planFingerprint: fingerprintPlan({
+        plan,
+        settings: settingsResult.data,
+        git: input.git,
+      }),
     },
   };
 }
@@ -584,6 +631,6 @@ export async function planCapabilityAddition(input: Readonly<{
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: "booking-calendly";
   settings: CalendlyBookingSettings;
-}>): Promise<ValidationResult<CapabilityAdditionPlan>> {
+}>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   return planCapabilityAdditionUnchecked(input);
 }

@@ -127,60 +127,135 @@
       "type": "array"
     },
     "lastSuccessfulVerification": {
-      "additionalProperties": false,
-      "properties": {
-        "checks": {
-          "anyOf": [
-            {
-              "maxItems": 9,
-              "minItems": 9,
-              "prefixItems": [
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "checks": {
+              "anyOf": [
                 {
-                  "const": "contracts",
-                  "type": "string"
+                  "maxItems": 9,
+                  "minItems": 9,
+                  "prefixItems": [
+                    {
+                      "const": "contracts",
+                      "type": "string"
+                    },
+                    {
+                      "const": "pre-state-inference",
+                      "type": "string"
+                    },
+                    {
+                      "const": "lockfile",
+                      "type": "string"
+                    },
+                    {
+                      "const": "frozen-install",
+                      "type": "string"
+                    },
+                    {
+                      "const": "lint",
+                      "type": "string"
+                    },
+                    {
+                      "const": "typecheck",
+                      "type": "string"
+                    },
+                    {
+                      "const": "next-build",
+                      "type": "string"
+                    },
+                    {
+                      "const": "opennext-build",
+                      "type": "string"
+                    },
+                    {
+                      "const": "post-state-inference",
+                      "type": "string"
+                    }
+                  ],
+                  "readOnly": true,
+                  "type": "array"
                 },
                 {
-                  "const": "pre-state-inference",
-                  "type": "string"
-                },
-                {
-                  "const": "lockfile",
-                  "type": "string"
-                },
-                {
-                  "const": "frozen-install",
-                  "type": "string"
-                },
-                {
-                  "const": "lint",
-                  "type": "string"
-                },
-                {
-                  "const": "typecheck",
-                  "type": "string"
-                },
-                {
-                  "const": "next-build",
-                  "type": "string"
-                },
-                {
-                  "const": "opennext-build",
-                  "type": "string"
-                },
-                {
-                  "const": "post-state-inference",
-                  "type": "string"
+                  "maxItems": 11,
+                  "minItems": 11,
+                  "prefixItems": [
+                    {
+                      "const": "contracts",
+                      "type": "string"
+                    },
+                    {
+                      "const": "pre-state-inference",
+                      "type": "string"
+                    },
+                    {
+                      "const": "lockfile",
+                      "type": "string"
+                    },
+                    {
+                      "const": "frozen-install",
+                      "type": "string"
+                    },
+                    {
+                      "const": "lint",
+                      "type": "string"
+                    },
+                    {
+                      "const": "typecheck",
+                      "type": "string"
+                    },
+                    {
+                      "const": "unit-tests",
+                      "type": "string"
+                    },
+                    {
+                      "const": "component-tests",
+                      "type": "string"
+                    },
+                    {
+                      "const": "next-build",
+                      "type": "string"
+                    },
+                    {
+                      "const": "opennext-build",
+                      "type": "string"
+                    },
+                    {
+                      "const": "post-state-inference",
+                      "type": "string"
+                    }
+                  ],
+                  "readOnly": true,
+                  "type": "array"
                 }
               ],
-              "readOnly": true,
-              "type": "array"
+              "readOnly": true
             },
-            {
-              "maxItems": 11,
-              "minItems": 11,
+            "kind": {
+              "const": "generation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "checks"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "checks": {
+              "maxItems": 12,
+              "minItems": 12,
               "prefixItems": [
                 {
                   "const": "contracts",
+                  "type": "string"
+                },
+                {
+                  "const": "plan-approval",
                   "type": "string"
                 },
                 {
@@ -220,27 +295,26 @@
                   "type": "string"
                 },
                 {
-                  "const": "post-state-inference",
+                  "const": "post-change-inference",
                   "type": "string"
                 }
               ],
               "readOnly": true,
               "type": "array"
+            },
+            "kind": {
+              "const": "capability-addition",
+              "type": "string"
             }
+          },
+          "required": [
+            "kind",
+            "checks"
           ],
-          "readOnly": true
-        },
-        "kind": {
-          "const": "generation",
-          "type": "string"
+          "type": "object"
         }
-      },
-      "readOnly": true,
-      "required": [
-        "kind",
-        "checks"
       ],
-      "type": "object"
+      "readOnly": true
     },
     "managedSurfaces": {
       "items": {

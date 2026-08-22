@@ -127,6 +127,26 @@ async function inspectScript(script) {
   });
 }
 
+function scriptIdentity(script) {
+  return {
+    root: script.root,
+    revision: script.revision,
+    attachedRef: script.attachedRef,
+    gitDirectory: script.gitDirectory,
+    commonDirectory: script.commonDirectory,
+  };
+}
+
+async function inspectExpectedScript(script, expectedPaths) {
+  return core.inspectGitExpectedChanges({
+    root: script.root,
+    identity: scriptIdentity(script),
+    expectedPaths,
+    runGit: script.runGit,
+    readMetadata: script.readMetadata,
+  });
+}
+
 test("Git worktree inspection builds an exact bounded Git process request", async () => {
   const requests = [];
   const runGit = core.createGitCommandRunner({
@@ -204,6 +224,60 @@ test("Git worktree inspection builds an exact bounded Git process request", asyn
     GIT_CONFIG_GLOBAL: "NUL",
     LC_ALL: "C",
   });
+});
+
+test("expected Git changes require the exact identity and path set", async () => {
+  const expectedPaths = ["tracked.txt", "new/nested.txt"];
+  const exact = scriptedInspection({
+    statusResult: commandResult(" M tracked.txt\0?? new/nested.txt\0"),
+  });
+  assert.deepEqual(await inspectExpectedScript(exact, expectedPaths), {
+    ok: true,
+  });
+
+  for (const status of [
+    " M tracked.txt\0",
+    " M tracked.txt\0?? new/nested.txt\0?? extra.txt\0",
+    "R  tracked.txt\0old.txt\0?? new/nested.txt\0",
+    "UU tracked.txt\0?? new/nested.txt\0",
+    "!! tracked.txt\0?? new/nested.txt\0",
+  ]) {
+    const script = scriptedInspection({ statusResult: commandResult(status) });
+    assert.deepEqual(await inspectExpectedScript(script, expectedPaths), {
+      ok: false,
+      code: status.startsWith("UU")
+        ? "GIT_WORKTREE_CONFLICTED"
+        : "GIT_WORKTREE_CHANGED",
+    });
+  }
+
+  const changedIdentity = scriptedInspection({
+    statusResult: commandResult(" M tracked.txt\0?? new/nested.txt\0"),
+  });
+  assert.deepEqual(
+    await core.inspectGitExpectedChanges({
+      root: changedIdentity.root,
+      identity: {
+        ...scriptIdentity(changedIdentity),
+        revision: "abcdef0123456789abcdef0123456789abcdef01",
+      },
+      expectedPaths,
+      runGit: changedIdentity.runGit,
+      readMetadata: changedIdentity.readMetadata,
+    }),
+    { ok: false, code: "GIT_WORKTREE_CHANGED" },
+  );
+
+  assert.deepEqual(
+    await core.inspectGitExpectedChanges({
+      root: exact.root,
+      identity: scriptIdentity(exact),
+      expectedPaths: ["../unsafe"],
+      runGit: exact.runGit,
+      readMetadata: exact.readMetadata,
+    }),
+    { ok: false, code: "GIT_WORKTREE_IDENTITY_INVALID" },
+  );
 });
 
 test("Git worktree inspection passes the exact request through execFile and contains failures", async () => {

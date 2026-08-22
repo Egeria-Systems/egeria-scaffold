@@ -88,18 +88,21 @@ export type GitWorktreeRefusalCode =
   | "GIT_BRANCH_REQUIRED"
   | "GIT_OPERATION_IN_PROGRESS"
   | "GIT_WORKTREE_CONFLICTED"
-  | "GIT_WORKTREE_DIRTY";
+  | "GIT_WORKTREE_DIRTY"
+  | "GIT_WORKTREE_CHANGED";
+
+export type GitWorktreeIdentity = Readonly<{
+  root: string;
+  revision: string;
+  attachedRef: string;
+  gitDirectory: string;
+  commonDirectory: string;
+}>;
 
 export type GitWorktreeInspection =
   | Readonly<{
       ok: true;
-      identity: Readonly<{
-        root: string;
-        revision: string;
-        attachedRef: string;
-        gitDirectory: string;
-        commonDirectory: string;
-      }>;
+      identity: GitWorktreeIdentity;
     }>
   | Readonly<{ ok: false; code: GitWorktreeRefusalCode }>;
 
@@ -109,6 +112,10 @@ export type GitCreateTargetInspection =
       ok: false;
       code: "CAPABILITY_ACTION_CONFLICT" | "GIT_WORKTREE_IDENTITY_INVALID";
     }>;
+
+export type GitExpectedChangesInspection =
+  | Readonly<{ ok: true }>
+  | Readonly<{ ok: false; code: GitWorktreeRefusalCode }>;
 
 class GitProcessFailure extends Error {
   constructor() {
@@ -332,7 +339,15 @@ async function readGitMetadata(
   }
 }
 
-type StatusInspection = "clean" | "dirty" | "conflicted" | "invalid";
+type StatusInspection =
+  | Readonly<{ kind: "clean" }>
+  | Readonly<{
+      kind: "dirty";
+      paths: readonly string[];
+      hasRenameOrCopy: boolean;
+    }>
+  | Readonly<{ kind: "conflicted" }>
+  | Readonly<{ kind: "invalid" }>;
 type IndexVisibilityInspection = "visible" | "hidden" | "invalid";
 
 function findNul(output: Uint8Array, start: number): number {
@@ -345,27 +360,48 @@ function findNul(output: Uint8Array, start: number): number {
   return -1;
 }
 
+function decodeStatusPath(
+  output: Uint8Array,
+  start: number,
+  end: number,
+): string | undefined {
+  if (end <= start) {
+    return undefined;
+  }
+
+  try {
+    const path = new TextDecoder("utf-8", { fatal: true }).decode(
+      output.subarray(start, end),
+    );
+    return safeRelativePathSchema.safeParse(path).success ? path : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function inspectStatus(output: Uint8Array): StatusInspection {
   if (output.length === 0) {
-    return "clean";
+    return { kind: "clean" };
   }
 
   if (
     output.length > maximumCommandOutputBytes ||
     output[output.length - 1] !== 0
   ) {
-    return "invalid";
+    return { kind: "invalid" };
   }
 
   let offset = 0;
   let dirty = false;
   let conflicted = false;
+  let hasRenameOrCopy = false;
+  const paths: string[] = [];
 
   while (offset < output.length) {
     const recordEnd = findNul(output, offset);
 
     if (recordEnd < offset + 4 || output[offset + 2] !== 0x20) {
-      return "invalid";
+      return { kind: "invalid" };
     }
 
     const x = output[offset];
@@ -377,13 +413,19 @@ function inspectStatus(output: Uint8Array): StatusInspection {
       !validStatusBytes.has(x) ||
       !validStatusBytes.has(y)
     ) {
-      return "invalid";
+      return { kind: "invalid" };
     }
 
     const status = String.fromCodePoint(x, y);
 
     if ((status.includes("?") || status.includes("!")) && status !== "??" && status !== "!!") {
-      return "invalid";
+      return { kind: "invalid" };
+    }
+
+    const path = decodeStatusPath(output, offset + 3, recordEnd);
+
+    if (path === undefined) {
+      return { kind: "invalid" };
     }
 
     offset = recordEnd + 1;
@@ -397,12 +439,18 @@ function inspectStatus(output: Uint8Array): StatusInspection {
     }
 
     dirty = true;
+    paths.push(path);
 
     if (status.includes("R") || status.includes("C")) {
+      hasRenameOrCopy = true;
       const originalPathEnd = findNul(output, offset);
 
       if (originalPathEnd <= offset) {
-        return "invalid";
+        return { kind: "invalid" };
+      }
+
+      if (decodeStatusPath(output, offset, originalPathEnd) === undefined) {
+        return { kind: "invalid" };
       }
 
       offset = originalPathEnd + 1;
@@ -410,10 +458,40 @@ function inspectStatus(output: Uint8Array): StatusInspection {
   }
 
   if (conflicted) {
-    return "conflicted";
+    return { kind: "conflicted" };
   }
 
-  return dirty ? "dirty" : "clean";
+  if (new Set(paths).size !== paths.length) {
+    return { kind: "invalid" };
+  }
+
+  return dirty
+    ? { kind: "dirty", paths, hasRenameOrCopy }
+    : { kind: "clean" };
+}
+
+export function sameGitIdentity(
+  left: GitWorktreeIdentity,
+  right: GitWorktreeIdentity,
+): boolean {
+  return (
+    left.root === right.root &&
+    left.revision === right.revision &&
+    left.attachedRef === right.attachedRef &&
+    left.gitDirectory === right.gitDirectory &&
+    left.commonDirectory === right.commonDirectory
+  );
+}
+
+function samePathSet(
+  actual: readonly string[],
+  expected: readonly string[],
+): boolean {
+  return (
+    actual.length === expected.length &&
+    new Set(actual).size === actual.length &&
+    actual.every((path) => expected.includes(path))
+  );
 }
 
 function inspectIndexVisibility(output: Uint8Array): IndexVisibilityInspection {
@@ -524,14 +602,27 @@ export async function inspectGitCreateTargets(
   return { ok: true };
 }
 
-export async function inspectGitWorktree(
+async function inspectGitWorktreeInternal(
   input: Readonly<{
     root: string;
     runGit?: GitCommandRunner;
     readMetadata?: GitMetadataReader;
+    expected?: Readonly<{
+      identity: GitWorktreeIdentity;
+      paths: readonly string[];
+    }>;
   }>,
 ): Promise<GitWorktreeInspection> {
-  if (!isAbsolute(input.root) || resolve(input.root) !== input.root) {
+  if (
+    !isAbsolute(input.root) ||
+    resolve(input.root) !== input.root ||
+    input.expected?.paths.some(
+      (path) => !safeRelativePathSchema.safeParse(path).success,
+    ) === true ||
+    (input.expected !== undefined &&
+      (input.expected.identity.root !== input.root ||
+        new Set(input.expected.paths).size !== input.expected.paths.length))
+  ) {
     return refusal("GIT_WORKTREE_IDENTITY_INVALID");
   }
 
@@ -704,26 +795,71 @@ export async function inspectGitWorktree(
 
   const status = inspectStatus(statusResult.stdout);
 
-  if (status === "invalid") {
+  if (status.kind === "invalid") {
     return refusal("GIT_WORKTREE_IDENTITY_INVALID");
   }
 
-  if (status === "conflicted") {
+  if (status.kind === "conflicted") {
     return refusal("GIT_WORKTREE_CONFLICTED");
   }
 
-  if (status === "dirty" || indexVisibility === "hidden") {
+  const identity = {
+    root,
+    revision,
+    attachedRef,
+    gitDirectory,
+    commonDirectory,
+  };
+
+  if (input.expected !== undefined) {
+    if (
+      indexVisibility === "hidden" ||
+      !sameGitIdentity(identity, input.expected.identity) ||
+      status.kind !== "dirty" ||
+      status.hasRenameOrCopy ||
+      !samePathSet(status.paths, input.expected.paths)
+    ) {
+      return refusal("GIT_WORKTREE_CHANGED");
+    }
+
+    return { ok: true, identity };
+  }
+
+  if (status.kind === "dirty" || indexVisibility === "hidden") {
     return refusal("GIT_WORKTREE_DIRTY");
   }
 
   return {
     ok: true,
-    identity: {
-      root,
-      revision,
-      attachedRef,
-      gitDirectory,
-      commonDirectory,
-    },
+    identity,
   };
+}
+
+export async function inspectGitWorktree(
+  input: Readonly<{
+    root: string;
+    runGit?: GitCommandRunner;
+    readMetadata?: GitMetadataReader;
+  }>,
+): Promise<GitWorktreeInspection> {
+  return inspectGitWorktreeInternal(input);
+}
+
+export async function inspectGitExpectedChanges(input: Readonly<{
+  root: string;
+  identity: GitWorktreeIdentity;
+  expectedPaths: readonly string[];
+  runGit?: GitCommandRunner;
+  readMetadata?: GitMetadataReader;
+}>): Promise<GitExpectedChangesInspection> {
+  const result = await inspectGitWorktreeInternal({
+    root: input.root,
+    ...(input.runGit === undefined ? {} : { runGit: input.runGit }),
+    ...(input.readMetadata === undefined
+      ? {}
+      : { readMetadata: input.readMetadata }),
+    expected: { identity: input.identity, paths: input.expectedPaths },
+  });
+
+  return result.ok ? { ok: true } : result;
 }

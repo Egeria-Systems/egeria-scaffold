@@ -126,6 +126,21 @@ const currentVerificationChecks = [
   "post-state-inference",
 ];
 
+const persistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  "lockfile",
+  "frozen-install",
+  "lint",
+  "typecheck",
+  "unit-tests",
+  "component-tests",
+  "next-build",
+  "opennext-build",
+  "post-change-inference",
+];
+
 const readableRecipeVersions = [
   "0.1.0",
   "0.2.0",
@@ -736,6 +751,34 @@ test("installed state is strict and records the exact successful generation chec
   });
 });
 
+test("installed state records only the exact capability-addition verification receipt", () => {
+  const capabilityAdditionState = {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.10.0" },
+    appliedMigrations: ["add-booking-calendly-0-1-0"],
+    lastSuccessfulVerification: {
+      kind: "capability-addition",
+      checks: persistedVerificationChecks,
+    },
+  };
+
+  assertAccepts(contracts.installedStateSchema, capabilityAdditionState);
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityAdditionState,
+    lastSuccessfulVerification: {
+      ...capabilityAdditionState.lastSuccessfulVerification,
+      checks: persistedVerificationChecks.slice(0, -1),
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityAdditionState,
+    lastSuccessfulVerification: {
+      kind: "generation",
+      checks: persistedVerificationChecks,
+    },
+  });
+});
+
 test("migration records describe only completed migration or reconciliation work", () => {
   assertAccepts(contracts.migrationRecordSchema, validMigrationRecord);
   assertAccepts(contracts.migrationRecordSchema, {
@@ -810,8 +853,10 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
     );
   }
   const verificationCheckTuples =
-    generated["state.schema.json"].properties.lastSuccessfulVerification
-      .properties.checks.anyOf;
+    generated["state.schema.json"].properties.lastSuccessfulVerification.oneOf
+      .flatMap(({ properties }) =>
+        properties.checks.anyOf ?? [properties.checks],
+      );
   for (const tuple of verificationCheckTuples) {
     assert.equal(tuple.minItems, tuple.prefixItems.length);
     assert.equal(tuple.maxItems, tuple.prefixItems.length);

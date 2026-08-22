@@ -6,9 +6,9 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  rename,
   readdir,
   realpath,
-  rename,
   rm,
   symlink,
   writeFile,
@@ -398,15 +398,20 @@ async function createFakePnpmExecutable(owner) {
   const executable = join(owner, "fake-pnpm");
   const controlPath = join(owner, "fake-pnpm-control.json");
   const logPath = join(owner, "fake-pnpm-log.jsonl");
-  const source = `#!${process.execPath}
-import { appendFileSync, readFileSync } from "node:fs";
+const source = `#!${process.execPath}
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 const control = JSON.parse(readFileSync(${JSON.stringify(controlPath)}, "utf8"));
 const arguments_ = process.argv.slice(2);
 const operation = arguments_.join(" ");
 appendFileSync(
   ${JSON.stringify(logPath)},
-  JSON.stringify({ arguments: arguments_, cwd: process.cwd(), environment: process.env }) + "\\n",
+  JSON.stringify({
+    arguments: arguments_,
+    cwd: process.cwd(),
+    environment: process.env,
+    gitControlPresent: existsSync(".git"),
+  }) + "\\n",
 );
 
 if (control.overflowOperation === operation) {
@@ -446,6 +451,18 @@ if (operation === "--version") {
         .map((line) => JSON.parse(line));
     },
   };
+}
+
+async function createFakeVoltaPnpmExecutable(owner) {
+  const fake = await createFakePnpmExecutable(owner);
+  const voltaHome = join(owner, ".volta");
+  const bin = join(voltaHome, "bin");
+  const shim = join(bin, "volta-shim");
+  const executable = join(bin, "pnpm");
+  await mkdir(bin, { recursive: true });
+  await rename(fake.executable, shim);
+  await symlink("volta-shim", executable);
+  return { ...fake, executable, voltaHome };
 }
 
 async function createVerifierSource(owner, name = "source") {
@@ -564,6 +581,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
   await withTestRoot(async (owner) => {
     const fakePnpm = await createFakePnpmExecutable(owner);
     const source = await createVerifierSource(owner);
+    await writeFile(join(source, ".git"), "gitdir: /private/shared-git-authority\n");
     const canonicalSource = await realpath(source);
     const verifier = core.createPnpmGeneratedProjectVerifier({
       pnpmExecutable: fakePnpm.executable,
@@ -609,6 +627,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
     );
     assert.notEqual(calls[0].cwd, canonicalSource);
     assert.ok(calls.every(({ cwd }) => cwd === calls[0].cwd));
+    assert.ok(calls.every(({ gitControlPresent }) => gitControlPresent === false));
 
     const forbiddenEnvironmentKeys = [
       "TOKEN",
@@ -657,6 +676,56 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
     assert.doesNotMatch(
       commandText,
       /preview|deploy|upload|wrangler|git|npm publish|--force|--update-checksums|[;&|`$<>]/i,
+    );
+  });
+});
+
+test("the pnpm verifier preserves only derived Volta tool resolution with an isolated home", async () => {
+  await withTestRoot(async (owner) => {
+    const fakePnpm = await createFakeVoltaPnpmExecutable(owner);
+    const source = await createVerifierSource(owner);
+    const verifier = core.createPnpmGeneratedProjectVerifier({
+      pnpmExecutable: fakePnpm.executable,
+    });
+
+    assert.deepEqual(assertSuccess(await verifier.verifyInIsolatedCopy(source)), {
+      checks: generatedChecks,
+    });
+    const calls = await fakePnpm.readCalls();
+    const canonicalVoltaHome = await realpath(fakePnpm.voltaHome);
+    assert.equal(calls.length, 8);
+    for (const { environment } of calls) {
+      assert.equal(environment.VOLTA_HOME, canonicalVoltaHome);
+      assert.equal(environment.VOLTA_FEATURE_PNPM, "1");
+      assert.notEqual(environment.HOME, canonicalVoltaHome);
+    }
+  });
+});
+
+test("Windows pnpm resolution applies PATHEXT and recognizes a copied Volta shim", async () => {
+  await withTestRoot(async (owner) => {
+    const voltaHome = join(owner, "windows-volta");
+    const bin = join(voltaHome, "bin");
+    const shim = join(bin, "volta-shim.exe");
+    const executable = join(bin, "pnpm.EXE");
+    await mkdir(bin, { recursive: true });
+    await writeFile(shim, "copied volta shim\n");
+    await writeFile(executable, "copied volta shim\n");
+    const options = {
+      platform: "win32",
+      environment: { PATH: bin, PATHEXT: ".EXE;.CMD" },
+    };
+
+    assert.equal(
+      await verifierModule.resolveExecutablePath("pnpm", options),
+      resolve(executable),
+    );
+    assert.deepEqual(
+      await verifierModule.derivePnpmToolEnvironment("pnpm", options),
+      {
+        VOLTA_HOME: await realpath(voltaHome),
+        VOLTA_FEATURE_PNPM: "1",
+      },
     );
   });
 });

@@ -2790,7 +2790,7 @@ test("canonical documentation records visual regression and the client-ready clo
   );
 });
 
-test("canonical documentation records the transactional capability-planning start", async () => {
+test("canonical documentation distinguishes the accepted planning base from the exact addition transaction", async () => {
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3B");
   const [sourcePlan, roadmap, overview, capabilityModel, enforcementMap] =
@@ -2836,8 +2836,6 @@ test("canonical documentation records the transactional capability-planning star
     sourcePlan,
     roadmap,
     overview,
-    capabilityModel,
-    enforcementMap,
   ]) {
     assert.match(
       boundaryOwner,
@@ -2845,21 +2843,46 @@ test("canonical documentation records the transactional capability-planning star
     );
     assert.match(
       boundaryOwner,
-      /transformation[^\n]+migration[^\n]+state[^\n]+remain[^\n]+planned/iu,
+      /fingerprint-gated[^\n]+apply-add[^\n]+booking-calendly@0\.1\.0/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /existing-repository transformation[^\n]+migration append[^\n]+state-last persistence/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /Generic transformation[^\n]+upgrades[^\n]+removals[^\n]+automated recovery[^\n]+later-add certification remain planned/iu,
     );
   }
 
   assert.match(
+    overview,
+    /Generic existing-repository mutation[^\n]+migration orchestration remain deferred/iu,
+  );
+  assert.match(
+    overview,
+    /Generic or unapproved existing-repository changes[^\n]+unsupported transactional migrations[^\n]+remain outside the accepted baseline/iu,
+  );
+
+  assert.match(
     capabilityModel,
-    /eligibility planning[^\n]+no existing-repository transformation[^\n]+no later-add certification/iu,
+    /read-only `plan-add`[^\n]+fingerprint-gated `apply-add`[^\n]+booking-calendly@0\.1\.0/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /verifies an isolated copy[^\n]+migration record[^\n]+state last[^\n]+verified-final-diff approval/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /Generic transformation[^\n]+upgrades[^\n]+removals[^\n]+automated recovery[^\n]+later-add certification remain planned/iu,
   );
   assert.match(
     enforcementMap,
-    /INV-CLEAN-ISOLATED-MIGRATION[^\n]+actual read-only planning[^\n]+mutation planned/iu,
+    /INV-CLEAN-ISOLATED-MIGRATION[^\n]+booking-calendly@0\.1\.0[^\n]+plan-add[^\n]+apply-add[^\n]+exact plan fingerprint[^\n]+exact expected dirty paths/iu,
   );
   assert.match(
     enforcementMap,
-    /INV-STATE-UPDATE-ORDER[^\n]+existing-repository[^\n]+planned/iu,
+    /INV-STATE-UPDATE-ORDER[^\n]+exact Calendly addition transaction[^\n]+migration-before-state persistence[^\n]+final manifest\/state\/inference agreement/iu,
   );
 });
 

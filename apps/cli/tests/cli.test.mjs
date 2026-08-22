@@ -104,7 +104,7 @@ function expectedPlanActions() {
   ];
 }
 
-function expectedAdditionPlan(profile, revision, mode = "popup") {
+function expectedAdditionPlan(profile, revision, planFingerprint, mode = "popup") {
   const currentCapabilities = [
     "content-files",
     "deployment-cloudflare",
@@ -117,6 +117,7 @@ function expectedAdditionPlan(profile, revision, mode = "popup") {
   return {
     operation: "add-capability",
     status: "approval-required",
+    planFingerprint,
     baseRevision: revision,
     profile,
     capability: {
@@ -188,6 +189,26 @@ function planAddArguments(directory, selectedSettings = planSettings) {
     selectedSettings.destination,
     "--calendly-mode",
     selectedSettings.mode,
+  ];
+}
+
+function applyAddArguments(
+  directory,
+  approvedPlan = `sha256:${"a".repeat(64)}`,
+  selectedSettings = planSettings,
+) {
+  return [
+    "apply-add",
+    "--directory",
+    directory,
+    "--capability",
+    "booking-calendly",
+    "--calendly-url",
+    selectedSettings.destination,
+    "--calendly-mode",
+    selectedSettings.mode,
+    "--approved-plan",
+    approvedPlan,
   ];
 }
 
@@ -424,6 +445,46 @@ test("the plan-add parser rejects incomplete, duplicate, unknown, and unsafe val
       JSON.stringify(result),
       /invented-capability|calendar\.example|private-value|bad\\u0000directory/u,
     );
+  }
+});
+
+test("the apply-add parser accepts only the exact approved transaction arguments", () => {
+  const fingerprint = `sha256:${"a".repeat(64)}`;
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments(
+        applyAddArguments("/private/tmp/acme-portfolio", fingerprint),
+      ),
+    ),
+    {
+      kind: "apply-add",
+      directory: "/private/tmp/acme-portfolio",
+      capability: "booking-calendly",
+      settings: planSettings,
+      approvedPlanFingerprint: fingerprint,
+    },
+  );
+
+  for (const arguments_ of [
+    applyAddArguments("/private/tmp/acme-portfolio").slice(0, -2),
+    [...applyAddArguments("/private/tmp/acme-portfolio"), "--unknown", "x"],
+    applyAddArguments("/private/tmp/acme-portfolio", "sha256:short"),
+    applyAddArguments("/private/tmp/acme-portfolio", `sha256:${"A".repeat(64)}`),
+    [
+      ...applyAddArguments("/private/tmp/acme-portfolio"),
+      "--approved-plan",
+      fingerprint,
+    ],
+  ]) {
+    const result = cliArguments.parseCliArguments(arguments_);
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.issues, [
+      {
+        code: "CLI_ARGUMENT_INVALID",
+        path: [],
+        context: { reason: "invalid-arguments" },
+      },
+    ]);
   }
 });
 
@@ -825,16 +886,122 @@ test("plan-add emits the complete approval-required envelope after two matching 
   );
   assert.deepEqual(inspections, []);
   assert.deepEqual(captured.error, []);
-  assert.deepEqual(captured.standard, [
-    JSON.stringify({
-      ok: true,
-      command: "plan-add",
-      result: expectedAdditionPlan("portfolio", inspection.identity.revision),
-    }),
-  ]);
+  const emitted = JSON.parse(captured.standard[0]);
+  assert.match(emitted.result.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
+  assert.deepEqual(emitted, {
+    ok: true,
+    command: "plan-add",
+    result: expectedAdditionPlan(
+      "portfolio",
+      inspection.identity.revision,
+      emitted.result.planFingerprint,
+    ),
+  });
   assert.doesNotMatch(
     captured.standard[0],
     /private-planning-destination|calendly\.com|refs\/heads|generated-common/u,
+  );
+});
+
+test("apply-add forwards exact approval inputs and emits only the bounded result", async () => {
+  const calls = [];
+  const fingerprint = `sha256:${"a".repeat(64)}`;
+  const value = {
+    status: "verified-final-diff-approval-required",
+    baseRevision: "abcdef0123456789abcdef0123456789abcdef01",
+    capability: { identifier: "booking-calendly", version: "0.1.0" },
+    migration: "add-booking-calendly-0-1-0",
+    changedPaths: [".egeria/project.yaml", ".egeria/state.json"],
+    verificationChecks: core.capabilityAdditionVerificationChecks,
+  };
+  const runCli = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    applyCapabilityAddition(input) {
+      calls.push(input);
+      return Promise.resolve({ ok: true, value });
+    },
+  });
+  const captured = captureOutput();
+
+  assert.equal(
+    await runCli(
+      applyAddArguments("/private/transaction", fingerprint),
+      captured.output,
+    ),
+    0,
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].root, resolve("/private/transaction"));
+  assert.equal(calls[0].capability, "booking-calendly");
+  assert.deepEqual(calls[0].settings, planSettings);
+  assert.equal(calls[0].approvedPlanFingerprint, fingerprint);
+  assert.equal(typeof calls[0].verifier.verifyInIsolatedCopy, "function");
+  assert.deepEqual(captured.error, []);
+  assert.deepEqual(captured.standard, [
+    JSON.stringify({ ok: true, command: "apply-add", result: value }),
+  ]);
+  assert.doesNotMatch(
+    captured.standard[0],
+    /private-planning-destination|calendly\.com|refs\/heads/u,
+  );
+});
+
+test("apply-add contains refusal and recovery details without leaking internals", async () => {
+  const runCli = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    applyCapabilityAddition: () =>
+      Promise.resolve({
+        ok: false,
+        code: "CAPABILITY_VERIFICATION_FAILED",
+        phase: "verify",
+        recovery: "inspect-worktree",
+        privateDetail: "must not escape",
+      }),
+  });
+  const captured = captureOutput();
+
+  assert.equal(
+    await runCli(applyAddArguments("/private/transaction"), captured.output),
+    1,
+  );
+  assert.deepEqual(captured.standard, []);
+  assert.deepEqual(captured.error, [
+    JSON.stringify({
+      ok: false,
+      command: "apply-add",
+      code: "CAPABILITY_VERIFICATION_FAILED",
+      phase: "verify",
+      recovery: "inspect-worktree",
+    }),
+  ]);
+  assert.doesNotMatch(captured.error[0], /must not escape|calendly\.com/u);
+});
+
+test("apply-add conservatively contains a rejected executor promise", async () => {
+  const runCli = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    applyCapabilityAddition: () =>
+      Promise.reject(new Error("private executor failure")),
+  });
+  const captured = captureOutput();
+
+  assert.equal(
+    await runCli(applyAddArguments("/private/transaction"), captured.output),
+    1,
+  );
+  assert.deepEqual(captured.standard, []);
+  assert.deepEqual(captured.error, [
+    JSON.stringify({
+      ok: false,
+      command: "apply-add",
+      code: "CAPABILITY_EXECUTION_FAILED",
+      phase: "precondition",
+      recovery: "inspect-worktree",
+    }),
+  ]);
+  assert.doesNotMatch(
+    captured.error[0],
+    /private executor failure|calendly\.com/u,
   );
 });
 
@@ -1171,6 +1338,13 @@ async function executeBuiltPlanAdd(directory) {
   ]);
 }
 
+async function executeBuiltApplyAdd(directory, approvedPlan) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...applyAddArguments(directory, approvedPlan),
+  ]);
+}
+
 test("the compiled plan-add command emits exact portfolio and site plans without writes", async () => {
   for (const profile of ["portfolio", "site"]) {
     await withGitFixture(profile, async ({ linked }) => {
@@ -1181,14 +1355,90 @@ test("the compiled plan-add command emits exact portfolio and site plans without
 
       assert.equal(execution.exitCode, 0);
       assert.equal(execution.stderr, "");
-      assert.deepEqual(execution.stdout.trimEnd().split("\n"), [
-        JSON.stringify({
-          ok: true,
-          command: "plan-add",
-          result: expectedAdditionPlan(profile, revision),
-        }),
-      ]);
+      const emitted = JSON.parse(execution.stdout.trimEnd());
+      assert.match(emitted.result.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
+      assert.deepEqual(emitted, {
+        ok: true,
+        command: "plan-add",
+        result: expectedAdditionPlan(
+          profile,
+          revision,
+          emitted.result.planFingerprint,
+        ),
+      });
       assert.deepEqual(after, before);
+      assert.doesNotMatch(
+        execution.stdout,
+        /private-planning-destination|calendly\.com|refs\/heads|\.git\/worktrees/u,
+      );
+    });
+  }
+});
+
+test("the compiled apply-add command completes exact portfolio and site transactions", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    await withGitFixture(profile, async ({ linked, primary }) => {
+      const primaryBefore = await gitRepositorySnapshot(primary);
+      const linkedBefore = await gitRepositorySnapshot(linked);
+      const planExecution = await executeBuiltPlanAdd(linked);
+      assert.equal(planExecution.exitCode, 0, planExecution.stderr);
+      const planEnvelope = JSON.parse(planExecution.stdout);
+      const wrongApproval = await executeBuiltApplyAdd(
+        linked,
+        `sha256:${"0".repeat(64)}`,
+      );
+      assert.equal(wrongApproval.exitCode, 1);
+      assert.deepEqual(JSON.parse(wrongApproval.stderr), {
+        ok: false,
+        command: "apply-add",
+        code: "CAPABILITY_PLAN_APPROVAL_INVALID",
+        phase: "precondition",
+        recovery: "not-required",
+      });
+      assert.deepEqual(await gitRepositorySnapshot(linked), linkedBefore);
+
+      const execution = await executeBuiltApplyAdd(
+        linked,
+        planEnvelope.result.planFingerprint,
+      );
+      assert.equal(execution.exitCode, 0, execution.stderr);
+      assert.equal(execution.stderr, "");
+      const envelope = JSON.parse(execution.stdout);
+      const expectedPaths = [
+        ...expectedPlanActions().map(({ path }) => path),
+        ".egeria/migrations.jsonl",
+        ".egeria/state.json",
+      ].sort();
+      assert.deepEqual(envelope, {
+        ok: true,
+        command: "apply-add",
+        result: {
+          status: "verified-final-diff-approval-required",
+          baseRevision: Buffer.from(linkedBefore.head).toString("utf8").trim(),
+          capability: { identifier: "booking-calendly", version: "0.1.0" },
+          migration: "add-booking-calendly-0-1-0",
+          changedPaths: expectedPaths,
+          verificationChecks: core.capabilityAdditionVerificationChecks,
+        },
+      });
+      assert.deepEqual(await gitRepositorySnapshot(primary), primaryBefore);
+
+      const state = core.parseStateJson(
+        await readFile(join(linked, ".egeria/state.json"), "utf8"),
+      );
+      const migrations = core.parseMigrationLog(
+        await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8"),
+      );
+      assert.equal(state.ok, true, JSON.stringify(state.issues));
+      assert.equal(migrations.ok, true, JSON.stringify(migrations.issues));
+      assert.deepEqual(state.value.appliedMigrations, [
+        "add-booking-calendly-0-1-0",
+      ]);
+      assert.equal(migrations.value.length, 1);
+      assert.equal(
+        migrations.value[0].identifier,
+        "add-booking-calendly-0-1-0",
+      );
       assert.doesNotMatch(
         execution.stdout,
         /private-planning-destination|calendly\.com|refs\/heads|\.git\/worktrees/u,

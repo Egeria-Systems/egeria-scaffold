@@ -74,6 +74,20 @@ const currentVerificationChecks = [
   "post-state-inference",
 ] as const;
 
+export const capabilityAdditionPersistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  ...ordinaryGenerationVerificationChecks,
+  "post-change-inference",
+] as const;
+
+export const capabilityAdditionVerificationChecks = [
+  ...capabilityAdditionPersistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+] as const;
+
 const legacyVerificationChecksSchema = z
   .tuple([
     z.literal("contracts"),
@@ -100,6 +114,10 @@ function createLiteralTupleSchema<
 
 const currentVerificationChecksSchema = createLiteralTupleSchema(
   currentVerificationChecks,
+).readonly();
+
+const capabilityAdditionVerificationChecksSchema = createLiteralTupleSchema(
+  capabilityAdditionPersistedVerificationChecks,
 ).readonly();
 
 const verificationChecksSchema = z
@@ -145,18 +163,26 @@ export const installedStateSchema = z
       })
       .readonly(),
     lastSuccessfulVerification: z
-      .strictObject({
-        kind: z.literal("generation"),
-        checks: verificationChecksSchema,
-      })
+      .discriminatedUnion("kind", [
+        z.strictObject({
+          kind: z.literal("generation"),
+          checks: verificationChecksSchema,
+        }),
+        z.strictObject({
+          kind: z.literal("capability-addition"),
+          checks: capabilityAdditionVerificationChecksSchema,
+        }),
+      ])
       .readonly(),
   })
   .superRefine((state, context) => {
-    const expectedChecks =
-      state.origin.recipeVersion === "0.7.0" ||
-      state.origin.recipeVersion === "0.8.0" ||
-      state.origin.recipeVersion === "0.9.0" ||
-      state.origin.recipeVersion === "0.10.0"
+    const expectedChecks = state.lastSuccessfulVerification.kind ===
+      "capability-addition"
+      ? capabilityAdditionPersistedVerificationChecks
+      : state.origin.recipeVersion === "0.7.0" ||
+          state.origin.recipeVersion === "0.8.0" ||
+          state.origin.recipeVersion === "0.9.0" ||
+          state.origin.recipeVersion === "0.10.0"
         ? currentVerificationChecks
         : legacyVerificationChecks;
 
