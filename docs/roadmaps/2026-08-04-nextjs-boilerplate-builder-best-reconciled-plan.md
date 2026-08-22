@@ -1142,6 +1142,8 @@ P3B Production site profile + independently selected multilingual and analytics
  ↓
     FIRST CLIENT-READY MILESTONE
  ↓
+P3C Automated removal-reference hardening
+ ↓
 P4  App profile/app-foundation
  ↓
 ├─ P5C Application persistence

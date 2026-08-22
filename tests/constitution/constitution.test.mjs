@@ -2316,6 +2316,7 @@ test("client-required public-site work is relocated after lifecycle without requ
       readRepositoryFile("docs/adr/0010-analytics-and-observability.md"),
     ]);
   const lifecyclePhase = compactLabel("P", "3");
+  const architecturePhase = compactLabel("P", "0");
   const clientExpansionPhase = compactLabel("P", "3", "B");
   const appFoundationPhase = compactLabel("P", "4");
   const portfolioBaselinePhase = compactLabel("P", "2");
@@ -3220,6 +3221,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
 });
 
 test("automated removal-reference hardening follows client expansion without weakening existing gates", async () => {
+  const architecturePhase = compactLabel("P", "0");
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3", "B");
   const referenceHardeningPhase = compactLabel("P", "3", "C");
@@ -3245,6 +3247,33 @@ test("automated removal-reference hardening follows client expansion without wea
   assert.ok(clientExpansionIndex >= 0);
   assert.ok(referenceHardeningIndex > clientExpansionIndex);
   assert.ok(appFoundationIndex > referenceHardeningIndex);
+
+  const gradualRoadmapStart = sourcePlan.indexOf(
+    `\`\`\`text\n${architecturePhase}  Architecture materialization and deployed compatibility proof`,
+  );
+  const gradualRoadmapEnd = sourcePlan.indexOf(
+    "```\n\n### Sequencing rules",
+    gradualRoadmapStart,
+  );
+  const gradualRoadmap = sourcePlan.slice(
+    gradualRoadmapStart,
+    gradualRoadmapEnd,
+  );
+  const sourceClientExpansionIndex = gradualRoadmap.indexOf(
+    `${clientExpansionPhase} Production site profile`,
+  );
+  const sourceReferenceHardeningIndex = gradualRoadmap.indexOf(
+    `${referenceHardeningPhase} Automated removal-reference hardening`,
+  );
+  const sourceAppFoundationIndex = gradualRoadmap.indexOf(
+    `${appFoundationPhase}  App profile/app-foundation`,
+  );
+
+  assert.ok(gradualRoadmapStart >= 0);
+  assert.ok(gradualRoadmapEnd > gradualRoadmapStart);
+  assert.ok(sourceClientExpansionIndex >= 0);
+  assert.ok(sourceReferenceHardeningIndex > sourceClientExpansionIndex);
+  assert.ok(sourceAppFoundationIndex > sourceReferenceHardeningIndex);
   assert.match(
     roadmap,
     new RegExp(
