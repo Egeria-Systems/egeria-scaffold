@@ -779,6 +779,34 @@ test("installed state records only the exact capability-addition verification re
   });
 });
 
+test("installed state records only the exact capability-removal verification receipt", () => {
+  const capabilityRemovalState = {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.10.0" },
+    appliedMigrations: ["remove-booking-calendly-0-1-0"],
+    lastSuccessfulVerification: {
+      kind: "capability-removal",
+      checks: persistedVerificationChecks,
+    },
+  };
+
+  assertAccepts(contracts.installedStateSchema, capabilityRemovalState);
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityRemovalState,
+    lastSuccessfulVerification: {
+      ...capabilityRemovalState.lastSuccessfulVerification,
+      checks: persistedVerificationChecks.slice(0, -1),
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityRemovalState,
+    lastSuccessfulVerification: {
+      kind: "generation",
+      checks: persistedVerificationChecks,
+    },
+  });
+});
+
 test("migration records describe only completed migration or reconciliation work", () => {
   assertAccepts(contracts.migrationRecordSchema, validMigrationRecord);
   assertAccepts(contracts.migrationRecordSchema, {
