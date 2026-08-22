@@ -3225,13 +3225,15 @@ test("automated removal-reference hardening follows client expansion without wea
   const clientExpansionPhase = compactLabel("P", "3", "B");
   const referenceHardeningPhase = compactLabel("P", "3", "C");
   const appFoundationPhase = compactLabel("P", "4");
-  const [sourcePlan, roadmap, enforcementMap] = await Promise.all([
-    readRepositoryFile(
-      "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
-    ),
-    readRepositoryFile("docs/roadmaps/program-roadmap.md"),
-    readRepositoryFile("docs/architecture/enforcement-map.md"),
-  ]);
+  const [sourcePlan, roadmap, architectureOverview, enforcementMap] =
+    await Promise.all([
+      readRepositoryFile(
+        "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+      ),
+      readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+      readRepositoryFile("docs/architecture/overview.md"),
+      readRepositoryFile("docs/architecture/enforcement-map.md"),
+    ]);
 
   const clientExpansionIndex = roadmap.indexOf(
     `## ${clientExpansionPhase} — Client-required public-site expansion`,
@@ -3273,6 +3275,13 @@ test("automated removal-reference hardening follows client expansion without wea
   assert.ok(sourceClientExpansionIndex >= 0);
   assert.ok(sourceReferenceHardeningIndex > sourceClientExpansionIndex);
   assert.ok(sourceAppFoundationIndex > sourceReferenceHardeningIndex);
+  assert.match(
+    architectureOverview,
+    new RegExp(
+      `${clientExpansionPhase} client-required public-site expansion.+${referenceHardeningPhase} automated removal-reference hardening.+${appFoundationPhase}`,
+      "is",
+    ),
+  );
   assert.match(
     roadmap,
     new RegExp(
