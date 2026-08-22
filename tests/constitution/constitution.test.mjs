@@ -2826,6 +2826,15 @@ test("canonical documentation records the exact Calendly removal candidate after
     );
   }
 
+  assert.match(
+    sourcePlan,
+    /pre-write[^\n]+original repository[^\n]+unchanged[^\n]+committed write[^\n]+retains[^\n]+exact prefix[^\n]+recovery evidence/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /injected removal failure[^\n]+exact mutation boundary[^\n]+three authoritative state files[^\n]+never[^\n]+automatic rollback/iu,
+  );
+
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.match(
       sequencingOwner,
