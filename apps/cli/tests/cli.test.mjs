@@ -206,6 +206,12 @@ function expectedRemovalPlan(profile, revision, planFingerprint) {
         owner: "booking-calendly",
       },
     ],
+    reviewRequirements: [
+      {
+        code: "review-surviving-references-to-removed-surfaces",
+        scope: "repository",
+      },
+    ],
     requiredApprovals: ["transform", "verified-final-diff"],
     persistenceOrder: [
       "transform",

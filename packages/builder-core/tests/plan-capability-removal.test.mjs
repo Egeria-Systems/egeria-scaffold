@@ -241,7 +241,17 @@ function expectedActions(overrides = new Map()) {
   return actions.sort((left, right) => compareText(left.path, right.path));
 }
 
-function expectedPlan(profile, result, actionOverrides) {
+function expectedPlan(
+  profile,
+  result,
+  actionOverrides,
+  reviewRequirements = [
+    {
+      code: "review-surviving-references-to-removed-surfaces",
+      scope: "repository",
+    },
+  ],
+) {
   const currentCapabilities = result.currentCapabilities;
   return {
     operation: "remove-capability",
@@ -255,6 +265,7 @@ function expectedPlan(profile, result, actionOverrides) {
       (identifier) => identifier !== "booking-calendly",
     ),
     actions: expectedActions(actionOverrides),
+    reviewRequirements,
     requiredApprovals: ["transform", "verified-final-diff"],
     persistenceOrder: [
       "transform",
@@ -379,6 +390,16 @@ test("capability removal plan preserves modified and already-ejected application
       "portfolio",
       modifiedResult.value,
       new Map([[modifiedPath, preservedAction]]),
+      [
+        {
+          code: "review-surviving-references-to-removed-surfaces",
+          scope: "repository",
+        },
+        {
+          code: "reconcile-preserved-capability-surfaces",
+          paths: [modifiedPath],
+        },
+      ],
     ),
   );
   assert.doesNotMatch(JSON.stringify(modifiedResult), /private application/u);
@@ -393,6 +414,16 @@ test("capability removal plan preserves modified and already-ejected application
     ejectedResult.value.actions,
     expectedActions(new Map([[modifiedPath, preservedAction]])),
   );
+  assert.deepEqual(ejectedResult.value.reviewRequirements, [
+    {
+      code: "review-surviving-references-to-removed-surfaces",
+      scope: "repository",
+    },
+    {
+      code: "reconcile-preserved-capability-surfaces",
+      paths: [modifiedPath],
+    },
+  ]);
 
   const unrelatedPath = "README.md";
   const unrelatedEjection = updateEjections(

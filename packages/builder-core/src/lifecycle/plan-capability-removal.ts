@@ -39,6 +39,16 @@ export type CapabilityRemovalAction = Readonly<{
   owner: "booking-calendly" | "builder-kernel";
 }>;
 
+export type CapabilityRemovalReviewRequirement =
+  | Readonly<{
+      code: "review-surviving-references-to-removed-surfaces";
+      scope: "repository";
+    }>
+  | Readonly<{
+      code: "reconcile-preserved-capability-surfaces";
+      paths: readonly string[];
+    }>;
+
 export type CapabilityRemovalPlan = Readonly<{
   operation: "remove-capability";
   status: "approval-required";
@@ -52,6 +62,7 @@ export type CapabilityRemovalPlan = Readonly<{
   currentCapabilities: readonly string[];
   desiredCapabilities: readonly string[];
   actions: readonly CapabilityRemovalAction[];
+  reviewRequirements: readonly CapabilityRemovalReviewRequirement[];
   requiredApprovals: readonly ["transform", "verified-final-diff"];
   persistenceOrder: readonly [
     "transform",
@@ -572,6 +583,31 @@ async function deriveActions(input: Readonly<{
   };
 }
 
+function removalReviewRequirements(
+  actions: readonly CapabilityRemovalAction[],
+): readonly CapabilityRemovalReviewRequirement[] {
+  const preservedPaths = actions
+    .flatMap((action) =>
+      action.kind === "preserve-file-and-eject" ? [action.path] : [],
+    )
+    .sort(compareText);
+
+  return [
+    {
+      code: "review-surviving-references-to-removed-surfaces",
+      scope: "repository",
+    },
+    ...(preservedPaths.length === 0
+      ? []
+      : [
+          {
+            code: "reconcile-preserved-capability-surfaces" as const,
+            paths: preservedPaths,
+          },
+        ]),
+  ];
+}
+
 function fingerprintPlan(input: Readonly<{
   plan: CapabilityRemovalPlanBody;
   project: ValidInspection["project"]["value"];
@@ -745,6 +781,7 @@ async function planCapabilityRemovalUnchecked(input: Readonly<{
     currentCapabilities,
     desiredCapabilities,
     actions: actions.value,
+    reviewRequirements: removalReviewRequirements(actions.value),
     requiredApprovals: ["transform", "verified-final-diff"],
     persistenceOrder: [
       "transform",
