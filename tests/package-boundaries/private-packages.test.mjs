@@ -447,6 +447,9 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /child output is never returned/i);
   assert.match(builderReadme, /planCapabilityAddition/);
   assert.match(builderReadme, /applyCapabilityAddition/);
+  assert.match(builderReadme, /planCapabilityRemoval/);
+  assert.match(builderReadme, /preserve-file-and-eject/);
+  assert.match(builderReadme, /CAPABILITY_NOT_INSTALLED/);
   assert.match(builderReadme, /verified-final-diff approval/);
   assert.match(builderReadme, /clean attached linked worktree/);
   assert.match(builderReadme, /all non-ignored untracked files/);
@@ -464,8 +467,10 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliInstructions, /modified[^\n]+application-owned[^\n]+preserv[^\n]+eject/);
   assert.match(cliInstructions, /remain read-only/);
   assert.match(cliInstructions, /does not add overwrite/);
-  assert.match(cliReadme, /six exact commands/);
+  assert.match(cliReadme, /seven exact commands/);
   assert.match(cliReadme, /`apply-add` accepts/);
+  assert.match(cliReadme, /`plan-remove` is also read-only/);
+  assert.match(cliReadme, /CAPABILITY_NOT_INSTALLED/);
   assert.match(cliReadme, /clean attached linked worktree/);
   assert.match(cliReadme, /never creates the worktree or branch/);
   assert.match(cliReadme, /`assume-unchanged` and `skip-worktree`/);
@@ -501,11 +506,12 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /removal planning[^\n]+read-only/);
   assert.doesNotMatch(packageOwnership, /future CLI consumer/);
   assert.match(packageOwnership, /existing-repository transformation/);
-  assert.match(rootReadme, /six exact commands/);
+  assert.match(rootReadme, /seven exact commands/);
   assert.match(rootReadme, /transaction evidence awaiting verified-final-diff approval/);
+  assert.match(rootReadme, /`plan-remove`/);
   assert.match(rootReadme, /`assume-unchanged` and `skip-worktree`/);
   assert.match(rootReadme, /canonical managed-surface inventory/);
-  assert.match(rootReadme, /Neither lifecycle command creates the branch\/worktree/);
+  assert.match(rootReadme, /No lifecycle command creates the branch\/worktree/);
   assert.match(enforcementMap, /desired, installed, and inferred/);
   assert.match(enforcementMap, /read-only diagnostics/);
   assert.match(enforcementMap, /exact source and template allowlists/);
