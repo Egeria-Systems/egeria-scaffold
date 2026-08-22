@@ -421,7 +421,10 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /absent but Git-ignored create targets/);
   assert.match(builderInstructions, /every installed application-owned surface/);
   assert.match(builderInstructions, /canonical managed-surface inventory/);
-  assert.match(builderInstructions, /Git preflight, deterministic addition planning, exact-diff inspection/);
+  assert.match(
+    builderInstructions,
+    /Git preflight, deterministic addition and removal planning, exact-diff inspection/,
+  );
   assert.match(builderInstructions, /`applyCapabilityAddition`/);
   assert.match(builderInstructions, /`applyCapabilityRemoval`/);
   assert.match(builderInstructions, /persist state last/);
