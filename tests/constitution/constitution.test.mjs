@@ -2801,7 +2801,7 @@ test("canonical documentation records visual regression and the client-ready clo
   );
 });
 
-test("canonical documentation distinguishes accepted addition execution from read-only removal planning", async () => {
+test("canonical documentation admits only exact Calendly removal execution after accepted planning", async () => {
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3B");
   const [sourcePlan, roadmap, overview, capabilityModel, enforcementMap] =
@@ -2823,6 +2823,21 @@ test("canonical documentation distinguishes accepted addition execution from rea
     assert.match(
       statusOwner,
       /31e1bab38496c87dc2e6084c958bd9300a141508[^\n]+32577925329/iu,
+    );
+  }
+
+  for (const sequencingOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      sequencingOwner,
+      /7509fc819ba8670040374c350762720848a47ef1[^\n]+next direct[^\n]+removal-execution/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /fingerprint-gated[^\n]+apply-remove[^\n]+booking-calendly@0\.1\.0/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /apply-remove[^\n]+verified-final-diff[^\n]+separate[^\n]+approval/iu,
     );
   }
 
@@ -2870,7 +2885,7 @@ test("canonical documentation distinguishes accepted addition execution from rea
     );
     assert.match(
       boundaryOwner,
-      /removal execution[^\n]+Generic transformation[^\n]+upgrades[^\n]+automated recovery[^\n]+later-add certification remain planned/iu,
+      /apply-remove[^\n]+Generic transformation[^\n]+upgrades[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
     );
   }
 
@@ -2893,7 +2908,7 @@ test("canonical documentation distinguishes accepted addition execution from rea
   );
   assert.match(
     capabilityModel,
-    /removal execution[^\n]+Generic transformation[^\n]+upgrades[^\n]+automated recovery[^\n]+later-add certification remain planned/iu,
+    /apply-remove[^\n]+Generic transformation[^\n]+upgrades[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
   );
   assert.match(
     enforcementMap,
@@ -2906,6 +2921,14 @@ test("canonical documentation distinguishes accepted addition execution from rea
   assert.match(
     enforcementMap,
     /INV-STATE-UPDATE-ORDER[^\n]+exact Calendly addition transaction[^\n]+migration-before-state persistence[^\n]+final manifest\/state\/inference agreement/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /next direct[^\n]+apply-remove[^\n]+accepted[^\n]+plan-remove[^\n]+fingerprint/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /apply-remove[^\n]+planned[^\n]+exact[^\n]+booking-calendly@0\.1\.0/iu,
   );
 });
 

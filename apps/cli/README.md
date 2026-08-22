@@ -2,7 +2,7 @@
 
 Private command adapter for the Egeria Systems builder kernel.
 
-The executable exposes seven exact commands: `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, and `plan-remove`. It performs strict command-specific argument parsing, delegates all builder policy and repository behavior to private `@egeria-systems/builder-core`, and emits one content-safe JSON line with stable exits.
+The approved boundary contains eight exact commands: `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, `plan-remove`, and planned `apply-remove`. `apply-remove` is the approved next command and is not represented as implemented until its executor and compiled lifecycle evidence pass. The executable performs strict command-specific argument parsing, delegates all builder policy and repository behavior to private `@egeria-systems/builder-core`, and emits one content-safe JSON line with stable exits.
 
 `create` generates only a previously absent portfolio or site directory through the verified state-last builder-core boundary. It accepts either the exact base creation arguments or those arguments plus paired `--calendly-url` and `--calendly-mode` options for explicit Calendly initial scaffolding. The mode is exactly `link`, `inline`, or `popup`; builder-core owns the bounded HTTPS Calendly destination contract, selected-capability/settings agreement, and sanitized validation issues.
 
