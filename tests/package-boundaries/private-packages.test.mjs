@@ -221,7 +221,7 @@ test("the root copy lint covers integration presentation templates", async () =>
   );
 });
 
-test("the CLI is a thin command adapter while builder-core owns generation and lifecycle planning", async () => {
+test("the CLI is a thin command adapter while builder-core owns generation and lifecycle execution", async () => {
   const expectedEntry = `#!/usr/bin/env node
 
 import { runCli } from "./run-cli.js";
@@ -276,7 +276,9 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "inference/evaluate-probe.ts",
       "inference/infer-repository.ts",
       "lifecycle/apply-capability-addition.ts",
+      "lifecycle/apply-capability-removal.ts",
       "lifecycle/capability-addition-writer.ts",
+      "lifecycle/capability-removal-writer.ts",
       "lifecycle/git-worktree-inspection.ts",
       "lifecycle/plan-capability-addition.ts",
       "lifecycle/plan-capability-removal.ts",
@@ -421,6 +423,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /canonical managed-surface inventory/);
   assert.match(builderInstructions, /Git preflight, deterministic addition planning, exact-diff inspection/);
   assert.match(builderInstructions, /`applyCapabilityAddition`/);
+  assert.match(builderInstructions, /`applyCapabilityRemoval`/);
   assert.match(builderInstructions, /persist state last/);
   assert.match(builderInstructions, /no transform, migration, state update, or provider action/);
 
@@ -447,6 +450,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /child output is never returned/i);
   assert.match(builderReadme, /planCapabilityAddition/);
   assert.match(builderReadme, /applyCapabilityAddition/);
+  assert.match(builderReadme, /applyCapabilityRemoval/);
   assert.match(builderReadme, /planCapabilityRemoval/);
   assert.match(builderReadme, /preserve-file-and-eject/);
   assert.match(builderReadme, /CAPABILITY_NOT_INSTALLED/);
@@ -460,6 +464,13 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /redacts settings and repository metadata/);
   assert.match(builderReadme, /never resets, cleans, commits, creates a branch\/worktree, auto-rolls back, or contacts a provider/);
   assert.doesNotMatch(builderReadme, /The CLI remains empty/);
+
+  const builderIndex = await readFile(
+    resolve(repositoryRoot, "packages/builder-core/src/index.ts"),
+    "utf8",
+  );
+  assert.match(builderIndex, /apply-capability-removal\.js/);
+  assert.match(builderIndex, /capability-removal-writer\.js/);
   assert.match(cliInstructions, /eight commands exact/);
   assert.match(cliInstructions, /`plan-add` remains read-only/);
   assert.match(cliInstructions, /`apply-add` is limited/);
