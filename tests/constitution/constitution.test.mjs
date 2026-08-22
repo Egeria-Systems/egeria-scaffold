@@ -2316,7 +2316,6 @@ test("client-required public-site work is relocated after lifecycle without requ
       readRepositoryFile("docs/adr/0010-analytics-and-observability.md"),
     ]);
   const lifecyclePhase = compactLabel("P", "3");
-  const architecturePhase = compactLabel("P", "0");
   const clientExpansionPhase = compactLabel("P", "3", "B");
   const appFoundationPhase = compactLabel("P", "4");
   const portfolioBaselinePhase = compactLabel("P", "2");
