@@ -2317,6 +2317,7 @@ test("client-required public-site work is relocated after lifecycle without requ
     ]);
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3", "B");
+  const referenceHardeningPhase = compactLabel("P", "3", "C");
   const appFoundationPhase = compactLabel("P", "4");
   const portfolioBaselinePhase = compactLabel("P", "2");
   const multilingualSlot = compactLabel("P", "5", "A");
@@ -2330,16 +2331,26 @@ test("client-required public-site work is relocated after lifecycle without requ
       `#### ${clientExpansionPhase} — Client-required public-site expansion\n`,
       2,
     )[1]
-    .split(`#### ${appFoundationPhase} — App foundation`, 1)[0];
+    .split(
+      `#### ${referenceHardeningPhase} — Automated removal-reference hardening`,
+      1,
+    )[0];
   const roadmapExpansion = programRoadmap
     .split(`## ${clientExpansionPhase} — Client-required public-site expansion\n`, 2)[1]
-    .split(`## ${appFoundationPhase} — App foundation`, 1)[0];
+    .split(
+      `## ${referenceHardeningPhase} — Automated removal-reference hardening`,
+      1,
+    )[0];
 
   assert.ok(roadmapPortfolio, "portfolio baseline roadmap section is missing");
   assert.doesNotMatch(roadmapPortfolio, /urgent first-client milestone/iu);
   assert.match(
     roadmapExpansion,
     /first client-ready milestone[\s\S]+real client/iu,
+  );
+  assert.match(
+    roadmapExpansion,
+    /\*\*Stop gate:\*\*[\s\S]+production `site`[\s\S]+independent multilingual and analytics[\s\S]+combined client journey[\s\S]+retained migration fixture[\s\S]+before app-foundation/iu,
   );
 
   for (const section of [sourceExpansion, roadmapExpansion]) {
@@ -3244,10 +3255,47 @@ test("automated removal-reference hardening follows client expansion without wea
   const appFoundationIndex = roadmap.indexOf(
     `## ${appFoundationPhase} — App foundation`,
   );
+  const sourceReferenceHardening = sourcePlan
+    .split(
+      `#### ${referenceHardeningPhase} — Automated removal-reference hardening\n`,
+      2,
+    )[1]
+    .split(`#### ${appFoundationPhase} — App foundation`, 1)[0];
+  const roadmapReferenceHardening = roadmap
+    .split(
+      `## ${referenceHardeningPhase} — Automated removal-reference hardening\n`,
+      2,
+    )[1]
+    .split(`## ${appFoundationPhase} — App foundation`, 1)[0];
 
   assert.ok(clientExpansionIndex >= 0);
   assert.ok(referenceHardeningIndex > clientExpansionIndex);
   assert.ok(appFoundationIndex > referenceHardeningIndex);
+  assert.ok(sourceReferenceHardening);
+  assert.ok(roadmapReferenceHardening);
+  assert.match(sourceReferenceHardening, /\*\*Stop gate:\*\*/u);
+  for (const obligation of [
+    /Calendly/iu,
+    /deterministic inventory/iu,
+    /privacy-safe output/iu,
+    /repository-identity refusal/iu,
+    /executor revalidation/iu,
+    /no-mutation refusal/iu,
+  ]) {
+    assert.match(sourceReferenceHardening, obligation);
+  }
+  assert.match(roadmapReferenceHardening, /\*\*Stop gate:\*\*/u);
+  for (const obligation of [
+    /Calendly/iu,
+    /deterministic/iu,
+    /privacy-safe/iu,
+    /identity-change/iu,
+    /executor-revalidation/iu,
+    /no-mutation/iu,
+    /before app-foundation/iu,
+  ]) {
+    assert.match(roadmapReferenceHardening, obligation);
+  }
 
   const gradualRoadmapStart = sourcePlan.indexOf(
     `\`\`\`text\n${architecturePhase}  Architecture materialization and deployed compatibility proof`,
