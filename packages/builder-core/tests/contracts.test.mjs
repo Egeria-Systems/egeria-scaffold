@@ -801,6 +801,35 @@ test("installed state records only the exact capability-removal verification rec
   assertRejects(contracts.installedStateSchema, {
     ...capabilityRemovalState,
     lastSuccessfulVerification: {
+      ...capabilityRemovalState.lastSuccessfulVerification,
+      checks: [...persistedVerificationChecks, "unexpected-check"],
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityRemovalState,
+    lastSuccessfulVerification: {
+      ...capabilityRemovalState.lastSuccessfulVerification,
+      checks: [
+        persistedVerificationChecks[1],
+        persistedVerificationChecks[0],
+        ...persistedVerificationChecks.slice(2),
+      ],
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityRemovalState,
+    lastSuccessfulVerification: {
+      ...capabilityRemovalState.lastSuccessfulVerification,
+      checks: [
+        ...persistedVerificationChecks,
+        "migration-record",
+        "post-state-inference",
+      ],
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityRemovalState,
+    lastSuccessfulVerification: {
       kind: "generation",
       checks: persistedVerificationChecks,
     },
