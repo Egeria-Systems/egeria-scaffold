@@ -35,6 +35,7 @@ export * from "./lifecycle/git-worktree-inspection.js";
 export * from "./lifecycle/apply-capability-addition.js";
 export * from "./lifecycle/capability-addition-writer.js";
 export * from "./lifecycle/plan-capability-addition.js";
+export * from "./lifecycle/plan-capability-removal.js";
 export type {
   ProbeEvidence,
   ProbeEvidenceStatus,

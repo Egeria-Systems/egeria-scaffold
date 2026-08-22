@@ -140,6 +140,90 @@ function expectedAdditionPlan(profile, revision, planFingerprint, mode = "popup"
   };
 }
 
+function expectedRemovalPlan(profile, revision, planFingerprint) {
+  const desiredCapabilities = [
+    "content-files",
+    "deployment-cloudflare",
+    "observability",
+    "section-composition",
+    ...(profile === "site" ? ["site-routing"] : []),
+    "standards",
+  ].sort();
+
+  return {
+    operation: "remove-capability",
+    status: "approval-required",
+    planFingerprint,
+    baseRevision: revision,
+    profile,
+    capability: {
+      identifier: "booking-calendly",
+      version: "0.1.0",
+    },
+    currentCapabilities: ["booking-calendly", ...desiredCapabilities].sort(),
+    desiredCapabilities,
+    actions: [
+      {
+        kind: "replace-project-configuration",
+        path: ".egeria/project.yaml",
+        ownership: "managed",
+        owner: "builder-kernel",
+      },
+      {
+        kind: "replace-file",
+        path: "apps/web/app/page.tsx",
+        ownership: "application-owned",
+        owner: "builder-kernel",
+      },
+      {
+        kind: "delete-file",
+        path: "apps/web/content/en-CA/booking-calendly.yaml",
+        ownership: "application-owned",
+        owner: "booking-calendly",
+      },
+      {
+        kind: "delete-file",
+        path: "apps/web/src/integrations/booking-calendly/booking-content.ts",
+        ownership: "application-owned",
+        owner: "booking-calendly",
+      },
+      {
+        kind: "delete-file",
+        path: "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+        ownership: "managed",
+        owner: "booking-calendly",
+      },
+      {
+        kind: "delete-file",
+        path: "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+        ownership: "application-owned",
+        owner: "booking-calendly",
+      },
+      {
+        kind: "delete-file",
+        path: "apps/web/tests/e2e/calendly-booking.spec.ts",
+        ownership: "application-owned",
+        owner: "booking-calendly",
+      },
+    ],
+    reviewRequirements: [
+      {
+        code: "review-surviving-references-to-removed-surfaces",
+        scope: "repository",
+      },
+    ],
+    requiredApprovals: ["transform", "verified-final-diff"],
+    persistenceOrder: [
+      "transform",
+      "verify",
+      "re-infer",
+      "append-migration-record",
+      "persist-state",
+      "verify-state-and-inference",
+    ],
+  };
+}
+
 function assertSuccess(result) {
   assert.equal(result.ok, true, JSON.stringify(result.issues));
   return result.value;
@@ -189,6 +273,16 @@ function planAddArguments(directory, selectedSettings = planSettings) {
     selectedSettings.destination,
     "--calendly-mode",
     selectedSettings.mode,
+  ];
+}
+
+function planRemoveArguments(directory) {
+  return [
+    "plan-remove",
+    "--directory",
+    directory,
+    "--capability",
+    "booking-calendly",
   ];
 }
 
@@ -279,6 +373,29 @@ async function withGeneratedFixture(run) {
           profile: "portfolio",
           projectName: "acme-portfolio",
           displayName: "Acme Portfolio",
+        },
+        destination,
+        verifier: createFakeVerifier(),
+      }),
+    );
+    await run(destination);
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+}
+
+async function withGeneratedCalendlyFixture(profile, run) {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-cli-remove-test-"));
+  const destination = join(owner, `acme-${profile}`);
+
+  try {
+    assertSuccess(
+      await core.generateProject({
+        request: {
+          profile,
+          projectName: `acme-${profile}`,
+          displayName: `Acme ${profile}`,
+          bookingCalendly: planSettings,
         },
         destination,
         verifier: createFakeVerifier(),
@@ -444,6 +561,76 @@ test("the plan-add parser rejects incomplete, duplicate, unknown, and unsafe val
     assert.doesNotMatch(
       JSON.stringify(result),
       /invented-capability|calendar\.example|private-value|bad\\u0000directory/u,
+    );
+  }
+});
+
+test("the plan-remove parser accepts only its exact options in any order", () => {
+  const expected = {
+    kind: "plan-remove",
+    directory: "/private/tmp/acme-portfolio",
+    capability: "booking-calendly",
+  };
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments(
+        planRemoveArguments("/private/tmp/acme-portfolio"),
+      ),
+    ),
+    expected,
+  );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "plan-remove",
+        "--capability",
+        "booking-calendly",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+      ]),
+    ),
+    expected,
+  );
+
+  const invalidCases = [
+    planRemoveArguments("/private/tmp/acme-portfolio").slice(0, -2),
+    [
+      ...planRemoveArguments("/private/tmp/acme-portfolio"),
+      "--directory",
+      "/private/tmp/other",
+    ],
+    [
+      ...planRemoveArguments("/private/tmp/acme-portfolio"),
+      "--unknown",
+      "private-value",
+    ],
+    [
+      "plan-remove",
+      "--dir",
+      "/private/tmp/acme-portfolio",
+      "--capability",
+      "booking-calendly",
+    ],
+    planRemoveArguments("/private/tmp/acme-portfolio").map((value) =>
+      value === "booking-calendly" ? "invented-capability" : value,
+    ),
+    planRemoveArguments("bad\0directory"),
+    [...planRemoveArguments("/private/tmp/acme-portfolio"), "--calendly-mode", "popup"],
+  ];
+
+  for (const arguments_ of invalidCases) {
+    const result = cliArguments.parseCliArguments(arguments_);
+    assert.equal(result.ok, false, JSON.stringify(arguments_));
+    assert.deepEqual(result.issues, [
+      {
+        code: "CLI_ARGUMENT_INVALID",
+        path: [],
+        context: { reason: "invalid-arguments" },
+      },
+    ]);
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /invented-capability|private-value|bad\\u0000directory/u,
     );
   }
 });
@@ -903,6 +1090,186 @@ test("plan-add emits the complete approval-required envelope after two matching 
   );
 });
 
+test("plan-remove emits the complete approval-required plan after two matching inspections", async () => {
+  await withGeneratedCalendlyFixture("portfolio", async (directory) => {
+    const inspection = cleanGitInspection();
+    const inspections = [inspection, structuredClone(inspection)];
+    const runCli = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      createReader: () => core.createFileSystemRepositoryReader(directory),
+      inspectGitWorktree: () => Promise.resolve(inspections.shift()),
+    });
+    const captured = captureOutput();
+
+    assert.equal(
+      await runCli(
+        planRemoveArguments("/private/ignored-input"),
+        captured.output,
+      ),
+      0,
+    );
+    assert.deepEqual(inspections, []);
+    assert.deepEqual(captured.error, []);
+    const emitted = JSON.parse(captured.standard[0]);
+    assert.match(emitted.plan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
+    assert.deepEqual(emitted, {
+      ok: true,
+      command: "plan-remove",
+      plan: expectedRemovalPlan(
+        "portfolio",
+        inspection.identity.revision,
+        emitted.plan.planFingerprint,
+      ),
+    });
+    assert.doesNotMatch(
+      captured.standard[0],
+      /private-planning-destination|calendly\.com|refs\/heads|generated-common/u,
+    );
+  });
+});
+
+test("plan-remove reports exact absence and contains final identity changes", async () => {
+  await withGeneratedFixture(async (directory) => {
+    const inspection = cleanGitInspection();
+    const runCli = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      createReader: () => core.createFileSystemRepositoryReader(directory),
+      inspectGitWorktree: () => Promise.resolve(structuredClone(inspection)),
+    });
+    const captured = captureOutput();
+
+    assert.equal(
+      await runCli(
+        planRemoveArguments("/private/ignored-input"),
+        captured.output,
+      ),
+      1,
+    );
+    assert.deepEqual(captured.standard, []);
+    assert.deepEqual(captured.error, [
+      JSON.stringify({
+        ok: false,
+        command: "plan-remove",
+        code: "CAPABILITY_NOT_INSTALLED",
+        capability: "booking-calendly",
+      }),
+    ]);
+  });
+
+  await withGeneratedFixture(async (directory) => {
+    const inspections = [
+      cleanGitInspection(),
+      cleanGitInspection({
+        revision: "1111111111111111111111111111111111111111",
+      }),
+    ];
+    const runCli = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      createReader: () => core.createFileSystemRepositoryReader(directory),
+      inspectGitWorktree: () => Promise.resolve(inspections.shift()),
+    });
+    const captured = captureOutput();
+
+    assert.equal(
+      await runCli(
+        planRemoveArguments("/private/ignored-input"),
+        captured.output,
+      ),
+      1,
+    );
+    assert.deepEqual(captured.standard, []);
+    assert.deepEqual(captured.error, [
+      JSON.stringify({
+        ok: false,
+        command: "plan-remove",
+        code: "GIT_WORKTREE_CHANGED",
+      }),
+    ]);
+  });
+
+  await withGeneratedCalendlyFixture("portfolio", async (directory) => {
+    const inspections = [
+      cleanGitInspection(),
+      cleanGitInspection({
+        revision: "1111111111111111111111111111111111111111",
+      }),
+    ];
+    const runCli = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      createReader: () => core.createFileSystemRepositoryReader(directory),
+      inspectGitWorktree: () => Promise.resolve(inspections.shift()),
+    });
+    const captured = captureOutput();
+
+    assert.equal(
+      await runCli(
+        planRemoveArguments("/private/ignored-input"),
+        captured.output,
+      ),
+      1,
+    );
+    assert.deepEqual(captured.standard, []);
+    assert.deepEqual(captured.error, [
+      JSON.stringify({
+        ok: false,
+        command: "plan-remove",
+        code: "GIT_WORKTREE_CHANGED",
+      }),
+    ]);
+  });
+});
+
+test("plan-remove maps Git and repository failures without disclosing internals", async () => {
+  const gitRunner = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    inspectGitWorktree: () =>
+      Promise.resolve({ ok: false, code: "GIT_WORKTREE_DIRTY" }),
+  });
+  const gitFailure = captureOutput();
+  assert.equal(
+    await gitRunner(
+      planRemoveArguments("/private/ignored-input"),
+      gitFailure.output,
+    ),
+    1,
+  );
+  assert.deepEqual(gitFailure.standard, []);
+  assert.deepEqual(gitFailure.error, [
+    JSON.stringify({
+      ok: false,
+      command: "plan-remove",
+      code: "GIT_WORKTREE_DIRTY",
+    }),
+  ]);
+
+  const readerRunner = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    createReader: () => ({
+      readText() {
+        throw new Error("private repository reader failure");
+      },
+    }),
+    inspectGitWorktree: () => Promise.resolve(cleanGitInspection()),
+  });
+  const readerFailure = captureOutput();
+  assert.equal(
+    await readerRunner(
+      planRemoveArguments("/private/ignored-input"),
+      readerFailure.output,
+    ),
+    1,
+  );
+  assert.deepEqual(readerFailure.standard, []);
+  assert.deepEqual(readerFailure.error, [
+    JSON.stringify({
+      ok: false,
+      command: "plan-remove",
+      code: "REPOSITORY_OPEN_FAILED",
+    }),
+  ]);
+  assert.doesNotMatch(readerFailure.error[0], /private repository reader/u);
+});
+
 test("apply-add forwards exact approval inputs and emits only the bounded result", async () => {
   const calls = [];
   const fingerprint = `sha256:${"a".repeat(64)}`;
@@ -1221,7 +1588,7 @@ async function executeGit(root, arguments_, readOnly = false) {
   });
 }
 
-async function withGitFixture(name, run) {
+async function withGitFixture(name, run, options = {}) {
   const createdOwner = await mkdtemp(join(tmpdir(), "egeria-plan-add-cli-"));
   const owner = await realpath(createdOwner);
   const ownerStats = await lstat(owner, { bigint: true });
@@ -1229,9 +1596,24 @@ async function withGitFixture(name, run) {
   const linked = join(owner, "linked");
 
   try {
-    await cp(resolve(repositoryRoot, `fixtures/generated/${name}`), primary, {
-      recursive: true,
-    });
+    if (options.bookingCalendly === undefined) {
+      await cp(resolve(repositoryRoot, `fixtures/generated/${name}`), primary, {
+        recursive: true,
+      });
+    } else {
+      assertSuccess(
+        await core.generateProject({
+          request: {
+            profile: name,
+            projectName: `acme-${name}`,
+            displayName: `Acme ${name}`,
+            bookingCalendly: options.bookingCalendly,
+          },
+          destination: primary,
+          verifier: createFakeVerifier(),
+        }),
+      );
+    }
     await executeGit(owner, ["init", "--initial-branch=main", primary]);
     await executeGit(primary, ["config", "user.name", "CLI Plan Test"]);
     await executeGit(primary, [
@@ -1245,7 +1627,7 @@ async function withGitFixture(name, run) {
       "worktree",
       "add",
       "-b",
-      "plan-add-test",
+      options.branch ?? "plan-add-test",
       linked,
     ]);
     await run({ linked, primary });
@@ -1338,6 +1720,13 @@ async function executeBuiltPlanAdd(directory) {
   ]);
 }
 
+async function executeBuiltPlanRemove(directory) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...planRemoveArguments(directory),
+  ]);
+}
+
 async function executeBuiltApplyAdd(directory, approvedPlan) {
   return executeNode([
     resolve(packageRoot, "dist/index.js"),
@@ -1372,6 +1761,119 @@ test("the compiled plan-add command emits exact portfolio and site plans without
         /private-planning-destination|calendly\.com|refs\/heads|\.git\/worktrees/u,
       );
     });
+  }
+});
+
+test("the compiled plan-remove command emits exact portfolio and site plans without writes", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    await withGitFixture(
+      profile,
+      async ({ linked }) => {
+        const before = await gitRepositorySnapshot(linked);
+        const execution = await executeBuiltPlanRemove(linked);
+        const after = await gitRepositorySnapshot(linked);
+        const revision = Buffer.from(before.head).toString("utf8").trim();
+
+        assert.equal(execution.exitCode, 0, execution.stderr);
+        assert.equal(execution.stderr, "");
+        const emitted = JSON.parse(execution.stdout.trimEnd());
+        assert.match(emitted.plan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
+        assert.deepEqual(emitted, {
+          ok: true,
+          command: "plan-remove",
+          plan: expectedRemovalPlan(
+            profile,
+            revision,
+            emitted.plan.planFingerprint,
+          ),
+        });
+        assert.deepEqual(after, before);
+        assert.doesNotMatch(
+          execution.stdout,
+          /private-planning-destination|calendly\.com|refs\/heads|\.git\/worktrees/u,
+        );
+      },
+      {
+        bookingCalendly: planSettings,
+        branch: `plan-remove-${profile}-test`,
+      },
+    );
+  }
+});
+
+test("the compiled plan-remove command reports exact absence without writes", async () => {
+  await withGitFixture("portfolio", async ({ linked }) => {
+    const before = await gitRepositorySnapshot(linked);
+    const execution = await executeBuiltPlanRemove(linked);
+    const after = await gitRepositorySnapshot(linked);
+
+    assert.equal(execution.exitCode, 1);
+    assert.equal(execution.stdout, "");
+    assert.deepEqual(JSON.parse(execution.stderr), {
+      ok: false,
+      command: "plan-remove",
+      code: "CAPABILITY_NOT_INSTALLED",
+      capability: "booking-calendly",
+    });
+    assert.deepEqual(after, before);
+  });
+});
+
+test("the compiled plan-remove command refuses unsafe states without writes", async () => {
+  const cases = [
+    {
+      name: "dirty repository",
+      prepare: (root) => writeFile(join(root, "private-untracked.txt"), "x\n"),
+      code: "GIT_WORKTREE_DIRTY",
+    },
+    {
+      name: "managed surface drift",
+      prepare: async (root) => {
+        await writeFile(
+          join(
+            root,
+            "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+          ),
+          "private drift\n",
+        );
+        await commitAll(root, "drift managed Calendly settings");
+      },
+      code: "PROJECT_DRIFT_DETECTED",
+    },
+  ];
+
+  for (const fixture of cases) {
+    await withGitFixture(
+      "portfolio",
+      async ({ linked }) => {
+        await fixture.prepare(linked);
+        const before = await gitRepositorySnapshot(linked);
+        const execution = await executeBuiltPlanRemove(linked);
+        const after = await gitRepositorySnapshot(linked);
+
+        assert.equal(execution.exitCode, 1, fixture.name);
+        assert.equal(execution.stdout, "", fixture.name);
+        assert.deepEqual(
+          JSON.parse(execution.stderr),
+          {
+            ok: false,
+            command: "plan-remove",
+            code: fixture.code,
+          },
+          fixture.name,
+        );
+        assert.deepEqual(after, before, fixture.name);
+        assert.doesNotMatch(
+          execution.stderr,
+          /private drift|calendly\.com|refs\/heads|\.git\/worktrees/u,
+          fixture.name,
+        );
+      },
+      {
+        bookingCalendly: planSettings,
+        branch: `plan-remove-${fixture.code.toLowerCase()}-test`,
+      },
+    );
   }
 });
 
