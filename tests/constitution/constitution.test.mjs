@@ -3218,3 +3218,52 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     ),
   );
 });
+
+test("automated removal-reference hardening follows client expansion without weakening existing gates", async () => {
+  const lifecyclePhase = compactLabel("P", "3");
+  const clientExpansionPhase = compactLabel("P", "3", "B");
+  const referenceHardeningPhase = compactLabel("P", "3", "C");
+  const appFoundationPhase = compactLabel("P", "4");
+  const [sourcePlan, roadmap, enforcementMap] = await Promise.all([
+    readRepositoryFile(
+      "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+    ),
+    readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+    readRepositoryFile("docs/architecture/enforcement-map.md"),
+  ]);
+
+  const clientExpansionIndex = roadmap.indexOf(
+    `## ${clientExpansionPhase} — Client-required public-site expansion`,
+  );
+  const referenceHardeningIndex = roadmap.indexOf(
+    `## ${referenceHardeningPhase} — Automated removal-reference hardening`,
+  );
+  const appFoundationIndex = roadmap.indexOf(
+    `## ${appFoundationPhase} — App foundation`,
+  );
+
+  assert.ok(clientExpansionIndex >= 0);
+  assert.ok(referenceHardeningIndex > clientExpansionIndex);
+  assert.ok(appFoundationIndex > referenceHardeningIndex);
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${referenceHardeningPhase} begins after ${clientExpansionPhase} closes[^\n]+does not reopen or weaken ${lifecyclePhase} or ${clientExpansionPhase}`,
+      "i",
+    ),
+  );
+  assert.match(
+    sourcePlan,
+    new RegExp(
+      `${referenceHardeningPhase} begins only after ${clientExpansionPhase} closes.+no detected match.+never be represented as proof`,
+      "is",
+    ),
+  );
+  assert.match(
+    enforcementMap,
+    new RegExp(
+      `INV-REMOVAL-REFERENCE-GUARDS[^\n]+planned[^\n]+${referenceHardeningPhase}`,
+      "i",
+    ),
+  );
+});

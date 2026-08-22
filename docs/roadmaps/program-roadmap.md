@@ -116,6 +116,12 @@ P5A and P5B are therefore not deleted and not renumbered.
 
 **Stop gate:** Approve the production `site`, independent multilingual and analytics capability evidence, the combined client journey, and the retained migration fixture before app-foundation work begins.
 
+## P3C — Automated removal-reference hardening
+
+P3C begins after P3B closes and does not reopen or weaken P3 or P3B. Strengthen the accepted manual, fingerprint-bound removal-review contract with bounded Git-identity inventory and capability-specific automated reference guards. Exact resolved conflicts refuse or require explicit reconciliation; heuristic and incomplete-coverage findings require review; finding no detected match must never be represented as proof of dependency absence or complete removal. Recompute the guarded plan before the accepted executor's first write. Provider resources, credentials, and persistent data remain separate disposition and recovery domains. Generic extraction remains evidence-gated.
+
+**Stop gate:** The bounded Calendly guard and any then-concrete package-backed guard pass deterministic, privacy-safe, identity-change, executor-revalidation, and no-mutation review before app-foundation work begins.
+
 ## P4 — App foundation
 
 Complete internal `app-foundation` and the public `app` recipe resolving only to `app-foundation`. Prove portfolio/site-to-app transitions without automatically adding stateful infrastructure.
