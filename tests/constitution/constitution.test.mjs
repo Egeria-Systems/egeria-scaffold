@@ -3267,26 +3267,45 @@ test("automated removal-reference hardening follows client expansion without wea
       2,
     )[1]
     .split(`## ${appFoundationPhase} — App foundation`, 1)[0];
+  const sourceReferenceHardeningStopGate = sourceReferenceHardening.split(
+    "**Stop gate:**",
+    2,
+  )[1];
+  const roadmapReferenceHardeningStopGate = roadmapReferenceHardening.split(
+    "**Stop gate:**",
+    2,
+  )[1];
+  const removalReferenceGuardRow = enforcementMap
+    .split("\n")
+    .find((line) => line.startsWith("| `INV-REMOVAL-REFERENCE-GUARDS` |"));
 
   assert.ok(clientExpansionIndex >= 0);
   assert.ok(referenceHardeningIndex > clientExpansionIndex);
   assert.ok(appFoundationIndex > referenceHardeningIndex);
   assert.ok(sourceReferenceHardening);
   assert.ok(roadmapReferenceHardening);
-  assert.match(sourceReferenceHardening, /\*\*Stop gate:\*\*/u);
+  assert.ok(sourceReferenceHardeningStopGate);
   for (const obligation of [
-    /Calendly/iu,
+    /Calendly exact-reference refusals/iu,
+    /heuristic and coverage warnings/iu,
     /deterministic inventory/iu,
     /privacy-safe output/iu,
     /repository-identity refusal/iu,
     /executor revalidation/iu,
     /no-mutation refusal/iu,
+    /Package-backed or reusable-analysis claims/iu,
+    /separately named concrete evidence gates/iu,
   ]) {
-    assert.match(sourceReferenceHardening, obligation);
+    assert.match(sourceReferenceHardeningStopGate, obligation);
   }
-  assert.match(roadmapReferenceHardening, /\*\*Stop gate:\*\*/u);
+  assert.match(
+    roadmapReferenceHardening,
+    /finding no detected match must never be represented as proof of dependency absence or complete removal/iu,
+  );
+  assert.ok(roadmapReferenceHardeningStopGate);
   for (const obligation of [
-    /Calendly/iu,
+    /bounded Calendly guard/iu,
+    /then-concrete package-backed guard/iu,
     /deterministic/iu,
     /privacy-safe/iu,
     /identity-change/iu,
@@ -3294,7 +3313,7 @@ test("automated removal-reference hardening follows client expansion without wea
     /no-mutation/iu,
     /before app-foundation/iu,
   ]) {
-    assert.match(roadmapReferenceHardening, obligation);
+    assert.match(roadmapReferenceHardeningStopGate, obligation);
   }
 
   const gradualRoadmapStart = sourcePlan.indexOf(
@@ -3326,7 +3345,7 @@ test("automated removal-reference hardening follows client expansion without wea
   assert.match(
     architectureOverview,
     new RegExp(
-      `${clientExpansionPhase} client-required public-site expansion.+${referenceHardeningPhase} automated removal-reference hardening.+${appFoundationPhase}`,
+      `planned sequencing.+${lifecyclePhase} transactional lifecycle.+prerequisite.+${clientExpansionPhase} client-required public-site expansion.+after ${clientExpansionPhase} closes, ${referenceHardeningPhase} automated removal-reference hardening.+without reopening ${lifecyclePhase} or ${clientExpansionPhase}.+${appFoundationPhase}.+changes no capability defaults.+no composite client profile or capability`,
       "is",
     ),
   );
@@ -3344,11 +3363,19 @@ test("automated removal-reference hardening follows client expansion without wea
       "is",
     ),
   );
-  assert.match(
-    enforcementMap,
-    new RegExp(
-      `INV-REMOVAL-REFERENCE-GUARDS[^\n]+planned[^\n]+${referenceHardeningPhase}`,
-      "i",
-    ),
+  assert.ok(removalReferenceGuardRow);
+  const removalReferenceGuardColumns = removalReferenceGuardRow
+    .split("|")
+    .slice(1, -1)
+    .map((column) => column.trim());
+  assert.deepEqual(
+    removalReferenceGuardColumns.slice(0, 1),
+    ["`INV-REMOVAL-REFERENCE-GUARDS`"],
   );
+  assert.match(
+    removalReferenceGuardColumns[1],
+    /finding no detected match may never be represented as proof of dependency absence or complete removal/iu,
+  );
+  assert.match(removalReferenceGuardColumns[2], /^planned;/u);
+  assert.equal(removalReferenceGuardColumns[4], referenceHardeningPhase);
 });
