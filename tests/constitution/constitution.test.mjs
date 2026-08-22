@@ -2856,6 +2856,15 @@ test("canonical documentation distinguishes the accepted planning base from the 
   }
 
   assert.match(
+    overview,
+    /Generic existing-repository mutation[^\n]+migration orchestration remain deferred/iu,
+  );
+  assert.match(
+    overview,
+    /Generic or unapproved existing-repository changes[^\n]+unsupported transactional migrations[^\n]+remain outside the accepted baseline/iu,
+  );
+
+  assert.match(
     capabilityModel,
     /read-only `plan-add`[^\n]+fingerprint-gated `apply-add`[^\n]+booking-calendly@0\.1\.0/iu,
   );
