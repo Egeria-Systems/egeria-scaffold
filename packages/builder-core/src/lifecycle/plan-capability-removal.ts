@@ -629,7 +629,7 @@ function fingerprintPlan(input: Readonly<{
   return `sha256:${digest}`;
 }
 
-async function planCapabilityRemovalUnchecked(input: Readonly<{
+export async function planCapabilityRemoval(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: "booking-calendly";
@@ -763,7 +763,7 @@ async function planCapabilityRemovalUnchecked(input: Readonly<{
     return actions;
   }
 
-  const currentCapabilities = inspection.resolution.value.capabilities
+  const currentCapabilities = current.value.resolved.capabilities
     .map(({ identifier }) => identifier)
     .sort(compareText);
   const desiredCapabilities = desiredRender.value.resolved.capabilities
@@ -805,12 +805,4 @@ async function planCapabilityRemovalUnchecked(input: Readonly<{
       }),
     },
   };
-}
-
-export async function planCapabilityRemoval(input: Readonly<{
-  reader: RepositoryReader;
-  git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "booking-calendly";
-}>): Promise<PlanningResult<CapabilityRemovalPlan>> {
-  return planCapabilityRemovalUnchecked(input);
 }

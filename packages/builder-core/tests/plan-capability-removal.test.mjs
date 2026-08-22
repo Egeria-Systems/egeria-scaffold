@@ -243,7 +243,8 @@ function expectedActions(overrides = new Map()) {
 
 function expectedPlan(
   profile,
-  result,
+  planFingerprint,
+  currentCapabilities,
   actionOverrides,
   reviewRequirements = [
     {
@@ -252,11 +253,10 @@ function expectedPlan(
     },
   ],
 ) {
-  const currentCapabilities = result.currentCapabilities;
   return {
     operation: "remove-capability",
     status: "approval-required",
-    planFingerprint: result.planFingerprint,
+    planFingerprint,
     baseRevision: git.identity.revision,
     profile,
     capability: { identifier: "booking-calendly", version: "0.1.0" },
@@ -277,6 +277,26 @@ function expectedPlan(
     ],
   };
 }
+
+const expectedCurrentCapabilities = Object.freeze({
+  portfolio: Object.freeze([
+    "booking-calendly",
+    "content-files",
+    "deployment-cloudflare",
+    "observability",
+    "section-composition",
+    "standards",
+  ]),
+  site: Object.freeze([
+    "booking-calendly",
+    "content-files",
+    "deployment-cloudflare",
+    "observability",
+    "section-composition",
+    "site-routing",
+    "standards",
+  ]),
+});
 
 function updateEjections(entries, paths) {
   const next = new Map(entries);
@@ -363,7 +383,14 @@ test("capability removal plan is exact and read-only for portfolio and site", as
     const result = await planFromEntries(await installedEntries(profile));
     assert.equal(result.ok, true, JSON.stringify(result.issues));
     assert.match(result.value.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
-    assert.deepEqual(result.value, expectedPlan(profile, result.value));
+    assert.deepEqual(
+      result.value,
+      expectedPlan(
+        profile,
+        result.value.planFingerprint,
+        expectedCurrentCapabilities[profile],
+      ),
+    );
     assert.doesNotMatch(
       JSON.stringify(result.value),
       /calendly\.com|refs\/heads|\/generated\//u,
@@ -388,7 +415,8 @@ test("capability removal plan preserves modified and already-ejected application
     modifiedResult.value,
     expectedPlan(
       "portfolio",
-      modifiedResult.value,
+      modifiedResult.value.planFingerprint,
+      expectedCurrentCapabilities.portfolio,
       new Map([[modifiedPath, preservedAction]]),
       [
         {
@@ -458,7 +486,8 @@ test("capability removal plan reconciles every preserved path in deterministic o
     result.value,
     expectedPlan(
       "portfolio",
-      result.value,
+      result.value.planFingerprint,
+      expectedCurrentCapabilities.portfolio,
       new Map([
         [alreadyEjectedPath, preservedAction(alreadyEjectedPath)],
         [modifiedPath, preservedAction(modifiedPath)],
@@ -690,10 +719,25 @@ test("capability removal plan refuses unsupported requests before repository acc
   );
 });
 
+test("capability removal plan tolerates bounded application-owned reader errors", async () => {
+  const base = await installedEntries("portfolio");
+
+  for (const code of ["FILE_ENCODING_INVALID", "FILE_TOO_LARGE"]) {
+    const result = await planFromEntries(base, {
+      overrides: new Map([["README.md", { kind: "error", code }]]),
+    });
+    assert.equal(result.ok, true, JSON.stringify(result.issues));
+    assert.deepEqual(result.value.actions, expectedActions());
+  }
+});
+
 test("capability removal plan binds private controls and Git identity without disclosure", async () => {
   const base = await installedEntries("portfolio");
   const first = await planFromEntries(base);
   assert.equal(first.ok, true, JSON.stringify(first.issues));
+  const repeated = await planFromEntries(base);
+  assert.equal(repeated.ok, true, JSON.stringify(repeated.issues));
+  assert.equal(repeated.value.planFingerprint, first.value.planFingerprint);
 
   const changedSettings = await installedEntries("portfolio", {
     ...settings,
@@ -726,7 +770,7 @@ test("capability removal plan binds private controls and Git identity without di
     { ...second.value, planFingerprint: "redacted" },
   );
   assert.doesNotMatch(
-    JSON.stringify([first, second, changedGit]),
+    JSON.stringify([first, repeated, second, changedGit]),
     /calendly\.com|refs\/heads|\/generated\//u,
   );
 });
