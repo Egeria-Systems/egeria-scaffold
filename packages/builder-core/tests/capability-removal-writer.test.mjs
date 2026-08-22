@@ -203,3 +203,35 @@ test("filesystem removal writer cleans only its identity-matching temporary file
   assert.equal(await readFile(target, "utf8"), "before\n");
   assert.equal(await readFile(substitutedTemporaryPath, "utf8"), "concurrent temporary\n");
 });
+
+test("filesystem removal writer preserves its temporary path after concurrent byte changes", async (context) => {
+  const root = await createTemporaryRoot(context, "egeria-removal-temporary-bytes-");
+  const target = join(root, "target.txt");
+  await writeFile(target, "before\n", "utf8");
+  let modifiedTemporaryPath;
+  const writer = createFileSystemCapabilityRemovalWriter(root, {
+    beforeCommit: async () => {
+      const temporaryName = (await readdir(root)).find((name) =>
+        name.startsWith(".egeria-removal-"),
+      );
+      assert.ok(temporaryName);
+      modifiedTemporaryPath = join(root, temporaryName);
+      await writeFile(modifiedTemporaryPath, "changed\n", "utf8");
+      throw new Error("injected failure");
+    },
+  });
+
+  assert.deepEqual(
+    await writer.write([
+      {
+        kind: "replace-file",
+        path: "target.txt",
+        expected: encoder.encode("before\n"),
+        content: encoder.encode("after\n"),
+      },
+    ]),
+    { ok: false, sourceChanged: true },
+  );
+  assert.equal(await readFile(target, "utf8"), "before\n");
+  assert.equal(await readFile(modifiedTemporaryPath, "utf8"), "changed\n");
+});

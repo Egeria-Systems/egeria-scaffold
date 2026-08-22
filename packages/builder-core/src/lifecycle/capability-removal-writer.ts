@@ -34,7 +34,13 @@ type PathIdentity = Readonly<{
   inode: bigint;
 }>;
 
-type FileIdentity = PathIdentity & Readonly<{ mode: number }>;
+type FileIdentity = PathIdentity &
+  Readonly<{
+    mode: number;
+    size: bigint;
+    changeTime: bigint;
+    modificationTime: bigint;
+  }>;
 
 type PreparedChange = Readonly<{
   change: CapabilityRemovalFileChange;
@@ -71,6 +77,24 @@ async function identityMatches(identity: PathIdentity): Promise<boolean> {
       !stats.isSymbolicLink() &&
       stats.dev === identity.device &&
       stats.ino === identity.inode
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function fileIdentityMatches(identity: FileIdentity): Promise<boolean> {
+  try {
+    const stats = await lstat(identity.path, { bigint: true });
+    return (
+      !stats.isSymbolicLink() &&
+      stats.isFile() &&
+      stats.dev === identity.device &&
+      stats.ino === identity.inode &&
+      Number(stats.mode & 0o777n) === identity.mode &&
+      stats.size === identity.size &&
+      stats.ctimeNs === identity.changeTime &&
+      stats.mtimeNs === identity.modificationTime
     );
   } catch {
     return false;
@@ -130,6 +154,9 @@ async function prepareChange(
             device: stats.dev,
             inode: stats.ino,
             mode: Number(stats.mode & 0o777n),
+            size: stats.size,
+            changeTime: stats.ctimeNs,
+            modificationTime: stats.mtimeNs,
           },
         }
       : undefined;
@@ -152,7 +179,7 @@ function samePreparedIdentity(
 }
 
 async function removeOwnedTemporary(identity: FileIdentity): Promise<boolean> {
-  if (!(await identityMatches(identity))) {
+  if (!(await fileIdentityMatches(identity))) {
     return false;
   }
 
@@ -193,15 +220,19 @@ async function createTemporaryFile(
       if (stats.isSymbolicLink() || !stats.isFile()) {
         throw new Error("temporary-file-invalid");
       }
-      identity = {
-        path,
-        device: stats.dev,
-        inode: stats.ino,
-        mode: prepared.identity.mode,
-      };
       await handle.chmod(prepared.identity.mode);
       await handle.writeFile(prepared.change.content);
       await handle.sync();
+      const finalStats = await handle.stat({ bigint: true });
+      identity = {
+        path,
+        device: finalStats.dev,
+        inode: finalStats.ino,
+        mode: Number(finalStats.mode & 0o777n),
+        size: finalStats.size,
+        changeTime: finalStats.ctimeNs,
+        modificationTime: finalStats.mtimeNs,
+      };
       await handle.close();
       handle = undefined;
       return { ok: true, identity };
