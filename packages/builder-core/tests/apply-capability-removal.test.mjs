@@ -880,6 +880,49 @@ test("capability removal retains transformed source and old receipts on verifica
   assert.equal(inferenceRepository.writes.length, 1);
 });
 
+test("capability removal rejects incomplete, reordered, and extra verification receipts", async () => {
+  const entries = await installedEntries("portfolio");
+  const oldState = entries.get(".egeria/state.json");
+  const oldMigrations = entries.get(".egeria/migrations.jsonl");
+  const checks = core.ordinaryGenerationVerificationChecks;
+  const invalidChecks = [
+    checks.slice(0, -1),
+    [checks[1], checks[0], ...checks.slice(2)],
+    [...checks, checks[0]],
+  ];
+
+  for (const receivedChecks of invalidChecks) {
+    const repository = createRepository(entries);
+    const result = await runApply(repository, {
+      verifier: {
+        prepareLockfile() {
+          throw new Error("not used");
+        },
+        verifyInIsolatedCopy() {
+          return Promise.resolve({
+            ok: true,
+            value: { checks: receivedChecks },
+          });
+        },
+      },
+    });
+
+    assert.deepEqual(result.result, {
+      ok: false,
+      code: "CAPABILITY_VERIFICATION_FAILED",
+      phase: "verify",
+      recovery: "inspect-worktree",
+    });
+    assert.equal(repository.writes.length, 1);
+    assert.equal(repository.files.get(".egeria/state.json"), oldState);
+    assert.equal(
+      repository.files.get(".egeria/migrations.jsonl"),
+      oldMigrations,
+    );
+    assert.deepEqual(result.expectedInspections, []);
+  }
+});
+
 test("capability removal preserves exact persistence prefixes across migration and state failures", async () => {
   const entries = await installedEntries("site");
   const planRepository = createRepository(entries);
@@ -939,6 +982,34 @@ test("capability removal preserves exact persistence prefixes across migration a
   assert.equal(
     uncertainRepository.files.get(".egeria/migrations.jsonl"),
     "uncertain prefix\n",
+  );
+
+  const corruptMigrationRepository = createRepository(entries, {
+    afterWrite({ batch, files }) {
+      if (batch === 2) {
+        files.set(".egeria/migrations.jsonl", "corrupt migration prefix\n");
+      }
+    },
+  });
+  const corruptMigration = await runApply(corruptMigrationRepository);
+  assert.deepEqual(corruptMigration.result, {
+    ok: false,
+    code: "CAPABILITY_MIGRATION_WRITE_FAILED",
+    phase: "persist-migration",
+    recovery: "inspect-worktree",
+  });
+  assert.equal(corruptMigrationRepository.writes.length, 2);
+  assert.deepEqual(corruptMigrationRepository.writes[1], [
+    { kind: "replace-file", path: ".egeria/migrations.jsonl" },
+  ]);
+  assert.equal(corruptMigrationRepository.files.get(".egeria/state.json"), oldState);
+  assert.equal(
+    corruptMigrationRepository.files.get(".egeria/migrations.jsonl"),
+    "corrupt migration prefix\n",
+  );
+  assert.equal(
+    corruptMigrationRepository.files.get(".egeria/project.yaml"),
+    expected.projectSource,
   );
 
   const stateRepository = createRepository(entries, { failBatch: 3 });
