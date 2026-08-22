@@ -282,26 +282,27 @@ function isValidRemovedCapabilityState(input: Readonly<{
     ({ owner }) =>
       owner.kind === "capability" && owner.identifier === "booking-calendly",
   );
+  const preservedPaths = new Set<string>();
 
-  if (
-    ownedSurfaces.some((surface) => {
-      const expected = expectedByIdentifier.get(surface.identifier);
-      return (
-        surface.ownership !== "ejected" ||
-        !input.ejections.has(surface.path) ||
-        expected?.ownership !== "application-owned" ||
-        !matchesSurfaceDescriptor(surface, expected)
-      );
-    })
-  ) {
-    return false;
+  for (const surface of ownedSurfaces) {
+    const expected = expectedByIdentifier.get(surface.identifier);
+
+    if (
+      surface.ownership !== "ejected" ||
+      !input.ejections.has(surface.path) ||
+      expected?.ownership !== "application-owned" ||
+      !matchesSurfaceDescriptor(surface, expected)
+    ) {
+      return false;
+    }
+
+    preservedPaths.add(surface.path);
   }
 
   return (
     input.inferred === undefined ||
     input.inferred.probes.every(
-      (probe) =>
-        input.ejections.has(probe.path) || probe.status === "missing",
+      (probe) => preservedPaths.has(probe.path) || probe.status === "missing",
     )
   );
 }

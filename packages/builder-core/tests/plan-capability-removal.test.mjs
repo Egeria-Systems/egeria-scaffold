@@ -302,7 +302,7 @@ function updateEjections(entries, paths) {
   return next;
 }
 
-async function postRemovalEntriesWithEjection(path) {
+async function postRemovalEntriesWithEjection(path, surfaceOverrides = {}) {
   const base = await baseFixtureEntries("portfolio");
   const installed = await installedEntries("portfolio");
   const project = core.parseProjectYaml(base.get(".egeria/project.yaml"));
@@ -332,7 +332,7 @@ async function postRemovalEntriesWithEjection(path) {
           }
         : surface,
     ),
-    { ...preservedSurface, ownership: "ejected" },
+    { ...preservedSurface, ownership: "ejected", ...surfaceOverrides },
   ].sort((left, right) => compareText(left.identifier, right.identifier));
   base.set(path, "private preserved application source\n");
   base.set(".egeria/project.yaml", projectSource);
@@ -429,6 +429,15 @@ test("capability removal plan distinguishes not-installed state from removal dri
       await postRemovalEntriesWithEjection(preservedPath),
     ),
     "CAPABILITY_NOT_INSTALLED",
+  );
+
+  assertFailure(
+    await planFromEntries(
+      await postRemovalEntriesWithEjection(preservedPath, {
+        owner: { kind: "capability", identifier: "standards" },
+      }),
+    ),
+    "PROJECT_DRIFT_DETECTED",
   );
 });
 
