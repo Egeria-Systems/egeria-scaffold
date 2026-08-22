@@ -1150,6 +1150,37 @@ test("plan-remove reports exact absence and contains final identity changes", as
     ]);
   });
 
+  await withGeneratedFixture(async (directory) => {
+    const inspections = [
+      cleanGitInspection(),
+      cleanGitInspection({
+        revision: "1111111111111111111111111111111111111111",
+      }),
+    ];
+    const runCli = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      createReader: () => core.createFileSystemRepositoryReader(directory),
+      inspectGitWorktree: () => Promise.resolve(inspections.shift()),
+    });
+    const captured = captureOutput();
+
+    assert.equal(
+      await runCli(
+        planRemoveArguments("/private/ignored-input"),
+        captured.output,
+      ),
+      1,
+    );
+    assert.deepEqual(captured.standard, []);
+    assert.deepEqual(captured.error, [
+      JSON.stringify({
+        ok: false,
+        command: "plan-remove",
+        code: "GIT_WORKTREE_CHANGED",
+      }),
+    ]);
+  });
+
   await withGeneratedCalendlyFixture("portfolio", async (directory) => {
     const inspections = [
       cleanGitInspection(),

@@ -337,27 +337,25 @@ async function runPlanRemove(
     return writePlanRemoveRefusal(output, initialGit.code);
   }
 
-  let result;
+  let outcome:
+    | Readonly<{
+        kind: "result";
+        result: Awaited<ReturnType<typeof planCapabilityRemoval>>;
+      }>
+    | Readonly<{ kind: "failure"; code: "REPOSITORY_OPEN_FAILED" }>;
 
   try {
     const reader = (dependencies.createReader ?? createCliRepositoryReader)(root);
-    result = await planCapabilityRemoval({
-      reader,
-      git: initialGit,
-      capability: command.capability,
-    });
+    outcome = {
+      kind: "result",
+      result: await planCapabilityRemoval({
+        reader,
+        git: initialGit,
+        capability: command.capability,
+      }),
+    };
   } catch {
-    return writePlanRemoveRefusal(output, "REPOSITORY_OPEN_FAILED");
-  }
-
-  if (!result.ok) {
-    const code = result.issues[0]?.code;
-    return writePlanRemoveRefusal(
-      output,
-      code !== undefined && isRemovalPlannerRefusalCode(code)
-        ? code
-        : "REPOSITORY_OPEN_FAILED",
-    );
+    outcome = { kind: "failure", code: "REPOSITORY_OPEN_FAILED" };
   }
 
   const finalGit = await inspectForPlan(root, dependencies);
@@ -370,10 +368,24 @@ async function runPlanRemove(
     return writePlanRemoveRefusal(output, "GIT_WORKTREE_CHANGED");
   }
 
+  if (outcome.kind === "failure") {
+    return writePlanRemoveRefusal(output, outcome.code);
+  }
+
+  if (!outcome.result.ok) {
+    const code = outcome.result.issues[0]?.code;
+    return writePlanRemoveRefusal(
+      output,
+      code !== undefined && isRemovalPlannerRefusalCode(code)
+        ? code
+        : "REPOSITORY_OPEN_FAILED",
+    );
+  }
+
   const success: PlanRemoveSuccess = {
     ok: true,
     command: "plan-remove",
-    plan: result.value,
+    plan: outcome.result.value,
   };
   writeJson(output.write, success);
   return 0;

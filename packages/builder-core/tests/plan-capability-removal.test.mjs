@@ -302,6 +302,51 @@ function updateEjections(entries, paths) {
   return next;
 }
 
+async function postRemovalEntriesWithEjection(path) {
+  const base = await baseFixtureEntries("portfolio");
+  const installed = await installedEntries("portfolio");
+  const project = core.parseProjectYaml(base.get(".egeria/project.yaml"));
+  const state = core.parseStateJson(base.get(".egeria/state.json"));
+  const installedState = core.parseStateJson(
+    installed.get(".egeria/state.json"),
+  );
+  assert.equal(project.ok, true);
+  assert.equal(state.ok, true);
+  assert.equal(installedState.ok, true);
+  const preservedSurface = installedState.value.managedSurfaces.find(
+    (surface) => surface.path === path,
+  );
+  assert.notEqual(preservedSurface, undefined);
+  const projectSource = core.serializeProjectYaml({
+    ...project.value,
+    ejectedAreas: [path],
+  });
+  const managedSurfaces = [
+    ...state.value.managedSurfaces.map((surface) =>
+      surface.identifier === "builder-project-configuration"
+        ? {
+            ...surface,
+            fingerprint: core.fingerprintFileContent(
+              encoder.encode(projectSource),
+            ),
+          }
+        : surface,
+    ),
+    { ...preservedSurface, ownership: "ejected" },
+  ].sort((left, right) => compareText(left.identifier, right.identifier));
+  base.set(path, "private preserved application source\n");
+  base.set(".egeria/project.yaml", projectSource);
+  base.set(
+    ".egeria/state.json",
+    core.serializeStateJson({
+      ...state.value,
+      managedSurfaces,
+      ejections: [path],
+    }),
+  );
+  return base;
+}
+
 test("capability removal plan is exact and read-only for portfolio and site", async () => {
   for (const profile of ["portfolio", "site"]) {
     const result = await planFromEntries(await installedEntries(profile));
@@ -376,6 +421,15 @@ test("capability removal plan distinguishes not-installed state from removal dri
     await planFromEntries(residual),
     "PROJECT_DRIFT_DETECTED",
   );
+
+  const preservedPath =
+    "apps/web/src/integrations/booking-calendly/calendly-booking.tsx";
+  assertFailure(
+    await planFromEntries(
+      await postRemovalEntriesWithEjection(preservedPath),
+    ),
+    "CAPABILITY_NOT_INSTALLED",
+  );
 });
 
 test("capability removal plan refuses invalid controls, inventory, ejections, and owned drift", async () => {
@@ -446,6 +500,23 @@ test("capability removal plan refuses invalid controls, inventory, ejections, an
           "apps/web/content/en-CA/booking-calendly.yaml",
           { kind: "missing" },
         ],
+      ]),
+      code: "PROJECT_DRIFT_DETECTED",
+    },
+    {
+      entries: base,
+      overrides: new Map([["README.md", { kind: "missing" }]]),
+      code: "PROJECT_DRIFT_DETECTED",
+    },
+    {
+      entries: base,
+      overrides: new Map([["README.md", { kind: "symlink" }]]),
+      code: "PROJECT_DRIFT_DETECTED",
+    },
+    {
+      entries: base,
+      overrides: new Map([
+        ["README.md", { kind: "error", code: "READ_FAILED" }],
       ]),
       code: "PROJECT_DRIFT_DETECTED",
     },

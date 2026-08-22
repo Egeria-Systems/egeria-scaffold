@@ -4,7 +4,10 @@ import {
   createVerifiedCapabilityCatalog,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
-import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
+import type {
+  CapabilityDescriptor,
+  ManagedSurfaceDescriptor,
+} from "../contracts/capability.js";
 import type { ContractIssue } from "../contracts/result.js";
 import type { InstalledState, InstalledSurface } from "../contracts/state.js";
 import {
@@ -189,6 +192,21 @@ function sameFingerprintTarget(
   );
 }
 
+function matchesSurfaceDescriptor(
+  installed: InstalledSurface,
+  expected: ManagedSurfaceDescriptor,
+): boolean {
+  return (
+    installed.path === expected.path &&
+    installed.mergeStrategy === expected.mergeStrategy &&
+    sameSurfaceOwner(installed.owner, expected.owner) &&
+    sameFingerprintTarget(
+      installed.fingerprintTarget,
+      expected.fingerprintTarget,
+    )
+  );
+}
+
 function ejectionPathsAreValid(state: InstalledState, projectPaths: readonly string[]): boolean {
   if (!sameOrderedValues(projectPaths, state.ejections)) {
     return false;
@@ -241,17 +259,86 @@ function hasSurfaceInventoryDrift(
           ejections.has(surface.path));
 
       return (
-        installedSurface.path !== surface.path ||
-        !ownershipMatches ||
-        installedSurface.mergeStrategy !== surface.mergeStrategy ||
-        !sameSurfaceOwner(installedSurface.owner, surface.owner) ||
-        !sameFingerprintTarget(
-          installedSurface.fingerprintTarget,
-          surface.fingerprintTarget,
-        )
+        !matchesSurfaceDescriptor(installedSurface, surface) ||
+        !ownershipMatches
       );
     })
   );
+}
+
+function isValidRemovedCapabilityState(input: Readonly<{
+  state: InstalledState;
+  descriptor: CapabilityDescriptor;
+  inferred: ValidInspection["inference"]["capabilities"][number] | undefined;
+  ejections: ReadonlySet<string>;
+}>): boolean {
+  const expectedByIdentifier = new Map(
+    input.descriptor.managedSurfaces.map((surface) => [
+      surface.identifier,
+      surface,
+    ]),
+  );
+  const ownedSurfaces = input.state.managedSurfaces.filter(
+    ({ owner }) =>
+      owner.kind === "capability" && owner.identifier === "booking-calendly",
+  );
+
+  if (
+    ownedSurfaces.some((surface) => {
+      const expected = expectedByIdentifier.get(surface.identifier);
+      return (
+        surface.ownership !== "ejected" ||
+        !input.ejections.has(surface.path) ||
+        expected?.ownership !== "application-owned" ||
+        !matchesSurfaceDescriptor(surface, expected)
+      );
+    })
+  ) {
+    return false;
+  }
+
+  return (
+    input.inferred === undefined ||
+    input.inferred.probes.every(
+      (probe) =>
+        input.ejections.has(probe.path) || probe.status === "missing",
+    )
+  );
+}
+
+async function hasUnavailableApplicationOwnedSurface(input: Readonly<{
+  reader: RepositoryReader;
+  rendered: RenderedSkeleton;
+  state: InstalledState;
+}>): Promise<boolean> {
+  const installedByIdentifier = new Map(
+    input.state.managedSurfaces.map((surface) => [surface.identifier, surface]),
+  );
+  const paths = input.rendered.surfaces
+    .filter(
+      (surface) =>
+        surface.ownership === "application-owned" &&
+        installedByIdentifier.get(surface.identifier)?.ownership !== "ejected",
+    )
+    .map(({ path }) => path)
+    .sort(compareText);
+
+  for (const path of new Set(paths)) {
+    const result = await input.reader.readText(path);
+
+    if (
+      result.kind === "file" ||
+      (result.kind === "error" &&
+        (result.code === "FILE_ENCODING_INVALID" ||
+          result.code === "FILE_TOO_LARGE"))
+    ) {
+      continue;
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 function hasMaterialDrift(inspection: ValidInspection): boolean {
@@ -543,32 +630,35 @@ async function planCapabilityRemovalUnchecked(input: Readonly<{
   const inferred = inspection.inference.capabilities.find(
     ({ identifier }) => identifier === "booking-calendly",
   );
-  const ownedSurfaces = state.managedSurfaces.filter(
-    ({ owner }) =>
-      owner.kind === "capability" && owner.identifier === "booking-calendly",
-  );
-
-  if (!desired && installedCapability === undefined) {
-    return inferred === undefined && ownedSurfaces.length === 0
-      ? planningFailure("CAPABILITY_NOT_INSTALLED")
-      : planningFailure("PROJECT_DRIFT_DETECTED");
-  }
-
   const descriptor = catalog.value.find(
     ({ identifier }) => identifier === "booking-calendly",
   );
 
-  if (
-    !desired ||
-    descriptor?.version !== "0.1.0" ||
-    installedCapability?.version !== "0.1.0" ||
-    inferred?.category !== "confirmed"
-  ) {
-    return planningFailure("PROJECT_DRIFT_DETECTED");
+  if (descriptor?.version !== "0.1.0") {
+    return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
   if (!ejectionPathsAreValid(state, project.ejectedAreas)) {
     return planningFailure("PROJECT_EJECTION_INVALID");
+  }
+
+  if (!desired && installedCapability === undefined) {
+    return isValidRemovedCapabilityState({
+      state,
+      descriptor,
+      inferred,
+      ejections: new Set(project.ejectedAreas),
+    })
+      ? planningFailure("CAPABILITY_NOT_INSTALLED")
+      : planningFailure("PROJECT_DRIFT_DETECTED");
+  }
+
+  if (
+    !desired ||
+    installedCapability?.version !== "0.1.0" ||
+    inferred?.category !== "confirmed"
+  ) {
+    return planningFailure("PROJECT_DRIFT_DETECTED");
   }
 
   if (hasMaterialDrift(inspection)) {
@@ -602,6 +692,16 @@ async function planCapabilityRemovalUnchecked(input: Readonly<{
       [...current.value.surfaces, ...createBuilderStateSurfaces()],
       new Set(project.ejectedAreas),
     )
+  ) {
+    return planningFailure("PROJECT_DRIFT_DETECTED");
+  }
+
+  if (
+    await hasUnavailableApplicationOwnedSurface({
+      reader: input.reader,
+      rendered: current.value,
+      state,
+    })
   ) {
     return planningFailure("PROJECT_DRIFT_DETECTED");
   }
