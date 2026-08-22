@@ -441,6 +441,71 @@ test("capability removal plan distinguishes not-installed state from removal dri
   );
 });
 
+test("capability removal plan refuses unsupported recipe, provenance, migration, and version state", async () => {
+  const base = await installedEntries("portfolio");
+  const project = core.parseProjectYaml(base.get(".egeria/project.yaml"));
+  const state = core.parseStateJson(base.get(".egeria/state.json"));
+  assert.equal(project.ok, true);
+  assert.equal(state.ok, true);
+
+  const historicalRecipe = new Map(base);
+  historicalRecipe.set(
+    ".egeria/project.yaml",
+    core.serializeProjectYaml({
+      ...project.value,
+      recipeVersion: "0.9.0",
+    }),
+  );
+  historicalRecipe.set(
+    ".egeria/state.json",
+    core.serializeStateJson({
+      ...state.value,
+      origin: { ...state.value.origin, recipeVersion: "0.9.0" },
+    }),
+  );
+
+  const mismatchedOrigin = new Map(base);
+  mismatchedOrigin.set(
+    ".egeria/state.json",
+    core.serializeStateJson({
+      ...state.value,
+      origin: { ...state.value.origin, profile: "site" },
+    }),
+  );
+
+  const mismatchedMigrations = new Map(base);
+  mismatchedMigrations.set(
+    ".egeria/state.json",
+    core.serializeStateJson({
+      ...state.value,
+      appliedMigrations: ["add-booking-calendly-0-1-0"],
+    }),
+  );
+
+  const unsupportedInstalledVersion = new Map(base);
+  unsupportedInstalledVersion.set(
+    ".egeria/state.json",
+    core.serializeStateJson({
+      ...state.value,
+      installedCapabilities: state.value.installedCapabilities.map(
+        (capability) =>
+          capability.identifier === "booking-calendly"
+            ? { ...capability, version: "0.2.0" }
+            : capability,
+      ),
+    }),
+  );
+
+  for (const { entries, code } of [
+    { entries: historicalRecipe, code: "PROJECT_INSPECTION_INVALID" },
+    { entries: mismatchedOrigin, code: "PROJECT_INSPECTION_INVALID" },
+    { entries: mismatchedMigrations, code: "PROJECT_INSPECTION_INVALID" },
+    { entries: unsupportedInstalledVersion, code: "PROJECT_DRIFT_DETECTED" },
+  ]) {
+    assertFailure(await planFromEntries(entries), code);
+  }
+});
+
 test("capability removal plan refuses invalid controls, inventory, ejections, and owned drift", async () => {
   const base = await installedEntries("portfolio");
   const state = core.parseStateJson(base.get(".egeria/state.json"));
