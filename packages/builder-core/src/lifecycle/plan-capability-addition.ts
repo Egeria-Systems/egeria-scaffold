@@ -6,7 +6,7 @@ import {
   calendlyBookingSettingsSchema,
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
-import type { ContractIssue, ValidationResult } from "../contracts/result.js";
+import type { ContractIssue } from "../contracts/result.js";
 import type { InstalledSurface } from "../contracts/state.js";
 import {
   deriveProjectDiscrepancies,
@@ -73,6 +73,16 @@ export type PlanningFailureCode =
   | "CAPABILITY_ALREADY_INSTALLED"
   | "CAPABILITY_ADDITION_UNSUPPORTED";
 
+type PlanningIssue = Omit<ContractIssue, "code"> &
+  Readonly<{ code: PlanningFailureCode }>;
+
+type PlanningResult<T> =
+  | Readonly<{ ok: true; value: T }>
+  | Readonly<{
+      ok: false;
+      issues: readonly PlanningIssue[];
+    }>;
+
 type ValidInspection = ProjectInspection &
   Readonly<{
     project: Extract<ProjectInspection["project"], Readonly<{ kind: "valid" }>>;
@@ -106,8 +116,8 @@ function compareText(left: string, right: string): number {
 
 function planningFailure(
   code: PlanningFailureCode,
-): ValidationResult<never> {
-  const issue: ContractIssue = {
+): PlanningResult<never> {
+  const issue: PlanningIssue = {
     code,
     path: [],
     context: { reason: "precondition-refused" },
@@ -381,7 +391,7 @@ async function deriveActions(input: Readonly<{
   reader: RepositoryReader;
   current: RenderedSkeleton;
   desired: RenderedSkeleton;
-}>): Promise<ValidationResult<readonly CapabilityAdditionAction[]>> {
+}>): Promise<PlanningResult<readonly CapabilityAdditionAction[]>> {
   const differences = changedFiles(input.current, input.desired);
 
   if (differences === undefined) {
@@ -452,7 +462,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: "booking-calendly";
   settings: CalendlyBookingSettings;
-}>): Promise<ValidationResult<CapabilityAdditionPlan>> {
+}>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
 
   if (capabilityValue !== "booking-calendly") {
@@ -621,6 +631,6 @@ export async function planCapabilityAddition(input: Readonly<{
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: "booking-calendly";
   settings: CalendlyBookingSettings;
-}>): Promise<ValidationResult<CapabilityAdditionPlan>> {
+}>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   return planCapabilityAdditionUnchecked(input);
 }

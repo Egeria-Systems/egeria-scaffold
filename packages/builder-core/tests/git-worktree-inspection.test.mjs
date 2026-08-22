@@ -251,7 +251,9 @@ test("expected Git changes require the exact identity and path set", async () =>
     });
   }
 
-  const changedIdentity = scriptedInspection();
+  const changedIdentity = scriptedInspection({
+    statusResult: commandResult(" M tracked.txt\0?? new/nested.txt\0"),
+  });
   assert.deepEqual(
     await core.inspectGitExpectedChanges({
       root: changedIdentity.root,

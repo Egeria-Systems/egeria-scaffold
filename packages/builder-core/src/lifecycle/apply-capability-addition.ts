@@ -48,13 +48,16 @@ import {
   inspectGitCreateTargets,
   inspectGitExpectedChanges,
   inspectGitWorktree,
+  sameGitIdentity,
   type GitCreateTargetInspection,
   type GitExpectedChangesInspection,
   type GitWorktreeIdentity,
+  type GitWorktreeRefusalCode,
   type GitWorktreeInspection,
 } from "./git-worktree-inspection.js";
 import {
   planCapabilityAddition,
+  type PlanningFailureCode,
 } from "./plan-capability-addition.js";
 
 const encoder = new TextEncoder();
@@ -71,6 +74,23 @@ export type CapabilityAdditionPhase =
   | "final-diff";
 
 export type CapabilityAdditionRecovery = "not-required" | "inspect-worktree";
+
+type CapabilityAdditionLocalFailureCode =
+  | "REPOSITORY_OPEN_FAILED"
+  | "CAPABILITY_PLAN_APPROVAL_INVALID"
+  | "CAPABILITY_TRANSFORM_FAILED"
+  | "CAPABILITY_VERIFICATION_FAILED"
+  | "CAPABILITY_REINFERENCE_FAILED"
+  | "CAPABILITY_MIGRATION_RECORD_INVALID"
+  | "CAPABILITY_STATE_CONSTRUCTION_FAILED"
+  | "CAPABILITY_MIGRATION_WRITE_FAILED"
+  | "CAPABILITY_STATE_WRITE_FAILED"
+  | "CAPABILITY_POST_STATE_FAILED";
+
+export type CapabilityAdditionFailureCode =
+  | GitWorktreeRefusalCode
+  | PlanningFailureCode
+  | CapabilityAdditionLocalFailureCode;
 
 export type CapabilityAdditionExecutionResult =
   | Readonly<{
@@ -89,7 +109,7 @@ export type CapabilityAdditionExecutionResult =
     }>
   | Readonly<{
       ok: false;
-      code: string;
+      code: CapabilityAdditionFailureCode;
       phase: CapabilityAdditionPhase;
       recovery: CapabilityAdditionRecovery;
     }>;
@@ -119,7 +139,7 @@ type ControlSnapshot = Readonly<{
 }>;
 
 function failure(
-  code: string,
+  code: CapabilityAdditionFailureCode,
   phase: CapabilityAdditionPhase,
   recovery: CapabilityAdditionRecovery,
 ): CapabilityAdditionExecutionResult {
@@ -162,19 +182,6 @@ async function readExactFileBytes(
   }
 
   return actual;
-}
-
-function sameGitIdentity(
-  left: GitWorktreeIdentity,
-  right: GitWorktreeIdentity,
-): boolean {
-  return (
-    left.root === right.root &&
-    left.revision === right.revision &&
-    left.attachedRef === right.attachedRef &&
-    left.gitDirectory === right.gitDirectory &&
-    left.commonDirectory === right.commonDirectory
-  );
 }
 
 async function readControlSnapshot(

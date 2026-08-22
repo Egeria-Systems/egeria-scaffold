@@ -309,7 +309,7 @@ async function runApplyAdd(
       command: "apply-add",
       code: "CAPABILITY_EXECUTION_FAILED",
       phase: "precondition",
-      recovery: "not-required",
+      recovery: "inspect-worktree",
     });
     return 1;
   }

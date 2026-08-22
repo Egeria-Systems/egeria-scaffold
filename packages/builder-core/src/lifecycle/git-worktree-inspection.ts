@@ -470,7 +470,7 @@ function inspectStatus(output: Uint8Array): StatusInspection {
     : { kind: "clean" };
 }
 
-function sameGitIdentity(
+export function sameGitIdentity(
   left: GitWorktreeIdentity,
   right: GitWorktreeIdentity,
 ): boolean {

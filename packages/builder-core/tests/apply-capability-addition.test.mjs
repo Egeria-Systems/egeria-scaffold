@@ -86,6 +86,7 @@ function createRepository(entries, failBatch, afterWrite) {
           return { ok: false, sourceChanged: false };
         }
 
+        let sourceChanged = false;
         for (const change of changes) {
           const current = files.get(change.path);
           if (
@@ -93,9 +94,10 @@ function createRepository(entries, failBatch, afterWrite) {
             (change.expected.kind === "file" &&
               current !== decoder.decode(change.expected.content))
           ) {
-            return { ok: false, sourceChanged: writes.length > 0 };
+            return { ok: false, sourceChanged };
           }
           files.set(change.path, decoder.decode(change.content));
+          sourceChanged = true;
         }
         writes.push(changes.map(({ path }) => path));
         await afterWrite?.({ batch, changes, files });
@@ -311,7 +313,7 @@ test("capability addition refuses changed output bytes before persistence", asyn
   );
 });
 
-test("capability addition reports bounded recovery when persistence or final diff fails", async () => {
+test("capability addition preserves state when migration persistence fails", async () => {
   const migrationFailureRepository = createRepository(await fixtureEntries(), 2);
   const initialState = migrationFailureRepository.files.get(".egeria/state.json");
   const migrationFailure = await runApply(migrationFailureRepository);
@@ -325,7 +327,9 @@ test("capability addition reports bounded recovery when persistence or final dif
     migrationFailureRepository.files.get(".egeria/state.json"),
     initialState,
   );
+});
 
+test("capability addition records only persisted checks when state persistence fails", async () => {
   const stateFailureRepository = createRepository(await fixtureEntries(), 3);
   const stateFailure = await runApply(stateFailureRepository);
   assert.deepEqual(stateFailure.result, {
@@ -346,7 +350,9 @@ test("capability addition reports bounded recovery when persistence or final dif
     stateFailureMigrations.value.at(-1).completedAt,
     "2026-08-21T15:00:00.000Z",
   );
+});
 
+test("capability addition retains persisted receipts when post-state inference disagrees", async () => {
   const postStateRepository = createRepository(
     await fixtureEntries(),
     undefined,
@@ -376,7 +382,9 @@ test("capability addition reports bounded recovery when persistence or final dif
     kind: "capability-addition",
     checks: persistedVerificationChecks,
   });
+});
 
+test("capability addition reports a final diff refusal after persistence", async () => {
   const finalDiffRepository = createRepository(await fixtureEntries());
   const finalDiffFailure = await runApply(finalDiffRepository, {
     inspectExpectedChanges: () =>
@@ -389,7 +397,9 @@ test("capability addition reports bounded recovery when persistence or final dif
     recovery: "inspect-worktree",
   });
   assert.equal(finalDiffRepository.writes.length, 3);
+});
 
+test("capability addition refuses changed final bytes after diff inspection", async () => {
   const finalBytesRepository = createRepository(await fixtureEntries());
   const finalBytesFailure = await runApply(finalBytesRepository, {
     inspectExpectedChanges: () => {

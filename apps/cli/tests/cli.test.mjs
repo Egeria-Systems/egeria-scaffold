@@ -977,6 +977,34 @@ test("apply-add contains refusal and recovery details without leaking internals"
   assert.doesNotMatch(captured.error[0], /must not escape|calendly\.com/u);
 });
 
+test("apply-add conservatively contains a rejected executor promise", async () => {
+  const runCli = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    applyCapabilityAddition: () =>
+      Promise.reject(new Error("private executor failure")),
+  });
+  const captured = captureOutput();
+
+  assert.equal(
+    await runCli(applyAddArguments("/private/transaction"), captured.output),
+    1,
+  );
+  assert.deepEqual(captured.standard, []);
+  assert.deepEqual(captured.error, [
+    JSON.stringify({
+      ok: false,
+      command: "apply-add",
+      code: "CAPABILITY_EXECUTION_FAILED",
+      phase: "precondition",
+      recovery: "inspect-worktree",
+    }),
+  ]);
+  assert.doesNotMatch(
+    captured.error[0],
+    /private executor failure|calendly\.com/u,
+  );
+});
+
 test("plan-add contains final inspection changes and never leaks a completed plan", async () => {
   const initial = cleanGitInspection();
   const finalCases = [

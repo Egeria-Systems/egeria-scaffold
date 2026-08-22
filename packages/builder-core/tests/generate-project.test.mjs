@@ -702,6 +702,34 @@ test("the pnpm verifier preserves only derived Volta tool resolution with an iso
   });
 });
 
+test("Windows pnpm resolution applies PATHEXT and recognizes a copied Volta shim", async () => {
+  await withTestRoot(async (owner) => {
+    const voltaHome = join(owner, "windows-volta");
+    const bin = join(voltaHome, "bin");
+    const shim = join(bin, "volta-shim.exe");
+    const executable = join(bin, "pnpm.EXE");
+    await mkdir(bin, { recursive: true });
+    await writeFile(shim, "copied volta shim\n");
+    await writeFile(executable, "copied volta shim\n");
+    const options = {
+      platform: "win32",
+      environment: { PATH: bin, PATHEXT: ".EXE;.CMD" },
+    };
+
+    assert.equal(
+      await verifierModule.resolveExecutablePath("pnpm", options),
+      resolve(executable),
+    );
+    assert.deepEqual(
+      await verifierModule.derivePnpmToolEnvironment("pnpm", options),
+      {
+        VOLTA_HOME: await realpath(voltaHome),
+        VOLTA_FEATURE_PNPM: "1",
+      },
+    );
+  });
+});
+
 test("the pnpm verifier rejects pre-existing lockfile targets without invoking pnpm", async () => {
   await withTestRoot(async (owner) => {
     const fakePnpm = await createFakePnpmExecutable(owner);

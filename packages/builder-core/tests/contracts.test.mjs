@@ -126,7 +126,7 @@ const currentVerificationChecks = [
   "post-state-inference",
 ];
 
-const capabilityAdditionVerificationChecks = [
+const persistedVerificationChecks = [
   "contracts",
   "plan-approval",
   "pre-state-inference",
@@ -758,7 +758,7 @@ test("installed state records only the exact capability-addition verification re
     appliedMigrations: ["add-booking-calendly-0-1-0"],
     lastSuccessfulVerification: {
       kind: "capability-addition",
-      checks: capabilityAdditionVerificationChecks,
+      checks: persistedVerificationChecks,
     },
   };
 
@@ -767,14 +767,14 @@ test("installed state records only the exact capability-addition verification re
     ...capabilityAdditionState,
     lastSuccessfulVerification: {
       ...capabilityAdditionState.lastSuccessfulVerification,
-      checks: capabilityAdditionVerificationChecks.slice(0, -1),
+      checks: persistedVerificationChecks.slice(0, -1),
     },
   });
   assertRejects(contracts.installedStateSchema, {
     ...capabilityAdditionState,
     lastSuccessfulVerification: {
       kind: "generation",
-      checks: capabilityAdditionVerificationChecks,
+      checks: persistedVerificationChecks,
     },
   });
 });
