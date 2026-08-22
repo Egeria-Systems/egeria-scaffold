@@ -939,11 +939,14 @@ In addition to in-process unit and integration coverage, the builder maintains a
 Required representative scenarios are:
 
 1. a successful capability addition;
-2. refusal of an addition when the repository is dirty, materially drifted, or incompatible;
-3. a successful supported capability upgrade;
-4. refusal of an unsupported version edge without repository or state mutation;
-5. a successful migration whose post-change inference agrees and whose state and migration records update only after transformation verification;
-6. an injected transformation or verification failure that leaves the original repository and authoritative state unchanged and produces recovery evidence.
+2. a successful capability removal exercised through an add, remove, and re-add sequence;
+3. refusal of an addition when the repository is dirty, materially drifted, or incompatible;
+4. a successful supported capability upgrade;
+5. refusal of an unsupported version edge without repository or state mutation;
+6. a successful migration whose post-change inference agrees and whose state and migration records update only after transformation verification;
+7. an injected transformation or verification failure, including during removal, that leaves the original repository and authoritative state unchanged and produces recovery evidence.
+
+The removal sequence asserts after every operation and any documented repeat invocation: the exact repository diff; agreement among desired, installed, and inferred capability state; the exact `.egeria/project.yaml`, `.egeria/state.json`, and `.egeria/migrations.jsonl` results; ownership- and removal-policy-compliant disposition of managed, merge-managed, and unchanged application-owned surfaces; preservation of user-modified application-owned surfaces and ejected surfaces; and the defined repeated-command result. An injected removal failure leaves the original repository and its three authoritative state files byte-for-byte unchanged.
 
 Unit, property-based, and temporary-repository integration tests remain responsible for exhaustive policy, combination, failure-point, and supported-version-edge coverage. Compiled-CLI end-to-end cases remain risk-based and representative rather than Cartesian. This builder layer performs no deployment, production action, persistent-data or provider mutation, or claim about the generated application's runtime behavior; those require their separately approved application, staging, provider, and recovery evidence.
 
@@ -1228,7 +1231,7 @@ P10 Fleet hardening, package review, and portability evidence
 - bounded deterministic `fast-check` properties for materially combinatorial builder state and migration invariants, with replayable failure evidence and the existing Node.js test runner;
 - current/previous-major upgrade matrix;
 - portfolio-to-site transition;
-- bounded compiled-CLI end-to-end coverage for representative capability addition, upgrade, migration, refusal, and recovery paths;
+- bounded compiled-CLI end-to-end coverage for representative capability addition, removal through add-remove-re-add, upgrade, migration, refusal, and recovery paths, including exact resultant-state and no-write-on-failure assertions;
 - extension of the capability-certification foundation to add, upgrade, migration, removal, refusal, and recovery journeys;
 - a one-time coverage backfill for existing executable capabilities, reusing unchanged valid evidence and creating separate certification tasks for gaps;
 - the first fresh-added `booking-calendly` staging journey.
