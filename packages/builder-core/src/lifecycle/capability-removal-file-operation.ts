@@ -265,7 +265,23 @@ async function createFile(
     handle = undefined;
     return { ok: true, identity };
   } catch {
+    let cleanupIdentity: SerializedIdentity | undefined;
+    try {
+      cleanupIdentity =
+        handle === undefined
+          ? undefined
+          : serializeIdentity(await handle.stat({ bigint: true }));
+    } catch {
+      cleanupIdentity = undefined;
+    }
     await handle?.close().catch(() => undefined);
+    if (
+      created &&
+      cleanupIdentity !== undefined &&
+      (await fileMatches(operation.name, cleanupIdentity))
+    ) {
+      await unlink(operation.name).catch(() => undefined);
+    }
     return { ok: false, sourceChanged: created };
   }
 }

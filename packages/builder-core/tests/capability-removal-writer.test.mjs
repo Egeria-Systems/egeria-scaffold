@@ -1,18 +1,85 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { chmod, link, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { createFileSystemCapabilityRemovalWriter } from "../dist/lifecycle/capability-removal-writer.js";
 
 const encoder = new TextEncoder();
+const fileOperationPath = fileURLToPath(
+  new URL(
+    "../dist/lifecycle/capability-removal-file-operation.js",
+    import.meta.url,
+  ),
+);
 
 async function createTemporaryRoot(context, prefix) {
   const root = await mkdtemp(join(tmpdir(), prefix));
   context.after(() => rm(root, { recursive: true, force: false }));
   return root;
 }
+
+async function runCreateWithZeroFileSizeLimit(root, request) {
+  return new Promise((resolveResult, rejectResult) => {
+    const output = [];
+    const child = spawn(
+      "/bin/sh",
+      [
+        "-c",
+        'ulimit -f 0; exec "$1" "$2"',
+        "egeria-removal-test",
+        process.execPath,
+        fileOperationPath,
+      ],
+      {
+        cwd: root,
+        env: {},
+        stdio: ["pipe", "pipe", "ignore"],
+      },
+    );
+    child.stdout.on("data", (chunk) => output.push(chunk));
+    child.once("error", rejectResult);
+    child.once("close", (code) => {
+      if (code !== 0) {
+        rejectResult(new Error(`helper exited with code ${String(code)}`));
+        return;
+      }
+      resolveResult(JSON.parse(Buffer.concat(output).toString("utf8")));
+    });
+    child.stdin.end(JSON.stringify(request));
+  });
+}
+
+test(
+  "filesystem removal writer cleans its exclusively created staging file after a write failure",
+  { skip: process.platform === "win32" },
+  async (context) => {
+    const root = await createTemporaryRoot(
+      context,
+      "egeria-removal-create-failure-",
+    );
+    const rootStats = await lstat(root, { bigint: true });
+    assert.deepEqual(
+      await runCreateWithZeroFileSizeLimit(root, {
+        parent: {
+          device: rootStats.dev.toString(),
+          inode: rootStats.ino.toString(),
+        },
+        operation: {
+          kind: "create",
+          name: ".egeria-removal-injected.tmp",
+          mode: 0o600,
+          content: Buffer.from("write must fail\n", "utf8").toString("base64"),
+        },
+      }),
+      { ok: false, sourceChanged: true },
+    );
+    assert.deepEqual(await readdir(root), []);
+  },
+);
 
 test("filesystem removal writer commits an ordered replace/delete batch and preserves replacement mode", async (context) => {
   assert.equal(typeof createFileSystemCapabilityRemovalWriter, "function");
