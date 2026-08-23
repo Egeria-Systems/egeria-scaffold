@@ -2801,10 +2801,18 @@ test("canonical documentation records visual regression and the client-ready clo
   );
 });
 
-test("canonical documentation records accepted Calendly removal and the first upgrade planning edge", async () => {
+test("canonical documentation separates accepted upgrade planning from the local executor candidate", async () => {
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3B");
-  const [sourcePlan, roadmap, overview, capabilityModel, enforcementMap] =
+  const executorCandidateGate = compactLabel("Gate ", "3");
+  const [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+    packageOwnership,
+    enforcementMap,
+  ] =
     await Promise.all([
       readRepositoryFile(
         "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
@@ -2812,6 +2820,7 @@ test("canonical documentation records accepted Calendly removal and the first up
       readRepositoryFile("docs/roadmaps/program-roadmap.md"),
       readRepositoryFile("docs/architecture/overview.md"),
       readRepositoryFile("docs/architecture/capability-model.md"),
+      readRepositoryFile("docs/architecture/package-ownership.md"),
       readRepositoryFile("docs/architecture/enforcement-map.md"),
     ]);
 
@@ -2894,13 +2903,13 @@ test("canonical documentation records accepted Calendly removal and the first up
     );
     assert.match(
       boundaryOwner,
-      /apply-remove[^\n]+accepted-main integrated[^\n]+Generic transformation[^\n]+upgrade execution[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+      /apply-remove[^\n]+accepted-main integrated[^\n]+Generic lifecycle[^\n]+another upgrade edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
     );
   }
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+implemented only[^\n]+exact Calendly addition and removal transactions[^\n]+generic transformation[^\n]+upgrade execution[^\n]+automated recovery[^\n]+certification backfill[^\n]+provider\/data cleanup[^\n]+remain planned/iu,
+    /Existing-repository mutation[^\n]+exact Calendly addition\/removal transactions[^\n]+local exact standards upgrade executor candidate[^\n]+generic lifecycle transformation[^\n]+another upgrade edge[^\n]+automated recovery[^\n]+provider\/data\/credential cleanup/iu,
   );
   assert.match(
     overview,
@@ -2917,7 +2926,7 @@ test("canonical documentation records accepted Calendly removal and the first up
   );
   assert.match(
     capabilityModel,
-    /apply-remove[^\n]+accepted-main integrated[^\n]+Generic transformation[^\n]+upgrade execution[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+    /apply-remove[^\n]+accepted-main integrated[^\n]+standards executor[^\n]+not accepted-main integrated[^\n]+Generic lifecycle transformation[^\n]+another upgrade edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
   );
   assert.match(
     enforcementMap,
@@ -2988,6 +2997,60 @@ test("canonical documentation records accepted Calendly removal and the first up
     );
   }
 
+  for (const acceptedPlanningOwner of [sourcePlan, roadmap, capabilityModel]) {
+    assert.match(
+      acceptedPlanningOwner,
+      /pull request 47[^\n]+main@138b5d712ab22016c020eb1c2a3e56e0efc89a5a/iu,
+    );
+  }
+  for (const acceptedPlanningOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      acceptedPlanningOwner,
+      /cd57c479cb74a5e0f839f7b46ded220bc456b151[^\n]+32658708533/iu,
+    );
+  }
+  for (const executorCandidateOwner of [sourcePlan, roadmap, overview]) {
+    assert.match(
+      executorCandidateOwner,
+      new RegExp(
+        `local[^\\n]+unaccepted[^\\n]+${executorCandidateGate}[^\\n]+candidate`,
+        "iu",
+      ),
+    );
+    assert.match(
+      executorCandidateOwner,
+      /apply-upgrade[^\n]+(?:verified-final-diff[^\n]+separate[^\n]+approval|separate[^\n]+verified-final-diff[^\n]+approval)/iu,
+    );
+  }
+  assert.match(
+    capabilityModel,
+    /apply-upgrade[^\n]+local[^\n]+unaccepted[^\n]+candidate/iu,
+  );
+  assert.match(
+    packageOwnership,
+    /applyCapabilityUpgrade[^\n]+createFileSystemCapabilityUpgradeWriter[^\n]+private/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+apply-upgrade[^\n]+actual[^\n]+local[^\n]+unaccepted/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-STATE-UPDATE-ORDER[^\n]+standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+migration-before-state[^\n]+verified-final-diff/iu,
+  );
+  for (const candidateOwner of [sourcePlan, capabilityModel, enforcementMap]) {
+    assert.match(
+      candidateOwner,
+      /failure[^\n]+inspectable prefix[^\n]+never[^\n]+automatic rollback/iu,
+    );
+  }
+  for (const claimOwner of [sourcePlan, roadmap, overview, capabilityModel]) {
+    assert.match(
+      claimOwner,
+      /apply-upgrade[^\n]+(?:unaccepted|not accepted)[^\n]+(?:certif|deploy|production)/iu,
+    );
+  }
+
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.match(
       sequencingOwner,
@@ -3013,7 +3076,7 @@ test("canonical documentation records accepted Calendly removal and the first up
   }
 
   for (const responsibility of [
-    /1\. implement the separately approved exact standards upgrade executor/iu,
+    /1\. review and accept or reject the local exact standards upgrade executor candidate/iu,
     /2\. implement read-only portfolio-to-site transition planning/iu,
     /3\. implement its separately approved executor/iu,
     /4\. perform one evidence-gated internal lifecycle extraction[^\n]+accepted add[^\n]+removal[^\n]+upgrade[^\n]+transition/iu,
@@ -3026,7 +3089,7 @@ test("canonical documentation records accepted Calendly removal and the first up
 
   assert.match(
     enforcementMap,
-    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+actual[^\n]+read-only planner[^\n]+compiled CLI[^\n]+upgrade execution remains separate and planned/iu,
+    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+apply-upgrade[^\n]+actual[^\n]+local unaccepted[^\n]+separate verified-final-diff stop/iu,
   );
 });
 

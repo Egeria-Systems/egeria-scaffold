@@ -102,6 +102,20 @@ export const capabilityRemovalVerificationChecks = [
   "post-state-inference",
 ] as const;
 
+export const capabilityUpgradePersistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  ...ordinaryGenerationVerificationChecks,
+  "post-change-inference",
+] as const;
+
+export const capabilityUpgradeVerificationChecks = [
+  ...capabilityUpgradePersistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+] as const;
+
 const legacyVerificationChecksSchema = z
   .tuple([
     z.literal("contracts"),
@@ -136,6 +150,10 @@ const capabilityAdditionVerificationChecksSchema = createLiteralTupleSchema(
 
 const capabilityRemovalVerificationChecksSchema = createLiteralTupleSchema(
   capabilityRemovalPersistedVerificationChecks,
+).readonly();
+
+const capabilityUpgradeVerificationChecksSchema = createLiteralTupleSchema(
+  capabilityUpgradePersistedVerificationChecks,
 ).readonly();
 
 const verificationChecksSchema = z
@@ -194,6 +212,10 @@ export const installedStateSchema = z
           kind: z.literal("capability-removal"),
           checks: capabilityRemovalVerificationChecksSchema,
         }),
+        z.strictObject({
+          kind: z.literal("capability-upgrade"),
+          checks: capabilityUpgradeVerificationChecksSchema,
+        }),
       ])
       .readonly(),
   })
@@ -203,7 +225,9 @@ export const installedStateSchema = z
       ? capabilityAdditionPersistedVerificationChecks
       : state.lastSuccessfulVerification.kind === "capability-removal"
         ? capabilityRemovalPersistedVerificationChecks
-      : state.origin.recipeVersion === "0.7.0" ||
+        : state.lastSuccessfulVerification.kind === "capability-upgrade"
+          ? capabilityUpgradePersistedVerificationChecks
+        : state.origin.recipeVersion === "0.7.0" ||
           state.origin.recipeVersion === "0.8.0" ||
           state.origin.recipeVersion === "0.9.0" ||
           state.origin.recipeVersion === "0.10.0"

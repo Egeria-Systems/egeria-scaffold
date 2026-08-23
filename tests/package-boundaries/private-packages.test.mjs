@@ -277,9 +277,11 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "inference/infer-repository.ts",
       "lifecycle/apply-capability-addition.ts",
       "lifecycle/apply-capability-removal.ts",
+      "lifecycle/apply-capability-upgrade.ts",
       "lifecycle/capability-addition-writer.ts",
       "lifecycle/capability-removal-file-operation.ts",
       "lifecycle/capability-removal-writer.ts",
+      "lifecycle/capability-upgrade-writer.ts",
       "lifecycle/git-worktree-inspection.ts",
       "lifecycle/plan-capability-addition.ts",
       "lifecycle/plan-capability-removal.ts",
@@ -476,24 +478,76 @@ test("builder-core direct consumers describe the private generation boundary", a
     resolve(repositoryRoot, "packages/builder-core/src/index.ts"),
     "utf8",
   );
+  const capabilityUpgradeExecutor = await readFile(
+    resolve(
+      repositoryRoot,
+      "packages/builder-core/src/lifecycle/apply-capability-upgrade.ts",
+    ),
+    "utf8",
+  );
+  const capabilityUpgradeWriter = await readFile(
+    resolve(
+      repositoryRoot,
+      "packages/builder-core/src/lifecycle/capability-upgrade-writer.ts",
+    ),
+    "utf8",
+  );
   assert.match(builderIndex, /apply-capability-removal\.js/);
   assert.match(builderIndex, /capability-removal-writer\.js/);
   assert.match(builderIndex, /plan-capability-upgrade\.js/);
-  assert.match(cliInstructions, /nine commands exact/);
+  assert.match(builderIndex, /apply-capability-upgrade\.js/);
+  assert.match(builderIndex, /capability-upgrade-writer\.js/);
+  assert.match(
+    capabilityUpgradeExecutor,
+    /export async function applyCapabilityUpgrade\(/,
+  );
+  assert.match(
+    capabilityUpgradeWriter,
+    /export function createFileSystemCapabilityUpgradeWriter\(/,
+  );
+  assert.match(builderInstructions, /`applyCapabilityUpgrade`/);
+  assert.match(
+    builderInstructions,
+    /`createFileSystemCapabilityUpgradeWriter`[^\n]+upgrade-specific/,
+  );
+  assert.match(builderReadme, /applyCapabilityUpgrade/);
+  assert.match(builderReadme, /createFileSystemCapabilityUpgradeWriter/);
+  assert.match(
+    builderReadme,
+    /lastSuccessfulVerification\.kind[^\n]+`capability-upgrade`/,
+  );
+  assert.match(
+    builderReadme,
+    /contracts[^\n]+plan-approval[^\n]+pre-state-inference[^\n]+lockfile[^\n]+frozen-install[^\n]+lint[^\n]+typecheck[^\n]+unit-tests[^\n]+component-tests[^\n]+next-build[^\n]+opennext-build[^\n]+post-change-inference[^\n]+migration-record[^\n]+post-state-inference/,
+  );
+  assert.match(cliInstructions, /ten commands exact/);
   assert.match(cliInstructions, /`plan-add` remains read-only/);
   assert.match(cliInstructions, /`apply-add` is limited/);
   assert.match(cliInstructions, /`plan-remove` remains read-only/);
   assert.match(cliInstructions, /`apply-remove` is the exact current removal command/);
   assert.match(cliInstructions, /exact `plan-remove` fingerprint/);
   assert.match(cliInstructions, /`plan-upgrade` remains read-only/);
+  assert.match(cliInstructions, /`apply-upgrade` is limited/);
+  assert.match(
+    cliInstructions,
+    /`apply-upgrade`[^\n]+`--directory`[^\n]+`--capability`[^\n]+`--to-version`[^\n]+`--approved-plan`/,
+  );
+  assert.match(
+    cliInstructions,
+    /standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+single[^\n]+edge/,
+  );
   assert.match(cliInstructions, /modified[^\n]+application-owned[^\n]+preserv[^\n]+eject/);
   assert.match(cliInstructions, /remain read-only/);
   assert.match(cliInstructions, /does not add overwrite/);
-  assert.match(cliReadme, /nine exact commands/);
+  assert.match(cliReadme, /ten exact commands/);
   assert.match(cliReadme, /`apply-add` accepts/);
   assert.match(cliReadme, /`plan-remove` is also read-only/);
   assert.match(cliReadme, /`apply-remove` is the exact current removal command/);
   assert.match(cliReadme, /`plan-upgrade --directory/);
+  assert.match(
+    cliReadme,
+    /`apply-upgrade --directory <absolute-existing-linked-worktree> --capability standards --to-version 0\.4\.0 --approved-plan sha256:<digest>`/,
+  );
   assert.match(cliReadme, /migration append[^\n]+state-last persistence/);
   assert.match(cliReadme, /preserve[^\n]+eject/);
   assert.match(cliReadme, /verified-final-diff approval/);
@@ -520,7 +574,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /portable-rename race limit/);
   assert.match(packageOwnership, /pnpm `11.20.0`/);
   assert.match(packageOwnership, /disabled Next telemetry/);
-  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, `plan-remove`, `apply-remove`, and `plan-upgrade`/);
+  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, `plan-remove`, `apply-remove`, `plan-upgrade`, and `apply-upgrade`/);
   assert.match(packageOwnership, /one-line JSON output/);
   assert.match(packageOwnership, /clean attached linked worktree/);
   assert.match(packageOwnership, /all non-ignored untracked files/);
@@ -533,11 +587,15 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /removal planning[^\n]+read-only/);
   assert.doesNotMatch(packageOwnership, /future CLI consumer/);
   assert.match(packageOwnership, /existing-repository transformation/);
-  assert.match(rootReadme, /nine exact commands/);
+  assert.match(rootReadme, /ten exact commands/);
   assert.match(rootReadme, /`apply-remove` is the exact current removal command/);
   assert.match(rootReadme, /transaction evidence awaiting verified-final-diff approval/);
   assert.match(rootReadme, /`plan-remove`/);
   assert.match(rootReadme, /egeria plan-upgrade/);
+  assert.match(
+    rootReadme,
+    /egeria apply-upgrade --directory <absolute-existing-linked-worktree> --capability standards --to-version 0\.4\.0 --approved-plan sha256:<digest>/,
+  );
   assert.match(rootReadme, /`assume-unchanged` and `skip-worktree`/);
   assert.match(rootReadme, /canonical managed-surface inventory/);
   assert.match(rootReadme, /No lifecycle command creates the branch\/worktree/);

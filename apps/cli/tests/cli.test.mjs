@@ -333,6 +333,23 @@ function applyRemoveArguments(
   ];
 }
 
+function applyUpgradeArguments(
+  directory,
+  approvedPlan = `sha256:${"a".repeat(64)}`,
+) {
+  return [
+    "apply-upgrade",
+    "--directory",
+    directory,
+    "--capability",
+    "standards",
+    "--to-version",
+    "0.4.0",
+    "--approved-plan",
+    approvedPlan,
+  ];
+}
+
 async function listTree(root) {
   const snapshot = [];
 
@@ -446,6 +463,16 @@ const visualUpgradePaths = [
   "apps/web/tests/visual/home-visual.spec.ts",
   "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
   "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+];
+const upgradeSourcePaths = [
+  ".github/workflows/quality.yml",
+  "apps/web/package.json",
+  ...visualUpgradePaths,
+];
+const upgradeControlPaths = [
+  ".egeria/project.yaml",
+  ".egeria/state.json",
+  ".egeria/migrations.jsonl",
 ];
 
 async function prepareHistoricalUpgradeFixture(root) {
@@ -925,6 +952,80 @@ test("the apply-remove parser accepts only the exact approved removal arguments"
         context: { reason: "invalid-arguments" },
       },
     ]);
+  }
+});
+
+test("the apply-upgrade parser accepts only the exact approved standards edge", () => {
+  const fingerprint = `sha256:${"a".repeat(64)}`;
+  const expected = {
+    kind: "apply-upgrade",
+    directory: "/private/tmp/acme-portfolio",
+    capability: "standards",
+    toVersion: "0.4.0",
+    approvedPlanFingerprint: fingerprint,
+  };
+  const valid = applyUpgradeArguments(
+    "/private/tmp/acme-portfolio",
+    fingerprint,
+  );
+
+  assert.deepEqual(
+    assertSuccess(cliArguments.parseCliArguments(valid)),
+    expected,
+  );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "apply-upgrade",
+        "--approved-plan",
+        fingerprint,
+        "--to-version",
+        "0.4.0",
+        "--capability",
+        "standards",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+      ]),
+    ),
+    expected,
+  );
+
+  const invalidCases = [
+    valid.slice(0, -2),
+    valid.slice(0, -4),
+    [...valid, "--approved-plan", fingerprint],
+    [...valid, "--directory", "/private/tmp/other"],
+    [...valid, "--unknown", "private-value"],
+    [...valid, "private-positional"],
+    [...valid, "--from-version", "0.3.0"],
+    [...valid, "--from-version=0.3.0"],
+    ["apply-upgrade", "--from-version", "0.3.0", ...valid.slice(1)],
+    applyUpgradeArguments("/private/tmp/acme-portfolio", "sha256:short"),
+    applyUpgradeArguments(
+      "/private/tmp/acme-portfolio",
+      `sha256:${"A".repeat(64)}`,
+    ),
+    valid.map((value) => (value === "standards" ? "observability" : value)),
+    valid.map((value) => (value === "0.4.0" ? "0.5.0" : value)),
+    applyUpgradeArguments(""),
+    applyUpgradeArguments("relative/project"),
+    applyUpgradeArguments("bad\0directory"),
+  ];
+
+  for (const arguments_ of invalidCases) {
+    const result = cliArguments.parseCliArguments(arguments_);
+    assert.equal(result.ok, false, JSON.stringify(arguments_));
+    assert.deepEqual(result.issues, [
+      {
+        code: "CLI_ARGUMENT_INVALID",
+        path: [],
+        context: { reason: "invalid-arguments" },
+      },
+    ]);
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /private-value|private-positional|observability|0\.5\.0|bad\\u0000directory/u,
+    );
   }
 });
 
@@ -1941,6 +2042,215 @@ test("apply-remove reports exact transformation mutation and recovery evidence",
   }
 });
 
+test("apply-upgrade forwards the exact approved edge and emits only the bounded result", async () => {
+  const calls = [];
+  const fingerprint = `sha256:${"b".repeat(64)}`;
+  const value = {
+    status: "verified-final-diff-approval-required",
+    baseRevision: "abcdef0123456789abcdef0123456789abcdef01",
+    capability: {
+      identifier: "standards",
+      fromVersion: "0.3.0",
+      toVersion: "0.4.0",
+    },
+    migration: "upgrade-standards-0-3-0-to-0-4-0",
+    changedPaths: [
+      ".egeria/migrations.jsonl",
+      ".egeria/state.json",
+      ...upgradeSourcePaths,
+    ].sort(),
+    verificationChecks: core.capabilityUpgradeVerificationChecks,
+  };
+  const runCli = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    applyCapabilityUpgrade(input) {
+      calls.push(input);
+      return Promise.resolve({ ok: true, value });
+    },
+  });
+  const captured = captureOutput();
+
+  assert.equal(
+    await runCli(
+      applyUpgradeArguments("/private/upgrade-worktree", fingerprint),
+      captured.output,
+    ),
+    0,
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].root, resolve("/private/upgrade-worktree"));
+  assert.equal(calls[0].capability, "standards");
+  assert.equal(calls[0].toVersion, "0.4.0");
+  assert.equal(calls[0].approvedPlanFingerprint, fingerprint);
+  assert.equal(typeof calls[0].verifier.verifyInIsolatedCopy, "function");
+  assert.deepEqual(captured.error, []);
+  assert.deepEqual(captured.standard, [
+    JSON.stringify({ ok: true, command: "apply-upgrade", result: value }),
+  ]);
+  assert.doesNotMatch(
+    captured.standard[0],
+    /upgrade-worktree|refs\/heads|\.git\/worktrees|private executor/u,
+  );
+});
+
+test("apply-upgrade emits exact refusal and rejected-executor envelopes", async () => {
+  const refusalRunner = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    applyCapabilityUpgrade: () =>
+      Promise.resolve({
+        ok: false,
+        code: "CAPABILITY_VERIFICATION_FAILED",
+        phase: "verify",
+        recovery: "inspect-worktree",
+        privateDetail: "private executor detail",
+      }),
+  });
+  const refusal = captureOutput();
+  assert.equal(
+    await refusalRunner(
+      applyUpgradeArguments("/private/upgrade-worktree"),
+      refusal.output,
+    ),
+    1,
+  );
+  assert.deepEqual(refusal.standard, []);
+  assert.deepEqual(refusal.error, [
+    JSON.stringify({
+      ok: false,
+      command: "apply-upgrade",
+      code: "CAPABILITY_VERIFICATION_FAILED",
+      phase: "verify",
+      recovery: "inspect-worktree",
+    }),
+  ]);
+  assert.doesNotMatch(
+    refusal.error[0],
+    /upgrade-worktree|private executor detail|refs\/heads|\.git\/worktrees/u,
+  );
+
+  const rejectedRunner = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    applyCapabilityUpgrade: () =>
+      Promise.reject(new Error("private executor rejection")),
+  });
+  const rejected = captureOutput();
+  assert.equal(
+    await rejectedRunner(
+      applyUpgradeArguments("/private/upgrade-worktree"),
+      rejected.output,
+    ),
+    1,
+  );
+  assert.deepEqual(rejected.standard, []);
+  assert.deepEqual(rejected.error, [
+    JSON.stringify({
+      ok: false,
+      command: "apply-upgrade",
+      code: "CAPABILITY_EXECUTION_FAILED",
+      phase: "precondition",
+      recovery: "inspect-worktree",
+    }),
+  ]);
+  assert.doesNotMatch(
+    rejected.error[0],
+    /upgrade-worktree|private executor rejection/u,
+  );
+});
+
+test("apply-upgrade preserves representative inspectable failure prefixes", async () => {
+  const cases = [
+    {
+      name: "verification",
+      failure: {
+        code: "CAPABILITY_VERIFICATION_FAILED",
+        phase: "verify",
+        recovery: "inspect-worktree",
+      },
+      mutate(repository) {
+        repository.source = "six-source-action-prefix";
+      },
+      expected: {
+        source: "six-source-action-prefix",
+        migration: "original-migration",
+        state: "original-state",
+      },
+    },
+    {
+      name: "migration persistence",
+      failure: {
+        code: "CAPABILITY_MIGRATION_WRITE_FAILED",
+        phase: "persist-migration",
+        recovery: "inspect-worktree",
+      },
+      mutate(repository) {
+        repository.source = "six-source-action-prefix";
+        repository.migration = "original-migration+upgrade-record";
+      },
+      expected: {
+        source: "six-source-action-prefix",
+        migration: "original-migration+upgrade-record",
+        state: "original-state",
+      },
+    },
+    {
+      name: "state persistence",
+      failure: {
+        code: "CAPABILITY_STATE_WRITE_FAILED",
+        phase: "persist-state",
+        recovery: "inspect-worktree",
+      },
+      mutate(repository) {
+        repository.source = "six-source-action-prefix";
+        repository.migration = "original-migration+upgrade-record";
+        repository.state = "uncertain-upgrade-state";
+      },
+      expected: {
+        source: "six-source-action-prefix",
+        migration: "original-migration+upgrade-record",
+        state: "uncertain-upgrade-state",
+      },
+    },
+  ];
+
+  for (const fixture of cases) {
+    const repository = {
+      source: "original-source",
+      migration: "original-migration",
+      state: "original-state",
+    };
+    const runCli = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      applyCapabilityUpgrade: () => {
+        fixture.mutate(repository);
+        return Promise.resolve({ ok: false, ...fixture.failure });
+      },
+    });
+    const captured = captureOutput();
+
+    assert.equal(
+      await runCli(
+        applyUpgradeArguments("/private/upgrade-worktree"),
+        captured.output,
+      ),
+      1,
+      fixture.name,
+    );
+    assert.deepEqual(repository, fixture.expected, fixture.name);
+    assert.deepEqual(captured.standard, [], fixture.name);
+    assert.deepEqual(
+      captured.error,
+      [
+        JSON.stringify({
+          ok: false,
+          command: "apply-upgrade",
+          ...fixture.failure,
+        }),
+      ],
+      fixture.name,
+    );
+  }
+});
+
 test("plan-add contains final inspection changes and never leaks a completed plan", async () => {
   const initial = cleanGitInspection();
   const finalCases = [
@@ -2397,6 +2707,13 @@ async function executeBuiltApplyRemove(directory, approvedPlan) {
   ]);
 }
 
+async function executeBuiltApplyUpgrade(directory, approvedPlan) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...applyUpgradeArguments(directory, approvedPlan),
+  ]);
+}
+
 test("the compiled plan-add command emits exact portfolio and site plans without writes", async () => {
   for (const profile of ["portfolio", "site"]) {
     await withGitFixture(profile, async ({ linked }) => {
@@ -2476,6 +2793,216 @@ test("the compiled plan-upgrade command plans both profiles without changing any
       },
       {
         branch: `plan-upgrade-${profile}-test`,
+        preparePrimary: prepareHistoricalUpgradeFixture,
+      },
+    );
+  }
+});
+
+test("the compiled apply-upgrade command completes the exact portfolio and site transactions", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    await withGitFixture(
+      profile,
+      async ({ linked, primary }) => {
+        const linkedBefore = await gitRepositorySnapshot(linked);
+        const primaryBefore = await gitRepositorySnapshot(primary);
+        const initialInspection = await core.inspectGitWorktree({ root: linked });
+        assert.equal(initialInspection.ok, true);
+        const initialProjectSource = await readFile(
+          join(linked, ".egeria/project.yaml"),
+          "utf8",
+        );
+        const initialStateSource = await readFile(
+          join(linked, ".egeria/state.json"),
+          "utf8",
+        );
+        const initialMigrationSource = await readFile(
+          join(linked, ".egeria/migrations.jsonl"),
+          "utf8",
+        );
+        const initialState = core.parseStateJson(initialStateSource);
+        assert.equal(initialState.ok, true);
+
+        const planExecution = await executeBuiltPlanUpgrade(linked);
+        assert.equal(planExecution.exitCode, 0, planExecution.stderr);
+        assert.equal(planExecution.stderr, "");
+        const plan = JSON.parse(planExecution.stdout).plan;
+        assert.deepEqual(await gitRepositorySnapshot(linked), linkedBefore);
+
+        const execution = await executeBuiltApplyUpgrade(
+          linked,
+          plan.planFingerprint,
+        );
+        assert.equal(execution.exitCode, 0, execution.stderr);
+        assert.equal(execution.stderr, "");
+        assert.equal(execution.stdout.endsWith("\n"), true);
+        assert.equal(execution.stdout.trimEnd().split("\n").length, 1);
+        const emitted = JSON.parse(execution.stdout);
+        const expectedChangedPaths = [
+          ...upgradeSourcePaths,
+          ".egeria/migrations.jsonl",
+          ".egeria/state.json",
+        ].sort();
+        assert.deepEqual(emitted, {
+          ok: true,
+          command: "apply-upgrade",
+          result: {
+            status: "verified-final-diff-approval-required",
+            baseRevision: Buffer.from(linkedBefore.head).toString("utf8").trim(),
+            capability: {
+              identifier: "standards",
+              fromVersion: "0.3.0",
+              toVersion: "0.4.0",
+            },
+            migration: "upgrade-standards-0-3-0-to-0-4-0",
+            changedPaths: expectedChangedPaths,
+            verificationChecks: core.capabilityUpgradeVerificationChecks,
+          },
+        });
+
+        for (const path of upgradeSourcePaths) {
+          assert.deepEqual(
+            await readFile(join(linked, path)),
+            await readFile(
+              resolve(repositoryRoot, `fixtures/generated/${profile}`, path),
+            ),
+            `${profile}:${path}`,
+          );
+        }
+        assert.equal(
+          await readFile(join(linked, ".egeria/project.yaml"), "utf8"),
+          initialProjectSource,
+        );
+
+        const migrationSource = await readFile(
+          join(linked, ".egeria/migrations.jsonl"),
+          "utf8",
+        );
+        const migrations = core.parseMigrationLog(migrationSource);
+        assert.equal(migrations.ok, true);
+        assert.equal(migrations.value.length, 1);
+        const migration = migrations.value[0];
+        assert.match(migration.completedAt, /^\d{4}-\d{2}-\d{2}T/u);
+        assert.deepEqual(migration, {
+          schemaVersion: "1.0.0",
+          identifier: "upgrade-standards-0-3-0-to-0-4-0",
+          kind: "migration",
+          outcome: "succeeded",
+          completedAt: migration.completedAt,
+          fromBuilderVersion: "0.0.0",
+          toBuilderVersion: "0.0.0",
+          capabilities: plan.desiredCapabilities,
+          persistentDataAuthorizations: [],
+          remainingKnownDrift: [],
+          verificationChecks: core.capabilityUpgradePersistedVerificationChecks,
+        });
+        const migrationSeparator =
+          initialMigrationSource.length > 0 &&
+          !initialMigrationSource.endsWith("\n")
+            ? "\n"
+            : "";
+        assert.equal(
+          migrationSource,
+          `${initialMigrationSource}${migrationSeparator}${core.serializeMigrationRecord(
+            migration,
+          )}`,
+        );
+
+        const targetState = core.parseStateJson(
+          await readFile(
+            resolve(
+              repositoryRoot,
+              `fixtures/generated/${profile}/.egeria/state.json`,
+            ),
+            "utf8",
+          ),
+        );
+        assert.equal(targetState.ok, true);
+        const initialSurfaces = new Map(
+          initialState.value.managedSurfaces.map((surface) => [
+            surface.identifier,
+            surface,
+          ]),
+        );
+        const changedSurfacePaths = new Set([
+          ...upgradeSourcePaths,
+          ".egeria/migrations.jsonl",
+        ]);
+        const expectedManagedSurfaces = targetState.value.managedSurfaces.map(
+          (surface) => {
+            if (surface.path === ".egeria/migrations.jsonl") {
+              return {
+                ...surface,
+                fingerprint: core.fingerprintFileContent(
+                  new TextEncoder().encode(migrationSource),
+                ),
+              };
+            }
+            if (changedSurfacePaths.has(surface.path)) {
+              return surface;
+            }
+            const initial = initialSurfaces.get(surface.identifier);
+            assert.notEqual(initial, undefined, surface.identifier);
+            return initial;
+          },
+        );
+        const expectedStateSource = core.serializeStateJson({
+          ...initialState.value,
+          installedCapabilities: initialState.value.installedCapabilities.map(
+            (capability) =>
+              capability.identifier === "standards"
+                ? { ...capability, version: "0.4.0" }
+                : capability,
+          ),
+          appliedMigrations: [
+            ...initialState.value.appliedMigrations,
+            "upgrade-standards-0-3-0-to-0-4-0",
+          ],
+          managedSurfaces: expectedManagedSurfaces,
+          lastSuccessfulVerification: {
+            kind: "capability-upgrade",
+            checks: core.capabilityUpgradePersistedVerificationChecks,
+          },
+        });
+        assert.equal(
+          await readFile(join(linked, ".egeria/state.json"), "utf8"),
+          expectedStateSource,
+        );
+
+        const status = Buffer.from(
+          await executeGit(
+            linked,
+            ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            true,
+          ),
+        ).toString("utf8");
+        assert.deepEqual(
+          status
+            .split("\0")
+            .filter(Boolean)
+            .map((entry) => entry.slice(3))
+            .sort(),
+          expectedChangedPaths,
+        );
+        assert.deepEqual(
+          await core.inspectGitExpectedChanges({
+            root: linked,
+            identity: initialInspection.identity,
+            expectedPaths: expectedChangedPaths,
+          }),
+          { ok: true },
+        );
+        assert.deepEqual(
+          withoutSharedRefs(await gitRepositorySnapshot(primary)),
+          withoutSharedRefs(primaryBefore),
+        );
+        assert.doesNotMatch(
+          execution.stdout,
+          /refs\/heads|\.git\/worktrees|acme-(?:portfolio|site)|project\.yaml/u,
+        );
+      },
+      {
+        branch: `standards-upgrade-${profile}-success`,
         preparePrimary: prepareHistoricalUpgradeFixture,
       },
     );
@@ -2631,6 +3158,307 @@ test("the compiled plan-upgrade command refuses unsafe or unsupported repository
         ...(fixture.preparePrimary === undefined
           ? {}
           : { preparePrimary: fixture.preparePrimary }),
+      },
+    );
+  }
+});
+
+test("the compiled apply-upgrade command refuses the finite unsafe matrix without mutation", async () => {
+  const cases = [
+    {
+      name: "wrong fingerprint",
+      historical: true,
+      prepare: async ({ linked }) => ({
+        root: linked,
+        approvedPlan: `sha256:${"0".repeat(64)}`,
+        expectedCode: "CAPABILITY_PLAN_APPROVAL_INVALID",
+      }),
+    },
+    {
+      name: "stale fingerprint after a clean base revision change",
+      historical: true,
+      prepare: async ({ linked }) => {
+        const planned = await executeBuiltPlanUpgrade(linked);
+        assert.equal(planned.exitCode, 0, planned.stderr);
+        const approvedPlan = JSON.parse(planned.stdout).plan.planFingerprint;
+        await writeFile(
+          join(linked, ".gitignore"),
+          `${await readFile(join(linked, ".gitignore"), "utf8")}\n# changed base\n`,
+        );
+        await commitAll(linked, "change approved upgrade base");
+        return {
+          root: linked,
+          approvedPlan,
+          expectedCode: "CAPABILITY_PLAN_APPROVAL_INVALID",
+        };
+      },
+    },
+    {
+      name: "changed approved plan through managed drift",
+      historical: true,
+      prepare: async ({ linked }) => {
+        const planned = await executeBuiltPlanUpgrade(linked);
+        assert.equal(planned.exitCode, 0, planned.stderr);
+        const approvedPlan = JSON.parse(planned.stdout).plan.planFingerprint;
+        await writeFile(
+          join(linked, ".github/workflows/quality.yml"),
+          "private changed approved source\n",
+        );
+        await commitAll(linked, "change approved upgrade source");
+        return {
+          root: linked,
+          approvedPlan,
+          expectedCode: "PROJECT_DRIFT_DETECTED",
+        };
+      },
+    },
+    {
+      name: "unsupported target syntax",
+      historical: true,
+      prepare: async ({ linked }) => ({
+        root: linked,
+        approvedPlan: `sha256:${"0".repeat(64)}`,
+        expectedArgumentRefusal: true,
+        arguments: applyUpgradeArguments(
+          linked,
+          `sha256:${"0".repeat(64)}`,
+        ).map((value) => (value === "0.4.0" ? "0.5.0" : value)),
+      }),
+    },
+    {
+      name: "missing source edge",
+      historical: true,
+      prepare: async ({ linked }) => {
+        const path = join(linked, ".egeria/state.json");
+        const state = core.parseStateJson(await readFile(path, "utf8"));
+        assert.equal(state.ok, true);
+        await writeFile(
+          path,
+          core.serializeStateJson({
+            ...state.value,
+            installedCapabilities: state.value.installedCapabilities.map(
+              (capability) =>
+                capability.identifier === "standards"
+                  ? { ...capability, version: "0.2.0" }
+                  : capability,
+            ),
+          }),
+        );
+        await commitAll(linked, "set unsupported standards source");
+        return {
+          root: linked,
+          approvedPlan: `sha256:${"0".repeat(64)}`,
+          expectedCode: "CAPABILITY_UPGRADE_EDGE_MISSING",
+        };
+      },
+    },
+    {
+      name: "already current",
+      historical: false,
+      prepare: async ({ linked }) => ({
+        root: linked,
+        approvedPlan: `sha256:${"0".repeat(64)}`,
+        expectedCode: "CAPABILITY_ALREADY_CURRENT",
+      }),
+    },
+    {
+      name: "ambiguous source",
+      historical: true,
+      prepare: async ({ linked }) => {
+        await writeFile(join(linked, "apps/web/package.json"), "{");
+        await commitAll(linked, "make standards source ambiguous");
+        return {
+          root: linked,
+          approvedPlan: `sha256:${"0".repeat(64)}`,
+          expectedCode: "CAPABILITY_VERSION_AMBIGUOUS",
+        };
+      },
+    },
+    {
+      name: "managed drift",
+      historical: true,
+      prepare: async ({ linked }) => {
+        await writeFile(
+          join(linked, ".github/workflows/quality.yml"),
+          "private managed drift\n",
+        );
+        await commitAll(linked, "drift standards workflow");
+        return {
+          root: linked,
+          approvedPlan: `sha256:${"0".repeat(64)}`,
+          expectedCode: "PROJECT_DRIFT_DETECTED",
+        };
+      },
+    },
+    {
+      name: "incompatible state",
+      historical: true,
+      prepare: async ({ linked }) => {
+        const path = join(linked, ".egeria/state.json");
+        const state = core.parseStateJson(await readFile(path, "utf8"));
+        assert.equal(state.ok, true);
+        await writeFile(
+          path,
+          core.serializeStateJson({
+            ...state.value,
+            appliedMigrations: ["invented-migration"],
+          }),
+        );
+        await commitAll(linked, "make upgrade state incompatible");
+        return {
+          root: linked,
+          approvedPlan: `sha256:${"0".repeat(64)}`,
+          expectedCode: "PROJECT_STATE_INCOMPATIBLE",
+        };
+      },
+    },
+    {
+      name: "create target conflict",
+      historical: true,
+      prepare: async ({ linked }) => {
+        const path = join(linked, visualUpgradePaths[0]);
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, "private create conflict\n");
+        await commitAll(linked, "add conflicting upgrade target");
+        return {
+          root: linked,
+          approvedPlan: `sha256:${"0".repeat(64)}`,
+          expectedCode: "CAPABILITY_ACTION_CONFLICT",
+        };
+      },
+    },
+    {
+      name: "ignored create target conflict",
+      historical: true,
+      prepare: async ({ linked }) => {
+        await writeFile(
+          join(linked, ".gitignore"),
+          `${await readFile(join(linked, ".gitignore"), "utf8")}\n${visualUpgradePaths[0]}\n`,
+        );
+        await commitAll(linked, "ignore upgrade target");
+        const path = join(linked, visualUpgradePaths[0]);
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, "private ignored conflict\n");
+        return {
+          root: linked,
+          approvedPlan: `sha256:${"0".repeat(64)}`,
+          expectedCode: "CAPABILITY_ACTION_CONFLICT",
+        };
+      },
+    },
+    {
+      name: "dirty repository",
+      historical: true,
+      prepare: async ({ linked }) => {
+        await writeFile(join(linked, "private-untracked.txt"), "private\n");
+        return {
+          root: linked,
+          approvedPlan: `sha256:${"0".repeat(64)}`,
+          expectedCode: "GIT_WORKTREE_DIRTY",
+        };
+      },
+    },
+    {
+      name: "detached worktree",
+      historical: true,
+      prepare: async ({ linked }) => {
+        await executeGit(linked, ["checkout", "--detach"]);
+        return {
+          root: linked,
+          approvedPlan: `sha256:${"0".repeat(64)}`,
+          expectedCode: "GIT_BRANCH_REQUIRED",
+        };
+      },
+    },
+    {
+      name: "primary unisolated checkout",
+      historical: true,
+      prepare: async ({ primary }) => ({
+        root: primary,
+        approvedPlan: `sha256:${"0".repeat(64)}`,
+        expectedCode: "GIT_WORKTREE_NOT_ISOLATED",
+      }),
+    },
+    ...[
+      ["assume-unchanged", "--assume-unchanged"],
+      ["skip-worktree", "--skip-worktree"],
+    ].map(([name, flag]) => ({
+      name: `${name} hidden tracked change`,
+      historical: true,
+      prepare: async ({ linked }) => {
+        await executeGit(linked, ["update-index", flag, ".gitignore"]);
+        await writeFile(join(linked, ".gitignore"), `private ${name} drift\n`);
+        return {
+          root: linked,
+          approvedPlan: `sha256:${"0".repeat(64)}`,
+          expectedCode: "GIT_WORKTREE_DIRTY",
+        };
+      },
+    })),
+  ];
+
+  for (const [index, fixture] of cases.entries()) {
+    await withGitFixture(
+      "portfolio",
+      async (roots) => {
+        const prepared = await fixture.prepare(roots);
+        const before = await gitRepositorySnapshot(prepared.root);
+        const controlsBefore = await Promise.all(
+          upgradeControlPaths.map((path) => readFile(join(prepared.root, path))),
+        );
+        const execution =
+          prepared.arguments === undefined
+            ? await executeBuiltApplyUpgrade(
+                prepared.root,
+                prepared.approvedPlan,
+              )
+            : await executeNode([
+                resolve(packageRoot, "dist/index.js"),
+                ...prepared.arguments,
+              ]);
+        const after = await gitRepositorySnapshot(prepared.root);
+        const controlsAfter = await Promise.all(
+          upgradeControlPaths.map((path) => readFile(join(prepared.root, path))),
+        );
+
+        assert.equal(
+          execution.exitCode,
+          prepared.expectedArgumentRefusal === true ? 2 : 1,
+          fixture.name,
+        );
+        assert.equal(execution.stdout, "", fixture.name);
+        assert.equal(execution.stderr.endsWith("\n"), true, fixture.name);
+        assert.equal(
+          execution.stderr.trimEnd().split("\n").length,
+          1,
+          fixture.name,
+        );
+        assert.deepEqual(
+          JSON.parse(execution.stderr),
+          prepared.expectedArgumentRefusal === true
+            ? { ok: false, code: "CLI_ARGUMENT_INVALID" }
+            : {
+                ok: false,
+                command: "apply-upgrade",
+                code: prepared.expectedCode,
+                phase: "precondition",
+                recovery: "not-required",
+              },
+          fixture.name,
+        );
+        assert.deepEqual(after, before, fixture.name);
+        assert.deepEqual(controlsAfter, controlsBefore, fixture.name);
+        assert.doesNotMatch(
+          execution.stderr,
+          /private|refs\/heads|\.git\/worktrees|invented-migration/u,
+          fixture.name,
+        );
+      },
+      {
+        branch: `standards-upgrade-refusal-${index}`,
+        ...(fixture.historical
+          ? { preparePrimary: prepareHistoricalUpgradeFixture }
+          : {}),
       },
     );
   }
