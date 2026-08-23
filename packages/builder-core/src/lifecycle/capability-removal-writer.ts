@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import { constants, lstatSync } from "node:fs";
-import { lstat, open, rename, unlink } from "node:fs/promises";
-import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { lstat, open } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { safeRelativePathSchema } from "../contracts/identifiers.js";
 
@@ -45,12 +47,59 @@ type FileIdentity = PathIdentity &
 type PreparedChange = Readonly<{
   change: CapabilityRemovalFileChange;
   target: string;
+  parent: PathIdentity;
   identity: FileIdentity;
 }>;
 
 type CapabilityRemovalWriterHooks = Readonly<{
   beforeCommit?: (path: string) => Promise<unknown>;
+  beforeMutation?: (path: string) => Promise<unknown>;
 }>;
+
+type SerializedFileIdentity = Readonly<{
+  device: string;
+  inode: string;
+  mode: number;
+  size: string;
+  changeTime: string;
+  modificationTime: string;
+}>;
+
+type FileOperation =
+  | Readonly<{
+      kind: "create";
+      name: string;
+      mode: number;
+      content: string;
+    }>
+  | Readonly<{
+      kind: "remove";
+      name: string;
+      identity: SerializedFileIdentity;
+    }>
+  | Readonly<{
+      kind: "replace";
+      targetName: string;
+      targetIdentity: SerializedFileIdentity;
+      expected: string;
+      temporaryName: string;
+      temporaryIdentity: SerializedFileIdentity;
+    }>
+  | Readonly<{
+      kind: "delete";
+      targetName: string;
+      targetIdentity: SerializedFileIdentity;
+      expected: string;
+    }>;
+
+type FileOperationResult =
+  | Readonly<{ ok: true; identity?: SerializedFileIdentity }>
+  | Readonly<{ ok: false; sourceChanged: boolean }>;
+
+const fileOperationPath = fileURLToPath(
+  new URL("./capability-removal-file-operation.js", import.meta.url),
+);
+const maximumOperationOutputBytes = 4 * 1024;
 
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
   return (
@@ -83,49 +132,37 @@ async function identityMatches(identity: PathIdentity): Promise<boolean> {
   }
 }
 
-async function fileIdentityMatches(identity: FileIdentity): Promise<boolean> {
-  try {
-    const stats = await lstat(identity.path, { bigint: true });
-    return (
-      !stats.isSymbolicLink() &&
-      stats.isFile() &&
-      stats.dev === identity.device &&
-      stats.ino === identity.inode &&
-      Number(stats.mode & 0o777n) === identity.mode &&
-      stats.size === identity.size &&
-      stats.ctimeNs === identity.changeTime &&
-      stats.mtimeNs === identity.modificationTime
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function parentDirectoriesAreSafe(
+async function captureParentDirectory(
   rootIdentity: PathIdentity,
   path: string,
-): Promise<boolean> {
+): Promise<PathIdentity | undefined> {
   const parent = dirname(path);
   const relativeParent = parent
     .slice(rootIdentity.path.length)
     .replace(/^[/\\]/u, "");
   let current = rootIdentity.path;
+  let currentIdentity = rootIdentity;
 
   for (const segment of relativeParent.length === 0
     ? []
     : relativeParent.split(sep)) {
     current = join(current, segment);
     try {
-      const stats = await lstat(current);
+      const stats = await lstat(current, { bigint: true });
       if (stats.isSymbolicLink() || !stats.isDirectory()) {
-        return false;
+        return undefined;
       }
+      currentIdentity = {
+        path: current,
+        device: stats.dev,
+        inode: stats.ino,
+      };
     } catch {
-      return false;
+      return undefined;
     }
   }
 
-  return identityMatches(rootIdentity);
+  return (await identityMatches(rootIdentity)) ? currentIdentity : undefined;
 }
 
 async function prepareChange(
@@ -133,7 +170,8 @@ async function prepareChange(
   change: CapabilityRemovalFileChange,
 ): Promise<PreparedChange | undefined> {
   const target = join(rootIdentity.path, change.path);
-  if (!(await parentDirectoriesAreSafe(rootIdentity, target))) {
+  const parent = await captureParentDirectory(rootIdentity, target);
+  if (parent === undefined) {
     return undefined;
   }
 
@@ -149,6 +187,7 @@ async function prepareChange(
       ? {
           change,
           target,
+          parent,
           identity: {
             path: target,
             device: stats.dev,
@@ -178,17 +217,167 @@ function samePreparedIdentity(
   );
 }
 
-async function removeOwnedTemporary(identity: FileIdentity): Promise<boolean> {
-  if (!(await fileIdentityMatches(identity))) {
-    return false;
-  }
+function samePathIdentity(left: PathIdentity, right: PathIdentity): boolean {
+  return left.device === right.device && left.inode === right.inode;
+}
 
-  try {
-    await unlink(identity.path);
-    return true;
-  } catch {
-    return false;
+function serializeFileIdentity(
+  identity: FileIdentity,
+): SerializedFileIdentity {
+  return {
+    device: identity.device.toString(),
+    inode: identity.inode.toString(),
+    mode: identity.mode,
+    size: identity.size.toString(),
+    changeTime: identity.changeTime.toString(),
+    modificationTime: identity.modificationTime.toString(),
+  };
+}
+
+function parseSerializedIdentity(
+  value: unknown,
+  path: string,
+): FileIdentity | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
   }
+  const identity = value as Record<string, unknown>;
+  const decimals = [
+    identity.device,
+    identity.inode,
+    identity.size,
+    identity.changeTime,
+    identity.modificationTime,
+  ];
+  if (
+    decimals.some(
+      (part) =>
+        typeof part !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(part),
+    ) ||
+    typeof identity.mode !== "number" ||
+    !Number.isInteger(identity.mode) ||
+    identity.mode < 0 ||
+    identity.mode > 0o777
+  ) {
+    return undefined;
+  }
+  return {
+    path,
+    device: BigInt(identity.device as string),
+    inode: BigInt(identity.inode as string),
+    mode: identity.mode,
+    size: BigInt(identity.size as string),
+    changeTime: BigInt(identity.changeTime as string),
+    modificationTime: BigInt(identity.modificationTime as string),
+  };
+}
+
+async function runFileOperation(
+  parent: PathIdentity,
+  operation: FileOperation,
+): Promise<FileOperationResult> {
+  return new Promise((resolveOperation) => {
+    let settled = false;
+    let outputBytes = 0;
+    let outputExceeded = false;
+    const output: Buffer[] = [];
+    const child = spawn(process.execPath, [fileOperationPath], {
+      cwd: parent.path,
+      env: {},
+      stdio: ["pipe", "pipe", "ignore"],
+      windowsHide: true,
+    });
+    const finish = (result: FileOperationResult): void => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timeout);
+        resolveOperation(result);
+      }
+    };
+    const timeout = setTimeout(() => {
+      child.kill();
+      finish({ ok: false, sourceChanged: false });
+    }, 5_000);
+    timeout.unref();
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      outputBytes += chunk.length;
+      if (outputBytes > maximumOperationOutputBytes) {
+        outputExceeded = true;
+        child.kill();
+        return;
+      }
+      output.push(chunk);
+    });
+    child.once("error", () => {
+      finish({ ok: false, sourceChanged: false });
+    });
+    child.once("close", (code) => {
+      if (settled) {
+        return;
+      }
+      if (code !== 0 || outputExceeded) {
+        finish({ ok: false, sourceChanged: false });
+        return;
+      }
+      try {
+        const parsed = JSON.parse(
+          Buffer.concat(output).toString("utf8"),
+        ) as unknown;
+        if (
+          typeof parsed !== "object" ||
+          parsed === null ||
+          Array.isArray(parsed)
+        ) {
+          finish({ ok: false, sourceChanged: false });
+          return;
+        }
+        const result = parsed as Record<string, unknown>;
+        if (result.ok === true) {
+          finish(
+            result.identity === undefined
+              ? { ok: true }
+              : {
+                  ok: true,
+                  identity: result.identity as SerializedFileIdentity,
+                },
+          );
+          return;
+        }
+        finish({
+          ok: false,
+          sourceChanged:
+            result.ok === false && typeof result.sourceChanged === "boolean"
+              ? result.sourceChanged
+              : false,
+        });
+      } catch {
+        finish({ ok: false, sourceChanged: false });
+      }
+    });
+    child.stdin.on("error", () => undefined);
+    child.stdin.end(
+      JSON.stringify({
+        parent: {
+          device: parent.device.toString(),
+          inode: parent.inode.toString(),
+        },
+        operation,
+      }),
+    );
+  });
+}
+
+async function removeOwnedTemporary(
+  parent: PathIdentity,
+  identity: FileIdentity,
+): Promise<boolean> {
+  const result = await runFileOperation(parent, {
+    kind: "remove",
+    name: basename(identity.path),
+    identity: serializeFileIdentity(identity),
+  });
+  return result.ok;
 }
 
 async function createTemporaryFile(
@@ -199,54 +388,21 @@ async function createTemporaryFile(
   | Readonly<{ ok: true; identity: FileIdentity }>
   | Readonly<{ ok: false; sourceChanged: boolean }>
 > {
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    const path = join(
-      dirname(prepared.target),
-      `.egeria-removal-${randomUUID()}.tmp`,
-    );
-    let handle;
-    try {
-      handle = await open(path, "wx", prepared.identity.mode);
-    } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "EEXIST") {
-        continue;
-      }
-      return { ok: false, sourceChanged: false };
-    }
-
-    let identity: FileIdentity | undefined;
-    try {
-      const stats = await handle.stat({ bigint: true });
-      if (stats.isSymbolicLink() || !stats.isFile()) {
-        throw new Error("temporary-file-invalid");
-      }
-      await handle.chmod(prepared.identity.mode);
-      await handle.writeFile(prepared.change.content);
-      await handle.sync();
-      const finalStats = await handle.stat({ bigint: true });
-      identity = {
-        path,
-        device: finalStats.dev,
-        inode: finalStats.ino,
-        mode: Number(finalStats.mode & 0o777n),
-        size: finalStats.size,
-        changeTime: finalStats.ctimeNs,
-        modificationTime: finalStats.mtimeNs,
-      };
-      await handle.close();
-      handle = undefined;
-      return { ok: true, identity };
-    } catch {
-      await handle?.close().catch(() => undefined);
-      return {
-        ok: false,
-        sourceChanged:
-          identity === undefined || !(await removeOwnedTemporary(identity)),
-      };
-    }
+  const name = `.egeria-removal-${randomUUID()}.tmp`;
+  const path = join(prepared.parent.path, name);
+  const result = await runFileOperation(prepared.parent, {
+    kind: "create",
+    name,
+    mode: prepared.identity.mode,
+    content: Buffer.from(prepared.change.content).toString("base64"),
+  });
+  if (!result.ok) {
+    return result;
   }
-
-  return { ok: false, sourceChanged: false };
+  const identity = parseSerializedIdentity(result.identity, path);
+  return identity === undefined
+    ? { ok: false, sourceChanged: true }
+    : { ok: true, identity };
 }
 
 async function targetStillMatches(
@@ -257,7 +413,7 @@ async function targetStillMatches(
   return (
     current !== undefined &&
     samePreparedIdentity(prepared, current) &&
-    (await parentDirectoriesAreSafe(rootIdentity, prepared.target))
+    samePathIdentity(prepared.parent, current.parent)
   );
 }
 
@@ -277,7 +433,10 @@ async function replacePreparedFile(
     await hooks.beforeCommit?.(prepared.change.path);
   } catch {
     const targetChanged = !(await targetStillMatches(rootIdentity, prepared));
-    const temporaryRemoved = await removeOwnedTemporary(temporary.identity);
+    const temporaryRemoved = await removeOwnedTemporary(
+      prepared.parent,
+      temporary.identity,
+    );
     return {
       ok: false,
       sourceChanged: targetChanged || !temporaryRemoved,
@@ -285,7 +444,7 @@ async function replacePreparedFile(
   }
 
   if (!(await targetStillMatches(rootIdentity, prepared))) {
-    await removeOwnedTemporary(temporary.identity);
+    await removeOwnedTemporary(prepared.parent, temporary.identity);
     return {
       ok: false,
       sourceChanged: true,
@@ -293,14 +452,38 @@ async function replacePreparedFile(
   }
 
   try {
-    await rename(temporary.identity.path, prepared.target);
-    return { ok: true };
+    await hooks.beforeMutation?.(prepared.change.path);
   } catch {
+    const targetChanged = !(await targetStillMatches(rootIdentity, prepared));
+    const temporaryRemoved = await removeOwnedTemporary(
+      prepared.parent,
+      temporary.identity,
+    );
     return {
       ok: false,
-      sourceChanged: !(await removeOwnedTemporary(temporary.identity)),
+      sourceChanged: targetChanged || !temporaryRemoved,
     };
   }
+
+  const result = await runFileOperation(prepared.parent, {
+    kind: "replace",
+    targetName: basename(prepared.target),
+    targetIdentity: serializeFileIdentity(prepared.identity),
+    expected: Buffer.from(prepared.change.expected).toString("base64"),
+    temporaryName: basename(temporary.identity.path),
+    temporaryIdentity: serializeFileIdentity(temporary.identity),
+  });
+  if (result.ok) {
+    return result;
+  }
+  const temporaryRemoved = await removeOwnedTemporary(
+    prepared.parent,
+    temporary.identity,
+  );
+  return {
+    ok: false,
+    sourceChanged: result.sourceChanged || !temporaryRemoved,
+  };
 }
 
 async function deletePreparedFile(
@@ -322,14 +505,28 @@ async function deletePreparedFile(
   }
 
   try {
-    await unlink(prepared.target);
-    return { ok: true };
+    await hooks.beforeMutation?.(prepared.change.path);
   } catch {
     return {
       ok: false,
       sourceChanged: !(await targetStillMatches(rootIdentity, prepared)),
     };
   }
+
+  const result = await runFileOperation(prepared.parent, {
+    kind: "delete",
+    targetName: basename(prepared.target),
+    targetIdentity: serializeFileIdentity(prepared.identity),
+    expected: Buffer.from(prepared.change.expected).toString("base64"),
+  });
+  return result.ok
+    ? result
+    : {
+        ok: false,
+        sourceChanged:
+          result.sourceChanged ||
+          !(await targetStillMatches(rootIdentity, prepared)),
+      };
 }
 
 export function createFileSystemCapabilityRemovalWriter(

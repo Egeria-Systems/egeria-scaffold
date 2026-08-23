@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
+import { chmod, link, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -234,4 +234,85 @@ test("filesystem removal writer preserves its temporary path after concurrent by
   );
   assert.equal(await readFile(target, "utf8"), "before\n");
   assert.equal(await readFile(modifiedTemporaryPath, "utf8"), "changed\n");
+});
+
+test("filesystem removal writer confines final mutations to the validated parent directory", async (context) => {
+  const root = await createTemporaryRoot(context, "egeria-removal-parent-race-");
+  const outside = await createTemporaryRoot(context, "egeria-removal-parent-outside-");
+  const replacementParent = join(root, "replacement");
+  const movedReplacementParent = join(root, "replacement-moved");
+  await mkdir(replacementParent);
+  await writeFile(join(replacementParent, "target.txt"), "before\n", "utf8");
+  await link(
+    join(replacementParent, "target.txt"),
+    join(outside, "target.txt"),
+  );
+
+  const replacementWriter = createFileSystemCapabilityRemovalWriter(root, {
+    beforeMutation: async () => {
+      const temporaryName = (await readdir(replacementParent)).find((name) =>
+        name.startsWith(".egeria-removal-"),
+      );
+      assert.ok(temporaryName);
+      await rename(replacementParent, movedReplacementParent);
+      await link(
+        join(movedReplacementParent, temporaryName),
+        join(outside, temporaryName),
+      );
+      await symlink(outside, replacementParent);
+    },
+  });
+  assert.deepEqual(
+    await replacementWriter.write([
+      {
+        kind: "replace-file",
+        path: "replacement/target.txt",
+        expected: encoder.encode("before\n"),
+        content: encoder.encode("after\n"),
+      },
+    ]),
+    { ok: false, sourceChanged: true },
+  );
+  assert.equal(await readFile(join(outside, "target.txt"), "utf8"), "before\n");
+  assert.equal(
+    await readFile(join(movedReplacementParent, "target.txt"), "utf8"),
+    "before\n",
+  );
+
+  const deletionParent = join(root, "deletion");
+  const movedDeletionParent = join(root, "deletion-moved");
+  await mkdir(deletionParent);
+  await writeFile(
+    join(deletionParent, "delete-target.txt"),
+    "delete me\n",
+    "utf8",
+  );
+  await link(
+    join(deletionParent, "delete-target.txt"),
+    join(outside, "delete-target.txt"),
+  );
+  const deletionWriter = createFileSystemCapabilityRemovalWriter(root, {
+    beforeMutation: async () => {
+      await rename(deletionParent, movedDeletionParent);
+      await symlink(outside, deletionParent);
+    },
+  });
+  assert.deepEqual(
+    await deletionWriter.write([
+      {
+        kind: "delete-file",
+        path: "deletion/delete-target.txt",
+        expected: encoder.encode("delete me\n"),
+      },
+    ]),
+    { ok: false, sourceChanged: true },
+  );
+  assert.equal(
+    await readFile(join(outside, "delete-target.txt"), "utf8"),
+    "delete me\n",
+  );
+  assert.equal(
+    await readFile(join(movedDeletionParent, "delete-target.txt"), "utf8"),
+    "delete me\n",
+  );
 });

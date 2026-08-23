@@ -278,6 +278,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "lifecycle/apply-capability-addition.ts",
       "lifecycle/apply-capability-removal.ts",
       "lifecycle/capability-addition-writer.ts",
+      "lifecycle/capability-removal-file-operation.ts",
       "lifecycle/capability-removal-writer.ts",
       "lifecycle/git-worktree-inspection.ts",
       "lifecycle/plan-capability-addition.ts",
