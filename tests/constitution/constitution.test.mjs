@@ -2801,7 +2801,7 @@ test("canonical documentation records visual regression and the client-ready clo
   );
 });
 
-test("canonical documentation records the exact Calendly removal candidate after accepted planning", async () => {
+test("canonical documentation records accepted Calendly removal and the first upgrade planning edge", async () => {
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3B");
   const [sourcePlan, roadmap, overview, capabilityModel, enforcementMap] =
@@ -2838,7 +2838,7 @@ test("canonical documentation records the exact Calendly removal candidate after
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.match(
       sequencingOwner,
-      /7509fc819ba8670040374c350762720848a47ef1[^\n]+direct predecessor[^\n]+apply-remove[^\n]+implemented candidate/iu,
+        /7509fc819ba8670040374c350762720848a47ef1[^\n]+direct predecessor[^\n]+apply-remove[^\n]+pull request 46[^\n]+7f59e8b093edb7be617cd2a30bfb4ebaa6a8ab6e[^\n]+32620215344/iu,
     );
     assert.match(
       sequencingOwner,
@@ -2894,13 +2894,13 @@ test("canonical documentation records the exact Calendly removal candidate after
     );
     assert.match(
       boundaryOwner,
-      /apply-remove[^\n]+implemented candidate[^\n]+Generic transformation[^\n]+upgrades[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+      /apply-remove[^\n]+accepted-main integrated[^\n]+Generic transformation[^\n]+upgrade execution[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
     );
   }
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+implemented only[^\n]+exact Calendly addition and removal transactions[^\n]+generic transformation[^\n]+upgrades[^\n]+automated recovery[^\n]+certification backfill[^\n]+provider\/data cleanup[^\n]+remain planned/iu,
+    /Existing-repository mutation[^\n]+implemented only[^\n]+exact Calendly addition and removal transactions[^\n]+generic transformation[^\n]+upgrade execution[^\n]+automated recovery[^\n]+certification backfill[^\n]+provider\/data cleanup[^\n]+remain planned/iu,
   );
   assert.match(
     overview,
@@ -2917,7 +2917,7 @@ test("canonical documentation records the exact Calendly removal candidate after
   );
   assert.match(
     capabilityModel,
-    /apply-remove[^\n]+implemented candidate[^\n]+Generic transformation[^\n]+upgrades[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+    /apply-remove[^\n]+accepted-main integrated[^\n]+Generic transformation[^\n]+upgrade execution[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
   );
   assert.match(
     enforcementMap,
@@ -2937,7 +2937,96 @@ test("canonical documentation records the exact Calendly removal candidate after
   );
   assert.match(
     enforcementMap,
-    /apply-remove[^\n]+actual[^\n]+exact[^\n]+booking-calendly@0\.1\.0/iu,
+    /INV-STATE-UPDATE-ORDER[^\n]+actual[^\n]+exact Calendly addition and removal transactions/iu,
+  );
+
+  assert.match(
+    sourcePlan,
+    /standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+capability edge[^\n]+recipe[^\n]+builder-version[^\n]+profile-transition edge/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /plan-upgrade --directory <absolute-existing-linked-worktree> --capability standards --to-version 0\.4\.0/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /desired selection[^\n]+installed state[^\n]+inference[^\n]+project provenance[^\n]+state[^\n]+migration history/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /drift[^\n]+dirty or unstable Git identity[^\n]+disagreement[^\n]+without repository mutation/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /already-current refusal[^\n]+unsupported or missing-edge[^\n]+ambiguous versions[^\n]+incompatible control state/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /stdout[^\n]+stderr[^\n]+exit-code[^\n]+fingerprint[^\n]+stable[^\n]+privacy-safe/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /project\.yaml[^\n]+state\.json[^\n]+migrations\.jsonl[^\n]+exact original bytes/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /0\.y\.z[^\n]+1\.0\.0[^\n]+control contracts[^\n]+not upgrade subjects[^\n]+previous capability major[^\n]+does not exist/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /portfolio-to-site[^\n]+later[^\n]+independent/iu,
+  );
+
+  for (const upgradeSummary of [roadmap, overview, capabilityModel]) {
+    assert.match(
+      upgradeSummary,
+      /standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+capability edge/iu,
+    );
+    assert.match(
+      upgradeSummary,
+      /first-supported-upgrade-planning-boundary/iu,
+    );
+  }
+
+  for (const sequencingOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      sequencingOwner,
+      /minimum ten remaining increments/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /first fresh-added[^\n]+booking-calendly@0\.1\.0[^\n]+protected-staging journey/iu,
+    );
+    for (const backfillSubject of [
+      "content-files",
+      "section-composition",
+      "site-routing",
+    ]) {
+      assert.match(
+        sequencingOwner,
+        new RegExp(
+          `${escapeRegularExpression(backfillSubject)}@[^\\s,;]+[^\\n]+separate certification increment`,
+          "iu",
+        ),
+      );
+    }
+  }
+
+  for (const responsibility of [
+    /1\. implement the separately approved exact standards upgrade executor/iu,
+    /2\. implement read-only portfolio-to-site transition planning/iu,
+    /3\. implement its separately approved executor/iu,
+    /4\. perform one evidence-gated internal lifecycle extraction[^\n]+accepted add[^\n]+removal[^\n]+upgrade[^\n]+transition/iu,
+    /5\. run one `booking-calendly@0\.1\.0` lifecycle certification increment[^\n]+add-remove-re-add[^\n]+refusal[^\n]+recovery[^\n]+protected-staging journey/iu,
+    /6\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
+    /7\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
+  ]) {
+    assert.match(roadmap, responsibility);
+  }
+
+  assert.match(
+    enforcementMap,
+    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+actual[^\n]+read-only planner[^\n]+compiled CLI[^\n]+upgrade execution remains separate and planned/iu,
   );
 });
 

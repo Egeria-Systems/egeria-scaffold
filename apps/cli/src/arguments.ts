@@ -7,6 +7,7 @@ import {
   type ValidationResult,
 } from "@egeria-systems/builder-core";
 import { parseArgs } from "node:util";
+import { isAbsolute } from "node:path";
 
 export type CliCommand =
   | Readonly<{
@@ -31,6 +32,12 @@ export type CliCommand =
       kind: "plan-remove";
       directory: string;
       capability: "booking-calendly";
+    }>
+  | Readonly<{
+      kind: "plan-upgrade";
+      directory: string;
+      capability: "standards";
+      toVersion: "0.4.0";
     }>
   | Readonly<{
       kind: "apply-add";
@@ -80,6 +87,10 @@ function hasExactOptions(
 
 function validDirectory(value: string | undefined): value is string {
   return value !== undefined && value.length > 0 && !value.includes("\0");
+}
+
+function validAbsoluteDirectory(value: string | undefined): value is string {
+  return validDirectory(value) && isAbsolute(value);
 }
 
 function parseCreate(
@@ -268,6 +279,48 @@ function parsePlanRemove(
   }
 }
 
+function parsePlanUpgrade(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        capability: { type: "string" },
+        "to-version": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const capability = values.capability;
+    const toVersion = values["to-version"];
+
+    if (
+      !hasExactOptions(tokens, ["directory", "capability", "to-version"]) ||
+      !validAbsoluteDirectory(directory) ||
+      capability !== "standards" ||
+      toVersion !== "0.4.0"
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "plan-upgrade",
+        directory,
+        capability,
+        toVersion,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
 function parseApplyAdd(
   arguments_: readonly string[],
 ): ValidationResult<CliCommand> {
@@ -388,6 +441,8 @@ export function parseCliArguments(
       return parsePlanAdd(commandArguments);
     case "plan-remove":
       return parsePlanRemove(commandArguments);
+    case "plan-upgrade":
+      return parsePlanUpgrade(commandArguments);
     case "apply-add":
       return parseApplyAdd(commandArguments);
     case "apply-remove":
