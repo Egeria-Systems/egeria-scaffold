@@ -280,6 +280,43 @@ test("expected Git changes require the exact identity and path set", async () =>
   );
 });
 
+test("expected Git changes accept exact porcelain deletion paths only", async () => {
+  const expectedPaths = ["changed.txt", "deleted.txt"];
+  const exact = scriptedInspection({
+    statusResult: commandResult(" M changed.txt\0 D deleted.txt\0"),
+  });
+  assert.deepEqual(await inspectExpectedScript(exact, expectedPaths), {
+    ok: true,
+  });
+
+  for (const fixture of [
+    {
+      status: " M changed.txt\0",
+      code: "GIT_WORKTREE_CHANGED",
+    },
+    {
+      status: " M changed.txt\0 D deleted.txt\0?? extra.txt\0",
+      code: "GIT_WORKTREE_CHANGED",
+    },
+    {
+      status: " M changed.txt\0R  deleted.txt\0original.txt\0",
+      code: "GIT_WORKTREE_CHANGED",
+    },
+    {
+      status: " M changed.txt\0UD deleted.txt\0",
+      code: "GIT_WORKTREE_CONFLICTED",
+    },
+  ]) {
+    const script = scriptedInspection({
+      statusResult: commandResult(fixture.status),
+    });
+    assert.deepEqual(await inspectExpectedScript(script, expectedPaths), {
+      ok: false,
+      code: fixture.code,
+    });
+  }
+});
+
 test("Git worktree inspection passes the exact request through execFile and contains failures", async () => {
   const calls = [];
   const stdout = Buffer.from("bounded-output");

@@ -1,5 +1,6 @@
 import {
   applyCapabilityAddition as applyCapabilityAdditionDefault,
+  applyCapabilityRemoval as applyCapabilityRemovalDefault,
   createFileSystemRepositoryReader,
   createPnpmGeneratedProjectVerifier,
   createVerifiedCapabilityCatalog,
@@ -15,6 +16,7 @@ import {
   type CapabilityAdditionPlan,
   type CapabilityAdditionExecutionResult,
   type CapabilityRemovalPlan,
+  type CapabilityRemovalExecutionResult,
   type CapabilityRemovalPlanningFailureCode,
   type GeneratedProjectVerifier,
   type GitCreateTargetInspection,
@@ -36,6 +38,9 @@ type CliRunnerDependencies = Readonly<{
   applyCapabilityAddition?(input: Parameters<
     typeof applyCapabilityAdditionDefault
   >[0]): Promise<CapabilityAdditionExecutionResult>;
+  applyCapabilityRemoval?(input: Parameters<
+    typeof applyCapabilityRemovalDefault
+  >[0]): Promise<CapabilityRemovalExecutionResult>;
   createReader?(root: string): RepositoryReader;
   inspectGitCreateTargets?(input: Readonly<{
     root: string;
@@ -437,6 +442,52 @@ async function runApplyAdd(
   return 0;
 }
 
+async function runApplyRemove(
+  command: Extract<CliCommand, Readonly<{ kind: "apply-remove" }>>,
+  output: CliOutput,
+  dependencies: CliRunnerDependencies,
+): Promise<0 | 1> {
+  let result: CapabilityRemovalExecutionResult;
+  try {
+    result = await (
+      dependencies.applyCapabilityRemoval ?? applyCapabilityRemovalDefault
+    )({
+      root: resolve(command.directory),
+      capability: command.capability,
+      approvedPlanFingerprint: command.approvedPlanFingerprint,
+      verifier: dependencies.createVerifier(),
+    });
+  } catch {
+    writeJson(output.writeError, {
+      ok: false,
+      command: "apply-remove",
+      code: "CAPABILITY_EXECUTION_FAILED",
+      phase: "precondition",
+      recovery: "inspect-worktree",
+    });
+    return 1;
+  }
+
+  if (!result.ok) {
+    writeJson(output.writeError, {
+      ok: false,
+      command: "apply-remove",
+      code: result.code,
+      ...(result.code === "CAPABILITY_NOT_INSTALLED"
+        ? { capability: "booking-calendly" }
+        : { phase: result.phase, recovery: result.recovery }),
+    });
+    return 1;
+  }
+
+  writeJson(output.write, {
+    ok: true,
+    command: "apply-remove",
+    result: result.value,
+  });
+  return 0;
+}
+
 export function createCliRunner(
   dependencies: CliRunnerDependencies,
 ): CliRunner {
@@ -473,6 +524,10 @@ export function createCliRunner(
 
     if (parsed.value.kind === "apply-add") {
       return runApplyAdd(parsed.value, output, dependencies);
+    }
+
+    if (parsed.value.kind === "apply-remove") {
+      return runApplyRemove(parsed.value, output, dependencies);
     }
 
     const catalog = createVerifiedCapabilityCatalog();

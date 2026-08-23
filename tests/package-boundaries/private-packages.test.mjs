@@ -221,7 +221,7 @@ test("the root copy lint covers integration presentation templates", async () =>
   );
 });
 
-test("the CLI is a thin command adapter while builder-core owns generation and lifecycle planning", async () => {
+test("the CLI is a thin command adapter while builder-core owns generation and lifecycle execution", async () => {
   const expectedEntry = `#!/usr/bin/env node
 
 import { runCli } from "./run-cli.js";
@@ -276,7 +276,10 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "inference/evaluate-probe.ts",
       "inference/infer-repository.ts",
       "lifecycle/apply-capability-addition.ts",
+      "lifecycle/apply-capability-removal.ts",
       "lifecycle/capability-addition-writer.ts",
+      "lifecycle/capability-removal-file-operation.ts",
+      "lifecycle/capability-removal-writer.ts",
       "lifecycle/git-worktree-inspection.ts",
       "lifecycle/plan-capability-addition.ts",
       "lifecycle/plan-capability-removal.ts",
@@ -419,8 +422,12 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /absent but Git-ignored create targets/);
   assert.match(builderInstructions, /every installed application-owned surface/);
   assert.match(builderInstructions, /canonical managed-surface inventory/);
-  assert.match(builderInstructions, /Git preflight, deterministic addition planning, exact-diff inspection/);
+  assert.match(
+    builderInstructions,
+    /Git preflight, deterministic addition and removal planning, exact-diff inspection/,
+  );
   assert.match(builderInstructions, /`applyCapabilityAddition`/);
+  assert.match(builderInstructions, /`applyCapabilityRemoval`/);
   assert.match(builderInstructions, /persist state last/);
   assert.match(builderInstructions, /no transform, migration, state update, or provider action/);
 
@@ -447,6 +454,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /child output is never returned/i);
   assert.match(builderReadme, /planCapabilityAddition/);
   assert.match(builderReadme, /applyCapabilityAddition/);
+  assert.match(builderReadme, /applyCapabilityRemoval/);
   assert.match(builderReadme, /planCapabilityRemoval/);
   assert.match(builderReadme, /preserve-file-and-eject/);
   assert.match(builderReadme, /CAPABILITY_NOT_INSTALLED/);
@@ -460,16 +468,29 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /redacts settings and repository metadata/);
   assert.match(builderReadme, /never resets, cleans, commits, creates a branch\/worktree, auto-rolls back, or contacts a provider/);
   assert.doesNotMatch(builderReadme, /The CLI remains empty/);
-  assert.match(cliInstructions, /seven commands exact/);
+
+  const builderIndex = await readFile(
+    resolve(repositoryRoot, "packages/builder-core/src/index.ts"),
+    "utf8",
+  );
+  assert.match(builderIndex, /apply-capability-removal\.js/);
+  assert.match(builderIndex, /capability-removal-writer\.js/);
+  assert.match(cliInstructions, /eight commands exact/);
   assert.match(cliInstructions, /`plan-add` remains read-only/);
   assert.match(cliInstructions, /`apply-add` is limited/);
   assert.match(cliInstructions, /`plan-remove` remains read-only/);
+  assert.match(cliInstructions, /`apply-remove` is the exact current removal command/);
+  assert.match(cliInstructions, /exact `plan-remove` fingerprint/);
   assert.match(cliInstructions, /modified[^\n]+application-owned[^\n]+preserv[^\n]+eject/);
   assert.match(cliInstructions, /remain read-only/);
   assert.match(cliInstructions, /does not add overwrite/);
-  assert.match(cliReadme, /seven exact commands/);
+  assert.match(cliReadme, /eight exact commands/);
   assert.match(cliReadme, /`apply-add` accepts/);
   assert.match(cliReadme, /`plan-remove` is also read-only/);
+  assert.match(cliReadme, /`apply-remove` is the exact current removal command/);
+  assert.match(cliReadme, /migration append[^\n]+state-last persistence/);
+  assert.match(cliReadme, /preserve[^\n]+eject/);
+  assert.match(cliReadme, /verified-final-diff approval/);
   assert.match(cliReadme, /CAPABILITY_NOT_INSTALLED/);
   assert.match(cliReadme, /clean attached linked worktree/);
   assert.match(cliReadme, /never creates the worktree or branch/);
@@ -479,7 +500,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliReadme, /one content-safe JSON line/);
   assert.match(cliReadme, /no prompt, overwrite mode/);
 
-  assert.match(packageOwnership, /exact approval-gated Calendly addition transaction/);
+  assert.match(packageOwnership, /exact approval-gated Calendly addition and removal transactions/);
   assert.match(packageOwnership, /canonical private owner/i);
   assert.match(packageOwnership, /deterministic in-memory rendering/);
   assert.match(packageOwnership, /explicit allowlisted templates/);
@@ -493,7 +514,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /portable-rename race limit/);
   assert.match(packageOwnership, /pnpm `11.20.0`/);
   assert.match(packageOwnership, /disabled Next telemetry/);
-  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, and `plan-remove`/);
+  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, `plan-remove`, and `apply-remove`/);
   assert.match(packageOwnership, /one-line JSON output/);
   assert.match(packageOwnership, /clean attached linked worktree/);
   assert.match(packageOwnership, /all non-ignored untracked files/);
@@ -506,7 +527,8 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /removal planning[^\n]+read-only/);
   assert.doesNotMatch(packageOwnership, /future CLI consumer/);
   assert.match(packageOwnership, /existing-repository transformation/);
-  assert.match(rootReadme, /seven exact commands/);
+  assert.match(rootReadme, /eight exact commands/);
+  assert.match(rootReadme, /`apply-remove` is the exact current removal command/);
   assert.match(rootReadme, /transaction evidence awaiting verified-final-diff approval/);
   assert.match(rootReadme, /`plan-remove`/);
   assert.match(rootReadme, /`assume-unchanged` and `skip-worktree`/);

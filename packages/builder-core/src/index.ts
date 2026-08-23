@@ -33,7 +33,9 @@ export type {
 } from "./generation/write-generated-project.js";
 export * from "./lifecycle/git-worktree-inspection.js";
 export * from "./lifecycle/apply-capability-addition.js";
+export * from "./lifecycle/apply-capability-removal.js";
 export * from "./lifecycle/capability-addition-writer.js";
+export * from "./lifecycle/capability-removal-writer.js";
 export * from "./lifecycle/plan-capability-addition.js";
 export * from "./lifecycle/plan-capability-removal.js";
 export type {

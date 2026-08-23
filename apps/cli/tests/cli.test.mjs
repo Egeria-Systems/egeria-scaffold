@@ -306,6 +306,21 @@ function applyAddArguments(
   ];
 }
 
+function applyRemoveArguments(
+  directory,
+  approvedPlan = `sha256:${"a".repeat(64)}`,
+) {
+  return [
+    "apply-remove",
+    "--directory",
+    directory,
+    "--capability",
+    "booking-calendly",
+    "--approved-plan",
+    approvedPlan,
+  ];
+}
+
 async function listTree(root) {
   const snapshot = [];
 
@@ -662,6 +677,77 @@ test("the apply-add parser accepts only the exact approved transaction arguments
       "--approved-plan",
       fingerprint,
     ],
+  ]) {
+    const result = cliArguments.parseCliArguments(arguments_);
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.issues, [
+      {
+        code: "CLI_ARGUMENT_INVALID",
+        path: [],
+        context: { reason: "invalid-arguments" },
+      },
+    ]);
+  }
+});
+
+test("the apply-remove parser accepts only the exact approved removal arguments", () => {
+  const fingerprint = `sha256:${"a".repeat(64)}`;
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments(
+        applyRemoveArguments("/private/tmp/acme-portfolio", fingerprint),
+      ),
+    ),
+    {
+      kind: "apply-remove",
+      directory: "/private/tmp/acme-portfolio",
+      capability: "booking-calendly",
+      approvedPlanFingerprint: fingerprint,
+    },
+  );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "apply-remove",
+        "--approved-plan",
+        fingerprint,
+        "--capability",
+        "booking-calendly",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+      ]),
+    ),
+    {
+      kind: "apply-remove",
+      directory: "/private/tmp/acme-portfolio",
+      capability: "booking-calendly",
+      approvedPlanFingerprint: fingerprint,
+    },
+  );
+
+  for (const arguments_ of [
+    applyRemoveArguments("/private/tmp/acme-portfolio").slice(0, -2),
+    [...applyRemoveArguments("/private/tmp/acme-portfolio"), "--unknown", "x"],
+    applyRemoveArguments("/private/tmp/acme-portfolio", "sha256:short"),
+    applyRemoveArguments(
+      "/private/tmp/acme-portfolio",
+      `sha256:${"A".repeat(64)}`,
+    ),
+    [
+      ...applyRemoveArguments("/private/tmp/acme-portfolio"),
+      "--calendly-mode",
+      "popup",
+    ],
+    [
+      ...applyRemoveArguments("/private/tmp/acme-portfolio"),
+      "--approved-plan",
+      fingerprint,
+    ],
+    applyRemoveArguments(""),
+    applyRemoveArguments("bad\0directory"),
+    applyRemoveArguments("/private/tmp/acme-portfolio").map((value) =>
+      value === "booking-calendly" ? "invented-capability" : value,
+    ),
   ]) {
     const result = cliArguments.parseCliArguments(arguments_);
     assert.equal(result.ok, false);
@@ -1372,6 +1458,184 @@ test("apply-add conservatively contains a rejected executor promise", async () =
   );
 });
 
+test("apply-remove forwards exact approval inputs and emits only the bounded result", async () => {
+  const calls = [];
+  const fingerprint = `sha256:${"a".repeat(64)}`;
+  const value = {
+    status: "verified-final-diff-approval-required",
+    baseRevision: "abcdef0123456789abcdef0123456789abcdef01",
+    capability: { identifier: "booking-calendly", version: "0.1.0" },
+    migration: "remove-booking-calendly-0-1-0",
+    changedPaths: [".egeria/project.yaml", ".egeria/state.json"],
+    preservedPaths: [],
+    verificationChecks: core.capabilityRemovalVerificationChecks,
+  };
+  const runCli = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    applyCapabilityRemoval(input) {
+      calls.push(input);
+      return Promise.resolve({ ok: true, value });
+    },
+  });
+  const captured = captureOutput();
+
+  assert.equal(
+    await runCli(
+      applyRemoveArguments("/private/transaction", fingerprint),
+      captured.output,
+    ),
+    0,
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].root, resolve("/private/transaction"));
+  assert.equal(calls[0].capability, "booking-calendly");
+  assert.equal(calls[0].approvedPlanFingerprint, fingerprint);
+  assert.equal(typeof calls[0].verifier.verifyInIsolatedCopy, "function");
+  assert.deepEqual(captured.error, []);
+  assert.deepEqual(captured.standard, [
+    JSON.stringify({ ok: true, command: "apply-remove", result: value }),
+  ]);
+});
+
+test("apply-remove contains ordinary failure details and emits exact absence", async () => {
+  const ordinaryRunner = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    applyCapabilityRemoval: () =>
+      Promise.resolve({
+        ok: false,
+        code: "CAPABILITY_VERIFICATION_FAILED",
+        phase: "verify",
+        recovery: "inspect-worktree",
+        privateDetail: "must not escape",
+      }),
+  });
+  const ordinary = captureOutput();
+  assert.equal(
+    await ordinaryRunner(
+      applyRemoveArguments("/private/transaction"),
+      ordinary.output,
+    ),
+    1,
+  );
+  assert.deepEqual(ordinary.standard, []);
+  assert.deepEqual(ordinary.error, [
+    JSON.stringify({
+      ok: false,
+      command: "apply-remove",
+      code: "CAPABILITY_VERIFICATION_FAILED",
+      phase: "verify",
+      recovery: "inspect-worktree",
+    }),
+  ]);
+  assert.doesNotMatch(ordinary.error[0], /must not escape|calendly\.com/u);
+
+  const absentRunner = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    applyCapabilityRemoval: () =>
+      Promise.resolve({
+        ok: false,
+        code: "CAPABILITY_NOT_INSTALLED",
+        phase: "precondition",
+        recovery: "not-required",
+      }),
+  });
+  const absent = captureOutput();
+  assert.equal(
+    await absentRunner(
+      applyRemoveArguments("/private/transaction"),
+      absent.output,
+    ),
+    1,
+  );
+  assert.deepEqual(absent.standard, []);
+  assert.deepEqual(absent.error, [
+    JSON.stringify({
+      ok: false,
+      command: "apply-remove",
+      code: "CAPABILITY_NOT_INSTALLED",
+      capability: "booking-calendly",
+    }),
+  ]);
+});
+
+test("apply-remove conservatively contains a rejected executor promise", async () => {
+  const runCli = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    applyCapabilityRemoval: () =>
+      Promise.reject(new Error("private executor failure")),
+  });
+  const captured = captureOutput();
+
+  assert.equal(
+    await runCli(
+      applyRemoveArguments("/private/transaction"),
+      captured.output,
+    ),
+    1,
+  );
+  assert.deepEqual(captured.standard, []);
+  assert.deepEqual(captured.error, [
+    JSON.stringify({
+      ok: false,
+      command: "apply-remove",
+      code: "CAPABILITY_EXECUTION_FAILED",
+      phase: "precondition",
+      recovery: "inspect-worktree",
+    }),
+  ]);
+  assert.doesNotMatch(captured.error[0], /private executor failure|calendly\.com/u);
+});
+
+test("apply-remove reports exact transformation mutation and recovery evidence", async () => {
+  for (const fixture of [
+    {
+      recovery: "not-required",
+      mutate() {},
+      expected: "before\n",
+    },
+    {
+      recovery: "inspect-worktree",
+      mutate(repository) {
+        repository.source = "retained prefix\n";
+      },
+      expected: "retained prefix\n",
+    },
+  ]) {
+    const repository = { source: "before\n" };
+    const runCli = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      applyCapabilityRemoval: () => {
+        fixture.mutate(repository);
+        return Promise.resolve({
+          ok: false,
+          code: "CAPABILITY_TRANSFORM_FAILED",
+          phase: "transform",
+          recovery: fixture.recovery,
+        });
+      },
+    });
+    const captured = captureOutput();
+    assert.equal(
+      await runCli(
+        applyRemoveArguments("/private/transaction"),
+        captured.output,
+      ),
+      1,
+    );
+    assert.equal(repository.source, fixture.expected);
+    assert.deepEqual(captured.standard, []);
+    assert.deepEqual(captured.error, [
+      JSON.stringify({
+        ok: false,
+        command: "apply-remove",
+        code: "CAPABILITY_TRANSFORM_FAILED",
+        phase: "transform",
+        recovery: fixture.recovery,
+      }),
+    ]);
+  }
+});
+
 test("plan-add contains final inspection changes and never leaks a completed plan", async () => {
   const initial = cleanGitInspection();
   const finalCases = [
@@ -1708,9 +1972,86 @@ async function gitRepositorySnapshot(root) {
   };
 }
 
+function withoutSharedRefs(snapshot) {
+  return {
+    head: snapshot.head,
+    status: snapshot.status,
+    indexVisibility: snapshot.indexVisibility,
+    tree: snapshot.tree,
+    operations: snapshot.operations,
+  };
+}
+
+async function assertExactInstalledAgreement(root, options = {}) {
+  const projectSource = await readFile(join(root, ".egeria/project.yaml"), "utf8");
+  const stateSource = await readFile(join(root, ".egeria/state.json"), "utf8");
+  const project = core.parseProjectYaml(projectSource);
+  const state = core.parseStateJson(stateSource);
+  const catalog = core.createVerifiedCapabilityCatalog();
+  assert.equal(project.ok, true);
+  assert.equal(state.ok, true);
+  assert.equal(catalog.ok, true);
+  const inference = await core.inferRepository({
+    reader: core.createFileSystemRepositoryReader(root),
+    catalog: catalog.value,
+  });
+  const desired = [...project.value.selectedCapabilities].sort();
+  const installed = state.value.installedCapabilities
+    .map(({ identifier }) => identifier)
+    .sort();
+  const confirmed = inference.capabilities
+    .filter(({ category }) => category === "confirmed")
+    .map(({ identifier }) => identifier)
+    .sort();
+  assert.deepEqual(installed, desired);
+  assert.deepEqual(confirmed, desired);
+  assert.equal(inference.state.kind, "valid");
+  assert.equal(core.serializeStateJson(inference.state.value), stateSource);
+  for (const evidence of inference.capabilities.filter(
+    ({ identifier }) => !desired.includes(identifier),
+  )) {
+    assert.equal(evidence.identifier, "booking-calendly");
+    assert.equal(options.allowPreservedCalendly, true);
+    assert.equal(
+      evidence.probes.every(
+        ({ path, status }) =>
+          status === "missing" ||
+          (status === "present" && state.value.ejections.includes(path)),
+      ),
+      true,
+    );
+  }
+}
+
 async function commitAll(root, message) {
   await executeGit(root, ["add", "-A"]);
   await executeGit(root, ["commit", "-m", message]);
+}
+
+async function replaceFakeLockfileWithFixture(root, profile) {
+  const lockfile = new Uint8Array(
+    await readFile(
+      resolve(repositoryRoot, `fixtures/generated/${profile}/pnpm-lock.yaml`),
+    ),
+  );
+  await writeFile(join(root, "pnpm-lock.yaml"), lockfile);
+  const statePath = join(root, ".egeria/state.json");
+  const state = core.parseStateJson(await readFile(statePath, "utf8"));
+  assert.equal(state.ok, true);
+  await writeFile(
+    statePath,
+    core.serializeStateJson({
+      ...state.value,
+      managedSurfaces: state.value.managedSurfaces.map((surface) =>
+        surface.identifier === "builder-dependency-lockfile"
+          ? {
+              ...surface,
+              fingerprint: core.fingerprintFileContent(lockfile),
+            }
+          : surface,
+      ),
+    }),
+  );
 }
 
 async function executeBuiltPlanAdd(directory) {
@@ -1731,6 +2072,13 @@ async function executeBuiltApplyAdd(directory, approvedPlan) {
   return executeNode([
     resolve(packageRoot, "dist/index.js"),
     ...applyAddArguments(directory, approvedPlan),
+  ]);
+}
+
+async function executeBuiltApplyRemove(directory, approvedPlan) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...applyRemoveArguments(directory, approvedPlan),
   ]);
 }
 
@@ -1877,11 +2225,15 @@ test("the compiled plan-remove command refuses unsafe states without writes", as
   }
 });
 
-test("the compiled apply-add command completes exact portfolio and site transactions", async () => {
+test("the compiled CLI completes exact add-remove-re-add transactions", async () => {
   for (const profile of ["portfolio", "site"]) {
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = await gitRepositorySnapshot(primary);
       const linkedBefore = await gitRepositorySnapshot(linked);
+      const initialProjectSource = await readFile(
+        join(linked, ".egeria/project.yaml"),
+        "utf8",
+      );
       const planExecution = await executeBuiltPlanAdd(linked);
       assert.equal(planExecution.exitCode, 0, planExecution.stderr);
       const planEnvelope = JSON.parse(planExecution.stdout);
@@ -1941,12 +2293,490 @@ test("the compiled apply-add command completes exact portfolio and site transact
         migrations.value[0].identifier,
         "add-booking-calendly-0-1-0",
       );
+      const addedProjectSource = await readFile(
+        join(linked, ".egeria/project.yaml"),
+        "utf8",
+      );
+      const addedStateSource = await readFile(
+        join(linked, ".egeria/state.json"),
+        "utf8",
+      );
+      const addedMigrationSource = await readFile(
+        join(linked, ".egeria/migrations.jsonl"),
+        "utf8",
+      );
+      const addedProject = core.parseProjectYaml(addedProjectSource);
+      assert.equal(addedProject.ok, true);
+      assert.equal(
+        addedProjectSource,
+        core.serializeProjectYaml(addedProject.value),
+      );
+      assert.equal(addedStateSource, core.serializeStateJson(state.value));
+      assert.equal(
+        addedMigrationSource,
+        migrations.value.map(core.serializeMigrationRecord).join(""),
+      );
       assert.doesNotMatch(
         execution.stdout,
         /private-planning-destination|calendly\.com|refs\/heads|\.git\/worktrees/u,
       );
+
+      await commitAll(linked, "add Calendly capability");
+      const cleanAdded = await gitRepositorySnapshot(linked);
+      const removalPlanExecution = await executeBuiltPlanRemove(linked);
+      assert.equal(removalPlanExecution.exitCode, 0, removalPlanExecution.stderr);
+      const removalPlan = JSON.parse(removalPlanExecution.stdout).plan;
+      assert.deepEqual(await gitRepositorySnapshot(linked), cleanAdded);
+
+      const wrongRemoval = await executeBuiltApplyRemove(
+        linked,
+        `sha256:${"0".repeat(64)}`,
+      );
+      assert.equal(wrongRemoval.exitCode, 1);
+      assert.deepEqual(JSON.parse(wrongRemoval.stderr), {
+        ok: false,
+        command: "apply-remove",
+        code: "CAPABILITY_PLAN_APPROVAL_INVALID",
+        phase: "precondition",
+        recovery: "not-required",
+      });
+      assert.deepEqual(await gitRepositorySnapshot(linked), cleanAdded);
+      assert.equal(
+        await readFile(join(linked, ".egeria/project.yaml"), "utf8"),
+        addedProjectSource,
+      );
+      assert.equal(
+        await readFile(join(linked, ".egeria/state.json"), "utf8"),
+        addedStateSource,
+      );
+      assert.equal(
+        await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8"),
+        addedMigrationSource,
+      );
+
+      const removal = await executeBuiltApplyRemove(
+        linked,
+        removalPlan.planFingerprint,
+      );
+      assert.equal(removal.exitCode, 0, removal.stderr);
+      assert.equal(removal.stderr, "");
+      const removalEnvelope = JSON.parse(removal.stdout);
+      const removalPaths = [
+        ...removalPlan.actions.flatMap((action) =>
+          action.kind === "preserve-file-and-eject" ? [] : [action.path],
+        ),
+        ".egeria/migrations.jsonl",
+        ".egeria/state.json",
+      ].sort();
+      assert.deepEqual(removalEnvelope, {
+        ok: true,
+        command: "apply-remove",
+        result: {
+          status: "verified-final-diff-approval-required",
+          baseRevision: Buffer.from(cleanAdded.head).toString("utf8").trim(),
+          capability: { identifier: "booking-calendly", version: "0.1.0" },
+          migration: "remove-booking-calendly-0-1-0",
+          changedPaths: removalPaths,
+          preservedPaths: [],
+          verificationChecks: core.capabilityRemovalVerificationChecks,
+        },
+      });
+      const removedProjectSource = await readFile(
+        join(linked, ".egeria/project.yaml"),
+        "utf8",
+      );
+      const removedStateSource = await readFile(
+        join(linked, ".egeria/state.json"),
+        "utf8",
+      );
+      const removedMigrationSource = await readFile(
+        join(linked, ".egeria/migrations.jsonl"),
+        "utf8",
+      );
+      const removedProject = core.parseProjectYaml(removedProjectSource);
+      const removedState = core.parseStateJson(removedStateSource);
+      const removedMigrations = core.parseMigrationLog(removedMigrationSource);
+      assert.equal(removedProject.ok, true);
+      assert.equal(removedState.ok, true);
+      assert.equal(removedMigrations.ok, true);
+      assert.equal(removedProjectSource, initialProjectSource);
+      assert.equal(
+        removedProjectSource,
+        core.serializeProjectYaml(removedProject.value),
+      );
+      assert.equal(
+        removedStateSource,
+        core.serializeStateJson(removedState.value),
+      );
+      assert.equal(
+        removedMigrationSource,
+        removedMigrations.value.map(core.serializeMigrationRecord).join(""),
+      );
+      assert.deepEqual(removedState.value.appliedMigrations, [
+        "add-booking-calendly-0-1-0",
+        "remove-booking-calendly-0-1-0",
+      ]);
+      assert.deepEqual(
+        removedMigrations.value.map(({ identifier }) => identifier),
+        removedState.value.appliedMigrations,
+      );
+      assert.equal(
+        removedState.value.installedCapabilities.some(
+          ({ identifier }) => identifier === "booking-calendly",
+        ),
+        false,
+      );
+      await assertExactInstalledAgreement(linked);
+      assert.doesNotMatch(
+        removal.stdout,
+        /private-planning-destination|calendly\.com|refs\/heads|\.git\/worktrees/u,
+      );
+
+      await commitAll(linked, "remove Calendly capability");
+      const cleanRemoved = await gitRepositorySnapshot(linked);
+      const repeatedRemoval = await executeBuiltApplyRemove(
+        linked,
+        removalPlan.planFingerprint,
+      );
+      assert.equal(repeatedRemoval.exitCode, 1);
+      assert.equal(repeatedRemoval.stdout, "");
+      assert.deepEqual(JSON.parse(repeatedRemoval.stderr), {
+        ok: false,
+        command: "apply-remove",
+        code: "CAPABILITY_NOT_INSTALLED",
+        capability: "booking-calendly",
+      });
+      assert.deepEqual(await gitRepositorySnapshot(linked), cleanRemoved);
+      assert.equal(
+        await readFile(join(linked, ".egeria/project.yaml"), "utf8"),
+        removedProjectSource,
+      );
+      assert.equal(
+        await readFile(join(linked, ".egeria/state.json"), "utf8"),
+        removedStateSource,
+      );
+      assert.equal(
+        await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8"),
+        removedMigrationSource,
+      );
+
+      const readdPlanExecution = await executeBuiltPlanAdd(linked);
+      assert.equal(readdPlanExecution.exitCode, 0, readdPlanExecution.stderr);
+      const readdPlan = JSON.parse(readdPlanExecution.stdout).result;
+      assert.deepEqual(await gitRepositorySnapshot(linked), cleanRemoved);
+      const readdition = await executeBuiltApplyAdd(
+        linked,
+        readdPlan.planFingerprint,
+      );
+      assert.equal(readdition.exitCode, 0, readdition.stderr);
+      assert.equal(readdition.stderr, "");
+      const readdedProjectSource = await readFile(
+        join(linked, ".egeria/project.yaml"),
+        "utf8",
+      );
+      const readdedStateSource = await readFile(
+        join(linked, ".egeria/state.json"),
+        "utf8",
+      );
+      const readdedMigrationSource = await readFile(
+        join(linked, ".egeria/migrations.jsonl"),
+        "utf8",
+      );
+      const readdedProject = core.parseProjectYaml(readdedProjectSource);
+      const readdedState = core.parseStateJson(readdedStateSource);
+      const readdedMigrations = core.parseMigrationLog(readdedMigrationSource);
+      assert.equal(readdedProject.ok, true);
+      assert.equal(readdedState.ok, true);
+      assert.equal(readdedMigrations.ok, true);
+      assert.equal(readdedProjectSource, addedProjectSource);
+      assert.equal(
+        readdedProjectSource,
+        core.serializeProjectYaml(readdedProject.value),
+      );
+      assert.equal(
+        readdedStateSource,
+        core.serializeStateJson(readdedState.value),
+      );
+      assert.equal(
+        readdedMigrationSource,
+        readdedMigrations.value.map(core.serializeMigrationRecord).join(""),
+      );
+      assert.deepEqual(readdedState.value.appliedMigrations, [
+        "add-booking-calendly-0-1-0",
+        "remove-booking-calendly-0-1-0",
+        "add-booking-calendly-0-1-0",
+      ]);
+      assert.deepEqual(
+        readdedMigrations.value.map(({ identifier }) => identifier),
+        readdedState.value.appliedMigrations,
+      );
+      assert.equal(
+        readdedState.value.installedCapabilities.some(
+          ({ identifier }) => identifier === "booking-calendly",
+        ),
+        true,
+      );
+      await assertExactInstalledAgreement(linked);
+      const primaryAfterLifecycle = await gitRepositorySnapshot(primary);
+      assert.deepEqual(
+        {
+          head: primaryAfterLifecycle.head,
+          status: primaryAfterLifecycle.status,
+          indexVisibility: primaryAfterLifecycle.indexVisibility,
+          tree: primaryAfterLifecycle.tree,
+          operations: primaryAfterLifecycle.operations,
+        },
+        {
+          head: primaryBefore.head,
+          status: primaryBefore.status,
+          indexVisibility: primaryBefore.indexVisibility,
+          tree: primaryBefore.tree,
+          operations: primaryBefore.operations,
+        },
+      );
     });
   }
+});
+
+test("compiled removal preserves modified and already-ejected application surfaces", async () => {
+  await withGitFixture(
+    "portfolio",
+    async ({ linked, primary }) => {
+      await replaceFakeLockfileWithFixture(linked, "portfolio");
+      const primaryBefore = await gitRepositorySnapshot(primary);
+      const modifiedPath = "apps/web/content/en-CA/booking-calendly.yaml";
+      const ejectedPath =
+        "apps/web/src/integrations/booking-calendly/booking-content.ts";
+      const modifiedSource = `${await readFile(join(linked, modifiedPath), "utf8")}\n# application change\n`;
+      const ejectedSource = await readFile(join(linked, ejectedPath), "utf8");
+      await writeFile(join(linked, modifiedPath), modifiedSource);
+
+      const projectPath = join(linked, ".egeria/project.yaml");
+      const statePath = join(linked, ".egeria/state.json");
+      const project = core.parseProjectYaml(await readFile(projectPath, "utf8"));
+      const state = core.parseStateJson(await readFile(statePath, "utf8"));
+      assert.equal(project.ok, true);
+      assert.equal(state.ok, true);
+      const ejectedProjectSource = core.serializeProjectYaml({
+        ...project.value,
+        ejectedAreas: [ejectedPath],
+      });
+      await writeFile(projectPath, ejectedProjectSource);
+      const ejectedState = {
+        ...state.value,
+        managedSurfaces: state.value.managedSurfaces.map((surface) =>
+          surface.path === ejectedPath
+            ? { ...surface, ownership: "ejected" }
+            : surface.identifier === "builder-project-configuration"
+              ? {
+                  ...surface,
+                  fingerprint: core.fingerprintFileContent(
+                    new TextEncoder().encode(ejectedProjectSource),
+                  ),
+                }
+              : surface,
+        ),
+        ejections: [ejectedPath],
+      };
+      await writeFile(statePath, core.serializeStateJson(ejectedState));
+      await commitAll(linked, "modify and eject Calendly surfaces");
+      const cleanBefore = await gitRepositorySnapshot(linked);
+      const controlsBeforePlan = {
+        project: await readFile(projectPath, "utf8"),
+        state: await readFile(statePath, "utf8"),
+        migrations: await readFile(
+          join(linked, ".egeria/migrations.jsonl"),
+          "utf8",
+        ),
+      };
+
+      const planExecution = await executeBuiltPlanRemove(linked);
+      assert.equal(planExecution.exitCode, 0, planExecution.stderr);
+      const plan = JSON.parse(planExecution.stdout).plan;
+      assert.deepEqual(await gitRepositorySnapshot(linked), cleanBefore);
+      assert.deepEqual(
+        {
+          project: await readFile(projectPath, "utf8"),
+          state: await readFile(statePath, "utf8"),
+          migrations: await readFile(
+            join(linked, ".egeria/migrations.jsonl"),
+            "utf8",
+          ),
+        },
+        controlsBeforePlan,
+      );
+      assert.deepEqual(
+        plan.actions
+          .filter(({ kind }) => kind === "preserve-file-and-eject")
+          .map(({ path }) => path),
+        [ejectedPath, modifiedPath].sort(),
+      );
+
+      const removal = await executeBuiltApplyRemove(
+        linked,
+        plan.planFingerprint,
+      );
+      assert.equal(removal.exitCode, 0, removal.stderr);
+      assert.equal(removal.stderr, "");
+      const envelope = JSON.parse(removal.stdout);
+      assert.deepEqual(envelope.result.preservedPaths, [
+        ejectedPath,
+        modifiedPath,
+      ].sort());
+      assert.equal(envelope.result.changedPaths.includes(ejectedPath), false);
+      assert.equal(envelope.result.changedPaths.includes(modifiedPath), false);
+      assert.equal(await readFile(join(linked, modifiedPath), "utf8"), modifiedSource);
+      assert.equal(await readFile(join(linked, ejectedPath), "utf8"), ejectedSource);
+
+      const finalProjectSource = await readFile(projectPath, "utf8");
+      const finalStateSource = await readFile(statePath, "utf8");
+      const finalMigrationSource = await readFile(
+        join(linked, ".egeria/migrations.jsonl"),
+        "utf8",
+      );
+      const finalProject = core.parseProjectYaml(finalProjectSource);
+      const finalState = core.parseStateJson(finalStateSource);
+      const finalMigrations = core.parseMigrationLog(finalMigrationSource);
+      assert.equal(finalProject.ok, true);
+      assert.equal(finalState.ok, true);
+      assert.equal(finalMigrations.ok, true);
+      assert.equal(
+        finalProjectSource,
+        core.serializeProjectYaml(finalProject.value),
+      );
+      assert.equal(finalStateSource, core.serializeStateJson(finalState.value));
+      assert.equal(
+        finalMigrationSource,
+        finalMigrations.value.map(core.serializeMigrationRecord).join(""),
+      );
+      assert.deepEqual(finalProject.value.ejectedAreas, envelope.result.preservedPaths);
+      assert.deepEqual(finalState.value.ejections, envelope.result.preservedPaths);
+      const changedSurfaceIdentifiers = new Set([
+        "builder-home-route",
+        "builder-migration-log",
+        "builder-project-configuration",
+      ]);
+      for (const priorSurface of ejectedState.managedSurfaces) {
+        if (
+          priorSurface.owner.kind === "capability" &&
+          priorSurface.owner.identifier === "booking-calendly"
+        ) {
+          continue;
+        }
+        if (changedSurfaceIdentifiers.has(priorSurface.identifier)) {
+          continue;
+        }
+        assert.deepEqual(
+          finalState.value.managedSurfaces.find(
+            ({ identifier }) => identifier === priorSurface.identifier,
+          ),
+          priorSurface,
+        );
+      }
+      await assertExactInstalledAgreement(linked, {
+        allowPreservedCalendly: true,
+      });
+      assert.deepEqual(
+        withoutSharedRefs(await gitRepositorySnapshot(primary)),
+        withoutSharedRefs(primaryBefore),
+      );
+    },
+    {
+      bookingCalendly: planSettings,
+      branch: "apply-remove-preservation-test",
+    },
+  );
+});
+
+test("compiled removal verification failure retains transformation and old receipts", async () => {
+  await withGitFixture(
+    "portfolio",
+    async ({ linked, primary }) => {
+      await replaceFakeLockfileWithFixture(linked, "portfolio");
+      const primaryBefore = await gitRepositorySnapshot(primary);
+      const preservedPath =
+        "apps/web/src/integrations/booking-calendly/booking-content.ts";
+      const invalidSource = "export const broken = ;\n";
+      await writeFile(join(linked, preservedPath), invalidSource);
+      await commitAll(linked, "make Calendly application source invalid");
+      const initialInspection = await core.inspectGitWorktree({ root: linked });
+      assert.equal(initialInspection.ok, true);
+      const stateBefore = await readFile(
+        join(linked, ".egeria/state.json"),
+        "utf8",
+      );
+      const migrationsBefore = await readFile(
+        join(linked, ".egeria/migrations.jsonl"),
+        "utf8",
+      );
+      const planExecution = await executeBuiltPlanRemove(linked);
+      assert.equal(planExecution.exitCode, 0, planExecution.stderr);
+      const plan = JSON.parse(planExecution.stdout).plan;
+      assert.equal(
+        plan.actions.find(({ path }) => path === preservedPath).kind,
+        "preserve-file-and-eject",
+      );
+
+      const removal = await executeBuiltApplyRemove(
+        linked,
+        plan.planFingerprint,
+      );
+      assert.equal(removal.exitCode, 1);
+      assert.equal(removal.stdout, "");
+      assert.deepEqual(JSON.parse(removal.stderr), {
+        ok: false,
+        command: "apply-remove",
+        code: "CAPABILITY_VERIFICATION_FAILED",
+        phase: "verify",
+        recovery: "inspect-worktree",
+      });
+      assert.equal(await readFile(join(linked, preservedPath), "utf8"), invalidSource);
+      assert.equal(
+        await readFile(join(linked, ".egeria/state.json"), "utf8"),
+        stateBefore,
+      );
+      assert.equal(
+        await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8"),
+        migrationsBefore,
+      );
+      const transformedProjectSource = await readFile(
+        join(linked, ".egeria/project.yaml"),
+        "utf8",
+      );
+      const transformedProject = core.parseProjectYaml(transformedProjectSource);
+      assert.equal(transformedProject.ok, true);
+      assert.equal(
+        transformedProject.value.selectedCapabilities.includes(
+          "booking-calendly",
+        ),
+        false,
+      );
+      assert.deepEqual(transformedProject.value.ejectedAreas, [preservedPath]);
+      const transformedPaths = plan.actions.flatMap((action) =>
+        action.kind === "preserve-file-and-eject" ? [] : [action.path],
+      );
+      assert.deepEqual(
+        await core.inspectGitExpectedChanges({
+          root: linked,
+          identity: initialInspection.identity,
+          expectedPaths: transformedPaths,
+        }),
+        { ok: true },
+      );
+      assert.deepEqual(
+        withoutSharedRefs(await gitRepositorySnapshot(primary)),
+        withoutSharedRefs(primaryBefore),
+      );
+      assert.doesNotMatch(
+        removal.stderr,
+        /export const broken|calendly\.com|refs\/heads|\.git\/worktrees/u,
+      );
+    },
+    {
+      bookingCalendly: planSettings,
+      branch: "apply-remove-verification-failure-test",
+    },
+  );
 });
 
 test("the compiled plan-add command refuses unsafe repository states without writes", async () => {

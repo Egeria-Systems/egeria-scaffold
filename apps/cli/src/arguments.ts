@@ -38,6 +38,12 @@ export type CliCommand =
       capability: "booking-calendly";
       settings: CalendlyBookingSettings;
       approvedPlanFingerprint: string;
+    }>
+  | Readonly<{
+      kind: "apply-remove";
+      directory: string;
+      capability: "booking-calendly";
+      approvedPlanFingerprint: string;
     }>;
 
 const projectFields = projectConfigurationSchema
@@ -319,6 +325,53 @@ function parseApplyAdd(
   }
 }
 
+function parseApplyRemove(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        capability: { type: "string" },
+        "approved-plan": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const capability = values.capability;
+    const approvedPlanFingerprint = values["approved-plan"];
+
+    if (
+      !hasExactOptions(tokens, [
+        "directory",
+        "capability",
+        "approved-plan",
+      ]) ||
+      !validDirectory(directory) ||
+      capability !== "booking-calendly" ||
+      approvedPlanFingerprint === undefined ||
+      !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "apply-remove",
+        directory,
+        capability,
+        approvedPlanFingerprint,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
 export function parseCliArguments(
   arguments_: readonly string[],
 ): ValidationResult<CliCommand> {
@@ -337,6 +390,8 @@ export function parseCliArguments(
       return parsePlanRemove(commandArguments);
     case "apply-add":
       return parseApplyAdd(commandArguments);
+    case "apply-remove":
+      return parseApplyRemove(commandArguments);
     default:
       return invalidArguments();
   }
