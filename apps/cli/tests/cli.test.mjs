@@ -286,6 +286,18 @@ function planRemoveArguments(directory) {
   ];
 }
 
+function planUpgradeArguments(directory) {
+  return [
+    "plan-upgrade",
+    "--directory",
+    directory,
+    "--capability",
+    "standards",
+    "--to-version",
+    "0.4.0",
+  ];
+}
+
 function applyAddArguments(
   directory,
   approvedPlan = `sha256:${"a".repeat(64)}`,
@@ -416,6 +428,106 @@ async function withGeneratedCalendlyFixture(profile, run) {
         verifier: createFakeVerifier(),
       }),
     );
+    await run(destination);
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+}
+
+const currentStandardsSurfaceIdentifiers = new Set([
+  "standards-playwright-visual-configuration",
+  "standards-visual-regression-desktop-baseline",
+  "standards-visual-regression-mobile-baseline",
+  "standards-visual-regression-specification",
+  "standards-visual-regression-test-script",
+]);
+const visualUpgradePaths = [
+  "apps/web/playwright.visual.config.ts",
+  "apps/web/tests/visual/home-visual.spec.ts",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+];
+
+async function prepareHistoricalUpgradeFixture(root) {
+  for (const path of visualUpgradePaths) {
+    await rm(join(root, path), { force: false });
+  }
+
+  const qualityPath = join(root, ".github/workflows/quality.yml");
+  const quality = await readFile(qualityPath, "utf8");
+  const visualStep = [
+    "      - name: Compare OpenNext visual baselines",
+    "        run: pnpm --dir apps/web run test:visual",
+    "",
+  ].join("\n");
+  assert.equal(quality.includes(visualStep), true);
+  const historicalQuality = quality.replace(visualStep, "");
+  await writeFile(qualityPath, historicalQuality);
+
+  const manifestPath = join(root, "apps/web/package.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  delete manifest.scripts["test:visual"];
+  await writeFile(manifestPath, `${JSON.stringify(manifest)}\n`);
+
+  const projectPath = join(root, ".egeria/project.yaml");
+  const statePath = join(root, ".egeria/state.json");
+  const project = core.parseProjectYaml(await readFile(projectPath, "utf8"));
+  const state = core.parseStateJson(await readFile(statePath, "utf8"));
+  assert.equal(project.ok, true);
+  assert.equal(state.ok, true);
+  const projectSource = core.serializeProjectYaml({
+    ...project.value,
+    recipeVersion: "0.9.0",
+  });
+  const managedSurfaces = state.value.managedSurfaces
+    .filter(({ identifier }) => !currentStandardsSurfaceIdentifiers.has(identifier))
+    .map((surface) => {
+      if (surface.identifier === "builder-project-configuration") {
+        return {
+          ...surface,
+          fingerprint: core.fingerprintFileContent(
+            new TextEncoder().encode(projectSource),
+          ),
+        };
+      }
+
+      if (surface.identifier === "standards-quality-workflow") {
+        return {
+          ...surface,
+          fingerprint: core.fingerprintFileContent(
+            new TextEncoder().encode(historicalQuality),
+          ),
+        };
+      }
+
+      return surface;
+    });
+  await writeFile(projectPath, projectSource);
+  await writeFile(
+    statePath,
+    core.serializeStateJson({
+      ...state.value,
+      origin: { ...state.value.origin, recipeVersion: "0.9.0" },
+      installedCapabilities: state.value.installedCapabilities.map(
+        (capability) =>
+          capability.identifier === "standards"
+            ? { ...capability, version: "0.3.0" }
+            : capability,
+      ),
+      managedSurfaces,
+    }),
+  );
+}
+
+async function withHistoricalUpgradeFixture(profile, run) {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-cli-upgrade-test-"));
+  const destination = join(owner, `acme-${profile}`);
+
+  try {
+    await cp(resolve(repositoryRoot, `fixtures/generated/${profile}`), destination, {
+      recursive: true,
+    });
+    await prepareHistoricalUpgradeFixture(destination);
     await run(destination);
   } finally {
     await rm(owner, { recursive: true, force: true });
@@ -646,6 +758,61 @@ test("the plan-remove parser accepts only its exact options in any order", () =>
     assert.doesNotMatch(
       JSON.stringify(result),
       /invented-capability|private-value|bad\\u0000directory/u,
+    );
+  }
+});
+
+test("the plan-upgrade parser accepts only its exact absolute-worktree contract", () => {
+  const expected = {
+    kind: "plan-upgrade",
+    directory: "/private/tmp/acme-portfolio",
+    capability: "standards",
+    toVersion: "0.4.0",
+  };
+  const valid = planUpgradeArguments("/private/tmp/acme-portfolio");
+  assert.deepEqual(
+    assertSuccess(cliArguments.parseCliArguments(valid)),
+    expected,
+  );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "plan-upgrade",
+        "--to-version",
+        "0.4.0",
+        "--capability",
+        "standards",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+      ]),
+    ),
+    expected,
+  );
+
+  const invalidCases = [
+    valid.slice(0, -2),
+    [...valid, "--directory", "/private/tmp/other"],
+    [...valid, "--unknown", "private-value"],
+    [...valid, "--from-version", "0.3.0"],
+    valid.map((value) => (value === "standards" ? "observability" : value)),
+    valid.map((value) => (value === "0.4.0" ? "0.5.0" : value)),
+    planUpgradeArguments("relative/project"),
+    planUpgradeArguments("bad\0directory"),
+  ];
+
+  for (const arguments_ of invalidCases) {
+    const result = cliArguments.parseCliArguments(arguments_);
+    assert.equal(result.ok, false, JSON.stringify(arguments_));
+    assert.deepEqual(result.issues, [
+      {
+        code: "CLI_ARGUMENT_INVALID",
+        path: [],
+        context: { reason: "invalid-arguments" },
+      },
+    ]);
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /observability|0\.5\.0|private-value|bad\\u0000directory/u,
     );
   }
 });
@@ -1211,6 +1378,144 @@ test("plan-remove emits the complete approval-required plan after two matching i
       captured.standard[0],
       /private-planning-destination|calendly\.com|refs\/heads|generated-common/u,
     );
+  });
+});
+
+test("plan-upgrade emits the exact read-only plan after stable Git and target checks", async () => {
+  await withHistoricalUpgradeFixture("portfolio", async (directory) => {
+    const inspection = cleanGitInspection();
+    const inspections = [inspection, structuredClone(inspection)];
+    const runCli = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      createReader: () => core.createFileSystemRepositoryReader(directory),
+      inspectGitWorktree: () => Promise.resolve(inspections.shift()),
+      inspectGitCreateTargets: ({ paths }) => {
+        assert.deepEqual(paths, visualUpgradePaths);
+        return Promise.resolve({ ok: true });
+      },
+    });
+    const before = await listTree(directory);
+    const direct = await core.planCapabilityUpgrade({
+      reader: core.createFileSystemRepositoryReader(directory),
+      git: inspection,
+      capability: "standards",
+      toVersion: "0.4.0",
+    });
+    assert.equal(direct.ok, true);
+    const captured = captureOutput();
+
+    assert.equal(
+      await runCli(
+        planUpgradeArguments("/private/ignored-input"),
+        captured.output,
+      ),
+      0,
+    );
+    assert.deepEqual(inspections, []);
+    assert.deepEqual(captured.error, []);
+    assert.deepEqual(JSON.parse(captured.standard[0]), {
+      ok: true,
+      command: "plan-upgrade",
+      plan: direct.value,
+    });
+    assert.deepEqual(await listTree(directory), before);
+    assert.doesNotMatch(
+      captured.standard[0],
+      /refs\/heads|generated-common|generated-worktree|ignored-input/u,
+    );
+  });
+});
+
+test("plan-upgrade contains planner, target, Git, and reader refusals", async () => {
+  await withHistoricalUpgradeFixture("portfolio", async (directory) => {
+    const cases = [
+      {
+        name: "dirty Git",
+        inspections: [{ ok: false, code: "GIT_WORKTREE_DIRTY" }],
+        code: "GIT_WORKTREE_DIRTY",
+      },
+      {
+        name: "identity changed",
+        inspections: [
+          cleanGitInspection(),
+          cleanGitInspection({
+            revision: "1111111111111111111111111111111111111111",
+          }),
+        ],
+        code: "GIT_WORKTREE_CHANGED",
+      },
+    ];
+
+    for (const fixture of cases) {
+      const inspections = structuredClone(fixture.inspections);
+      const runCli = cli.createCliRunner({
+        createVerifier: createFakeVerifier,
+        createReader: () => core.createFileSystemRepositoryReader(directory),
+        inspectGitCreateTargets: () => Promise.resolve({ ok: true }),
+        inspectGitWorktree: () => Promise.resolve(inspections.shift()),
+      });
+      const captured = captureOutput();
+      assert.equal(
+        await runCli(planUpgradeArguments(directory), captured.output),
+        1,
+        fixture.name,
+      );
+      assert.deepEqual(captured.standard, [], fixture.name);
+      assert.deepEqual(
+        captured.error,
+        [
+          JSON.stringify({
+            ok: false,
+            command: "plan-upgrade",
+            code: fixture.code,
+          }),
+        ],
+        fixture.name,
+      );
+    }
+
+    const targetRunner = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      createReader: () => core.createFileSystemRepositoryReader(directory),
+      inspectGitCreateTargets: () =>
+        Promise.resolve({ ok: false, code: "CAPABILITY_ACTION_CONFLICT" }),
+      inspectGitWorktree: () => Promise.resolve(cleanGitInspection()),
+    });
+    const target = captureOutput();
+    assert.equal(
+      await targetRunner(planUpgradeArguments(directory), target.output),
+      1,
+    );
+    assert.deepEqual(target.error, [
+      JSON.stringify({
+        ok: false,
+        command: "plan-upgrade",
+        code: "CAPABILITY_ACTION_CONFLICT",
+      }),
+    ]);
+
+    const readerRunner = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      createReader: () => ({
+        readText() {
+          throw new Error("private reader failure");
+        },
+      }),
+      inspectGitWorktree: () => Promise.resolve(cleanGitInspection()),
+    });
+    const reader = captureOutput();
+    assert.equal(
+      await readerRunner(planUpgradeArguments(directory), reader.output),
+      1,
+    );
+    assert.deepEqual(reader.error, [
+      JSON.stringify({
+        ok: false,
+        command: "plan-upgrade",
+        code: "REPOSITORY_OPEN_FAILED",
+      }),
+    ]);
+    assert.doesNotMatch(reader.error[0], /private reader failure/u);
   });
 });
 
@@ -1878,6 +2183,9 @@ async function withGitFixture(name, run, options = {}) {
         }),
       );
     }
+    if (options.preparePrimary !== undefined) {
+      await options.preparePrimary(primary);
+    }
     await executeGit(owner, ["init", "--initial-branch=main", primary]);
     await executeGit(primary, ["config", "user.name", "CLI Plan Test"]);
     await executeGit(primary, [
@@ -2068,6 +2376,13 @@ async function executeBuiltPlanRemove(directory) {
   ]);
 }
 
+async function executeBuiltPlanUpgrade(directory) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...planUpgradeArguments(directory),
+  ]);
+}
+
 async function executeBuiltApplyAdd(directory, approvedPlan) {
   return executeNode([
     resolve(packageRoot, "dist/index.js"),
@@ -2109,6 +2424,215 @@ test("the compiled plan-add command emits exact portfolio and site plans without
         /private-planning-destination|calendly\.com|refs\/heads|\.git\/worktrees/u,
       );
     });
+  }
+});
+
+test("the compiled plan-upgrade command plans both profiles without changing any byte", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    await withGitFixture(
+      profile,
+      async ({ linked }) => {
+        const before = await gitRepositorySnapshot(linked);
+        const controlBefore = await Promise.all(
+          ["project.yaml", "state.json", "migrations.jsonl"].map((name) =>
+            readFile(join(linked, ".egeria", name)),
+          ),
+        );
+        const execution = await executeBuiltPlanUpgrade(linked);
+        const after = await gitRepositorySnapshot(linked);
+        const controlAfter = await Promise.all(
+          ["project.yaml", "state.json", "migrations.jsonl"].map((name) =>
+            readFile(join(linked, ".egeria", name)),
+          ),
+        );
+
+        assert.equal(execution.exitCode, 0, execution.stderr);
+        assert.equal(execution.stderr, "");
+        const emitted = JSON.parse(execution.stdout);
+        assert.equal(emitted.ok, true);
+        assert.equal(emitted.command, "plan-upgrade");
+        assert.equal(emitted.plan.profile, profile);
+        assert.deepEqual(emitted.plan.capability, {
+          identifier: "standards",
+          fromVersion: "0.3.0",
+          toVersion: "0.4.0",
+        });
+        assert.equal(emitted.plan.actions.length, 6);
+        assert.deepEqual(
+          emitted.plan.actions.filter(({ kind }) => kind === "create-file")
+            .map(({ path }) => path),
+          visualUpgradePaths,
+        );
+        assert.match(
+          emitted.plan.planFingerprint,
+          /^sha256:[a-f0-9]{64}$/u,
+        );
+        assert.deepEqual(after, before);
+        assert.deepEqual(controlAfter, controlBefore);
+        assert.doesNotMatch(
+          execution.stdout,
+          /refs\/heads|\.git\/worktrees|acme-(?:portfolio|site)/u,
+        );
+      },
+      {
+        branch: `plan-upgrade-${profile}-test`,
+        preparePrimary: prepareHistoricalUpgradeFixture,
+      },
+    );
+  }
+});
+
+test("the compiled plan-upgrade command refuses unsafe or unsupported repository states without writes", async () => {
+  const cases = [
+    {
+      name: "primary worktree",
+      preparePrimary: prepareHistoricalUpgradeFixture,
+      select: ({ primary }) => primary,
+      prepareLinked: async () => {},
+      code: "GIT_WORKTREE_NOT_ISOLATED",
+    },
+    {
+      name: "detached worktree",
+      preparePrimary: prepareHistoricalUpgradeFixture,
+      prepareLinked: (root) => executeGit(root, ["checkout", "--detach"]),
+      code: "GIT_BRANCH_REQUIRED",
+    },
+    {
+      name: "already current",
+      preparePrimary: undefined,
+      prepareLinked: async () => {},
+      code: "CAPABILITY_ALREADY_CURRENT",
+    },
+    {
+      name: "dirty repository",
+      preparePrimary: prepareHistoricalUpgradeFixture,
+      prepareLinked: (root) =>
+        writeFile(join(root, "private-untracked.txt"), "private\n"),
+      code: "GIT_WORKTREE_DIRTY",
+    },
+    ...[
+      ["assume-unchanged", "--assume-unchanged"],
+      ["skip-worktree", "--skip-worktree"],
+    ].map(([name, flag]) => ({
+      name: `hidden tracked change with ${name}`,
+      preparePrimary: prepareHistoricalUpgradeFixture,
+      prepareLinked: async (root) => {
+        await executeGit(root, ["update-index", flag, ".gitignore"]);
+        await writeFile(join(root, ".gitignore"), `private ${name} drift\n`);
+      },
+      code: "GIT_WORKTREE_DIRTY",
+    })),
+    {
+      name: "managed drift",
+      preparePrimary: prepareHistoricalUpgradeFixture,
+      prepareLinked: async (root) => {
+        await writeFile(
+          join(root, ".github/workflows/quality.yml"),
+          "private managed drift\n",
+        );
+        await commitAll(root, "drift managed quality workflow");
+      },
+      code: "PROJECT_DRIFT_DETECTED",
+    },
+    {
+      name: "incompatible migration state",
+      preparePrimary: prepareHistoricalUpgradeFixture,
+      prepareLinked: async (root) => {
+        const path = join(root, ".egeria/state.json");
+        const state = core.parseStateJson(await readFile(path, "utf8"));
+        assert.equal(state.ok, true);
+        await writeFile(
+          path,
+          core.serializeStateJson({
+            ...state.value,
+            appliedMigrations: ["invented"],
+          }),
+        );
+        await commitAll(root, "create incompatible migration state");
+      },
+      code: "PROJECT_STATE_INCOMPATIBLE",
+    },
+    {
+      name: "missing source edge",
+      preparePrimary: prepareHistoricalUpgradeFixture,
+      prepareLinked: async (root) => {
+        const path = join(root, ".egeria/state.json");
+        const state = core.parseStateJson(await readFile(path, "utf8"));
+        assert.equal(state.ok, true);
+        await writeFile(
+          path,
+          core.serializeStateJson({
+            ...state.value,
+            installedCapabilities: state.value.installedCapabilities.map(
+              (capability) =>
+                capability.identifier === "standards"
+                  ? { ...capability, version: "0.2.0" }
+                  : capability,
+            ),
+          }),
+        );
+        await commitAll(root, "set unsupported source version");
+      },
+      code: "CAPABILITY_UPGRADE_EDGE_MISSING",
+    },
+    {
+      name: "ambiguous source inference",
+      preparePrimary: prepareHistoricalUpgradeFixture,
+      prepareLinked: async (root) => {
+        await writeFile(join(root, "apps/web/package.json"), "{");
+        await commitAll(root, "make version inference ambiguous");
+      },
+      code: "CAPABILITY_VERSION_AMBIGUOUS",
+    },
+    {
+      name: "ignored create target",
+      preparePrimary: prepareHistoricalUpgradeFixture,
+      prepareLinked: async (root) => {
+        await writeFile(
+          join(root, ".gitignore"),
+          `${await readFile(join(root, ".gitignore"), "utf8")}\n${visualUpgradePaths[0]}\n`,
+        );
+        await commitAll(root, "ignore an upgrade create target");
+      },
+      code: "CAPABILITY_ACTION_CONFLICT",
+    },
+  ];
+
+  for (const fixture of cases) {
+    await withGitFixture(
+      "portfolio",
+      async (roots) => {
+        const root = fixture.select?.(roots) ?? roots.linked;
+        await fixture.prepareLinked(root);
+        const before = await gitRepositorySnapshot(root);
+        const execution = await executeBuiltPlanUpgrade(root);
+        const after = await gitRepositorySnapshot(root);
+
+        assert.equal(execution.exitCode, 1, fixture.name);
+        assert.equal(execution.stdout, "", fixture.name);
+        assert.deepEqual(
+          JSON.parse(execution.stderr),
+          {
+            ok: false,
+            command: "plan-upgrade",
+            code: fixture.code,
+          },
+          fixture.name,
+        );
+        assert.deepEqual(after, before, fixture.name);
+        assert.doesNotMatch(
+          execution.stderr,
+          /private|refs\/heads|\.git\/worktrees/u,
+          fixture.name,
+        );
+      },
+      {
+        branch: `plan-upgrade-${fixture.code.toLowerCase()}-test`,
+        ...(fixture.preparePrimary === undefined
+          ? {}
+          : { preparePrimary: fixture.preparePrimary }),
+      },
+    );
   }
 });
 

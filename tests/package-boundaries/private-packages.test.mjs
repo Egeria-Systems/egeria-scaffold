@@ -283,6 +283,8 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "lifecycle/git-worktree-inspection.ts",
       "lifecycle/plan-capability-addition.ts",
       "lifecycle/plan-capability-removal.ts",
+      "lifecycle/plan-capability-upgrade.ts",
+      "lifecycle/supported-capability-upgrades.ts",
       "manifest/create-installed-manifest.ts",
       "ownership/fingerprint.ts",
       "ownership/materialize-surfaces.ts",
@@ -424,7 +426,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /canonical managed-surface inventory/);
   assert.match(
     builderInstructions,
-    /Git preflight, deterministic addition and removal planning, exact-diff inspection/,
+    /Git preflight, deterministic addition, removal, and exact supported-upgrade planning, exact-diff inspection/,
   );
   assert.match(builderInstructions, /`applyCapabilityAddition`/);
   assert.match(builderInstructions, /`applyCapabilityRemoval`/);
@@ -456,6 +458,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /applyCapabilityAddition/);
   assert.match(builderReadme, /applyCapabilityRemoval/);
   assert.match(builderReadme, /planCapabilityRemoval/);
+  assert.match(builderReadme, /planCapabilityUpgrade/);
   assert.match(builderReadme, /preserve-file-and-eject/);
   assert.match(builderReadme, /CAPABILITY_NOT_INSTALLED/);
   assert.match(builderReadme, /verified-final-diff approval/);
@@ -475,19 +478,22 @@ test("builder-core direct consumers describe the private generation boundary", a
   );
   assert.match(builderIndex, /apply-capability-removal\.js/);
   assert.match(builderIndex, /capability-removal-writer\.js/);
-  assert.match(cliInstructions, /eight commands exact/);
+  assert.match(builderIndex, /plan-capability-upgrade\.js/);
+  assert.match(cliInstructions, /nine commands exact/);
   assert.match(cliInstructions, /`plan-add` remains read-only/);
   assert.match(cliInstructions, /`apply-add` is limited/);
   assert.match(cliInstructions, /`plan-remove` remains read-only/);
   assert.match(cliInstructions, /`apply-remove` is the exact current removal command/);
   assert.match(cliInstructions, /exact `plan-remove` fingerprint/);
+  assert.match(cliInstructions, /`plan-upgrade` remains read-only/);
   assert.match(cliInstructions, /modified[^\n]+application-owned[^\n]+preserv[^\n]+eject/);
   assert.match(cliInstructions, /remain read-only/);
   assert.match(cliInstructions, /does not add overwrite/);
-  assert.match(cliReadme, /eight exact commands/);
+  assert.match(cliReadme, /nine exact commands/);
   assert.match(cliReadme, /`apply-add` accepts/);
   assert.match(cliReadme, /`plan-remove` is also read-only/);
   assert.match(cliReadme, /`apply-remove` is the exact current removal command/);
+  assert.match(cliReadme, /`plan-upgrade --directory/);
   assert.match(cliReadme, /migration append[^\n]+state-last persistence/);
   assert.match(cliReadme, /preserve[^\n]+eject/);
   assert.match(cliReadme, /verified-final-diff approval/);
@@ -514,7 +520,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /portable-rename race limit/);
   assert.match(packageOwnership, /pnpm `11.20.0`/);
   assert.match(packageOwnership, /disabled Next telemetry/);
-  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, `plan-remove`, and `apply-remove`/);
+  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, `plan-remove`, `apply-remove`, and `plan-upgrade`/);
   assert.match(packageOwnership, /one-line JSON output/);
   assert.match(packageOwnership, /clean attached linked worktree/);
   assert.match(packageOwnership, /all non-ignored untracked files/);
@@ -527,10 +533,11 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /removal planning[^\n]+read-only/);
   assert.doesNotMatch(packageOwnership, /future CLI consumer/);
   assert.match(packageOwnership, /existing-repository transformation/);
-  assert.match(rootReadme, /eight exact commands/);
+  assert.match(rootReadme, /nine exact commands/);
   assert.match(rootReadme, /`apply-remove` is the exact current removal command/);
   assert.match(rootReadme, /transaction evidence awaiting verified-final-diff approval/);
   assert.match(rootReadme, /`plan-remove`/);
+  assert.match(rootReadme, /egeria plan-upgrade/);
   assert.match(rootReadme, /`assume-unchanged` and `skip-worktree`/);
   assert.match(rootReadme, /canonical managed-surface inventory/);
   assert.match(rootReadme, /No lifecycle command creates the branch\/worktree/);

@@ -12,12 +12,15 @@ import {
   inspectGitWorktree as inspectGitWorktreeDefault,
   planCapabilityAddition,
   planCapabilityRemoval,
+  planCapabilityUpgrade,
   profileRecipes,
   type CapabilityAdditionPlan,
   type CapabilityAdditionExecutionResult,
   type CapabilityRemovalPlan,
   type CapabilityRemovalExecutionResult,
   type CapabilityRemovalPlanningFailureCode,
+  type CapabilityUpgradePlan,
+  type CapabilityUpgradePlanningFailureCode,
   type GeneratedProjectVerifier,
   type GitCreateTargetInspection,
   type GitWorktreeInspection,
@@ -66,6 +69,12 @@ type PlanRemoveSuccess = Readonly<{
   plan: CapabilityRemovalPlan;
 }>;
 
+type PlanUpgradeSuccess = Readonly<{
+  ok: true;
+  command: "plan-upgrade";
+  plan: CapabilityUpgradePlan;
+}>;
+
 const plannerRefusalCodes = new Set<PlanningFailureCode>([
   "PROJECT_INSPECTION_INVALID",
   "PROJECT_DRIFT_DETECTED",
@@ -84,6 +93,19 @@ const removalPlannerRefusalCodes =
     "CAPABILITY_REMOVAL_UNSUPPORTED",
   ]);
 
+const upgradePlannerRefusalCodes =
+  new Set<CapabilityUpgradePlanningFailureCode>([
+    "CAPABILITY_ACTION_CONFLICT",
+    "CAPABILITY_ALREADY_CURRENT",
+    "CAPABILITY_UPGRADE_EDGE_MISSING",
+    "CAPABILITY_UPGRADE_UNSUPPORTED",
+    "CAPABILITY_VERSION_AMBIGUOUS",
+    "PROJECT_DRIFT_DETECTED",
+    "PROJECT_EJECTION_UNSUPPORTED",
+    "PROJECT_INSPECTION_INVALID",
+    "PROJECT_STATE_INCOMPATIBLE",
+  ]);
+
 function isPlannerRefusalCode(code: string): code is PlanningFailureCode {
   return plannerRefusalCodes.has(code as PlanningFailureCode);
 }
@@ -93,6 +115,14 @@ function isRemovalPlannerRefusalCode(
 ): code is CapabilityRemovalPlanningFailureCode {
   return removalPlannerRefusalCodes.has(
     code as CapabilityRemovalPlanningFailureCode,
+  );
+}
+
+function isUpgradePlannerRefusalCode(
+  code: string,
+): code is CapabilityUpgradePlanningFailureCode {
+  return upgradePlannerRefusalCodes.has(
+    code as CapabilityUpgradePlanningFailureCode,
   );
 }
 
@@ -218,6 +248,15 @@ function writePlanRemoveRefusal(output: CliOutput, code: string): 1 {
     ...(code === "CAPABILITY_NOT_INSTALLED"
       ? { capability: "booking-calendly" }
       : {}),
+  });
+  return 1;
+}
+
+function writePlanUpgradeRefusal(output: CliOutput, code: string): 1 {
+  writeJson(output.writeError, {
+    ok: false,
+    command: "plan-upgrade",
+    code,
   });
   return 1;
 }
@@ -396,6 +435,93 @@ async function runPlanRemove(
   return 0;
 }
 
+async function runPlanUpgrade(
+  command: Extract<CliCommand, Readonly<{ kind: "plan-upgrade" }>>,
+  output: CliOutput,
+  dependencies: CliRunnerDependencies,
+): Promise<0 | 1> {
+  const root = resolve(command.directory);
+  const initialGit = await inspectForPlan(root, dependencies);
+
+  if (!initialGit.ok) {
+    return writePlanUpgradeRefusal(output, initialGit.code);
+  }
+
+  let outcome:
+    | Readonly<{
+        kind: "result";
+        result: Awaited<ReturnType<typeof planCapabilityUpgrade>>;
+      }>
+    | Readonly<{ kind: "failure"; code: "REPOSITORY_OPEN_FAILED" }>;
+
+  try {
+    const reader = (dependencies.createReader ?? createCliRepositoryReader)(root);
+    outcome = {
+      kind: "result",
+      result: await planCapabilityUpgrade({
+        reader,
+        git: initialGit,
+        capability: command.capability,
+        toVersion: command.toVersion,
+      }),
+    };
+  } catch {
+    outcome = { kind: "failure", code: "REPOSITORY_OPEN_FAILED" };
+  }
+
+  let targetFailure: string | undefined;
+  if (outcome.kind === "result" && outcome.result.ok) {
+    const createTargets = outcome.result.value.actions.flatMap((action) =>
+      action.kind === "create-file" ? [action.path] : [],
+    );
+    const targetInspection = await inspectCreateTargetsForPlan(
+      root,
+      createTargets,
+      dependencies,
+    );
+
+    if (!targetInspection.ok) {
+      targetFailure = targetInspection.code;
+    }
+  }
+
+  const finalGit = await inspectForPlan(root, dependencies);
+
+  if (!finalGit.ok) {
+    return writePlanUpgradeRefusal(output, finalGit.code);
+  }
+
+  if (!sameGitIdentity(initialGit, finalGit)) {
+    return writePlanUpgradeRefusal(output, "GIT_WORKTREE_CHANGED");
+  }
+
+  if (targetFailure !== undefined) {
+    return writePlanUpgradeRefusal(output, targetFailure);
+  }
+
+  if (outcome.kind === "failure") {
+    return writePlanUpgradeRefusal(output, outcome.code);
+  }
+
+  if (!outcome.result.ok) {
+    const code = outcome.result.issues[0]?.code;
+    return writePlanUpgradeRefusal(
+      output,
+      code !== undefined && isUpgradePlannerRefusalCode(code)
+        ? code
+        : "REPOSITORY_OPEN_FAILED",
+    );
+  }
+
+  const success: PlanUpgradeSuccess = {
+    ok: true,
+    command: "plan-upgrade",
+    plan: outcome.result.value,
+  };
+  writeJson(output.write, success);
+  return 0;
+}
+
 async function runApplyAdd(
   command: Extract<CliCommand, Readonly<{ kind: "apply-add" }>>,
   output: CliOutput,
@@ -520,6 +646,10 @@ export function createCliRunner(
 
     if (parsed.value.kind === "plan-remove") {
       return runPlanRemove(parsed.value, output, dependencies);
+    }
+
+    if (parsed.value.kind === "plan-upgrade") {
+      return runPlanUpgrade(parsed.value, output, dependencies);
     }
 
     if (parsed.value.kind === "apply-add") {
