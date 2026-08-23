@@ -265,23 +265,9 @@ async function createFile(
     handle = undefined;
     return { ok: true, identity };
   } catch {
-    let cleanupIdentity: SerializedIdentity | undefined;
-    try {
-      cleanupIdentity =
-        handle === undefined
-          ? undefined
-          : serializeIdentity(await handle.stat({ bigint: true }));
-    } catch {
-      cleanupIdentity = undefined;
-    }
     await handle?.close().catch(() => undefined);
-    if (
-      created &&
-      cleanupIdentity !== undefined &&
-      (await fileMatches(operation.name, cleanupIdentity))
-    ) {
-      await unlink(operation.name).catch(() => undefined);
-    }
+    // Node has no descriptor-relative unlink. Retain a created path so recovery
+    // cannot delete a concurrent replacement after a pathname identity check.
     return { ok: false, sourceChanged: created };
   }
 }

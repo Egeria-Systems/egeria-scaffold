@@ -54,7 +54,7 @@ async function runCreateWithZeroFileSizeLimit(root, request) {
 }
 
 test(
-  "filesystem removal writer cleans its exclusively created staging file after a write failure",
+  "filesystem removal writer retains failed staging paths for fail-closed recovery",
   { skip: process.platform === "win32" },
   async (context) => {
     const root = await createTemporaryRoot(
@@ -77,7 +77,17 @@ test(
       }),
       { ok: false, sourceChanged: true },
     );
-    assert.deepEqual(await readdir(root), []);
+    assert.deepEqual(await readdir(root), [".egeria-removal-injected.tmp"]);
+    await unlink(join(root, ".egeria-removal-injected.tmp"));
+    await writeFile(
+      join(root, ".egeria-removal-injected.tmp"),
+      "concurrent replacement\n",
+      "utf8",
+    );
+    assert.equal(
+      await readFile(join(root, ".egeria-removal-injected.tmp"), "utf8"),
+      "concurrent replacement\n",
+    );
   },
 );
 
