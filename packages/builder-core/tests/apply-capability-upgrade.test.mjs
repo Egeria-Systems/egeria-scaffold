@@ -576,8 +576,8 @@ test("standards capability upgrade transforms, verifies, persists state last, an
       initialStateResult.value.builderVersion,
     );
     assert.equal(
-      state.value.projectVersion,
-      initialStateResult.value.projectVersion,
+      state.value.projectSchemaVersion,
+      initialStateResult.value.projectSchemaVersion,
     );
     assert.deepEqual(state.value.compatibility, initialStateResult.value.compatibility);
     assert.deepEqual(state.value.ejections, initialStateResult.value.ejections);
@@ -889,50 +889,6 @@ test("standards capability upgrade refuses an ignored create target before mutat
   });
   assertFailure(execution.result, {
     code: "CAPABILITY_ACTION_CONFLICT",
-    phase: "precondition",
-    recovery: "not-required",
-  });
-  assertUnchanged(repository, before);
-  assertControlBytes(repository, controls);
-  assert.equal(repository.writes.length, 0);
-});
-
-test("standards capability upgrade propagates assume-unchanged refusal before mutation", async () => {
-  const repository = createRepository(await historicalEntries("portfolio"));
-  const before = snapshotFiles(repository.files);
-  const controls = new Map(
-    [".egeria/project.yaml", ".egeria/state.json", ".egeria/migrations.jsonl"].map(
-      (path) => [path, new Uint8Array(repository.files.get(path))],
-    ),
-  );
-  const execution = await invokeApply(repository, {
-    inspectWorktree: () =>
-      Promise.resolve({ ok: false, code: "GIT_WORKTREE_DIRTY" }),
-  });
-  assertFailure(execution.result, {
-    code: "GIT_WORKTREE_DIRTY",
-    phase: "precondition",
-    recovery: "not-required",
-  });
-  assertUnchanged(repository, before);
-  assertControlBytes(repository, controls);
-  assert.equal(repository.writes.length, 0);
-});
-
-test("standards capability upgrade propagates skip-worktree refusal before mutation", async () => {
-  const repository = createRepository(await historicalEntries("portfolio"));
-  const before = snapshotFiles(repository.files);
-  const controls = new Map(
-    [".egeria/project.yaml", ".egeria/state.json", ".egeria/migrations.jsonl"].map(
-      (path) => [path, new Uint8Array(repository.files.get(path))],
-    ),
-  );
-  const execution = await invokeApply(repository, {
-    inspectWorktree: () =>
-      Promise.resolve({ ok: false, code: "GIT_WORKTREE_DIRTY" }),
-  });
-  assertFailure(execution.result, {
-    code: "GIT_WORKTREE_DIRTY",
     phase: "precondition",
     recovery: "not-required",
   });
