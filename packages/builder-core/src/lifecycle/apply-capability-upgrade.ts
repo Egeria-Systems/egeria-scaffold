@@ -47,7 +47,6 @@ import {
   parseMigrationLog,
   parseProjectYaml,
   parseStateJson,
-  serializeMigrationRecord,
   serializeProjectYaml,
   serializeStateJson,
 } from "../state/codecs.js";
@@ -67,6 +66,11 @@ import {
   type GitWorktreeInspection,
   type GitWorktreeRefusalCode,
 } from "./git-worktree-inspection.js";
+import {
+  persistInstalledState,
+  persistMigrationRecord,
+  prepareMigrationRecord,
+} from "./lifecycle-control-persistence.js";
 import {
   planCapabilityUpgrade,
   type CapabilityUpgradeAction,
@@ -602,11 +606,6 @@ function requirePendingInference(input: Readonly<{
   );
 }
 
-function appendMigrationSource(current: string, record: MigrationRecord): string {
-  const separator = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
-  return `${current}${separator}${serializeMigrationRecord(record)}`;
-}
-
 function createNextState(input: Readonly<{
   current: InstalledState;
   rendered: RenderedSkeleton;
@@ -1003,52 +1002,38 @@ export async function applyCapabilityUpgrade(input: Readonly<{
     );
   }
 
-  const migrationSource = appendMigrationSource(
-    controls.migrationSource,
-    migration.data,
-  );
-  let migrationWrite;
-  try {
-    migrationWrite = await writer.write([
-      {
-        path: ".egeria/migrations.jsonl",
-        expected: {
-          kind: "file",
-          content: encoder.encode(controls.migrationSource),
-        },
-        content: encoder.encode(migrationSource),
-      },
-    ]);
-  } catch {
-    migrationWrite = { ok: false as const, sourceChanged: true };
-  }
-  if (!migrationWrite.ok) {
-    return failure(
-      "CAPABILITY_MIGRATION_WRITE_FAILED",
-      "persist-migration",
-      "inspect-worktree",
-    );
-  }
-
-  let writtenMigration;
-  try {
-    writtenMigration = await reader.readText(".egeria/migrations.jsonl");
-  } catch {
-    writtenMigration = { kind: "missing" as const };
-  }
-  const parsedWrittenMigration =
-    writtenMigration.kind === "file"
-      ? parseMigrationLog(writtenMigration.content)
-      : undefined;
-  if (
-    writtenMigration.kind !== "file" ||
-    writtenMigration.content !== migrationSource ||
-    parsedWrittenMigration?.ok !== true ||
-    !sameValues(
-      parsedWrittenMigration.value.map(({ identifier }) => identifier),
-      [...controls.state.value.appliedMigrations, migrationIdentifier],
-    )
-  ) {
+  const preparedMigration = prepareMigrationRecord({
+    currentSource: controls.migrationSource,
+    currentIdentifiers: controls.state.value.appliedMigrations,
+    record: migration.data,
+  });
+  const persistedMigration = await persistMigrationRecord({
+    prepared: preparedMigration,
+    write: async (change) => {
+      try {
+        return (
+          await writer.write([
+            {
+              path: change.path,
+              expected: { kind: "file", content: change.expected },
+              content: change.content,
+            },
+          ])
+        ).ok;
+      } catch {
+        return false;
+      }
+    },
+    readSource: async () => {
+      try {
+        const written = await reader.readText(".egeria/migrations.jsonl");
+        return written.kind === "file" ? written.content : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+  });
+  if (!persistedMigration.ok) {
     return failure(
       "CAPABILITY_MIGRATION_WRITE_FAILED",
       "persist-migration",
@@ -1057,10 +1042,7 @@ export async function applyCapabilityUpgrade(input: Readonly<{
   }
 
   const expectedBytes = new Map(materialized.targetBytes);
-  expectedBytes.set(
-    ".egeria/migrations.jsonl",
-    encoder.encode(migrationSource),
-  );
+  expectedBytes.set(".egeria/migrations.jsonl", persistedMigration.content);
   let nextState: InstalledState | undefined;
   try {
     nextState = createNextState({
@@ -1081,30 +1063,33 @@ export async function applyCapabilityUpgrade(input: Readonly<{
     );
   }
 
-  const stateSource = serializeStateJson(nextState);
-  let stateWrite;
-  try {
-    stateWrite = await writer.write([
-      {
-        path: ".egeria/state.json",
-        expected: {
-          kind: "file",
-          content: encoder.encode(controls.stateSource),
-        },
-        content: encoder.encode(stateSource),
-      },
-    ]);
-  } catch {
-    stateWrite = { ok: false as const, sourceChanged: true };
-  }
-  if (!stateWrite.ok) {
+  const persistedState = await persistInstalledState({
+    currentSource: controls.stateSource,
+    state: nextState,
+    write: async (change) => {
+      try {
+        return (
+          await writer.write([
+            {
+              path: change.path,
+              expected: { kind: "file", content: change.expected },
+              content: change.content,
+            },
+          ])
+        ).ok;
+      } catch {
+        return false;
+      }
+    },
+  });
+  if (!persistedState.ok) {
     return failure(
       "CAPABILITY_STATE_WRITE_FAILED",
       "persist-state",
       "inspect-worktree",
     );
   }
-  expectedBytes.set(".egeria/state.json", encoder.encode(stateSource));
+  expectedBytes.set(".egeria/state.json", persistedState.content);
 
   let finalControls: ControlSnapshot | undefined;
   let finalInference: Awaited<ReturnType<typeof inferRepository>>;
@@ -1127,7 +1112,7 @@ export async function applyCapabilityUpgrade(input: Readonly<{
       controls: finalControls,
       original: controls,
       expectedState: nextState,
-      migrationSource,
+      migrationSource: persistedMigration.source,
       desiredCapabilities: plan.desiredCapabilities,
     }) ||
     !requireFinalInference({

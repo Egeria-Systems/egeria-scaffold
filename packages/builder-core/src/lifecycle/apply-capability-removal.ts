@@ -41,7 +41,6 @@ import {
   parseMigrationLog,
   parseProjectYaml,
   parseStateJson,
-  serializeMigrationRecord,
   serializeProjectYaml,
   serializeStateJson,
 } from "../state/codecs.js";
@@ -59,6 +58,11 @@ import {
   type GitWorktreeInspection,
   type GitWorktreeRefusalCode,
 } from "./git-worktree-inspection.js";
+import {
+  persistInstalledState,
+  persistMigrationRecord,
+  prepareMigrationRecord,
+} from "./lifecycle-control-persistence.js";
 import {
   planCapabilityRemoval,
   type CapabilityRemovalAction,
@@ -254,11 +258,6 @@ function sameSurfaceDescriptor(
         installed.fingerprintTarget.pointer ===
           descriptor.fingerprintTarget.pointer))
   );
-}
-
-function appendMigrationSource(current: string, record: MigrationRecord): string {
-  const separator = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
-  return `${current}${separator}${serializeMigrationRecord(record)}`;
 }
 
 function expectedPendingSurfaceStatus(
@@ -778,17 +777,18 @@ export async function applyCapabilityRemoval(input: Readonly<{
     );
   }
 
-  const migrationSource = appendMigrationSource(
-    controls.migrationSource,
-    migration.data,
-  );
+  const preparedMigration = prepareMigrationRecord({
+    currentSource: controls.migrationSource,
+    currentIdentifiers: controls.state.value.appliedMigrations,
+    record: migration.data,
+  });
   const actualFiles = new Map<string, Uint8Array>();
   for (const [path, expected] of transformedExpected) {
     if (expected.kind === "file") {
       actualFiles.set(path, expected.content);
     }
   }
-  actualFiles.set(".egeria/migrations.jsonl", encoder.encode(migrationSource));
+  actualFiles.set(".egeria/migrations.jsonl", preparedMigration.content);
   const changedActionPaths = plan.actions.flatMap((action) =>
     action.kind === "preserve-file-and-eject" ? [] : [action.path],
   );
@@ -809,20 +809,34 @@ export async function applyCapabilityRemoval(input: Readonly<{
     );
   }
 
-  let migrationWrite;
-  try {
-    migrationWrite = await writer.write([
-      {
-        kind: "replace-file",
-        path: ".egeria/migrations.jsonl",
-        expected: encoder.encode(controls.migrationSource),
-        content: encoder.encode(migrationSource),
-      },
-    ]);
-  } catch {
-    migrationWrite = { ok: false as const, sourceChanged: true };
-  }
-  if (!migrationWrite.ok) {
+  const persistedMigration = await persistMigrationRecord({
+    prepared: preparedMigration,
+    write: async (change) => {
+      try {
+        return (
+          await writer.write([
+            {
+              kind: "replace-file",
+              path: change.path,
+              expected: change.expected,
+              content: change.content,
+            },
+          ])
+        ).ok;
+      } catch {
+        return false;
+      }
+    },
+    readSource: async () => {
+      try {
+        const written = await reader.readText(".egeria/migrations.jsonl");
+        return written.kind === "file" ? written.content : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+  });
+  if (!persistedMigration.ok) {
     return failure(
       "CAPABILITY_MIGRATION_WRITE_FAILED",
       "persist-migration",
@@ -830,47 +844,27 @@ export async function applyCapabilityRemoval(input: Readonly<{
     );
   }
 
-  let writtenMigration;
-  try {
-    writtenMigration = await reader.readText(".egeria/migrations.jsonl");
-  } catch {
-    writtenMigration = { kind: "missing" as const };
-  }
-  const parsedWrittenMigration =
-    writtenMigration.kind === "file"
-      ? parseMigrationLog(writtenMigration.content)
-      : undefined;
-  if (
-    writtenMigration.kind !== "file" ||
-    writtenMigration.content !== migrationSource ||
-    parsedWrittenMigration?.ok !== true ||
-    !sameValues(
-      parsedWrittenMigration.value.map(({ identifier }) => identifier),
-      [...controls.state.value.appliedMigrations, migrationIdentifier],
-    )
-  ) {
-    return failure(
-      "CAPABILITY_MIGRATION_WRITE_FAILED",
-      "persist-migration",
-      "inspect-worktree",
-    );
-  }
-
-  const stateSource = serializeStateJson(nextState);
-  let stateWrite;
-  try {
-    stateWrite = await writer.write([
-      {
-        kind: "replace-file",
-        path: ".egeria/state.json",
-        expected: encoder.encode(controls.stateSource),
-        content: encoder.encode(stateSource),
-      },
-    ]);
-  } catch {
-    stateWrite = { ok: false as const, sourceChanged: true };
-  }
-  if (!stateWrite.ok) {
+  const persistedState = await persistInstalledState({
+    currentSource: controls.stateSource,
+    state: nextState,
+    write: async (change) => {
+      try {
+        return (
+          await writer.write([
+            {
+              kind: "replace-file",
+              path: change.path,
+              expected: change.expected,
+              content: change.content,
+            },
+          ])
+        ).ok;
+      } catch {
+        return false;
+      }
+    },
+  });
+  if (!persistedState.ok) {
     return failure(
       "CAPABILITY_STATE_WRITE_FAILED",
       "persist-state",
@@ -879,11 +873,11 @@ export async function applyCapabilityRemoval(input: Readonly<{
   }
   transformedExpected.set(".egeria/migrations.jsonl", {
     kind: "file",
-    content: encoder.encode(migrationSource),
+    content: persistedMigration.content,
   });
   transformedExpected.set(".egeria/state.json", {
     kind: "file",
-    content: encoder.encode(stateSource),
+    content: persistedState.content,
   });
 
   let finalInference;
