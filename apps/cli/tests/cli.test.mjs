@@ -360,6 +360,21 @@ function applyUpgradeArguments(
   ];
 }
 
+function applyProfileTransitionArguments(
+  directory,
+  approvedPlan = `sha256:${"a".repeat(64)}`,
+) {
+  return [
+    "apply-profile-transition",
+    "--directory",
+    directory,
+    "--to-profile",
+    "site",
+    "--approved-plan",
+    approvedPlan,
+  ];
+}
+
 async function listTree(root) {
   const snapshot = [];
 
@@ -484,6 +499,43 @@ const upgradeControlPaths = [
   ".egeria/state.json",
   ".egeria/migrations.jsonl",
 ];
+const profileTransitionSourcePaths = [
+  ".egeria/project.yaml",
+  "apps/web/app/about/page.tsx",
+  "apps/web/content/en-CA/about.yaml",
+  "apps/web/content/en-CA/long-form/introduction.md",
+  "apps/web/content/en-CA/site.yaml",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+];
+const profileTransitionChangedPaths = [
+  ".egeria/migrations.jsonl",
+  ".egeria/state.json",
+  ...profileTransitionSourcePaths,
+].sort();
+
+async function renderProfileTransitionTarget(root) {
+  const project = core.parseProjectYaml(
+    await readFile(join(root, ".egeria/project.yaml"), "utf8"),
+  );
+  assert.equal(project.ok, true, JSON.stringify(project.issues));
+  const booking = project.value.capabilitySettings["booking-calendly"];
+  const rendered = await core.renderSkeleton({
+    profile: "site",
+    projectName: project.value.project.name,
+    displayName: project.value.project.displayName,
+    packageVersions: core.verifiedCapabilityPackageVersions,
+    ...(booking === undefined ? {} : { bookingCalendly: booking }),
+  });
+  assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
+  return {
+    files: new Map(
+      rendered.value.files.map(({ path, content }) => [path, content]),
+    ),
+    project: rendered.value.project,
+    sourceProject: project.value,
+  };
+}
 
 async function prepareHistoricalUpgradeFixture(root) {
   for (const path of visualUpgradePaths) {
@@ -1097,6 +1149,71 @@ test("the apply-upgrade parser accepts only the exact approved standards edge", 
     assert.doesNotMatch(
       JSON.stringify(result),
       /private-value|private-positional|observability|0\.5\.0|bad\\u0000directory/u,
+    );
+  }
+});
+
+test("the apply-profile-transition parser accepts only the exact approved portfolio-to-site edge", () => {
+  const fingerprint = `sha256:${"a".repeat(64)}`;
+  const expected = {
+    kind: "apply-profile-transition",
+    directory: "/private/tmp/acme-portfolio",
+    toProfile: "site",
+    approvedPlanFingerprint: fingerprint,
+  };
+  const valid = applyProfileTransitionArguments(
+    "/private/tmp/acme-portfolio",
+    fingerprint,
+  );
+
+  assert.deepEqual(assertSuccess(cliArguments.parseCliArguments(valid)), expected);
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "apply-profile-transition",
+        "--approved-plan",
+        fingerprint,
+        "--to-profile",
+        "site",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+      ]),
+    ),
+    expected,
+  );
+
+  for (const arguments_ of [
+    valid.slice(0, -2),
+    valid.slice(0, -4),
+    [...valid, "--approved-plan", fingerprint],
+    [...valid, "--directory", "/private/tmp/other"],
+    [...valid, "--unknown", "private-value"],
+    [...valid, "private-positional"],
+    applyProfileTransitionArguments(
+      "/private/tmp/acme-portfolio",
+      "sha256:short",
+    ),
+    applyProfileTransitionArguments(
+      "/private/tmp/acme-portfolio",
+      `sha256:${"A".repeat(64)}`,
+    ),
+    valid.map((value) => (value === "site" ? "portfolio" : value)),
+    applyProfileTransitionArguments(""),
+    applyProfileTransitionArguments("relative/project"),
+    applyProfileTransitionArguments("bad\0directory"),
+  ]) {
+    const result = cliArguments.parseCliArguments(arguments_);
+    assert.equal(result.ok, false, JSON.stringify(arguments_));
+    assert.deepEqual(result.issues, [
+      {
+        code: "CLI_ARGUMENT_INVALID",
+        path: [],
+        context: { reason: "invalid-arguments" },
+      },
+    ]);
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /private-value|private-positional|bad\\u0000directory/u,
     );
   }
 });
@@ -2378,6 +2495,111 @@ test("apply-upgrade emits exact refusal and rejected-executor envelopes", async 
   );
 });
 
+test("apply-profile-transition forwards exact approval and emits bounded success or refusal envelopes", async () => {
+  const calls = [];
+  const fingerprint = `sha256:${"b".repeat(64)}`;
+  const value = {
+    status: "verified-final-diff-approval-required",
+    baseRevision: "abcdef0123456789abcdef0123456789abcdef01",
+    transition: {
+      fromProfile: "portfolio",
+      fromRecipeVersion: "0.10.0",
+      toProfile: "site",
+      toRecipeVersion: "0.10.0",
+    },
+    migration: "transition-portfolio-0-10-0-to-site-0-10-0",
+    changedPaths: [
+      ".egeria/migrations.jsonl",
+      ".egeria/project.yaml",
+      ".egeria/state.json",
+    ],
+    verificationChecks: core.profileTransitionVerificationChecks,
+  };
+  const runCli = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    applyProfileTransition(input) {
+      calls.push(input);
+      return Promise.resolve({ ok: true, value });
+    },
+  });
+  const captured = captureOutput();
+
+  assert.equal(
+    await runCli(
+      applyProfileTransitionArguments(
+        "/private/profile-transition-worktree",
+        fingerprint,
+      ),
+      captured.output,
+    ),
+    0,
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].root, resolve("/private/profile-transition-worktree"));
+  assert.equal(calls[0].toProfile, "site");
+  assert.equal(calls[0].approvedPlanFingerprint, fingerprint);
+  assert.equal(typeof calls[0].verifier.verifyInIsolatedCopy, "function");
+  assert.deepEqual(captured.error, []);
+  assert.deepEqual(captured.standard, [
+    JSON.stringify({
+      ok: true,
+      command: "apply-profile-transition",
+      result: value,
+    }),
+  ]);
+  assert.doesNotMatch(
+    captured.standard[0],
+    /profile-transition-worktree|refs\/heads|\.git\/worktrees|private executor/u,
+  );
+
+  for (const fixture of [
+    {
+      invoke: () =>
+        Promise.resolve({
+          ok: false,
+          code: "PROFILE_TRANSITION_VERIFICATION_FAILED",
+          phase: "verify",
+          recovery: "inspect-worktree",
+          privateDetail: "private executor detail",
+        }),
+      expectedCode: "PROFILE_TRANSITION_VERIFICATION_FAILED",
+      expectedPhase: "verify",
+    },
+    {
+      invoke: () => Promise.reject(new Error("private executor rejection")),
+      expectedCode: "PROFILE_TRANSITION_EXECUTION_FAILED",
+      expectedPhase: "precondition",
+    },
+  ]) {
+    const refusalRunner = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      applyProfileTransition: fixture.invoke,
+    });
+    const refusal = captureOutput();
+    assert.equal(
+      await refusalRunner(
+        applyProfileTransitionArguments("/private/profile-transition-worktree"),
+        refusal.output,
+      ),
+      1,
+    );
+    assert.deepEqual(refusal.standard, []);
+    assert.deepEqual(refusal.error, [
+      JSON.stringify({
+        ok: false,
+        command: "apply-profile-transition",
+        code: fixture.expectedCode,
+        phase: fixture.expectedPhase,
+        recovery: "inspect-worktree",
+      }),
+    ]);
+    assert.doesNotMatch(
+      refusal.error[0],
+      /profile-transition-worktree|private executor|refs\/heads|\.git\/worktrees/u,
+    );
+  }
+});
+
 test("apply-upgrade preserves representative inspectable failure prefixes", async () => {
   const cases = [
     {
@@ -2942,6 +3164,13 @@ async function executeBuiltApplyUpgrade(directory, approvedPlan) {
   ]);
 }
 
+async function executeBuiltApplyProfileTransition(directory, approvedPlan) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...applyProfileTransitionArguments(directory, approvedPlan),
+  ]);
+}
+
 test("the compiled plan-add command emits exact portfolio and site plans without writes", async () => {
   for (const profile of ["portfolio", "site"]) {
     await withGitFixture(profile, async ({ linked }) => {
@@ -3260,6 +3489,213 @@ test("the compiled profile-transition planner refuses the finite unsafe matrix w
       { branch: `profile-transition-${fixture.code.toLowerCase()}-test` },
     );
   }
+});
+
+test("the compiled apply-profile-transition command completes default and Calendly portfolio transactions", async () => {
+  for (const fixture of ["portfolio", "portfolio-calendly"]) {
+    await withGitFixture(
+      fixture,
+      async ({ linked, primary }) => {
+        const linkedBefore = await gitRepositorySnapshot(linked);
+        const primaryBefore = await gitRepositorySnapshot(primary);
+        const initialInspection = await core.inspectGitWorktree({ root: linked });
+        assert.equal(initialInspection.ok, true);
+        const target = await renderProfileTransitionTarget(linked);
+        const initialMigrationSource = await readFile(
+          join(linked, ".egeria/migrations.jsonl"),
+          "utf8",
+        );
+
+        const planExecution = await executeBuiltPlanProfileTransition(linked);
+        assert.equal(planExecution.exitCode, 0, planExecution.stderr);
+        assert.equal(planExecution.stderr, "");
+        const plan = JSON.parse(planExecution.stdout).plan;
+        assert.deepEqual(
+          plan.actions.map(({ path }) => path),
+          profileTransitionSourcePaths,
+        );
+        assert.deepEqual(await gitRepositorySnapshot(linked), linkedBefore);
+
+        const execution = await executeBuiltApplyProfileTransition(
+          linked,
+          plan.planFingerprint,
+        );
+        assert.equal(execution.exitCode, 0, execution.stderr);
+        assert.equal(execution.stderr, "");
+        assert.equal(execution.stdout.endsWith("\n"), true);
+        assert.equal(execution.stdout.trimEnd().split("\n").length, 1);
+        assert.deepEqual(JSON.parse(execution.stdout), {
+          ok: true,
+          command: "apply-profile-transition",
+          result: {
+            status: "verified-final-diff-approval-required",
+            baseRevision: Buffer.from(linkedBefore.head).toString("utf8").trim(),
+            transition: {
+              fromProfile: "portfolio",
+              fromRecipeVersion: "0.10.0",
+              toProfile: "site",
+              toRecipeVersion: "0.10.0",
+            },
+            migration: "transition-portfolio-0-10-0-to-site-0-10-0",
+            changedPaths: profileTransitionChangedPaths,
+            verificationChecks: core.profileTransitionVerificationChecks,
+          },
+        });
+
+        assert.equal(
+          await readFile(join(linked, ".egeria/project.yaml"), "utf8"),
+          core.serializeProjectYaml(target.project),
+        );
+        for (const path of profileTransitionSourcePaths.slice(1)) {
+          assert.deepEqual(
+            await readFile(join(linked, path)),
+            Buffer.from(target.files.get(path)),
+            `${fixture}:${path}`,
+          );
+        }
+
+        const project = core.parseProjectYaml(
+          await readFile(join(linked, ".egeria/project.yaml"), "utf8"),
+        );
+        const state = core.parseStateJson(
+          await readFile(join(linked, ".egeria/state.json"), "utf8"),
+        );
+        const migrations = core.parseMigrationLog(
+          await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8"),
+        );
+        assert.equal(project.ok, true);
+        assert.equal(state.ok, true);
+        assert.equal(migrations.ok, true);
+        assert.deepEqual(
+          project.value.capabilitySettings["booking-calendly"],
+          target.sourceProject.capabilitySettings["booking-calendly"],
+        );
+        assert.deepEqual(state.value.origin, {
+          profile: "site",
+          recipeVersion: "0.10.0",
+        });
+        assert.deepEqual(state.value.lastSuccessfulVerification, {
+          kind: "profile-transition",
+          checks: core.profileTransitionPersistedVerificationChecks,
+        });
+        assert.equal(
+          state.value.appliedMigrations.at(-1),
+          "transition-portfolio-0-10-0-to-site-0-10-0",
+        );
+        assert.deepEqual(
+          migrations.value.at(-1).verificationChecks,
+          core.profileTransitionPersistedVerificationChecks,
+        );
+        assert.equal(
+          (await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8"))
+            .startsWith(initialMigrationSource),
+          true,
+        );
+        assert.equal(
+          (
+            await core.inspectGitExpectedChanges({
+              root: linked,
+              identity: initialInspection.identity,
+              expectedPaths: profileTransitionChangedPaths,
+            })
+          ).ok,
+          true,
+        );
+        await assertExactInstalledAgreement(linked);
+        assert.deepEqual(await gitRepositorySnapshot(primary), primaryBefore);
+        assert.doesNotMatch(
+          execution.stdout,
+          /refs\/heads|\.git\/worktrees|calendly\.com|acme-portfolio/u,
+        );
+      },
+      { branch: `apply-${fixture}-to-site-test` },
+    );
+  }
+});
+
+test("the compiled apply-profile-transition command refuses representative unsafe inputs without mutation", async () => {
+  const cases = [
+    {
+      name: "wrong approved fingerprint",
+      fixture: "portfolio",
+      select: ({ linked }) => linked,
+      prepare: async () => undefined,
+      code: "PROFILE_TRANSITION_PLAN_APPROVAL_INVALID",
+    },
+    {
+      name: "dirty linked worktree",
+      fixture: "portfolio",
+      select: ({ linked }) => linked,
+      prepare: (root) =>
+        writeFile(join(root, "private-untracked.txt"), "private\n"),
+      code: "GIT_WORKTREE_DIRTY",
+    },
+    {
+      name: "primary checkout",
+      fixture: "portfolio",
+      select: ({ primary }) => primary,
+      prepare: async () => undefined,
+      code: "GIT_WORKTREE_NOT_ISOLATED",
+    },
+    {
+      name: "already current",
+      fixture: "site",
+      select: ({ linked }) => linked,
+      prepare: async () => undefined,
+      code: "PROFILE_ALREADY_CURRENT",
+    },
+  ];
+
+  for (const [index, fixture] of cases.entries()) {
+    await withGitFixture(
+      fixture.fixture,
+      async (roots) => {
+        const root = fixture.select(roots);
+        await fixture.prepare(root);
+        const before = await gitRepositorySnapshot(root);
+        const execution = await executeBuiltApplyProfileTransition(
+          root,
+          `sha256:${"0".repeat(64)}`,
+        );
+        const after = await gitRepositorySnapshot(root);
+
+        assert.equal(execution.exitCode, 1, fixture.name);
+        assert.equal(execution.stdout, "", fixture.name);
+        assert.equal(execution.stderr.endsWith("\n"), true, fixture.name);
+        assert.deepEqual(
+          JSON.parse(execution.stderr),
+          {
+            ok: false,
+            command: "apply-profile-transition",
+            code: fixture.code,
+            phase: "precondition",
+            recovery: "not-required",
+          },
+          fixture.name,
+        );
+        assert.deepEqual(after, before, fixture.name);
+        assert.doesNotMatch(
+          execution.stderr,
+          /private|refs\/heads|\.git\/worktrees|acme/u,
+          fixture.name,
+        );
+      },
+      { branch: `apply-profile-transition-refusal-${index}` },
+    );
+  }
+
+  const invalid = await executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...applyProfileTransitionArguments("relative/project"),
+  ]);
+  assert.equal(invalid.exitCode, 2);
+  assert.equal(invalid.stdout, "");
+  assert.deepEqual(JSON.parse(invalid.stderr), {
+    ok: false,
+    command: "apply-profile-transition",
+    code: "CLI_ARGUMENT_INVALID",
+    recovery: "not-required",
+  });
 });
 
 test("the compiled apply-upgrade command completes the exact portfolio and site transactions", async () => {

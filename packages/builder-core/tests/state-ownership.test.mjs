@@ -249,6 +249,57 @@ test("state JSON is strict, canonical, and content-safe", () => {
   assert.doesNotMatch(JSON.stringify(invalidSchema.issues), /secret-state/);
 });
 
+test("profile-transition receipts require the exact conservative persisted checks", () => {
+  const expectedChecks = [
+    "contracts",
+    "plan-approval",
+    "pre-state-inference",
+    "lockfile",
+    "frozen-install",
+    "lint",
+    "typecheck",
+    "unit-tests",
+    "component-tests",
+    "next-build",
+    "opennext-build",
+    "post-change-inference",
+  ];
+  assert.deepEqual(core.profileTransitionPersistedVerificationChecks, expectedChecks);
+  assert.deepEqual(core.profileTransitionVerificationChecks, [
+    ...expectedChecks,
+    "migration-record",
+    "post-state-inference",
+  ]);
+
+  const transitionState = {
+    ...validState,
+    origin: { profile: "site", recipeVersion: "0.10.0" },
+    lastSuccessfulVerification: {
+      kind: "profile-transition",
+      checks: expectedChecks,
+    },
+  };
+  assert.deepEqual(assertOk(core.parseStateJson(JSON.stringify(transitionState))), transitionState);
+
+  for (const checks of [
+    expectedChecks.slice(0, -1),
+    [...expectedChecks, "migration-record"],
+  ]) {
+    assertIssue(
+      core.parseStateJson(
+        JSON.stringify({
+          ...transitionState,
+          lastSuccessfulVerification: {
+            kind: "profile-transition",
+            checks,
+          },
+        }),
+      ),
+      "STATE_SCHEMA_INVALID",
+    );
+  }
+});
+
 test("migration JSONL preserves source line numbers and serializes one canonical record", () => {
   assert.deepEqual(assertOk(core.parseMigrationLog("\n  \n")), []);
 

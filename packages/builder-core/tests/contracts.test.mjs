@@ -174,6 +174,16 @@ const capabilityUpgradeVerificationChecks = [
   "post-state-inference",
 ];
 
+const profileTransitionPersistedVerificationChecks = [
+  ...capabilityUpgradePersistedVerificationChecks,
+];
+
+const profileTransitionVerificationChecks = [
+  ...profileTransitionPersistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+];
+
 const readableRecipeVersions = [
   "0.1.0",
   "0.2.0",
@@ -293,6 +303,8 @@ test("builder-core exports the executable contract boundary", () => {
     "capabilityDeliveryModeSchema",
     "capabilityUpgradePersistedVerificationChecks",
     "capabilityUpgradeVerificationChecks",
+    "profileTransitionPersistedVerificationChecks",
+    "profileTransitionVerificationChecks",
     "capabilityDescriptorSchema",
     "capabilityRemovalPolicySchema",
     "capabilityStateClassificationSchema",
@@ -1009,6 +1021,7 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
       "capability-addition",
       "capability-removal",
       "capability-upgrade",
+      "profile-transition",
     ],
   );
   const capabilityUpgradeSchema =
@@ -1018,6 +1031,16 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
   assert.deepEqual(
     capabilityUpgradeSchema.properties.checks.prefixItems.map(({ const: value }) => value),
     capabilityUpgradePersistedVerificationChecks,
+  );
+  const profileTransitionSchema =
+    generated["state.schema.json"].properties.lastSuccessfulVerification.oneOf.find(
+      ({ properties }) => properties.kind.const === "profile-transition",
+    );
+  assert.deepEqual(
+    profileTransitionSchema.properties.checks.prefixItems.map(
+      ({ const: value }) => value,
+    ),
+    profileTransitionPersistedVerificationChecks,
   );
   for (const tuple of verificationCheckTuples) {
     assert.equal(tuple.minItems, tuple.prefixItems.length);

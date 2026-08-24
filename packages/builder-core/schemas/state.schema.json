@@ -452,6 +452,76 @@
             "checks"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "checks": {
+              "maxItems": 12,
+              "minItems": 12,
+              "prefixItems": [
+                {
+                  "const": "contracts",
+                  "type": "string"
+                },
+                {
+                  "const": "plan-approval",
+                  "type": "string"
+                },
+                {
+                  "const": "pre-state-inference",
+                  "type": "string"
+                },
+                {
+                  "const": "lockfile",
+                  "type": "string"
+                },
+                {
+                  "const": "frozen-install",
+                  "type": "string"
+                },
+                {
+                  "const": "lint",
+                  "type": "string"
+                },
+                {
+                  "const": "typecheck",
+                  "type": "string"
+                },
+                {
+                  "const": "unit-tests",
+                  "type": "string"
+                },
+                {
+                  "const": "component-tests",
+                  "type": "string"
+                },
+                {
+                  "const": "next-build",
+                  "type": "string"
+                },
+                {
+                  "const": "opennext-build",
+                  "type": "string"
+                },
+                {
+                  "const": "post-change-inference",
+                  "type": "string"
+                }
+              ],
+              "readOnly": true,
+              "type": "array"
+            },
+            "kind": {
+              "const": "profile-transition",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "checks"
+          ],
+          "type": "object"
         }
       ],
       "readOnly": true

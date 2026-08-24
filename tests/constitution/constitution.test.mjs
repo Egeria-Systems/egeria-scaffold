@@ -2801,7 +2801,7 @@ test("canonical documentation records visual regression and the client-ready clo
   );
 });
 
-test("canonical documentation accepts profile-transition planning and selects its exact executor", async () => {
+test("canonical documentation accepts profile-transition planning and bounds its exact executor candidate", async () => {
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3B");
   const [
@@ -2906,7 +2906,7 @@ test("canonical documentation accepts profile-transition planning and selects it
     );
     assert.match(
       boundaryOwner,
-      /apply-profile-transition[^\n]+selected next/iu,
+      /apply-profile-transition[^\n]+(?:candidate|pending[^\n]+integration)|candidate[^\n]+apply-profile-transition/iu,
     );
     assert.match(
       boundaryOwner,
@@ -2916,7 +2916,7 @@ test("canonical documentation accepts profile-transition planning and selects it
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+exact Calendly addition\/removal and standards upgrade transactions[^\n]+portfolio-to-site execution[^\n]+approved next transaction[^\n]+generic lifecycle transformation[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+provider\/data\/credential cleanup/iu,
+    /Existing-repository mutation[^\n]+exact Calendly addition\/removal and standards upgrade transactions[^\n]+candidate[^\n]+portfolio-to-site execution[^\n]+pending accepted-main integration[^\n]+generic lifecycle transformation[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+provider\/data\/credential cleanup/iu,
   );
   assert.match(
     overview,
@@ -2933,7 +2933,7 @@ test("canonical documentation accepts profile-transition planning and selects it
   );
   assert.match(
     capabilityModel,
-    /apply-remove[^\n]+standards executor[^\n]+accepted-main integrated[^\n]+portfolio-to-site planning[^\n]+accepted-main integrated[^\n]+apply-profile-transition[^\n]+next[^\n]+Generic lifecycle transformation[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+    /apply-remove[^\n]+standards executor[^\n]+accepted-main integrated[^\n]+portfolio-to-site planning[^\n]+accepted-main integrated[^\n]+apply-profile-transition[^\n]+pending[^\n]+candidate[^\n]+integration[^\n]+Generic lifecycle transformation[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
   );
   assert.match(
     enforcementMap,
@@ -3155,7 +3155,7 @@ test("canonical documentation accepts profile-transition planning and selects it
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.match(
       sequencingOwner,
-      /minimum eight remaining increments/iu,
+      /minimum seven remaining increments/iu,
     );
     assert.match(
       sequencingOwner,
@@ -3177,11 +3177,10 @@ test("canonical documentation accepts profile-transition planning and selects it
   }
 
   for (const responsibility of [
-    /1\. implement exact `egeria apply-profile-transition[^\n]+separately approved operation-specific executor/iu,
-    /2\. perform one evidence-gated internal lifecycle extraction[^\n]+accepted add[^\n]+removal[^\n]+upgrade[^\n]+transition/iu,
-    /3\. run one `booking-calendly@0\.1\.0` lifecycle certification increment[^\n]+add-remove-re-add[^\n]+refusal[^\n]+recovery[^\n]+protected-staging journey/iu,
-    /4\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
-    /5\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
+    /1\. perform one evidence-gated internal lifecycle extraction[^\n]+accepted add[^\n]+removal[^\n]+upgrade[^\n]+transition/iu,
+    /2\. run one `booking-calendly@0\.1\.0` lifecycle certification increment[^\n]+add-remove-re-add[^\n]+refusal[^\n]+recovery[^\n]+protected-staging journey/iu,
+    /3\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
+    /4\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
   ]) {
     assert.match(roadmap, responsibility);
   }
