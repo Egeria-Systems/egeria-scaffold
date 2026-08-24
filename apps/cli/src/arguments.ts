@@ -40,6 +40,11 @@ export type CliCommand =
       toVersion: "0.4.0";
     }>
   | Readonly<{
+      kind: "plan-profile-transition";
+      directory: string;
+      toProfile: "site";
+    }>
+  | Readonly<{
       kind: "apply-add";
       directory: string;
       capability: "booking-calendly";
@@ -328,6 +333,44 @@ function parsePlanUpgrade(
   }
 }
 
+function parsePlanProfileTransition(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        "to-profile": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const toProfile = values["to-profile"];
+
+    if (
+      !hasExactOptions(tokens, ["directory", "to-profile"]) ||
+      !validAbsoluteDirectory(directory) ||
+      toProfile !== "site"
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "plan-profile-transition",
+        directory,
+        toProfile,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
 function parseApplyAdd(
   arguments_: readonly string[],
 ): ValidationResult<CliCommand> {
@@ -502,6 +545,8 @@ export function parseCliArguments(
       return parsePlanRemove(commandArguments);
     case "plan-upgrade":
       return parsePlanUpgrade(commandArguments);
+    case "plan-profile-transition":
+      return parsePlanProfileTransition(commandArguments);
     case "apply-add":
       return parseApplyAdd(commandArguments);
     case "apply-remove":

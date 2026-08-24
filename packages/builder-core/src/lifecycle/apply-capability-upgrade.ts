@@ -162,14 +162,7 @@ type InspectExpectedChanges = (input: Readonly<{
   expectedPaths: readonly string[];
 }>) => Promise<GitExpectedChangesInspection>;
 
-type ExactByteReadResult =
-  | Readonly<{ kind: "file"; content: Uint8Array }>
-  | Readonly<{ kind: "missing" | "invalid" }>;
-
-type ExactByteReader = RepositoryReader &
-  Readonly<{
-    readBytes?: (path: string) => Promise<ExactByteReadResult>;
-  }>;
+type ExactByteReader = RepositoryReader;
 
 type ControlSnapshot = Readonly<{
   projectSource: string;
