@@ -36,6 +36,13 @@ type RepositoryReadFailure =
   | Readonly<{ kind: "symlink" }>
   | Readonly<{ kind: "error"; code: RepositoryReadErrorCode }>;
 
+type InspectedRepositoryFile = Readonly<{
+  kind: "file";
+  path: string;
+  identity: PathIdentity;
+  ancestors: readonly PathIdentity[];
+}>;
+
 type PathIdentity = Readonly<{
   path: string;
   device: number | bigint;
@@ -100,15 +107,7 @@ function validateRootAtConstruction(
 async function inspectRequestedPath(
   rootIdentity: PathIdentity,
   path: string,
-): Promise<
-  | Readonly<{
-      kind: "file";
-      path: string;
-      identity: PathIdentity;
-      ancestors: readonly PathIdentity[];
-    }>
-  | RepositoryReadFailure
-> {
+): Promise<InspectedRepositoryFile | RepositoryReadFailure> {
   const segments = path.split("/");
   const ancestors: PathIdentity[] = [rootIdentity];
   let currentPath = rootIdentity.path;
@@ -264,26 +263,31 @@ export function createFileSystemRepositoryReader(
     ? validateRootAtConstruction(fixedRoot)
     : undefined;
 
+  async function preflightRead(
+    path: string,
+  ): Promise<InspectedRepositoryFile | RepositoryReadFailure> {
+    if (!absoluteRoot || !safeRelativePathSchema.safeParse(path).success) {
+      return readError("PATH_INVALID");
+    }
+
+    if (rootIdentity === undefined) {
+      return readError("PATH_INVALID");
+    }
+
+    const currentRootIdentity = await validateRoot(fixedRoot);
+    if (
+      currentRootIdentity === undefined ||
+      !samePathIdentity(rootIdentity, currentRootIdentity)
+    ) {
+      return readError("PATH_INVALID");
+    }
+
+    return inspectRequestedPath(rootIdentity, path);
+  }
+
   return {
     async readText(path: string): Promise<RepositoryReadResult> {
-      if (!absoluteRoot || !safeRelativePathSchema.safeParse(path).success) {
-        return readError("PATH_INVALID");
-      }
-
-      if (rootIdentity === undefined) {
-        return readError("PATH_INVALID");
-      }
-
-      const currentRootIdentity = await validateRoot(fixedRoot);
-
-      if (
-        currentRootIdentity === undefined ||
-        !samePathIdentity(rootIdentity, currentRootIdentity)
-      ) {
-        return readError("PATH_INVALID");
-      }
-
-      const inspected = await inspectRequestedPath(rootIdentity, path);
+      const inspected = await preflightRead(path);
 
       if (inspected.kind !== "file") {
         return inspected;
@@ -296,23 +300,7 @@ export function createFileSystemRepositoryReader(
       );
     },
     async readBytes(path: string): Promise<RepositoryByteReadResult> {
-      if (!absoluteRoot || !safeRelativePathSchema.safeParse(path).success) {
-        return readError("PATH_INVALID");
-      }
-
-      if (rootIdentity === undefined) {
-        return readError("PATH_INVALID");
-      }
-
-      const currentRootIdentity = await validateRoot(fixedRoot);
-      if (
-        currentRootIdentity === undefined ||
-        !samePathIdentity(rootIdentity, currentRootIdentity)
-      ) {
-        return readError("PATH_INVALID");
-      }
-
-      const inspected = await inspectRequestedPath(rootIdentity, path);
+      const inspected = await preflightRead(path);
       if (inspected.kind !== "file") {
         return inspected;
       }

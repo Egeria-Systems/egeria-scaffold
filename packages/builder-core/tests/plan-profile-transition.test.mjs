@@ -502,6 +502,18 @@ test("planning refuses state disagreement, inventory drift, source drift, and ej
   );
 });
 
+test("planning refuses a text-only repository reader", async () => {
+  const entries = await portfolioEntries();
+  const { readText } = createSnapshotReader(entries);
+  const result = await core.planProfileTransition({
+    reader: { readText },
+    git: baseGit,
+    toProfile: "site",
+  });
+
+  assertFailure(result, "PROJECT_INSPECTION_INVALID");
+});
+
 test("planning contains unexpected reader failures and fingerprints every private input", async () => {
   const entries = await portfolioEntries();
   assertFailure(
