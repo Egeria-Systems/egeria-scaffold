@@ -528,7 +528,7 @@ test("builder-core direct consumers describe the private generation boundary", a
     builderReadme,
     /contracts[^\n]+plan-approval[^\n]+pre-state-inference[^\n]+lockfile[^\n]+frozen-install[^\n]+lint[^\n]+typecheck[^\n]+unit-tests[^\n]+component-tests[^\n]+next-build[^\n]+opennext-build[^\n]+post-change-inference[^\n]+migration-record[^\n]+post-state-inference/,
   );
-  assert.match(cliInstructions, /eleven commands exact/);
+  assert.match(cliInstructions, /twelve commands exact/);
   assert.match(cliInstructions, /`plan-add` remains read-only/);
   assert.match(cliInstructions, /`apply-add` is limited/);
   assert.match(cliInstructions, /`plan-remove` remains read-only/);
@@ -537,6 +537,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliInstructions, /`plan-upgrade` remains read-only/);
   assert.match(cliInstructions, /`apply-upgrade` is limited/);
   assert.match(cliInstructions, /`plan-profile-transition` remains read-only/);
+  assert.match(cliInstructions, /`apply-profile-transition` is limited/);
   assert.match(
     cliInstructions,
     /`plan-profile-transition`[^\n]+`--directory`[^\n]+`--to-profile site`[^\n]+no[^\n]+`--from-profile`/,
@@ -552,10 +553,10 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliInstructions, /modified[^\n]+application-owned[^\n]+preserv[^\n]+eject/);
   assert.match(cliInstructions, /remain read-only/);
   assert.match(cliInstructions, /does not add overwrite/);
-  assert.match(cliReadme, /eleven exact commands/);
+  assert.match(cliReadme, /twelve exact commands/);
   assert.match(cliReadme, /`apply-add` accepts/);
   assert.match(cliReadme, /`plan-remove` is also read-only/);
-  assert.match(cliReadme, /`apply-remove` is the exact current removal command/);
+  assert.match(cliReadme, /`apply-remove --directory/);
   assert.match(cliReadme, /`plan-upgrade --directory/);
   assert.match(
     cliReadme,
@@ -564,6 +565,10 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(
     cliReadme,
     /`plan-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site`/,
+  );
+  assert.match(
+    cliReadme,
+    /`apply-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site --approved-plan sha256:<digest>`/,
   );
   assert.match(cliReadme, /recovery[^\n]+`not-required`/);
   assert.match(cliReadme, /migration append[^\n]+state-last persistence/);
@@ -578,7 +583,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliReadme, /one content-safe JSON line/);
   assert.match(cliReadme, /no prompt, overwrite mode/);
 
-  assert.match(packageOwnership, /exact accepted Calendly and standards transactions/);
+  assert.match(packageOwnership, /exact Calendly and standards transactions/);
   assert.match(packageOwnership, /canonical private owner/i);
   assert.match(packageOwnership, /deterministic in-memory rendering/);
   assert.match(packageOwnership, /explicit allowlisted templates/);
@@ -592,7 +597,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /portable-rename race limit/);
   assert.match(packageOwnership, /pnpm `11.20.0`/);
   assert.match(packageOwnership, /disabled Next telemetry/);
-  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, `plan-remove`, `apply-remove`, `plan-upgrade`, `apply-upgrade`, and `plan-profile-transition`/);
+  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, `plan-remove`, `apply-remove`, `plan-upgrade`, `apply-upgrade`, `plan-profile-transition`, and `apply-profile-transition`/);
   assert.match(packageOwnership, /one-line JSON output/);
   assert.match(packageOwnership, /clean attached linked worktree/);
   assert.match(packageOwnership, /all non-ignored untracked files/);
@@ -605,8 +610,8 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(packageOwnership, /removal planning[^\n]+read-only/);
   assert.doesNotMatch(packageOwnership, /future CLI consumer/);
   assert.match(packageOwnership, /existing-repository transformation/);
-  assert.match(rootReadme, /eleven exact commands/);
-  assert.match(rootReadme, /`apply-remove` is the exact current removal command/);
+  assert.match(rootReadme, /twelve exact commands/);
+  assert.match(rootReadme, /`apply-remove` is the exact current removal command|`apply-remove --directory/);
   assert.match(rootReadme, /transaction evidence awaiting verified-final-diff approval/);
   assert.match(rootReadme, /`plan-remove`/);
   assert.match(rootReadme, /egeria plan-upgrade/);
@@ -617,6 +622,10 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(
     rootReadme,
     /egeria plan-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site/,
+  );
+  assert.match(
+    rootReadme,
+    /egeria apply-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site --approved-plan sha256:<digest>/,
   );
   assert.match(rootReadme, /`assume-unchanged` and `skip-worktree`/);
   assert.match(rootReadme, /canonical managed-surface inventory/);
