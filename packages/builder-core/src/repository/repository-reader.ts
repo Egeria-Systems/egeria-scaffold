@@ -20,8 +20,15 @@ export type RepositoryReadResult =
   | Readonly<{ kind: "symlink" }>
   | Readonly<{ kind: "error"; code: RepositoryReadErrorCode }>;
 
+export type RepositoryByteReadResult =
+  | Readonly<{ kind: "file"; content: Uint8Array }>
+  | Readonly<{ kind: "missing" }>
+  | Readonly<{ kind: "symlink" }>
+  | Readonly<{ kind: "error"; code: RepositoryReadErrorCode }>;
+
 export interface RepositoryReader {
   readText(path: string): Promise<RepositoryReadResult>;
+  readBytes?(path: string): Promise<RepositoryByteReadResult>;
 }
 
 type RepositoryReadFailure =
@@ -144,7 +151,7 @@ async function inspectRequestedPath(
 
 async function recheckAncestors(
   ancestors: readonly PathIdentity[],
-): Promise<RepositoryReadResult | undefined> {
+): Promise<RepositoryReadFailure | undefined> {
   for (const ancestor of ancestors) {
     try {
       const stats = await lstat(ancestor.path, { bigint: true });
@@ -164,11 +171,11 @@ async function recheckAncestors(
   return undefined;
 }
 
-async function readOpenedFile(
+async function readOpenedBytes(
   path: string,
   identity: PathIdentity,
   ancestors: readonly PathIdentity[],
-): Promise<RepositoryReadResult> {
+): Promise<RepositoryByteReadResult> {
   let handle;
 
   try {
@@ -211,18 +218,10 @@ async function readOpenedFile(
       return readError("FILE_TOO_LARGE");
     }
 
-    try {
-      const decoder = new TextDecoder("utf-8", {
-        fatal: true,
-        ignoreBOM: true,
-      });
-      return {
-        kind: "file",
-        content: decoder.decode(buffer.subarray(0, totalBytes)),
-      };
-    } catch {
-      return readError("FILE_ENCODING_INVALID");
-    }
+    return {
+      kind: "file",
+      content: new Uint8Array(buffer.subarray(0, totalBytes)),
+    };
   } catch (error) {
     if (isNodeError(error) && error.code === "ELOOP") {
       return { kind: "symlink" };
@@ -231,6 +230,28 @@ async function readOpenedFile(
     return readError("READ_FAILED");
   } finally {
     await handle?.close().catch(() => undefined);
+  }
+}
+
+async function readOpenedFile(
+  path: string,
+  identity: PathIdentity,
+  ancestors: readonly PathIdentity[],
+): Promise<RepositoryReadResult> {
+  const result = await readOpenedBytes(path, identity, ancestors);
+
+  if (result.kind !== "file") {
+    return result;
+  }
+
+  try {
+    const decoder = new TextDecoder("utf-8", {
+      fatal: true,
+      ignoreBOM: true,
+    });
+    return { kind: "file", content: decoder.decode(result.content) };
+  } catch {
+    return readError("FILE_ENCODING_INVALID");
   }
 }
 
@@ -274,6 +295,34 @@ export function createFileSystemRepositoryReader(
         inspected.ancestors,
       );
     },
+    async readBytes(path: string): Promise<RepositoryByteReadResult> {
+      if (!absoluteRoot || !safeRelativePathSchema.safeParse(path).success) {
+        return readError("PATH_INVALID");
+      }
+
+      if (rootIdentity === undefined) {
+        return readError("PATH_INVALID");
+      }
+
+      const currentRootIdentity = await validateRoot(fixedRoot);
+      if (
+        currentRootIdentity === undefined ||
+        !samePathIdentity(rootIdentity, currentRootIdentity)
+      ) {
+        return readError("PATH_INVALID");
+      }
+
+      const inspected = await inspectRequestedPath(rootIdentity, path);
+      if (inspected.kind !== "file") {
+        return inspected;
+      }
+
+      return readOpenedBytes(
+        inspected.path,
+        inspected.identity,
+        inspected.ancestors,
+      );
+    },
   };
 }
 
@@ -291,6 +340,18 @@ export function createInMemoryRepositoryReader(
       const content = snapshot.get(path);
       return Promise.resolve(
         content === undefined ? { kind: "missing" } : { kind: "file", content },
+      );
+    },
+    readBytes(path: string): Promise<RepositoryByteReadResult> {
+      if (!safeRelativePathSchema.safeParse(path).success) {
+        return Promise.resolve(readError("PATH_INVALID"));
+      }
+
+      const content = snapshot.get(path);
+      return Promise.resolve(
+        content === undefined
+          ? { kind: "missing" }
+          : { kind: "file", content: new TextEncoder().encode(content) },
       );
     },
   };

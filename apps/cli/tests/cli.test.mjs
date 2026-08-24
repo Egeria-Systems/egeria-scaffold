@@ -298,6 +298,16 @@ function planUpgradeArguments(directory) {
   ];
 }
 
+function planProfileTransitionArguments(directory) {
+  return [
+    "plan-profile-transition",
+    "--directory",
+    directory,
+    "--to-profile",
+    "site",
+  ];
+}
+
 function applyAddArguments(
   directory,
   approvedPlan = `sha256:${"a".repeat(64)}`,
@@ -840,6 +850,68 @@ test("the plan-upgrade parser accepts only its exact absolute-worktree contract"
     assert.doesNotMatch(
       JSON.stringify(result),
       /observability|0\.5\.0|private-value|bad\\u0000directory/u,
+    );
+  }
+});
+
+test("the plan-profile-transition parser accepts only an absolute worktree and exact site target", () => {
+  const expected = {
+    kind: "plan-profile-transition",
+    directory: "/private/tmp/acme-portfolio",
+    toProfile: "site",
+  };
+  const valid = planProfileTransitionArguments(
+    "/private/tmp/acme-portfolio",
+  );
+  assert.deepEqual(
+    assertSuccess(cliArguments.parseCliArguments(valid)),
+    expected,
+  );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "plan-profile-transition",
+        "--to-profile",
+        "site",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+      ]),
+    ),
+    expected,
+  );
+
+  const invalidCases = [
+    valid.slice(0, -2),
+    [...valid, "--directory", "/private/tmp/other"],
+    [...valid, "--unknown", "private-value"],
+    [...valid, "--from-profile", "portfolio"],
+    [...valid, "--recipe-version", "0.10.0"],
+    [...valid, "--approved-plan", `sha256:${"a".repeat(64)}`],
+    valid.map((value) => (value === "site" ? "portfolio" : value)),
+    planProfileTransitionArguments("relative/project"),
+    planProfileTransitionArguments("bad\0directory"),
+    [
+      "plan-profile-transition",
+      "--dir",
+      "/private/tmp/acme-portfolio",
+      "--to-profile",
+      "site",
+    ],
+  ];
+
+  for (const arguments_ of invalidCases) {
+    const result = cliArguments.parseCliArguments(arguments_);
+    assert.equal(result.ok, false, JSON.stringify(arguments_));
+    assert.deepEqual(result.issues, [
+      {
+        code: "CLI_ARGUMENT_INVALID",
+        path: [],
+        context: { reason: "invalid-arguments" },
+      },
+    ]);
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /private-value|bad\\u0000directory/u,
     );
   }
 });
@@ -1617,6 +1689,155 @@ test("plan-upgrade contains planner, target, Git, and reader refusals", async ()
       }),
     ]);
     assert.doesNotMatch(reader.error[0], /private reader failure/u);
+  });
+});
+
+test("plan-profile-transition emits the exact plan after stable Git and target checks", async () => {
+  await withGeneratedFixture(async (directory) => {
+    const inspection = cleanGitInspection();
+    const inspections = [inspection, structuredClone(inspection)];
+    const runCli = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      createReader: () => core.createFileSystemRepositoryReader(directory),
+      inspectGitWorktree: () => Promise.resolve(inspections.shift()),
+      inspectGitCreateTargets: ({ paths }) => {
+        assert.deepEqual(paths, [
+          "apps/web/app/about/page.tsx",
+          "apps/web/content/en-CA/about.yaml",
+        ]);
+        return Promise.resolve({ ok: true });
+      },
+    });
+    const direct = await core.planProfileTransition({
+      reader: core.createFileSystemRepositoryReader(directory),
+      git: inspection,
+      toProfile: "site",
+    });
+    assert.equal(direct.ok, true);
+    const before = await listTree(directory);
+    const captured = captureOutput();
+
+    assert.equal(
+      await runCli(
+        planProfileTransitionArguments("/private/ignored-input"),
+        captured.output,
+      ),
+      0,
+    );
+    assert.deepEqual(inspections, []);
+    assert.deepEqual(captured.error, []);
+    assert.deepEqual(JSON.parse(captured.standard[0]), {
+      ok: true,
+      command: "plan-profile-transition",
+      plan: direct.value,
+    });
+    assert.deepEqual(await listTree(directory), before);
+    assert.doesNotMatch(
+      captured.standard[0],
+      /ignored-input|refs\/heads|generated-common|generated-worktree|acme-portfolio/u,
+    );
+  });
+});
+
+test("plan-profile-transition contains Git, target, planner, and reader refusals", async () => {
+  await withGeneratedFixture(async (directory) => {
+    const cases = [
+      {
+        name: "dirty Git",
+        inspections: [{ ok: false, code: "GIT_WORKTREE_DIRTY" }],
+        code: "GIT_WORKTREE_DIRTY",
+      },
+      {
+        name: "identity changed",
+        inspections: [
+          cleanGitInspection(),
+          cleanGitInspection({
+            attachedRef: "refs/heads/changed-transition",
+          }),
+        ],
+        code: "GIT_WORKTREE_CHANGED",
+      },
+    ];
+
+    for (const fixture of cases) {
+      const inspections = structuredClone(fixture.inspections);
+      const runCli = cli.createCliRunner({
+        createVerifier: createFakeVerifier,
+        createReader: () => core.createFileSystemRepositoryReader(directory),
+        inspectGitCreateTargets: () => Promise.resolve({ ok: true }),
+        inspectGitWorktree: () => Promise.resolve(inspections.shift()),
+      });
+      const captured = captureOutput();
+      assert.equal(
+        await runCli(
+          planProfileTransitionArguments(directory),
+          captured.output,
+        ),
+        1,
+        fixture.name,
+      );
+      assert.deepEqual(captured.standard, [], fixture.name);
+      assert.deepEqual(captured.error, [
+        JSON.stringify({
+          ok: false,
+          command: "plan-profile-transition",
+          code: fixture.code,
+          recovery: "not-required",
+        }),
+      ]);
+    }
+
+    const targetRunner = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      createReader: () => core.createFileSystemRepositoryReader(directory),
+      inspectGitCreateTargets: () =>
+        Promise.resolve({
+          ok: false,
+          code: "PROFILE_TRANSITION_ACTION_CONFLICT",
+        }),
+      inspectGitWorktree: () => Promise.resolve(cleanGitInspection()),
+    });
+    const target = captureOutput();
+    assert.equal(
+      await targetRunner(
+        planProfileTransitionArguments(directory),
+        target.output,
+      ),
+      1,
+    );
+    assert.deepEqual(target.error, [
+      JSON.stringify({
+        ok: false,
+        command: "plan-profile-transition",
+        code: "PROFILE_TRANSITION_ACTION_CONFLICT",
+        recovery: "not-required",
+      }),
+    ]);
+
+    const plannerRunner = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      planProfileTransition: () => {
+        throw new Error("private planner failure");
+      },
+      inspectGitWorktree: () => Promise.resolve(cleanGitInspection()),
+    });
+    const planner = captureOutput();
+    assert.equal(
+      await plannerRunner(
+        planProfileTransitionArguments(directory),
+        planner.output,
+      ),
+      1,
+    );
+    assert.deepEqual(planner.error, [
+      JSON.stringify({
+        ok: false,
+        command: "plan-profile-transition",
+        code: "REPOSITORY_OPEN_FAILED",
+        recovery: "not-required",
+      }),
+    ]);
+    assert.doesNotMatch(planner.error[0], /private planner failure/u);
   });
 });
 
@@ -2693,6 +2914,13 @@ async function executeBuiltPlanUpgrade(directory) {
   ]);
 }
 
+async function executeBuiltPlanProfileTransition(directory) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...planProfileTransitionArguments(directory),
+  ]);
+}
+
 async function executeBuiltApplyAdd(directory, approvedPlan) {
   return executeNode([
     resolve(packageRoot, "dist/index.js"),
@@ -2795,6 +3023,241 @@ test("the compiled plan-upgrade command plans both profiles without changing any
         branch: `plan-upgrade-${profile}-test`,
         preparePrimary: prepareHistoricalUpgradeFixture,
       },
+    );
+  }
+});
+
+test("the compiled profile-transition planner is repeatable and leaves portfolio controls and Git unchanged", async () => {
+  await withGitFixture(
+    "portfolio",
+    async ({ linked }) => {
+      const before = await gitRepositorySnapshot(linked);
+      const controlsBefore = await Promise.all(
+        ["project.yaml", "state.json", "migrations.jsonl"].map((name) =>
+          readFile(join(linked, ".egeria", name)),
+        ),
+      );
+      const first = await executeBuiltPlanProfileTransition(linked);
+      const second = await executeBuiltPlanProfileTransition(linked);
+      const after = await gitRepositorySnapshot(linked);
+      const controlsAfter = await Promise.all(
+        ["project.yaml", "state.json", "migrations.jsonl"].map((name) =>
+          readFile(join(linked, ".egeria", name)),
+        ),
+      );
+
+      assert.equal(first.exitCode, 0, first.stderr);
+      assert.equal(first.stderr, "");
+      assert.equal(first.stdout.endsWith("\n"), true);
+      assert.equal(first.stdout.trimEnd().split("\n").length, 1);
+      assert.deepEqual(second, first);
+      const emitted = JSON.parse(first.stdout);
+      assert.equal(emitted.ok, true);
+      assert.equal(emitted.command, "plan-profile-transition");
+      assert.deepEqual(
+        emitted.plan.actions.map(({ kind, path }) => [kind, path]),
+        [
+          ["replace-file", ".egeria/project.yaml"],
+          ["create-file", "apps/web/app/about/page.tsx"],
+          ["create-file", "apps/web/content/en-CA/about.yaml"],
+          [
+            "replace-file",
+            "apps/web/content/en-CA/long-form/introduction.md",
+          ],
+          ["replace-file", "apps/web/content/en-CA/site.yaml"],
+          [
+            "replace-file",
+            "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+          ],
+          [
+            "replace-file",
+            "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+          ],
+        ],
+      );
+      assert.deepEqual(after, before);
+      assert.deepEqual(controlsAfter, controlsBefore);
+      assert.doesNotMatch(
+        first.stdout,
+        /refs\/heads|\.git\/worktrees|acme-portfolio/u,
+      );
+    },
+    { branch: "profile-transition-plan-test" },
+  );
+});
+
+test("the compiled profile-transition planner refuses an already-site project without mutation", async () => {
+  await withGitFixture(
+    "site",
+    async ({ linked }) => {
+      const before = await gitRepositorySnapshot(linked);
+      const execution = await executeBuiltPlanProfileTransition(linked);
+      const after = await gitRepositorySnapshot(linked);
+
+      assert.equal(execution.exitCode, 1);
+      assert.equal(execution.stdout, "");
+      assert.deepEqual(JSON.parse(execution.stderr), {
+        ok: false,
+        command: "plan-profile-transition",
+        code: "PROFILE_ALREADY_CURRENT",
+        recovery: "not-required",
+      });
+      assert.deepEqual(after, before);
+    },
+    { branch: "profile-transition-current-test" },
+  );
+});
+
+test("the compiled profile-transition command emits its command-specific malformed-argument refusal", async () => {
+  const execution = await executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    "plan-profile-transition",
+    "--directory",
+    "/private/tmp/acme-portfolio",
+    "--to-profile",
+    "portfolio",
+  ]);
+
+  assert.equal(execution.exitCode, 2);
+  assert.equal(execution.stdout, "");
+  assert.deepEqual(JSON.parse(execution.stderr), {
+    ok: false,
+    command: "plan-profile-transition",
+    code: "CLI_ARGUMENT_INVALID",
+    recovery: "not-required",
+  });
+});
+
+test("the compiled profile-transition planner refuses the finite unsafe matrix without mutation", async () => {
+  const siteFixture = resolve(repositoryRoot, "fixtures/generated/site");
+  const cases = [
+    {
+      name: "primary worktree",
+      select: ({ primary }) => primary,
+      prepare: async () => {},
+      code: "GIT_WORKTREE_NOT_ISOLATED",
+    },
+    {
+      name: "detached worktree",
+      prepare: (root) => executeGit(root, ["checkout", "--detach"]),
+      code: "GIT_BRANCH_REQUIRED",
+    },
+    {
+      name: "untracked repository input",
+      prepare: (root) =>
+        writeFile(join(root, "private-untracked.txt"), "private\n"),
+      code: "GIT_WORKTREE_DIRTY",
+    },
+    ...[
+      ["assume-unchanged", "--assume-unchanged"],
+      ["skip-worktree", "--skip-worktree"],
+    ].map(([name, flag]) => ({
+      name: `hidden tracked change with ${name}`,
+      prepare: async (root) => {
+        await executeGit(root, ["update-index", flag, ".gitignore"]);
+        await writeFile(join(root, ".gitignore"), `private ${name} drift\n`);
+      },
+      code: "GIT_WORKTREE_DIRTY",
+    })),
+    {
+      name: "managed source drift",
+      prepare: async (root) => {
+        await writeFile(
+          join(root, "apps/web/content/en-CA/site.yaml"),
+          "private managed drift\n",
+        );
+        await commitAll(root, "record managed content drift");
+      },
+      code: "PROJECT_DRIFT_DETECTED",
+    },
+    {
+      name: "incompatible migration state",
+      prepare: async (root) => {
+        const path = join(root, ".egeria/state.json");
+        const state = core.parseStateJson(await readFile(path, "utf8"));
+        assert.equal(state.ok, true);
+        await writeFile(
+          path,
+          core.serializeStateJson({
+            ...state.value,
+            appliedMigrations: ["invented-transition"],
+          }),
+        );
+        await commitAll(root, "record incompatible migration state");
+      },
+      code: "PROJECT_STATE_INCOMPATIBLE",
+    },
+    {
+      name: "partial target inference",
+      prepare: async (root) => {
+        await mkdir(join(root, "apps/web/app/about"), { recursive: true });
+        await cp(
+          join(siteFixture, "apps/web/app/about/page.tsx"),
+          join(root, "apps/web/app/about/page.tsx"),
+        );
+        await commitAll(root, "record partial site routing evidence");
+      },
+      code: "PROFILE_INFERENCE_AMBIGUOUS",
+    },
+    {
+      name: "present create targets",
+      prepare: async (root) => {
+        await mkdir(join(root, "apps/web/app/about"), { recursive: true });
+        await cp(
+          join(siteFixture, "apps/web/app/about/page.tsx"),
+          join(root, "apps/web/app/about/page.tsx"),
+        );
+        await cp(
+          join(siteFixture, "apps/web/content/en-CA/about.yaml"),
+          join(root, "apps/web/content/en-CA/about.yaml"),
+        );
+        await commitAll(root, "record conflicting site routing targets");
+      },
+      code: "PROFILE_TRANSITION_ACTION_CONFLICT",
+    },
+    {
+      name: "ignored create target",
+      prepare: async (root) => {
+        await writeFile(
+          join(root, ".gitignore"),
+          `${await readFile(join(root, ".gitignore"), "utf8")}\napps/web/app/about/page.tsx\n`,
+        );
+        await commitAll(root, "ignore a profile transition target");
+      },
+      code: "PROFILE_TRANSITION_ACTION_CONFLICT",
+    },
+  ];
+
+  for (const fixture of cases) {
+    await withGitFixture(
+      "portfolio",
+      async (roots) => {
+        const root = fixture.select?.(roots) ?? roots.linked;
+        await fixture.prepare(root);
+        const before = await gitRepositorySnapshot(root);
+        const execution = await executeBuiltPlanProfileTransition(root);
+        const after = await gitRepositorySnapshot(root);
+
+        assert.equal(execution.exitCode, 1, fixture.name);
+        assert.equal(execution.stdout, "", fixture.name);
+        assert.deepEqual(
+          JSON.parse(execution.stderr),
+          {
+            ok: false,
+            command: "plan-profile-transition",
+            code: fixture.code,
+            recovery: "not-required",
+          },
+          fixture.name,
+        );
+        assert.deepEqual(after, before, fixture.name);
+        assert.doesNotMatch(
+          execution.stderr,
+          /private|refs\/heads|\.git\/worktrees/u,
+          fixture.name,
+        );
+      },
+      { branch: `profile-transition-${fixture.code.toLowerCase()}-test` },
     );
   }
 });

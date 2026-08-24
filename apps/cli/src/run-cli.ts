@@ -14,6 +14,7 @@ import {
   planCapabilityAddition,
   planCapabilityRemoval,
   planCapabilityUpgrade,
+  planProfileTransition as planProfileTransitionDefault,
   profileRecipes,
   type CapabilityAdditionPlan,
   type CapabilityAdditionExecutionResult,
@@ -23,6 +24,8 @@ import {
   type CapabilityUpgradeExecutionResult,
   type CapabilityUpgradePlan,
   type CapabilityUpgradePlanningFailureCode,
+  type ProfileTransitionPlan,
+  type ProfileTransitionPlanningFailureCode,
   type GeneratedProjectVerifier,
   type GitCreateTargetInspection,
   type GitWorktreeInspection,
@@ -49,6 +52,9 @@ type CliRunnerDependencies = Readonly<{
   applyCapabilityUpgrade?(input: Parameters<
     typeof applyCapabilityUpgradeDefault
   >[0]): Promise<CapabilityUpgradeExecutionResult>;
+  planProfileTransition?(input: Parameters<
+    typeof planProfileTransitionDefault
+  >[0]): ReturnType<typeof planProfileTransitionDefault>;
   createReader?(root: string): RepositoryReader;
   inspectGitCreateTargets?(input: Readonly<{
     root: string;
@@ -78,6 +84,12 @@ type PlanUpgradeSuccess = Readonly<{
   ok: true;
   command: "plan-upgrade";
   plan: CapabilityUpgradePlan;
+}>;
+
+type PlanProfileTransitionSuccess = Readonly<{
+  ok: true;
+  command: "plan-profile-transition";
+  plan: ProfileTransitionPlan;
 }>;
 
 const plannerRefusalCodes = new Set<PlanningFailureCode>([
@@ -111,6 +123,20 @@ const upgradePlannerRefusalCodes =
     "PROJECT_STATE_INCOMPATIBLE",
   ]);
 
+const profileTransitionPlannerRefusalCodes =
+  new Set<ProfileTransitionPlanningFailureCode>([
+    "PROFILE_ALREADY_CURRENT",
+    "PROFILE_INFERENCE_AMBIGUOUS",
+    "PROFILE_TRANSITION_ACTION_CONFLICT",
+    "PROFILE_TRANSITION_EDGE_MISSING",
+    "PROFILE_TRANSITION_SOURCE_UNSUPPORTED",
+    "PROFILE_TRANSITION_UNSUPPORTED",
+    "PROJECT_DRIFT_DETECTED",
+    "PROJECT_EJECTION_UNSUPPORTED",
+    "PROJECT_INSPECTION_INVALID",
+    "PROJECT_STATE_INCOMPATIBLE",
+  ]);
+
 function isPlannerRefusalCode(code: string): code is PlanningFailureCode {
   return plannerRefusalCodes.has(code as PlanningFailureCode);
 }
@@ -128,6 +154,14 @@ function isUpgradePlannerRefusalCode(
 ): code is CapabilityUpgradePlanningFailureCode {
   return upgradePlannerRefusalCodes.has(
     code as CapabilityUpgradePlanningFailureCode,
+  );
+}
+
+function isProfileTransitionPlannerRefusalCode(
+  code: string,
+): code is ProfileTransitionPlanningFailureCode {
+  return profileTransitionPlannerRefusalCodes.has(
+    code as ProfileTransitionPlanningFailureCode,
   );
 }
 
@@ -151,6 +185,20 @@ function createCliRepositoryReader(root: string): RepositoryReader {
 
       return result;
     },
+    ...(reader.readBytes === undefined
+      ? {}
+      : {
+          async readBytes(path) {
+            const result = await reader.readBytes?.(path);
+            if (result === undefined) {
+              throw new TypeError("repository-open-failed");
+            }
+            if (result.kind === "error" && result.code === "PATH_INVALID") {
+              throw new TypeError("repository-open-failed");
+            }
+            return result;
+          },
+        }),
   };
 }
 
@@ -262,6 +310,19 @@ function writePlanUpgradeRefusal(output: CliOutput, code: string): 1 {
     ok: false,
     command: "plan-upgrade",
     code,
+  });
+  return 1;
+}
+
+function writePlanProfileTransitionRefusal(
+  output: CliOutput,
+  code: string,
+): 1 {
+  writeJson(output.writeError, {
+    ok: false,
+    command: "plan-profile-transition",
+    code,
+    recovery: "not-required",
   });
   return 1;
 }
@@ -527,6 +588,94 @@ async function runPlanUpgrade(
   return 0;
 }
 
+async function runPlanProfileTransition(
+  command: Extract<
+    CliCommand,
+    Readonly<{ kind: "plan-profile-transition" }>
+  >,
+  output: CliOutput,
+  dependencies: CliRunnerDependencies,
+): Promise<0 | 1> {
+  const root = resolve(command.directory);
+  const initialGit = await inspectForPlan(root, dependencies);
+
+  if (!initialGit.ok) {
+    return writePlanProfileTransitionRefusal(output, initialGit.code);
+  }
+
+  let outcome:
+    | Readonly<{
+        kind: "result";
+        result: Awaited<ReturnType<typeof planProfileTransitionDefault>>;
+      }>
+    | Readonly<{ kind: "failure"; code: "REPOSITORY_OPEN_FAILED" }>;
+
+  try {
+    const reader = (dependencies.createReader ?? createCliRepositoryReader)(root);
+    outcome = {
+      kind: "result",
+      result: await (
+        dependencies.planProfileTransition ?? planProfileTransitionDefault
+      )({
+        reader,
+        git: initialGit,
+        toProfile: command.toProfile,
+      }),
+    };
+  } catch {
+    outcome = { kind: "failure", code: "REPOSITORY_OPEN_FAILED" };
+  }
+
+  let targetFailure: string | undefined;
+  if (outcome.kind === "result" && outcome.result.ok) {
+    const createTargets = outcome.result.value.actions.flatMap((action) =>
+      action.kind === "create-file" ? [action.path] : [],
+    );
+    const targetInspection = await inspectCreateTargetsForPlan(
+      root,
+      createTargets,
+      dependencies,
+    );
+    if (!targetInspection.ok) {
+      targetFailure =
+        targetInspection.code === "CAPABILITY_ACTION_CONFLICT"
+          ? "PROFILE_TRANSITION_ACTION_CONFLICT"
+          : targetInspection.code;
+    }
+  }
+
+  const finalGit = await inspectForPlan(root, dependencies);
+  if (!finalGit.ok) {
+    return writePlanProfileTransitionRefusal(output, finalGit.code);
+  }
+  if (!sameGitIdentity(initialGit, finalGit)) {
+    return writePlanProfileTransitionRefusal(output, "GIT_WORKTREE_CHANGED");
+  }
+  if (targetFailure !== undefined) {
+    return writePlanProfileTransitionRefusal(output, targetFailure);
+  }
+  if (outcome.kind === "failure") {
+    return writePlanProfileTransitionRefusal(output, outcome.code);
+  }
+  if (!outcome.result.ok) {
+    const code = outcome.result.issues[0]?.code;
+    return writePlanProfileTransitionRefusal(
+      output,
+      code !== undefined && isProfileTransitionPlannerRefusalCode(code)
+        ? code
+        : "REPOSITORY_OPEN_FAILED",
+    );
+  }
+
+  const success: PlanProfileTransitionSuccess = {
+    ok: true,
+    command: "plan-profile-transition",
+    plan: outcome.result.value,
+  };
+  writeJson(output.write, success);
+  return 0;
+}
+
 async function runApplyAdd(
   command: Extract<CliCommand, Readonly<{ kind: "apply-add" }>>,
   output: CliOutput,
@@ -672,10 +821,20 @@ export function createCliRunner(
     const parsed = parseCliArguments(arguments_);
 
     if (!parsed.ok) {
-      writeJson(output.writeError, {
-        ok: false,
-        code: "CLI_ARGUMENT_INVALID",
-      });
+      writeJson(
+        output.writeError,
+        arguments_[0] === "plan-profile-transition"
+          ? {
+              ok: false,
+              command: "plan-profile-transition",
+              code: "CLI_ARGUMENT_INVALID",
+              recovery: "not-required",
+            }
+          : {
+              ok: false,
+              code: "CLI_ARGUMENT_INVALID",
+            },
+      );
       return 2;
     }
 
@@ -701,6 +860,10 @@ export function createCliRunner(
 
     if (parsed.value.kind === "plan-upgrade") {
       return runPlanUpgrade(parsed.value, output, dependencies);
+    }
+
+    if (parsed.value.kind === "plan-profile-transition") {
+      return runPlanProfileTransition(parsed.value, output, dependencies);
     }
 
     if (parsed.value.kind === "apply-add") {

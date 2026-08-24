@@ -286,7 +286,9 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "lifecycle/plan-capability-addition.ts",
       "lifecycle/plan-capability-removal.ts",
       "lifecycle/plan-capability-upgrade.ts",
+      "lifecycle/plan-profile-transition.ts",
       "lifecycle/supported-capability-upgrades.ts",
+      "lifecycle/supported-profile-transitions.ts",
       "manifest/create-installed-manifest.ts",
       "ownership/fingerprint.ts",
       "ownership/materialize-surfaces.ts",
@@ -495,6 +497,8 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderIndex, /apply-capability-removal\.js/);
   assert.match(builderIndex, /capability-removal-writer\.js/);
   assert.match(builderIndex, /plan-capability-upgrade\.js/);
+  assert.match(builderIndex, /plan-profile-transition\.js/);
+  assert.match(builderIndex, /supported-profile-transitions\.js/);
   assert.match(builderIndex, /apply-capability-upgrade\.js/);
   assert.match(builderIndex, /capability-upgrade-writer\.js/);
   assert.match(
@@ -506,12 +510,16 @@ test("builder-core direct consumers describe the private generation boundary", a
     /export function createFileSystemCapabilityUpgradeWriter\(/,
   );
   assert.match(builderInstructions, /`applyCapabilityUpgrade`/);
+  assert.match(builderInstructions, /`planProfileTransition`/);
+  assert.match(builderInstructions, /text and byte reads at 1 MiB/);
   assert.match(
     builderInstructions,
     /`createFileSystemCapabilityUpgradeWriter`[^\n]+upgrade-specific/,
   );
   assert.match(builderReadme, /applyCapabilityUpgrade/);
   assert.match(builderReadme, /createFileSystemCapabilityUpgradeWriter/);
+  assert.match(builderReadme, /planProfileTransition/);
+  assert.match(builderReadme, /binary visual baseline drift/);
   assert.match(
     builderReadme,
     /lastSuccessfulVerification\.kind[^\n]+`capability-upgrade`/,

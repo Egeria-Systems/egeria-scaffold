@@ -42,6 +42,8 @@ export * from "./lifecycle/plan-capability-addition.js";
 export * from "./lifecycle/plan-capability-removal.js";
 export * from "./lifecycle/plan-capability-upgrade.js";
 export * from "./lifecycle/supported-capability-upgrades.js";
+export * from "./lifecycle/plan-profile-transition.js";
+export * from "./lifecycle/supported-profile-transitions.js";
 export type {
   ProbeEvidence,
   ProbeEvidenceStatus,
