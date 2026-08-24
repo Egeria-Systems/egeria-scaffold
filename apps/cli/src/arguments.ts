@@ -63,6 +63,12 @@ export type CliCommand =
       capability: "standards";
       toVersion: "0.4.0";
       approvedPlanFingerprint: string;
+    }>
+  | Readonly<{
+      kind: "apply-profile-transition";
+      directory: string;
+      toProfile: "site";
+      approvedPlanFingerprint: string;
     }>;
 
 const projectFields = projectConfigurationSchema
@@ -527,6 +533,53 @@ function parseApplyUpgrade(
   }
 }
 
+function parseApplyProfileTransition(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        "to-profile": { type: "string" },
+        "approved-plan": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const toProfile = values["to-profile"];
+    const approvedPlanFingerprint = values["approved-plan"];
+
+    if (
+      !hasExactOptions(tokens, [
+        "directory",
+        "to-profile",
+        "approved-plan",
+      ]) ||
+      !validAbsoluteDirectory(directory) ||
+      toProfile !== "site" ||
+      approvedPlanFingerprint === undefined ||
+      !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "apply-profile-transition",
+        directory,
+        toProfile,
+        approvedPlanFingerprint,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
 export function parseCliArguments(
   arguments_: readonly string[],
 ): ValidationResult<CliCommand> {
@@ -553,6 +606,8 @@ export function parseCliArguments(
       return parseApplyRemove(commandArguments);
     case "apply-upgrade":
       return parseApplyUpgrade(commandArguments);
+    case "apply-profile-transition":
+      return parseApplyProfileTransition(commandArguments);
     default:
       return invalidArguments();
   }

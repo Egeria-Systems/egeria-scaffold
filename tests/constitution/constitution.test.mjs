@@ -2801,7 +2801,7 @@ test("canonical documentation records visual regression and the client-ready clo
   );
 });
 
-test("canonical documentation accepts the upgrade executor and selects read-only profile-transition planning", async () => {
+test("canonical documentation accepts profile-transition planning and bounds its exact executor candidate", async () => {
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3B");
   const [
@@ -2906,13 +2906,17 @@ test("canonical documentation accepts the upgrade executor and selects read-only
     );
     assert.match(
       boundaryOwner,
-      /Generic lifecycle[^\n]+another upgrade edge[^\n]+profile-transition execution[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+      /apply-profile-transition[^\n]+(?:candidate|pending[^\n]+integration)|candidate[^\n]+apply-profile-transition/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /Generic lifecycle[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
     );
   }
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+exact Calendly addition\/removal and standards upgrade transactions[^\n]+generic lifecycle transformation[^\n]+another upgrade edge[^\n]+profile-transition execution[^\n]+automated recovery[^\n]+provider\/data\/credential cleanup/iu,
+    /Existing-repository mutation[^\n]+exact Calendly addition\/removal and standards upgrade transactions[^\n]+candidate[^\n]+portfolio-to-site execution[^\n]+pending accepted-main integration[^\n]+generic lifecycle transformation[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+provider\/data\/credential cleanup/iu,
   );
   assert.match(
     overview,
@@ -2929,7 +2933,7 @@ test("canonical documentation accepts the upgrade executor and selects read-only
   );
   assert.match(
     capabilityModel,
-    /apply-remove[^\n]+standards executor[^\n]+accepted-main integrated[^\n]+read-only portfolio-to-site planning[^\n]+next[^\n]+Generic lifecycle transformation[^\n]+another upgrade edge[^\n]+profile-transition execution[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+    /apply-remove[^\n]+standards executor[^\n]+accepted-main integrated[^\n]+portfolio-to-site planning[^\n]+accepted-main integrated[^\n]+apply-profile-transition[^\n]+pending[^\n]+candidate[^\n]+integration[^\n]+Generic lifecycle transformation[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
   );
   assert.match(
     enforcementMap,
@@ -2986,7 +2990,7 @@ test("canonical documentation accepts the upgrade executor and selects read-only
   );
   assert.match(
     sourcePlan,
-    /portfolio-to-site[^\n]+next[^\n]+independent[^\n]+read-only/iu,
+    /portfolio-to-site[^\n]+independent[^\n]+profile-transition boundary/iu,
   );
 
   for (const upgradeSummary of [roadmap, overview, capabilityModel]) {
@@ -3110,12 +3114,48 @@ test("canonical documentation accepts the upgrade executor and selects read-only
       transitionConsumer,
       /plan-profile-transition[^\n]+portfolio[^\n]+site/iu,
     );
+    assert.match(
+      transitionConsumer,
+      /apply-profile-transition[^\n]+portfolio[^\n]+site|portfolio[^\n]+site[^\n]+apply-profile-transition/iu,
+    );
+  }
+
+  assert.match(
+    sourcePlan,
+    /apply-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site --approved-plan sha256:<digest>/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /applyProfileTransition[^\n]+createFileSystemProfileTransitionWriter/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /transition-portfolio-0-10-0-to-site-0-10-0[^\n]+profile-transition/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /seven action paths[^\n]+migrations\.jsonl[^\n]+state\.json[^\n]+dirty/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /(?:failure|refusal) before a committed write[^\n]+not-required[^\n]+failure after a committed write[^\n]+inspect-worktree/iu,
+  );
+
+  for (const acceptedTransitionOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      acceptedTransitionOwner,
+      /pull request 49[^\n]+main@612a963ab96221837b1c8ac815f41e90736d292e/iu,
+    );
+    assert.match(
+      acceptedTransitionOwner,
+      /d0ad744e3818046f755d3933843b22213307c109[^\n]+85afdf22ea8625f3b70cdd712f961d629e948daa[^\n]+32745968642/iu,
+    );
   }
 
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.match(
       sequencingOwner,
-      /minimum nine remaining increments/iu,
+      /minimum seven remaining increments/iu,
     );
     assert.match(
       sequencingOwner,
@@ -3137,12 +3177,10 @@ test("canonical documentation accepts the upgrade executor and selects read-only
   }
 
   for (const responsibility of [
-    /1\. implement read-only portfolio-to-site transition planning/iu,
-    /2\. implement its separately approved executor/iu,
-    /3\. perform one evidence-gated internal lifecycle extraction[^\n]+accepted add[^\n]+removal[^\n]+upgrade[^\n]+transition/iu,
-    /4\. run one `booking-calendly@0\.1\.0` lifecycle certification increment[^\n]+add-remove-re-add[^\n]+refusal[^\n]+recovery[^\n]+protected-staging journey/iu,
-    /5\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
-    /6\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
+    /1\. perform one evidence-gated internal lifecycle extraction[^\n]+accepted add[^\n]+removal[^\n]+upgrade[^\n]+transition/iu,
+    /2\. run one `booking-calendly@0\.1\.0` lifecycle certification increment[^\n]+add-remove-re-add[^\n]+refusal[^\n]+recovery[^\n]+protected-staging journey/iu,
+    /3\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
+    /4\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
   ]) {
     assert.match(roadmap, responsibility);
   }

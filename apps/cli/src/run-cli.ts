@@ -2,6 +2,7 @@ import {
   applyCapabilityAddition as applyCapabilityAdditionDefault,
   applyCapabilityRemoval as applyCapabilityRemovalDefault,
   applyCapabilityUpgrade as applyCapabilityUpgradeDefault,
+  applyProfileTransition as applyProfileTransitionDefault,
   createFileSystemRepositoryReader,
   createPnpmGeneratedProjectVerifier,
   createVerifiedCapabilityCatalog,
@@ -25,6 +26,7 @@ import {
   type CapabilityUpgradePlan,
   type CapabilityUpgradePlanningFailureCode,
   type ProfileTransitionPlan,
+  type ProfileTransitionExecutionResult,
   type ProfileTransitionPlanningFailureCode,
   type GeneratedProjectVerifier,
   type GitCreateTargetInspection,
@@ -52,6 +54,9 @@ type CliRunnerDependencies = Readonly<{
   applyCapabilityUpgrade?(input: Parameters<
     typeof applyCapabilityUpgradeDefault
   >[0]): Promise<CapabilityUpgradeExecutionResult>;
+  applyProfileTransition?(input: Parameters<
+    typeof applyProfileTransitionDefault
+  >[0]): Promise<ProfileTransitionExecutionResult>;
   planProfileTransition?(input: Parameters<
     typeof planProfileTransitionDefault
   >[0]): ReturnType<typeof planProfileTransitionDefault>;
@@ -814,6 +819,54 @@ async function runApplyUpgrade(
   return 0;
 }
 
+async function runApplyProfileTransition(
+  command: Extract<
+    CliCommand,
+    Readonly<{ kind: "apply-profile-transition" }>
+  >,
+  output: CliOutput,
+  dependencies: CliRunnerDependencies,
+): Promise<0 | 1> {
+  let result: ProfileTransitionExecutionResult;
+  try {
+    result = await (
+      dependencies.applyProfileTransition ?? applyProfileTransitionDefault
+    )({
+      root: resolve(command.directory),
+      toProfile: command.toProfile,
+      approvedPlanFingerprint: command.approvedPlanFingerprint,
+      verifier: dependencies.createVerifier(),
+    });
+  } catch {
+    writeJson(output.writeError, {
+      ok: false,
+      command: "apply-profile-transition",
+      code: "PROFILE_TRANSITION_EXECUTION_FAILED",
+      phase: "precondition",
+      recovery: "inspect-worktree",
+    });
+    return 1;
+  }
+
+  if (!result.ok) {
+    writeJson(output.writeError, {
+      ok: false,
+      command: "apply-profile-transition",
+      code: result.code,
+      phase: result.phase,
+      recovery: result.recovery,
+    });
+    return 1;
+  }
+
+  writeJson(output.write, {
+    ok: true,
+    command: "apply-profile-transition",
+    result: result.value,
+  });
+  return 0;
+}
+
 export function createCliRunner(
   dependencies: CliRunnerDependencies,
 ): CliRunner {
@@ -823,10 +876,11 @@ export function createCliRunner(
     if (!parsed.ok) {
       writeJson(
         output.writeError,
-        arguments_[0] === "plan-profile-transition"
+        arguments_[0] === "plan-profile-transition" ||
+          arguments_[0] === "apply-profile-transition"
           ? {
               ok: false,
-              command: "plan-profile-transition",
+              command: arguments_[0],
               code: "CLI_ARGUMENT_INVALID",
               recovery: "not-required",
             }
@@ -876,6 +930,10 @@ export function createCliRunner(
 
     if (parsed.value.kind === "apply-upgrade") {
       return runApplyUpgrade(parsed.value, output, dependencies);
+    }
+
+    if (parsed.value.kind === "apply-profile-transition") {
+      return runApplyProfileTransition(parsed.value, output, dependencies);
     }
 
     const catalog = createVerifiedCapabilityCatalog();
