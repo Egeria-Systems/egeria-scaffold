@@ -2801,10 +2801,9 @@ test("canonical documentation records visual regression and the client-ready clo
   );
 });
 
-test("canonical documentation separates accepted upgrade planning from the local executor candidate", async () => {
+test("canonical documentation accepts the upgrade executor and selects read-only profile-transition planning", async () => {
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3B");
-  const executorCandidateGate = compactLabel("Gate ", "3");
   const [
     sourcePlan,
     roadmap,
@@ -2903,13 +2902,17 @@ test("canonical documentation separates accepted upgrade planning from the local
     );
     assert.match(
       boundaryOwner,
-      /apply-remove[^\n]+accepted-main integrated[^\n]+Generic lifecycle[^\n]+another upgrade edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+      /apply-remove[^\n]+accepted-main integrated/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /Generic lifecycle[^\n]+another upgrade edge[^\n]+profile-transition execution[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
     );
   }
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+exact Calendly addition\/removal transactions[^\n]+local exact standards upgrade executor candidate[^\n]+generic lifecycle transformation[^\n]+another upgrade edge[^\n]+automated recovery[^\n]+provider\/data\/credential cleanup/iu,
+    /Existing-repository mutation[^\n]+exact Calendly addition\/removal and standards upgrade transactions[^\n]+generic lifecycle transformation[^\n]+another upgrade edge[^\n]+profile-transition execution[^\n]+automated recovery[^\n]+provider\/data\/credential cleanup/iu,
   );
   assert.match(
     overview,
@@ -2926,7 +2929,7 @@ test("canonical documentation separates accepted upgrade planning from the local
   );
   assert.match(
     capabilityModel,
-    /apply-remove[^\n]+accepted-main integrated[^\n]+standards executor[^\n]+not accepted-main integrated[^\n]+Generic lifecycle transformation[^\n]+another upgrade edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+    /apply-remove[^\n]+standards executor[^\n]+accepted-main integrated[^\n]+read-only portfolio-to-site planning[^\n]+next[^\n]+Generic lifecycle transformation[^\n]+another upgrade edge[^\n]+profile-transition execution[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
   );
   assert.match(
     enforcementMap,
@@ -2983,7 +2986,7 @@ test("canonical documentation separates accepted upgrade planning from the local
   );
   assert.match(
     sourcePlan,
-    /portfolio-to-site[^\n]+later[^\n]+independent/iu,
+    /portfolio-to-site[^\n]+next[^\n]+independent[^\n]+read-only/iu,
   );
 
   for (const upgradeSummary of [roadmap, overview, capabilityModel]) {
@@ -3009,30 +3012,47 @@ test("canonical documentation separates accepted upgrade planning from the local
       /cd57c479cb74a5e0f839f7b46ded220bc456b151[^\n]+32658708533/iu,
     );
   }
-  for (const executorCandidateOwner of [sourcePlan, roadmap, overview]) {
+  for (const acceptedExecutorOwner of [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+  ]) {
     assert.match(
-      executorCandidateOwner,
-      new RegExp(
-        `local[^\\n]+unaccepted[^\\n]+${executorCandidateGate}[^\\n]+candidate`,
-        "iu",
-      ),
+      acceptedExecutorOwner,
+      /pull request 48[^\n]+main@af8898b533f4a7ccf08c83bd7818312a5f27c3c0/iu,
     );
     assert.match(
-      executorCandidateOwner,
+      acceptedExecutorOwner,
       /apply-upgrade[^\n]+(?:verified-final-diff[^\n]+separate[^\n]+approval|separate[^\n]+verified-final-diff[^\n]+approval)/iu,
     );
   }
-  assert.match(
+  for (const integrationOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      integrationOwner,
+      /3cd51b076d076d39151e96fc1d04c4d91a689a81[^\n]+a9335c1078d5d613f398196674b6b4a39efab4ab[^\n]+32690135067/iu,
+    );
+  }
+  for (const currentStatusOwner of [
+    sourcePlan,
+    roadmap,
+    overview,
     capabilityModel,
-    /apply-upgrade[^\n]+local[^\n]+unaccepted[^\n]+candidate/iu,
-  );
+    packageOwnership,
+    enforcementMap,
+  ]) {
+    assert.doesNotMatch(
+      currentStatusOwner,
+      /(?:local|not accepted-main integrated)[^\n]+(?:apply-upgrade|standards executor)|(?:apply-upgrade|standards executor)[^\n]+(?:local|unaccepted|not accepted-main integrated)/iu,
+    );
+  }
   assert.match(
     packageOwnership,
     /applyCapabilityUpgrade[^\n]+createFileSystemCapabilityUpgradeWriter[^\n]+private/iu,
   );
   assert.match(
     enforcementMap,
-    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+apply-upgrade[^\n]+actual[^\n]+local[^\n]+unaccepted/iu,
+    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+apply-upgrade[^\n]+actual[^\n]+accepted/iu,
   );
   assert.match(
     enforcementMap,
@@ -3047,14 +3067,55 @@ test("canonical documentation separates accepted upgrade planning from the local
   for (const claimOwner of [sourcePlan, roadmap, overview, capabilityModel]) {
     assert.match(
       claimOwner,
-      /apply-upgrade[^\n]+(?:unaccepted|not accepted)[^\n]+(?:certif|deploy|production)/iu,
+      /apply-upgrade[^\n]+accepted[^\n]+(?:does not|not)[^\n]+(?:certif|deploy|production)/iu,
+    );
+  }
+
+  assert.match(
+    sourcePlan,
+    /plan-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /single declared profile-transition edge[^\n]+portfolio@0\.10\.0[^\n]+site@0\.10\.0/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /source profile[^\n]+infer[^\n]+no caller-supplied `--from-profile`/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /success[^\n]+stdout[^\n]+exit `0`[^\n]+refusal[^\n]+stderr[^\n]+exit `1`[^\n]+invalid[^\n]+exit `2`/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /recovery[^\n]+`not-required`[^\n]+approval-required/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /builder-core[^\n]+canonical[^\n]+transition-planning owner[^\n]+CLI[^\n]+thin/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /project\.yaml[^\n]+state\.json[^\n]+migrations\.jsonl[^\n]+every repository byte[^\n]+unchanged/iu,
+  );
+  for (const transitionConsumer of [
+    roadmap,
+    overview,
+    capabilityModel,
+    packageOwnership,
+    enforcementMap,
+  ]) {
+    assert.match(
+      transitionConsumer,
+      /plan-profile-transition[^\n]+portfolio[^\n]+site/iu,
     );
   }
 
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.match(
       sequencingOwner,
-      /minimum ten remaining increments/iu,
+      /minimum nine remaining increments/iu,
     );
     assert.match(
       sequencingOwner,
@@ -3076,20 +3137,19 @@ test("canonical documentation separates accepted upgrade planning from the local
   }
 
   for (const responsibility of [
-    /1\. review and accept or reject the local exact standards upgrade executor candidate/iu,
-    /2\. implement read-only portfolio-to-site transition planning/iu,
-    /3\. implement its separately approved executor/iu,
-    /4\. perform one evidence-gated internal lifecycle extraction[^\n]+accepted add[^\n]+removal[^\n]+upgrade[^\n]+transition/iu,
-    /5\. run one `booking-calendly@0\.1\.0` lifecycle certification increment[^\n]+add-remove-re-add[^\n]+refusal[^\n]+recovery[^\n]+protected-staging journey/iu,
-    /6\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
-    /7\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
+    /1\. implement read-only portfolio-to-site transition planning/iu,
+    /2\. implement its separately approved executor/iu,
+    /3\. perform one evidence-gated internal lifecycle extraction[^\n]+accepted add[^\n]+removal[^\n]+upgrade[^\n]+transition/iu,
+    /4\. run one `booking-calendly@0\.1\.0` lifecycle certification increment[^\n]+add-remove-re-add[^\n]+refusal[^\n]+recovery[^\n]+protected-staging journey/iu,
+    /5\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
+    /6\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
   ]) {
     assert.match(roadmap, responsibility);
   }
 
   assert.match(
     enforcementMap,
-    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+apply-upgrade[^\n]+actual[^\n]+local unaccepted[^\n]+separate verified-final-diff stop/iu,
+    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+apply-upgrade[^\n]+actual[^\n]+accepted[^\n]+separate verified-final-diff stop/iu,
   );
 });
 
