@@ -2898,7 +2898,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
     assert.match(
       boundaryOwner,
-      /(?:existing-repository[^\n]+(?:migration append|appends the migration)[^\n]+(?:state-last persistence|persists state last)|every application executor[^\n]+state construction[^\n]+final-diff)/iu,
+      /(?:existing-repository[^\n]+(?:migration append|appends the migration)[^\n]+(?:state-last persistence|persists state last)|prepare one canonical appended successful migration record[^\n]+write `\.egeria\/migrations\.jsonl`[^\n]+write `\.egeria\/state\.json` last)/iu,
     );
     assert.match(
       boundaryOwner,
