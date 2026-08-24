@@ -1,6 +1,7 @@
 import {
   applyCapabilityAddition as applyCapabilityAdditionDefault,
   applyCapabilityRemoval as applyCapabilityRemovalDefault,
+  applyCapabilityUpgrade as applyCapabilityUpgradeDefault,
   createFileSystemRepositoryReader,
   createPnpmGeneratedProjectVerifier,
   createVerifiedCapabilityCatalog,
@@ -19,6 +20,7 @@ import {
   type CapabilityRemovalPlan,
   type CapabilityRemovalExecutionResult,
   type CapabilityRemovalPlanningFailureCode,
+  type CapabilityUpgradeExecutionResult,
   type CapabilityUpgradePlan,
   type CapabilityUpgradePlanningFailureCode,
   type GeneratedProjectVerifier,
@@ -44,6 +46,9 @@ type CliRunnerDependencies = Readonly<{
   applyCapabilityRemoval?(input: Parameters<
     typeof applyCapabilityRemovalDefault
   >[0]): Promise<CapabilityRemovalExecutionResult>;
+  applyCapabilityUpgrade?(input: Parameters<
+    typeof applyCapabilityUpgradeDefault
+  >[0]): Promise<CapabilityUpgradeExecutionResult>;
   createReader?(root: string): RepositoryReader;
   inspectGitCreateTargets?(input: Readonly<{
     root: string;
@@ -614,6 +619,52 @@ async function runApplyRemove(
   return 0;
 }
 
+async function runApplyUpgrade(
+  command: Extract<CliCommand, Readonly<{ kind: "apply-upgrade" }>>,
+  output: CliOutput,
+  dependencies: CliRunnerDependencies,
+): Promise<0 | 1> {
+  let result: CapabilityUpgradeExecutionResult;
+  try {
+    result = await (
+      dependencies.applyCapabilityUpgrade ?? applyCapabilityUpgradeDefault
+    )({
+      root: resolve(command.directory),
+      capability: command.capability,
+      toVersion: command.toVersion,
+      approvedPlanFingerprint: command.approvedPlanFingerprint,
+      verifier: dependencies.createVerifier(),
+    });
+  } catch {
+    writeJson(output.writeError, {
+      ok: false,
+      command: "apply-upgrade",
+      code: "CAPABILITY_EXECUTION_FAILED",
+      phase: "precondition",
+      recovery: "inspect-worktree",
+    });
+    return 1;
+  }
+
+  if (!result.ok) {
+    writeJson(output.writeError, {
+      ok: false,
+      command: "apply-upgrade",
+      code: result.code,
+      phase: result.phase,
+      recovery: result.recovery,
+    });
+    return 1;
+  }
+
+  writeJson(output.write, {
+    ok: true,
+    command: "apply-upgrade",
+    result: result.value,
+  });
+  return 0;
+}
+
 export function createCliRunner(
   dependencies: CliRunnerDependencies,
 ): CliRunner {
@@ -658,6 +709,10 @@ export function createCliRunner(
 
     if (parsed.value.kind === "apply-remove") {
       return runApplyRemove(parsed.value, output, dependencies);
+    }
+
+    if (parsed.value.kind === "apply-upgrade") {
+      return runApplyUpgrade(parsed.value, output, dependencies);
     }
 
     const catalog = createVerifiedCapabilityCatalog();

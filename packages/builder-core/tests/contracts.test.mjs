@@ -141,6 +141,39 @@ const persistedVerificationChecks = [
   "post-change-inference",
 ];
 
+const capabilityUpgradePersistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  "lockfile",
+  "frozen-install",
+  "lint",
+  "typecheck",
+  "unit-tests",
+  "component-tests",
+  "next-build",
+  "opennext-build",
+  "post-change-inference",
+];
+
+const capabilityAdditionVerificationChecks = [
+  ...persistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+];
+
+const capabilityRemovalVerificationChecks = [
+  ...persistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+];
+
+const capabilityUpgradeVerificationChecks = [
+  ...capabilityUpgradePersistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+];
+
 const readableRecipeVersions = [
   "0.1.0",
   "0.2.0",
@@ -258,6 +291,8 @@ test("managed-surface constructors bind target and merge policy without changing
 test("builder-core exports the executable contract boundary", () => {
   for (const exportName of [
     "capabilityDeliveryModeSchema",
+    "capabilityUpgradePersistedVerificationChecks",
+    "capabilityUpgradeVerificationChecks",
     "capabilityDescriptorSchema",
     "capabilityRemovalPolicySchema",
     "capabilityStateClassificationSchema",
@@ -836,6 +871,53 @@ test("installed state records only the exact capability-removal verification rec
   });
 });
 
+test("installed state records only the exact capability-upgrade verification receipt", () => {
+  const capabilityUpgradeState = {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.10.0" },
+    appliedMigrations: ["upgrade-standards-0-3-0-to-0-4-0"],
+    lastSuccessfulVerification: {
+      kind: "capability-upgrade",
+      checks: capabilityUpgradePersistedVerificationChecks,
+    },
+  };
+
+  assert.deepEqual(
+    contracts.capabilityUpgradePersistedVerificationChecks,
+    capabilityUpgradePersistedVerificationChecks,
+  );
+  assert.deepEqual(
+    contracts.capabilityUpgradeVerificationChecks,
+    capabilityUpgradeVerificationChecks,
+  );
+  assertAccepts(contracts.installedStateSchema, capabilityUpgradeState);
+  for (const checks of [
+    capabilityUpgradePersistedVerificationChecks.slice(0, -1),
+    [
+      capabilityUpgradePersistedVerificationChecks[1],
+      capabilityUpgradePersistedVerificationChecks[0],
+      ...capabilityUpgradePersistedVerificationChecks.slice(2),
+    ],
+    [
+      capabilityUpgradePersistedVerificationChecks[0],
+      capabilityUpgradePersistedVerificationChecks[0],
+      ...capabilityUpgradePersistedVerificationChecks.slice(2),
+    ],
+    [...capabilityUpgradePersistedVerificationChecks, "unexpected-check"],
+    currentVerificationChecks,
+    capabilityAdditionVerificationChecks,
+    capabilityRemovalVerificationChecks,
+  ]) {
+    assertRejects(contracts.installedStateSchema, {
+      ...capabilityUpgradeState,
+      lastSuccessfulVerification: {
+        kind: "capability-upgrade",
+        checks,
+      },
+    });
+  }
+});
+
 test("migration records describe only completed migration or reconciliation work", () => {
   assertAccepts(contracts.migrationRecordSchema, validMigrationRecord);
   assertAccepts(contracts.migrationRecordSchema, {
@@ -914,6 +996,29 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
       .flatMap(({ properties }) =>
         properties.checks.anyOf ?? [properties.checks],
       );
+  assert.equal(
+    generated["state.schema.json"].properties.schemaVersion.const,
+    "1.0.0",
+  );
+  assert.deepEqual(
+    generated["state.schema.json"].properties.lastSuccessfulVerification.oneOf.map(
+      ({ properties }) => properties.kind.const,
+    ),
+    [
+      "generation",
+      "capability-addition",
+      "capability-removal",
+      "capability-upgrade",
+    ],
+  );
+  const capabilityUpgradeSchema =
+    generated["state.schema.json"].properties.lastSuccessfulVerification.oneOf.find(
+      ({ properties }) => properties.kind.const === "capability-upgrade",
+    );
+  assert.deepEqual(
+    capabilityUpgradeSchema.properties.checks.prefixItems.map(({ const: value }) => value),
+    capabilityUpgradePersistedVerificationChecks,
+  );
   for (const tuple of verificationCheckTuples) {
     assert.equal(tuple.minItems, tuple.prefixItems.length);
     assert.equal(tuple.maxItems, tuple.prefixItems.length);

@@ -51,6 +51,13 @@ export type CliCommand =
       directory: string;
       capability: "booking-calendly";
       approvedPlanFingerprint: string;
+    }>
+  | Readonly<{
+      kind: "apply-upgrade";
+      directory: string;
+      capability: "standards";
+      toVersion: "0.4.0";
+      approvedPlanFingerprint: string;
     }>;
 
 const projectFields = projectConfigurationSchema
@@ -425,6 +432,58 @@ function parseApplyRemove(
   }
 }
 
+function parseApplyUpgrade(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        capability: { type: "string" },
+        "to-version": { type: "string" },
+        "approved-plan": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const capability = values.capability;
+    const toVersion = values["to-version"];
+    const approvedPlanFingerprint = values["approved-plan"];
+
+    if (
+      !hasExactOptions(tokens, [
+        "directory",
+        "capability",
+        "to-version",
+        "approved-plan",
+      ]) ||
+      !validAbsoluteDirectory(directory) ||
+      capability !== "standards" ||
+      toVersion !== "0.4.0" ||
+      approvedPlanFingerprint === undefined ||
+      !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "apply-upgrade",
+        directory,
+        capability,
+        toVersion,
+        approvedPlanFingerprint,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
 export function parseCliArguments(
   arguments_: readonly string[],
 ): ValidationResult<CliCommand> {
@@ -447,6 +506,8 @@ export function parseCliArguments(
       return parseApplyAdd(commandArguments);
     case "apply-remove":
       return parseApplyRemove(commandArguments);
+    case "apply-upgrade":
+      return parseApplyUpgrade(commandArguments);
     default:
       return invalidArguments();
   }
