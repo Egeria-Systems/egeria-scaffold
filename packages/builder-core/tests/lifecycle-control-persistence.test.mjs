@@ -162,6 +162,23 @@ test("migration persistence rejects failed writes and exact-source identifier di
   assert.deepEqual(wrongIdentifiers, { ok: false });
 });
 
+test("migration persistence rejects byte-different rereads with matching ordered identifiers", async () => {
+  const prepared = prepareMigrationRecord({
+    currentSource: previousMigrationSource,
+    currentIdentifiers: ["previous-migration"],
+    record: migrationRecord,
+  });
+
+  const byteDifferentSource = `${prepared.source}\n`;
+  const result = await persistMigrationRecord({
+    prepared,
+    write: async () => true,
+    readSource: async () => byteDifferentSource,
+  });
+
+  assert.deepEqual(result, { ok: false });
+});
+
 test("installed state persistence writes exact canonical bytes through the state-last boundary", async () => {
   const changes = [];
   const result = await persistInstalledState({
