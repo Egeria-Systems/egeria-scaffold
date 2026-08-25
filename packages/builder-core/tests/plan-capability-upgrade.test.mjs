@@ -278,7 +278,7 @@ test("the supported standards edge binds the accepted endpoint subjects", () => 
       },
       target: {
         recipeVersion: "0.10.0",
-        evidenceRevision: "3ab15f69b57a8439b415dc085cb869335ea0a091",
+        evidenceRevision: "e871e65f5473adce67d0800849253712d809d792",
         subject: {
           descriptorVersion: "0.4.0",
           behaviorContractDigest:

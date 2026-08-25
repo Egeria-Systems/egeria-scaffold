@@ -29,7 +29,7 @@ const standardsPlanPath =
 const standardsEvidencePath =
   "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md";
 const standardsEvidenceRevision =
-  "3ab15f69b57a8439b415dc085cb869335ea0a091";
+  "e871e65f5473adce67d0800849253712d809d792";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const deploymentEvidencePath =
