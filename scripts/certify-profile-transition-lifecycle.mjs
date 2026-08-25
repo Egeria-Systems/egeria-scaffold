@@ -120,6 +120,24 @@ async function readRepositoryStatus() {
   }
 }
 
+async function readRepositoryIndexEntries() {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["ls-files", "-v", "-z"],
+      {
+        cwd: repositoryRoot,
+        env: createIsolatedProcessEnvironment(),
+        timeout: 30_000,
+        ...isolatedProcessOptions,
+      },
+    );
+    return stdout;
+  } catch {
+    fail("EVIDENCE_WORKTREE_UNAVAILABLE");
+  }
+}
+
 async function runCommand(input) {
   return execFileAsync(input.executable, input.arguments, {
     cwd: input.cwd,
@@ -130,7 +148,12 @@ async function runCommand(input) {
 }
 
 function productionAdapters() {
-  return { readCurrentRevision, readRepositoryStatus, runCommand };
+  return {
+    readCurrentRevision,
+    readRepositoryStatus,
+    readRepositoryIndexEntries,
+    runCommand,
+  };
 }
 
 function requireAdapters(adapters) {
@@ -139,6 +162,7 @@ function requireAdapters(adapters) {
     typeof adapters !== "object" ||
     typeof adapters.readCurrentRevision !== "function" ||
     typeof adapters.readRepositoryStatus !== "function" ||
+    typeof adapters.readRepositoryIndexEntries !== "function" ||
     typeof adapters.runCommand !== "function"
   ) {
     fail("CERTIFICATION_ADAPTER_INVALID");
@@ -157,6 +181,27 @@ async function requireCleanRepository(adapters) {
   }
   if (typeof status !== "string") fail("EVIDENCE_WORKTREE_UNAVAILABLE");
   if (status.length !== 0) fail("EVIDENCE_WORKTREE_DIRTY");
+
+  let indexEntries;
+  try {
+    indexEntries = await adapters.readRepositoryIndexEntries();
+  } catch (error) {
+    if (error instanceof ProfileTransitionLifecycleCertificationError) {
+      throw error;
+    }
+    fail("EVIDENCE_WORKTREE_UNAVAILABLE");
+  }
+  if (typeof indexEntries !== "string") fail("EVIDENCE_WORKTREE_UNAVAILABLE");
+  if (indexEntries.length === 0) return;
+  const entries = indexEntries.split("\0");
+  if (entries.at(-1) !== "") fail("EVIDENCE_WORKTREE_UNAVAILABLE");
+  entries.pop();
+  for (const entry of entries) {
+    if (entry.length < 3 || entry[1] !== " ") {
+      fail("EVIDENCE_WORKTREE_UNAVAILABLE");
+    }
+    if (entry[0] !== "H") fail("EVIDENCE_WORKTREE_INDEX_FLAGS");
+  }
 }
 
 async function requireRevision(revision, adapters) {

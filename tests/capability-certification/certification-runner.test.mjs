@@ -456,6 +456,7 @@ test("profile transition lifecycle certification accepts real TAP with nested an
     {
       readCurrentRevision: async () => revision,
       readRepositoryStatus: async () => "",
+      readRepositoryIndexEntries: async () => "H selected-evidence.test.mjs\0",
       async runCommand(input) {
         if (input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs") {
           const fixtureArguments = input.arguments.slice(0, -1);
@@ -486,6 +487,7 @@ test("profile transition lifecycle certification binds the exact revision to cau
   const commands = [];
   let revisionReads = 0;
   let statusReads = 0;
+  let indexReads = 0;
 
   const result = await certifyProfileTransitionLifecycleForTesting(
     { revision },
@@ -497,6 +499,10 @@ test("profile transition lifecycle certification binds the exact revision to cau
       async readRepositoryStatus() {
         statusReads += 1;
         return "";
+      },
+      async readRepositoryIndexEntries() {
+        indexReads += 1;
+        return "H selected-evidence.test.mjs\0";
       },
       async runCommand(input) {
         commands.push(input);
@@ -513,6 +519,7 @@ test("profile transition lifecycle certification binds the exact revision to cau
 
   assert.equal(revisionReads, 2);
   assert.equal(statusReads, 2);
+  assert.equal(indexReads, 2);
   assert.deepEqual(
     commands.map(({ executable, arguments: arguments_, cwd, environment }) => ({
       executable,
@@ -588,6 +595,7 @@ test("profile transition lifecycle certification fails closed on revision, statu
       {
         readCurrentRevision: async () => "b".repeat(40),
         readRepositoryStatus: async () => "",
+        readRepositoryIndexEntries: async () => "H selected-evidence.test.mjs\0",
         runCommand: async () => assert.fail("drift must stop before execution"),
       },
     ),
@@ -600,6 +608,7 @@ test("profile transition lifecycle certification fails closed on revision, statu
       {
         readCurrentRevision: async () => revision,
         readRepositoryStatus: async () => " M private-source.ts\0",
+        readRepositoryIndexEntries: async () => "H selected-evidence.test.mjs\0",
         runCommand: async () => assert.fail("dirty input must not execute"),
       },
     ),
@@ -612,6 +621,7 @@ test("profile transition lifecycle certification fails closed on revision, statu
       {
         readCurrentRevision: async () => revision,
         readRepositoryStatus: async () => "",
+        readRepositoryIndexEntries: async () => "H selected-evidence.test.mjs\0",
         runCommand: async () => {
           throw new Error("private output");
         },
@@ -627,6 +637,7 @@ test("profile transition lifecycle certification fails closed on revision, statu
       { revision },
       {
         readCurrentRevision: async () => revision,
+        readRepositoryIndexEntries: async () => "H selected-evidence.test.mjs\0",
         readRepositoryStatus: async () => {
           statusReads += 1;
           return statusReads === 1 ? "" : "?? unexpected-source.ts\0";
@@ -647,6 +658,99 @@ test("profile transition lifecycle certification fails closed on revision, statu
   );
   assert.equal(commandRuns, 2);
   assert.equal(statusReads, 2);
+
+  let indexReads = 0;
+  let indexCommandRuns = 0;
+  await assert.rejects(
+    certifyProfileTransitionLifecycleForTesting(
+      { revision },
+      {
+        readCurrentRevision: async () => revision,
+        readRepositoryStatus: async () => "",
+        readRepositoryIndexEntries: async () => {
+          indexReads += 1;
+          return indexReads === 1
+            ? "H selected-evidence.test.mjs\0"
+            : "S selected-evidence.test.mjs\0";
+        },
+        runCommand: async (input) => {
+          indexCommandRuns += 1;
+          return {
+            stdout: successfulTap(
+              input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
+                ? compiledProfileTransitionCertificationTests
+                : builderProfileTransitionCertificationTests,
+            ),
+          };
+        },
+      },
+    ),
+    (error) => error?.code === "EVIDENCE_WORKTREE_INDEX_FLAGS",
+  );
+  assert.equal(indexCommandRuns, 2);
+  assert.equal(indexReads, 2);
+});
+
+test("profile transition lifecycle certification rejects Git index flags that hide evidence changes", async (context) => {
+  const revision = "a".repeat(40);
+
+  for (const hiddenFlag of ["--assume-unchanged", "--skip-worktree"]) {
+    const fixtureRoot = await mkdtemp(
+      join(tmpdir(), "egeria-hidden-certification-evidence-"),
+    );
+    context.after(() => rm(fixtureRoot, { recursive: true, force: true }));
+    const evidencePath = "selected-evidence.test.mjs";
+    await execFileAsync("git", ["init", "--quiet"], { cwd: fixtureRoot });
+    await writeFile(join(fixtureRoot, evidencePath), "export const value = 1;\n");
+    await execFileAsync("git", ["add", evidencePath], { cwd: fixtureRoot });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Certification Test",
+        "-c",
+        "user.email=certification-test@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "Add evidence fixture",
+      ],
+      { cwd: fixtureRoot },
+    );
+    await execFileAsync("git", ["update-index", hiddenFlag, evidencePath], {
+      cwd: fixtureRoot,
+    });
+    await writeFile(join(fixtureRoot, evidencePath), "export const value = 2;\n");
+
+    const [{ stdout: status }, { stdout: indexEntries }] = await Promise.all([
+      execFileAsync(
+        "git",
+        ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        { cwd: fixtureRoot },
+      ),
+      execFileAsync("git", ["ls-files", "-v", "-z"], { cwd: fixtureRoot }),
+    ]);
+    assert.equal(status, "");
+
+    await assert.rejects(
+      certifyProfileTransitionLifecycleForTesting(
+        { revision },
+        {
+          readCurrentRevision: async () => revision,
+          readRepositoryStatus: async () => status,
+          readRepositoryIndexEntries: async () => indexEntries,
+          runCommand: async (input) => ({
+            stdout: successfulTap(
+              input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
+                ? compiledProfileTransitionCertificationTests
+                : builderProfileTransitionCertificationTests,
+            ),
+          }),
+        },
+      ),
+      (error) => error?.code === "EVIDENCE_WORKTREE_INDEX_FLAGS",
+    );
+  }
 });
 
 test("profile transition lifecycle certification rejects zero-match, selected-skip, and malformed TAP", async () => {
@@ -678,6 +782,7 @@ test("profile transition lifecycle certification rejects zero-match, selected-sk
         {
           readCurrentRevision: async () => revision,
           readRepositoryStatus: async () => "",
+          readRepositoryIndexEntries: async () => "H selected-evidence.test.mjs\0",
           runCommand: async () => ({ stdout }),
         },
       ),

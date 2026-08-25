@@ -3290,6 +3290,10 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
     assert.doesNotMatch(sequencingOwner, /minimum four remaining increments/iu);
     assert.doesNotMatch(sequencingOwner, /minimum five remaining increments/iu);
+    assert.doesNotMatch(
+      sequencingOwner,
+      /selected next increment[^\n]+portfolio-to-site transition lifecycle certification/iu,
+    );
     for (const backfillSubject of [
       "content-files",
       "section-composition",
