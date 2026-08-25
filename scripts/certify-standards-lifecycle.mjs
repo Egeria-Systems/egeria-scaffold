@@ -14,7 +14,35 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const exactRevisionPattern = /^[a-f0-9]{40}$/u;
 const commandTimeoutMilliseconds = 30 * 60 * 1000;
 const compiledCliPattern =
-  "^the compiled (?:plan-upgrade command plans both profiles without changing any byte|apply-upgrade command completes the exact portfolio and site transactions|plan-upgrade command refuses unsafe or unsupported repository states without writes|apply-upgrade command refuses the finite unsafe matrix without mutation)$";
+  "^the compiled (?:plan-upgrade command plans both profiles without changing any byte|apply-upgrade command completes the exact portfolio and site transactions|standards upgrade verification failure retains transformed source and old controls|plan-upgrade command refuses unsafe or unsupported repository states without writes|apply-upgrade command refuses the finite unsafe matrix without mutation)$";
+const compiledCliTests = Object.freeze([
+  "the compiled plan-upgrade command plans both profiles without changing any byte",
+  "the compiled apply-upgrade command completes the exact portfolio and site transactions",
+  "the compiled standards upgrade verification failure retains transformed source and old controls",
+  "the compiled plan-upgrade command refuses unsafe or unsupported repository states without writes",
+  "the compiled apply-upgrade command refuses the finite unsafe matrix without mutation",
+]);
+const builderCoreTests = Object.freeze([
+  "standards capability upgrade refuses unsupported capability and target inputs without mutation",
+  "standards capability upgrade transforms, verifies, persists state last, and stops for final-diff approval",
+  "standards capability upgrade refuses malformed, wrong, and stale plan authority without mutation",
+  "standards capability upgrade propagates named planner refusals without mutation",
+  "standards capability upgrade refuses duplicate migration history before writing",
+  "standards capability upgrade refuses unsafe Git and changed pre-write identity",
+  "standards capability upgrade refuses an ignored create target before mutation",
+  "standards capability upgrade contains reader, create-target, and preflight exceptions before writes",
+  "standards capability upgrade distinguishes uncommitted and partial transform failures",
+  "standards capability upgrade retains transformed source and old controls on verification or re-inference failure",
+  "standards capability upgrade maps clock and migration persistence failures to the retained source prefix",
+  "standards capability upgrade retains the migration prefix when its reread fails",
+  "standards capability upgrade retains an uncertain committed migration append",
+  "standards capability upgrade retains migration and old state on state construction failure",
+  "standards capability upgrade retains migration and old state when state persistence fails",
+  "standards capability upgrade retains an uncertain committed state replacement",
+  "standards capability upgrade retains the full persisted prefix on post-state disagreement",
+  "standards capability upgrade retains the full prefix on post-state state and inference disagreement",
+  "standards capability upgrade reports final Git and exact-byte failures after persistence",
+]);
 const lifecycleChecks = Object.freeze([
   "compiled-plan-upgrade",
   "compiled-apply-upgrade",
@@ -60,8 +88,26 @@ async function readCurrentRevision() {
   }
 }
 
+async function readRepositoryStatus() {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+      {
+        cwd: repositoryRoot,
+        env: createIsolatedProcessEnvironment(),
+        timeout: 30_000,
+        ...isolatedProcessOptions,
+      },
+    );
+    return stdout;
+  } catch {
+    fail("EVIDENCE_WORKTREE_UNAVAILABLE");
+  }
+}
+
 async function runCommand(input) {
-  await execFileAsync(input.executable, input.arguments, {
+  return execFileAsync(input.executable, input.arguments, {
     cwd: input.cwd,
     env: input.environment,
     timeout: commandTimeoutMilliseconds,
@@ -70,7 +116,7 @@ async function runCommand(input) {
 }
 
 function productionAdapters() {
-  return { readCurrentRevision, runCommand };
+  return { readCurrentRevision, readRepositoryStatus, runCommand };
 }
 
 function requireAdapters(adapters) {
@@ -78,10 +124,23 @@ function requireAdapters(adapters) {
     adapters === null ||
     typeof adapters !== "object" ||
     typeof adapters.readCurrentRevision !== "function" ||
+    typeof adapters.readRepositoryStatus !== "function" ||
     typeof adapters.runCommand !== "function"
   ) {
     fail("CERTIFICATION_ADAPTER_INVALID");
   }
+}
+
+async function requireCleanRepository(adapters) {
+  let status;
+  try {
+    status = await adapters.readRepositoryStatus();
+  } catch (error) {
+    if (error instanceof StandardsLifecycleCertificationError) throw error;
+    fail("EVIDENCE_WORKTREE_UNAVAILABLE");
+  }
+  if (typeof status !== "string") fail("EVIDENCE_WORKTREE_UNAVAILABLE");
+  if (status.length !== 0) fail("EVIDENCE_WORKTREE_DIRTY");
 }
 
 async function requireRevision(revision, adapters) {
@@ -95,14 +154,37 @@ async function requireRevision(revision, adapters) {
   if (current !== revision) fail("EVIDENCE_REVISION_MISMATCH");
 }
 
-async function runEvidenceCommand(adapters, arguments_) {
+function hasExactPassedTests(stdout, expectedTests) {
+  if (typeof stdout !== "string") return false;
+  const observedTests = stdout
+    .split("\n")
+    .flatMap((line) =>
+      line.startsWith("# Subtest: ") ? [line.slice("# Subtest: ".length)] : [],
+    );
+  return (
+    observedTests.length === expectedTests.length &&
+    observedTests.every((name, index) => name === expectedTests[index]) &&
+    stdout.includes(`\n1..${expectedTests.length}\n`) &&
+    stdout.includes(`\n# tests ${expectedTests.length}\n`) &&
+    stdout.includes(`\n# pass ${expectedTests.length}\n`) &&
+    stdout.includes("\n# fail 0\n")
+  );
+}
+
+async function runEvidenceCommand(adapters, arguments_, expectedTests) {
   try {
-    await adapters.runCommand({
+    const result = await adapters.runCommand({
       executable: process.execPath,
       arguments: [...arguments_],
       cwd: repositoryRoot,
       environment: createIsolatedProcessEnvironment(),
     });
+    if (
+      expectedTests !== undefined &&
+      !hasExactPassedTests(result?.stdout, expectedTests)
+    ) {
+      fail("LIFECYCLE_EVIDENCE_FAILED");
+    }
   } catch {
     fail("LIFECYCLE_EVIDENCE_FAILED");
   }
@@ -120,12 +202,13 @@ export async function certifyStandardsLifecycleForTesting(input = {}, adapters) 
   }
 
   await requireRevision(revision, adapters);
+  await requireCleanRepository(adapters);
   await runEvidenceCommand(adapters, [
     "--test",
     "--test-name-pattern",
     compiledCliPattern,
     "apps/cli/tests/cli.test.mjs",
-  ]);
+  ], compiledCliTests);
   await runEvidenceCommand(adapters, [
     "scripts/certify-generated-testing.mjs",
   ]);
@@ -134,8 +217,9 @@ export async function certifyStandardsLifecycleForTesting(input = {}, adapters) 
     "--test-name-pattern",
     "^standards capability upgrade ",
     "packages/builder-core/tests/apply-capability-upgrade.test.mjs",
-  ]);
+  ], builderCoreTests);
   await requireRevision(revision, adapters);
+  await requireCleanRepository(adapters);
 
   return {
     ok: true,

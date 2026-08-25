@@ -74,11 +74,55 @@ const standardsLifecycleCertificationScript = resolve(
   repositoryRoot,
   "scripts/certify-standards-lifecycle.mjs",
 );
+const compiledUpgradeCertificationTests = [
+  "the compiled plan-upgrade command plans both profiles without changing any byte",
+  "the compiled apply-upgrade command completes the exact portfolio and site transactions",
+  "the compiled standards upgrade verification failure retains transformed source and old controls",
+  "the compiled plan-upgrade command refuses unsafe or unsupported repository states without writes",
+  "the compiled apply-upgrade command refuses the finite unsafe matrix without mutation",
+];
+const builderUpgradeCertificationTests = [
+  "standards capability upgrade refuses unsupported capability and target inputs without mutation",
+  "standards capability upgrade transforms, verifies, persists state last, and stops for final-diff approval",
+  "standards capability upgrade refuses malformed, wrong, and stale plan authority without mutation",
+  "standards capability upgrade propagates named planner refusals without mutation",
+  "standards capability upgrade refuses duplicate migration history before writing",
+  "standards capability upgrade refuses unsafe Git and changed pre-write identity",
+  "standards capability upgrade refuses an ignored create target before mutation",
+  "standards capability upgrade contains reader, create-target, and preflight exceptions before writes",
+  "standards capability upgrade distinguishes uncommitted and partial transform failures",
+  "standards capability upgrade retains transformed source and old controls on verification or re-inference failure",
+  "standards capability upgrade maps clock and migration persistence failures to the retained source prefix",
+  "standards capability upgrade retains the migration prefix when its reread fails",
+  "standards capability upgrade retains an uncertain committed migration append",
+  "standards capability upgrade retains migration and old state on state construction failure",
+  "standards capability upgrade retains migration and old state when state persistence fails",
+  "standards capability upgrade retains an uncertain committed state replacement",
+  "standards capability upgrade retains the full persisted prefix on post-state disagreement",
+  "standards capability upgrade retains the full prefix on post-state state and inference disagreement",
+  "standards capability upgrade reports final Git and exact-byte failures after persistence",
+];
+
+function successfulTap(testNames) {
+  return [
+    "TAP version 13",
+    ...testNames.flatMap((name, index) => [
+      `# Subtest: ${name}`,
+      `ok ${index + 1} - ${name}`,
+    ]),
+    `1..${testNames.length}`,
+    `# tests ${testNames.length}`,
+    `# pass ${testNames.length}`,
+    "# fail 0",
+    "",
+  ].join("\n");
+}
 
 test("standards lifecycle certification binds the exact revision to causal compiled evidence", async () => {
   const revision = "a".repeat(40);
   const commands = [];
   let revisionReads = 0;
+  let statusReads = 0;
 
   const result = await certifyStandardsLifecycleForTesting(
     { revision },
@@ -87,13 +131,26 @@ test("standards lifecycle certification binds the exact revision to causal compi
         revisionReads += 1;
         return revision;
       },
+      async readRepositoryStatus() {
+        statusReads += 1;
+        return "";
+      },
       async runCommand(input) {
         commands.push(input);
+        if (input.arguments[0] !== "--test") return { stdout: "{}\n" };
+        return {
+          stdout: successfulTap(
+            input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
+              ? compiledUpgradeCertificationTests
+              : builderUpgradeCertificationTests,
+          ),
+        };
       },
     },
   );
 
   assert.equal(revisionReads, 2);
+  assert.equal(statusReads, 2);
   assert.deepEqual(
     commands.map(({ executable, arguments: arguments_, cwd, environment }) => ({
       executable,
@@ -111,7 +168,7 @@ test("standards lifecycle certification binds the exact revision to causal compi
         arguments: [
           "--test",
           "--test-name-pattern",
-          "^the compiled (?:plan-upgrade command plans both profiles without changing any byte|apply-upgrade command completes the exact portfolio and site transactions|plan-upgrade command refuses unsafe or unsupported repository states without writes|apply-upgrade command refuses the finite unsafe matrix without mutation)$",
+          "^the compiled (?:plan-upgrade command plans both profiles without changing any byte|apply-upgrade command completes the exact portfolio and site transactions|standards upgrade verification failure retains transformed source and old controls|plan-upgrade command refuses unsafe or unsupported repository states without writes|apply-upgrade command refuses the finite unsafe matrix without mutation)$",
           "apps/cli/tests/cli.test.mjs",
         ],
         cwd: repositoryRoot,
@@ -163,6 +220,7 @@ test("standards lifecycle certification fails closed on revision drift and comma
       { revision },
       {
         readCurrentRevision: async () => "b".repeat(40),
+        readRepositoryStatus: async () => "",
         runCommand: async () => assert.fail("drift must stop before execution"),
       },
     ),
@@ -178,6 +236,7 @@ test("standards lifecycle certification fails closed on revision drift and comma
           reads += 1;
           return revision;
         },
+        readRepositoryStatus: async () => "",
         runCommand: async () => {
           throw new Error("private output");
         },
@@ -186,6 +245,74 @@ test("standards lifecycle certification fails closed on revision drift and comma
     (error) => error?.code === "LIFECYCLE_EVIDENCE_FAILED",
   );
   assert.equal(reads, 1);
+});
+
+test("standards lifecycle certification rejects dirty inputs before and after evidence", async () => {
+  const revision = "a".repeat(40);
+  await assert.rejects(
+    certifyStandardsLifecycleForTesting(
+      { revision },
+      {
+        readCurrentRevision: async () => revision,
+        readRepositoryStatus: async () => " M packages/builder-core/src/index.ts\n",
+        runCommand: async () => assert.fail("dirty inputs must stop before execution"),
+      },
+    ),
+    (error) => error?.code === "EVIDENCE_WORKTREE_DIRTY",
+  );
+
+  let statusReads = 0;
+  let commandRuns = 0;
+  await assert.rejects(
+    certifyStandardsLifecycleForTesting(
+      { revision },
+      {
+        readCurrentRevision: async () => revision,
+        readRepositoryStatus: async () => {
+          statusReads += 1;
+          return statusReads === 1 ? "" : "?? unexpected-source.ts\0";
+        },
+        runCommand: async (input) => {
+          commandRuns += 1;
+          if (input.arguments[0] !== "--test") return { stdout: "{}\n" };
+          return {
+            stdout: successfulTap(
+              input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
+                ? compiledUpgradeCertificationTests
+                : builderUpgradeCertificationTests,
+            ),
+          };
+        },
+      },
+    ),
+    (error) => error?.code === "EVIDENCE_WORKTREE_DIRTY",
+  );
+  assert.equal(commandRuns, 3);
+  assert.equal(statusReads, 2);
+});
+
+test("standards lifecycle certification rejects a successful zero-match test process", async () => {
+  const revision = "a".repeat(40);
+  await assert.rejects(
+    certifyStandardsLifecycleForTesting(
+      { revision },
+      {
+        readCurrentRevision: async () => revision,
+        readRepositoryStatus: async () => "",
+        runCommand: async () => ({
+          stdout: [
+            "TAP version 13",
+            "1..0",
+            "# tests 0",
+            "# pass 0",
+            "# fail 0",
+            "",
+          ].join("\n"),
+        }),
+      },
+    ),
+    (error) => error?.code === "LIFECYCLE_EVIDENCE_FAILED",
+  );
 });
 
 test("the standards lifecycle certification command requires one exact revision without echoing rejected values", async () => {

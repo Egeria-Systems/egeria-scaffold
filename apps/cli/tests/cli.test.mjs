@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import {
+  chmod,
   cp,
   lstat,
   mkdir,
@@ -13,7 +14,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve, sep } from "node:path";
+import { delimiter, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
@@ -432,7 +433,7 @@ async function listCalendlyReferencePaths(root, relativeDirectory = "") {
   return matches.toSorted();
 }
 
-async function executeNode(arguments_) {
+async function executeNode(arguments_, environment = {}) {
   return new Promise((resolveResult) => {
     execFile(
       process.execPath,
@@ -442,6 +443,7 @@ async function executeNode(arguments_) {
         encoding: "utf8",
         env: {
           PATH: process.env.PATH,
+          ...environment,
         },
       },
       (error, stdout, stderr) => {
@@ -453,6 +455,18 @@ async function executeNode(arguments_) {
       },
     );
   });
+}
+
+async function withFailingPnpm(run) {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-failing-pnpm-"));
+  const executable = join(owner, "pnpm");
+  try {
+    await writeFile(executable, "#!/bin/sh\nexit 1\n");
+    await chmod(executable, 0o700);
+    await run(`${owner}${delimiter}${process.env.PATH}`);
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
 }
 
 async function withGeneratedFixture(run) {
@@ -3181,11 +3195,18 @@ async function executeBuiltApplyRemove(directory, approvedPlan) {
   ]);
 }
 
-async function executeBuiltApplyUpgrade(directory, approvedPlan) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...applyUpgradeArguments(directory, approvedPlan),
-  ]);
+async function executeBuiltApplyUpgrade(
+  directory,
+  approvedPlan,
+  environment = {},
+) {
+  return executeNode(
+    [
+      resolve(packageRoot, "dist/index.js"),
+      ...applyUpgradeArguments(directory, approvedPlan),
+    ],
+    environment,
+  );
 }
 
 async function executeBuiltApplyProfileTransition(directory, approvedPlan) {
@@ -3930,6 +3951,77 @@ test("the compiled apply-upgrade command completes the exact portfolio and site 
       },
     );
   }
+});
+
+test("the compiled standards upgrade verification failure retains transformed source and old controls", async () => {
+  await withGitFixture(
+    "portfolio",
+    async ({ linked, primary }) => {
+      const primaryBefore = await gitRepositorySnapshot(primary);
+      const initialInspection = await core.inspectGitWorktree({ root: linked });
+      assert.equal(initialInspection.ok, true);
+      const controlsBefore = await Promise.all(
+        upgradeControlPaths.map((path) => readFile(join(linked, path))),
+      );
+      const planExecution = await executeBuiltPlanUpgrade(linked);
+      assert.equal(planExecution.exitCode, 0, planExecution.stderr);
+      const plan = JSON.parse(planExecution.stdout).plan;
+
+      let execution;
+      await withFailingPnpm(async (path) => {
+        execution = await executeBuiltApplyUpgrade(
+          linked,
+          plan.planFingerprint,
+          { PATH: path },
+        );
+      });
+
+      assert.equal(execution.exitCode, 1);
+      assert.equal(execution.stdout, "");
+      assert.deepEqual(JSON.parse(execution.stderr), {
+        ok: false,
+        command: "apply-upgrade",
+        code: "CAPABILITY_VERIFICATION_FAILED",
+        phase: "verify",
+        recovery: "inspect-worktree",
+      });
+      assert.deepEqual(
+        await Promise.all(
+          upgradeControlPaths.map((path) => readFile(join(linked, path))),
+        ),
+        controlsBefore,
+      );
+      for (const path of upgradeSourcePaths) {
+        assert.deepEqual(
+          await readFile(join(linked, path)),
+          await readFile(
+            resolve(repositoryRoot, `fixtures/generated/portfolio/${path}`),
+          ),
+          path,
+        );
+      }
+      assert.deepEqual(
+        await core.inspectGitExpectedChanges({
+          root: linked,
+          identity: initialInspection.identity,
+          expectedPaths: [...upgradeSourcePaths].sort(),
+        }),
+        { ok: true },
+      );
+      assert.deepEqual(
+        withoutSharedRefs(await gitRepositorySnapshot(primary)),
+        withoutSharedRefs(primaryBefore),
+      );
+      assert.doesNotMatch(
+        execution.stderr,
+        /private|refs\/heads|\.git\/worktrees|egeria-failing-pnpm/u,
+      );
+    },
+    {
+      branch: "standards-upgrade-verification-failure-test",
+      preparePrimary: prepareHistoricalUpgradeFixture,
+    },
+  );
 });
 
 test("the compiled plan-upgrade command refuses unsafe or unsupported repository states without writes", async () => {

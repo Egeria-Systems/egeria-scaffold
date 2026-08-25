@@ -2992,7 +2992,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+exact Calendly addition\/removal[^\n]+standards upgrade[^\n]+portfolio-to-site transactions[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+fresh-add runner[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery/iu,
+    /Existing-repository mutation[^\n]+exact Calendly addition\/removal[^\n]+standards upgrade[^\n]+portfolio-to-site transactions[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+Exact Calendly certification[^\n]+protected-staging\/provider journey[^\n]+Exact standards certification[^\n]+compiled upgrade\/refusal\/recovery[^\n]+renewed fresh-scaffold evidence[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery/iu,
   );
   assert.match(
     overview,
@@ -3270,13 +3270,17 @@ test("canonical documentation accepts profile-transition execution and bounds it
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.match(
       sequencingOwner,
-      /minimum five remaining increments/iu,
+      /minimum four remaining increments/iu,
     );
     assert.match(
       sequencingOwner,
       /booking-calendly@0\.1\.0[^\n]+lifecycle certification[^\n]+complete/iu,
     );
-    assert.doesNotMatch(sequencingOwner, /minimum six remaining increments/iu);
+    assert.match(
+      sequencingOwner,
+      /standards@0\.4\.0[^\n]+lifecycle certification[^\n]+complete/iu,
+    );
+    assert.doesNotMatch(sequencingOwner, /minimum five remaining increments/iu);
     for (const backfillSubject of [
       "content-files",
       "section-composition",
@@ -3292,12 +3296,10 @@ test("canonical documentation accepts profile-transition execution and bounds it
     }
   }
 
-  for (const responsibility of [
-    /1\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
-    /2\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
-  ]) {
-    assert.match(roadmap, responsibility);
-  }
+  assert.match(
+    roadmap,
+    /1\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
+  );
 
   assert.match(
     sourcePlan,
