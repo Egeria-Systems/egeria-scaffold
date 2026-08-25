@@ -25,6 +25,7 @@ import {
   readCloudflareDeploymentRevisionForTesting,
 } from "../../scripts/certify-cloudflare-deployment.mjs";
 import { certifyGeneratedTestingForTesting } from "../../scripts/certify-generated-testing.mjs";
+import { certifyStandardsLifecycleForTesting } from "../../scripts/certify-standards-lifecycle.mjs";
 import { runCertificationCli } from "../../scripts/lib/certification-cli.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -69,6 +70,132 @@ const generatedTestingCertificationScript = resolve(
   repositoryRoot,
   "scripts/certify-generated-testing.mjs",
 );
+const standardsLifecycleCertificationScript = resolve(
+  repositoryRoot,
+  "scripts/certify-standards-lifecycle.mjs",
+);
+
+test("standards lifecycle certification binds the exact revision to causal compiled evidence", async () => {
+  const revision = "a".repeat(40);
+  const commands = [];
+  let revisionReads = 0;
+
+  const result = await certifyStandardsLifecycleForTesting(
+    { revision },
+    {
+      async readCurrentRevision() {
+        revisionReads += 1;
+        return revision;
+      },
+      async runCommand(input) {
+        commands.push(input);
+      },
+    },
+  );
+
+  assert.equal(revisionReads, 2);
+  assert.deepEqual(
+    commands.map(({ executable, arguments: arguments_, cwd, environment }) => ({
+      executable,
+      arguments: arguments_,
+      cwd,
+      secrets: [
+        environment.CLOUDFLARE_API_TOKEN,
+        environment.CLOUDFLARE_ACCOUNT_ID,
+        environment.NPM_TOKEN,
+      ],
+    })),
+    [
+      {
+        executable: process.execPath,
+        arguments: [
+          "--test",
+          "--test-name-pattern",
+          "^the compiled (?:plan-upgrade command plans both profiles without changing any byte|apply-upgrade command completes the exact portfolio and site transactions|plan-upgrade command refuses unsafe or unsupported repository states without writes|apply-upgrade command refuses the finite unsafe matrix without mutation)$",
+          "apps/cli/tests/cli.test.mjs",
+        ],
+        cwd: repositoryRoot,
+        secrets: [undefined, undefined, undefined],
+      },
+      {
+        executable: process.execPath,
+        arguments: [
+          "--test",
+          "--test-name-pattern",
+          "^standards capability upgrade ",
+          "packages/builder-core/tests/apply-capability-upgrade.test.mjs",
+        ],
+        cwd: repositoryRoot,
+        secrets: [undefined, undefined, undefined],
+      },
+    ],
+  );
+  assert.deepEqual(result, {
+    ok: true,
+    capability: "standards",
+    version: "0.4.0",
+    evidenceRevision: revision,
+    profiles: ["portfolio", "site"],
+    checks: [
+      "compiled-plan-upgrade",
+      "compiled-apply-upgrade",
+      "already-current-refusal",
+      "missing-edge-refusal",
+      "verification-failure-prefix",
+      "migration-before-state",
+      "state-persistence-failure-prefix",
+      "exact-final-state",
+    ],
+  });
+});
+
+test("standards lifecycle certification fails closed on revision drift and command failure", async () => {
+  const revision = "a".repeat(40);
+  await assert.rejects(
+    certifyStandardsLifecycleForTesting(
+      { revision },
+      {
+        readCurrentRevision: async () => "b".repeat(40),
+        runCommand: async () => assert.fail("drift must stop before execution"),
+      },
+    ),
+    (error) => error?.code === "EVIDENCE_REVISION_MISMATCH",
+  );
+
+  let reads = 0;
+  await assert.rejects(
+    certifyStandardsLifecycleForTesting(
+      { revision },
+      {
+        readCurrentRevision: async () => {
+          reads += 1;
+          return revision;
+        },
+        runCommand: async () => {
+          throw new Error("private output");
+        },
+      },
+    ),
+    (error) => error?.code === "LIFECYCLE_EVIDENCE_FAILED",
+  );
+  assert.equal(reads, 1);
+});
+
+test("the standards lifecycle certification command requires one exact revision without echoing rejected values", async () => {
+  const execution = await execFileAsync(process.execPath, [
+    standardsLifecycleCertificationScript,
+    "--revision",
+    "private-value",
+  ]).catch((error) => error);
+
+  assert.equal(execution.code, 2);
+  assert.equal(execution.stdout, "");
+  assert.deepEqual(JSON.parse(execution.stderr), {
+    ok: false,
+    code: "CERTIFICATION_ARGUMENT_INVALID",
+  });
+  assert.doesNotMatch(execution.stderr, /private-value/u);
+});
 
 const fixedChecks = Object.freeze([
   "pnpm-version",
