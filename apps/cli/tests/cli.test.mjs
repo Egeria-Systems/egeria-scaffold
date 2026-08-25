@@ -3209,11 +3209,18 @@ async function executeBuiltApplyUpgrade(
   );
 }
 
-async function executeBuiltApplyProfileTransition(directory, approvedPlan) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...applyProfileTransitionArguments(directory, approvedPlan),
-  ]);
+async function executeBuiltApplyProfileTransition(
+  directory,
+  approvedPlan,
+  environment = {},
+) {
+  return executeNode(
+    [
+      resolve(packageRoot, "dist/index.js"),
+      ...applyProfileTransitionArguments(directory, approvedPlan),
+    ],
+    environment,
+  );
 }
 
 test("the compiled plan-add command emits exact portfolio and site plans without writes", async () => {
@@ -3656,6 +3663,81 @@ test("the compiled apply-profile-transition command completes default and Calend
       { branch: `apply-${fixture}-to-site-test` },
     );
   }
+});
+
+test("the compiled profile transition verification failure retains transformed source and old controls", async () => {
+  await withGitFixture(
+    "portfolio",
+    async ({ linked, primary }) => {
+      const primaryBefore = await gitRepositorySnapshot(primary);
+      const initialInspection = await core.inspectGitWorktree({ root: linked });
+      assert.equal(initialInspection.ok, true);
+      const controlsBefore = await Promise.all(
+        ["state.json", "migrations.jsonl"].map((name) =>
+          readFile(join(linked, ".egeria", name)),
+        ),
+      );
+      const target = await renderProfileTransitionTarget(linked);
+      const planExecution = await executeBuiltPlanProfileTransition(linked);
+      assert.equal(planExecution.exitCode, 0, planExecution.stderr);
+      const plan = JSON.parse(planExecution.stdout).plan;
+
+      let execution;
+      await withFailingPnpm(async (path) => {
+        execution = await executeBuiltApplyProfileTransition(
+          linked,
+          plan.planFingerprint,
+          { PATH: path },
+        );
+      });
+
+      assert.equal(execution.exitCode, 1);
+      assert.equal(execution.stdout, "");
+      assert.deepEqual(JSON.parse(execution.stderr), {
+        ok: false,
+        command: "apply-profile-transition",
+        code: "PROFILE_TRANSITION_VERIFICATION_FAILED",
+        phase: "verify",
+        recovery: "inspect-worktree",
+      });
+      assert.deepEqual(
+        await Promise.all(
+          ["state.json", "migrations.jsonl"].map((name) =>
+            readFile(join(linked, ".egeria", name)),
+          ),
+        ),
+        controlsBefore,
+      );
+      assert.equal(
+        await readFile(join(linked, ".egeria/project.yaml"), "utf8"),
+        core.serializeProjectYaml(target.project),
+      );
+      for (const path of profileTransitionSourcePaths.slice(1)) {
+        assert.deepEqual(
+          await readFile(join(linked, path)),
+          Buffer.from(target.files.get(path)),
+          path,
+        );
+      }
+      assert.deepEqual(
+        await core.inspectGitExpectedChanges({
+          root: linked,
+          identity: initialInspection.identity,
+          expectedPaths: [...profileTransitionSourcePaths].sort(),
+        }),
+        { ok: true },
+      );
+      assert.deepEqual(
+        withoutSharedRefs(await gitRepositorySnapshot(primary)),
+        withoutSharedRefs(primaryBefore),
+      );
+      assert.doesNotMatch(
+        execution.stderr,
+        /private|refs\/heads|\.git\/worktrees|egeria-failing-pnpm/u,
+      );
+    },
+    { branch: "profile-transition-verification-failure-test" },
+  );
 });
 
 test("the compiled apply-profile-transition command refuses representative unsafe inputs without mutation", async () => {

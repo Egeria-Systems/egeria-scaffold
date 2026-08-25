@@ -25,6 +25,7 @@ import {
   readCloudflareDeploymentRevisionForTesting,
 } from "../../scripts/certify-cloudflare-deployment.mjs";
 import { certifyGeneratedTestingForTesting } from "../../scripts/certify-generated-testing.mjs";
+import { certifyProfileTransitionLifecycleForTesting } from "../../scripts/certify-profile-transition-lifecycle.mjs";
 import { certifyStandardsLifecycleForTesting } from "../../scripts/certify-standards-lifecycle.mjs";
 import { runCertificationCli } from "../../scripts/lib/certification-cli.mjs";
 
@@ -74,6 +75,10 @@ const standardsLifecycleCertificationScript = resolve(
   repositoryRoot,
   "scripts/certify-standards-lifecycle.mjs",
 );
+const profileTransitionLifecycleCertificationScript = resolve(
+  repositoryRoot,
+  "scripts/certify-profile-transition-lifecycle.mjs",
+);
 const compiledUpgradeCertificationTests = [
   "the compiled plan-upgrade command plans both profiles without changing any byte",
   "the compiled apply-upgrade command completes the exact portfolio and site transactions",
@@ -101,6 +106,44 @@ const builderUpgradeCertificationTests = [
   "standards capability upgrade retains the full persisted prefix on post-state disagreement",
   "standards capability upgrade retains the full prefix on post-state state and inference disagreement",
   "standards capability upgrade reports final Git and exact-byte failures after persistence",
+];
+const compiledProfileTransitionCertificationTests = [
+  "the compiled profile-transition planner is repeatable and leaves portfolio controls and Git unchanged",
+  "the compiled profile-transition planner refuses an already-site project without mutation",
+  "the compiled profile-transition command emits its command-specific malformed-argument refusal",
+  "the compiled profile-transition planner refuses the finite unsafe matrix without mutation",
+  "the compiled apply-profile-transition command completes default and Calendly portfolio transactions",
+  "the compiled profile transition verification failure retains transformed source and old controls",
+  "the compiled apply-profile-transition command refuses representative unsafe inputs without mutation",
+];
+const builderProfileTransitionCertificationTests = [
+  "portfolio-to-site profile transition refuses unsupported target inputs without mutation",
+  "portfolio-to-site profile transition transforms, verifies, persists state last, and stops for final-diff approval",
+  "portfolio-to-site profile transition preserves the optional Calendly capability and settings",
+  "portfolio-to-site profile transition refuses malformed, wrong, and stale plan authority without mutation",
+  "portfolio-to-site profile transition propagates named planner refusals without mutation",
+  "portfolio-to-site profile transition refuses duplicate migration history before writing",
+  "portfolio-to-site profile transition refuses unsafe Git and changed pre-write identity",
+  "portfolio-to-site profile transition refuses an ignored create target before mutation",
+  "portfolio-to-site profile transition contains reader, create-target, and preflight exceptions before writes",
+  "portfolio-to-site profile transition distinguishes uncommitted and partial transform failures",
+  "portfolio-to-site profile transition contains thrown writer exceptions at every persistence boundary",
+  "portfolio-to-site profile transition retains transformed source and old controls on verification or re-inference failure",
+  "portfolio-to-site profile transition contains a thrown verifier exception with the transformed prefix",
+  "portfolio-to-site profile transition maps clock and migration persistence failures to the retained source prefix",
+  "portfolio-to-site profile transition contains a thrown clock exception with the transformed prefix",
+  "portfolio-to-site profile transition retains the migration prefix when its reread fails",
+  "portfolio-to-site profile transition retains an uncertain committed migration append",
+  "portfolio-to-site profile transition retains migration and old state when state persistence fails",
+  "portfolio-to-site profile transition retains migration and old state on state construction failure",
+  "portfolio-to-site profile transition retains an uncertain committed state replacement",
+  "portfolio-to-site profile transition retains the complete persisted prefix when state reread fails",
+  "portfolio-to-site profile transition retains the full persisted prefix on post-state disagreement",
+  "portfolio-to-site profile transition retains the full prefix on post-state state and inference disagreement",
+  "portfolio-to-site profile transition reports final Git and exact-byte failures after persistence",
+  "filesystem-backed portfolio-to-site transition verifies binary baselines without an injected byte reader",
+  "filesystem-backed portfolio-to-site transition rejects changed final binary bytes without an injected byte reader",
+  "filesystem-backed portfolio-to-site transition rejects an ancestor swap during an exact-byte read",
 ];
 
 function successfulTap(testNames) {
@@ -371,6 +414,281 @@ test("standards lifecycle certification rejects a successful zero-match test pro
 test("the standards lifecycle certification command requires one exact revision without echoing rejected values", async () => {
   const execution = await execFileAsync(process.execPath, [
     standardsLifecycleCertificationScript,
+    "--revision",
+    "private-value",
+  ]).catch((error) => error);
+
+  assert.equal(execution.code, 2);
+  assert.equal(execution.stdout, "");
+  assert.deepEqual(JSON.parse(execution.stderr), {
+    ok: false,
+    code: "CERTIFICATION_ARGUMENT_INVALID",
+  });
+  assert.doesNotMatch(execution.stderr, /private-value/u);
+});
+
+test("profile transition lifecycle certification accepts real TAP with nested and unselected skipped tests", async (context) => {
+  const revision = "a".repeat(40);
+  const fixtureRoot = await mkdtemp(
+    join(tmpdir(), "egeria-profile-transition-filtered-tap-"),
+  );
+  context.after(() => rm(fixtureRoot, { recursive: true, force: true }));
+  const fixturePath = join(fixtureRoot, "filtered-evidence.test.mjs");
+  const fixtureTests = compiledProfileTransitionCertificationTests.map(
+    (name, index) =>
+      index === 0
+        ? `test(${JSON.stringify(name)}, async (context) => { await context.test("nested reporter evidence", () => {}); });`
+        : `test(${JSON.stringify(name)}, () => {});`,
+  );
+  await writeFile(
+    fixturePath,
+    [
+      'import test from "node:test";',
+      ...fixtureTests,
+      'test("unselected reporter evidence", { skip: true }, () => {});',
+      "",
+    ].join("\n"),
+  );
+
+  let realTap;
+  const result = await certifyProfileTransitionLifecycleForTesting(
+    { revision },
+    {
+      readCurrentRevision: async () => revision,
+      readRepositoryStatus: async () => "",
+      async runCommand(input) {
+        if (input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs") {
+          const fixtureArguments = input.arguments.slice(0, -1);
+          fixtureArguments.splice(
+            fixtureArguments.indexOf("--test-name-pattern"),
+            2,
+          );
+          const execution = await execFileAsync(
+            input.executable,
+            [...fixtureArguments, fixturePath],
+            { cwd: input.cwd, env: input.environment },
+          );
+          realTap = execution.stdout;
+          return execution;
+        }
+        return { stdout: successfulTap(builderProfileTransitionCertificationTests) };
+      },
+    },
+  );
+
+  assert.match(realTap, /^    # Subtest: nested reporter evidence$/mu);
+  assert.match(realTap, /unselected reporter evidence.*# SKIP/mu);
+  assert.equal(result.ok, true);
+});
+
+test("profile transition lifecycle certification binds the exact revision to causal evidence", async () => {
+  const revision = "a".repeat(40);
+  const commands = [];
+  let revisionReads = 0;
+  let statusReads = 0;
+
+  const result = await certifyProfileTransitionLifecycleForTesting(
+    { revision },
+    {
+      async readCurrentRevision() {
+        revisionReads += 1;
+        return revision;
+      },
+      async readRepositoryStatus() {
+        statusReads += 1;
+        return "";
+      },
+      async runCommand(input) {
+        commands.push(input);
+        return {
+          stdout: successfulTap(
+            input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
+              ? compiledProfileTransitionCertificationTests
+              : builderProfileTransitionCertificationTests,
+          ),
+        };
+      },
+    },
+  );
+
+  assert.equal(revisionReads, 2);
+  assert.equal(statusReads, 2);
+  assert.deepEqual(
+    commands.map(({ executable, arguments: arguments_, cwd, environment }) => ({
+      executable,
+      arguments: arguments_,
+      cwd,
+      secrets: [
+        environment.CLOUDFLARE_API_TOKEN,
+        environment.CLOUDFLARE_ACCOUNT_ID,
+        environment.NPM_TOKEN,
+      ],
+    })),
+    [
+      {
+        executable: process.execPath,
+        arguments: [
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern",
+          "^the compiled (?:profile-transition planner is repeatable and leaves portfolio controls and Git unchanged|profile-transition planner refuses an already-site project without mutation|profile-transition command emits its command-specific malformed-argument refusal|profile-transition planner refuses the finite unsafe matrix without mutation|apply-profile-transition command completes default and Calendly portfolio transactions|profile transition verification failure retains transformed source and old controls|apply-profile-transition command refuses representative unsafe inputs without mutation)$",
+          "apps/cli/tests/cli.test.mjs",
+        ],
+        cwd: repositoryRoot,
+        secrets: [undefined, undefined, undefined],
+      },
+      {
+        executable: process.execPath,
+        arguments: [
+          "--test",
+          "--test-reporter=tap",
+          "--test-name-pattern",
+          "^(?:portfolio-to-site profile transition |filesystem-backed portfolio-to-site transition )",
+          "packages/builder-core/tests/apply-profile-transition.test.mjs",
+        ],
+        cwd: repositoryRoot,
+        secrets: [undefined, undefined, undefined],
+      },
+    ],
+  );
+  assert.deepEqual(result, {
+    ok: true,
+    subject: "profile-transition-lifecycle",
+    evidenceRevision: revision,
+    transition: {
+      fromProfile: "portfolio",
+      fromRecipeVersion: "0.10.0",
+      toProfile: "site",
+      toRecipeVersion: "0.10.0",
+    },
+    migration: "transition-portfolio-0-10-0-to-site-0-10-0",
+    checks: [
+      "compiled-plan-repeatability",
+      "compiled-apply-default",
+      "compiled-apply-calendly",
+      "already-current-refusal",
+      "unsafe-and-malformed-refusal",
+      "verification-failure-prefix",
+      "transformation-failure-prefix",
+      "verification-and-reinference-prefix",
+      "migration-persistence-prefix",
+      "state-persistence-prefix",
+      "post-state-prefix",
+      "final-diff-and-byte-inspection",
+      "exact-resultant-state",
+    ],
+  });
+});
+
+test("profile transition lifecycle certification fails closed on revision, status, and command drift", async () => {
+  const revision = "a".repeat(40);
+  await assert.rejects(
+    certifyProfileTransitionLifecycleForTesting(
+      { revision },
+      {
+        readCurrentRevision: async () => "b".repeat(40),
+        readRepositoryStatus: async () => "",
+        runCommand: async () => assert.fail("drift must stop before execution"),
+      },
+    ),
+    (error) => error?.code === "EVIDENCE_REVISION_MISMATCH",
+  );
+
+  await assert.rejects(
+    certifyProfileTransitionLifecycleForTesting(
+      { revision },
+      {
+        readCurrentRevision: async () => revision,
+        readRepositoryStatus: async () => " M private-source.ts\0",
+        runCommand: async () => assert.fail("dirty input must not execute"),
+      },
+    ),
+    (error) => error?.code === "EVIDENCE_WORKTREE_DIRTY",
+  );
+
+  await assert.rejects(
+    certifyProfileTransitionLifecycleForTesting(
+      { revision },
+      {
+        readCurrentRevision: async () => revision,
+        readRepositoryStatus: async () => "",
+        runCommand: async () => {
+          throw new Error("private output");
+        },
+      },
+    ),
+    (error) => error?.code === "LIFECYCLE_EVIDENCE_FAILED",
+  );
+
+  let statusReads = 0;
+  let commandRuns = 0;
+  await assert.rejects(
+    certifyProfileTransitionLifecycleForTesting(
+      { revision },
+      {
+        readCurrentRevision: async () => revision,
+        readRepositoryStatus: async () => {
+          statusReads += 1;
+          return statusReads === 1 ? "" : "?? unexpected-source.ts\0";
+        },
+        runCommand: async (input) => {
+          commandRuns += 1;
+          return {
+            stdout: successfulTap(
+              input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
+                ? compiledProfileTransitionCertificationTests
+                : builderProfileTransitionCertificationTests,
+            ),
+          };
+        },
+      },
+    ),
+    (error) => error?.code === "EVIDENCE_WORKTREE_DIRTY",
+  );
+  assert.equal(commandRuns, 2);
+  assert.equal(statusReads, 2);
+});
+
+test("profile transition lifecycle certification rejects zero-match, selected-skip, and malformed TAP", async () => {
+  const revision = "a".repeat(40);
+  const invalidOutputs = [
+    ["TAP version 13", "1..0", "# tests 0", "# pass 0", "# fail 0", ""].join("\n"),
+    [
+      "TAP version 13",
+      ...compiledProfileTransitionCertificationTests.flatMap((name, index) => [
+        `# Subtest: ${name}`,
+        index === 0
+          ? `ok ${index + 1} - ${name} # SKIP selected evidence`
+          : `ok ${index + 1} - ${name}`,
+      ]),
+      `1..${compiledProfileTransitionCertificationTests.length}`,
+      `# tests ${compiledProfileTransitionCertificationTests.length}`,
+      `# pass ${compiledProfileTransitionCertificationTests.length - 1}`,
+      "# fail 0",
+      "# skipped 1",
+      "",
+    ].join("\n"),
+    "not TAP\n",
+  ];
+
+  for (const stdout of invalidOutputs) {
+    await assert.rejects(
+      certifyProfileTransitionLifecycleForTesting(
+        { revision },
+        {
+          readCurrentRevision: async () => revision,
+          readRepositoryStatus: async () => "",
+          runCommand: async () => ({ stdout }),
+        },
+      ),
+      (error) => error?.code === "LIFECYCLE_EVIDENCE_FAILED",
+    );
+  }
+});
+
+test("the profile transition lifecycle certification command requires one exact revision without echoing rejected values", async () => {
+  const execution = await execFileAsync(process.execPath, [
+    profileTransitionLifecycleCertificationScript,
     "--revision",
     "private-value",
   ]).catch((error) => error);
