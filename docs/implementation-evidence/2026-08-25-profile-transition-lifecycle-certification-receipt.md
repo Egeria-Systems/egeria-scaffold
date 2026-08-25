@@ -4,13 +4,13 @@
 
 **Certification subject:** exact repository transition from `portfolio@0.10.0` to `site@0.10.0`
 
-**Evidence revision:** `2650a9a5039f6b94d7d0c26dcc3d255ff6e6e579`
+**Evidence revision:** `e62cfe064020bf05a0f1e5519a524da49cfc164d`
 
 **Accepted implementation base:** `main@83dd4aa391af23106cc5479fafbeb184b89e4565`, containing merged pull request 53 and its accepted standards lifecycle certification
 
 **Migration:** `transition-portfolio-0-10-0-to-site-0-10-0`
 
-**Evidence command:** `pnpm run verify:profile-transition-lifecycle-certification -- --revision 2650a9a5039f6b94d7d0c26dcc3d255ff6e6e579`
+**Evidence command:** `pnpm run verify:profile-transition-lifecycle-certification -- --revision e62cfe064020bf05a0f1e5519a524da49cfc164d`
 
 **Result:** `passed`
 
@@ -18,7 +18,7 @@ This content-safe receipt records the successful local transition certificate. T
 
 ## Revision and runner binding
 
-The runner required the exact 40-character evidence revision and an empty staged, tracked, and non-ignored-untracked Git status before and after both evidence commands. Revision or status drift, malformed arguments, a command failure, malformed TAP, zero selected tests, an absent expected name, or a selected skipped or todo test fails the certificate.
+The runner required the exact 40-character evidence revision, an empty staged, tracked, and non-ignored-untracked Git status, and ordinary tracked index entries before and after both evidence commands. It rejected Git `assume-unchanged` and `skip-worktree` flags so they could not hide changed evidence from porcelain status. Revision, status, or index-flag drift, malformed arguments, a command failure, malformed TAP, zero selected tests, an absent expected name, or a selected skipped or todo test fails the certificate.
 
 The certificate selected exactly seven compiled CLI tests from `apps/cli/tests/cli.test.mjs` and 27 operation-specific transition tests from `packages/builder-core/tests/apply-profile-transition.test.mjs`. It used the Node.js TAP reporter, parsed only unindented top-level results as selected evidence, tolerated nested results and unrelated skipped tests, and required the exact expected top-level passed-test order. Both selections passed.
 
