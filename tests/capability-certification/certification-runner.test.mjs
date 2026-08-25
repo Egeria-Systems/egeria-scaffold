@@ -167,6 +167,7 @@ test("standards lifecycle certification binds the exact revision to causal compi
         executable: process.execPath,
         arguments: [
           "--test",
+          "--test-reporter=tap",
           "--test-name-pattern",
           "^the compiled (?:plan-upgrade command plans both profiles without changing any byte|apply-upgrade command completes the exact portfolio and site transactions|standards upgrade verification failure retains transformed source and old controls|plan-upgrade command refuses unsafe or unsupported repository states without writes|apply-upgrade command refuses the finite unsafe matrix without mutation)$",
           "apps/cli/tests/cli.test.mjs",
@@ -184,6 +185,7 @@ test("standards lifecycle certification binds the exact revision to causal compi
         executable: process.execPath,
         arguments: [
           "--test",
+          "--test-reporter=tap",
           "--test-name-pattern",
           "^standards capability upgrade ",
           "packages/builder-core/tests/apply-capability-upgrade.test.mjs",

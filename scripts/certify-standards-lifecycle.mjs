@@ -205,6 +205,7 @@ export async function certifyStandardsLifecycleForTesting(input = {}, adapters) 
   await requireCleanRepository(adapters);
   await runEvidenceCommand(adapters, [
     "--test",
+    "--test-reporter=tap",
     "--test-name-pattern",
     compiledCliPattern,
     "apps/cli/tests/cli.test.mjs",
@@ -214,6 +215,7 @@ export async function certifyStandardsLifecycleForTesting(input = {}, adapters) 
   ]);
   await runEvidenceCommand(adapters, [
     "--test",
+    "--test-reporter=tap",
     "--test-name-pattern",
     "^standards capability upgrade ",
     "packages/builder-core/tests/apply-capability-upgrade.test.mjs",
