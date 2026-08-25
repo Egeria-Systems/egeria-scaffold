@@ -1477,3 +1477,35 @@ test("the certification entry accepts retained output syntax before safe root va
   );
   assert.doesNotMatch(result.stderr, /private-relative|calendly\.com/u);
 });
+
+test("the certification entry accepts the conventional package-script separator", async () => {
+  let result;
+  try {
+    await execFileAsync(process.execPath, [
+      certificationScript,
+      "--",
+      "--output-root",
+      "private-relative-output",
+      "--calendly-url",
+      "https://calendly.com/example/private-value",
+    ], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    });
+    assert.fail("relative retained output must fail");
+  } catch (error) {
+    result = error;
+  }
+
+  assert.equal(result.code, 1);
+  assert.equal(result.stdout, "");
+  assert.equal(
+    result.stderr,
+    `${JSON.stringify({
+      ok: false,
+      code: "CERTIFICATION_OUTPUT_ROOT_INVALID",
+    })}\n`,
+  );
+  assert.doesNotMatch(result.stderr, /private-relative|calendly\.com/u);
+});

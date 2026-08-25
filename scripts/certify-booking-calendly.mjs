@@ -420,13 +420,15 @@ export async function certifyBookingCalendlyForTesting(input = {}, adapters) {
 }
 
 function parseArguments(arguments_) {
-  if (arguments_.length === 0) return {};
-  if (arguments_.length % 2 !== 0) return undefined;
+  const normalizedArguments =
+    arguments_[0] === "--" ? arguments_.slice(1) : arguments_;
+  if (normalizedArguments.length === 0) return {};
+  if (normalizedArguments.length % 2 !== 0) return undefined;
 
   const result = {};
-  for (let index = 0; index < arguments_.length; index += 2) {
-    const name = arguments_[index];
-    const value = arguments_[index + 1];
+  for (let index = 0; index < normalizedArguments.length; index += 2) {
+    const name = normalizedArguments[index];
+    const value = normalizedArguments[index + 1];
     if (value === undefined) return undefined;
     if (name === "--calendly-url" && result.calendlyUrl === undefined) {
       result.calendlyUrl = value;
