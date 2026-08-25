@@ -161,13 +161,21 @@ function hasExactPassedTests(stdout, expectedTests) {
     .flatMap((line) =>
       line.startsWith("# Subtest: ") ? [line.slice("# Subtest: ".length)] : [],
     );
+  const summaryCounts = new Map(
+    stdout.split("\n").flatMap((line) => {
+      const match = /^# (tests|pass|fail) ([0-9]+)$/u.exec(line);
+      return match === null ? [] : [[match[1], Number(match[2])]];
+    }),
+  );
+  const totalTests = summaryCounts.get("tests");
   return (
     observedTests.length === expectedTests.length &&
     observedTests.every((name, index) => name === expectedTests[index]) &&
     stdout.includes(`\n1..${expectedTests.length}\n`) &&
-    stdout.includes(`\n# tests ${expectedTests.length}\n`) &&
-    stdout.includes(`\n# pass ${expectedTests.length}\n`) &&
-    stdout.includes("\n# fail 0\n")
+    totalTests !== undefined &&
+    totalTests >= expectedTests.length &&
+    summaryCounts.get("pass") === totalTests &&
+    summaryCounts.get("fail") === 0
   );
 }
 

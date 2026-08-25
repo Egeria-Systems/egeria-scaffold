@@ -118,6 +118,57 @@ function successfulTap(testNames) {
   ].join("\n");
 }
 
+test("standards lifecycle certification accepts real filtered TAP with passing nested subtests", async (context) => {
+  const revision = "a".repeat(40);
+  const fixtureRoot = await mkdtemp(
+    join(tmpdir(), "egeria-standards-filtered-tap-"),
+  );
+  context.after(() => rm(fixtureRoot, { recursive: true, force: true }));
+  const fixturePath = join(fixtureRoot, "filtered-evidence.test.mjs");
+  const fixtureTests = compiledUpgradeCertificationTests.map((name, index) =>
+    index === 0
+      ? `test(${JSON.stringify(name)}, async (context) => { await context.test("nested reporter evidence", () => {}); });`
+      : `test(${JSON.stringify(name)}, () => {});`,
+  );
+  await writeFile(
+    fixturePath,
+    [
+      'import test from "node:test";',
+      ...fixtureTests,
+      'test("unselected reporter evidence", () => {});',
+      "",
+    ].join("\n"),
+  );
+
+  let realTap;
+  const result = await certifyStandardsLifecycleForTesting(
+    { revision },
+    {
+      readCurrentRevision: async () => revision,
+      readRepositoryStatus: async () => "",
+      async runCommand(input) {
+        if (input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs") {
+          const execution = await execFileAsync(
+            input.executable,
+            [...input.arguments.slice(0, -1), fixturePath],
+            {
+              cwd: input.cwd,
+              env: input.environment,
+            },
+          );
+          realTap = execution.stdout;
+          return execution;
+        }
+        if (input.arguments[0] !== "--test") return { stdout: "{}\n" };
+        return { stdout: successfulTap(builderUpgradeCertificationTests) };
+      },
+    },
+  );
+
+  assert.match(realTap, /^    # Subtest: nested reporter evidence$/mu);
+  assert.equal(result.ok, true);
+});
+
 test("standards lifecycle certification binds the exact revision to causal compiled evidence", async () => {
   const revision = "a".repeat(40);
   const commands = [];
