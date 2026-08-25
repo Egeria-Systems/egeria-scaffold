@@ -25,11 +25,11 @@ const observabilityEvidencePath =
 const observabilityEvidenceRevision =
   "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad";
 const standardsPlanPath =
-  "docs/superpowers/plans/2026-08-19-generated-visual-regression-certification.md";
+  "docs/superpowers/plans/2026-08-25-standards-lifecycle-certification.md";
 const standardsEvidencePath =
-  "docs/implementation-evidence/2026-08-20-generated-visual-regression-certification-receipt.md";
+  "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md";
 const standardsEvidenceRevision =
-  "416e2c2441978ac86f3a17dee96a694141033e20";
+  "d7f9dac6e25d5dde32015968d0912b45e73644e7";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const deploymentEvidencePath =
@@ -478,11 +478,12 @@ test("material observability diagnostics have exact reviewed certification evide
   );
 });
 
-test("material visual testing changes have exact accepted certification evidence", () => {
+test("standards has exact accepted fresh-scaffold and lifecycle evidence", () => {
   const standardsDescriptor = descriptorsByIdentifier.get("standards");
   assert.notEqual(standardsDescriptor, undefined);
 
   const subject = core.createCertificationSubject(standardsDescriptor, [
+    "existing-repository-lifecycle",
     "fresh-scaffold",
   ]);
 
@@ -493,42 +494,43 @@ test("material visual testing changes have exact accepted certification evidence
   );
   assert.deepEqual(committedRegistry.records.standards, {
     subject,
-    requiredEvidence: ["fresh-scaffold"],
+    requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
     status: "certified",
     taskPlan: standardsPlanPath,
-    evidence: [
-      {
-        kind: "fresh-scaffold",
+    evidence: ["existing-repository-lifecycle", "fresh-scaffold"].map(
+      (kind) => ({
+        kind,
         path: standardsEvidencePath,
         outcome: "passed",
         revision: standardsEvidenceRevision,
         subject,
-      },
-    ],
+      }),
+    ),
   });
 });
 
-test("accepted visual standards receipt binds the reviewed fresh-scaffold outcome", () => {
+test("accepted standards receipt binds the reviewed fresh-scaffold and lifecycle outcomes", () => {
   const standardsDescriptor = descriptorsByIdentifier.get("standards");
   assert.notEqual(standardsDescriptor, undefined);
 
   const subject = core.createCertificationSubject(standardsDescriptor, [
+    "existing-repository-lifecycle",
     "fresh-scaffold",
   ]);
   const acceptedRecord = {
     subject,
-    requiredEvidence: ["fresh-scaffold"],
+    requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
     status: "certified",
     taskPlan: standardsPlanPath,
-    evidence: [
-      {
-        kind: "fresh-scaffold",
+    evidence: ["existing-repository-lifecycle", "fresh-scaffold"].map(
+      (kind) => ({
+        kind,
         path: standardsEvidencePath,
         outcome: "passed",
         revision: standardsEvidenceRevision,
         subject,
-      },
-    ],
+      }),
+    ),
   };
   const acceptedReceiptUrl = new URL(
     `../../../${standardsEvidencePath}`,

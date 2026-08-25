@@ -32,7 +32,7 @@ const expectedVerificationChecks = Object.freeze([
 const subject = Object.freeze({
   descriptorVersion: "0.4.0",
   behaviorContractDigest:
-    "sha256:8733f70cdc64134232912c691c6922b27defb8cb7c2871faa334cfad2b394643",
+    "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4",
 });
 
 export class GeneratedTestingCertificationError extends Error {
