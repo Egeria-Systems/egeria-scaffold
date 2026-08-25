@@ -2801,7 +2801,7 @@ test("canonical documentation records visual regression and the client-ready clo
   );
 });
 
-test("canonical documentation accepts profile-transition planning and bounds its exact executor candidate", async () => {
+test("canonical documentation accepts profile-transition execution and bounds its internal lifecycle extraction", async () => {
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3B");
   const [
@@ -2854,7 +2854,7 @@ test("canonical documentation accepts profile-transition planning and bounds its
     );
     assert.match(
       sequencingOwner,
-      /apply-remove[^\n]+verified-final-diff[^\n]+separate[^\n]+approval/iu,
+      /(?:verified-final-diff[^\n]+separate[^\n]+approval|separate[^\n]+verified-final-diff[^\n]+approval)/iu,
     );
   }
 
@@ -2898,7 +2898,7 @@ test("canonical documentation accepts profile-transition planning and bounds its
     );
     assert.match(
       boundaryOwner,
-      /existing-repository transformation[^\n]+migration append[^\n]+state-last persistence/iu,
+      /(?:existing-repository[^\n]+(?:migration append|appends the migration)[^\n]+(?:state-last persistence|persists state last)|prepare one canonical appended successful migration record[^\n]+write `\.egeria\/migrations\.jsonl`[^\n]+write `\.egeria\/state\.json` last)/iu,
     );
     assert.match(
       boundaryOwner,
@@ -2906,17 +2906,17 @@ test("canonical documentation accepts profile-transition planning and bounds its
     );
     assert.match(
       boundaryOwner,
-      /apply-profile-transition[^\n]+(?:candidate|pending[^\n]+integration)|candidate[^\n]+apply-profile-transition/iu,
+      /apply-profile-transition[^\n]+(?:pull request 50|accepted|641db9537f5dea4911b0b727eb083f8d6d359204)/iu,
     );
     assert.match(
       boundaryOwner,
-      /Generic lifecycle[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+      /generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
     );
   }
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+exact Calendly addition\/removal and standards upgrade transactions[^\n]+candidate[^\n]+portfolio-to-site execution[^\n]+pending accepted-main integration[^\n]+generic lifecycle transformation[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+provider\/data\/credential cleanup/iu,
+    /Existing-repository mutation[^\n]+exact Calendly addition\/removal[^\n]+standards upgrade[^\n]+portfolio-to-site transactions[^\n]+internal extraction[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+provider\/data\/credential cleanup/iu,
   );
   assert.match(
     overview,
@@ -2933,7 +2933,7 @@ test("canonical documentation accepts profile-transition planning and bounds its
   );
   assert.match(
     capabilityModel,
-    /apply-remove[^\n]+standards executor[^\n]+accepted-main integrated[^\n]+portfolio-to-site planning[^\n]+accepted-main integrated[^\n]+apply-profile-transition[^\n]+pending[^\n]+candidate[^\n]+integration[^\n]+Generic lifecycle transformation[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+    /Pull requests 48, 49, and 50[^\n]+standards executor[^\n]+portfolio-to-site planner\/executor[^\n]+accepted-main integrated[^\n]+641db9537f5dea4911b0b727eb083f8d6d359204[^\n]+private migration-log[^\n]+state-control persistence[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
   );
   assert.match(
     enforcementMap,
@@ -2945,15 +2945,23 @@ test("canonical documentation accepts profile-transition planning and bounds its
   );
   assert.match(
     enforcementMap,
-    /INV-STATE-UPDATE-ORDER[^\n]+exact Calendly addition and removal transactions[^\n]+migration-before-state persistence[^\n]+final manifest\/state\/inference agreement/iu,
+    /INV-STATE-UPDATE-ORDER[^\n]+exact Calendly addition\/removal[^\n]+migration-before-state persistence[^\n]+final manifest\/state\/inference agreement/iu,
   );
   assert.match(
     capabilityModel,
-    /implemented[^\n]+apply-remove[^\n]+accepted[^\n]+plan-remove[^\n]+fingerprint/iu,
+    /implemented existing-repository boundary[^\n]+apply-remove/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /Exact `apply-remove`[^\n]+accepted-main integrated/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /Removal planning[^\n]+fingerprint/iu,
   );
   assert.match(
     enforcementMap,
-    /INV-STATE-UPDATE-ORDER[^\n]+actual[^\n]+exact Calendly addition and removal transactions/iu,
+    /INV-STATE-UPDATE-ORDER[^\n]+actual[^\n]+exact Calendly addition\/removal/iu,
   );
 
   assert.match(
@@ -3060,7 +3068,7 @@ test("canonical documentation accepts profile-transition planning and bounds its
   );
   assert.match(
     enforcementMap,
-    /INV-STATE-UPDATE-ORDER[^\n]+standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+migration-before-state[^\n]+verified-final-diff/iu,
+    /INV-STATE-UPDATE-ORDER[^\n]+standards upgrade[^\n]+migration-before-state[^\n]+verified-final-diff/iu,
   );
   for (const candidateOwner of [sourcePlan, capabilityModel, enforcementMap]) {
     assert.match(
@@ -3112,7 +3120,7 @@ test("canonical documentation accepts profile-transition planning and bounds its
   ]) {
     assert.match(
       transitionConsumer,
-      /plan-profile-transition[^\n]+portfolio[^\n]+site/iu,
+      /plan-profile-transition[^\n]+portfolio[^\n]+site|portfolio[^\n]+site[^\n]+plan-profile-transition/iu,
     );
     assert.match(
       transitionConsumer,
@@ -3152,10 +3160,41 @@ test("canonical documentation accepts profile-transition planning and bounds its
     );
   }
 
+  for (const acceptedTransitionExecutorOwner of [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+    packageOwnership,
+  ]) {
+    assert.match(
+      acceptedTransitionExecutorOwner,
+      /pull request(?: 50|s 48, 49, and 50)[^\n]+main@641db9537f5dea4911b0b727eb083f8d6d359204/iu,
+    );
+  }
+  assert.match(
+    enforcementMap,
+    /INV-SUPPORTED-PROFILE-TRANSITION[^\n]+actual and accepted[^\n]+pull request 50/iu,
+  );
+
+  for (const extractionOwner of [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+    packageOwnership,
+    enforcementMap,
+  ]) {
+    assert.match(
+      extractionOwner,
+      /private[^\n]+(?:migration-log[^\n]+state-control|control-persistence|control persistence|shared control)/iu,
+    );
+  }
+
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.match(
       sequencingOwner,
-      /minimum seven remaining increments/iu,
+      /minimum six remaining increments/iu,
     );
     assert.match(
       sequencingOwner,
@@ -3177,13 +3216,17 @@ test("canonical documentation accepts profile-transition planning and bounds its
   }
 
   for (const responsibility of [
-    /1\. perform one evidence-gated internal lifecycle extraction[^\n]+accepted add[^\n]+removal[^\n]+upgrade[^\n]+transition/iu,
-    /2\. run one `booking-calendly@0\.1\.0` lifecycle certification increment[^\n]+add-remove-re-add[^\n]+refusal[^\n]+recovery[^\n]+protected-staging journey/iu,
-    /3\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
-    /4\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
+    /1\. run one `booking-calendly@0\.1\.0` lifecycle certification increment[^\n]+add-remove-re-add[^\n]+refusal[^\n]+recovery[^\n]+protected-staging journey/iu,
+    /2\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
+    /3\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
   ]) {
     assert.match(roadmap, responsibility);
   }
+
+  assert.match(
+    sourcePlan,
+    /Evidence-gated internal lifecycle extraction boundary[^]+private to `packages\/builder-core`[^]+not a generic lifecycle executor or public API/iu,
+  );
 
   assert.match(
     enforcementMap,
