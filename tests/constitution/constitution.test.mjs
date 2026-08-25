@@ -1584,7 +1584,7 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
   assert.deepEqual(workflow.on.workflow_dispatch.inputs, {
     expected_revision: {
-      description: "Exact main revision approved for certification",
+      description: "Exact reviewed revision approved for certification",
       required: true,
       type: "string",
     },
@@ -1614,12 +1614,33 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   const stepsByName = Object.fromEntries(
     job.steps.map((step) => [step.name, step]),
   );
-  const certificationRoot =
-    "${{ runner.temp }}/booking-calendly-certification/project";
-  assert.deepEqual(stepsByName["Create deployment candidate"].env, {
-    CALENDLY_URL: "${{ inputs.calendly_url }}",
-    CERTIFICATION_ROOT: certificationRoot,
-  });
+  const certificationOwner =
+    "${{ runner.temp }}/booking-calendly-certification";
+  const certificationRoot = `${certificationOwner}/project`;
+  assert.deepEqual(
+    stepsByName["Create fresh-added deployment candidate"].env,
+    {
+      CALENDLY_URL: "${{ inputs.calendly_url }}",
+      CERTIFICATION_OWNER: certificationOwner,
+    },
+  );
+  assert.equal(stepsByName["Build builder"].run, "pnpm run build:builder");
+  assert.equal(
+    stepsByName["Test compiled lifecycle behavior"].run,
+    "pnpm run test:cli",
+  );
+  assert.match(
+    stepsByName["Create fresh-added deployment candidate"].run,
+    /node scripts\/certify-booking-calendly\.mjs --calendly-url "\$CALENDLY_URL" --output-root "\$CERTIFICATION_OWNER"/u,
+  );
+  assert.doesNotMatch(
+    stepsByName["Create fresh-added deployment candidate"].run,
+    /pnpm run verify:booking-calendly-certification/u,
+  );
+  assert.doesNotMatch(
+    stepsByName["Create fresh-added deployment candidate"].run,
+    /apps\/cli\/dist\/index\.js create/u,
+  );
   assert.deepEqual(stepsByName["Build and prepare deployment candidate"].env, {
     CERTIFICATION_ROOT: certificationRoot,
   });
@@ -1673,6 +1694,15 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   const deployIndex = job.steps.findIndex(
     ({ name }) => name === "Deploy certification Worker",
   );
+  const candidateIndex = job.steps.findIndex(
+    ({ name }) => name === "Create fresh-added deployment candidate",
+  );
+  const builderBuildIndex = job.steps.findIndex(
+    ({ name }) => name === "Build builder",
+  );
+  const lifecycleTestIndex = job.steps.findIndex(
+    ({ name }) => name === "Test compiled lifecycle behavior",
+  );
   const unitTestIndex = job.steps.findIndex(
     ({ name }) => name === "Test deployment candidate unit behavior",
   );
@@ -1687,7 +1717,10 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   );
   assert.ok(
     revisionIndex > -1 &&
-      revisionIndex < unitTestIndex &&
+      revisionIndex < builderBuildIndex &&
+      builderBuildIndex < lifecycleTestIndex &&
+      lifecycleTestIndex < candidateIndex &&
+      candidateIndex < unitTestIndex &&
       unitTestIndex < componentTestIndex &&
       componentTestIndex < buildIndex &&
       buildIndex < deployIndex,
@@ -1738,11 +1771,10 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   assert.doesNotMatch(source, /^  (?:pull_request|push|schedule):/mu);
   assert.doesNotMatch(source, /wrangler delete|calendly\.com\/api|provider token/iu);
 
-  const projectName =
-    stepsByName["Create deployment candidate"].run.match(
-      /--name ([a-z][a-z0-9-]+)/u,
-    )?.[1];
-  assert.equal(projectName, "acme-portfolio-calendly");
+  assert.match(
+    stepsByName["Create fresh-added deployment candidate"].run,
+    /booking-calendly-local-receipt\.json/u,
+  );
   assert.match(wranglerTemplate, /"name": "\{\{workerName\}\}"/u);
   assert.match(
     renderingSource,
@@ -2291,7 +2323,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /standards@0\.4\.0[^\n]+certified[^\n]+416e2c2441978ac86f3a17dee96a694141033e20[^\n]+booking-calendly@0\.1\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
+    /standards@0\.4\.0[^\n]+certified[^\n]+416e2c2441978ac86f3a17dee96a694141033e20[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2299,7 +2331,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+passes[^\n]+all-certified[^\n]+rejects only[^\n]+three[^\n]+backfill-pending/i,
+    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+pass[^\n]+all-certified[^\n]+rejects only[^\n]+backfill records/i,
   );
 });
 
@@ -2438,20 +2470,78 @@ test("executable capability certification ownership is current", async () => {
 
   for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
     assert.match(document, /certifications\/capabilities\.json/u);
-    assert.match(document, /booking-calendly[\s\S]+certified/iu);
-  }
-  for (const document of [capabilityModel, enforcementMap]) {
     assert.match(
       document,
-      /booking-calendly[\s\S]+certified[\s\S]+provider-confirmed[\s\S]+cleanup/iu,
+      /booking-calendly[^\n]+(?:active|current)[^\n]+certified/iu,
     );
   }
+  assert.match(
+    capabilityModel,
+    /booking-calendly[^\n]+certified[^\n]+fresh-add lifecycle[^\n]+protected-staging\/provider receipts/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /booking-calendly[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+provider-confirmed[^\n]+cleanup[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d/iu,
+  );
   const registry = JSON.parse(registrySource);
   const bookingRecord = registry.records["booking-calendly"];
   const deploymentRecord = registry.records["deployment-cloudflare"];
   const observabilityRecord = registry.records.observability;
   const standardsRecord = registry.records.standards;
   assert.equal(bookingRecord.status, "certified");
+  assert.equal(
+    bookingRecord.taskPlan,
+    "docs/superpowers/plans/2026-08-24-booking-calendly-lifecycle-certification.md",
+  );
+  assert.deepEqual(bookingRecord.requiredEvidence, [
+    "cleanup-recovery",
+    "deployed-application",
+    "existing-repository-lifecycle",
+    "fresh-scaffold",
+    "provider-confirmed",
+  ]);
+  const bookingSubject = {
+    descriptorVersion: "0.1.0",
+    behaviorContractDigest:
+      "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2",
+  };
+  assert.deepEqual(bookingRecord.evidence, [
+    {
+      kind: "cleanup-recovery",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
+      outcome: "passed",
+      revision: "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
+      subject: bookingSubject,
+    },
+    {
+      kind: "deployed-application",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
+      outcome: "passed",
+      revision: "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
+      subject: bookingSubject,
+    },
+    {
+      kind: "existing-repository-lifecycle",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md",
+      outcome: "passed",
+      revision: "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059",
+      subject: bookingSubject,
+    },
+    {
+      kind: "fresh-scaffold",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md",
+      outcome: "passed",
+      revision: "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059",
+      subject: bookingSubject,
+    },
+    {
+      kind: "provider-confirmed",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
+      outcome: "passed",
+      revision: "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
+      subject: bookingSubject,
+    },
+  ]);
   assert.equal(deploymentRecord.status, "certified");
   assert.deepEqual(
     deploymentRecord.evidence.map(({ kind, path, outcome, revision }) => ({
@@ -2515,6 +2605,10 @@ test("executable capability certification ownership is current", async () => {
     /recipe `0\.10\.0`[^\n]+standards@0\.4\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0/iu,
   );
   assert.match(
+    rootReadme,
+    /booking-calendly@0\.1\.0[^\n]+fresh-scaffold[^\n]+existing-repository-lifecycle[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+deployed-application[^\n]+provider-confirmed[^\n]+cleanup-recovery[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d/iu,
+  );
+  assert.match(
     capabilityModel,
     /all three Next\.js request-error inputs[^\n]+browser error\/rejection instrumentation[^\n]+five declared application-owned error surfaces[^\n]+app\/error\.tsx[^\n]+app\/global-error\.tsx[^\n]+externalized observability copy[^\n]+typed copy reader[^\n]+pure fallback presentation/iu,
   );
@@ -2566,35 +2660,13 @@ test("executable capability certification ownership is current", async () => {
     packageOwnership,
     /descriptor `standards@0\.4\.0` is certified from accepted fresh-scaffold evidence at revision `416e2c2441978ac86f3a17dee96a694141033e20`[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
   );
-  assert.deepEqual(
-    bookingRecord.evidence.map(({ kind }) => kind),
-    [
-      "cleanup-recovery",
-      "deployed-application",
-      "fresh-scaffold",
-      "provider-confirmed",
-    ],
-  );
-  assert.deepEqual(
-    bookingRecord.evidence
-      .filter(({ kind }) => kind !== "fresh-scaffold")
-      .map(({ path, revision }) => ({ path, revision })),
-    [
-      "cleanup-recovery",
-      "deployed-application",
-      "provider-confirmed",
-    ].map(() => ({
-      path: "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
-      revision: "f9ccb143724b4f1dd7f05a2ee8e3219c224d5558",
-    })),
+  assert.match(
+    enforcementMap,
+    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+pass[^\n]+all-certified[^\n]+rejects only[^\n]+backfill records/iu,
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+passes[^\n]+all-certified[^\n]+rejects only[^\n]+three[^\n]+backfill-pending/iu,
-  );
-  assert.match(
-    enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified from fresh-scaffold[^\n]+provider-confirmed[^\n]+cleanup/iu,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+provider-confirmed[^\n]+cleanup[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d/iu,
   );
   assert.match(
     reviewProtocol,
@@ -2910,13 +2982,13 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
     assert.match(
       boundaryOwner,
-      /generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+      /generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+remain planned/iu,
     );
   }
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+exact Calendly addition\/removal[^\n]+standards upgrade[^\n]+portfolio-to-site transactions[^\n]+internal extraction[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+provider\/data\/credential cleanup/iu,
+    /Existing-repository mutation[^\n]+exact Calendly addition\/removal[^\n]+standards upgrade[^\n]+portfolio-to-site transactions[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+fresh-add runner[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery/iu,
   );
   assert.match(
     overview,
@@ -2933,7 +3005,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
   );
   assert.match(
     capabilityModel,
-    /Pull requests 48, 49, and 50[^\n]+standards executor[^\n]+portfolio-to-site planner\/executor[^\n]+accepted-main integrated[^\n]+641db9537f5dea4911b0b727eb083f8d6d359204[^\n]+private migration-log[^\n]+state-control persistence[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+later-add certification[^\n]+remain planned/iu,
+    /Pull requests 48, 49, and 50[^\n]+standards executor[^\n]+portfolio-to-site planner\/executor[^\n]+accepted-main integrated[^\n]+641db9537f5dea4911b0b727eb083f8d6d359204[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+selected certification[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+remain planned/iu,
   );
   assert.match(
     enforcementMap,
@@ -3055,7 +3127,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
   ]) {
     assert.doesNotMatch(
       currentStatusOwner,
-      /(?:local|not accepted-main integrated)[^\n]+(?:apply-upgrade|standards executor)|(?:apply-upgrade|standards executor)[^\n]+(?:local|unaccepted|not accepted-main integrated)/iu,
+      /(?:apply-upgrade|standards executor)[^.\n]+(?:\bis\b|\bremains\b)[^.\n]+(?:\blocal\b|unaccepted|not accepted-main integrated)|(?:\blocal\b|unaccepted|not accepted-main integrated)[^.\n]+(?:apply-upgrade|standards executor)[^.\n]+(?:\bis\b|\bremains\b)/iu,
     );
   }
   assert.match(
@@ -3194,12 +3266,13 @@ test("canonical documentation accepts profile-transition execution and bounds it
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.match(
       sequencingOwner,
-      /minimum six remaining increments/iu,
+      /minimum five remaining increments/iu,
     );
     assert.match(
       sequencingOwner,
-      /first fresh-added[^\n]+booking-calendly@0\.1\.0[^\n]+protected-staging journey/iu,
+      /booking-calendly@0\.1\.0[^\n]+lifecycle certification[^\n]+complete/iu,
     );
+    assert.doesNotMatch(sequencingOwner, /minimum six remaining increments/iu);
     for (const backfillSubject of [
       "content-files",
       "section-composition",
@@ -3216,9 +3289,8 @@ test("canonical documentation accepts profile-transition execution and bounds it
   }
 
   for (const responsibility of [
-    /1\. run one `booking-calendly@0\.1\.0` lifecycle certification increment[^\n]+add-remove-re-add[^\n]+refusal[^\n]+recovery[^\n]+protected-staging journey/iu,
-    /2\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
-    /3\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
+    /1\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
+    /2\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
   ]) {
     assert.match(roadmap, responsibility);
   }

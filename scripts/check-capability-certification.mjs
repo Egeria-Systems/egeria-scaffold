@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { isDeepStrictEqual, promisify } from "node:util";
 
 import {
   certificationRegistrySchema,
@@ -84,9 +84,101 @@ async function revisionIsInCheckedHistory(revision) {
   }
 }
 
+async function readAcceptedBaselineRegistry() {
+  const options = {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: { PATH: process.env.PATH },
+    windowsHide: true,
+  };
+
+  try {
+    const { stdout: baselineRevisionOutput } = await executeFile(
+      "git",
+      ["merge-base", "HEAD", "refs/remotes/origin/main"],
+      options,
+    );
+    const baselineRevision = baselineRevisionOutput.trim();
+    const { stdout: registryOutput } = await executeFile(
+      "git",
+      ["show", `${baselineRevision}:certifications/capabilities.json`],
+      options,
+    );
+    const registry = validateContract(
+      certificationRegistrySchema,
+      JSON.parse(registryOutput),
+    );
+    return registry.ok
+      ? { registry: registry.value, revision: baselineRevision }
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function readChangedPaths(baselineRevision) {
+  const options = {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: { PATH: process.env.PATH },
+    windowsHide: true,
+  };
+
+  try {
+    const { stdout } = await executeFile(
+      "git",
+      ["diff", "--name-only", "--no-renames", "-z", baselineRevision, "--"],
+      options,
+    );
+    return new Set(stdout.split("\0").filter(Boolean));
+  } catch {
+    return undefined;
+  }
+}
+
+function recordReferencesChangedArtifact(record, changedPaths) {
+  return (
+    (record.taskPlan !== null && changedPaths.has(record.taskPlan)) ||
+    record.evidence.some((evidence) => changedPaths.has(evidence.path))
+  );
+}
+
+function selectChangedCertificationRecords(
+  registry,
+  baselineRegistry,
+  changedPaths,
+) {
+  if (
+    baselineRegistry === undefined ||
+    changedPaths === undefined ||
+    baselineRegistry.schemaVersion !== registry.schemaVersion
+  ) {
+    return registry;
+  }
+
+  return {
+    ...registry,
+    records: Object.fromEntries(
+      Object.entries(registry.records).filter(
+        ([identifier, record]) =>
+          !isDeepStrictEqual(record, baselineRegistry.records[identifier]) ||
+          recordReferencesChangedArtifact(record, changedPaths),
+      ),
+    ),
+  };
+}
+
 async function validatePrivateArtifacts(registry) {
+  const acceptedBaseline = await readAcceptedBaselineRegistry();
+  const selectedRegistry = selectChangedCertificationRecords(
+    registry,
+    acceptedBaseline?.registry,
+    acceptedBaseline === undefined
+      ? undefined
+      : await readChangedPaths(acceptedBaseline.revision),
+  );
   const artifactPaths = new Set();
-  for (const record of Object.values(registry.records)) {
+  for (const record of Object.values(selectedRegistry.records)) {
     if (record.taskPlan !== null) {
       artifactPaths.add(record.taskPlan);
     }
@@ -103,7 +195,7 @@ async function validatePrivateArtifacts(registry) {
   );
   const evidenceRevisions = [
     ...new Set(
-      Object.values(registry.records).flatMap((record) =>
+      Object.values(selectedRegistry.records).flatMap((record) =>
         record.evidence.map((evidence) => evidence.revision),
       ),
     ),
@@ -119,11 +211,14 @@ async function validatePrivateArtifacts(registry) {
     .filter(({ valid }) => valid)
     .map(({ revision }) => revision);
 
-  return validateCertificationArtifacts({
-    registry,
-    artifacts,
-    validRevisions,
-  });
+  return {
+    result: validateCertificationArtifacts({
+      registry: selectedRegistry,
+      artifacts,
+      validRevisions,
+    }),
+    recordCount: Object.keys(selectedRegistry.records).length,
+  };
 }
 
 async function runMain() {
@@ -154,11 +249,11 @@ async function runMain() {
 
   if (command.kind === "artifacts") {
     const artifactValidation = await validatePrivateArtifacts(registry.value);
-    if (!artifactValidation.ok) {
+    if (!artifactValidation.result.ok) {
       writeStandard({
         ok: false,
         gate: "artifacts",
-        issues: artifactValidation.issues,
+        issues: artifactValidation.result.issues,
       });
       process.exitCode = 1;
       return;
@@ -166,7 +261,7 @@ async function runMain() {
     writeStandard({
       ok: true,
       gate: "artifacts",
-      records: Object.keys(registry.value.records).length,
+      records: artifactValidation.recordCount,
     });
     return;
   }

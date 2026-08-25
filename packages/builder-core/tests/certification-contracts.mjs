@@ -2,6 +2,7 @@ export const requiredEvidence = Object.freeze({
   "booking-calendly": Object.freeze([
     "cleanup-recovery",
     "deployed-application",
+    "existing-repository-lifecycle",
     "fresh-scaffold",
     "provider-confirmed",
   ]),

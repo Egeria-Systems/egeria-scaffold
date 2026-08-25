@@ -13,7 +13,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
@@ -406,6 +406,30 @@ async function listTree(root) {
 
   await visit(root, "");
   return snapshot;
+}
+
+async function listCalendlyReferencePaths(root, relativeDirectory = "") {
+  const matches = [];
+  const directory = join(root, relativeDirectory);
+  const entries = await readdir(directory, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const relativePath = join(relativeDirectory, entry.name);
+    if (relativePath === ".git" || entry.name === "node_modules") continue;
+    if (entry.isDirectory()) {
+      matches.push(...(await listCalendlyReferencePaths(root, relativePath)));
+      continue;
+    }
+    if (!entry.isFile()) continue;
+
+    const source = await readFile(join(root, relativePath));
+    if (source.includes(0)) continue;
+    if (/booking-calendly|calendly/iu.test(source.toString("utf8"))) {
+      matches.push(relativePath.split(sep).join("/"));
+    }
+  }
+
+  return matches.toSorted();
 }
 
 async function executeNode(arguments_) {
@@ -4574,10 +4598,25 @@ test("the compiled CLI completes exact add-remove-re-add transactions", async ()
 
       await commitAll(linked, "add Calendly capability");
       const cleanAdded = await gitRepositorySnapshot(linked);
+      const survivingGuidance = await Promise.all(
+        ["README.md", "apps/web/AGENTS.md"].map((path) =>
+          readFile(join(linked, path), "utf8"),
+        ),
+      );
       const removalPlanExecution = await executeBuiltPlanRemove(linked);
       assert.equal(removalPlanExecution.exitCode, 0, removalPlanExecution.stderr);
       const removalPlan = JSON.parse(removalPlanExecution.stdout).plan;
       assert.deepEqual(await gitRepositorySnapshot(linked), cleanAdded);
+      assert.deepEqual(
+        await listCalendlyReferencePaths(linked),
+        [
+          ...removalPlan.actions.map(({ path }) => path),
+          ".egeria/migrations.jsonl",
+          ".egeria/state.json",
+          "README.md",
+          "apps/web/AGENTS.md",
+        ].toSorted(),
+      );
 
       const wrongRemoval = await executeBuiltApplyRemove(
         linked,
@@ -4670,6 +4709,14 @@ test("the compiled CLI completes exact add-remove-re-add transactions", async ()
       assert.deepEqual(
         removedMigrations.value.map(({ identifier }) => identifier),
         removedState.value.appliedMigrations,
+      );
+      assert.deepEqual(
+        await Promise.all(
+          ["README.md", "apps/web/AGENTS.md"].map((path) =>
+            readFile(join(linked, path), "utf8"),
+          ),
+        ),
+        survivingGuidance,
       );
       assert.equal(
         removedState.value.installedCapabilities.some(

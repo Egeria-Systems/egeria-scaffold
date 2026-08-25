@@ -8,7 +8,9 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  realpath,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -451,7 +453,7 @@ async function runCheck(
   }
 }
 
-test("the repository registry admits certified visual standards and closes current certification tasks", async () => {
+test("the repository registry admits the certified Calendly lifecycle and retains only historical backfills", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -598,6 +600,199 @@ test("private certification validation rejects missing, rejected, and non-ancest
         script: cleanCheckScript,
       }),
       "CERTIFICATION_EVIDENCE_REVISION_UNKNOWN",
+    );
+  } finally {
+    await rm(cleanRoot, { recursive: true, force: true });
+  }
+});
+
+test("private certification validation checks only records changed from accepted main", async () => {
+  const cleanRoot = await mkdtemp(
+    join(tmpdir(), "egeria-private-certification-delta-"),
+  );
+
+  try {
+    const cleanCheckScript = await copyCertificationRuntime(cleanRoot);
+    await writeFile(join(cleanRoot, "baseline.txt"), "baseline\n", "utf8");
+    await execFileAsync("git", ["init", "--quiet"], { cwd: cleanRoot });
+    await execFileAsync("git", ["add", "baseline.txt"], { cwd: cleanRoot });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Certification Test",
+        "-c",
+        "user.email=certification@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "baseline",
+      ],
+      { cwd: cleanRoot },
+    );
+    const { stdout: initialRevisionOutput } = await execFileAsync(
+      "git",
+      ["rev-parse", "HEAD"],
+      { cwd: cleanRoot, encoding: "utf8" },
+    );
+    const initialRevision = initialRevisionOutput.trim();
+    const historicalSubject = {
+      descriptorVersion: "0.4.0",
+      behaviorContractDigest: `sha256:${"a".repeat(64)}`,
+    };
+    const historicalRecord = {
+      subject: historicalSubject,
+      requiredEvidence: ["fresh-scaffold"],
+      status: "certified",
+      taskPlan: "docs/superpowers/plans/historical-certification.md",
+      evidence: [
+        {
+          kind: "fresh-scaffold",
+          path: "docs/implementation-evidence/historical-certification.md",
+          outcome: "passed",
+          revision: initialRevision,
+          subject: historicalSubject,
+        },
+      ],
+    };
+    const baselineRegistry = createPrivateRegistry(initialRevision);
+    baselineRegistry.records["booking-calendly"].status = "pending";
+    baselineRegistry.records["booking-calendly"].evidence = [];
+    baselineRegistry.records.standards = historicalRecord;
+    await writeFile(
+      join(cleanRoot, "certifications/capabilities.json"),
+      `${JSON.stringify(baselineRegistry, null, 2)}\n`,
+      "utf8",
+    );
+    await execFileAsync(
+      "git",
+      ["add", "certifications/capabilities.json"],
+      { cwd: cleanRoot },
+    );
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Certification Test",
+        "-c",
+        "user.email=certification@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "accept baseline registry",
+      ],
+      { cwd: cleanRoot },
+    );
+    const { stdout: baselineRevisionOutput } = await execFileAsync(
+      "git",
+      ["rev-parse", "HEAD"],
+      { cwd: cleanRoot, encoding: "utf8" },
+    );
+    const baselineRevision = baselineRevisionOutput.trim();
+    await execFileAsync(
+      "git",
+      ["update-ref", "refs/remotes/origin/main", baselineRevision],
+      { cwd: cleanRoot },
+    );
+
+    await writePrivateValidationFixture(cleanRoot, baselineRevision);
+    const currentRegistry = createPrivateRegistry(baselineRevision);
+    currentRegistry.records.standards = historicalRecord;
+    await writeFile(
+      join(cleanRoot, "certifications/capabilities.json"),
+      `${JSON.stringify(currentRegistry, null, 2)}\n`,
+      "utf8",
+    );
+
+    assert.deepEqual(
+      await runCheck(["--artifacts"], {
+        cwd: cleanRoot,
+        script: cleanCheckScript,
+      }),
+      {
+        exitCode: 0,
+        stdout: `${JSON.stringify({
+          ok: true,
+          gate: "artifacts",
+          records: 1,
+        })}\n`,
+        stderr: "",
+      },
+    );
+  } finally {
+    await rm(cleanRoot, { recursive: true, force: true });
+  }
+});
+
+test("private certification validation rejects deletion of an accepted evidence artifact", async () => {
+  const cleanRoot = await mkdtemp(
+    join(tmpdir(), "egeria-private-certification-deleted-evidence-"),
+  );
+
+  try {
+    const cleanCheckScript = await copyCertificationRuntime(cleanRoot);
+    await execFileAsync("git", ["init", "--quiet"], { cwd: cleanRoot });
+    await writePrivateValidationFixture(cleanRoot, "0".repeat(40));
+    await execFileAsync("git", ["add", "."], { cwd: cleanRoot });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Certification Test",
+        "-c",
+        "user.email=certification@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "accept certification evidence",
+      ],
+      { cwd: cleanRoot },
+    );
+    const { stdout: baselineRevisionOutput } = await execFileAsync(
+      "git",
+      ["rev-parse", "HEAD"],
+      { cwd: cleanRoot, encoding: "utf8" },
+    );
+    const baselineRevision = baselineRevisionOutput.trim();
+    await writePrivateValidationFixture(cleanRoot, baselineRevision);
+    await execFileAsync(
+      "git",
+      ["add", "certifications/capabilities.json", privateEvidencePath],
+      { cwd: cleanRoot },
+    );
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Certification Test",
+        "-c",
+        "user.email=certification@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "bind accepted evidence revision",
+      ],
+      { cwd: cleanRoot },
+    );
+    const { stdout: acceptedRevisionOutput } = await execFileAsync(
+      "git",
+      ["rev-parse", "HEAD"],
+      { cwd: cleanRoot, encoding: "utf8" },
+    );
+    await execFileAsync(
+      "git",
+      ["update-ref", "refs/remotes/origin/main", acceptedRevisionOutput.trim()],
+      { cwd: cleanRoot },
+    );
+
+    await rm(join(cleanRoot, privateEvidencePath));
+
+    assertArtifactIssue(
+      await runCheck(["--artifacts"], {
+        cwd: cleanRoot,
+        script: cleanCheckScript,
+      }),
+      "CERTIFICATION_EVIDENCE_MISSING",
     );
   } finally {
     await rm(cleanRoot, { recursive: true, force: true });
@@ -1096,6 +1291,7 @@ test("Calendly production mutation keeps real owner identity while testing mocks
   const commands = [];
   let ownedPath;
   let projectRoot;
+  let primaryRoot;
   let verifiedRoot;
   const previousToken = process.env.CLOUDFLARE_API_TOKEN;
   process.env.CLOUDFLARE_API_TOKEN = "PRIVATE_VALUE";
@@ -1106,18 +1302,29 @@ test("Calendly production mutation keeps real owner identity while testing mocks
       {
         async runCommand(input) {
           commands.push(input);
-          assert.equal(input.executable, process.execPath);
           assert.equal(input.environment.CLOUDFLARE_API_TOKEN, undefined);
           assert.equal(input.environment.NPM_TOKEN, undefined);
           assert.equal(input.environment.NODE_OPTIONS, undefined);
+          if (input.executable === "git") {
+            const worktreeIndex = input.arguments.indexOf("worktree");
+            if (worktreeIndex !== -1) {
+              projectRoot = input.arguments.at(-1);
+              await mkdir(projectRoot);
+              await writeFile(join(projectRoot, ".git"), "gitdir: private\n");
+            }
+            return "";
+          }
+
+          assert.equal(input.executable, process.execPath);
           const command = input.arguments[1];
 
           if (command === "create") {
-            projectRoot = input.arguments[
+            primaryRoot = input.arguments[
               input.arguments.indexOf("--directory") + 1
             ];
-            ownedPath = dirname(projectRoot);
+            ownedPath = dirname(primaryRoot);
             assert.equal((await lstat(ownedPath)).mode & 0o777, 0o700);
+            await mkdir(primaryRoot);
             return `${JSON.stringify({
               ok: true,
               command: "create",
@@ -1129,8 +1336,37 @@ test("Calendly production mutation keeps real owner identity while testing mocks
                 "section-composition",
                 "deployment-cloudflare",
                 "observability",
-                "booking-calendly",
               ],
+            })}\n`;
+          }
+          if (command === "plan-add") {
+            return `${JSON.stringify({
+              ok: true,
+              command: "plan-add",
+              result: {
+                operation: "add-capability",
+                status: "approval-required",
+                planFingerprint: `sha256:${"a".repeat(64)}`,
+                profile: "portfolio",
+                capability: {
+                  identifier: "booking-calendly",
+                  version: "0.1.0",
+                },
+              },
+            })}\n`;
+          }
+          if (command === "apply-add") {
+            return `${JSON.stringify({
+              ok: true,
+              command: "apply-add",
+              result: {
+                status: "verified-final-diff-approval-required",
+                capability: {
+                  identifier: "booking-calendly",
+                  version: "0.1.0",
+                },
+                migration: "add-booking-calendly-0-1-0",
+              },
             })}\n`;
           }
           if (command === "infer") {
@@ -1171,6 +1407,9 @@ test("Calendly production mutation keeps real owner identity while testing mocks
         async verifyProject(root, identifier) {
           verifiedRoot = root;
           assert.equal(identifier, "portfolio-calendly");
+          assert.notEqual(root, projectRoot);
+          assert.equal(dirname(root), ownedPath);
+          assert.equal(await pathExists(join(root, ".git")), false);
           return {
             ok: true,
             fixtures: ["portfolio-calendly"],
@@ -1188,16 +1427,21 @@ test("Calendly production mutation keeps real owner identity while testing mocks
       profile: "portfolio",
       mode: "popup",
       checks: [
-        "compiled-cli-create",
+        "compiled-cli-create-baseline",
+        "clean-linked-worktree",
+        "compiled-cli-plan-add",
+        "compiled-cli-apply-add",
         "state-inference",
         "healthy-diagnostics",
         "exact-diff",
         ...fixedChecks,
       ],
     });
-    assert.equal(commands.length, 4);
+    assert.equal(commands.length, 12);
     assert.deepEqual(
-      commands.map(({ arguments: arguments_ }) => arguments_.slice(1)),
+      commands
+        .filter(({ executable }) => executable === process.execPath)
+        .map(({ arguments: arguments_ }) => arguments_.slice(1)),
       [
         [
           "create",
@@ -1208,18 +1452,65 @@ test("Calendly production mutation keeps real owner identity while testing mocks
           "--display-name",
           "Acme Portfolio Booking",
           "--directory",
+          primaryRoot,
+        ],
+        [
+          "plan-add",
+          "--directory",
           projectRoot,
+          "--capability",
+          "booking-calendly",
           "--calendly-url",
           "https://calendly.com/example/intro",
           "--calendly-mode",
           "popup",
+        ],
+        [
+          "apply-add",
+          "--directory",
+          projectRoot,
+          "--capability",
+          "booking-calendly",
+          "--calendly-url",
+          "https://calendly.com/example/intro",
+          "--calendly-mode",
+          "popup",
+          "--approved-plan",
+          `sha256:${"a".repeat(64)}`,
         ],
         ["infer", "--directory", projectRoot],
         ["doctor", "--directory", projectRoot],
         ["diff", "--directory", projectRoot],
       ],
     );
-    assert.equal(verifiedRoot, projectRoot);
+    assert.deepEqual(
+      commands
+        .filter(({ executable }) => executable === "git")
+        .map(({ arguments: arguments_ }) => arguments_),
+      [
+        ["-C", primaryRoot, "init", "--initial-branch", "main"],
+        ["-C", primaryRoot, "config", "user.name", "Egeria Certification"],
+        [
+          "-C",
+          primaryRoot,
+          "config",
+          "user.email",
+          "certification@example.invalid",
+        ],
+        ["-C", primaryRoot, "add", "--all"],
+        ["-C", primaryRoot, "commit", "-m", "Create certification baseline"],
+        [
+          "-C",
+          primaryRoot,
+          "worktree",
+          "add",
+          "-b",
+          "booking-calendly-certification-worktree",
+          projectRoot,
+        ],
+      ],
+    );
+    assert.notEqual(verifiedRoot, projectRoot);
     assert.equal(await pathExists(ownedPath), false);
     assert.doesNotMatch(JSON.stringify(result), /calendly\.com|PRIVATE_VALUE/u);
   } finally {
@@ -1252,12 +1543,60 @@ test("Calendly production mutation maps command failures and removes its real ow
       ),
     (error) => {
       assert.equal(error?.name, "BookingCalendlyCertificationError");
-      assert.equal(error?.code, "FRESH_SCAFFOLD_CREATE_FAILED");
+      assert.equal(error?.code, "BASELINE_CREATE_FAILED");
       assert.doesNotMatch(String(error), /PRIVATE_VALUE|calendly\.com/u);
       return true;
     },
   );
   assert.equal(await pathExists(ownedPath), false);
+});
+
+test("Calendly certification canonicalizes an owned directory below a symbolic-link parent", async () => {
+  const testRoot = await mkdtemp(
+    join(tmpdir(), "egeria-calendly-canonical-owner-test-"),
+  );
+  const canonicalParent = join(testRoot, "canonical");
+  const aliasParent = join(testRoot, "alias");
+  await mkdir(canonicalParent);
+  await symlink(
+    canonicalParent,
+    aliasParent,
+    process.platform === "win32" ? "junction" : "dir",
+  );
+  const requestedOutputRoot = join(aliasParent, "owner");
+  let observedOutputRoot;
+
+  try {
+    await assert.rejects(
+      () =>
+        certifyBookingCalendlyForTesting(
+          {
+            calendlyUrl: "https://calendly.com/example/private-value",
+            outputRoot: requestedOutputRoot,
+          },
+          {
+            async runCommand(input) {
+              observedOutputRoot = dirname(
+                input.arguments[input.arguments.indexOf("--directory") + 1],
+              );
+              throw new Error("stop after observing canonical owner");
+            },
+            async verifyProject() {
+              throw new Error("must not verify");
+            },
+          },
+        ),
+      (error) => {
+        assert.equal(error?.code, "BASELINE_CREATE_FAILED");
+        return true;
+      },
+    );
+
+    assert.equal(observedOutputRoot, join(await realpath(aliasParent), "owner"));
+    assert.equal(await pathExists(requestedOutputRoot), false);
+  } finally {
+    await rm(testRoot, { recursive: true });
+  }
 });
 
 test("Calendly testing API rejects the production-adapter mutation", async () => {
@@ -1274,6 +1613,47 @@ test("Calendly testing API rejects the production-adapter mutation", async () =>
         return true;
       },
     );
+  }
+});
+
+test("Calendly certification rejects unsafe retained output roots before commands", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-calendly-output-test-"));
+  const existing = join(owner, "existing");
+  await mkdir(existing);
+  let calls = 0;
+  const adapters = {
+    runCommand() {
+      calls += 1;
+      throw new Error("must not run");
+    },
+    verifyProject() {
+      throw new Error("must not verify");
+    },
+  };
+
+  try {
+    for (const outputRoot of ["relative-output", existing]) {
+      await assert.rejects(
+        () =>
+          certifyBookingCalendlyForTesting(
+            {
+              calendlyUrl: "https://calendly.com/example/private-value",
+              outputRoot,
+            },
+            adapters,
+          ),
+        (error) => {
+          assert.equal(error?.name, "BookingCalendlyCertificationError");
+          assert.equal(error?.code, "CERTIFICATION_OUTPUT_ROOT_INVALID");
+          assert.doesNotMatch(String(error), /PRIVATE_VALUE|calendly\.com/u);
+          return true;
+        },
+      );
+    }
+    assert.equal(calls, 0);
+    assert.equal((await lstat(existing)).isDirectory(), true);
+  } finally {
+    await rm(owner, { recursive: true });
   }
 });
 
@@ -1304,4 +1684,67 @@ test("the certification entry rejects unknown arguments without echoing them", a
     })}\n`,
   );
   assert.doesNotMatch(result.stderr, /private-value/u);
+});
+
+test("the certification entry accepts retained output syntax before safe root validation", async () => {
+  let result;
+  try {
+    await execFileAsync(process.execPath, [
+      certificationScript,
+      "--output-root",
+      "private-relative-output",
+      "--calendly-url",
+      "https://calendly.com/example/private-value",
+    ], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    });
+    assert.fail("relative retained output must fail");
+  } catch (error) {
+    result = error;
+  }
+
+  assert.equal(result.code, 1);
+  assert.equal(result.stdout, "");
+  assert.equal(
+    result.stderr,
+    `${JSON.stringify({
+      ok: false,
+      code: "CERTIFICATION_OUTPUT_ROOT_INVALID",
+    })}\n`,
+  );
+  assert.doesNotMatch(result.stderr, /private-relative|calendly\.com/u);
+});
+
+test("the certification entry accepts the conventional package-script separator", async () => {
+  let result;
+  try {
+    await execFileAsync(process.execPath, [
+      certificationScript,
+      "--",
+      "--output-root",
+      "private-relative-output",
+      "--calendly-url",
+      "https://calendly.com/example/private-value",
+    ], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    });
+    assert.fail("relative retained output must fail");
+  } catch (error) {
+    result = error;
+  }
+
+  assert.equal(result.code, 1);
+  assert.equal(result.stdout, "");
+  assert.equal(
+    result.stderr,
+    `${JSON.stringify({
+      ok: false,
+      code: "CERTIFICATION_OUTPUT_ROOT_INVALID",
+    })}\n`,
+  );
+  assert.doesNotMatch(result.stderr, /private-relative|calendly\.com/u);
 });
