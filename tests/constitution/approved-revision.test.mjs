@@ -57,12 +57,6 @@ async function runVerifier(overrides = {}, arguments_ = []) {
 
 test("approved revision admission accepts only the exact current approved event revision", async () => {
   assert.deepEqual(await runVerifier(), { code: 0, stdout: "", stderr: "" });
-  assert.deepEqual(
-    await runVerifier({
-      GITHUB_REF: "refs/heads/booking-calendly-lifecycle-certification",
-    }),
-    { code: 0, stdout: "", stderr: "" },
-  );
 
   for (const scenario of [
     {
@@ -80,6 +74,12 @@ test("approved revision admission accepts only the exact current approved event 
     {
       name: "abbreviated expected revision",
       environment: { EXPECTED_REVISION: currentHead.slice(0, 12) },
+    },
+    {
+      name: "completed certification branch ref",
+      environment: {
+        GITHUB_REF: "refs/heads/booking-calendly-lifecycle-certification",
+      },
     },
     { name: "non-main ref", environment: { GITHUB_REF: "refs/heads/release" } },
     { name: "expected event mismatch", environment: { EXPECTED_REVISION: otherRevision } },

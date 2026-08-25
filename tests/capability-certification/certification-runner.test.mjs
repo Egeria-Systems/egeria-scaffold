@@ -724,6 +724,81 @@ test("private certification validation checks only records changed from accepted
   }
 });
 
+test("private certification validation rejects deletion of an accepted evidence artifact", async () => {
+  const cleanRoot = await mkdtemp(
+    join(tmpdir(), "egeria-private-certification-deleted-evidence-"),
+  );
+
+  try {
+    const cleanCheckScript = await copyCertificationRuntime(cleanRoot);
+    await execFileAsync("git", ["init", "--quiet"], { cwd: cleanRoot });
+    await writePrivateValidationFixture(cleanRoot, "0".repeat(40));
+    await execFileAsync("git", ["add", "."], { cwd: cleanRoot });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Certification Test",
+        "-c",
+        "user.email=certification@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "accept certification evidence",
+      ],
+      { cwd: cleanRoot },
+    );
+    const { stdout: baselineRevisionOutput } = await execFileAsync(
+      "git",
+      ["rev-parse", "HEAD"],
+      { cwd: cleanRoot, encoding: "utf8" },
+    );
+    const baselineRevision = baselineRevisionOutput.trim();
+    await writePrivateValidationFixture(cleanRoot, baselineRevision);
+    await execFileAsync(
+      "git",
+      ["add", "certifications/capabilities.json", privateEvidencePath],
+      { cwd: cleanRoot },
+    );
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Certification Test",
+        "-c",
+        "user.email=certification@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "bind accepted evidence revision",
+      ],
+      { cwd: cleanRoot },
+    );
+    const { stdout: acceptedRevisionOutput } = await execFileAsync(
+      "git",
+      ["rev-parse", "HEAD"],
+      { cwd: cleanRoot, encoding: "utf8" },
+    );
+    await execFileAsync(
+      "git",
+      ["update-ref", "refs/remotes/origin/main", acceptedRevisionOutput.trim()],
+      { cwd: cleanRoot },
+    );
+
+    await rm(join(cleanRoot, privateEvidencePath));
+
+    assertArtifactIssue(
+      await runCheck(["--artifacts"], {
+        cwd: cleanRoot,
+        script: cleanCheckScript,
+      }),
+      "CERTIFICATION_EVIDENCE_MISSING",
+    );
+  } finally {
+    await rm(cleanRoot, { recursive: true, force: true });
+  }
+});
+
 test("Cloudflare deployment certification binds a fresh portfolio to the exact deployment subject", async () => {
   const revision = "a".repeat(40);
   const previousToken = process.env.CLOUDFLARE_API_TOKEN;

@@ -1602,10 +1602,7 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   });
 
   const job = workflow.jobs["verify-and-deploy"];
-  assert.equal(
-    job.if,
-    "github.ref == 'refs/heads/main' || github.ref == 'refs/heads/booking-calendly-lifecycle-certification'",
-  );
+  assert.equal(job.if, "github.ref == 'refs/heads/main'");
   assert.equal(job["runs-on"], "ubuntu-24.04");
   assert.equal(job["timeout-minutes"], 45);
   assert.deepEqual(job.environment, {
@@ -2473,7 +2470,10 @@ test("executable capability certification ownership is current", async () => {
 
   for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
     assert.match(document, /certifications\/capabilities\.json/u);
-    assert.match(document, /booking-calendly[\s\S]+(?:active|current)[^\n]+certified/iu);
+    assert.match(
+      document,
+      /booking-calendly[^\n]+(?:active|current)[^\n]+certified/iu,
+    );
   }
   assert.match(
     capabilityModel,

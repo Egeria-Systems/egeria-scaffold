@@ -108,15 +108,49 @@ async function readAcceptedBaselineRegistry() {
       certificationRegistrySchema,
       JSON.parse(registryOutput),
     );
-    return registry.ok ? registry.value : undefined;
+    return registry.ok
+      ? { registry: registry.value, revision: baselineRevision }
+      : undefined;
   } catch {
     return undefined;
   }
 }
 
-function selectChangedCertificationRecords(registry, baselineRegistry) {
+async function readChangedPaths(baselineRevision) {
+  const options = {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: { PATH: process.env.PATH },
+    windowsHide: true,
+  };
+
+  try {
+    const { stdout } = await executeFile(
+      "git",
+      ["diff", "--name-only", "--no-renames", "-z", baselineRevision, "--"],
+      options,
+    );
+    return new Set(stdout.split("\0").filter(Boolean));
+  } catch {
+    return undefined;
+  }
+}
+
+function recordReferencesChangedArtifact(record, changedPaths) {
+  return (
+    (record.taskPlan !== null && changedPaths.has(record.taskPlan)) ||
+    record.evidence.some((evidence) => changedPaths.has(evidence.path))
+  );
+}
+
+function selectChangedCertificationRecords(
+  registry,
+  baselineRegistry,
+  changedPaths,
+) {
   if (
     baselineRegistry === undefined ||
+    changedPaths === undefined ||
     baselineRegistry.schemaVersion !== registry.schemaVersion
   ) {
     return registry;
@@ -127,16 +161,21 @@ function selectChangedCertificationRecords(registry, baselineRegistry) {
     records: Object.fromEntries(
       Object.entries(registry.records).filter(
         ([identifier, record]) =>
-          !isDeepStrictEqual(record, baselineRegistry.records[identifier]),
+          !isDeepStrictEqual(record, baselineRegistry.records[identifier]) ||
+          recordReferencesChangedArtifact(record, changedPaths),
       ),
     ),
   };
 }
 
 async function validatePrivateArtifacts(registry) {
+  const acceptedBaseline = await readAcceptedBaselineRegistry();
   const selectedRegistry = selectChangedCertificationRecords(
     registry,
-    await readAcceptedBaselineRegistry(),
+    acceptedBaseline?.registry,
+    acceptedBaseline === undefined
+      ? undefined
+      : await readChangedPaths(acceptedBaseline.revision),
   );
   const artifactPaths = new Set();
   for (const record of Object.values(selectedRegistry.records)) {

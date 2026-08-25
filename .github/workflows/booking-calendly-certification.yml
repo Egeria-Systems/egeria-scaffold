@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   verify-and-deploy:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/booking-calendly-lifecycle-certification'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment:
