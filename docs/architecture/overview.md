@@ -4,7 +4,7 @@
 
 **Source:** [Approved reconciled program plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md)
 
-Accepted [ADRs](../adr/README.md) own individual decisions. This overview explains how those decisions fit together; it does not replace them. The [enforcement map](enforcement-map.md) owns automation status, [package ownership](package-ownership.md) owns the exact package matrix and publication boundaries, and the [Next.js and Cloudflare compatibility record](../compatibility/nextjs-cloudflare.md) owns the current executable proof matrix and evidence boundary.
+Accepted [ADRs](../adr/README.md) own individual decisions. This overview explains how those decisions fit together; it does not replace them. The [enforcement map](enforcement-map.md) owns automation status, [package ownership](package-ownership.md) owns the exact public package matrix and publication boundaries, executable manifests own current proof dependency versions, and the [Next.js and Cloudflare compatibility record](../compatibility/nextjs-cloudflare.md) owns accepted proof snapshots and their evidence boundary.
 
 ## Product model
 
