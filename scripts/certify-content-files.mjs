@@ -1,0 +1,427 @@
+import { execFile } from "node:child_process";
+import {
+  constants,
+  copyFile,
+  mkdir,
+  readFile,
+  writeFile,
+} from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
+import {
+  certifyFreshScaffold,
+  certifyFreshScaffoldForTesting,
+} from "./lib/certify-fresh-scaffold.mjs";
+import { runCertificationCli } from "./lib/certification-cli.mjs";
+import {
+  createIsolatedProcessEnvironment,
+  isolatedProcessOptions,
+} from "./lib/isolated-process.mjs";
+
+const execFileAsync = promisify(execFile);
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const exactRevisionPattern = /^[0-9a-f]{40}$/u;
+const publicRegistry = "https://registry.npmjs.org/";
+const commandTimeoutMilliseconds = 15 * 60 * 1000;
+const subject = Object.freeze({
+  descriptorVersion: "0.4.0",
+  behaviorContractDigest:
+    "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05",
+});
+const expectedCapabilities = Object.freeze([
+  "standards",
+  "content-files",
+  "section-composition",
+  "deployment-cloudflare",
+  "observability",
+]);
+const expectedVerificationChecks = Object.freeze([
+  "pnpm-version",
+  "frozen-install",
+  "peer-dependencies",
+  "dependency-audit",
+  "registry-signatures",
+  "lint",
+  "cloudflare-types",
+  "typecheck",
+  "unit-tests",
+  "component-tests",
+  "next-build",
+  "opennext-build",
+  "browser-install",
+  "browser-development",
+  "browser-preview",
+]);
+const expectedFixtureChecks = Object.freeze([
+  "content-fixture-overlay",
+  "content-fixture-frozen-install",
+  "content-fixture-unit-contract",
+  "content-fixture-browser-install",
+  "content-fixture-browser-development",
+]);
+const fixtureRoot = resolve(
+  repositoryRoot,
+  "tests/capability-certification/fixtures/content-files",
+);
+const fixtureMappings = Object.freeze([
+  Object.freeze({
+    source: "content-files-certification.test.ts",
+    destination: "apps/web/tests/unit/content-files-certification.test.ts",
+  }),
+  Object.freeze({
+    source: "content-files-certification.spec.ts",
+    destination: "apps/web/tests/e2e/content-files-certification.spec.ts",
+  }),
+]);
+
+export class ContentFilesCertificationError extends Error {
+  constructor(code) {
+    super(`Content files certification failed: ${code}`);
+    this.name = "ContentFilesCertificationError";
+    this.code = code;
+  }
+}
+
+function createError(code) {
+  return new ContentFilesCertificationError(code);
+}
+
+function configurationFor(revision) {
+  if (typeof revision !== "string" || !exactRevisionPattern.test(revision)) {
+    throw createError("CERTIFICATION_REVISION_INVALID");
+  }
+
+  return Object.freeze({
+    profile: "portfolio",
+    projectName: "acme-portfolio",
+    displayName: "Acme Portfolio",
+    createArguments: Object.freeze([]),
+    expectedCapabilities,
+    capabilityIdentifier: "content-files",
+    capabilityVersion: "0.4.0",
+    expectedRecipeVersion: "0.10.0",
+    verifierIdentifier: "portfolio",
+    expectedVerificationChecks,
+    expectedFixtureChecks,
+    receipt: Object.freeze({
+      subject,
+      recipeVersion: "0.10.0",
+      locale: "en-CA",
+      evidenceRevision: revision,
+    }),
+    createError,
+    isCertificationError: (error) =>
+      error instanceof ContentFilesCertificationError,
+  });
+}
+
+async function readCurrentRevision() {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["rev-parse", "--verify", "HEAD"],
+      {
+        cwd: repositoryRoot,
+        env: createIsolatedProcessEnvironment(),
+        timeout: 30_000,
+        ...isolatedProcessOptions,
+      },
+    );
+    const revision = stdout.trim();
+    if (!exactRevisionPattern.test(revision)) {
+      throw new Error("invalid revision");
+    }
+    return revision;
+  } catch {
+    throw createError("CERTIFICATION_REVISION_UNAVAILABLE");
+  }
+}
+
+async function readRepositoryStatus() {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+      {
+        cwd: repositoryRoot,
+        env: createIsolatedProcessEnvironment(),
+        timeout: 30_000,
+        ...isolatedProcessOptions,
+      },
+    );
+    return stdout;
+  } catch {
+    throw createError("CERTIFICATION_WORKTREE_UNAVAILABLE");
+  }
+}
+
+async function readRepositoryIndexEntries() {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["ls-files", "-v", "-z"],
+      {
+        cwd: repositoryRoot,
+        env: createIsolatedProcessEnvironment(),
+        timeout: 30_000,
+        ...isolatedProcessOptions,
+      },
+    );
+    return stdout;
+  } catch {
+    throw createError("CERTIFICATION_WORKTREE_UNAVAILABLE");
+  }
+}
+
+function authorityAdapters() {
+  return {
+    readCurrentRevision,
+    readRepositoryStatus,
+    readRepositoryIndexEntries,
+  };
+}
+
+function requireAuthorityAdapters(adapters) {
+  if (
+    adapters === null ||
+    typeof adapters !== "object" ||
+    typeof adapters.readCurrentRevision !== "function" ||
+    typeof adapters.readRepositoryStatus !== "function" ||
+    typeof adapters.readRepositoryIndexEntries !== "function"
+  ) {
+    throw createError("CERTIFICATION_ADAPTER_INVALID");
+  }
+}
+
+async function requireRevision(revision, adapters) {
+  let current;
+  try {
+    current = await adapters.readCurrentRevision();
+  } catch (error) {
+    if (error instanceof ContentFilesCertificationError) throw error;
+    throw createError("CERTIFICATION_REVISION_UNAVAILABLE");
+  }
+  if (current !== revision) {
+    throw createError("CERTIFICATION_REVISION_MISMATCH");
+  }
+}
+
+async function requireCleanRepository(adapters) {
+  let status;
+  let indexEntries;
+  try {
+    status = await adapters.readRepositoryStatus();
+    indexEntries = await adapters.readRepositoryIndexEntries();
+  } catch (error) {
+    if (error instanceof ContentFilesCertificationError) throw error;
+    throw createError("CERTIFICATION_WORKTREE_UNAVAILABLE");
+  }
+
+  if (typeof status !== "string" || typeof indexEntries !== "string") {
+    throw createError("CERTIFICATION_WORKTREE_UNAVAILABLE");
+  }
+  if (status.length !== 0) {
+    throw createError("CERTIFICATION_WORKTREE_DIRTY");
+  }
+  if (indexEntries.length === 0) return;
+
+  const entries = indexEntries.split("\0");
+  if (entries.at(-1) !== "") {
+    throw createError("CERTIFICATION_WORKTREE_UNAVAILABLE");
+  }
+  entries.pop();
+  for (const entry of entries) {
+    if (entry.length < 3 || entry[1] !== " ") {
+      throw createError("CERTIFICATION_WORKTREE_UNAVAILABLE");
+    }
+    if (entry[0] !== "H") {
+      throw createError("CERTIFICATION_INDEX_FLAGS");
+    }
+  }
+}
+
+async function copyCertificationFixtures(projectRoot) {
+  for (const mapping of fixtureMappings) {
+    const destination = join(projectRoot, mapping.destination);
+    await mkdir(dirname(destination), { recursive: true });
+    try {
+      await copyFile(
+        join(fixtureRoot, mapping.source),
+        destination,
+        constants.COPYFILE_EXCL,
+      );
+    } catch {
+      throw createError("CERTIFICATION_FIXTURE_OVERLAY_FAILED");
+    }
+  }
+
+  const siteContentPath = join(
+    projectRoot,
+    "apps/web/content/en-CA/site.yaml",
+  );
+  let siteContent;
+  try {
+    siteContent = await readFile(siteContentPath, "utf8");
+  } catch {
+    throw createError("CERTIFICATION_FIXTURE_OVERLAY_FAILED");
+  }
+  const navigationMarker = "navigation: []\n";
+  if (siteContent.split(navigationMarker).length !== 2) {
+    throw createError("CERTIFICATION_FIXTURE_OVERLAY_FAILED");
+  }
+  await writeFile(
+    siteContentPath,
+    siteContent.replace(
+      navigationMarker,
+      "navigation:\n  - href: \"#introduction\"\n    label: Introduction\n",
+    ),
+  );
+}
+
+async function runProjectCommand(
+  runCommand,
+  environment,
+  projectRoot,
+  arguments_,
+  failureCode,
+) {
+  try {
+    await runCommand({
+      executable: "pnpm",
+      arguments: arguments_,
+      cwd: projectRoot,
+      environment,
+      timeout: commandTimeoutMilliseconds,
+    });
+  } catch {
+    throw createError(failureCode);
+  }
+}
+
+async function verifyContentFixture({ projectRoot, runCommand, environment }) {
+  const supportRoot = join(dirname(projectRoot), "content-fixture-support");
+  const home = join(supportRoot, "home");
+  const browsers = join(supportRoot, "playwright-browsers");
+  const cache = join(supportRoot, "cache");
+  const temporary = join(supportRoot, "temporary");
+  const store = join(supportRoot, "store");
+  const userConfiguration = join(supportRoot, ".npmrc");
+
+  await mkdir(home, { recursive: true, mode: 0o700 });
+  await mkdir(browsers, { mode: 0o700 });
+  await mkdir(cache, { mode: 0o700 });
+  await mkdir(temporary, { mode: 0o700 });
+  await mkdir(store, { mode: 0o700 });
+  await writeFile(userConfiguration, "", { flag: "wx", mode: 0o600 });
+  await copyCertificationFixtures(projectRoot);
+
+  const childEnvironment = {
+    ...environment,
+    HOME: home,
+    USERPROFILE: home,
+    TMPDIR: temporary,
+    TMP: temporary,
+    TEMP: temporary,
+    NPM_CONFIG_REGISTRY: publicRegistry,
+    NPM_CONFIG_USERCONFIG: userConfiguration,
+    PLAYWRIGHT_BROWSERS_PATH: browsers,
+    XDG_CACHE_HOME: cache,
+  };
+
+  await runProjectCommand(
+    runCommand,
+    childEnvironment,
+    projectRoot,
+    ["install", "--frozen-lockfile", "--store-dir", store],
+    "CERTIFICATION_FIXTURE_INSTALL_FAILED",
+  );
+  await runProjectCommand(
+    runCommand,
+    childEnvironment,
+    projectRoot,
+    [
+      "--dir",
+      "apps/web",
+      "exec",
+      "vitest",
+      "run",
+      "--project",
+      "unit",
+      "tests/unit/content-files-certification.test.ts",
+    ],
+    "CERTIFICATION_FIXTURE_UNIT_FAILED",
+  );
+  await runProjectCommand(
+    runCommand,
+    childEnvironment,
+    projectRoot,
+    ["--dir", "apps/web", "run", "browser:install"],
+    "CERTIFICATION_FIXTURE_BROWSER_INSTALL_FAILED",
+  );
+  await runProjectCommand(
+    runCommand,
+    childEnvironment,
+    projectRoot,
+    [
+      "--dir",
+      "apps/web",
+      "exec",
+      "playwright",
+      "test",
+      "--config",
+      "playwright.dev.config.ts",
+      "tests/e2e/content-files-certification.spec.ts",
+    ],
+    "CERTIFICATION_FIXTURE_BROWSER_FAILED",
+  );
+
+  return Object.freeze({ ok: true, checks: expectedFixtureChecks });
+}
+
+function withSourceCheck(result) {
+  return Object.freeze({
+    ...result,
+    checks: Object.freeze([...result.checks, "repository-sources-unchanged"]),
+  });
+}
+
+async function certifyWithAuthority(input, adapters, certify) {
+  const configuration = configurationFor(input?.revision);
+  requireAuthorityAdapters(adapters);
+  await requireCleanRepository(adapters);
+  await requireRevision(input.revision, adapters);
+  const result = await certify(configuration);
+  await requireRevision(input.revision, adapters);
+  await requireCleanRepository(adapters);
+  return withSourceCheck(result);
+}
+
+export function certifyContentFiles(input = {}) {
+  const adapters = authorityAdapters();
+  return certifyWithAuthority(input, adapters, (configuration) =>
+    certifyFreshScaffold(configuration, verifyContentFixture),
+  );
+}
+
+export function certifyContentFilesForTesting(input, adapters) {
+  return certifyWithAuthority(input, adapters, (configuration) =>
+    certifyFreshScaffoldForTesting(configuration, adapters),
+  );
+}
+
+function parseArguments(arguments_) {
+  if (arguments_.length === 2 && arguments_[0] === "--revision") {
+    return { revision: arguments_[1] };
+  }
+  return undefined;
+}
+
+await runCertificationCli({
+  moduleUrl: import.meta.url,
+  parseArguments,
+  certify: certifyContentFiles,
+  isCertificationError: (error) =>
+    error instanceof ContentFilesCertificationError,
+});
