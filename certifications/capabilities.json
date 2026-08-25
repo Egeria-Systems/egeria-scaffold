@@ -204,7 +204,7 @@
           "kind": "existing-repository-lifecycle",
           "path": "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md",
           "outcome": "passed",
-          "revision": "e871e65f5473adce67d0800849253712d809d792",
+          "revision": "d7f9dac6e25d5dde32015968d0912b45e73644e7",
           "subject": {
             "descriptorVersion": "0.4.0",
             "behaviorContractDigest": "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4"
@@ -214,7 +214,7 @@
           "kind": "fresh-scaffold",
           "path": "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md",
           "outcome": "passed",
-          "revision": "e871e65f5473adce67d0800849253712d809d792",
+          "revision": "d7f9dac6e25d5dde32015968d0912b45e73644e7",
           "subject": {
             "descriptorVersion": "0.4.0",
             "behaviorContractDigest": "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4"

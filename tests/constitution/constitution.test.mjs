@@ -2323,7 +2323,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /standards@0\.4\.0[^\n]+certified[^\n]+e871e65f5473adce67d0800849253712d809d792[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
+    /standards@0\.4\.0[^\n]+certified[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2571,7 +2571,7 @@ test("executable capability certification ownership is current", async () => {
       kind,
       path: "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md",
       outcome: "passed",
-      revision: "e871e65f5473adce67d0800849253712d809d792",
+      revision: "d7f9dac6e25d5dde32015968d0912b45e73644e7",
       subject: {
         descriptorVersion: "0.4.0",
         behaviorContractDigest:
@@ -2662,7 +2662,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     packageOwnership,
-    /descriptor `standards@0\.4\.0` is certified from accepted existing-repository-lifecycle and renewed fresh-scaffold evidence at revision `e871e65f5473adce67d0800849253712d809d792`[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
+    /descriptor `standards@0\.4\.0` is certified from accepted existing-repository-lifecycle and renewed fresh-scaffold evidence at revision `d7f9dac6e25d5dde32015968d0912b45e73644e7`[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
   );
   assert.match(
     enforcementMap,
@@ -2766,7 +2766,7 @@ test("canonical documentation records visual regression and the client-ready clo
     );
     assert.match(
       currentOwner,
-      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+e871e65f5473adce67d0800849253712d809d792/iu,
+      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7/iu,
     );
   }
 
@@ -2833,7 +2833,7 @@ test("canonical documentation records visual regression and the client-ready clo
     assert.match(sequencingOwner, /unnumbered closure amendment/iu);
     assert.match(
       sequencingOwner,
-      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+e871e65f5473adce67d0800849253712d809d792/iu,
+      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7/iu,
     );
     assert.match(
       sequencingOwner,
