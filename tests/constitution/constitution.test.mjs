@@ -3009,7 +3009,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
   );
   assert.match(
     capabilityModel,
-    /Pull requests 48, 49, and 50[^\n]+standards executor[^\n]+portfolio-to-site planner\/executor[^\n]+accepted-main integrated[^\n]+641db9537f5dea4911b0b727eb083f8d6d359204[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+portfolio-to-site transition lifecycle certification[^\n]+complete[^\n]+e62cfe064020bf05a0f1e5519a524da49cfc164d[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+remain planned/iu,
+    /Pull requests 48, 49, and 50[^\n]+standards executor[^\n]+portfolio-to-site planner\/executor[^\n]+accepted-main integrated[^\n]+641db9537f5dea4911b0b727eb083f8d6d359204[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+portfolio-to-site transition lifecycle certification[^\n]+complete[^\n]+8098c68c82aaa35a59345706c851e8111d463111[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+remain planned/iu,
   );
   assert.match(
     enforcementMap,
@@ -3282,7 +3282,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
     assert.match(
       sequencingOwner,
-      /portfolio-to-site[^\n]+transition[^\n]+lifecycle certification[^\n]+complete[^\n]+e62cfe064020bf05a0f1e5519a524da49cfc164d/iu,
+      /portfolio-to-site[^\n]+transition[^\n]+lifecycle certification[^\n]+complete[^\n]+8098c68c82aaa35a59345706c851e8111d463111/iu,
     );
     assert.match(
       sequencingOwner,
@@ -3321,7 +3321,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
   ]) {
     assert.match(
       certificationStatusOwner,
-      /portfolio-to-site[^\n]+transition[^\n]+lifecycle certification[^\n]+complete[^\n]+e62cfe064020bf05a0f1e5519a524da49cfc164d/iu,
+      /portfolio-to-site[^\n]+transition[^\n]+lifecycle certification[^\n]+complete[^\n]+8098c68c82aaa35a59345706c851e8111d463111/iu,
     );
   }
 

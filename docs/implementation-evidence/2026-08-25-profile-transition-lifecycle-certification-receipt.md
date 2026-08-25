@@ -4,13 +4,13 @@
 
 **Certification subject:** exact repository transition from `portfolio@0.10.0` to `site@0.10.0`
 
-**Evidence revision:** `e62cfe064020bf05a0f1e5519a524da49cfc164d`
+**Evidence revision:** `8098c68c82aaa35a59345706c851e8111d463111`
 
 **Accepted implementation base:** `main@83dd4aa391af23106cc5479fafbeb184b89e4565`, containing merged pull request 53 and its accepted standards lifecycle certification
 
 **Migration:** `transition-portfolio-0-10-0-to-site-0-10-0`
 
-**Evidence command:** `pnpm run verify:profile-transition-lifecycle-certification -- --revision e62cfe064020bf05a0f1e5519a524da49cfc164d`
+**Evidence command:** `pnpm run verify:profile-transition-lifecycle-certification -- --revision 8098c68c82aaa35a59345706c851e8111d463111`
 
 **Result:** `passed`
 
