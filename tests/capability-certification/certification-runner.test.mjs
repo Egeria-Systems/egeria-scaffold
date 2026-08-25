@@ -451,7 +451,7 @@ async function runCheck(
   }
 }
 
-test("the repository registry admits certified visual standards and closes current certification tasks", async () => {
+test("the repository registry admits current subjects and rejects the pending Calendly lifecycle", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -465,11 +465,18 @@ test("the repository registry admits certified visual standards and closes curre
 
   const closure = await runCheck(["--closure", "legacy-backfill-exempt"]);
   assert.deepEqual(closure, {
-    exitCode: 0,
+    exitCode: 1,
     stdout: `${JSON.stringify({
-      ok: true,
+      ok: false,
       gate: "closure",
       policy: "legacy-backfill-exempt",
+      issues: [
+        {
+          code: "CAPABILITY_CERTIFICATION_PENDING",
+          path: ["records", "booking-calendly", "status"],
+          context: { reason: "pending" },
+        },
+      ],
     })}\n`,
     stderr: "",
   });
@@ -482,6 +489,7 @@ test("the repository registry admits certified visual standards and closes curre
       gate: "closure",
       policy: "all-certified",
       issues: [
+        ["booking-calendly", "pending"],
         ["content-files", "backfill-pending"],
         ["section-composition", "backfill-pending"],
         ["site-routing", "backfill-pending"],
@@ -1096,6 +1104,7 @@ test("Calendly production mutation keeps real owner identity while testing mocks
   const commands = [];
   let ownedPath;
   let projectRoot;
+  let primaryRoot;
   let verifiedRoot;
   const previousToken = process.env.CLOUDFLARE_API_TOKEN;
   process.env.CLOUDFLARE_API_TOKEN = "PRIVATE_VALUE";
@@ -1106,18 +1115,28 @@ test("Calendly production mutation keeps real owner identity while testing mocks
       {
         async runCommand(input) {
           commands.push(input);
-          assert.equal(input.executable, process.execPath);
           assert.equal(input.environment.CLOUDFLARE_API_TOKEN, undefined);
           assert.equal(input.environment.NPM_TOKEN, undefined);
           assert.equal(input.environment.NODE_OPTIONS, undefined);
+          if (input.executable === "git") {
+            const worktreeIndex = input.arguments.indexOf("worktree");
+            if (worktreeIndex !== -1) {
+              projectRoot = input.arguments.at(-1);
+              await mkdir(projectRoot);
+            }
+            return "";
+          }
+
+          assert.equal(input.executable, process.execPath);
           const command = input.arguments[1];
 
           if (command === "create") {
-            projectRoot = input.arguments[
+            primaryRoot = input.arguments[
               input.arguments.indexOf("--directory") + 1
             ];
-            ownedPath = dirname(projectRoot);
+            ownedPath = dirname(primaryRoot);
             assert.equal((await lstat(ownedPath)).mode & 0o777, 0o700);
+            await mkdir(primaryRoot);
             return `${JSON.stringify({
               ok: true,
               command: "create",
@@ -1129,8 +1148,37 @@ test("Calendly production mutation keeps real owner identity while testing mocks
                 "section-composition",
                 "deployment-cloudflare",
                 "observability",
-                "booking-calendly",
               ],
+            })}\n`;
+          }
+          if (command === "plan-add") {
+            return `${JSON.stringify({
+              ok: true,
+              command: "plan-add",
+              result: {
+                operation: "add-capability",
+                status: "approval-required",
+                planFingerprint: `sha256:${"a".repeat(64)}`,
+                profile: "portfolio",
+                capability: {
+                  identifier: "booking-calendly",
+                  version: "0.1.0",
+                },
+              },
+            })}\n`;
+          }
+          if (command === "apply-add") {
+            return `${JSON.stringify({
+              ok: true,
+              command: "apply-add",
+              result: {
+                status: "verified-final-diff-approval-required",
+                capability: {
+                  identifier: "booking-calendly",
+                  version: "0.1.0",
+                },
+                migration: "add-booking-calendly-0-1-0",
+              },
             })}\n`;
           }
           if (command === "infer") {
@@ -1188,16 +1236,21 @@ test("Calendly production mutation keeps real owner identity while testing mocks
       profile: "portfolio",
       mode: "popup",
       checks: [
-        "compiled-cli-create",
+        "compiled-cli-create-baseline",
+        "clean-linked-worktree",
+        "compiled-cli-plan-add",
+        "compiled-cli-apply-add",
         "state-inference",
         "healthy-diagnostics",
         "exact-diff",
         ...fixedChecks,
       ],
     });
-    assert.equal(commands.length, 4);
+    assert.equal(commands.length, 12);
     assert.deepEqual(
-      commands.map(({ arguments: arguments_ }) => arguments_.slice(1)),
+      commands
+        .filter(({ executable }) => executable === process.execPath)
+        .map(({ arguments: arguments_ }) => arguments_.slice(1)),
       [
         [
           "create",
@@ -1208,15 +1261,62 @@ test("Calendly production mutation keeps real owner identity while testing mocks
           "--display-name",
           "Acme Portfolio Booking",
           "--directory",
+          primaryRoot,
+        ],
+        [
+          "plan-add",
+          "--directory",
           projectRoot,
+          "--capability",
+          "booking-calendly",
           "--calendly-url",
           "https://calendly.com/example/intro",
           "--calendly-mode",
           "popup",
         ],
+        [
+          "apply-add",
+          "--directory",
+          projectRoot,
+          "--capability",
+          "booking-calendly",
+          "--calendly-url",
+          "https://calendly.com/example/intro",
+          "--calendly-mode",
+          "popup",
+          "--approved-plan",
+          `sha256:${"a".repeat(64)}`,
+        ],
         ["infer", "--directory", projectRoot],
         ["doctor", "--directory", projectRoot],
         ["diff", "--directory", projectRoot],
+      ],
+    );
+    assert.deepEqual(
+      commands
+        .filter(({ executable }) => executable === "git")
+        .map(({ arguments: arguments_ }) => arguments_),
+      [
+        ["-C", primaryRoot, "init", "--initial-branch", "main"],
+        ["-C", primaryRoot, "config", "user.name", "Egeria Certification"],
+        [
+          "-C",
+          primaryRoot,
+          "config",
+          "user.email",
+          "certification@example.invalid",
+        ],
+        ["-C", primaryRoot, "add", "--all"],
+        ["-C", primaryRoot, "commit", "-m", "Create certification baseline"],
+        [
+          "-C",
+          primaryRoot,
+          "worktree",
+          "add",
+          "-b",
+          "booking-calendly-certification-worktree",
+          projectRoot,
+        ],
       ],
     );
     assert.equal(verifiedRoot, projectRoot);
@@ -1252,7 +1352,7 @@ test("Calendly production mutation maps command failures and removes its real ow
       ),
     (error) => {
       assert.equal(error?.name, "BookingCalendlyCertificationError");
-      assert.equal(error?.code, "FRESH_SCAFFOLD_CREATE_FAILED");
+      assert.equal(error?.code, "BASELINE_CREATE_FAILED");
       assert.doesNotMatch(String(error), /PRIVATE_VALUE|calendly\.com/u);
       return true;
     },
@@ -1274,6 +1374,47 @@ test("Calendly testing API rejects the production-adapter mutation", async () =>
         return true;
       },
     );
+  }
+});
+
+test("Calendly certification rejects unsafe retained output roots before commands", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-calendly-output-test-"));
+  const existing = join(owner, "existing");
+  await mkdir(existing);
+  let calls = 0;
+  const adapters = {
+    runCommand() {
+      calls += 1;
+      throw new Error("must not run");
+    },
+    verifyProject() {
+      throw new Error("must not verify");
+    },
+  };
+
+  try {
+    for (const outputRoot of ["relative-output", existing]) {
+      await assert.rejects(
+        () =>
+          certifyBookingCalendlyForTesting(
+            {
+              calendlyUrl: "https://calendly.com/example/private-value",
+              outputRoot,
+            },
+            adapters,
+          ),
+        (error) => {
+          assert.equal(error?.name, "BookingCalendlyCertificationError");
+          assert.equal(error?.code, "CERTIFICATION_OUTPUT_ROOT_INVALID");
+          assert.doesNotMatch(String(error), /PRIVATE_VALUE|calendly\.com/u);
+          return true;
+        },
+      );
+    }
+    assert.equal(calls, 0);
+    assert.equal((await lstat(existing)).isDirectory(), true);
+  } finally {
+    await rm(owner, { recursive: true });
   }
 });
 
@@ -1304,4 +1445,35 @@ test("the certification entry rejects unknown arguments without echoing them", a
     })}\n`,
   );
   assert.doesNotMatch(result.stderr, /private-value/u);
+});
+
+test("the certification entry accepts retained output syntax before safe root validation", async () => {
+  let result;
+  try {
+    await execFileAsync(process.execPath, [
+      certificationScript,
+      "--output-root",
+      "private-relative-output",
+      "--calendly-url",
+      "https://calendly.com/example/private-value",
+    ], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH },
+    });
+    assert.fail("relative retained output must fail");
+  } catch (error) {
+    result = error;
+  }
+
+  assert.equal(result.code, 1);
+  assert.equal(result.stdout, "");
+  assert.equal(
+    result.stderr,
+    `${JSON.stringify({
+      ok: false,
+      code: "CERTIFICATION_OUTPUT_ROOT_INVALID",
+    })}\n`,
+  );
+  assert.doesNotMatch(result.stderr, /private-relative|calendly\.com/u);
 });
