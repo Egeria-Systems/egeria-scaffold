@@ -4,58 +4,18 @@
     "booking-calendly": {
       "subject": {
         "descriptorVersion": "0.1.0",
-        "behaviorContractDigest": "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab"
+        "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
       },
       "requiredEvidence": [
         "cleanup-recovery",
         "deployed-application",
+        "existing-repository-lifecycle",
         "fresh-scaffold",
         "provider-confirmed"
       ],
-      "status": "certified",
-      "taskPlan": "docs/superpowers/plans/2026-08-10-booking-calendly-certification.md",
-      "evidence": [
-        {
-          "kind": "cleanup-recovery",
-          "path": "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
-          "outcome": "passed",
-          "revision": "f9ccb143724b4f1dd7f05a2ee8e3219c224d5558",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab"
-          }
-        },
-        {
-          "kind": "deployed-application",
-          "path": "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
-          "outcome": "passed",
-          "revision": "f9ccb143724b4f1dd7f05a2ee8e3219c224d5558",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab"
-          }
-        },
-        {
-          "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-10-booking-calendly-certification-verification.md",
-          "outcome": "passed",
-          "revision": "636df53958c0e3421b7f493d83493724b67b41f3",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab"
-          }
-        },
-        {
-          "kind": "provider-confirmed",
-          "path": "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
-          "outcome": "passed",
-          "revision": "f9ccb143724b4f1dd7f05a2ee8e3219c224d5558",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab"
-          }
-        }
-      ]
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-08-24-booking-calendly-lifecycle-certification.md",
+      "evidence": []
     },
     "content-files": {
       "subject": {

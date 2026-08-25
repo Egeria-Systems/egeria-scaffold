@@ -6,7 +6,7 @@ import * as core from "../dist/index.js";
 import { requiredEvidence } from "./certification-contracts.mjs";
 
 const planPath =
-  "docs/superpowers/plans/2026-08-10-booking-calendly-certification.md";
+  "docs/superpowers/plans/2026-08-24-booking-calendly-lifecycle-certification.md";
 const evidencePath =
   "docs/implementation-evidence/2026-08-10-booking-calendly-certification-verification.md";
 const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
@@ -37,7 +37,7 @@ const committedRegistry = JSON.parse(
 
 const descriptorDigests = Object.freeze({
   "booking-calendly":
-    "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab",
+    "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2",
   "content-files":
     "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05",
   "deployment-cloudflare":
@@ -217,7 +217,7 @@ test("certification subjects bind the descriptor and required evidence", () => {
     {
       descriptorVersion: "0.1.0",
       behaviorContractDigest:
-        "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab",
+        "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2",
     },
   );
 
