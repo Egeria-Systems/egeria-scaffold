@@ -2605,6 +2605,10 @@ test("executable capability certification ownership is current", async () => {
     /recipe `0\.10\.0`[^\n]+standards@0\.4\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0/iu,
   );
   assert.match(
+    rootReadme,
+    /booking-calendly@0\.1\.0[^\n]+fresh-scaffold[^\n]+existing-repository-lifecycle[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+deployed-application[^\n]+provider-confirmed[^\n]+cleanup-recovery[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d/iu,
+  );
+  assert.match(
     capabilityModel,
     /all three Next\.js request-error inputs[^\n]+browser error\/rejection instrumentation[^\n]+five declared application-owned error surfaces[^\n]+app\/error\.tsx[^\n]+app\/global-error\.tsx[^\n]+externalized observability copy[^\n]+typed copy reader[^\n]+pure fallback presentation/iu,
   );
@@ -3262,12 +3266,13 @@ test("canonical documentation accepts profile-transition execution and bounds it
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.match(
       sequencingOwner,
-      /minimum six remaining increments/iu,
+      /minimum five remaining increments/iu,
     );
     assert.match(
       sequencingOwner,
-      /first fresh-added[^\n]+booking-calendly@0\.1\.0[^\n]+protected-staging journey/iu,
+      /booking-calendly@0\.1\.0[^\n]+lifecycle certification[^\n]+complete/iu,
     );
+    assert.doesNotMatch(sequencingOwner, /minimum six remaining increments/iu);
     for (const backfillSubject of [
       "content-files",
       "section-composition",
@@ -3284,9 +3289,8 @@ test("canonical documentation accepts profile-transition execution and bounds it
   }
 
   for (const responsibility of [
-    /1\. run one `booking-calendly@0\.1\.0` lifecycle certification increment[^\n]+add-remove-re-add[^\n]+refusal[^\n]+recovery[^\n]+protected-staging journey/iu,
-    /2\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
-    /3\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
+    /1\. run a separate `standards@0\.4\.0` lifecycle certification increment[^\n]+supported upgrade[^\n]+refusal[^\n]+recovery/iu,
+    /2\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
   ]) {
     assert.match(roadmap, responsibility);
   }
