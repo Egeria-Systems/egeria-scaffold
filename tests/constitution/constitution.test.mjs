@@ -2323,7 +2323,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /standards@0\.4\.0[^\n]+certified[^\n]+416e2c2441978ac86f3a17dee96a694141033e20[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
+    /standards@0\.4\.0[^\n]+certified[^\n]+3ab15f69b57a8439b415dc085cb869335ea0a091[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2561,23 +2561,27 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.equal(observabilityRecord.status, "certified");
   assert.equal(standardsRecord.status, "certified");
-  assert.deepEqual(standardsRecord.requiredEvidence, ["fresh-scaffold"]);
-  assert.deepEqual(standardsRecord.evidence, [
-    {
-      kind: "fresh-scaffold",
-      path: "docs/implementation-evidence/2026-08-20-generated-visual-regression-certification-receipt.md",
+  assert.deepEqual(standardsRecord.requiredEvidence, [
+    "existing-repository-lifecycle",
+    "fresh-scaffold",
+  ]);
+  assert.deepEqual(
+    standardsRecord.evidence,
+    ["existing-repository-lifecycle", "fresh-scaffold"].map((kind) => ({
+      kind,
+      path: "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md",
       outcome: "passed",
-      revision: "416e2c2441978ac86f3a17dee96a694141033e20",
+      revision: "3ab15f69b57a8439b415dc085cb869335ea0a091",
       subject: {
         descriptorVersion: "0.4.0",
         behaviorContractDigest:
-          "sha256:8733f70cdc64134232912c691c6922b27defb8cb7c2871faa334cfad2b394643",
+          "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4",
       },
-    },
-  ]);
+    })),
+  );
   assert.equal(
     standardsRecord.taskPlan,
-    "docs/superpowers/plans/2026-08-19-generated-visual-regression-certification.md",
+    "docs/superpowers/plans/2026-08-25-standards-lifecycle-certification.md",
   );
   assert.deepEqual(observabilityRecord.requiredEvidence, [
     "cleanup-recovery",
@@ -2658,7 +2662,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     packageOwnership,
-    /descriptor `standards@0\.4\.0` is certified from accepted fresh-scaffold evidence at revision `416e2c2441978ac86f3a17dee96a694141033e20`[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
+    /descriptor `standards@0\.4\.0` is certified from accepted existing-repository-lifecycle and renewed fresh-scaffold evidence at revision `3ab15f69b57a8439b415dc085cb869335ea0a091`[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
   );
   assert.match(
     enforcementMap,
@@ -2762,7 +2766,7 @@ test("canonical documentation records visual regression and the client-ready clo
     );
     assert.match(
       currentOwner,
-      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+416e2c2441978ac86f3a17dee96a694141033e20/iu,
+      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+3ab15f69b57a8439b415dc085cb869335ea0a091/iu,
     );
   }
 
@@ -2829,7 +2833,7 @@ test("canonical documentation records visual regression and the client-ready clo
     assert.match(sequencingOwner, /unnumbered closure amendment/iu);
     assert.match(
       sequencingOwner,
-      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+416e2c2441978ac86f3a17dee96a694141033e20/iu,
+      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+3ab15f69b57a8439b415dc085cb869335ea0a091/iu,
     );
     assert.match(
       sequencingOwner,

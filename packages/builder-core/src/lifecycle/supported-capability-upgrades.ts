@@ -80,8 +80,9 @@ function createStandardsUpgrade(): SupportedCapabilityUpgrade {
     },
     target: {
       recipeVersion: "0.10.0",
-      evidenceRevision: "416e2c2441978ac86f3a17dee96a694141033e20",
+      evidenceRevision: "3ab15f69b57a8439b415dc085cb869335ea0a091",
       subject: createCertificationSubject(standardsDescriptor("0.4.0"), [
+        "existing-repository-lifecycle",
         "fresh-scaffold",
       ]),
     },
