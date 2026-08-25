@@ -24,6 +24,7 @@ const lifecycleChecks = Object.freeze([
   "migration-before-state",
   "state-persistence-failure-prefix",
   "exact-final-state",
+  "fresh-scaffold",
 ]);
 
 export class StandardsLifecycleCertificationError extends Error {
@@ -124,6 +125,9 @@ export async function certifyStandardsLifecycleForTesting(input = {}, adapters) 
     "--test-name-pattern",
     compiledCliPattern,
     "apps/cli/tests/cli.test.mjs",
+  ]);
+  await runEvidenceCommand(adapters, [
+    "scripts/certify-generated-testing.mjs",
   ]);
   await runEvidenceCommand(adapters, [
     "--test",

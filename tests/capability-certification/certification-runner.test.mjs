@@ -119,6 +119,12 @@ test("standards lifecycle certification binds the exact revision to causal compi
       },
       {
         executable: process.execPath,
+        arguments: ["scripts/certify-generated-testing.mjs"],
+        cwd: repositoryRoot,
+        secrets: [undefined, undefined, undefined],
+      },
+      {
+        executable: process.execPath,
         arguments: [
           "--test",
           "--test-name-pattern",
@@ -145,6 +151,7 @@ test("standards lifecycle certification binds the exact revision to causal compi
       "migration-before-state",
       "state-persistence-failure-prefix",
       "exact-final-state",
+      "fresh-scaffold",
     ],
   });
 });
@@ -1232,7 +1239,7 @@ test("generated testing certification binds a fresh portfolio to the exact stand
       subject: {
         descriptorVersion: "0.4.0",
         behaviorContractDigest:
-          "sha256:8733f70cdc64134232912c691c6922b27defb8cb7c2871faa334cfad2b394643",
+          "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4",
       },
       recipeVersion: "0.10.0",
       checks: [
