@@ -33,6 +33,8 @@ const namedLabel = (prefix, ordinal, separator = " ") =>
   [prefix, separator, ordinal].join("");
 const credentialBoundPackageCommandPattern =
   /\b(?:pnpm|npm|yarn)\b[^\n]*(?:\bbuild|\btest)(?=[:\s]|$)/iu;
+const exactSemanticVersionPattern =
+  /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:(?:0|[1-9]\d*)|(?:\d*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9]\d*)|(?:\d*[A-Za-z-][0-9A-Za-z-]*)))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
 
 async function runRepositoryQualityScopeClassifier(input) {
   const executionRoot = await mkdtemp(
@@ -1038,7 +1040,7 @@ test("the compatibility record preserves its required evidence boundaries", asyn
 
   for (const heading of [
     "Status and evidence date",
-    "Exact matrix",
+    "Accepted evidence snapshot",
     "What each check proves",
     "Runtime distinctions",
     "Known limitations",
@@ -1065,30 +1067,25 @@ test("the compatibility record preserves its required evidence boundaries", asyn
   assert.match(compatibility, /do(?:es)? not establish WCAG conformance/i);
 });
 
-test("the compatibility package matrix follows executable version owners", async () => {
-  const [compatibility, rootSource, proofSource] = await Promise.all([
-    readRepositoryFile("docs/compatibility/nextjs-cloudflare.md"),
+test("exact semantic versions reject zero-padded numeric prereleases", () => {
+  assert.doesNotMatch("1.2.3-01", exactSemanticVersionPattern);
+  assert.match("1.2.3-alpha.1", exactSemanticVersionPattern);
+  assert.match("1.2.3-01alpha", exactSemanticVersionPattern);
+});
+
+test("the compatibility proof manifests use exact semantic versions", async () => {
+  const [rootSource, proofSource] = await Promise.all([
     readRepositoryFile("package.json"),
     readRepositoryFile("proofs/nextjs-cloudflare/package.json"),
   ]);
   const rootManifest = JSON.parse(rootSource);
   const proofManifest = JSON.parse(proofSource);
-  const matrixBody = compatibility
-    .split("## Exact matrix\n\n", 2)[1]
-    ?.split("\n\n", 1)[0];
-  assert.equal(typeof matrixBody, "string");
-  const exactMatrix = new Map(
-    matrixBody
-      .split("\n")
-      .slice(2)
-      .map((row) => row.split("|").slice(1, -1).map((cell) => cell.trim())),
-  );
 
   assert.equal(
     proofManifest.dependencies.react,
     proofManifest.dependencies["react-dom"],
   );
-  const expectedPackageVersions = [
+  const executableVersions = [
     ["Node.js", rootManifest.engines.node],
     ["pnpm", rootManifest.engines.pnpm],
     ["Next.js", proofManifest.dependencies.next],
@@ -1116,8 +1113,76 @@ test("the compatibility package matrix follows executable version owners", async
     ],
   ];
 
-  for (const [surface, version] of expectedPackageVersions) {
-    assert.equal(exactMatrix.get(surface), `\`${version}\``, surface);
+  for (const [surface, version] of executableVersions) {
+    assert.equal(typeof version, "string", surface);
+    assert.match(version, exactSemanticVersionPattern, surface);
+  }
+});
+
+test("the compatibility package matrix is bound to accepted evidence", async () => {
+  const compatibility = await readRepositoryFile(
+    "docs/compatibility/nextjs-cloudflare.md",
+  );
+  const matrixBody = compatibility
+    .split("## Accepted evidence snapshot\n\n", 2)[1]
+    ?.split("\n\n", 1)[0];
+  assert.equal(typeof matrixBody, "string");
+  const evidenceRows = matrixBody
+    .split("\n")
+    .slice(2)
+    .map((row) => row.split("|").slice(1, -1).map((cell) => cell.trim()));
+  const evidenceSnapshot = new Map(evidenceRows);
+  assert.equal(
+    evidenceSnapshot.size,
+    evidenceRows.length,
+    "accepted evidence surfaces must be unique",
+  );
+  const expectedEvidenceSnapshot = new Map([
+    ["Evidence date", "`2026-08-13`"],
+    ["Repository quality run", "`31742910235`"],
+    [
+      "Implementation commit",
+      "`05fc743e5e24801d6e16e2ed89a8962397272238`",
+    ],
+    [
+      "`pnpm-lock.yaml` SHA-256",
+      "`71444e493ea0d4f2c2011fddcf2dd8b9b339335afafd56dd765e0c50878c126d`",
+    ],
+    ["Node.js", "`22.23.2`"],
+    ["pnpm", "`11.20.0`"],
+    ["Next.js", "`16.3.0`"],
+    ["React / React DOM", "`19.2.8`"],
+    ["OpenNext Cloudflare", "`1.20.2`"],
+    ["Wrangler", "`4.120.1`"],
+    ["TypeScript", "`6.0.3`"],
+    ["ESLint", "`9.39.5`"],
+    ["Next ESLint config", "`16.3.0`"],
+    ["typescript-eslint", "`8.66.0`"],
+    ["Vitest", "`4.1.10`"],
+    ["Playwright", "`1.62.1`"],
+    ["axe Playwright adapter", "`4.12.1`"],
+    ["Cloudflare compatibility date", "`2026-08-04`"],
+  ]);
+
+  assert.deepEqual(evidenceSnapshot, expectedEvidenceSnapshot);
+  for (const surface of [
+    "Node.js",
+    "pnpm",
+    "Next.js",
+    "React / React DOM",
+    "OpenNext Cloudflare",
+    "Wrangler",
+    "TypeScript",
+    "ESLint",
+    "Next ESLint config",
+    "typescript-eslint",
+    "Vitest",
+    "Playwright",
+    "axe Playwright adapter",
+  ]) {
+    const cell = evidenceSnapshot.get(surface) ?? "";
+    assert.match(cell, /^`[^`]+`$/u, surface);
+    assert.match(cell.slice(1, -1), exactSemanticVersionPattern, surface);
   }
 });
 
