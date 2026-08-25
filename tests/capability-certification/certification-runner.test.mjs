@@ -8,7 +8,9 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  realpath,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -1123,6 +1125,7 @@ test("Calendly production mutation keeps real owner identity while testing mocks
             if (worktreeIndex !== -1) {
               projectRoot = input.arguments.at(-1);
               await mkdir(projectRoot);
+              await writeFile(join(projectRoot, ".git"), "gitdir: private\n");
             }
             return "";
           }
@@ -1219,6 +1222,9 @@ test("Calendly production mutation keeps real owner identity while testing mocks
         async verifyProject(root, identifier) {
           verifiedRoot = root;
           assert.equal(identifier, "portfolio-calendly");
+          assert.notEqual(root, projectRoot);
+          assert.equal(dirname(root), ownedPath);
+          assert.equal(await pathExists(join(root, ".git")), false);
           return {
             ok: true,
             fixtures: ["portfolio-calendly"],
@@ -1319,7 +1325,7 @@ test("Calendly production mutation keeps real owner identity while testing mocks
         ],
       ],
     );
-    assert.equal(verifiedRoot, projectRoot);
+    assert.notEqual(verifiedRoot, projectRoot);
     assert.equal(await pathExists(ownedPath), false);
     assert.doesNotMatch(JSON.stringify(result), /calendly\.com|PRIVATE_VALUE/u);
   } finally {
@@ -1358,6 +1364,54 @@ test("Calendly production mutation maps command failures and removes its real ow
     },
   );
   assert.equal(await pathExists(ownedPath), false);
+});
+
+test("Calendly certification canonicalizes an owned directory below a symbolic-link parent", async () => {
+  const testRoot = await mkdtemp(
+    join(tmpdir(), "egeria-calendly-canonical-owner-test-"),
+  );
+  const canonicalParent = join(testRoot, "canonical");
+  const aliasParent = join(testRoot, "alias");
+  await mkdir(canonicalParent);
+  await symlink(
+    canonicalParent,
+    aliasParent,
+    process.platform === "win32" ? "junction" : "dir",
+  );
+  const requestedOutputRoot = join(aliasParent, "owner");
+  let observedOutputRoot;
+
+  try {
+    await assert.rejects(
+      () =>
+        certifyBookingCalendlyForTesting(
+          {
+            calendlyUrl: "https://calendly.com/example/private-value",
+            outputRoot: requestedOutputRoot,
+          },
+          {
+            async runCommand(input) {
+              observedOutputRoot = dirname(
+                input.arguments[input.arguments.indexOf("--directory") + 1],
+              );
+              throw new Error("stop after observing canonical owner");
+            },
+            async verifyProject() {
+              throw new Error("must not verify");
+            },
+          },
+        ),
+      (error) => {
+        assert.equal(error?.code, "BASELINE_CREATE_FAILED");
+        return true;
+      },
+    );
+
+    assert.equal(observedOutputRoot, join(await realpath(aliasParent), "owner"));
+    assert.equal(await pathExists(requestedOutputRoot), false);
+  } finally {
+    await rm(testRoot, { recursive: true });
+  }
 });
 
 test("Calendly testing API rejects the production-adapter mutation", async () => {

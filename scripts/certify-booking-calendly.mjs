@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { chmod, mkdir, mkdtemp } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -157,6 +157,11 @@ async function createOwnedDirectory(outputRoot) {
     path = outputRoot;
   }
 
+  try {
+    path = await realpath(path);
+  } catch {
+    fail("CERTIFICATION_SETUP_FAILED");
+  }
   const identity = await readPathIdentity(path);
   if (identity.isSymbolicLink || !identity.isDirectory) {
     fail("CERTIFICATION_SETUP_FAILED");
@@ -367,10 +372,18 @@ async function createFreshAddedProject(input, adapters, owner) {
   );
   requireDiff(diff);
 
+  const verificationRoot = join(owner.path, "verification-project");
   let generatedVerification;
   try {
+    await cp(projectRoot, verificationRoot, {
+      recursive: true,
+      force: false,
+      errorOnExist: true,
+      dereference: false,
+      filter: (source) => source !== join(projectRoot, ".git"),
+    });
     generatedVerification = await adapters.verifyProject(
-      projectRoot,
+      verificationRoot,
       "portfolio-calendly",
       projectName,
     );
