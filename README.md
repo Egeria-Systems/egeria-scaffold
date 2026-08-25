@@ -61,7 +61,7 @@ Run the complete local public-package release-candidate gate with:
 pnpm run verify:package-release-candidate
 ```
 
-Node.js `22.23.2` is pinned through `.nvmrc` and `package.json` Volta configuration. pnpm `11.20.0` is pinned through `packageManager` and exact engine policy. The [compatibility record](docs/compatibility/nextjs-cloudflare.md) owns the exact matrix, runtime distinctions, known limitations, and evidence boundary.
+Node.js `22.23.2` is pinned through `.nvmrc` and `package.json` Volta configuration. pnpm `11.20.0` is pinned through `packageManager` and exact engine policy. The executable manifests own current exact dependency versions; the [compatibility record](docs/compatibility/nextjs-cloudflare.md) owns accepted evidence snapshots, runtime distinctions, known limitations, and claim boundaries.
 
 ## Current builder topology
 
