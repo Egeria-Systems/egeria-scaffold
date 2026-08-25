@@ -412,8 +412,13 @@ export function certifyContentFilesForTesting(input, adapters) {
 }
 
 function parseArguments(arguments_) {
-  if (arguments_.length === 2 && arguments_[0] === "--revision") {
-    return { revision: arguments_[1] };
+  const normalizedArguments =
+    arguments_[0] === "--" ? arguments_.slice(1) : arguments_;
+  if (
+    normalizedArguments.length === 2 &&
+    normalizedArguments[0] === "--revision"
+  ) {
+    return { revision: normalizedArguments[1] };
   }
   return undefined;
 }

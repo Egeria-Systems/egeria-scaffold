@@ -2215,6 +2215,11 @@ test("the content files certification command requires one exact revision withou
       "CERTIFICATION_REVISION_INVALID",
       1,
     ],
+    [
+      ["--", "--revision", "private-value"],
+      "CERTIFICATION_REVISION_INVALID",
+      1,
+    ],
     [["--unknown", "private-value"], "CERTIFICATION_ARGUMENT_INVALID", 2],
   ]) {
     const execution = await execFileAsync(
