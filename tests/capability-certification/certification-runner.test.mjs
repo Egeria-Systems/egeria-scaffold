@@ -739,13 +739,8 @@ test("profile transition lifecycle certification rejects Git index flags that hi
           readCurrentRevision: async () => revision,
           readRepositoryStatus: async () => status,
           readRepositoryIndexEntries: async () => indexEntries,
-          runCommand: async (input) => ({
-            stdout: successfulTap(
-              input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
-                ? compiledProfileTransitionCertificationTests
-                : builderProfileTransitionCertificationTests,
-            ),
-          }),
+          runCommand: async () =>
+            assert.fail("hidden index flags must stop before evidence"),
         },
       ),
       (error) => error?.code === "EVIDENCE_WORKTREE_INDEX_FLAGS",
