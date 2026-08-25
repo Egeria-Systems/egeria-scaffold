@@ -1627,9 +1627,18 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
       CERTIFICATION_OWNER: certificationOwner,
     },
   );
+  assert.equal(stepsByName["Build builder"].run, "pnpm run build:builder");
+  assert.equal(
+    stepsByName["Test compiled lifecycle behavior"].run,
+    "pnpm run test:cli",
+  );
   assert.match(
     stepsByName["Create fresh-added deployment candidate"].run,
-    /pnpm run verify:booking-calendly-certification -- --calendly-url "\$CALENDLY_URL" --output-root "\$CERTIFICATION_OWNER"/u,
+    /node scripts\/certify-booking-calendly\.mjs --calendly-url "\$CALENDLY_URL" --output-root "\$CERTIFICATION_OWNER"/u,
+  );
+  assert.doesNotMatch(
+    stepsByName["Create fresh-added deployment candidate"].run,
+    /pnpm run verify:booking-calendly-certification/u,
   );
   assert.doesNotMatch(
     stepsByName["Create fresh-added deployment candidate"].run,
@@ -1691,6 +1700,12 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   const candidateIndex = job.steps.findIndex(
     ({ name }) => name === "Create fresh-added deployment candidate",
   );
+  const builderBuildIndex = job.steps.findIndex(
+    ({ name }) => name === "Build builder",
+  );
+  const lifecycleTestIndex = job.steps.findIndex(
+    ({ name }) => name === "Test compiled lifecycle behavior",
+  );
   const unitTestIndex = job.steps.findIndex(
     ({ name }) => name === "Test deployment candidate unit behavior",
   );
@@ -1705,7 +1720,9 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   );
   assert.ok(
     revisionIndex > -1 &&
-      revisionIndex < candidateIndex &&
+      revisionIndex < builderBuildIndex &&
+      builderBuildIndex < lifecycleTestIndex &&
+      lifecycleTestIndex < candidateIndex &&
       candidateIndex < unitTestIndex &&
       unitTestIndex < componentTestIndex &&
       componentTestIndex < buildIndex &&

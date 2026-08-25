@@ -55,13 +55,19 @@ jobs:
       - name: Check capability admission
         run: pnpm run check:capability-certification
 
+      - name: Build builder
+        run: pnpm run build:builder
+
+      - name: Test compiled lifecycle behavior
+        run: pnpm run test:cli
+
       - name: Create fresh-added deployment candidate
         env:
           CALENDLY_URL: ${{ inputs.calendly_url }}
           CERTIFICATION_OWNER: ${{ runner.temp }}/booking-calendly-certification
         run: |
           test -n "$CALENDLY_URL"
-          pnpm run verify:booking-calendly-certification -- --calendly-url "$CALENDLY_URL" --output-root "$CERTIFICATION_OWNER" > "$RUNNER_TEMP/booking-calendly-local-receipt.json"
+          node scripts/certify-booking-calendly.mjs --calendly-url "$CALENDLY_URL" --output-root "$CERTIFICATION_OWNER" > "$RUNNER_TEMP/booking-calendly-local-receipt.json"
           test "$(wc -l < "$RUNNER_TEMP/booking-calendly-local-receipt.json")" -eq 1
 
       - name: Install deployment candidate dependencies
