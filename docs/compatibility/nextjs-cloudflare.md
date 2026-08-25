@@ -34,6 +34,17 @@ The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](..
 | Playwright | `1.62.1` |
 | axe Playwright adapter | `4.12.1` |
 | Cloudflare compatibility date | `2026-08-04` |
+
+The table is the immutable package snapshot for the accepted hosted evidence named above. It does not mirror later manifest updates. A newer dependency has current compatibility evidence only from checks that ran against that exact revision until a separately approved evidence refresh replaces this snapshot.
+
+All package versions in this snapshot are exact. Current package versions remain exact in their executable manifests. The workspace uses a one-day package maturity policy, a reviewed lifecycle-script allowlist, and the narrow `miniflare>undici: 7.29.0` security override recorded in the preparation evidence.
+
+## Informational deployment context
+
+The following values summarize separately accepted workflow and deployment evidence for reader orientation. They are not part of the immutable hosted package snapshot. The current workflows and shared deployment policy own the current deployment contract; the exact historical evidence identity remains recorded under [Deployment boundary](#deployment-boundary).
+
+| Surface | Accepted or historical value |
+|---|---|
 | Historical deployed GitHub environment | `compatibility` |
 | Historical deployed Cloudflare Worker | `egeria-scaffold-nextjs-cloudflare-proof` |
 | Accepted shared GitHub environment | `test-deploy` |
@@ -47,10 +58,6 @@ The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](..
 | Deployed Node.js | `22.23.0` |
 | Deployed implementation | `160b8ef261e69ec783ad93b7bfe69d932ba84541` |
 | Deployed `pnpm-lock.yaml` SHA-256 | `72fab6af3a327404e287094e99438b98f7a43007765a4a9e6255cc357dd637c7` |
-
-The table is the immutable package, workflow, and deployment snapshot for the accepted hosted evidence named above. It does not mirror later manifest or workflow updates. A newer dependency has current compatibility evidence only from checks that ran against that exact revision until a separately approved evidence refresh replaces this snapshot.
-
-All package versions in this snapshot are exact. Current package versions remain exact in their executable manifests. The workspace uses a one-day package maturity policy, a reviewed lifecycle-script allowlist, and the narrow `miniflare>undici: 7.29.0` security override recorded in the preparation evidence.
 
 ## What each check proves
 
