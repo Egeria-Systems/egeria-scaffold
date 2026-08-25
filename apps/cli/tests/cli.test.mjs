@@ -13,7 +13,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
@@ -425,7 +425,7 @@ async function listCalendlyReferencePaths(root, relativeDirectory = "") {
     const source = await readFile(join(root, relativePath));
     if (source.includes(0)) continue;
     if (/booking-calendly|calendly/iu.test(source.toString("utf8"))) {
-      matches.push(relativePath);
+      matches.push(relativePath.split(sep).join("/"));
     }
   }
 
