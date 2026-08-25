@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       expected_revision:
-        description: Exact main revision approved for certification
+        description: Exact reviewed revision approved for certification
         required: true
         type: string
       calendly_url:
@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   verify-and-deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/booking-calendly-lifecycle-certification'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment:
@@ -55,25 +55,14 @@ jobs:
       - name: Check capability admission
         run: pnpm run check:capability-certification
 
-      - name: Build builder packages
-        run: pnpm run build:builder
-
-      - name: Verify fresh local scaffold
+      - name: Create fresh-added deployment candidate
         env:
           CALENDLY_URL: ${{ inputs.calendly_url }}
+          CERTIFICATION_OWNER: ${{ runner.temp }}/booking-calendly-certification
         run: |
           test -n "$CALENDLY_URL"
-          node scripts/certify-booking-calendly.mjs --calendly-url "$CALENDLY_URL" > "$RUNNER_TEMP/booking-calendly-local-receipt.json"
+          pnpm run verify:booking-calendly-certification -- --calendly-url "$CALENDLY_URL" --output-root "$CERTIFICATION_OWNER" > "$RUNNER_TEMP/booking-calendly-local-receipt.json"
           test "$(wc -l < "$RUNNER_TEMP/booking-calendly-local-receipt.json")" -eq 1
-
-      - name: Create deployment candidate
-        env:
-          CALENDLY_URL: ${{ inputs.calendly_url }}
-          CERTIFICATION_ROOT: ${{ runner.temp }}/booking-calendly-certification/project
-        run: |
-          test -n "$CALENDLY_URL"
-          mkdir -p "$RUNNER_TEMP/booking-calendly-certification"
-          node apps/cli/dist/index.js create --profile portfolio --name acme-portfolio-calendly --display-name "Acme Portfolio Booking" --directory "$CERTIFICATION_ROOT" --calendly-url "$CALENDLY_URL" --calendly-mode popup
 
       - name: Install deployment candidate dependencies
         env:
