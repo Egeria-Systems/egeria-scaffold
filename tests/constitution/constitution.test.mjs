@@ -3009,7 +3009,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
   );
   assert.match(
     capabilityModel,
-    /Pull requests 48, 49, and 50[^\n]+standards executor[^\n]+portfolio-to-site planner\/executor[^\n]+accepted-main integrated[^\n]+641db9537f5dea4911b0b727eb083f8d6d359204[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+selected certification[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+remain planned/iu,
+    /Pull requests 48, 49, and 50[^\n]+standards executor[^\n]+portfolio-to-site planner\/executor[^\n]+accepted-main integrated[^\n]+641db9537f5dea4911b0b727eb083f8d6d359204[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+portfolio-to-site transition lifecycle certification[^\n]+complete[^\n]+2650a9a5039f6b94d7d0c26dcc3d255ff6e6e579[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+remain planned/iu,
   );
   assert.match(
     enforcementMap,
@@ -3270,7 +3270,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.match(
       sequencingOwner,
-      /minimum four remaining increments/iu,
+      /minimum three remaining increments/iu,
     );
     assert.match(
       sequencingOwner,
@@ -3280,6 +3280,15 @@ test("canonical documentation accepts profile-transition execution and bounds it
       sequencingOwner,
       /standards@0\.4\.0[^\n]+lifecycle certification[^\n]+complete/iu,
     );
+    assert.match(
+      sequencingOwner,
+      /portfolio-to-site[^\n]+transition[^\n]+lifecycle certification[^\n]+complete[^\n]+2650a9a5039f6b94d7d0c26dcc3d255ff6e6e579/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /(?:content-files@0\.4\.0[^\n]+next[^\n]+certification increment|next[^\n]+certification increment[^\n]+content-files@0\.4\.0)/iu,
+    );
+    assert.doesNotMatch(sequencingOwner, /minimum four remaining increments/iu);
     assert.doesNotMatch(sequencingOwner, /minimum five remaining increments/iu);
     for (const backfillSubject of [
       "content-files",
@@ -3298,8 +3307,19 @@ test("canonical documentation accepts profile-transition execution and bounds it
 
   assert.match(
     roadmap,
-    /1\. run a separate portfolio-to-site transition certification increment[^\n]+migration[^\n]+refusal[^\n]+exact state[^\n]+recovery/iu,
+    /1\. reconcile `content-files@0\.4\.0` in a separate certification increment/iu,
   );
+
+  for (const certificationStatusOwner of [
+    overview,
+    capabilityModel,
+    enforcementMap,
+  ]) {
+    assert.match(
+      certificationStatusOwner,
+      /portfolio-to-site[^\n]+transition[^\n]+lifecycle certification[^\n]+complete[^\n]+2650a9a5039f6b94d7d0c26dcc3d255ff6e6e579/iu,
+    );
+  }
 
   assert.match(
     sourcePlan,
