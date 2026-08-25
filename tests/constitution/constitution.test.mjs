@@ -2326,7 +2326,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /standards@0\.4\.0[^\n]+certified[^\n]+416e2c2441978ac86f3a17dee96a694141033e20[^\n]+booking-calendly@0\.1\.0[^\n]+pending[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
+    /standards@0\.4\.0[^\n]+certified[^\n]+416e2c2441978ac86f3a17dee96a694141033e20[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -2334,7 +2334,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+closure rejects[^\n]+current Calendly subject[^\n]+backfill records/i,
+    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+pass[^\n]+all-certified[^\n]+rejects only[^\n]+backfill records/i,
   );
 });
 
@@ -2473,22 +2473,22 @@ test("executable capability certification ownership is current", async () => {
 
   for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
     assert.match(document, /certifications\/capabilities\.json/u);
-    assert.match(document, /booking-calendly[\s\S]+(?:active|current)[^\n]+pending/iu);
+    assert.match(document, /booking-calendly[\s\S]+(?:active|current)[^\n]+certified/iu);
   }
   assert.match(
     capabilityModel,
-    /booking-calendly[^\n]+pending[^\n]+separately bound protected-staging evidence/iu,
+    /booking-calendly[^\n]+certified[^\n]+fresh-add lifecycle[^\n]+protected-staging\/provider receipts/iu,
   );
   assert.match(
     enforcementMap,
-    /booking-calendly[^\n]+pending[^\n]+provider-confirmed[^\n]+cleanup/iu,
+    /booking-calendly[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+provider-confirmed[^\n]+cleanup[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d/iu,
   );
   const registry = JSON.parse(registrySource);
   const bookingRecord = registry.records["booking-calendly"];
   const deploymentRecord = registry.records["deployment-cloudflare"];
   const observabilityRecord = registry.records.observability;
   const standardsRecord = registry.records.standards;
-  assert.equal(bookingRecord.status, "pending");
+  assert.equal(bookingRecord.status, "certified");
   assert.equal(
     bookingRecord.taskPlan,
     "docs/superpowers/plans/2026-08-24-booking-calendly-lifecycle-certification.md",
@@ -2500,7 +2500,48 @@ test("executable capability certification ownership is current", async () => {
     "fresh-scaffold",
     "provider-confirmed",
   ]);
-  assert.deepEqual(bookingRecord.evidence, []);
+  const bookingSubject = {
+    descriptorVersion: "0.1.0",
+    behaviorContractDigest:
+      "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2",
+  };
+  assert.deepEqual(bookingRecord.evidence, [
+    {
+      kind: "cleanup-recovery",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
+      outcome: "passed",
+      revision: "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
+      subject: bookingSubject,
+    },
+    {
+      kind: "deployed-application",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
+      outcome: "passed",
+      revision: "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
+      subject: bookingSubject,
+    },
+    {
+      kind: "existing-repository-lifecycle",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md",
+      outcome: "passed",
+      revision: "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059",
+      subject: bookingSubject,
+    },
+    {
+      kind: "fresh-scaffold",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md",
+      outcome: "passed",
+      revision: "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059",
+      subject: bookingSubject,
+    },
+    {
+      kind: "provider-confirmed",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
+      outcome: "passed",
+      revision: "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
+      subject: bookingSubject,
+    },
+  ]);
   assert.equal(deploymentRecord.status, "certified");
   assert.deepEqual(
     deploymentRecord.evidence.map(({ kind, path, outcome, revision }) => ({
@@ -2617,11 +2658,11 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+closure rejects[^\n]+current Calendly subject[^\n]+backfill records/iu,
+    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+pass[^\n]+all-certified[^\n]+rejects only[^\n]+backfill records/iu,
   );
   assert.match(
     enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+pending subject[^\n]+existing-repository-lifecycle[^\n]+provider-confirmed[^\n]+cleanup/iu,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+provider-confirmed[^\n]+cleanup[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d/iu,
   );
   assert.match(
     reviewProtocol,

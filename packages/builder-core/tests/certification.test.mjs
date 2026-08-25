@@ -10,6 +10,14 @@ const planPath =
 const evidencePath =
   "docs/implementation-evidence/2026-08-10-booking-calendly-certification-verification.md";
 const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
+const bookingLifecycleEvidencePath =
+  "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md";
+const bookingLifecycleEvidenceRevision =
+  "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059";
+const bookingProviderEvidencePath =
+  "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md";
+const bookingProviderEvidenceRevision =
+  "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d";
 const observabilityPlanPath =
   "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md";
 const observabilityEvidencePath =
@@ -226,6 +234,65 @@ test("certification subjects bind the descriptor and required evidence", () => {
       .behaviorContractDigest,
     descriptorDigests["booking-calendly"],
   );
+});
+
+test("current Calendly lifecycle subject has exact reviewed certification evidence", () => {
+  const bookingDescriptor = descriptorsByIdentifier.get("booking-calendly");
+  assert.notEqual(bookingDescriptor, undefined);
+  const subject = core.createCertificationSubject(
+    bookingDescriptor,
+    requiredEvidence["booking-calendly"],
+  );
+
+  assert.deepEqual(committedRegistry.records["booking-calendly"], {
+    subject,
+    requiredEvidence: [
+      "cleanup-recovery",
+      "deployed-application",
+      "existing-repository-lifecycle",
+      "fresh-scaffold",
+      "provider-confirmed",
+    ],
+    status: "certified",
+    taskPlan: planPath,
+    evidence: [
+      {
+        kind: "cleanup-recovery",
+        path: bookingProviderEvidencePath,
+        outcome: "passed",
+        revision: bookingProviderEvidenceRevision,
+        subject,
+      },
+      {
+        kind: "deployed-application",
+        path: bookingProviderEvidencePath,
+        outcome: "passed",
+        revision: bookingProviderEvidenceRevision,
+        subject,
+      },
+      {
+        kind: "existing-repository-lifecycle",
+        path: bookingLifecycleEvidencePath,
+        outcome: "passed",
+        revision: bookingLifecycleEvidenceRevision,
+        subject,
+      },
+      {
+        kind: "fresh-scaffold",
+        path: bookingLifecycleEvidencePath,
+        outcome: "passed",
+        revision: bookingLifecycleEvidenceRevision,
+        subject,
+      },
+      {
+        kind: "provider-confirmed",
+        path: bookingProviderEvidencePath,
+        outcome: "passed",
+        revision: bookingProviderEvidenceRevision,
+        subject,
+      },
+    ],
+  });
 });
 
 test("descriptor admission rejects incomplete, stale, extra, and false-legacy coverage", () => {

@@ -453,7 +453,7 @@ async function runCheck(
   }
 }
 
-test("the repository registry admits current subjects and rejects the pending Calendly lifecycle", async () => {
+test("the repository registry admits the certified Calendly lifecycle and retains only historical backfills", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -467,18 +467,11 @@ test("the repository registry admits current subjects and rejects the pending Ca
 
   const closure = await runCheck(["--closure", "legacy-backfill-exempt"]);
   assert.deepEqual(closure, {
-    exitCode: 1,
+    exitCode: 0,
     stdout: `${JSON.stringify({
-      ok: false,
+      ok: true,
       gate: "closure",
       policy: "legacy-backfill-exempt",
-      issues: [
-        {
-          code: "CAPABILITY_CERTIFICATION_PENDING",
-          path: ["records", "booking-calendly", "status"],
-          context: { reason: "pending" },
-        },
-      ],
     })}\n`,
     stderr: "",
   });
@@ -491,7 +484,6 @@ test("the repository registry admits current subjects and rejects the pending Ca
       gate: "closure",
       policy: "all-certified",
       issues: [
-        ["booking-calendly", "pending"],
         ["content-files", "backfill-pending"],
         ["section-composition", "backfill-pending"],
         ["site-routing", "backfill-pending"],
@@ -608,6 +600,124 @@ test("private certification validation rejects missing, rejected, and non-ancest
         script: cleanCheckScript,
       }),
       "CERTIFICATION_EVIDENCE_REVISION_UNKNOWN",
+    );
+  } finally {
+    await rm(cleanRoot, { recursive: true, force: true });
+  }
+});
+
+test("private certification validation checks only records changed from accepted main", async () => {
+  const cleanRoot = await mkdtemp(
+    join(tmpdir(), "egeria-private-certification-delta-"),
+  );
+
+  try {
+    const cleanCheckScript = await copyCertificationRuntime(cleanRoot);
+    await writeFile(join(cleanRoot, "baseline.txt"), "baseline\n", "utf8");
+    await execFileAsync("git", ["init", "--quiet"], { cwd: cleanRoot });
+    await execFileAsync("git", ["add", "baseline.txt"], { cwd: cleanRoot });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Certification Test",
+        "-c",
+        "user.email=certification@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "baseline",
+      ],
+      { cwd: cleanRoot },
+    );
+    const { stdout: initialRevisionOutput } = await execFileAsync(
+      "git",
+      ["rev-parse", "HEAD"],
+      { cwd: cleanRoot, encoding: "utf8" },
+    );
+    const initialRevision = initialRevisionOutput.trim();
+    const historicalSubject = {
+      descriptorVersion: "0.4.0",
+      behaviorContractDigest: `sha256:${"a".repeat(64)}`,
+    };
+    const historicalRecord = {
+      subject: historicalSubject,
+      requiredEvidence: ["fresh-scaffold"],
+      status: "certified",
+      taskPlan: "docs/superpowers/plans/historical-certification.md",
+      evidence: [
+        {
+          kind: "fresh-scaffold",
+          path: "docs/implementation-evidence/historical-certification.md",
+          outcome: "passed",
+          revision: initialRevision,
+          subject: historicalSubject,
+        },
+      ],
+    };
+    const baselineRegistry = createPrivateRegistry(initialRevision);
+    baselineRegistry.records["booking-calendly"].status = "pending";
+    baselineRegistry.records["booking-calendly"].evidence = [];
+    baselineRegistry.records.standards = historicalRecord;
+    await writeFile(
+      join(cleanRoot, "certifications/capabilities.json"),
+      `${JSON.stringify(baselineRegistry, null, 2)}\n`,
+      "utf8",
+    );
+    await execFileAsync(
+      "git",
+      ["add", "certifications/capabilities.json"],
+      { cwd: cleanRoot },
+    );
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Certification Test",
+        "-c",
+        "user.email=certification@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "accept baseline registry",
+      ],
+      { cwd: cleanRoot },
+    );
+    const { stdout: baselineRevisionOutput } = await execFileAsync(
+      "git",
+      ["rev-parse", "HEAD"],
+      { cwd: cleanRoot, encoding: "utf8" },
+    );
+    const baselineRevision = baselineRevisionOutput.trim();
+    await execFileAsync(
+      "git",
+      ["update-ref", "refs/remotes/origin/main", baselineRevision],
+      { cwd: cleanRoot },
+    );
+
+    await writePrivateValidationFixture(cleanRoot, baselineRevision);
+    const currentRegistry = createPrivateRegistry(baselineRevision);
+    currentRegistry.records.standards = historicalRecord;
+    await writeFile(
+      join(cleanRoot, "certifications/capabilities.json"),
+      `${JSON.stringify(currentRegistry, null, 2)}\n`,
+      "utf8",
+    );
+
+    assert.deepEqual(
+      await runCheck(["--artifacts"], {
+        cwd: cleanRoot,
+        script: cleanCheckScript,
+      }),
+      {
+        exitCode: 0,
+        stdout: `${JSON.stringify({
+          ok: true,
+          gate: "artifacts",
+          records: 1,
+        })}\n`,
+        stderr: "",
+      },
     );
   } finally {
     await rm(cleanRoot, { recursive: true, force: true });
