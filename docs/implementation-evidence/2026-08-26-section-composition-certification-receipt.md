@@ -14,7 +14,7 @@
 
 **Certification behavior-contract digest:** `sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696`
 
-**Certification evidence revision:** `ef35bf58d86febd3e3abb3549d61669922094550`
+**Certification evidence revision:** `f74459c8833833186bb651c116ed524e51044677`
 
 **Passed certification outcomes:** `fresh-scaffold`
 
@@ -35,12 +35,14 @@ This content-safe receipt records the causal local certification and approved re
 The exact clean revision ran:
 
 ```text
-pnpm run verify:section-composition-certification -- --revision ef35bf58d86febd3e3abb3549d61669922094550
+pnpm run verify:section-composition-certification -- --revision f74459c8833833186bb651c116ed524e51044677
 ```
 
 The runner used repository-pinned Node.js `22.23.2` and pnpm `11.20.0`. Frozen dependency installation and Chromium installation used bounded network access inside identity-owned disposable roots. No credential, provider account, deployment, protected environment, persistent external state, or spend was required.
 
 An earlier clean attempt at revision `aae33f0e344c2e7255f943a39ea48f0851af3fb6` was rejected because the disposable unit fixture used an incorrect relative import. The exact fixture command reproduced the failure, the import boundary was corrected under that failing fixture, and unit, component, and four development-browser checks passed in an identity-bounded diagnostic copy before the complete journey reran. The earlier revision is superseded and is not registry evidence.
+
+The initial successful evidence revision `ef35bf58d86febd3e3abb3549d61669922094550` was superseded after hosted review found that the responsive-grid browser assertion did not independently require the project list to be a grid container and read the desktop state without retrying. The fixture was narrowed to retry the exact computed `display: grid` plus one- and two-track outcomes, and the complete certification reran successfully at the evidence revision recorded above.
 
 ## Fresh-scaffold outcome
 
@@ -84,5 +86,5 @@ It does not establish visual or design quality, arbitrary responsive quality, pe
 - Exact ownership, package, registry, component, and browser fixture results accepted: `yes`
 - Cleanup, privacy exclusions, and claim boundary accepted: `yes`
 - Registry transition approved: `yes`
-- Review revision: `ef35bf58d86febd3e3abb3549d61669922094550`
+- Review revision: `f74459c8833833186bb651c116ed524e51044677`
 - Rerun trigger: any material descriptor, required-evidence contract, runner, fixture, owned generated surface, package property, presentation, registry, verifier, or evidence defect requires a new clean evidence revision and complete affected rerun

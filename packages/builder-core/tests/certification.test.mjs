@@ -41,7 +41,7 @@ const sectionCompositionPlanPath =
 const sectionCompositionEvidencePath =
   "docs/implementation-evidence/2026-08-26-section-composition-certification-receipt.md";
 const sectionCompositionEvidenceRevision =
-  "ef35bf58d86febd3e3abb3549d61669922094550";
+  "f74459c8833833186bb651c116ed524e51044677";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const deploymentEvidencePath =

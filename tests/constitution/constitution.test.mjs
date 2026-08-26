@@ -2388,7 +2388,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /standards@0\.4\.0[^\n]+certified[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+content-files@0\.4\.0[^\n]+certified[^\n]+f03b9f624c370728f678924ce34e5287558d2a87[^\n]+section-composition@0\.3\.0[^\n]+certified[^\n]+ef35bf58d86febd3e3abb3549d61669922094550[^\n]+one unchanged subject[^\n]+backfill-pending/i,
+    /standards@0\.4\.0[^\n]+certified[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+content-files@0\.4\.0[^\n]+certified[^\n]+f03b9f624c370728f678924ce34e5287558d2a87[^\n]+section-composition@0\.3\.0[^\n]+certified[^\n]+f74459c8833833186bb651c116ed524e51044677[^\n]+one unchanged subject[^\n]+backfill-pending/i,
   );
   assert.match(
     enforcementMap,
@@ -3355,7 +3355,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
     assert.match(
       sequencingOwner,
-      /section-composition@0\.3\.0[^\n]+certification[^\n]+complete[^\n]+ef35bf58d86febd3e3abb3549d61669922094550/iu,
+      /section-composition@0\.3\.0[^\n]+certification[^\n]+complete[^\n]+f74459c8833833186bb651c116ed524e51044677/iu,
     );
     assert.match(
       sequencingOwner,
@@ -3400,7 +3400,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
     assert.match(
       certificationStatusOwner,
-      /section-composition@0\.3\.0[^\n]+certified[^\n]+ef35bf58d86febd3e3abb3549d61669922094550/iu,
+      /section-composition@0\.3\.0[^\n]+certified[^\n]+f74459c8833833186bb651c116ed524e51044677/iu,
     );
   }
 
