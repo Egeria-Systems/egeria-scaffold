@@ -33,6 +33,8 @@ const namedLabel = (prefix, ordinal, separator = " ") =>
   [prefix, separator, ordinal].join("");
 const credentialBoundPackageCommandPattern =
   /\b(?:pnpm|npm|yarn)\b[^\n]*(?:\bbuild|\btest)(?=[:\s]|$)/iu;
+const exactSemanticVersionPattern =
+  /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:(?:0|[1-9]\d*)|(?:\d*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9]\d*)|(?:\d*[A-Za-z-][0-9A-Za-z-]*)))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
 
 async function runRepositoryQualityScopeClassifier(input) {
   const executionRoot = await mkdtemp(
@@ -1038,7 +1040,7 @@ test("the compatibility record preserves its required evidence boundaries", asyn
 
   for (const heading of [
     "Status and evidence date",
-    "Exact matrix",
+    "Accepted evidence snapshot",
     "What each check proves",
     "Runtime distinctions",
     "Known limitations",
@@ -1065,30 +1067,25 @@ test("the compatibility record preserves its required evidence boundaries", asyn
   assert.match(compatibility, /do(?:es)? not establish WCAG conformance/i);
 });
 
-test("the compatibility package matrix follows executable version owners", async () => {
-  const [compatibility, rootSource, proofSource] = await Promise.all([
-    readRepositoryFile("docs/compatibility/nextjs-cloudflare.md"),
+test("exact semantic versions reject zero-padded numeric prereleases", () => {
+  assert.doesNotMatch("1.2.3-01", exactSemanticVersionPattern);
+  assert.match("1.2.3-alpha.1", exactSemanticVersionPattern);
+  assert.match("1.2.3-01alpha", exactSemanticVersionPattern);
+});
+
+test("the compatibility proof manifests use exact semantic versions", async () => {
+  const [rootSource, proofSource] = await Promise.all([
     readRepositoryFile("package.json"),
     readRepositoryFile("proofs/nextjs-cloudflare/package.json"),
   ]);
   const rootManifest = JSON.parse(rootSource);
   const proofManifest = JSON.parse(proofSource);
-  const matrixBody = compatibility
-    .split("## Exact matrix\n\n", 2)[1]
-    ?.split("\n\n", 1)[0];
-  assert.equal(typeof matrixBody, "string");
-  const exactMatrix = new Map(
-    matrixBody
-      .split("\n")
-      .slice(2)
-      .map((row) => row.split("|").slice(1, -1).map((cell) => cell.trim())),
-  );
 
   assert.equal(
     proofManifest.dependencies.react,
     proofManifest.dependencies["react-dom"],
   );
-  const expectedPackageVersions = [
+  const executableVersions = [
     ["Node.js", rootManifest.engines.node],
     ["pnpm", rootManifest.engines.pnpm],
     ["Next.js", proofManifest.dependencies.next],
@@ -1116,8 +1113,76 @@ test("the compatibility package matrix follows executable version owners", async
     ],
   ];
 
-  for (const [surface, version] of expectedPackageVersions) {
-    assert.equal(exactMatrix.get(surface), `\`${version}\``, surface);
+  for (const [surface, version] of executableVersions) {
+    assert.equal(typeof version, "string", surface);
+    assert.match(version, exactSemanticVersionPattern, surface);
+  }
+});
+
+test("the compatibility package matrix is bound to accepted evidence", async () => {
+  const compatibility = await readRepositoryFile(
+    "docs/compatibility/nextjs-cloudflare.md",
+  );
+  const matrixBody = compatibility
+    .split("## Accepted evidence snapshot\n\n", 2)[1]
+    ?.split("\n\n", 1)[0];
+  assert.equal(typeof matrixBody, "string");
+  const evidenceRows = matrixBody
+    .split("\n")
+    .slice(2)
+    .map((row) => row.split("|").slice(1, -1).map((cell) => cell.trim()));
+  const evidenceSnapshot = new Map(evidenceRows);
+  assert.equal(
+    evidenceSnapshot.size,
+    evidenceRows.length,
+    "accepted evidence surfaces must be unique",
+  );
+  const expectedEvidenceSnapshot = new Map([
+    ["Evidence date", "`2026-08-13`"],
+    ["Repository quality run", "`31742910235`"],
+    [
+      "Implementation commit",
+      "`05fc743e5e24801d6e16e2ed89a8962397272238`",
+    ],
+    [
+      "`pnpm-lock.yaml` SHA-256",
+      "`71444e493ea0d4f2c2011fddcf2dd8b9b339335afafd56dd765e0c50878c126d`",
+    ],
+    ["Node.js", "`22.23.2`"],
+    ["pnpm", "`11.20.0`"],
+    ["Next.js", "`16.3.0`"],
+    ["React / React DOM", "`19.2.8`"],
+    ["OpenNext Cloudflare", "`1.20.2`"],
+    ["Wrangler", "`4.120.1`"],
+    ["TypeScript", "`6.0.3`"],
+    ["ESLint", "`9.39.5`"],
+    ["Next ESLint config", "`16.3.0`"],
+    ["typescript-eslint", "`8.66.0`"],
+    ["Vitest", "`4.1.10`"],
+    ["Playwright", "`1.62.1`"],
+    ["axe Playwright adapter", "`4.12.1`"],
+    ["Cloudflare compatibility date", "`2026-08-04`"],
+  ]);
+
+  assert.deepEqual(evidenceSnapshot, expectedEvidenceSnapshot);
+  for (const surface of [
+    "Node.js",
+    "pnpm",
+    "Next.js",
+    "React / React DOM",
+    "OpenNext Cloudflare",
+    "Wrangler",
+    "TypeScript",
+    "ESLint",
+    "Next ESLint config",
+    "typescript-eslint",
+    "Vitest",
+    "Playwright",
+    "axe Playwright adapter",
+  ]) {
+    const cell = evidenceSnapshot.get(surface) ?? "";
+    assert.match(cell, /^`[^`]+`$/u, surface);
+    assert.match(cell.slice(1, -1), exactSemanticVersionPattern, surface);
   }
 });
 
@@ -1278,7 +1343,7 @@ test("package ownership documentation records the approved release boundary", as
   );
   assert.match(
     readme,
-    /builder kernel has received verified-final-diff approval.*client-ready portfolio stage is in progress/iu,
+    /builder kernel has received verified-final-diff approval.*client-ready portfolio stage is completed through an unnumbered closure amendment/iu,
   );
   assert.match(contributing, /pnpm run verify:builder-packages/);
 
@@ -1584,7 +1649,7 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
   assert.deepEqual(workflow.on.workflow_dispatch.inputs, {
     expected_revision: {
-      description: "Exact main revision approved for certification",
+      description: "Exact reviewed revision approved for certification",
       required: true,
       type: "string",
     },
@@ -1614,12 +1679,33 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   const stepsByName = Object.fromEntries(
     job.steps.map((step) => [step.name, step]),
   );
-  const certificationRoot =
-    "${{ runner.temp }}/booking-calendly-certification/project";
-  assert.deepEqual(stepsByName["Create deployment candidate"].env, {
-    CALENDLY_URL: "${{ inputs.calendly_url }}",
-    CERTIFICATION_ROOT: certificationRoot,
-  });
+  const certificationOwner =
+    "${{ runner.temp }}/booking-calendly-certification";
+  const certificationRoot = `${certificationOwner}/project`;
+  assert.deepEqual(
+    stepsByName["Create fresh-added deployment candidate"].env,
+    {
+      CALENDLY_URL: "${{ inputs.calendly_url }}",
+      CERTIFICATION_OWNER: certificationOwner,
+    },
+  );
+  assert.equal(stepsByName["Build builder"].run, "pnpm run build:builder");
+  assert.equal(
+    stepsByName["Test compiled lifecycle behavior"].run,
+    "pnpm run test:cli",
+  );
+  assert.match(
+    stepsByName["Create fresh-added deployment candidate"].run,
+    /node scripts\/certify-booking-calendly\.mjs --calendly-url "\$CALENDLY_URL" --output-root "\$CERTIFICATION_OWNER"/u,
+  );
+  assert.doesNotMatch(
+    stepsByName["Create fresh-added deployment candidate"].run,
+    /pnpm run verify:booking-calendly-certification/u,
+  );
+  assert.doesNotMatch(
+    stepsByName["Create fresh-added deployment candidate"].run,
+    /apps\/cli\/dist\/index\.js create/u,
+  );
   assert.deepEqual(stepsByName["Build and prepare deployment candidate"].env, {
     CERTIFICATION_ROOT: certificationRoot,
   });
@@ -1673,6 +1759,15 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   const deployIndex = job.steps.findIndex(
     ({ name }) => name === "Deploy certification Worker",
   );
+  const candidateIndex = job.steps.findIndex(
+    ({ name }) => name === "Create fresh-added deployment candidate",
+  );
+  const builderBuildIndex = job.steps.findIndex(
+    ({ name }) => name === "Build builder",
+  );
+  const lifecycleTestIndex = job.steps.findIndex(
+    ({ name }) => name === "Test compiled lifecycle behavior",
+  );
   const unitTestIndex = job.steps.findIndex(
     ({ name }) => name === "Test deployment candidate unit behavior",
   );
@@ -1687,7 +1782,10 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   );
   assert.ok(
     revisionIndex > -1 &&
-      revisionIndex < unitTestIndex &&
+      revisionIndex < builderBuildIndex &&
+      builderBuildIndex < lifecycleTestIndex &&
+      lifecycleTestIndex < candidateIndex &&
+      candidateIndex < unitTestIndex &&
       unitTestIndex < componentTestIndex &&
       componentTestIndex < buildIndex &&
       buildIndex < deployIndex,
@@ -1738,11 +1836,10 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   assert.doesNotMatch(source, /^  (?:pull_request|push|schedule):/mu);
   assert.doesNotMatch(source, /wrangler delete|calendly\.com\/api|provider token/iu);
 
-  const projectName =
-    stepsByName["Create deployment candidate"].run.match(
-      /--name ([a-z][a-z0-9-]+)/u,
-    )?.[1];
-  assert.equal(projectName, "acme-portfolio-calendly");
+  assert.match(
+    stepsByName["Create fresh-added deployment candidate"].run,
+    /booking-calendly-local-receipt\.json/u,
+  );
   assert.match(wranglerTemplate, /"name": "\{\{workerName\}\}"/u);
   assert.match(
     renderingSource,
@@ -2279,11 +2376,19 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
+    /INV-CAPABILITY-CERTIFICATION[^\n]+content-safe tracked receipts[^\n]+exact ignore exceptions/i,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-CAPABILITY-CERTIFICATION[^\n]+check:private-capability-certification[^\n]+private-workflow-artifacts\.test\.mjs/i,
+  );
+  assert.match(
+    enforcementMap,
     /documentation contract[^\n]+does not prove[^\n]+runtime or provider result/i,
   );
   assert.match(
     enforcementMap,
-    /standards@0\.4\.0[^\n]+pending[^\n]+booking-calendly@0\.1\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+three unchanged subjects[^\n]+backfill-pending/i,
+    /standards@0\.4\.0[^\n]+certified[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+content-files@0\.4\.0[^\n]+certified[^\n]+f03b9f624c370728f678924ce34e5287558d2a87[^\n]+section-composition@0\.3\.0[^\n]+certified[^\n]+f74459c8833833186bb651c116ed524e51044677[^\n]+site-routing@0\.3\.0[^\n]+certified[^\n]+77cea944513e521939bf4de088048f67acdfbc3c/i,
   );
   assert.match(
     enforcementMap,
@@ -2291,7 +2396,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending standards/i,
+    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/i,
   );
 });
 
@@ -2309,6 +2414,7 @@ test("client-required public-site work is relocated after lifecycle without requ
     ]);
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3", "B");
+  const referenceHardeningPhase = compactLabel("P", "3", "C");
   const appFoundationPhase = compactLabel("P", "4");
   const portfolioBaselinePhase = compactLabel("P", "2");
   const multilingualSlot = compactLabel("P", "5", "A");
@@ -2322,16 +2428,26 @@ test("client-required public-site work is relocated after lifecycle without requ
       `#### ${clientExpansionPhase} — Client-required public-site expansion\n`,
       2,
     )[1]
-    .split(`#### ${appFoundationPhase} — App foundation`, 1)[0];
+    .split(
+      `#### ${referenceHardeningPhase} — Automated removal-reference hardening`,
+      1,
+    )[0];
   const roadmapExpansion = programRoadmap
     .split(`## ${clientExpansionPhase} — Client-required public-site expansion\n`, 2)[1]
-    .split(`## ${appFoundationPhase} — App foundation`, 1)[0];
+    .split(
+      `## ${referenceHardeningPhase} — Automated removal-reference hardening`,
+      1,
+    )[0];
 
   assert.ok(roadmapPortfolio, "portfolio baseline roadmap section is missing");
   assert.doesNotMatch(roadmapPortfolio, /urgent first-client milestone/iu);
   assert.match(
     roadmapExpansion,
     /first client-ready milestone[\s\S]+real client/iu,
+  );
+  assert.match(
+    roadmapExpansion,
+    /\*\*Stop gate:\*\*[\s\S]+production `site`[\s\S]+independent multilingual and analytics[\s\S]+combined client journey[\s\S]+retained migration fixture[\s\S]+before app-foundation/iu,
   );
 
   for (const section of [sourceExpansion, roadmapExpansion]) {
@@ -2419,20 +2535,78 @@ test("executable capability certification ownership is current", async () => {
 
   for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
     assert.match(document, /certifications\/capabilities\.json/u);
-    assert.match(document, /booking-calendly[\s\S]+certified/iu);
-  }
-  for (const document of [capabilityModel, enforcementMap]) {
     assert.match(
       document,
-      /booking-calendly[\s\S]+certified[\s\S]+provider-confirmed[\s\S]+cleanup/iu,
+      /booking-calendly[^\n]+(?:active|current)[^\n]+certified/iu,
     );
   }
+  assert.match(
+    capabilityModel,
+    /booking-calendly[^\n]+certified[^\n]+fresh-add lifecycle[^\n]+protected-staging\/provider receipts/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /booking-calendly[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+provider-confirmed[^\n]+cleanup[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d/iu,
+  );
   const registry = JSON.parse(registrySource);
   const bookingRecord = registry.records["booking-calendly"];
   const deploymentRecord = registry.records["deployment-cloudflare"];
   const observabilityRecord = registry.records.observability;
   const standardsRecord = registry.records.standards;
   assert.equal(bookingRecord.status, "certified");
+  assert.equal(
+    bookingRecord.taskPlan,
+    "docs/superpowers/plans/2026-08-24-booking-calendly-lifecycle-certification.md",
+  );
+  assert.deepEqual(bookingRecord.requiredEvidence, [
+    "cleanup-recovery",
+    "deployed-application",
+    "existing-repository-lifecycle",
+    "fresh-scaffold",
+    "provider-confirmed",
+  ]);
+  const bookingSubject = {
+    descriptorVersion: "0.1.0",
+    behaviorContractDigest:
+      "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2",
+  };
+  assert.deepEqual(bookingRecord.evidence, [
+    {
+      kind: "cleanup-recovery",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
+      outcome: "passed",
+      revision: "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
+      subject: bookingSubject,
+    },
+    {
+      kind: "deployed-application",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
+      outcome: "passed",
+      revision: "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
+      subject: bookingSubject,
+    },
+    {
+      kind: "existing-repository-lifecycle",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md",
+      outcome: "passed",
+      revision: "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059",
+      subject: bookingSubject,
+    },
+    {
+      kind: "fresh-scaffold",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md",
+      outcome: "passed",
+      revision: "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059",
+      subject: bookingSubject,
+    },
+    {
+      kind: "provider-confirmed",
+      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
+      outcome: "passed",
+      revision: "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
+      subject: bookingSubject,
+    },
+  ]);
   assert.equal(deploymentRecord.status, "certified");
   assert.deepEqual(
     deploymentRecord.evidence.map(({ kind, path, outcome, revision }) => ({
@@ -2451,12 +2625,28 @@ test("executable capability certification ownership is current", async () => {
     ),
   );
   assert.equal(observabilityRecord.status, "certified");
-  assert.equal(standardsRecord.status, "pending");
-  assert.deepEqual(standardsRecord.requiredEvidence, ["fresh-scaffold"]);
-  assert.deepEqual(standardsRecord.evidence, []);
+  assert.equal(standardsRecord.status, "certified");
+  assert.deepEqual(standardsRecord.requiredEvidence, [
+    "existing-repository-lifecycle",
+    "fresh-scaffold",
+  ]);
+  assert.deepEqual(
+    standardsRecord.evidence,
+    ["existing-repository-lifecycle", "fresh-scaffold"].map((kind) => ({
+      kind,
+      path: "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md",
+      outcome: "passed",
+      revision: "d7f9dac6e25d5dde32015968d0912b45e73644e7",
+      subject: {
+        descriptorVersion: "0.4.0",
+        behaviorContractDigest:
+          "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4",
+      },
+    })),
+  );
   assert.equal(
     standardsRecord.taskPlan,
-    "docs/superpowers/plans/2026-08-19-generated-visual-regression-certification.md",
+    "docs/superpowers/plans/2026-08-25-standards-lifecycle-certification.md",
   );
   assert.deepEqual(observabilityRecord.requiredEvidence, [
     "cleanup-recovery",
@@ -2482,6 +2672,10 @@ test("executable capability certification ownership is current", async () => {
   assert.match(
     rootReadme,
     /recipe `0\.10\.0`[^\n]+standards@0\.4\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0/iu,
+  );
+  assert.match(
+    rootReadme,
+    /booking-calendly@0\.1\.0[^\n]+fresh-scaffold[^\n]+existing-repository-lifecycle[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+deployed-application[^\n]+provider-confirmed[^\n]+cleanup-recovery[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d/iu,
   );
   assert.match(
     capabilityModel,
@@ -2533,37 +2727,15 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     packageOwnership,
-    /descriptor `standards@0\.4\.0` is pending separate fresh-scaffold certification[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
-  );
-  assert.deepEqual(
-    bookingRecord.evidence.map(({ kind }) => kind),
-    [
-      "cleanup-recovery",
-      "deployed-application",
-      "fresh-scaffold",
-      "provider-confirmed",
-    ],
-  );
-  assert.deepEqual(
-    bookingRecord.evidence
-      .filter(({ kind }) => kind !== "fresh-scaffold")
-      .map(({ path, revision }) => ({ path, revision })),
-    [
-      "cleanup-recovery",
-      "deployed-application",
-      "provider-confirmed",
-    ].map(() => ({
-      path: "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
-      revision: "f9ccb143724b4f1dd7f05a2ee8e3219c224d5558",
-    })),
+    /descriptor `standards@0\.4\.0` is certified from accepted existing-repository-lifecycle and renewed fresh-scaffold evidence at revision `d7f9dac6e25d5dde32015968d0912b45e73644e7`[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending standards/iu,
+    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/iu,
   );
   assert.match(
     enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified from fresh-scaffold[^\n]+provider-confirmed[^\n]+cleanup/iu,
+    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+provider-confirmed[^\n]+cleanup[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d/iu,
   );
   assert.match(
     reviewProtocol,
@@ -2592,8 +2764,11 @@ test("executable capability certification ownership is current", async () => {
   }
 });
 
-test("canonical documentation records the generated visual regression boundary", async () => {
+test("canonical documentation records visual regression and the client-ready closure boundary", async () => {
   const visualCertificationTask = namedLabel("Task", "8B");
+  const clientReadyPhase = compactLabel("P", "2");
+  const lifecyclePhase = compactLabel("P", "3");
+  const clientExpansionPhase = compactLabel("P", "3B");
   const [
     rootInstructions,
     contributing,
@@ -2628,6 +2803,16 @@ test("canonical documentation records the generated visual regression boundary",
       /b46f5f59c7f98ed6be1fa569a2f4a1f23d1ca1ad[^\n]+32323617228/iu,
     );
   }
+  for (const statusOwner of [sourcePlan, overview, roadmap]) {
+    assert.match(
+      statusOwner,
+      /8e5f376f32a95f87420fd82a61566c08c2db020e[^\n]+32399819237/iu,
+    );
+    assert.match(
+      statusOwner,
+      /8e5f376f32a95f87420fd82a61566c08c2db020e[^\n]+32399819237[^\n]+integration evidence[^\n]+not[^\n]+certification evidence/iu,
+    );
+  }
   for (const currentOwner of [
     rootReadme,
     sourcePlan,
@@ -2636,10 +2821,24 @@ test("canonical documentation records the generated visual regression boundary",
     overview,
     packageOwnership,
     roadmap,
+    builderInstructions,
     builderReadme,
   ]) {
     assert.match(currentOwner, /standards@0\.4\.0/iu);
+    assert.match(
+      currentOwner,
+      /standards@0\.4\.0[^\n]+certified|certified[^\n]+standards@0\.4\.0/iu,
+    );
+    assert.match(
+      currentOwner,
+      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7/iu,
+    );
   }
+
+  assert.match(
+    capabilityModel,
+    /compiled CLI[^\n]+fresh[^\n]+scaffold[^\n]+fixed generated-project verifier[^\n]+deterministic visual regression/iu,
+  );
 
   assert.match(
     capabilityModel,
@@ -2652,7 +2851,7 @@ test("canonical documentation records the generated visual regression boundary",
   assert.match(
     capabilityModel,
     new RegExp(
-      `${escapeRegularExpression(visualCertificationTask)}[^\\n]+pending[^\\n]+fresh-scaffold`,
+      `${escapeRegularExpression(visualCertificationTask)}[^\\n]+complete[^\\n]+standards@0\\.4\\.0[^\\n]+fresh-scaffold`,
       "iu",
     ),
   );
@@ -2682,12 +2881,583 @@ test("canonical documentation records the generated visual regression boundary",
       /visual quality[^\n]+WCAG conformance/iu,
     );
   }
+  for (const closureOwner of [
+    rootReadme,
+    sourcePlan,
+    capabilityModel,
+    enforcementMap,
+    overview,
+    roadmap,
+  ]) {
+    assert.match(
+      closureOwner,
+      /(?:deferring performance budgets[^\n]+no performance or production-readiness claim|performance budgets[^\n]+deferred[^\n]+no performance claim)/iu,
+    );
+  }
+  for (const sequencingOwner of [sourcePlan, roadmap]) {
+    assert.match(sequencingOwner, /unnumbered closure amendment/iu);
+    assert.match(
+      sequencingOwner,
+      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /visual regression[^\n]+claim limits[^\n]+unchanged/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      new RegExp(
+        `${escapeRegularExpression(lifecyclePhase)}[^\\n]+eligible[^\\n]+verified-final-diff approval[^\\n]+accepted-main integration`,
+        "iu",
+      ),
+    );
+    assert.match(
+      sequencingOwner,
+      new RegExp(
+        `${escapeRegularExpression(clientExpansionPhase)}[^\\n]+not begin`,
+        "iu",
+      ),
+    );
+  }
+  assert.doesNotMatch(
+    overview,
+    new RegExp(
+      `in-progress ${escapeRegularExpression(clientReadyPhase)} portfolio`,
+      "iu",
+    ),
+  );
+  assert.doesNotMatch(
+    sourcePlan,
+    new RegExp(
+      `${escapeRegularExpression(clientReadyPhase)}\\s+Production-ready portfolio`,
+      "iu",
+    ),
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `backfill-pending[^\\n]+exempt from ${escapeRegularExpression(clientReadyPhase)} closure[^\\n]+${escapeRegularExpression(lifecyclePhase)} closure[^\\n]+rejects`,
+      "iu",
+    ),
+  );
+});
+
+test("canonical documentation accepts profile-transition execution and records transactional-lifecycle closure", async () => {
+  const lifecyclePhase = compactLabel("P", "3");
+  const clientExpansionPhase = compactLabel("P", "3B");
+  const [
+    rootReadme,
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+    packageOwnership,
+    enforcementMap,
+    builderCoreInstructions,
+    builderCoreReadme,
+  ] =
+    await Promise.all([
+      readRepositoryFile("README.md"),
+      readRepositoryFile(
+        "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+      ),
+      readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+      readRepositoryFile("docs/architecture/overview.md"),
+      readRepositoryFile("docs/architecture/capability-model.md"),
+      readRepositoryFile("docs/architecture/package-ownership.md"),
+      readRepositoryFile("docs/architecture/enforcement-map.md"),
+      readRepositoryFile("packages/builder-core/AGENTS.md"),
+      readRepositoryFile("packages/builder-core/README.md"),
+    ]);
+
+  for (const statusOwner of [sourcePlan, roadmap, overview]) {
+    assert.match(
+      statusOwner,
+      /7ba461ac20d4a1d708e9f7b940e15cda0fce3295[^\n]+32429352322/iu,
+    );
+    assert.match(
+      statusOwner,
+      /31e1bab38496c87dc2e6084c958bd9300a141508[^\n]+32577925329/iu,
+    );
+  }
+
+  assert.match(
+    sourcePlan,
+    /pre-write[^\n]+original repository[^\n]+unchanged[^\n]+committed write[^\n]+retains[^\n]+exact prefix[^\n]+recovery evidence/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /injected removal failure[^\n]+exact mutation boundary[^\n]+three authoritative state files[^\n]+never[^\n]+automatic rollback/iu,
+  );
+
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.match(
       sequencingOwner,
-      /visual regression[^\n]+implemented[^\n]+performance budgets[^\n]+separate[^\n]+unimplemented/iu,
+        /7509fc819ba8670040374c350762720848a47ef1[^\n]+direct predecessor[^\n]+apply-remove[^\n]+pull request 46[^\n]+7f59e8b093edb7be617cd2a30bfb4ebaa6a8ab6e[^\n]+32620215344/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /fingerprint-gated[^\n]+apply-remove[^\n]+booking-calendly@0\.1\.0/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /(?:verified-final-diff[^\n]+separate[^\n]+approval|separate[^\n]+verified-final-diff[^\n]+approval)/iu,
     );
   }
+
+  for (const sequencingOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      sequencingOwner,
+      /performance budgets[^\n]+deferred[^\n]+no performance claim/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      new RegExp(
+        `94a1d88f500b145366e065797633788a415c00ef[^\\n]+${escapeRegularExpression(lifecyclePhase)} entry gate`,
+        "iu",
+      ),
+    );
+    assert.match(
+      sequencingOwner,
+      new RegExp(
+        `${escapeRegularExpression(clientExpansionPhase)}[^\\n]+must not begin[^\\n]+${escapeRegularExpression(lifecyclePhase)} closes`,
+        "iu",
+      ),
+    );
+  }
+
+  for (const boundaryOwner of [
+    sourcePlan,
+    roadmap,
+    overview,
+  ]) {
+    assert.match(
+      boundaryOwner,
+      /read-only[^\n]+plan-add[^\n]+booking-calendly@0\.1\.0/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /fingerprint-gated[^\n]+apply-add[^\n]+booking-calendly@0\.1\.0/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /read-only[^\n]+plan-remove[^\n]+booking-calendly@0\.1\.0/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /(?:existing-repository[^\n]+(?:migration append|appends the migration)[^\n]+(?:state-last persistence|persists state last)|prepare one canonical appended successful migration record[^\n]+write `\.egeria\/migrations\.jsonl`[^\n]+write `\.egeria\/state\.json` last)/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /apply-remove[^\n]+accepted-main integrated/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /apply-profile-transition[^\n]+(?:pull request 50|accepted|641db9537f5dea4911b0b727eb083f8d6d359204)/iu,
+    );
+    assert.match(
+      boundaryOwner,
+      /generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+remain planned/iu,
+    );
+  }
+
+  assert.match(
+    overview,
+    /Existing-repository mutation[^\n]+exact Calendly addition\/removal[^\n]+standards upgrade[^\n]+portfolio-to-site transactions[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+Exact Calendly certification[^\n]+protected-staging\/provider journey[^\n]+Exact standards certification[^\n]+compiled upgrade\/refusal\/recovery[^\n]+renewed fresh-scaffold evidence[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery/iu,
+  );
+  assert.match(
+    overview,
+    /Generic or unapproved existing-repository changes[^\n]+unsupported transactional migrations[^\n]+remain outside the accepted baseline/iu,
+  );
+
+  assert.match(
+    capabilityModel,
+    /read-only `plan-add`[^\n]+fingerprint-gated `apply-add`[^\n]+read-only `plan-remove`[^\n]+booking-calendly@0\.1\.0/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /verifies an isolated copy[^\n]+migration record[^\n]+state last[^\n]+verified-final-diff approval/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /Pull requests 48, 49, and 50[^\n]+standards executor[^\n]+portfolio-to-site planner\/executor[^\n]+accepted-main integrated[^\n]+641db9537f5dea4911b0b727eb083f8d6d359204[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+portfolio-to-site transition lifecycle certification[^\n]+complete[^\n]+8098c68c82aaa35a59345706c851e8111d463111[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+remain planned/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-CLEAN-ISOLATED-MIGRATION[^\n]+booking-calendly@0\.1\.0[^\n]+plan-add[^\n]+apply-add[^\n]+plan-remove[^\n]+exact plan fingerprint[^\n]+exact expected dirty paths/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /plan-remove[^\n]+ownership-aware[^\n]+delete[^\n]+preserve[^\n]+eject[^\n]+redact[^\n]+no write/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-STATE-UPDATE-ORDER[^\n]+exact Calendly addition\/removal[^\n]+migration-before-state persistence[^\n]+final manifest\/state\/inference agreement/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /implemented existing-repository boundary[^\n]+apply-remove/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /Exact `apply-remove`[^\n]+accepted-main integrated/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /Removal planning[^\n]+fingerprint/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-STATE-UPDATE-ORDER[^\n]+actual[^\n]+exact Calendly addition\/removal/iu,
+  );
+
+  assert.match(
+    sourcePlan,
+    /standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+capability edge[^\n]+recipe[^\n]+builder-version[^\n]+profile-transition edge/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /plan-upgrade --directory <absolute-existing-linked-worktree> --capability standards --to-version 0\.4\.0/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /desired selection[^\n]+installed state[^\n]+inference[^\n]+project provenance[^\n]+state[^\n]+migration history/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /drift[^\n]+dirty or unstable Git identity[^\n]+disagreement[^\n]+without repository mutation/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /already-current refusal[^\n]+unsupported or missing-edge[^\n]+ambiguous versions[^\n]+incompatible control state/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /stdout[^\n]+stderr[^\n]+exit-code[^\n]+fingerprint[^\n]+stable[^\n]+privacy-safe/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /project\.yaml[^\n]+state\.json[^\n]+migrations\.jsonl[^\n]+exact original bytes/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /0\.y\.z[^\n]+1\.0\.0[^\n]+control contracts[^\n]+not upgrade subjects[^\n]+previous capability major[^\n]+does not exist/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /portfolio-to-site[^\n]+independent[^\n]+profile-transition boundary/iu,
+  );
+
+  for (const upgradeSummary of [roadmap, overview, capabilityModel]) {
+    assert.match(
+      upgradeSummary,
+      /standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+capability edge/iu,
+    );
+    assert.match(
+      upgradeSummary,
+      /first-supported-upgrade-planning-boundary/iu,
+    );
+  }
+
+  for (const acceptedPlanningOwner of [sourcePlan, roadmap, capabilityModel]) {
+    assert.match(
+      acceptedPlanningOwner,
+      /pull request 47[^\n]+main@138b5d712ab22016c020eb1c2a3e56e0efc89a5a/iu,
+    );
+  }
+  for (const acceptedPlanningOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      acceptedPlanningOwner,
+      /cd57c479cb74a5e0f839f7b46ded220bc456b151[^\n]+32658708533/iu,
+    );
+  }
+  for (const acceptedExecutorOwner of [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+  ]) {
+    assert.match(
+      acceptedExecutorOwner,
+      /pull request 48[^\n]+main@af8898b533f4a7ccf08c83bd7818312a5f27c3c0/iu,
+    );
+    assert.match(
+      acceptedExecutorOwner,
+      /apply-upgrade[^\n]+(?:verified-final-diff[^\n]+separate[^\n]+approval|separate[^\n]+verified-final-diff[^\n]+approval)/iu,
+    );
+  }
+  for (const integrationOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      integrationOwner,
+      /3cd51b076d076d39151e96fc1d04c4d91a689a81[^\n]+a9335c1078d5d613f398196674b6b4a39efab4ab[^\n]+32690135067/iu,
+    );
+  }
+  for (const currentStatusOwner of [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+    packageOwnership,
+    enforcementMap,
+  ]) {
+    assert.doesNotMatch(
+      currentStatusOwner,
+      /(?:apply-upgrade|standards executor)[^.\n]+(?:\bis\b|\bremains\b)[^.\n]+(?:\blocal\b|unaccepted|not accepted-main integrated)|(?:\blocal\b|unaccepted|not accepted-main integrated)[^.\n]+(?:apply-upgrade|standards executor)[^.\n]+(?:\bis\b|\bremains\b)/iu,
+    );
+  }
+  assert.match(
+    packageOwnership,
+    /applyCapabilityUpgrade[^\n]+createFileSystemCapabilityUpgradeWriter[^\n]+private/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+apply-upgrade[^\n]+actual[^\n]+accepted/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-STATE-UPDATE-ORDER[^\n]+standards upgrade[^\n]+migration-before-state[^\n]+verified-final-diff/iu,
+  );
+  for (const candidateOwner of [sourcePlan, capabilityModel, enforcementMap]) {
+    assert.match(
+      candidateOwner,
+      /failure[^\n]+inspectable prefix[^\n]+never[^\n]+automatic rollback/iu,
+    );
+  }
+  for (const claimOwner of [sourcePlan, roadmap, overview, capabilityModel]) {
+    assert.match(
+      claimOwner,
+      /apply-upgrade[^\n]+accepted[^\n]+(?:does not|not)[^\n]+(?:certif|deploy|production)/iu,
+    );
+  }
+
+  assert.match(
+    sourcePlan,
+    /plan-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /single declared profile-transition edge[^\n]+portfolio@0\.10\.0[^\n]+site@0\.10\.0/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /source profile[^\n]+infer[^\n]+no caller-supplied `--from-profile`/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /success[^\n]+stdout[^\n]+exit `0`[^\n]+refusal[^\n]+stderr[^\n]+exit `1`[^\n]+invalid[^\n]+exit `2`/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /recovery[^\n]+`not-required`[^\n]+approval-required/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /builder-core[^\n]+canonical[^\n]+transition-planning owner[^\n]+CLI[^\n]+thin/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /project\.yaml[^\n]+state\.json[^\n]+migrations\.jsonl[^\n]+every repository byte[^\n]+unchanged/iu,
+  );
+  for (const transitionConsumer of [
+    roadmap,
+    overview,
+    capabilityModel,
+    packageOwnership,
+    enforcementMap,
+  ]) {
+    assert.match(
+      transitionConsumer,
+      /plan-profile-transition[^\n]+portfolio[^\n]+site|portfolio[^\n]+site[^\n]+plan-profile-transition/iu,
+    );
+    assert.match(
+      transitionConsumer,
+      /apply-profile-transition[^\n]+portfolio[^\n]+site|portfolio[^\n]+site[^\n]+apply-profile-transition/iu,
+    );
+  }
+
+  assert.match(
+    sourcePlan,
+    /apply-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site --approved-plan sha256:<digest>/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /applyProfileTransition[^\n]+createFileSystemProfileTransitionWriter/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /transition-portfolio-0-10-0-to-site-0-10-0[^\n]+profile-transition/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /seven action paths[^\n]+migrations\.jsonl[^\n]+state\.json[^\n]+dirty/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /(?:failure|refusal) before a committed write[^\n]+not-required[^\n]+failure after a committed write[^\n]+inspect-worktree/iu,
+  );
+
+  for (const acceptedTransitionOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      acceptedTransitionOwner,
+      /pull request 49[^\n]+main@612a963ab96221837b1c8ac815f41e90736d292e/iu,
+    );
+    assert.match(
+      acceptedTransitionOwner,
+      /d0ad744e3818046f755d3933843b22213307c109[^\n]+85afdf22ea8625f3b70cdd712f961d629e948daa[^\n]+32745968642/iu,
+    );
+  }
+
+  for (const acceptedTransitionExecutorOwner of [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+    packageOwnership,
+  ]) {
+    assert.match(
+      acceptedTransitionExecutorOwner,
+      /pull request(?: 50|s 48, 49, and 50)[^\n]+main@641db9537f5dea4911b0b727eb083f8d6d359204/iu,
+    );
+  }
+  assert.match(
+    enforcementMap,
+    /INV-SUPPORTED-PROFILE-TRANSITION[^\n]+actual and accepted[^\n]+pull request 50/iu,
+  );
+
+  for (const extractionOwner of [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+    packageOwnership,
+    enforcementMap,
+  ]) {
+    assert.match(
+      extractionOwner,
+      /private[^\n]+(?:migration-log[^\n]+state-control|control-persistence|control persistence|shared control)/iu,
+    );
+  }
+
+  const lifecycleClosureLabel = [
+    lifecyclePhase,
+    " ",
+    namedLabel("Gate", "3"),
+    " closure",
+  ].join("");
+  const finalLifecycleClosurePattern = new RegExp(
+    `${escapeRegularExpression(lifecycleClosureLabel)}[^\\n]+approved[^\\n]+closed`,
+    "iu",
+  );
+  const clientExpansionEligibilityPattern = new RegExp(
+    `${escapeRegularExpression(clientExpansionPhase)}[^\\n]+next eligible[^\\n]+(?:does not authorize|not authorized|separate approval)`,
+    "iu",
+  );
+  const semanticLifecycleClosurePattern =
+    /transactional-lifecycle closure[^\n]+approved[^\n]+closed/iu;
+  const semanticClientExpansionPattern =
+    /client-required public-site expansion[^\n]+next eligible[^\n]+does not authorize[^\n]+automated removal-reference hardening/iu;
+
+  for (const sequencingOwner of [sourcePlan, roadmap]) {
+    assert.doesNotMatch(sequencingOwner, /minimum one remaining increment/iu);
+    assert.match(
+      sequencingOwner,
+      /booking-calendly@0\.1\.0[^\n]+lifecycle certification[^\n]+complete/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /standards@0\.4\.0[^\n]+lifecycle certification[^\n]+complete/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /portfolio-to-site[^\n]+transition[^\n]+lifecycle certification[^\n]+complete[^\n]+8098c68c82aaa35a59345706c851e8111d463111/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /content-files@0\.4\.0[^\n]+certification[^\n]+complete[^\n]+f03b9f624c370728f678924ce34e5287558d2a87/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /section-composition@0\.3\.0[^\n]+certification[^\n]+complete[^\n]+f74459c8833833186bb651c116ed524e51044677/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /site-routing@0\.3\.0[^\n]+certification[^\n]+complete[^\n]+77cea944513e521939bf4de088048f67acdfbc3c/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      finalLifecycleClosurePattern,
+    );
+    assert.doesNotMatch(sequencingOwner, /minimum two remaining increments/iu);
+    assert.doesNotMatch(sequencingOwner, /minimum three remaining increments/iu);
+    assert.doesNotMatch(sequencingOwner, /minimum four remaining increments/iu);
+    assert.doesNotMatch(sequencingOwner, /minimum five remaining increments/iu);
+    assert.doesNotMatch(
+      sequencingOwner,
+      /selected next increment[^\n]+portfolio-to-site transition lifecycle certification/iu,
+    );
+    assert.doesNotMatch(
+      sequencingOwner,
+      /site-routing@0\.3\.0[^\n]+next[^\n]+certification increment/iu,
+    );
+  }
+
+  for (const closureStatusConsumer of [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+    builderCoreInstructions,
+  ]) {
+    assert.match(closureStatusConsumer, finalLifecycleClosurePattern);
+    assert.match(closureStatusConsumer, clientExpansionEligibilityPattern);
+  }
+
+  for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
+    assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);
+    assert.match(semanticStatusConsumer, semanticClientExpansionPattern);
+  }
+
+  assert.match(
+    roadmap,
+    /main@392f2e27de1d4a24124d51daf059b1667207436e[^\n]+0f5b729262237aa6856be4d8e5aa4396584233a2/iu,
+  );
+  assert.match(
+    roadmap,
+    /32984587387[^\n]+unavailable[^\n]+outage[^\n]+waiv[^\n]+not[^\n]+passing hosted check/iu,
+  );
+
+  for (const certificationStatusOwner of [
+    overview,
+    capabilityModel,
+    enforcementMap,
+  ]) {
+    assert.match(
+      certificationStatusOwner,
+      /portfolio-to-site[^\n]+transition[^\n]+lifecycle certification[^\n]+complete[^\n]+8098c68c82aaa35a59345706c851e8111d463111/iu,
+    );
+    assert.match(
+      certificationStatusOwner,
+      /content-files@0\.4\.0[^\n]+certified[^\n]+f03b9f624c370728f678924ce34e5287558d2a87/iu,
+    );
+    assert.match(
+      certificationStatusOwner,
+      /section-composition@0\.3\.0[^\n]+certified[^\n]+f74459c8833833186bb651c116ed524e51044677/iu,
+    );
+    assert.match(
+      certificationStatusOwner,
+      /site-routing@0\.3\.0[^\n]+certified[^\n]+77cea944513e521939bf4de088048f67acdfbc3c/iu,
+    );
+  }
+
+  assert.match(
+    sourcePlan,
+    /Evidence-gated internal lifecycle extraction boundary[^]+private to `packages\/builder-core`[^]+not a generic lifecycle executor or public API/iu,
+  );
+
+  assert.match(
+    enforcementMap,
+    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+apply-upgrade[^\n]+actual[^\n]+accepted[^\n]+separate verified-final-diff stop/iu,
+  );
 });
 
 test("execution plans enforce direct predecessors and bounded independent-work exceptions", async () => {
@@ -2883,7 +3653,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     readme,
-    /builder kernel has received verified-final-diff approval.*committed golden fixtures.*client-ready portfolio stage is in progress/iu,
+    /builder kernel has received verified-final-diff approval.*committed golden fixtures.*client-ready portfolio stage is completed through an unnumbered closure amendment/iu,
   );
   assert.match(readme, /retained `portfolio-calendly` fixture/iu);
   assert.match(
@@ -3009,4 +3779,154 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
       resolve(repositoryRoot, "scripts/eslint/no-sequencing-labels.mjs"),
     ),
   );
+});
+
+test("automated removal-reference hardening follows client expansion without weakening existing gates", async () => {
+  const architecturePhase = compactLabel("P", "0");
+  const lifecyclePhase = compactLabel("P", "3");
+  const clientExpansionPhase = compactLabel("P", "3", "B");
+  const referenceHardeningPhase = compactLabel("P", "3", "C");
+  const appFoundationPhase = compactLabel("P", "4");
+  const [sourcePlan, roadmap, architectureOverview, enforcementMap] =
+    await Promise.all([
+      readRepositoryFile(
+        "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+      ),
+      readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+      readRepositoryFile("docs/architecture/overview.md"),
+      readRepositoryFile("docs/architecture/enforcement-map.md"),
+    ]);
+
+  const clientExpansionIndex = roadmap.indexOf(
+    `## ${clientExpansionPhase} — Client-required public-site expansion`,
+  );
+  const referenceHardeningIndex = roadmap.indexOf(
+    `## ${referenceHardeningPhase} — Automated removal-reference hardening`,
+  );
+  const appFoundationIndex = roadmap.indexOf(
+    `## ${appFoundationPhase} — App foundation`,
+  );
+  const sourceReferenceHardening = sourcePlan
+    .split(
+      `#### ${referenceHardeningPhase} — Automated removal-reference hardening\n`,
+      2,
+    )[1]
+    .split(`#### ${appFoundationPhase} — App foundation`, 1)[0];
+  const roadmapReferenceHardening = roadmap
+    .split(
+      `## ${referenceHardeningPhase} — Automated removal-reference hardening\n`,
+      2,
+    )[1]
+    .split(`## ${appFoundationPhase} — App foundation`, 1)[0];
+  const sourceReferenceHardeningStopGate = sourceReferenceHardening.split(
+    "**Stop gate:**",
+    2,
+  )[1];
+  const roadmapReferenceHardeningStopGate = roadmapReferenceHardening.split(
+    "**Stop gate:**",
+    2,
+  )[1];
+  const removalReferenceGuardRow = enforcementMap
+    .split("\n")
+    .find((line) => line.startsWith("| `INV-REMOVAL-REFERENCE-GUARDS` |"));
+
+  assert.ok(clientExpansionIndex >= 0);
+  assert.ok(referenceHardeningIndex > clientExpansionIndex);
+  assert.ok(appFoundationIndex > referenceHardeningIndex);
+  assert.ok(sourceReferenceHardening);
+  assert.ok(roadmapReferenceHardening);
+  assert.ok(sourceReferenceHardeningStopGate);
+  for (const obligation of [
+    /Calendly exact-reference refusals/iu,
+    /heuristic and coverage warnings/iu,
+    /deterministic inventory/iu,
+    /privacy-safe output/iu,
+    /repository-identity refusal/iu,
+    /executor revalidation/iu,
+    /no-mutation refusal/iu,
+    /Package-backed or reusable-analysis claims/iu,
+    /separately named concrete evidence gates/iu,
+  ]) {
+    assert.match(sourceReferenceHardeningStopGate, obligation);
+  }
+  assert.match(
+    roadmapReferenceHardening,
+    /finding no detected match must never be represented as proof of dependency absence or complete removal/iu,
+  );
+  assert.ok(roadmapReferenceHardeningStopGate);
+  for (const obligation of [
+    /bounded Calendly guard/iu,
+    /then-concrete package-backed guard/iu,
+    /deterministic/iu,
+    /privacy-safe/iu,
+    /identity-change/iu,
+    /executor-revalidation/iu,
+    /no-mutation/iu,
+    /before app-foundation/iu,
+  ]) {
+    assert.match(roadmapReferenceHardeningStopGate, obligation);
+  }
+
+  const gradualRoadmapStart = sourcePlan.indexOf(
+    `\`\`\`text\n${architecturePhase}  Architecture materialization and deployed compatibility proof`,
+  );
+  const gradualRoadmapEnd = sourcePlan.indexOf(
+    "```\n\n### Sequencing rules",
+    gradualRoadmapStart,
+  );
+  const gradualRoadmap = sourcePlan.slice(
+    gradualRoadmapStart,
+    gradualRoadmapEnd,
+  );
+  const sourceClientExpansionIndex = gradualRoadmap.indexOf(
+    `${clientExpansionPhase} Production site profile`,
+  );
+  const sourceReferenceHardeningIndex = gradualRoadmap.indexOf(
+    `${referenceHardeningPhase} Automated removal-reference hardening`,
+  );
+  const sourceAppFoundationIndex = gradualRoadmap.indexOf(
+    `${appFoundationPhase}  App profile/app-foundation`,
+  );
+
+  assert.ok(gradualRoadmapStart >= 0);
+  assert.ok(gradualRoadmapEnd > gradualRoadmapStart);
+  assert.ok(sourceClientExpansionIndex >= 0);
+  assert.ok(sourceReferenceHardeningIndex > sourceClientExpansionIndex);
+  assert.ok(sourceAppFoundationIndex > sourceReferenceHardeningIndex);
+  assert.match(
+    architectureOverview,
+    new RegExp(
+      `planned sequencing.+${lifecyclePhase} transactional lifecycle.+prerequisite.+${clientExpansionPhase} client-required public-site expansion.+after ${clientExpansionPhase} closes, ${referenceHardeningPhase} automated removal-reference hardening.+without reopening ${lifecyclePhase} or ${clientExpansionPhase}.+${appFoundationPhase}.+changes no capability defaults.+no composite client profile or capability`,
+      "is",
+    ),
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${referenceHardeningPhase} begins after ${clientExpansionPhase} closes[^\n]+does not reopen or weaken ${lifecyclePhase} or ${clientExpansionPhase}`,
+      "i",
+    ),
+  );
+  assert.match(
+    sourcePlan,
+    new RegExp(
+      `${referenceHardeningPhase} begins only after ${clientExpansionPhase} closes.+no detected match.+never be represented as proof`,
+      "is",
+    ),
+  );
+  assert.ok(removalReferenceGuardRow);
+  const removalReferenceGuardColumns = removalReferenceGuardRow
+    .split("|")
+    .slice(1, -1)
+    .map((column) => column.trim());
+  assert.deepEqual(
+    removalReferenceGuardColumns.slice(0, 1),
+    ["`INV-REMOVAL-REFERENCE-GUARDS`"],
+  );
+  assert.match(
+    removalReferenceGuardColumns[1],
+    /finding no detected match may never be represented as proof of dependency absence or complete removal/iu,
+  );
+  assert.match(removalReferenceGuardColumns[2], /^planned;/u);
+  assert.equal(removalReferenceGuardColumns[4], referenceHardeningPhase);
 });
