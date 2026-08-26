@@ -9,6 +9,10 @@ import {
 describe("content files certification", () => {
   it("uses strict YAML 1.2 core parsing without aliases", () => {
     expect(parseYamlContent("answer: No\n")).toEqual({ answer: "No" });
+    expect(parseYamlContent("octal: 0o10\nnothing: ~\n")).toEqual({
+      octal: 8,
+      nothing: null,
+    });
     expect(() => parseYamlContent("heading: One\nheading: Two\n")).toThrow(
       new TypeError("CONTENT_INVALID"),
     );

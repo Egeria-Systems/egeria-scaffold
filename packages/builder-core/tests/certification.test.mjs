@@ -326,6 +326,30 @@ test("current content files subject has exact reviewed fresh-scaffold evidence",
   });
 });
 
+test("accepted content files receipt binds the reviewed fresh-scaffold outcome", () => {
+  const acceptedRecord = committedRegistry.records["content-files"];
+  const acceptedReceiptUrl = new URL(
+    `../../../${contentFilesEvidencePath}`,
+    import.meta.url,
+  );
+
+  assert.equal(existsSync(acceptedReceiptUrl), true, contentFilesEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { "content-files": acceptedRecord },
+      },
+      artifacts: {
+        [contentFilesPlanPath]: "# approved plan",
+        [contentFilesEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [contentFilesEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
+});
+
 test("descriptor admission rejects incomplete, stale, extra, and false-legacy coverage", () => {
   assert.deepEqual(
     core.validateCertificationAdmission({ catalog, registry }),

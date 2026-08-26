@@ -8,6 +8,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  readFile,
   realpath,
   rm,
   symlink,
@@ -2117,6 +2118,154 @@ test("content files certification binds a clean exact revision to causal fresh-s
   assert.equal(statusReads, 2);
   assert.equal(indexReads, 2);
   assert.equal(await pathExists(scaffold.state.ownedPath), false);
+});
+
+test("content files fixture verification applies the exact isolated overlay and command sequence", async () => {
+  const ownedRoot = await mkdtemp(join(tmpdir(), "content-fixture-verifier-"));
+  const projectRoot = join(ownedRoot, "generated-project");
+  const supportRoot = join(ownedRoot, "content-fixture-support");
+  const siteContentPath = join(
+    projectRoot,
+    "apps/web/content/en-CA/site.yaml",
+  );
+  const commands = [];
+
+  try {
+    await mkdir(dirname(siteContentPath), { recursive: true });
+    await writeFile(
+      siteContentPath,
+      "schemaVersion: 1.0.0\nnavigation: []\n",
+    );
+    const { verifyContentFixtureForTesting } = await import(
+      "../../scripts/certify-content-files.mjs"
+    );
+
+    const result = await verifyContentFixtureForTesting({
+      projectRoot,
+      environment: { PATH: "/verified/bin" },
+      runCommand: async (command) => {
+        commands.push(command);
+      },
+    });
+
+    assert.deepEqual(result, { ok: true, checks: contentFixtureChecks });
+    assert.equal(
+      await readFile(siteContentPath, "utf8"),
+      "schemaVersion: 1.0.0\nnavigation:\n  - href: \"#introduction\"\n    label: Introduction\n",
+    );
+    assert.equal(
+      await readFile(
+        join(
+          projectRoot,
+          "apps/web/tests/unit/content-files-certification.test.ts",
+        ),
+        "utf8",
+      ),
+      await readFile(
+        join(
+          repositoryRoot,
+          "tests/capability-certification/fixtures/content-files/content-files-certification.test.ts",
+        ),
+        "utf8",
+      ),
+    );
+    assert.equal(
+      await readFile(
+        join(
+          projectRoot,
+          "apps/web/tests/e2e/content-files-certification.spec.ts",
+        ),
+        "utf8",
+      ),
+      await readFile(
+        join(
+          repositoryRoot,
+          "tests/capability-certification/fixtures/content-files/content-files-certification.spec.ts",
+        ),
+        "utf8",
+      ),
+    );
+    assert.equal(await readFile(join(supportRoot, ".npmrc"), "utf8"), "");
+    assert.deepEqual(
+      commands.map(({ executable, arguments: arguments_, cwd, timeout }) => ({
+        executable,
+        arguments: arguments_,
+        cwd,
+        timeout,
+      })),
+      [
+        {
+          executable: "pnpm",
+          arguments: [
+            "install",
+            "--frozen-lockfile",
+            "--store-dir",
+            join(supportRoot, "store"),
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: [
+            "--dir",
+            "apps/web",
+            "exec",
+            "vitest",
+            "run",
+            "--project",
+            "unit",
+            "tests/unit/content-files-certification.test.ts",
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["--dir", "apps/web", "run", "browser:install"],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: [
+            "--dir",
+            "apps/web",
+            "exec",
+            "playwright",
+            "test",
+            "--config",
+            "playwright.dev.config.ts",
+            "tests/e2e/content-files-certification.spec.ts",
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+      ],
+    );
+    for (const command of commands) {
+      assert.equal(command.environment.PATH, "/verified/bin");
+      assert.equal(command.environment.HOME, join(supportRoot, "home"));
+      assert.equal(
+        command.environment.USERPROFILE,
+        join(supportRoot, "home"),
+      );
+      assert.equal(
+        command.environment.PLAYWRIGHT_BROWSERS_PATH,
+        join(supportRoot, "playwright-browsers"),
+      );
+      assert.equal(
+        command.environment.NPM_CONFIG_USERCONFIG,
+        join(supportRoot, ".npmrc"),
+      );
+      assert.equal(
+        command.environment.NPM_CONFIG_REGISTRY,
+        "https://registry.npmjs.org/",
+      );
+    }
+  } finally {
+    await rm(ownedRoot, { recursive: true, force: true });
+  }
 });
 
 test("content files certification fails closed on invalid authority and evidence drift", async (context) => {

@@ -380,6 +380,10 @@ async function verifyContentFixture({ projectRoot, runCommand, environment }) {
   return Object.freeze({ ok: true, checks: expectedFixtureChecks });
 }
 
+export function verifyContentFixtureForTesting(input) {
+  return verifyContentFixture(input);
+}
+
 function withSourceCheck(result) {
   return Object.freeze({
     ...result,
