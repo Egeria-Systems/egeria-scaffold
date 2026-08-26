@@ -3360,7 +3360,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
     assert.match(
       sequencingOwner,
-      /closure[^\n]+next legal action/iu,
+      /P3 Gate 3 closure[^\n]+next legal action/iu,
     );
     assert.doesNotMatch(sequencingOwner, /minimum two remaining increments/iu);
     assert.doesNotMatch(sequencingOwner, /minimum three remaining increments/iu);
@@ -3376,7 +3376,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
   }
 
-  assert.match(roadmap, /closure[^\n]+next legal action/iu);
+  assert.match(roadmap, /P3 Gate 3 closure[^\n]+next legal action/iu);
 
   for (const certificationStatusOwner of [
     overview,

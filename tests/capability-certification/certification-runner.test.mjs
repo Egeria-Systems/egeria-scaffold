@@ -3138,6 +3138,36 @@ test("site routing fixture verification applies the exact isolated overlay and c
   }
 });
 
+test("site routing fixture verification reports component command failures", async () => {
+  const ownedRoot = await mkdtemp(join(tmpdir(), "site-routing-fixture-component-failure-"));
+  const projectRoot = join(ownedRoot, "generated-project");
+  let commandRuns = 0;
+
+  try {
+    const { verifySiteRoutingFixtureForTesting } = await import(
+      "../../scripts/certify-site-routing.mjs"
+    );
+    await assert.rejects(
+      verifySiteRoutingFixtureForTesting({
+        projectRoot,
+        environment: { PATH: "/verified/bin" },
+        runCommand: async () => {
+          commandRuns += 1;
+          if (commandRuns === 2) {
+            throw new Error("private component failure");
+          }
+        },
+      }),
+      (error) =>
+        error?.name === "SiteRoutingCertificationError" &&
+        error.code === "CERTIFICATION_FIXTURE_COMPONENT_FAILED",
+    );
+    assert.equal(commandRuns, 2);
+  } finally {
+    await rm(ownedRoot, { recursive: true, force: true });
+  }
+});
+
 test("site routing fixture verification contains preparation failures", async () => {
   const ownedRoot = await mkdtemp(join(tmpdir(), "site-routing-fixture-failure-"));
   const projectRoot = join(ownedRoot, "generated-project");

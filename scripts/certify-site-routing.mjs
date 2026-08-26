@@ -332,7 +332,7 @@ async function verifySiteRoutingFixture({
       "tests/component/site-routing-vitest.config.ts",
       "tests/component/site-routing-certification.test.tsx",
     ],
-    "CERTIFICATION_FIXTURE_UNIT_FAILED",
+    "CERTIFICATION_FIXTURE_COMPONENT_FAILED",
   );
   await runProjectCommand(
     runCommand,
