@@ -28,6 +28,7 @@ import {
 import { certifyContentFilesForTesting } from "../../scripts/certify-content-files.mjs";
 import { certifyGeneratedTestingForTesting } from "../../scripts/certify-generated-testing.mjs";
 import { certifyProfileTransitionLifecycleForTesting } from "../../scripts/certify-profile-transition-lifecycle.mjs";
+import { certifySectionCompositionForTesting } from "../../scripts/certify-section-composition.mjs";
 import { certifyStandardsLifecycleForTesting } from "../../scripts/certify-standards-lifecycle.mjs";
 import { runCertificationCli } from "../../scripts/lib/certification-cli.mjs";
 
@@ -84,6 +85,10 @@ const standardsLifecycleCertificationScript = resolve(
 const profileTransitionLifecycleCertificationScript = resolve(
   repositoryRoot,
   "scripts/certify-profile-transition-lifecycle.mjs",
+);
+const sectionCompositionCertificationScript = resolve(
+  repositoryRoot,
+  "scripts/certify-section-composition.mjs",
 );
 const compiledUpgradeCertificationTests = [
   "the compiled plan-upgrade command plans both profiles without changing any byte",
@@ -833,6 +838,14 @@ const contentFixtureChecks = Object.freeze([
   "content-fixture-browser-install",
   "content-fixture-browser-development",
 ]);
+const sectionCompositionFixtureChecks = Object.freeze([
+  "section-composition-fixture-overlay",
+  "section-composition-fixture-frozen-install",
+  "section-composition-fixture-unit-contract",
+  "section-composition-fixture-component-contract",
+  "section-composition-fixture-browser-install",
+  "section-composition-fixture-browser-development",
+]);
 
 function createCertificationCliRuntime(arguments_ = []) {
   const scriptPath = resolve(
@@ -981,6 +994,14 @@ function createSuccessfulScaffoldAdapters({
   diagnostics = Object.freeze({ healthy: true, diagnostics: [] }),
   differences = Object.freeze({ equal: true, differences: [] }),
   inferredCapability,
+  profile = "portfolio",
+  expectedCapabilities = Object.freeze([
+    "standards",
+    "content-files",
+    "section-composition",
+    "deployment-cloudflare",
+    "observability",
+  ]),
   readCurrentRevision,
   readRepositoryStatus = async () => "",
   readRepositoryIndexEntries = async () =>
@@ -1027,14 +1048,8 @@ function createSuccessfulScaffoldAdapters({
             ok: true,
             command: "create",
             destination: state.projectRoot,
-            profile: "portfolio",
-            capabilities: [
-              "standards",
-              "content-files",
-              "section-composition",
-              "deployment-cloudflare",
-              "observability",
-            ],
+            profile,
+            capabilities: expectedCapabilities,
           })}\n`;
         }
         if (command === "infer") {
@@ -1079,7 +1094,7 @@ function createSuccessfulScaffoldAdapters({
         return {
           ok: true,
           fixtures: verificationFixtures ?? [verifierIdentifier],
-          profiles: ["portfolio"],
+          profiles: [profile],
           checks: verificationChecks,
         };
       },
@@ -1094,6 +1109,393 @@ function createSuccessfulScaffoldAdapters({
     },
   };
 }
+
+test("section composition certification binds both supported fresh-scaffold profiles to one clean exact subject", async () => {
+  const revision = "a".repeat(40);
+  let revisionReads = 0;
+  let statusReads = 0;
+  let indexReads = 0;
+  const authority = {
+    readCurrentRevision: async () => {
+      revisionReads += 1;
+      return revision;
+    },
+    readRepositoryStatus: async () => {
+      statusReads += 1;
+      return "";
+    },
+    readRepositoryIndexEntries: async () => {
+      indexReads += 1;
+      return "H selected-evidence.test.mjs\0";
+    },
+  };
+  const portfolio = createSuccessfulScaffoldAdapters({
+    inferredCapability: {
+      identifier: "section-composition",
+      version: "0.3.0",
+    },
+    readCurrentRevision: authority.readCurrentRevision,
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+    verifyFixture: async ({ environment }) => {
+      assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
+      assert.equal(environment.CLOUDFLARE_ACCOUNT_ID, undefined);
+      assert.equal(environment.NPM_TOKEN, undefined);
+      return { ok: true, checks: sectionCompositionFixtureChecks };
+    },
+  });
+  const site = createSuccessfulScaffoldAdapters({
+    expectedCapabilities: Object.freeze([
+      "standards",
+      "content-files",
+      "section-composition",
+      "deployment-cloudflare",
+      "observability",
+      "site-routing",
+    ]),
+    inferredCapability: {
+      identifier: "section-composition",
+      version: "0.3.0",
+    },
+    profile: "site",
+    readCurrentRevision: authority.readCurrentRevision,
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+    verifierIdentifier: "site",
+  });
+
+  const result = await certifySectionCompositionForTesting(
+    { revision },
+    {
+      ...authority,
+      journeys: { portfolio: portfolio.adapters, site: site.adapters },
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    capability: "section-composition",
+    version: "0.3.0",
+    profiles: ["portfolio", "site"],
+    subject: {
+      descriptorVersion: "0.3.0",
+      behaviorContractDigest:
+        "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
+    },
+    recipeVersion: "0.10.0",
+    locale: "en-CA",
+    evidenceRevision: revision,
+    checks: [
+      ...[
+        "compiled-cli-create",
+        "state-inference",
+        "healthy-diagnostics",
+        "exact-diff",
+        ...fixedChecks,
+        ...sectionCompositionFixtureChecks,
+      ].map((check) => `portfolio:${check}`),
+      ...[
+        "compiled-cli-create",
+        "state-inference",
+        "healthy-diagnostics",
+        "exact-diff",
+        ...fixedChecks,
+      ].map((check) => `site:${check}`),
+      "repository-sources-unchanged",
+    ],
+  });
+  assert.equal(portfolio.state.verifiedRoot, portfolio.state.projectRoot);
+  assert.equal(portfolio.state.fixtureInput.projectRoot, portfolio.state.projectRoot);
+  assert.equal(site.state.verifiedRoot, site.state.projectRoot);
+  assert.equal(site.state.fixtureInput, undefined);
+  assert.equal(revisionReads, 2);
+  assert.equal(statusReads, 2);
+  assert.equal(indexReads, 2);
+  assert.equal(await pathExists(portfolio.state.ownedPath), false);
+  assert.equal(await pathExists(site.state.ownedPath), false);
+});
+
+test("section composition fixture verification applies the exact isolated overlay and command sequence", async () => {
+  const ownedRoot = await mkdtemp(
+    join(tmpdir(), "section-composition-fixture-verifier-"),
+  );
+  const projectRoot = join(ownedRoot, "generated-project");
+  const supportRoot = join(
+    ownedRoot,
+    "section-composition-fixture-support",
+  );
+  const commands = [];
+
+  try {
+    const { verifySectionCompositionFixtureForTesting } = await import(
+      "../../scripts/certify-section-composition.mjs"
+    );
+    const result = await verifySectionCompositionFixtureForTesting({
+      projectRoot,
+      environment: { PATH: "/verified/bin" },
+      runCommand: async (command) => {
+        commands.push(command);
+      },
+    });
+
+    assert.deepEqual(result, {
+      ok: true,
+      checks: sectionCompositionFixtureChecks,
+    });
+    for (const [source, destination] of [
+      [
+        "section-composition-certification.test.ts",
+        "apps/web/tests/unit/section-composition-certification.test.ts",
+      ],
+      [
+        "section-composition-certification.test.tsx",
+        "apps/web/tests/component/section-composition-certification.test.tsx",
+      ],
+      [
+        "section-composition-certification.spec.ts",
+        "apps/web/tests/e2e/section-composition-certification.spec.ts",
+      ],
+    ]) {
+      assert.equal(
+        await readFile(join(projectRoot, destination), "utf8"),
+        await readFile(
+          join(
+            repositoryRoot,
+            "tests/capability-certification/fixtures/section-composition",
+            source,
+          ),
+          "utf8",
+        ),
+      );
+    }
+    assert.deepEqual(
+      commands.map(({ executable, arguments: arguments_, cwd, timeout }) => ({
+        executable,
+        arguments: arguments_,
+        cwd,
+        timeout,
+      })),
+      [
+        {
+          executable: "pnpm",
+          arguments: [
+            "install",
+            "--frozen-lockfile",
+            "--store-dir",
+            join(supportRoot, "store"),
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: [
+            "--dir",
+            "apps/web",
+            "exec",
+            "vitest",
+            "run",
+            "--project",
+            "unit",
+            "tests/unit/section-composition-certification.test.ts",
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: [
+            "--dir",
+            "apps/web",
+            "exec",
+            "vitest",
+            "run",
+            "--project",
+            "component",
+            "tests/component/section-composition-certification.test.tsx",
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["--dir", "apps/web", "run", "browser:install"],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: [
+            "--dir",
+            "apps/web",
+            "exec",
+            "playwright",
+            "test",
+            "--config",
+            "playwright.dev.config.ts",
+            "tests/e2e/section-composition-certification.spec.ts",
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+      ],
+    );
+    for (const command of commands) {
+      assert.equal(command.environment.PATH, "/verified/bin");
+      assert.equal(command.environment.HOME, join(supportRoot, "home"));
+      assert.equal(command.environment.USERPROFILE, join(supportRoot, "home"));
+      assert.equal(
+        command.environment.PLAYWRIGHT_BROWSERS_PATH,
+        join(supportRoot, "playwright-browsers"),
+      );
+      assert.equal(
+        command.environment.NPM_CONFIG_USERCONFIG,
+        join(supportRoot, ".npmrc"),
+      );
+      assert.equal(
+        command.environment.NPM_CONFIG_REGISTRY,
+        "https://registry.npmjs.org/",
+      );
+      assert.equal(command.environment.TMPDIR, join(supportRoot, "temporary"));
+      assert.equal(command.environment.TMP, join(supportRoot, "temporary"));
+      assert.equal(command.environment.TEMP, join(supportRoot, "temporary"));
+      assert.equal(command.environment.XDG_CACHE_HOME, join(supportRoot, "cache"));
+    }
+  } finally {
+    await rm(ownedRoot, { recursive: true, force: true });
+  }
+});
+
+test("section composition certification fails closed on authority and journey drift", async (context) => {
+  const revision = "a".repeat(40);
+  const createJourneys = (authorityOverrides = {}, siteOverrides = {}) => {
+    const authority = {
+      readCurrentRevision: async () => revision,
+      readRepositoryStatus: async () => "",
+      readRepositoryIndexEntries: async () =>
+        "H selected-evidence.test.mjs\0",
+      ...authorityOverrides,
+    };
+    const portfolio = createSuccessfulScaffoldAdapters({
+      inferredCapability: {
+        identifier: "section-composition",
+        version: "0.3.0",
+      },
+      readCurrentRevision: authority.readCurrentRevision,
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+      verifyFixture: async () => ({
+        ok: true,
+        checks: sectionCompositionFixtureChecks,
+      }),
+    });
+    const site = createSuccessfulScaffoldAdapters({
+      expectedCapabilities: Object.freeze([
+        "standards",
+        "content-files",
+        "section-composition",
+        "deployment-cloudflare",
+        "observability",
+        "site-routing",
+      ]),
+      inferredCapability: {
+        identifier: "section-composition",
+        version: "0.3.0",
+      },
+      profile: "site",
+      readCurrentRevision: authority.readCurrentRevision,
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+      verifierIdentifier: "site",
+      ...siteOverrides,
+    });
+    return {
+      adapters: {
+        ...authority,
+        journeys: { portfolio: portfolio.adapters, site: site.adapters },
+      },
+      portfolio,
+      site,
+    };
+  };
+
+  await context.test("rejects a dirty worktree before either journey", async () => {
+    const setup = createJourneys({
+      readRepositoryStatus: async () => "?? private-source.ts\0",
+    });
+    await assert.rejects(
+      certifySectionCompositionForTesting({ revision }, setup.adapters),
+      (error) => error?.code === "CERTIFICATION_WORKTREE_DIRTY",
+    );
+    assert.equal(setup.portfolio.state.commands.length, 0);
+    assert.equal(setup.site.state.commands.length, 0);
+  });
+
+  await context.test("rejects hidden index flags before either journey", async () => {
+    const setup = createJourneys({
+      readRepositoryIndexEntries: async () =>
+        "S selected-evidence.test.mjs\0",
+    });
+    await assert.rejects(
+      certifySectionCompositionForTesting({ revision }, setup.adapters),
+      (error) => error?.code === "CERTIFICATION_INDEX_FLAGS",
+    );
+    assert.equal(setup.portfolio.state.commands.length, 0);
+    assert.equal(setup.site.state.commands.length, 0);
+  });
+
+  await context.test("rejects an invalid site verification identity", async () => {
+    const setup = createJourneys({}, { verificationChecks: fixedChecks.slice(1) });
+    await assert.rejects(
+      certifySectionCompositionForTesting({ revision }, setup.adapters),
+      (error) => error?.code === "GENERATED_PROJECT_VERIFICATION_INVALID",
+    );
+    assert.equal(await pathExists(setup.portfolio.state.ownedPath), false);
+    assert.equal(await pathExists(setup.site.state.ownedPath), false);
+  });
+
+  await context.test("rejects revision drift after both contained journeys", async () => {
+    let reads = 0;
+    const setup = createJourneys({
+      readCurrentRevision: async () => {
+        reads += 1;
+        return reads === 1 ? revision : "b".repeat(40);
+      },
+    });
+    await assert.rejects(
+      certifySectionCompositionForTesting({ revision }, setup.adapters),
+      (error) => error?.code === "CERTIFICATION_REVISION_MISMATCH",
+    );
+    assert.equal(await pathExists(setup.portfolio.state.ownedPath), false);
+    assert.equal(await pathExists(setup.site.state.ownedPath), false);
+  });
+});
+
+test("the section composition certification command requires one exact revision without echoing rejected values", async () => {
+  for (const [arguments_, expectedCode, expectedExitCode] of [
+    [["--revision", "private-value"], "CERTIFICATION_REVISION_INVALID", 1],
+    [
+      ["--", "--revision", "private-value"],
+      "CERTIFICATION_REVISION_INVALID",
+      1,
+    ],
+    [["--unknown", "private-value"], "CERTIFICATION_ARGUMENT_INVALID", 2],
+  ]) {
+    const execution = await execFileAsync(
+      process.execPath,
+      [sectionCompositionCertificationScript, ...arguments_],
+      {
+        cwd: repositoryRoot,
+        encoding: "utf8",
+        env: { PATH: process.env.PATH },
+      },
+    ).catch((error) => error);
+
+    assert.equal(execution.code, expectedExitCode);
+    assert.equal(execution.stdout, "");
+    assert.deepEqual(JSON.parse(execution.stderr), {
+      ok: false,
+      code: expectedCode,
+    });
+    assert.doesNotMatch(execution.stderr, /private-value/u);
+  }
+});
 
 async function writeRecipeVersion(projectRoot, version) {
   await mkdir(join(projectRoot, ".egeria"), { recursive: true });
