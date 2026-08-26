@@ -2278,6 +2278,69 @@ test("content files fixture verification applies the exact isolated overlay and 
   }
 });
 
+test("content files fixture verification contains preparation and overlay filesystem failures", async (context) => {
+  const { verifyContentFixtureForTesting } = await import(
+    "../../scripts/certify-content-files.mjs"
+  );
+  const cases = [
+    {
+      name: "support-root preparation",
+      prepare: async ({ ownedRoot }) => {
+        await writeFile(join(ownedRoot, "content-fixture-support"), "blocked");
+      },
+    },
+    {
+      name: "fixture destination creation",
+      prepare: async ({ projectRoot, siteContentPath }) => {
+        await mkdir(dirname(siteContentPath), { recursive: true });
+        await writeFile(siteContentPath, "navigation: []\n");
+        await mkdir(join(projectRoot, "apps/web"), { recursive: true });
+        await writeFile(join(projectRoot, "apps/web/tests"), "blocked");
+      },
+    },
+    {
+      name: "navigation overlay write",
+      prepare: async ({ siteContentPath }) => {
+        await mkdir(dirname(siteContentPath), { recursive: true });
+        await writeFile(siteContentPath, "navigation: []\n", { mode: 0o400 });
+      },
+    },
+  ];
+
+  for (const { name, prepare } of cases) {
+    await context.test(name, async () => {
+      const ownedRoot = await mkdtemp(
+        join(tmpdir(), "content-fixture-failure-"),
+      );
+      const projectRoot = join(ownedRoot, "generated-project");
+      const siteContentPath = join(
+        projectRoot,
+        "apps/web/content/en-CA/site.yaml",
+      );
+      let commandRuns = 0;
+
+      try {
+        await prepare({ ownedRoot, projectRoot, siteContentPath });
+        await assert.rejects(
+          verifyContentFixtureForTesting({
+            projectRoot,
+            environment: { PATH: "/verified/bin" },
+            runCommand: async () => {
+              commandRuns += 1;
+            },
+          }),
+          (error) =>
+            error?.name === "ContentFilesCertificationError" &&
+            error.code === "CERTIFICATION_FIXTURE_OVERLAY_FAILED",
+        );
+        assert.equal(commandRuns, 0);
+      } finally {
+        await rm(ownedRoot, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
 test("content files certification fails closed on invalid authority and evidence drift", async (context) => {
   const revision = "a".repeat(40);
   const createScaffold = (overrides = {}) =>

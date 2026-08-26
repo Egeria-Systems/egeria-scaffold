@@ -245,8 +245,8 @@ async function requireCleanRepository(adapters) {
 async function copyCertificationFixtures(projectRoot) {
   for (const mapping of fixtureMappings) {
     const destination = join(projectRoot, mapping.destination);
-    await mkdir(dirname(destination), { recursive: true });
     try {
+      await mkdir(dirname(destination), { recursive: true });
       await copyFile(
         join(fixtureRoot, mapping.source),
         destination,
@@ -271,13 +271,17 @@ async function copyCertificationFixtures(projectRoot) {
   if (siteContent.split(navigationMarker).length !== 2) {
     throw createError("CERTIFICATION_FIXTURE_OVERLAY_FAILED");
   }
-  await writeFile(
-    siteContentPath,
-    siteContent.replace(
-      navigationMarker,
-      "navigation:\n  - href: \"#introduction\"\n    label: Introduction\n",
-    ),
-  );
+  try {
+    await writeFile(
+      siteContentPath,
+      siteContent.replace(
+        navigationMarker,
+        "navigation:\n  - href: \"#introduction\"\n    label: Introduction\n",
+      ),
+    );
+  } catch {
+    throw createError("CERTIFICATION_FIXTURE_OVERLAY_FAILED");
+  }
 }
 
 async function runProjectCommand(
@@ -309,12 +313,16 @@ async function verifyContentFixture({ projectRoot, runCommand, environment }) {
   const store = join(supportRoot, "store");
   const userConfiguration = join(supportRoot, ".npmrc");
 
-  await mkdir(home, { recursive: true, mode: 0o700 });
-  await mkdir(browsers, { mode: 0o700 });
-  await mkdir(cache, { mode: 0o700 });
-  await mkdir(temporary, { mode: 0o700 });
-  await mkdir(store, { mode: 0o700 });
-  await writeFile(userConfiguration, "", { flag: "wx", mode: 0o600 });
+  try {
+    await mkdir(home, { recursive: true, mode: 0o700 });
+    await mkdir(browsers, { mode: 0o700 });
+    await mkdir(cache, { mode: 0o700 });
+    await mkdir(temporary, { mode: 0o700 });
+    await mkdir(store, { mode: 0o700 });
+    await writeFile(userConfiguration, "", { flag: "wx", mode: 0o600 });
+  } catch {
+    throw createError("CERTIFICATION_FIXTURE_OVERLAY_FAILED");
+  }
   await copyCertificationFixtures(projectRoot);
 
   const childEnvironment = {
