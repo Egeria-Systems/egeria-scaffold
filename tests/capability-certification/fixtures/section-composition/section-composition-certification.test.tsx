@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { PageSection } from "../../../src/content/content-schema";
-import { SectionComposition } from "../../../src/sections/section-registry";
+import type { PageSection } from "../../src/content/content-schema";
+import { SectionComposition } from "../../src/sections/section-registry";
 
 const sections: readonly PageSection[] = [
   {

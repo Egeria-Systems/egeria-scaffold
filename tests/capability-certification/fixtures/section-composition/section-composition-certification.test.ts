@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { sectionRegistry } from "../../../src/sections/section-registry";
+import { sectionRegistry } from "../../src/sections/section-registry";
 
 const webRoot = resolve(import.meta.dirname, "../..");
 
