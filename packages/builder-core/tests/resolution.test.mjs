@@ -39,13 +39,13 @@ function resolveRequest(
   return core.resolveCapabilities(request, catalog, profiles);
 }
 
-test("standards hybrid ownership declares generated unit, component, and browser quality", () => {
+test("standards hybrid ownership declares generated unit, component, browser, and visual quality", () => {
   const standards = createCatalog().find(
     ({ identifier }) => identifier === "standards",
   );
 
   assert.notEqual(standards, undefined);
-  assert.equal(standards.version, "0.3.0");
+  assert.equal(standards.version, "0.4.0");
   assert.equal(standards.deliveryMode, "hybrid");
   assert.deepEqual(standards.requiredPackages, [
     "@axe-core/playwright",
@@ -98,6 +98,7 @@ test("standards hybrid ownership declares generated unit, component, and browser
       "standards-playwright-package",
       "standards-playwright-preview-configuration",
       "standards-playwright-shared-configuration",
+      "standards-playwright-visual-configuration",
       "standards-preview-browser-test-script",
       "standards-package",
       "standards-quality-workflow",
@@ -110,11 +111,69 @@ test("standards hybrid ownership declares generated unit, component, and browser
       "standards-unit-watch-script",
       "standards-user-event-package",
       "standards-vite-react-package",
+      "standards-visual-regression-desktop-baseline",
+      "standards-visual-regression-mobile-baseline",
+      "standards-visual-regression-specification",
+      "standards-visual-regression-test-script",
       "standards-vitest-configuration",
       "standards-vitest-package",
     ].toSorted(),
   );
-  assert.equal(standards.inferenceProbes.length, 33);
+  assert.equal(standards.inferenceProbes.length, 36);
+  const visualSurfaces = new Map(
+    standards.managedSurfaces
+      .filter(({ identifier }) => identifier.includes("visual"))
+      .toSorted((left, right) =>
+        left.identifier < right.identifier
+          ? -1
+          : left.identifier > right.identifier
+            ? 1
+            : 0,
+      )
+      .map((surface) => [surface.identifier, surface]),
+  );
+  assert.deepEqual(
+    [...visualSurfaces].map(([identifier, surface]) => ({
+      identifier,
+      path: surface.path,
+      ownership: surface.ownership,
+      target: surface.fingerprintTarget,
+    })),
+    [
+      {
+        identifier: "standards-playwright-visual-configuration",
+        path: "apps/web/playwright.visual.config.ts",
+        ownership: "managed",
+        target: { kind: "file" },
+      },
+      {
+        identifier: "standards-visual-regression-desktop-baseline",
+        path:
+          "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+        ownership: "application-owned",
+        target: { kind: "file" },
+      },
+      {
+        identifier: "standards-visual-regression-mobile-baseline",
+        path:
+          "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+        ownership: "application-owned",
+        target: { kind: "file" },
+      },
+      {
+        identifier: "standards-visual-regression-specification",
+        path: "apps/web/tests/visual/home-visual.spec.ts",
+        ownership: "application-owned",
+        target: { kind: "file" },
+      },
+      {
+        identifier: "standards-visual-regression-test-script",
+        path: "apps/web/package.json",
+        ownership: "merge-managed",
+        target: { kind: "json-value", pointer: "/scripts/test:visual" },
+      },
+    ],
+  );
   assert.deepEqual(standards.verificationPlan, [
     "package-resolution",
     "lint",
@@ -124,17 +183,20 @@ test("standards hybrid ownership declares generated unit, component, and browser
     "browser-development",
     "browser-preview",
     "deployed-configuration",
+    "visual-regression",
     "workflow-contracts",
   ]);
   assert.deepEqual(standards.documentationEvidenceRequirements, [
     "public-package-version-and-provenance",
     "unit-and-component-testing-claim-boundaries",
     "browser-testing-claim-boundaries",
+    "visual-regression-baseline-and-claim-boundaries",
   ]);
   assert.deepEqual(standards.removalAndRecoveryRequirements, [
     "review-package-and-configuration-removal",
     "review-generated-test-surface-removal",
     "review-generated-quality-surface-removal",
+    "review-visual-regression-configuration-and-baselines",
   ]);
 });
 
@@ -425,7 +487,7 @@ test("the portfolio and site catalog declares the exact seven executable capabil
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -434,16 +496,16 @@ test("the portfolio and site catalog declares the exact seven executable capabil
       conflicts: [],
       supportedProfiles: ["portfolio", "site"],
       requiredPackages: ["@opennextjs/cloudflare", "wrangler"],
-      environmentVariables: [],
-      secrets: [],
+      environmentVariables: ["DEPLOY_URL"],
+      secrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
       platformResources: ["cloudflare-worker", "cloudflare-static-assets"],
       externalDomains: [],
       contentSecurityPolicyContributions: [],
       browserStorage: [],
       dataClassifications: [],
       retentionAssumptions: [],
-      privilegedOperations: [],
-      threatReviewLevel: "standard",
+      privilegedOperations: ["cloudflare-worker-deployment"],
+      threatReviewLevel: "elevated",
       adapterSemanticRequirements: ["node-runtime", "worker-static-assets"],
       managedSurfaces: [
         {
@@ -467,6 +529,14 @@ test("the portfolio and site catalog declares the exact seven executable capabil
             pointer: "/devDependencies/wrangler",
           },
           mergeStrategy: "json-property",
+        },
+        {
+          identifier: "deployment-cloudflare-workflow",
+          owner: { kind: "capability", identifier: "deployment-cloudflare" },
+          path: ".github/workflows/deploy.yml",
+          ownership: "managed",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
         },
         {
           identifier: "deployment-cloudflare-next-configuration",
@@ -508,26 +578,39 @@ test("the portfolio and site catalog declares the exact seven executable capabil
           packageName: "wrangler",
           version: "4.118.0",
         },
+        { kind: "file", path: ".github/workflows/deploy.yml" },
         { kind: "file", path: "apps/web/next.config.ts" },
         { kind: "file", path: "apps/web/open-next.config.ts" },
         { kind: "file", path: "apps/web/wrangler.jsonc" },
       ],
       migrationPlanners: [],
-      verificationPlan: ["next-build", "opennext-build", "wrangler-types"],
+      verificationPlan: [
+        "next-build",
+        "opennext-build",
+        "wrangler-types",
+        "deployment-workflow-contracts",
+        "browser-deployed",
+      ],
       documentationEvidenceRequirements: [
         "nextjs-opennext-cloudflare-compatibility",
+        "deployment-authority-and-claim-boundaries",
       ],
       removalAndRecoveryRequirements: [
         "review-deployment-source-and-provider-state-separately",
+        "revoke-or-rotate-deployment-credentials-separately",
       ],
     },
     {
       identifier: "observability",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
-      dependencies: ["deployment-cloudflare"],
+      dependencies: [
+        "content-files",
+        "deployment-cloudflare",
+        "section-composition",
+      ],
       optionalIntegrations: [],
       conflicts: [],
       supportedProfiles: ["portfolio", "site"],
@@ -547,6 +630,7 @@ test("the portfolio and site catalog declares the exact seven executable capabil
       dataClassifications: [
         "bounded-operational-telemetry",
         "provider-platform-error-and-exception-logs",
+        "restricted-error-diagnostics",
       ],
       retentionAssumptions: ["provider-controlled-operational-log-retention"],
       privilegedOperations: [
@@ -558,6 +642,7 @@ test("the portfolio and site catalog declares the exact seven executable capabil
         "cloudflare-execution-context-lifetime",
         "cloudflare-version-metadata",
         "same-origin-browser-ingest",
+        "separate-operational-and-diagnostic-sinks",
       ],
       managedSurfaces: [
         {
@@ -640,6 +725,46 @@ test("the portfolio and site catalog declares the exact seven executable capabil
           fingerprintTarget: { kind: "file" },
           mergeStrategy: "replace-file",
         },
+        {
+          identifier: "observability-page-error-boundary",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/app/error.tsx",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-global-error-boundary",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/app/global-error.tsx",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-error-copy-source",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/content/en-CA/observability.yaml",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-error-copy",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/src/infrastructure/observability/error-copy.ts",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
+        {
+          identifier: "observability-error-fallback",
+          owner: { kind: "capability", identifier: "observability" },
+          path: "apps/web/src/presentation/error-fallback.tsx",
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        },
       ],
       inferenceProbes: [
         {
@@ -685,6 +810,20 @@ test("the portfolio and site catalog declares the exact seven executable capabil
           kind: "file",
           path:
             "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
+        },
+        { kind: "file", path: "apps/web/app/error.tsx" },
+        { kind: "file", path: "apps/web/app/global-error.tsx" },
+        {
+          kind: "file",
+          path: "apps/web/content/en-CA/observability.yaml",
+        },
+        {
+          kind: "file",
+          path: "apps/web/src/infrastructure/observability/error-copy.ts",
+        },
+        {
+          kind: "file",
+          path: "apps/web/src/presentation/error-fallback.tsx",
         },
         {
           kind: "json-value",
@@ -962,7 +1101,7 @@ test("capability package versions must be exact stable releases and issues do no
 test("the verified generation catalog pins exact public package releases", () => {
   assert.deepEqual(core.verifiedCapabilityPackageVersions, {
     standards: "0.1.0",
-    observability: "0.2.0",
+    observability: "0.3.0",
   });
   assert.equal(Object.isFrozen(core.verifiedCapabilityPackageVersions), true);
   assert.throws(() => {
@@ -1005,7 +1144,7 @@ test("the verified generation catalog pins exact public package releases", () =>
         path: "apps/web/package.json",
         section: "dependencies",
         packageName: "@egeria-systems/observability",
-        version: "0.2.0",
+        version: "0.3.0",
       },
     ],
   );
@@ -1023,7 +1162,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.7.0",
+      recipeVersion: "0.10.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1035,7 +1174,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.7.0",
+      recipeVersion: "0.10.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1066,7 +1205,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.7.0");
+  assert.equal(portfolio.recipeVersion, "0.10.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1100,7 +1239,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
       ({ identifier }) => identifier,
     );
 
-    assert.equal(selected.recipeVersion, "0.7.0");
+    assert.equal(selected.recipeVersion, "0.10.0");
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
         selectedIdentifiers.indexOf("booking-calendly"),
@@ -1119,7 +1258,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   assert.deepEqual(core.createInstalledManifest(site), [
     {
       identifier: "standards",
-      version: "0.3.0",
+      version: "0.4.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -1140,14 +1279,14 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
     },
     {
       identifier: "observability",
-      version: "0.2.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -1183,10 +1322,10 @@ test("resolution traverses dependency identifiers lexically rather than trusting
     resolved.capabilities.map(({ identifier }) => identifier),
     [
       "standards",
-      "deployment-cloudflare",
-      "observability",
       "content-files",
+      "deployment-cloudflare",
       "section-composition",
+      "observability",
       "site-routing",
     ],
   );

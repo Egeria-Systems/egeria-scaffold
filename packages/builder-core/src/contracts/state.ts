@@ -8,6 +8,7 @@ import {
   surfaceOwnerSchema,
   surfaceOwnershipModeSchema,
 } from "./capability.js";
+import { ordinaryGenerationVerificationChecks } from "./generation-verification.js";
 import {
   fingerprintSchema,
   safeRelativePathSchema,
@@ -69,14 +70,63 @@ const legacyVerificationChecks = [
 const currentVerificationChecks = [
   "contracts",
   "pre-state-inference",
-  "lockfile",
-  "frozen-install",
-  "lint",
-  "typecheck",
-  "unit-tests",
-  "component-tests",
-  "next-build",
-  "opennext-build",
+  ...ordinaryGenerationVerificationChecks,
+  "post-state-inference",
+] as const;
+
+export const capabilityAdditionPersistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  ...ordinaryGenerationVerificationChecks,
+  "post-change-inference",
+] as const;
+
+export const capabilityAdditionVerificationChecks = [
+  ...capabilityAdditionPersistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+] as const;
+
+export const capabilityRemovalPersistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  ...ordinaryGenerationVerificationChecks,
+  "post-change-inference",
+] as const;
+
+export const capabilityRemovalVerificationChecks = [
+  ...capabilityRemovalPersistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+] as const;
+
+export const capabilityUpgradePersistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  ...ordinaryGenerationVerificationChecks,
+  "post-change-inference",
+] as const;
+
+export const capabilityUpgradeVerificationChecks = [
+  ...capabilityUpgradePersistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+] as const;
+
+export const profileTransitionPersistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  ...ordinaryGenerationVerificationChecks,
+  "post-change-inference",
+] as const;
+
+export const profileTransitionVerificationChecks = [
+  ...profileTransitionPersistedVerificationChecks,
+  "migration-record",
   "post-state-inference",
 ] as const;
 
@@ -94,21 +144,35 @@ const legacyVerificationChecksSchema = z
   ])
   .readonly();
 
-const currentVerificationChecksSchema = z
-  .tuple([
-    z.literal("contracts"),
-    z.literal("pre-state-inference"),
-    z.literal("lockfile"),
-    z.literal("frozen-install"),
-    z.literal("lint"),
-    z.literal("typecheck"),
-    z.literal("unit-tests"),
-    z.literal("component-tests"),
-    z.literal("next-build"),
-    z.literal("opennext-build"),
-    z.literal("post-state-inference"),
-  ])
-  .readonly();
+function createLiteralTupleSchema<
+  const Values extends readonly [string, ...string[]],
+>(values: Values) {
+  const literalSchemas = values.map((value) => z.literal(value)) as {
+    [Index in keyof Values]: z.ZodLiteral<Values[Index]>;
+  };
+
+  return z.tuple(literalSchemas);
+}
+
+const currentVerificationChecksSchema = createLiteralTupleSchema(
+  currentVerificationChecks,
+).readonly();
+
+const capabilityAdditionVerificationChecksSchema = createLiteralTupleSchema(
+  capabilityAdditionPersistedVerificationChecks,
+).readonly();
+
+const capabilityRemovalVerificationChecksSchema = createLiteralTupleSchema(
+  capabilityRemovalPersistedVerificationChecks,
+).readonly();
+
+const capabilityUpgradeVerificationChecksSchema = createLiteralTupleSchema(
+  capabilityUpgradePersistedVerificationChecks,
+).readonly();
+
+const profileTransitionVerificationChecksSchema = createLiteralTupleSchema(
+  profileTransitionPersistedVerificationChecks,
+).readonly();
 
 const verificationChecksSchema = z
   .union([legacyVerificationChecksSchema, currentVerificationChecksSchema])
@@ -153,17 +217,46 @@ export const installedStateSchema = z
       })
       .readonly(),
     lastSuccessfulVerification: z
-      .strictObject({
-        kind: z.literal("generation"),
-        checks: verificationChecksSchema,
-      })
+      .discriminatedUnion("kind", [
+        z.strictObject({
+          kind: z.literal("generation"),
+          checks: verificationChecksSchema,
+        }),
+        z.strictObject({
+          kind: z.literal("capability-addition"),
+          checks: capabilityAdditionVerificationChecksSchema,
+        }),
+        z.strictObject({
+          kind: z.literal("capability-removal"),
+          checks: capabilityRemovalVerificationChecksSchema,
+        }),
+        z.strictObject({
+          kind: z.literal("capability-upgrade"),
+          checks: capabilityUpgradeVerificationChecksSchema,
+        }),
+        z.strictObject({
+          kind: z.literal("profile-transition"),
+          checks: profileTransitionVerificationChecksSchema,
+        }),
+      ])
       .readonly(),
   })
   .superRefine((state, context) => {
-    const expectedChecks =
-      state.origin.recipeVersion === "0.7.0"
-        ? currentVerificationChecks
-        : legacyVerificationChecks;
+    const expectedChecks = state.lastSuccessfulVerification.kind ===
+      "capability-addition"
+      ? capabilityAdditionPersistedVerificationChecks
+      : state.lastSuccessfulVerification.kind === "capability-removal"
+        ? capabilityRemovalPersistedVerificationChecks
+        : state.lastSuccessfulVerification.kind === "capability-upgrade"
+          ? capabilityUpgradePersistedVerificationChecks
+          : state.lastSuccessfulVerification.kind === "profile-transition"
+            ? profileTransitionPersistedVerificationChecks
+            : state.origin.recipeVersion === "0.7.0" ||
+                state.origin.recipeVersion === "0.8.0" ||
+                state.origin.recipeVersion === "0.9.0" ||
+                state.origin.recipeVersion === "0.10.0"
+              ? currentVerificationChecks
+              : legacyVerificationChecks;
 
     if (!hasExactChecks(state.lastSuccessfulVerification.checks, expectedChecks)) {
       context.addIssue({

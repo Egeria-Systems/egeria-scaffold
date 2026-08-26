@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 const maximumInputBytes = 65_536;
 const maximumDeploymentCount = 100;
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
+const supportedCapabilityVersion = "0.3.0";
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const workerName = "test-deploy";
 const checks = Object.freeze([
@@ -114,6 +115,7 @@ export function createCloudflareDeploymentReceiptForTesting({
   rawInput,
   revision,
   worker,
+  capabilityVersion,
 } = {}) {
   if (typeof revision !== "string" || !exactRevisionPattern.test(revision)) {
     throw createError("DEPLOYMENT_RECEIPT_REVISION_INVALID");
@@ -121,13 +123,16 @@ export function createCloudflareDeploymentReceiptForTesting({
   if (worker !== workerName) {
     throw createError("DEPLOYMENT_RECEIPT_WORKER_INVALID");
   }
+  if (capabilityVersion !== supportedCapabilityVersion) {
+    throw createError("DEPLOYMENT_RECEIPT_VERSION_INVALID");
+  }
 
   const deployments = parseRawDeployments(rawInput);
   const identity = readLatestIdentity(selectLatestDeployment(deployments));
   return Object.freeze({
     ok: true,
     capability: "observability",
-    version: "0.2.0",
+    version: capabilityVersion,
     worker: workerName,
     gitRevision: revision,
     ...identity,
@@ -173,15 +178,17 @@ async function readBoundedInput(path) {
 
 function parseArguments(arguments_) {
   if (
-    arguments_.length === 6 &&
+    arguments_.length === 8 &&
     arguments_[0] === "--input" &&
     arguments_[2] === "--revision" &&
-    arguments_[4] === "--worker"
+    arguments_[4] === "--worker" &&
+    arguments_[6] === "--version"
   ) {
     return {
       input: arguments_[1],
       revision: arguments_[3],
       worker: arguments_[5],
+      capabilityVersion: arguments_[7],
     };
   }
   return undefined;
@@ -205,6 +212,7 @@ async function runMain() {
       rawInput: await readBoundedInput(input.input),
       revision: input.revision,
       worker: input.worker,
+      capabilityVersion: input.capabilityVersion,
     });
     process.stdout.write(`${JSON.stringify(receipt)}\n`);
   } catch (error) {

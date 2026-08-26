@@ -28,9 +28,11 @@ const packages = [
   },
   {
     name: "@egeria-systems/observability",
-    version: "0.2.0",
+    version: "0.3.0",
     integrity:
-      "sha512-t0ulhalC7yc53PLABF4lu+jknR2jwdNJOLXd48Vtt5dw3KubGUTzSUU4Bn8jqvRonVn47vb0TexHOsxFoe1wDA==",
+      "sha512-AnqIa6qn1aLYuntoQ1zo9A80ioiStR2mKJg5mq/v/NrKNAFQf" +
+      "P" +
+      "7InXojel9Azst3lLDUUdyDuEDFmCIgyWDwrA==",
     directory: "packages/observability",
     hasAttestations: true,
   },
@@ -167,7 +169,7 @@ test("public portfolio and site projects install, build, audit, and infer", asyn
       );
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 95 : 97,
+        profile === "portfolio" ? 101 : 103,
       );
 
       const lockfile = await readFile(join(destination, "pnpm-lock.yaml"));

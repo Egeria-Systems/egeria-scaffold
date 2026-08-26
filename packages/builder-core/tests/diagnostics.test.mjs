@@ -17,11 +17,16 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
+import { requiredEvidence } from "./certification-contracts.mjs";
+
 const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const builtEntry = resolve(packageRoot, "dist/index.js");
 const typeScriptCompiler = resolve(packageRoot, "node_modules/typescript/bin/tsc");
 const core = await import(pathToFileURL(builtEntry));
+const projectInspection = await import(
+  pathToFileURL(resolve(packageRoot, "dist/diagnostics/project-inspection.js")),
+);
 const encoder = new TextEncoder();
 
 const verificationChecks = [
@@ -232,6 +237,144 @@ test("builder-core exports the approved read-only doctor and diff API", () => {
   assert.equal(typeof core.diffProject, "function");
 });
 
+test("doctor and diff share neutral capability and managed-surface discrepancy facts", () => {
+  const standards = createDescriptor("standards");
+  const installedOnly = createDescriptor("installed-only");
+  const unknownInstalled = {
+    ...installCapability(standards),
+    identifier: "unknown-installed",
+  };
+  const capabilitySurface = createSurface({
+    identifier: "capability-missing",
+    path: "missing.txt",
+  });
+  const builderSurface = {
+    ...createSurface({
+      identifier: "builder-ambiguous",
+      path: "ambiguous.txt",
+    }),
+    owner: { kind: "builder-kernel" },
+  };
+  const installedState = state(
+    [
+      installCapability(standards),
+      installCapability(installedOnly),
+      unknownInstalled,
+    ],
+    [capabilitySurface, builderSurface],
+  );
+
+  assert.deepEqual(
+    projectInspection.deriveProjectDiscrepancies({
+      project: { kind: "valid", value: project() },
+      migrations: { kind: "valid", value: [] },
+      resolution: {
+        ok: true,
+        value: {
+          capabilities: [standards, createDescriptor("desired-only")],
+        },
+      },
+      inference: {
+        state: { kind: "valid", value: installedState },
+        capabilities: [
+          {
+            identifier: "standards",
+            category: "contradictory",
+            probes: [],
+          },
+          {
+            identifier: "inferred-only",
+            category: "probable",
+            probes: [],
+          },
+          {
+            identifier: "installed-only",
+            category: "confirmed",
+            probes: [],
+          },
+          {
+            identifier: "unknown-installed",
+            category: "ambiguous",
+            probes: [],
+            code: "CAPABILITY_DESCRIPTOR_MISSING",
+          },
+        ],
+        surfaces: [
+          {
+            identifier: "capability-missing",
+            path: "missing.txt",
+            status: "missing",
+          },
+          {
+            identifier: "builder-ambiguous",
+            path: "ambiguous.txt",
+            status: "ambiguous",
+            code: "READ_FAILED",
+          },
+          {
+            identifier: "confirmed",
+            path: "confirmed.txt",
+            status: "confirmed",
+          },
+        ],
+      },
+    }),
+    {
+      capabilities: [
+        {
+          identifier: "desired-only",
+          desired: true,
+          installed: false,
+          descriptorMissing: false,
+        },
+        {
+          identifier: "inferred-only",
+          desired: false,
+          installed: false,
+          descriptorMissing: false,
+          inferenceCategory: "probable",
+        },
+        {
+          identifier: "installed-only",
+          desired: false,
+          installed: true,
+          descriptorMissing: false,
+          inferenceCategory: "confirmed",
+        },
+        {
+          identifier: "standards",
+          desired: true,
+          installed: true,
+          descriptorMissing: false,
+          inferenceCategory: "contradictory",
+        },
+        {
+          identifier: "unknown-installed",
+          desired: false,
+          installed: true,
+          descriptorMissing: true,
+          inferenceCategory: "ambiguous",
+          inferenceCode: "CAPABILITY_DESCRIPTOR_MISSING",
+        },
+      ],
+      surfaces: [
+        {
+          identifier: "builder-ambiguous",
+          path: "ambiguous.txt",
+          status: "ambiguous",
+          reason: "READ_FAILED",
+        },
+        {
+          identifier: "capability-missing",
+          path: "missing.txt",
+          status: "missing",
+          capability: "standards",
+        },
+      ],
+    },
+  );
+});
+
 test("the package root exposes the exact diagnostics types", async () => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "egeria-diagnostics-types-"));
 
@@ -353,6 +496,118 @@ test("doctor and diff report a healthy minimal repository", async () => {
   assert.deepEqual(difference, { equal: true, differences: [] });
 });
 
+test("restricted error diagnostics admission advances every direct owner together", async () => {
+  const catalog = core.createVerifiedCapabilityCatalog();
+  assert.equal(catalog.ok, true);
+  const descriptor = catalog.value.find(
+    ({ identifier }) => identifier === "observability",
+  );
+  assert.notEqual(descriptor, undefined);
+  assert.equal(descriptor.version, "0.3.0");
+  assert.equal(core.verifiedCapabilityPackageVersions.observability, "0.3.0");
+  assert.deepEqual(descriptor.dependencies, [
+    "content-files",
+    "deployment-cloudflare",
+    "section-composition",
+  ]);
+  assert.ok(
+    descriptor.dataClassifications.includes("restricted-error-diagnostics"),
+  );
+  assert.ok(
+    descriptor.adapterSemanticRequirements.includes(
+      "separate-operational-and-diagnostic-sinks",
+    ),
+  );
+
+  const newPaths = [
+    "apps/web/app/error.tsx",
+    "apps/web/app/global-error.tsx",
+    "apps/web/content/en-CA/observability.yaml",
+    "apps/web/src/infrastructure/observability/error-copy.ts",
+    "apps/web/src/presentation/error-fallback.tsx",
+  ];
+  assert.deepEqual(
+    descriptor.managedSurfaces
+      .map(({ path }) => path)
+      .filter((path) => newPaths.includes(path))
+      .sort(),
+    newPaths,
+  );
+  assert.deepEqual(
+    descriptor.inferenceProbes
+      .filter(({ kind }) => kind === "file")
+      .map(({ path }) => path)
+      .filter((path) => newPaths.includes(path))
+      .sort(),
+    newPaths,
+  );
+  assert.deepEqual(
+    core.profileRecipes.map(({ identifier, recipeVersion }) => ({
+      identifier,
+      recipeVersion,
+    })),
+    [
+      { identifier: "portfolio", recipeVersion: "0.10.0" },
+      { identifier: "site", recipeVersion: "0.10.0" },
+    ],
+  );
+
+  const registry = JSON.parse(
+    await readFile(
+      new URL("../../../certifications/capabilities.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  const subject = core.createCertificationSubject(
+    descriptor,
+    requiredEvidence.observability,
+  );
+  assert.deepEqual(registry.records.observability, {
+    subject,
+    requiredEvidence: requiredEvidence.observability,
+    status: "certified",
+    taskPlan:
+      "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md",
+    evidence: requiredEvidence.observability.map((kind) => ({
+      kind,
+      path: "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
+      outcome: "passed",
+      revision: "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
+      subject,
+    })),
+  });
+
+  const [packageTemplate, workspace, lockfile] = await Promise.all([
+    readFile(
+      new URL("../templates/common/apps/web/package.json.template", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../templates/common/pnpm-workspace.yaml", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../lockfiles/web-recipe-0.8.0/pnpm-lock.yaml", import.meta.url),
+      "utf8",
+    ),
+  ]);
+  assert.equal(
+    JSON.parse(packageTemplate).dependencies[
+      "@egeria-systems/observability"
+    ],
+    "0.3.0",
+  );
+  assert.match(
+    workspace,
+    /minimumReleaseAgeExclude:\n  - "@egeria-systems\/observability@0\.3\.0"/u,
+  );
+  assert.match(lockfile, /@egeria-systems\/observability@0\.3\.0/u);
+  assert.doesNotMatch(
+    lockfile,
+    /@egeria-systems\/observability@(?:file:|link:|workspace:)|(?:file:|link:|workspace:).*observability/u,
+  );
+});
+
 test("doctor and diff agree across the canonical portfolio composition", async () => {
   const catalogResult = core.createCapabilityCatalog({
     standards: "1.2.3",
@@ -409,6 +664,7 @@ test("doctor and diff agree across the canonical portfolio composition", async (
         "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
         "test:e2e:preview":
           "playwright test --config playwright.preview.config.ts",
+        "test:visual": "playwright test --config playwright.visual.config.ts",
         "test:unit": "vitest run --project unit",
         "test:unit:watch": "vitest --project unit",
         "test:watch": "vitest",
@@ -440,9 +696,14 @@ test("doctor and diff agree across the canonical portfolio composition", async (
     "apps/web/instrumentation-client.ts": "export {};\n",
     "apps/web/instrumentation.ts": "export {};\n",
     "apps/web/app/api/observability/route.ts": "export {};\n",
+    "apps/web/app/error.tsx": "export {};\n",
+    "apps/web/app/global-error.tsx": "export {};\n",
+    "apps/web/content/en-CA/observability.yaml": "title: Error\n",
     "apps/web/src/infrastructure/cloudflare/observability-context.ts":
       "export {};\n",
     "apps/web/src/infrastructure/observability/browser-reporter.ts":
+      "export {};\n",
+    "apps/web/src/infrastructure/observability/error-copy.ts":
       "export {};\n",
     "apps/web/src/infrastructure/observability/installed-capability.ts":
       "export {};\n",
@@ -450,15 +711,24 @@ test("doctor and diff agree across the canonical portfolio composition", async (
       "export {};\n",
     "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx":
       "export {};\n",
+    "apps/web/src/presentation/error-fallback.tsx":
+      "export {};\n",
+    ".github/workflows/deploy.yml": "name: Deploy\n",
     ".github/workflows/quality.yml": "name: Quality\n",
     "apps/web/playwright.config.shared.ts": "export {};\n",
     "apps/web/playwright.deployed.config.ts": "export {};\n",
     "apps/web/playwright.dev.config.ts": "export {};\n",
     "apps/web/playwright.preview.config.ts": "export {};\n",
+    "apps/web/playwright.visual.config.ts": "export {};\n",
     "apps/web/tests/e2e/site-quality.spec.ts": "export {};\n",
     "apps/web/tests/component/content-page.test.tsx": "export {};\n",
     "apps/web/tests/setup/component.ts": "export {};\n",
     "apps/web/tests/unit/content-schema.test.ts": "export {};\n",
+    "apps/web/tests/visual/home-visual.spec.ts": "export {};\n",
+    "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png":
+      "desktop baseline\n",
+    "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png":
+      "mobile baseline\n",
     "apps/web/vitest.config.ts": "export {};\n",
   };
   const surfaceResult = core.materializeInstalledSurfaces({

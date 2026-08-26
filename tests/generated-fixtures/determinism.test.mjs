@@ -128,7 +128,7 @@ function assertPortablePublicLockfile(lockfile) {
   );
   assert.doesNotMatch(lockfile, /(?:^|[{,]\s*)tarball:/mu);
   assert.match(lockfile, /@egeria-systems\/standards@0\.1\.0/u);
-  assert.match(lockfile, /@egeria-systems\/observability@0\.2\.0/u);
+  assert.match(lockfile, /@egeria-systems\/observability@0\.3\.0/u);
   assert.match(lockfile, /@axe-core\/playwright@4\.12\.1/u);
   assert.match(lockfile, /@playwright\/test@1\.62\.1/u);
   assert.match(lockfile, /@testing-library\/dom@10\.4\.1/u);

@@ -1,20 +1,35 @@
 import { execFile } from "node:child_process";
 import {
-  chmod,
   cp,
   lstat,
   mkdir,
-  mkdtemp,
   open,
   readFile,
-  readdir,
-  rm,
+  realpath,
 } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import {
+  delimiter,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 import { promisify } from "node:util";
 
-import { fingerprintFileContent } from "../ownership/fingerprint.js";
+import { ordinaryGenerationVerificationChecks } from "../contracts/generation-verification.js";
 import type { ValidationResult } from "../contracts/result.js";
+import {
+  classifyLockfileOnlyTransition,
+  cleanupOwnedDirectory,
+  createOwnedTemporaryDirectory,
+  readDirectoryIdentity,
+  snapshotSourceTree,
+  sourceIdentityMatches,
+  sourceTreesEqual,
+  type PathIdentity,
+} from "./source-tree-safety.js";
 
 export type GeneratedProjectVerification = Readonly<{
   checks: typeof verificationChecks;
@@ -27,10 +42,9 @@ export interface GeneratedProjectVerifier {
   ): Promise<ValidationResult<GeneratedProjectVerification>>;
 }
 
-type PathIdentity = Readonly<{
-  path: string;
-  device: bigint;
-  inode: bigint;
+type ToolResolutionOptions = Readonly<{
+  platform?: "win32" | "posix";
+  environment?: Readonly<Record<string, string | undefined>>;
 }>;
 
 type SupportPaths = Readonly<{
@@ -40,10 +54,6 @@ type SupportPaths = Readonly<{
   store: string;
   userConfiguration: string;
 }>;
-
-type SourceEntry =
-  | Readonly<{ kind: "directory" }>
-  | Readonly<{ kind: "file"; fingerprint: string }>;
 
 type ExclusiveWriteResult =
   | Readonly<{ ok: true }>
@@ -74,22 +84,13 @@ const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const requiredPnpmVersion = "11.20.0";
 const publicRegistry = "https://registry.npmjs.org/";
 const recipeLockfile = new URL(
-  "../../lockfiles/web-recipe-0.7.0/pnpm-lock.yaml",
+  "../../lockfiles/web-recipe-0.8.0/pnpm-lock.yaml",
   import.meta.url,
 );
 const exclusiveFileOperations: ExclusiveFileOperations = {
   open,
 };
-export const verificationChecks = Object.freeze([
-  "lockfile",
-  "frozen-install",
-  "lint",
-  "typecheck",
-  "unit-tests",
-  "component-tests",
-  "next-build",
-  "opennext-build",
-] as const);
+export const verificationChecks = ordinaryGenerationVerificationChecks;
 
 function issue<T>(code: string, reason: string): ValidationResult<T> {
   return {
@@ -98,14 +99,20 @@ function issue<T>(code: string, reason: string): ValidationResult<T> {
   };
 }
 
-function findEnvironmentValue(name: string): string | undefined {
+function findEnvironmentValue(
+  name: string,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): string | undefined {
   const normalizedName = name.toLowerCase();
-  return Object.entries(process.env).find(
+  return Object.entries(environment).find(
     ([key, value]) => key.toLowerCase() === normalizedName && value !== undefined,
   )?.[1];
 }
 
-function createChildEnvironment(support: SupportPaths): NodeJS.ProcessEnv {
+function createChildEnvironment(
+  support: SupportPaths,
+  toolEnvironment: Readonly<Record<string, string>> = {},
+): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = {};
 
   for (const key of ["PATH", "SystemRoot", "ComSpec", "PATHEXT", "LANG"] as const) {
@@ -120,6 +127,7 @@ function createChildEnvironment(support: SupportPaths): NodeJS.ProcessEnv {
 
   return {
     ...environment,
+    ...toolEnvironment,
     CI: "true",
     NEXT_TELEMETRY_DISABLED: "1",
     HOME: support.home,
@@ -132,30 +140,117 @@ function createChildEnvironment(support: SupportPaths): NodeJS.ProcessEnv {
   };
 }
 
-async function sourceIdentityMatches(identity: PathIdentity): Promise<boolean> {
-  try {
-    const stats = await lstat(identity.path, { bigint: true });
-    return (
-      !stats.isSymbolicLink() &&
-      stats.isDirectory() &&
-      stats.dev === identity.device &&
-      stats.ino === identity.inode
-    );
-  } catch {
-    return false;
+function executableNames(
+  executable: string,
+  options: ToolResolutionOptions,
+): readonly string[] {
+  if (options.platform !== "win32") {
+    return [executable];
   }
+
+  const extensions = (findEnvironmentValue("PATHEXT", options.environment) ?? "")
+    .split(";")
+    .filter((extension) => extension.length > 0)
+    .map((extension) =>
+      extension.startsWith(".") ? extension : `.${extension}`,
+    );
+  const executableLower = executable.toLowerCase();
+  return extensions.some((extension) =>
+    executableLower.endsWith(extension.toLowerCase()),
+  )
+    ? [executable]
+    : [executable, ...extensions.map((extension) => `${executable}${extension}`)];
 }
 
-async function cleanupOwnedDirectory(identity: PathIdentity): Promise<boolean> {
-  if (!(await sourceIdentityMatches(identity))) {
+export async function resolveExecutablePath(
+  executable: string,
+  options: ToolResolutionOptions = {},
+): Promise<string | undefined> {
+  const platform =
+    options.platform ?? (process.platform === "win32" ? "win32" : "posix");
+  const candidates = isAbsolute(executable)
+    ? [executable]
+    : (findEnvironmentValue("PATH", options.environment) ?? "")
+        .split(platform === "win32" ? ";" : delimiter)
+        .filter((entry) => entry.length > 0)
+        .flatMap((entry) =>
+          executableNames(executable, { ...options, platform }).map((name) =>
+            join(entry, name),
+          ),
+        );
+
+  for (const candidate of candidates) {
+    try {
+      const stats = await lstat(candidate);
+      if (stats.isFile() || stats.isSymbolicLink()) {
+        return resolve(candidate);
+      }
+    } catch {
+      // Continue to the next fixed PATH candidate.
+    }
+  }
+
+  return undefined;
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  return (
+    left.length === right.length &&
+    left.every((byte, index) => byte === right[index])
+  );
+}
+
+async function isVoltaShim(
+  executablePath: string,
+  bin: string,
+  platform: "win32" | "posix",
+): Promise<boolean> {
+  const executable = await realpath(executablePath);
+  const expectedShim = await realpath(
+    join(bin, platform === "win32" ? "volta-shim.exe" : "volta-shim"),
+  );
+  if (executable === expectedShim) {
+    return true;
+  }
+
+  if (platform !== "win32") {
     return false;
   }
 
+  const [executableContent, expectedShimContent] = await Promise.all([
+    readFile(executable),
+    readFile(expectedShim),
+  ]);
+  return sameBytes(executableContent, expectedShimContent);
+}
+
+export async function derivePnpmToolEnvironment(
+  executable: string,
+  options: ToolResolutionOptions = {},
+): Promise<Readonly<Record<string, string>>> {
+  const platform =
+    options.platform ?? (process.platform === "win32" ? "win32" : "posix");
+  const executablePath = await resolveExecutablePath(executable, {
+    ...options,
+    platform,
+  });
+  if (executablePath === undefined) {
+    return {};
+  }
+
   try {
-    await rm(identity.path, { recursive: true });
-    return true;
+    const bin = await realpath(dirname(executablePath));
+    if (!(await isVoltaShim(executablePath, bin, platform))) {
+      return {};
+    }
+
+    const voltaHome = await realpath(dirname(bin));
+    const stats = await lstat(voltaHome);
+    return stats.isDirectory() && !stats.isSymbolicLink()
+      ? { VOLTA_HOME: voltaHome, VOLTA_FEATURE_PNPM: "1" }
+      : {};
   } catch {
-    return false;
+    return {};
   }
 }
 
@@ -198,27 +293,6 @@ export async function writeExclusive(
   // could delete a replacement created after this handle was opened, so the
   // caller must fail closed and let the identity-owned staging root clean up.
   return { ok: false, sourceChanged: true };
-}
-
-async function createOwnedDirectory(
-  parent: string,
-  prefix: string,
-): Promise<ValidationResult<PathIdentity>> {
-  try {
-    const path = await mkdtemp(join(parent, prefix));
-    const stats = await lstat(path, { bigint: true });
-    if (stats.isSymbolicLink() || !stats.isDirectory()) {
-      return issue("VERIFIER_SETUP_FAILED", "invalid-owner");
-    }
-
-    await chmod(path, 0o700);
-    return {
-      ok: true,
-      value: { path, device: stats.dev, inode: stats.ino },
-    };
-  } catch {
-    return issue("VERIFIER_SETUP_FAILED", "owner-creation-failed");
-  }
 }
 
 async function createSupportPaths(
@@ -317,98 +391,21 @@ async function requirePnpmVersion(input: Readonly<{
     : issue("PNPM_VERSION_INVALID", "version-mismatch");
 }
 
-async function snapshotSource(
-  root: string,
-): Promise<ValidationResult<ReadonlyMap<string, SourceEntry>>> {
-  const entries = new Map<string, SourceEntry>();
-
-  async function visit(path: string, relativePath: string): Promise<boolean> {
-    let children;
-    try {
-      children = await readdir(path, { withFileTypes: true });
-    } catch {
-      return false;
-    }
-
-    for (const child of children) {
-      const childPath = join(path, child.name);
-      const childRelativePath = relativePath
-        ? `${relativePath}/${child.name}`
-        : child.name;
-
-      if (child.isDirectory()) {
-        entries.set(childRelativePath, { kind: "directory" });
-        if (!(await visit(childPath, childRelativePath))) {
-          return false;
-        }
-      } else if (child.isFile()) {
-        try {
-          entries.set(childRelativePath, {
-            kind: "file",
-            fingerprint: fingerprintFileContent(await readFile(childPath)),
-          });
-        } catch {
-          return false;
-        }
-      } else {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  return (await visit(root, ""))
-    ? { ok: true, value: entries }
-    : issue("SOURCE_SNAPSHOT_FAILED", "source-invalid");
-}
-
-function entriesEqual(left: SourceEntry, right: SourceEntry): boolean {
-  return (
-    left.kind === right.kind &&
-    (left.kind === "directory" ||
-      (right.kind === "file" && left.fingerprint === right.fingerprint))
-  );
-}
-
-function onlyLockfileWasAdded(
-  before: ReadonlyMap<string, SourceEntry>,
-  after: ReadonlyMap<string, SourceEntry>,
-): boolean {
-  if (
-    before.has("pnpm-lock.yaml") ||
-    after.get("pnpm-lock.yaml")?.kind !== "file" ||
-    after.size !== before.size + 1
-  ) {
-    return false;
-  }
-
-  return [...before].every(([path, entry]) => {
-    const current = after.get(path);
-    return current !== undefined && entriesEqual(entry, current);
-  });
-}
-
-function snapshotsEqual(
-  left: ReadonlyMap<string, SourceEntry>,
-  right: ReadonlyMap<string, SourceEntry>,
-): boolean {
-  return (
-    left.size === right.size &&
-    [...left].every(([path, entry]) => {
-      const current = right.get(path);
-      return current !== undefined && entriesEqual(entry, current);
-    })
-  );
-}
-
 export async function prepareLockfile(
   root: string,
   writer: ExclusiveFileWriter = writeExclusive,
 ): Promise<ValidationResult<void>> {
   const fixedRoot = resolve(root);
-  const before = await snapshotSource(fixedRoot);
-  if (!before.ok) {
+  const identity = await readDirectoryIdentity(fixedRoot);
+  if (identity === undefined) {
+    return issue("LOCKFILE_PREPARATION_FAILED", "source-invalid");
+  }
+
+  const before = await snapshotSourceTree(fixedRoot);
+  if (
+    before === undefined ||
+    !(await sourceIdentityMatches(identity))
+  ) {
     return issue("LOCKFILE_PREPARATION_FAILED", "source-invalid");
   }
 
@@ -432,8 +429,13 @@ export async function prepareLockfile(
     );
   }
 
-  const after = await snapshotSource(fixedRoot);
-  return after.ok && onlyLockfileWasAdded(before.value, after.value)
+  if (!(await sourceIdentityMatches(identity))) {
+    return issue("LOCKFILE_PREPARATION_FAILED", "source-changed");
+  }
+
+  const after = await snapshotSourceTree(fixedRoot);
+  return after !== undefined &&
+    classifyLockfileOnlyTransition(before, after) === "valid"
     ? { ok: true, value: undefined }
     : issue("LOCKFILE_PREPARATION_FAILED", "source-changed");
 }
@@ -443,12 +445,12 @@ async function verifyInIsolatedCopy(
   root: string,
 ): Promise<ValidationResult<GeneratedProjectVerification>> {
   const fixedRoot = resolve(root);
-  const sourceBefore = await snapshotSource(fixedRoot);
-  if (!sourceBefore.ok) {
+  const sourceBefore = await snapshotSourceTree(fixedRoot);
+  if (sourceBefore === undefined) {
     return issue("FROZEN_INSTALL_FAILED", "source-invalid");
   }
 
-  const owner = await createOwnedDirectory(
+  const owner = await createOwnedTemporaryDirectory(
     dirname(fixedRoot),
     ".egeria-validation-",
   );
@@ -465,6 +467,8 @@ async function verifyInIsolatedCopy(
       force: false,
       errorOnExist: true,
       dereference: false,
+      filter: (source) =>
+        !relative(fixedRoot, source).split(sep).includes(".git"),
     });
     await mkdir(supportRoot, { mode: 0o700 });
     const supportStats = await lstat(supportRoot, { bigint: true });
@@ -477,7 +481,10 @@ async function verifyInIsolatedCopy(
     if (!support.ok) {
       result = issue("FROZEN_INSTALL_FAILED", "support-creation-failed");
     } else {
-      const environment = createChildEnvironment(support.value);
+      const environment = createChildEnvironment(
+        support.value,
+        await derivePnpmToolEnvironment(executable),
+      );
       const version = await requirePnpmVersion({
         executable,
         cwd: validationRoot,
@@ -540,8 +547,11 @@ async function verifyInIsolatedCopy(
           }
         }
 
-        const sourceAfter = await snapshotSource(fixedRoot);
-        if (!sourceAfter.ok || !snapshotsEqual(sourceBefore.value, sourceAfter.value)) {
+        const sourceAfter = await snapshotSourceTree(fixedRoot);
+        if (
+          sourceAfter === undefined ||
+          !sourceTreesEqual(sourceBefore, sourceAfter)
+        ) {
           result = issue("FROZEN_INSTALL_FAILED", "source-changed");
         }
       }

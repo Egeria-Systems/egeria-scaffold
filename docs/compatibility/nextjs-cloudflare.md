@@ -2,24 +2,30 @@
 
 ## Status and evidence date
 
-**Evidence date:** 2026-08-06
+**Evidence date:** 2026-08-13
 
 This P0.2 combination is accepted after verified-final-diff approval. The original implementation candidate passed local Node.js, Next.js, OpenNext, workerd harness, preview, Ubuntu workflow, non-production Worker, Chromium, and automated accessibility checks under Node `22.23.0`.
 
-Node `22.23.2` revalidation is local-only. On 2026-08-06, the current candidate passed the frozen install, dependency audit, Next.js and OpenNext builds, workerd integration harness, development and preview browser checks, and the selected automated accessibility checks. The deployed evidence remains on Node `22.23.0`; no workflow was dispatched and no Worker was deployed for this patch update. Neither the local nor deployed results prove a production profile, production readiness, or WCAG conformance.
+The initial Node `22.23.2` revalidation is local-only. On 2026-08-06, the current candidate passed the frozen install, dependency audit, Next.js and OpenNext builds, workerd integration harness, development and preview browser checks, and the selected automated accessibility checks. No workflow was dispatched and no Worker was deployed for that patch update.
 
-The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). Preparation evidence and the approved implementation plan remain separately reviewable in [implementation evidence](../implementation-evidence/2026-08-04-p0-2-compatibility-preparation.md) and the [P0.2 plan](../superpowers/plans/2026-08-04-p0-2-nextjs-cloudflare-compatibility-proof.md).
+On 2026-08-13, Repository quality [run `31742910235`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/31742910235) passed the complete `compatibility-proof` job for exact commit `05fc743e5e24801d6e16e2ed89a8962397272238`, proof Wrangler `4.120.1`, and its frozen lockfile. The job passed frozen installation, lint, typecheck, unit behavior, Next.js build, OpenNext build, generated Cloudflare types, Cloudflare harness integration, Chromium installation, development-browser behavior, and OpenNext-preview browser behavior. It did not deploy a Worker. Historical deployed evidence remains on Node `22.23.0` at commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`, whose proof used Wrangler `4.118.0`. Neither the local, hosted, nor deployed results prove a production profile, production readiness, or WCAG conformance.
 
-## Exact matrix
+The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). Its package manifest and the root manifest own the current exact executable versions; the current workflows own their action pins and deployment contract. Preparation evidence and the approved implementation plan remain separately reviewable as private local workflow artifacts ignored by Git.
+
+## Accepted evidence snapshot
 
 | Surface | Exact version or value |
 |---|---|
+| Evidence date | `2026-08-13` |
+| Repository quality run | `31742910235` |
+| Implementation commit | `05fc743e5e24801d6e16e2ed89a8962397272238` |
+| `pnpm-lock.yaml` SHA-256 | `71444e493ea0d4f2c2011fddcf2dd8b9b339335afafd56dd765e0c50878c126d` |
 | Node.js | `22.23.2` |
 | pnpm | `11.20.0` |
 | Next.js | `16.3.0` |
 | React / React DOM | `19.2.8` |
 | OpenNext Cloudflare | `1.20.2` |
-| Wrangler | `4.118.0` |
+| Wrangler | `4.120.1` |
 | TypeScript | `6.0.3` |
 | ESLint | `9.39.5` |
 | Next ESLint config | `16.3.0` |
@@ -28,21 +34,30 @@ The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](..
 | Playwright | `1.62.1` |
 | axe Playwright adapter | `4.12.1` |
 | Cloudflare compatibility date | `2026-08-04` |
+
+The table is the immutable package snapshot for the accepted hosted evidence named above. It does not mirror later manifest updates. A newer dependency has current compatibility evidence only from checks that ran against that exact revision until a separately approved evidence refresh replaces this snapshot.
+
+All package versions in this snapshot are exact. Current package versions remain exact in their executable manifests. The workspace uses a one-day package maturity policy, a reviewed lifecycle-script allowlist, and the narrow `miniflare>undici: 7.29.0` security override recorded in the preparation evidence.
+
+## Informational deployment context
+
+The following values summarize separately accepted workflow and deployment evidence for reader orientation. They are not part of the immutable hosted package snapshot. The current workflows and shared deployment policy own the current deployment contract; the exact historical evidence identity remains recorded under [Deployment boundary](#deployment-boundary).
+
+| Surface | Accepted or historical value |
+|---|---|
 | Historical deployed GitHub environment | `compatibility` |
 | Historical deployed Cloudflare Worker | `egeria-scaffold-nextjs-cloudflare-proof` |
-| Current shared GitHub environment | `test-deploy` |
-| Current shared Cloudflare Worker | `test-deploy` |
-| Current manual deployment checkout action | `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` |
-| Current manual deployment setup action | `pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2` |
-| Current manual deployment revision binding | required `expected_revision`; `refs/heads/main`; lowercase 40-hex input; `GITHUB_SHA` and checked-out `HEAD` equality |
-| Current manual deployment checkout | `${{ github.sha }}`; full history; persisted credentials disabled |
-| Current manual deployment pnpm cache | disabled |
-| Current manual deployment timeout | 45 minutes |
+| Accepted shared GitHub environment | `test-deploy` |
+| Accepted shared Cloudflare Worker | `test-deploy` |
+| Accepted manual deployment checkout action | `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` |
+| Accepted manual deployment setup action | `pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2` |
+| Accepted manual deployment revision binding | required `expected_revision`; `refs/heads/main`; lowercase 40-hex input; `GITHUB_SHA` and checked-out `HEAD` equality |
+| Accepted manual deployment checkout | `${{ github.sha }}`; full history; persisted credentials disabled |
+| Accepted manual deployment pnpm cache | disabled |
+| Accepted manual deployment timeout | 45 minutes |
 | Deployed Node.js | `22.23.0` |
 | Deployed implementation | `160b8ef261e69ec783ad93b7bfe69d932ba84541` |
 | Deployed `pnpm-lock.yaml` SHA-256 | `72fab6af3a327404e287094e99438b98f7a43007765a4a9e6255cc357dd637c7` |
-
-All package versions are exact. The workspace uses a one-day package maturity policy, a reviewed lifecycle-script allowlist, and the narrow `miniflare>undici: 7.29.0` security override recorded in the preparation evidence.
 
 ## What each check proves
 
@@ -83,7 +98,7 @@ Deployment is manual GitHub Actions work. GitHub Actions is the sole deployment 
 
 The current manual workflow requires an explicitly approved exact lowercase 40-hex `main` revision, checks out `${{ github.sha }}` with full history and persisted credentials disabled, validates the ref, dispatch input, `GITHUB_SHA`, and checked-out `HEAD` before installation, disables the reusable pnpm cache, and bounds the job to 45 minutes. Local static validation of these controls does not prove GitHub-hosted execution, deployment, provider behavior, certification, publication, cleanup execution, or production safety.
 
-The historical deployment evidence is unchanged: the manual workflow at [`.github/workflows/compatibility-proof.yml`](../../.github/workflows/compatibility-proof.yml) ran from `main` through the earlier `compatibility` environment. [Run `30966212691`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/30966212691) completed successfully for exact commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`, deployed Worker version `fddba63e-c0e9-497e-98c4-4942461fb753` at the historical proof Worker, and passed the deployed smoke suite 4/4. An independent deployed rerun also passed 4/4. These historical identities are evidence facts, not the current deployment target.
+The historical deployment evidence is unchanged: the manual workflow at [`.github/workflows/compatibility-proof.yml`](../../.github/workflows/compatibility-proof.yml) ran from `main` through the earlier `compatibility` environment. [Run `30966212691`](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/30966212691) completed successfully for exact commit `160b8ef261e69ec783ad93b7bfe69d932ba84541`, whose proof used Wrangler `4.118.0`; it deployed Worker version `fddba63e-c0e9-497e-98c4-4942461fb753` at the historical proof Worker and passed the deployed smoke suite 4/4. An independent deployed rerun also passed 4/4. These historical identities are evidence facts, not the current deployment target.
 
 For a current run, the workflow references only `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, restricts them to the deploy-only step, publishes the previously verified OpenNext artifact to the explicit `test-deploy` target without rebuilding it under credentials, and maps `DEPLOY_URL` only to the post-deployment test interface. The shared environment may also hold the two source-specific Better Stack names allowed by the shared policy, but the compatibility workflow must not reference them. Values must never be committed or copied into logs or evidence. A run is blocked until the live environment's `main` restriction, available protection rules, bypass decision, URL-to-Worker match, credential scope and expiry, quota, and owners pass a fresh read-only preflight.
 
@@ -91,7 +106,7 @@ Source recovery uses a revert commit. Cloudflare rollback, clean-baseline deploy
 
 ## Revalidation triggers
 
-Revalidate the full matrix and current official documentation when any of these changes:
+Revalidate the current executable subject and current official documentation when any of these changes:
 
 - Node.js, pnpm, Next.js, React, OpenNext, Wrangler, TypeScript, ESLint, Vitest, Playwright, or axe version;
 - the Cloudflare compatibility date or a documented OpenNext/Workers limitation;
@@ -99,4 +114,6 @@ Revalidate the full matrix and current official documentation when any of these 
 - the lockfile, lifecycle-script allowlist, or transitive security override;
 - a new material security advisory affecting any selected or transitive dependency.
 
-Retain this private proof as the compatibility regression canary for those changes. Retire it only when an equivalent maintained surface replaces its Node development, built-Worker, workerd preview, deployed Worker, browser, and bounded accessibility evidence, and update this record plus the architecture owners in the same approved change.
+These triggers require exact-revision executable evidence; they do not rewrite or extend the accepted snapshot automatically. Replacing the snapshot requires a separately approved record that binds one evidence date, exact commit, hosted run, and lockfile identity to the replacement matrix.
+
+Retain this private proof as the compatibility regression canary for those changes. Retire it only when an equivalent maintained surface replaces its Node development, built-Worker, workerd preview, deployed Worker, browser, and bounded accessibility evidence. Update this record plus the architecture owners in the same approved change whenever the accepted snapshot or its ownership changes.

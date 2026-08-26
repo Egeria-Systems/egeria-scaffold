@@ -103,6 +103,16 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       },
       {
         filePath:
+          "packages/builder-core/templates/common/apps/web/app/error.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/common/apps/web/app/global-error.tsx",
+        messages: [],
+      },
+      {
+        filePath:
           "packages/builder-core/templates/common/apps/web/app/layout.tsx",
         messages: [],
       },
@@ -113,6 +123,11 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       {
         filePath:
           "packages/builder-core/templates/common/apps/web/src/presentation/content-page.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/common/apps/web/src/presentation/error-fallback.tsx",
         messages: [],
       },
       {

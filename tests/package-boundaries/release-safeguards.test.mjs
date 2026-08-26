@@ -322,7 +322,9 @@ test("pending Changeset discovery selects every Markdown record in deterministic
 
 test("the release candidate materializes only the approved public versions", async () => {
   const changesetFiles = await loadPendingChangesets();
-  assert.deepEqual(changesetFiles, []);
+  assert.deepEqual(changesetFiles, [
+    "observability-sink-identifiers.md",
+  ]);
 
   const observabilityManifest = await readJson(
     "packages/observability/package.json",

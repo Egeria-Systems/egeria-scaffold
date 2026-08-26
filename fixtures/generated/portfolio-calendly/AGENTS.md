@@ -7,6 +7,8 @@
 - Keep presentation components pure and pass them typed data and callbacks.
 - Preserve the generated Tailwind CSS and PostCSS boundary, semantic design tokens, visible focus treatment, responsive wrapping, and reduced-motion protection.
 - Keep Cloudflare types and bindings in platform adapters, generated configuration, integration tests, and composition roots.
+- Keep automatic quality CI read-only. Preserve the manual deployment workflow's exact-main revision guard, fixed `production` environment, least privilege, non-cancelling concurrency, pre-credential verification, deploy-only credential-bearing step, and post-deployment HTTPS browser smoke. Deployment, credentials, provider state, cleanup, and certification require separate authority.
+- The visual configuration is managed. Visual specifications and baselines are application-owned and may change only beside their reviewed causal source change. Use the pinned Linux/amd64 update command in `README.md`, inspect image diffs, and rerun without update mode before acceptance.
 - Keep operational telemetry stream-bounded and infrastructure-owned. Preserve disabled Cloudflare invocation logs. Do not add raw error/private fields, analytics, console interception, browser storage, or provider effects to presentation or application code.
 - Preserve application-owned files unless a reviewed change explicitly replaces them.
 
@@ -15,4 +17,6 @@
 - Run `pnpm run test:unit` for pure parsing and domain behavior in Node.
 - Run `pnpm run test:component` for synchronous React presentation behavior in jsdom.
 - Run `pnpm --dir apps/web run test:e2e:dev` for real-browser development behavior and `pnpm --dir apps/web run test:e2e:preview` for the OpenNext/workerd preview boundary. Preview E2E consumes already prepared `.open-next` output, so run the Next build followed by the OpenNext `--skipNextBuild` transform first.
+- Run `pnpm --dir apps/web run test:visual` only after preparing the same OpenNext output. Screenshot equality is bounded regression evidence; it does not establish visual quality, human usability, deployed behavior, or WCAG conformance.
 - Use `pnpm run verify` for the complete static, unit, component, and build boundary. No automated result alone establishes deployment, production safety, visual quality, human usability, or WCAG conformance.
+- Use `pnpm --dir apps/web run test:e2e:deployed` only with an explicitly supplied public HTTPS target. Local execution does not authorize `.github/workflows/deploy.yml`, provider access, or production mutation.

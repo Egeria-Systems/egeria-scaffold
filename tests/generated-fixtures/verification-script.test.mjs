@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import {
   access,
+  chmod,
   cp,
   lstat,
+  mkdir,
   mkdtemp,
   readFile,
+  readdir,
   rm,
   symlink,
   writeFile,
@@ -17,8 +20,10 @@ import { promisify } from "node:util";
 import test from "node:test";
 
 import {
+  captureVisualFailureArtifactsForTesting,
   generatedFixtureContracts,
   inspectGeneratedFixture,
+  parseVerificationArguments,
   verifyGeneratedProjectForTesting,
   verifyGeneratedSkeletonsForTesting,
 } from "../../scripts/verify-generated-skeletons.mjs";
@@ -28,6 +33,10 @@ const repositoryRoot = resolve(
   "../..",
 );
 const execFileAsync = promisify(execFile);
+const repositoryGitArguments = Object.freeze([
+  "-c",
+  `safe.directory=${repositoryRoot}`,
+]);
 
 async function pathExists(path) {
   try {
@@ -68,6 +77,16 @@ async function createKnownOwner(parent) {
   return { path, device: stats.dev, inode: stats.ino };
 }
 
+async function withPortfolioVisualFixture(callback) {
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-visual-option-"));
+  try {
+    const sourceRoot = await copyFixture(ownerParent, "portfolio", "source");
+    return await callback({ ownerParent, sourceRoot });
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
+}
+
 test("fixture inspection accepts only the exact portable generated trees", async () => {
   assert.deepEqual(
     generatedFixtureContracts.map(({ identifier, profile, relativeRoot }) => ({
@@ -95,11 +114,11 @@ test("fixture inspection accepts only the exact portable generated trees", async
   );
 
   for (const contract of generatedFixtureContracts) {
-    assert.equal(contract.expectedRecipeVersion, "0.7.0");
-    assert.equal(contract.expectedStandardsVersion, "0.3.0");
-    assert.equal(contract.expectedObservabilityVersion, "0.2.0");
+    assert.equal(contract.expectedRecipeVersion, "0.10.0");
+    assert.equal(contract.expectedStandardsVersion, "0.4.0");
+    assert.equal(contract.expectedObservabilityVersion, "0.3.0");
     assert.equal(contract.expectedContentFilesVersion, "0.4.0");
-    assert.equal(contract.expectedDeploymentCloudflareVersion, "0.2.0");
+    assert.equal(contract.expectedDeploymentCloudflareVersion, "0.3.0");
     assert.equal(
       contract.expectedSiteRoutingVersion,
       contract.identifier === "site" ? "0.3.0" : null,
@@ -111,10 +130,10 @@ test("fixture inspection accepts only the exact portable generated trees", async
     assert.equal(
       contract.expectedSurfaces,
       contract.identifier === "portfolio-calendly"
-        ? 100
+        ? 111
         : contract.identifier === "portfolio"
-          ? 95
-          : 97,
+          ? 106
+          : 108,
     );
     const snapshot = await inspectGeneratedFixture(
       resolve(repositoryRoot, contract.relativeRoot),
@@ -136,11 +155,11 @@ test("fixture inspection accepts only the exact portable generated trees", async
   const site = generatedFixtureContracts.find(
     ({ identifier }) => identifier === "site",
   );
-  assert.equal(basePortfolio.expectedFiles.length, 47);
-  assert.equal(site.expectedFiles.length, 49);
+  assert.equal(basePortfolio.expectedFiles.length, 57);
+  assert.equal(site.expectedFiles.length, 59);
   assert.equal(
     calendlyPortfolio.expectedFiles.length,
-    47 - 1 + 6,
+    57 - 1 + 6,
     "six booking sources replace one common home destination and add five distinct paths",
   );
   assert.deepEqual(calendlyPortfolio.createArguments, [
@@ -183,17 +202,24 @@ test("fixture inspection accepts only the exact portable generated trees", async
   );
 });
 
-test("generated fixture checkout bytes are pinned to LF", async () => {
+test("generated fixture text and visual baseline attributes are explicit", async () => {
   const fixturePaths = generatedFixtureContracts.map(
     ({ relativeRoot }) => `${relativeRoot}/package.json`,
   );
-  const { stdout } = await execFileAsync(
+  const { stdout: textAttributes } = await execFileAsync(
     "git",
-    ["check-attr", "text", "eol", "--", ...fixturePaths],
+    [
+      ...repositoryGitArguments,
+      "check-attr",
+      "text",
+      "eol",
+      "--",
+      ...fixturePaths,
+    ],
     { cwd: repositoryRoot, encoding: "utf8" },
   );
 
-  assert.deepEqual(stdout.trimEnd().split("\n"), [
+  assert.deepEqual(textAttributes.trimEnd().split("\n"), [
     "fixtures/generated/portfolio/package.json: text: set",
     "fixtures/generated/portfolio/package.json: eol: lf",
     "fixtures/generated/portfolio-calendly/package.json: text: set",
@@ -201,6 +227,42 @@ test("generated fixture checkout bytes are pinned to LF", async () => {
     "fixtures/generated/site/package.json: text: set",
     "fixtures/generated/site/package.json: eol: lf",
   ]);
+
+  const baselineDirectory =
+    "apps/web/tests/visual/home-visual.spec.ts-snapshots";
+  const baselineNames = [
+    "home-desktop-chromium-linux.png",
+    "home-mobile-chromium-linux.png",
+  ];
+  const baselineRoots = [
+    "packages/builder-core/templates/portfolio",
+    "packages/builder-core/templates/site",
+    ...generatedFixtureContracts.map(({ relativeRoot }) => relativeRoot),
+  ];
+  const baselinePaths = baselineRoots.flatMap((root) =>
+    baselineNames.map((name) => `${root}/${baselineDirectory}/${name}`),
+  );
+  const { stdout: binaryAttributes } = await execFileAsync(
+    "git",
+    [
+      ...repositoryGitArguments,
+      "check-attr",
+      "text",
+      "binary",
+      "--",
+      ...baselinePaths,
+    ],
+    { cwd: repositoryRoot, encoding: "utf8" },
+  );
+
+  assert.equal(baselinePaths.length, 10);
+  assert.deepEqual(
+    binaryAttributes.trimEnd().split("\n"),
+    baselinePaths.flatMap((path) => [
+      `${path}: text: unset`,
+      `${path}: binary: set`,
+    ]),
+  );
 });
 
 test("fixture inspection rejects artifacts, local sources, altered integrity, and links", async () => {
@@ -436,6 +498,295 @@ test("single-root verification runs the exact fixed checks against caller output
           },
         }),
       "FIXTURE_IDENTIFIER_INVALID",
+    );
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
+});
+
+test("visual verification accepts only the exact opt-in argument", () => {
+  assert.deepEqual(parseVerificationArguments([]), { includeVisual: false });
+  assert.deepEqual(parseVerificationArguments(["--visual"]), {
+    includeVisual: true,
+  });
+  for (const arguments_ of [
+    ["--unknown"],
+    ["--visual", "--visual"],
+    ["--visual=true"],
+  ]) {
+    assert.throws(() => parseVerificationArguments(arguments_), {
+      name: "GeneratedFixtureVerificationError",
+      code: "VERIFICATION_ARGUMENT_INVALID",
+    });
+  }
+});
+
+test("visual verification runs after prepared preview behavior", async () => {
+  await withPortfolioVisualFixture(async ({ ownerParent, sourceRoot }) => {
+    const commands = [];
+    const result = await verifyGeneratedProjectForTesting(
+      sourceRoot,
+      "portfolio",
+      {
+        async createOwner() {
+          return createKnownOwner(ownerParent);
+        },
+        async runCommand(input) {
+          commands.push(input.arguments);
+          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+        },
+      },
+      undefined,
+      { includeVisual: true },
+    );
+
+    assert.deepEqual(result.checks, [
+      "pnpm-version",
+      "frozen-install",
+      "peer-dependencies",
+      "dependency-audit",
+      "registry-signatures",
+      "lint",
+      "cloudflare-types",
+      "typecheck",
+      "unit-tests",
+      "component-tests",
+      "next-build",
+      "opennext-build",
+      "browser-install",
+      "browser-development",
+      "browser-preview",
+      "visual-regression",
+    ]);
+    assert.equal(commands.length, 16);
+    assert.deepEqual(commands.at(-2), [
+      "--dir",
+      "apps/web",
+      "run",
+      "test:e2e:preview",
+    ]);
+    assert.deepEqual(commands.at(-1), [
+      "--dir",
+      "apps/web",
+      "run",
+      "test:visual",
+    ]);
+  });
+});
+
+test("visual failures export artifacts before owned cleanup", async () => {
+  await withPortfolioVisualFixture(async ({ ownerParent, sourceRoot }) => {
+    let capturedVisualFailure;
+    let failedOwnerPath;
+    const failedArtifactRoot = join(ownerParent, "exported-artifacts");
+    await expectFixtureError(
+      () =>
+        verifyGeneratedProjectForTesting(
+          sourceRoot,
+          "portfolio",
+          {
+            async createOwner() {
+              const owner = await createKnownOwner(ownerParent);
+              failedOwnerPath = owner.path;
+              return owner;
+            },
+            async runCommand(input) {
+              if (input.arguments.at(-1) === "test:visual") {
+                await mkdir(join(input.cwd, "apps/web/playwright-report"), {
+                  recursive: true,
+                });
+                await mkdir(join(input.cwd, "apps/web/test-results"), {
+                  recursive: true,
+                });
+                await writeFile(
+                  join(input.cwd, "apps/web/playwright-report/index.html"),
+                  "bounded report",
+                );
+                await writeFile(
+                  join(input.cwd, "apps/web/test-results/actual.png"),
+                  "bounded image",
+                );
+                throw new Error("PRIVATE_VALUE");
+              }
+              return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+            },
+            async captureVisualArtifacts(input) {
+              capturedVisualFailure = {
+                identifier: input.identifier,
+                ownerExists: await pathExists(failedOwnerPath),
+                validationRoot: input.validationRoot,
+              };
+              await captureVisualFailureArtifactsForTesting({
+                ...input,
+                artifactRoot: failedArtifactRoot,
+              });
+            },
+          },
+          undefined,
+          { includeVisual: true },
+        ),
+      "VISUAL_REGRESSION_FAILED",
+    );
+    assert.deepEqual(capturedVisualFailure, {
+      identifier: "portfolio",
+      ownerExists: true,
+      validationRoot: join(failedOwnerPath, "portfolio-project"),
+    });
+    assert.equal(await pathExists(failedOwnerPath), false);
+    const exportedDirectories = await readdir(failedArtifactRoot);
+    assert.equal(exportedDirectories.length, 1);
+    const exportedRoot = join(failedArtifactRoot, exportedDirectories[0]);
+    assert.equal(
+      await readFile(join(exportedRoot, "playwright-report/index.html"), "utf8"),
+      "bounded report",
+    );
+    assert.equal(
+      await readFile(join(exportedRoot, "test-results/actual.png"), "utf8"),
+      "bounded image",
+    );
+    assert.deepEqual(
+      JSON.parse(await readFile(join(exportedRoot, "failure.json"), "utf8")),
+      { code: "VISUAL_REGRESSION_FAILED", fixture: "portfolio" },
+    );
+  });
+});
+
+test("visual artifact export failure preserves the primary regression code", async () => {
+  await withPortfolioVisualFixture(async ({ ownerParent, sourceRoot }) => {
+    let failedOwnerPath;
+    await assert.rejects(
+      () =>
+        verifyGeneratedProjectForTesting(
+          sourceRoot,
+          "portfolio",
+          {
+            async createOwner() {
+              const owner = await createKnownOwner(ownerParent);
+              failedOwnerPath = owner.path;
+              return owner;
+            },
+            async runCommand(input) {
+              if (input.arguments.at(-1) === "test:visual") {
+                throw new Error("PRIVATE_VALUE");
+              }
+              return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+            },
+            async captureVisualArtifacts() {
+              throw new Error("PRIVATE_EXPORT_VALUE");
+            },
+          },
+          undefined,
+          { includeVisual: true },
+        ),
+      (error) => {
+        assert.equal(error?.name, "GeneratedFixtureVerificationError");
+        assert.equal(error?.code, "VISUAL_REGRESSION_FAILED");
+        assert.equal(
+          error?.artifactExportCode,
+          "VISUAL_ARTIFACT_EXPORT_FAILED",
+        );
+        assert.doesNotMatch(String(error), /PRIVATE_/u);
+        return true;
+      },
+    );
+    assert.equal(await pathExists(failedOwnerPath), false);
+  });
+});
+
+test("visual artifact export caps total bytes and restricts its root", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-visual-artifact-cap-"));
+  const validationRoot = join(owner, "validation");
+  const artifactRoot = join(owner, "artifacts");
+
+  try {
+    await mkdir(join(validationRoot, "apps/web/playwright-report"), {
+      recursive: true,
+    });
+    await mkdir(join(validationRoot, "apps/web/test-results"), {
+      recursive: true,
+    });
+    await writeFile(
+      join(validationRoot, "apps/web/playwright-report/index.html"),
+      "1234",
+    );
+    await writeFile(
+      join(validationRoot, "apps/web/test-results/actual.png"),
+      "5678",
+    );
+    await mkdir(artifactRoot, { mode: 0o700 });
+    await chmod(artifactRoot, 0o777);
+
+    await expectFixtureError(
+      () =>
+        captureVisualFailureArtifactsForTesting({
+          identifier: "portfolio",
+          validationRoot,
+          artifactRoot,
+          maximumBytes: 7,
+        }),
+      "VISUAL_ARTIFACT_EXPORT_FAILED",
+    );
+
+    const artifactRootStats = await lstat(artifactRoot);
+    assert.equal(artifactRootStats.mode & 0o777, 0o700);
+    assert.deepEqual(await readdir(artifactRoot), []);
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+});
+
+test("single-root verification accepts an explicit generated project identity", async () => {
+  const ownerParent = await mkdtemp(
+    join(tmpdir(), "egeria-single-root-identity-"),
+  );
+  const canonicalRoot = resolve(repositoryRoot, "fixtures/generated/portfolio");
+  const canonicalBefore = await inspectGeneratedFixture(
+    canonicalRoot,
+    "portfolio",
+  );
+  const renamedRoot = await copyFixture(
+    ownerParent,
+    "portfolio",
+    "renamed-source",
+  );
+  let ownedPath;
+
+  try {
+    for (const [relativePath, name] of [
+      ["package.json", "acme-generated-project"],
+      ["apps/web/package.json", "acme-generated-project-web"],
+    ]) {
+      const manifestPath = join(renamedRoot, relativePath);
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+      await writeFile(
+        manifestPath,
+        `${JSON.stringify({ ...manifest, name }, null, 2)}\n`,
+        "utf8",
+      );
+    }
+
+    const result = await verifyGeneratedProjectForTesting(
+      renamedRoot,
+      "portfolio",
+      {
+        async createOwner() {
+          const identity = await createKnownOwner(ownerParent);
+          ownedPath = identity.path;
+          return identity;
+        },
+        async runCommand(input) {
+          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+        },
+      },
+      "acme-generated-project",
+    );
+
+    assert.deepEqual(result.fixtures, ["portfolio"]);
+    assert.deepEqual(result.profiles, ["portfolio"]);
+    assert.equal(await pathExists(ownedPath), false);
+    assert.deepEqual(
+      await inspectGeneratedFixture(canonicalRoot, "portfolio"),
+      canonicalBefore,
     );
   } finally {
     await rm(ownerParent, { recursive: true, force: true });

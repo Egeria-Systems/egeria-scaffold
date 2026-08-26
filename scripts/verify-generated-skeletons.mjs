@@ -8,7 +8,6 @@ import {
   mkdtemp,
   readFile,
   readdir,
-  rm,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,13 +15,35 @@ import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import {
+  cleanupOwnedDirectory,
+  createIsolatedProcessEnvironment,
+  isolatedProcessOptions,
+  pathIdentityMatches,
+  readPathIdentity,
+} from "./lib/isolated-process.mjs";
+
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const maximumOutputBytes = 1024 * 1024;
 const versionTimeoutMilliseconds = 30 * 1000;
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const requiredPnpmVersion = "11.20.0";
 const publicRegistry = "https://registry.npmjs.org/";
+const generatedVisualArtifactsRoot = resolve(
+  repositoryRoot,
+  "generated-visual-artifacts",
+);
+const visualArtifactMaximumBytes = 16 * 1024 * 1024;
+const visualArtifactDirectories = Object.freeze([
+  Object.freeze({
+    destination: "playwright-report",
+    relativeSource: "apps/web/playwright-report",
+  }),
+  Object.freeze({
+    destination: "test-results",
+    relativeSource: "apps/web/test-results",
+  }),
+]);
 const codePointCompare = (left, right) =>
   left < right ? -1 : left > right ? 1 : 0;
 
@@ -30,6 +51,7 @@ const portfolioFiles = Object.freeze([
   ".egeria/migrations.jsonl",
   ".egeria/project.yaml",
   ".egeria/state.json",
+  ".github/workflows/deploy.yml",
   ".github/workflows/quality.yml",
   ".gitignore",
   ".nvmrc",
@@ -37,11 +59,14 @@ const portfolioFiles = Object.freeze([
   "README.md",
   "apps/web/AGENTS.md",
   "apps/web/app/api/observability/route.ts",
+  "apps/web/app/error.tsx",
+  "apps/web/app/global-error.tsx",
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
   "apps/web/content/content.config.yaml",
   "apps/web/content/en-CA/long-form/introduction.md",
+  "apps/web/content/en-CA/observability.yaml",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/instrumentation-client.ts",
@@ -53,21 +78,27 @@ const portfolioFiles = Object.freeze([
   "apps/web/playwright.deployed.config.ts",
   "apps/web/playwright.dev.config.ts",
   "apps/web/playwright.preview.config.ts",
+  "apps/web/playwright.visual.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/cloudflare/observability-context.ts",
   "apps/web/src/infrastructure/observability/browser-reporter.ts",
+  "apps/web/src/infrastructure/observability/error-copy.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/infrastructure/observability/server-reporter.ts",
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
+  "apps/web/src/presentation/error-fallback.tsx",
   "apps/web/src/sections/section-registry.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
   "apps/web/tests/component/content-page.test.tsx",
   "apps/web/tests/setup/component.ts",
   "apps/web/tests/unit/content-schema.test.ts",
+  "apps/web/tests/visual/home-visual.spec.ts",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
   "apps/web/tsconfig.json",
   "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
@@ -137,15 +168,15 @@ export const generatedFixtureContracts = Object.freeze([
       "deployment-cloudflare",
       "observability",
     ]),
-    expectedRecipeVersion: "0.7.0",
-    expectedStandardsVersion: "0.3.0",
-    expectedObservabilityVersion: "0.2.0",
+    expectedRecipeVersion: "0.10.0",
+    expectedStandardsVersion: "0.4.0",
+    expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.2.0",
+    expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: null,
-    expectedSurfaces: 95,
+    expectedSurfaces: 106,
   }),
   Object.freeze({
     identifier: "portfolio-calendly",
@@ -174,15 +205,15 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "booking-calendly",
     ]),
-    expectedRecipeVersion: "0.7.0",
-    expectedStandardsVersion: "0.3.0",
-    expectedObservabilityVersion: "0.2.0",
+    expectedRecipeVersion: "0.10.0",
+    expectedStandardsVersion: "0.4.0",
+    expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.2.0",
+    expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: "0.1.0",
-    expectedSurfaces: 100,
+    expectedSurfaces: 111,
   }),
   Object.freeze({
     identifier: "site",
@@ -209,15 +240,15 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "site-routing",
     ]),
-    expectedRecipeVersion: "0.7.0",
-    expectedStandardsVersion: "0.3.0",
-    expectedObservabilityVersion: "0.2.0",
+    expectedRecipeVersion: "0.10.0",
+    expectedStandardsVersion: "0.4.0",
+    expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.2.0",
+    expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: "0.3.0",
     expectedBookingCalendlyVersion: null,
-    expectedSurfaces: 97,
+    expectedSurfaces: 108,
   }),
 ]);
 
@@ -238,14 +269,17 @@ const verificationChecks = [
   "browser-development",
   "browser-preview",
 ];
+const visualVerificationCheck = "visual-regression";
+const defaultVerificationOptions = Object.freeze({ includeVisual: false });
+const visualVerificationOptions = Object.freeze({ includeVisual: true });
 
 const requiredPublicPackages = [
   {
     name: "@egeria-systems/observability",
     field: "dependencies",
-    version: "0.2.0",
+    version: "0.3.0",
     integrity:
-      "sha512-t0ulhalC7yc53PLABF4lu+jknR2jwdNJOLXd48Vtt5dw3KubGUTzSUU4Bn8jqvRonVn47vb0TexHOsxFoe1wDA==",
+      "sha512-AnqIa6qn1aLYuntoQ1zo9A80ioiStR2mKJg5mq/v/NrKNAFQfP7InXojel9Azst3lLDUUdyDuEDFmCIgyWDwrA==",
   },
   {
     name: "@egeria-systems/standards",
@@ -263,7 +297,7 @@ pmOnFail: error
 
 minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
-  - "@egeria-systems/observability@0.2.0"
+  - "@egeria-systems/observability@0.3.0"
 
 resolutionMode: time-based
 
@@ -319,7 +353,7 @@ function expectedRootManifest(projectName) {
 function expectedWebManifest(projectName) {
   return {
     dependencies: {
-      "@egeria-systems/observability": "0.2.0",
+      "@egeria-systems/observability": "0.3.0",
       "@opennextjs/cloudflare": "1.20.2",
       next: "16.3.0",
       react: "19.2.8",
@@ -371,6 +405,7 @@ function expectedWebManifest(projectName) {
       "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
       "test:e2e:preview":
         "playwright test --config playwright.preview.config.ts",
+      "test:visual": "playwright test --config playwright.visual.config.ts",
       "test:unit": "vitest run --project unit",
       "test:unit:watch": "vitest --project unit",
       "test:watch": "vitest",
@@ -393,35 +428,36 @@ function fail(code) {
   throw new GeneratedFixtureVerificationError(code);
 }
 
+export function parseVerificationArguments(arguments_) {
+  if (!Array.isArray(arguments_)) {
+    fail("VERIFICATION_ARGUMENT_INVALID");
+  }
+  if (arguments_.length === 0) {
+    return defaultVerificationOptions;
+  }
+  if (arguments_.length === 1 && arguments_[0] === "--visual") {
+    return visualVerificationOptions;
+  }
+  fail("VERIFICATION_ARGUMENT_INVALID");
+}
+
+function requireVerificationOptions(options) {
+  if (
+    options === null ||
+    typeof options !== "object" ||
+    Object.keys(options).length !== 1 ||
+    typeof options.includeVisual !== "boolean"
+  ) {
+    fail("VERIFICATION_OPTION_INVALID");
+  }
+}
+
 function fingerprint(content) {
   return createHash("sha256").update(content).digest("hex");
 }
 
-function findEnvironmentValue(name) {
-  const normalizedName = name.toLowerCase();
-  return Object.entries(process.env).find(
-    ([key, value]) =>
-      key.toLowerCase() === normalizedName && value !== undefined,
-  )?.[1];
-}
-
 function createChildEnvironment(support) {
-  const environment = {};
-
-  for (const key of ["PATH", "SystemRoot", "ComSpec", "PATHEXT", "LANG"]) {
-    const value = findEnvironmentValue(key);
-    if (value !== undefined) {
-      environment[key] = value;
-    }
-  }
-  if (process.platform === "darwin") {
-    environment.__CF_USER_TEXT_ENCODING = "0x0:0x0:0x0";
-  }
-
-  return {
-    ...environment,
-    CI: "true",
-    NEXT_TELEMETRY_DISABLED: "1",
+  return createIsolatedProcessEnvironment({
     HOME: support.home,
     USERPROFILE: support.home,
     TMPDIR: support.temporary,
@@ -431,45 +467,22 @@ function createChildEnvironment(support) {
     NPM_CONFIG_USERCONFIG: support.userConfiguration,
     PLAYWRIGHT_BROWSERS_PATH: support.browsers,
     XDG_CACHE_HOME: support.cache,
-  };
+  });
 }
 
-async function pathIdentityMatches(identity) {
-  try {
-    const stats = await lstat(identity.path, { bigint: true });
-    return (
-      !stats.isSymbolicLink() &&
-      stats.isDirectory() &&
-      stats.dev === identity.device &&
-      stats.ino === identity.inode
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function createOwnedDirectory() {
+async function createGeneratedFixtureOwner() {
   const path = await mkdtemp(join(tmpdir(), "egeria-generated-fixtures-"));
-  const stats = await lstat(path, { bigint: true });
+  const identity = await readPathIdentity(path);
 
-  if (stats.isSymbolicLink() || !stats.isDirectory()) {
+  if (identity.isSymbolicLink || !identity.isDirectory) {
     fail("VERIFICATION_SETUP_FAILED");
   }
   await chmod(path, 0o700);
-  return { path, device: stats.dev, inode: stats.ino };
-}
-
-async function cleanupOwnedDirectory(identity) {
-  if (!(await pathIdentityMatches(identity))) {
-    return false;
-  }
-
-  try {
-    await rm(identity.path, { recursive: true });
-    return true;
-  } catch {
-    return false;
-  }
+  return {
+    path: identity.path,
+    device: identity.device,
+    inode: identity.inode,
+  };
 }
 
 async function createSupportPaths(root) {
@@ -683,6 +696,12 @@ function contractForIdentifier(identifier) {
   return contract;
 }
 
+function contractForGeneratedProject(identifier, expectedProjectName) {
+  const contract = contractForIdentifier(identifier);
+  if (expectedProjectName === undefined) return contract;
+  return Object.freeze({ ...contract, projectName: expectedProjectName });
+}
+
 export function inspectGeneratedFixture(root, identifier) {
   return inspectFixture(resolve(root), contractForIdentifier(identifier));
 }
@@ -693,16 +712,125 @@ async function defaultRunCommand(input) {
     [...input.arguments],
     {
       cwd: input.cwd,
-      encoding: "utf8",
       env: input.environment,
-      maxBuffer: maximumOutputBytes,
-      shell: false,
       timeout: input.timeout,
-      windowsHide: true,
+      ...isolatedProcessOptions,
     },
   );
   return stdout;
 }
+
+async function measureVisualArtifactTree(root, maximumBytes) {
+  let totalBytes = 0;
+
+  async function visit(directory) {
+    let entries;
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+    }
+    entries.sort((left, right) => codePointCompare(left.name, right.name));
+
+    for (const entry of entries) {
+      const path = join(directory, entry.name);
+      let stats;
+      try {
+        stats = await lstat(path);
+      } catch {
+        fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+      }
+      if (stats.isSymbolicLink()) {
+        fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+      }
+      if (stats.isDirectory()) {
+        await visit(path);
+      } else if (stats.isFile()) {
+        totalBytes += stats.size;
+        if (totalBytes > maximumBytes) {
+          fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+        }
+      } else {
+        fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+      }
+    }
+  }
+
+  await visit(root);
+  return totalBytes;
+}
+
+async function captureVisualFailureArtifacts({
+  identifier,
+  validationRoot,
+  artifactRoot = generatedVisualArtifactsRoot,
+  maximumBytes = visualArtifactMaximumBytes,
+}) {
+  await mkdir(artifactRoot, {
+    recursive: true,
+    mode: 0o700,
+  });
+  let artifactRootStats;
+  try {
+    artifactRootStats = await lstat(artifactRoot);
+  } catch {
+    fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+  }
+  if (artifactRootStats.isSymbolicLink() || !artifactRootStats.isDirectory()) {
+    fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+  }
+  await chmod(artifactRoot, 0o700);
+
+  let totalBytes = 0;
+  const availableArtifacts = [];
+
+  for (const artifact of visualArtifactDirectories) {
+    const source = join(validationRoot, artifact.relativeSource);
+    let sourceStats;
+    try {
+      sourceStats = await lstat(source);
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+    }
+    if (sourceStats.isSymbolicLink() || !sourceStats.isDirectory()) {
+      fail("VISUAL_ARTIFACT_EXPORT_FAILED");
+    }
+
+    const bytes = await measureVisualArtifactTree(
+      source,
+      maximumBytes - totalBytes,
+    );
+    totalBytes += bytes;
+    availableArtifacts.push({ ...artifact, bytes, source });
+  }
+
+  const outputRoot = await mkdtemp(
+    join(artifactRoot, `${identifier}-`),
+  );
+  await chmod(outputRoot, 0o700);
+
+  for (const artifact of availableArtifacts) {
+    await cp(artifact.source, join(outputRoot, artifact.destination), {
+      recursive: true,
+      force: false,
+      errorOnExist: true,
+      dereference: false,
+    });
+  }
+
+  await writeFile(
+    join(outputRoot, "failure.json"),
+    `${JSON.stringify({
+      code: "VISUAL_REGRESSION_FAILED",
+      fixture: identifier,
+    })}\n`,
+    { flag: "wx", mode: 0o600 },
+  );
+}
+
+export const captureVisualFailureArtifactsForTesting =
+  captureVisualFailureArtifacts;
 
 async function runExpectedCommand(runCommand, input, failureCode) {
   try {
@@ -712,7 +840,12 @@ async function runExpectedCommand(runCommand, input, failureCode) {
   }
 }
 
-async function verifySourcesWithAdapters(adapters, sourcesBefore) {
+async function verifySourcesWithAdapters(
+  adapters,
+  sourcesBefore,
+  options = defaultVerificationOptions,
+) {
+  requireVerificationOptions(options);
   let owner;
   try {
     owner = await adapters.createOwner();
@@ -824,14 +957,40 @@ async function verifySourcesWithAdapters(adapters, sourcesBefore) {
           arguments: ["--dir", "apps/web", "run", "test:e2e:preview"],
           failureCode: "BROWSER_PREVIEW_FAILED",
         },
+        ...(options.includeVisual
+          ? [
+              {
+                arguments: ["--dir", "apps/web", "run", "test:visual"],
+                failureCode: "VISUAL_REGRESSION_FAILED",
+              },
+            ]
+          : []),
       ];
 
       for (const command of commands) {
-        await runExpectedCommand(
-          adapters.runCommand,
-          commandInput(command.arguments),
-          command.failureCode,
-        );
+        try {
+          await runExpectedCommand(
+            adapters.runCommand,
+            commandInput(command.arguments),
+            command.failureCode,
+          );
+        } catch (error) {
+          if (
+            error instanceof GeneratedFixtureVerificationError &&
+            error.code === "VISUAL_REGRESSION_FAILED" &&
+            adapters.captureVisualArtifacts !== undefined
+          ) {
+            try {
+              await adapters.captureVisualArtifacts({
+                identifier: source.contract.identifier,
+                validationRoot,
+              });
+            } catch {
+              error.artifactExportCode = "VISUAL_ARTIFACT_EXPORT_FAILED";
+            }
+          }
+          throw error;
+        }
       }
     }
   } catch (error) {
@@ -880,15 +1039,21 @@ async function verifySourcesWithAdapters(adapters, sourcesBefore) {
     profiles: [
       ...new Set(sourcesBefore.map(({ contract }) => contract.profile)),
     ],
-    checks: verificationChecks,
+    checks: options.includeVisual
+      ? [...verificationChecks, visualVerificationCheck]
+      : verificationChecks,
   };
 }
 
-export function verifyGeneratedSkeletons() {
-  return verifyGeneratedSkeletonsForTesting({
-    createOwner: createOwnedDirectory,
-    runCommand: defaultRunCommand,
-  });
+export function verifyGeneratedSkeletons(options = defaultVerificationOptions) {
+  return verifyGeneratedSkeletonsForTesting(
+    {
+      captureVisualArtifacts: captureVisualFailureArtifacts,
+      createOwner: createGeneratedFixtureOwner,
+      runCommand: defaultRunCommand,
+    },
+    options,
+  );
 }
 
 function requireAdapters(adapters) {
@@ -896,7 +1061,9 @@ function requireAdapters(adapters) {
     adapters === null ||
     typeof adapters !== "object" ||
     typeof adapters.createOwner !== "function" ||
-    typeof adapters.runCommand !== "function"
+    typeof adapters.runCommand !== "function" ||
+    (adapters.captureVisualArtifacts !== undefined &&
+      typeof adapters.captureVisualArtifacts !== "function")
   ) {
     fail("VERIFICATION_ADAPTER_INVALID");
   }
@@ -911,37 +1078,58 @@ async function sourceForRoot(root, contract) {
   };
 }
 
-export async function verifyGeneratedSkeletonsForTesting(adapters) {
+export async function verifyGeneratedSkeletonsForTesting(
+  adapters,
+  options = defaultVerificationOptions,
+) {
   requireAdapters(adapters);
   const sources = await Promise.all(
     generatedFixtureContracts.map((contract) =>
       sourceForRoot(resolve(repositoryRoot, contract.relativeRoot), contract),
     ),
   );
-  return verifySourcesWithAdapters(adapters, sources);
+  return verifySourcesWithAdapters(adapters, sources, options);
 }
 
-export function verifyGeneratedProject(root, identifier) {
-  return verifyGeneratedProjectForTesting(root, identifier, {
-    createOwner: createOwnedDirectory,
-    runCommand: defaultRunCommand,
-  });
+export function verifyGeneratedProject(
+  root,
+  identifier,
+  expectedProjectName,
+  options = defaultVerificationOptions,
+) {
+  return verifyGeneratedProjectForTesting(
+    root,
+    identifier,
+    {
+      captureVisualArtifacts: captureVisualFailureArtifacts,
+      createOwner: createGeneratedFixtureOwner,
+      runCommand: defaultRunCommand,
+    },
+    expectedProjectName,
+    options,
+  );
 }
 
 export async function verifyGeneratedProjectForTesting(
   root,
   identifier,
   adapters,
+  expectedProjectName,
+  options = defaultVerificationOptions,
 ) {
   requireAdapters(adapters);
-  const contract = contractForIdentifier(identifier);
+  const contract = contractForGeneratedProject(
+    identifier,
+    expectedProjectName,
+  );
   const source = await sourceForRoot(root, contract);
-  return verifySourcesWithAdapters(adapters, [source]);
+  return verifySourcesWithAdapters(adapters, [source], options);
 }
 
 async function runMain() {
   try {
-    const result = await verifyGeneratedSkeletons();
+    const options = parseVerificationArguments(process.argv.slice(2));
+    const result = await verifyGeneratedSkeletons(options);
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } catch (error) {
     const code =
@@ -952,6 +1140,9 @@ async function runMain() {
       `${JSON.stringify({
         ok: false,
         code,
+        ...(error?.artifactExportCode === undefined
+          ? {}
+          : { artifactExportCode: error.artifactExportCode }),
       })}\n`,
     );
     process.exitCode = 1;

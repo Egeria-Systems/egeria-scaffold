@@ -10,6 +10,9 @@ const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const builtEntry = resolve(packageRoot, "dist/index.js");
 const contracts = await import(pathToFileURL(builtEntry));
+const surfaceTargets = await import(
+  pathToFileURL(resolve(packageRoot, "dist/contracts/surface-target.js"))
+);
 
 const schemaArtifactNames = [
   "capability.schema.json",
@@ -123,6 +126,77 @@ const currentVerificationChecks = [
   "post-state-inference",
 ];
 
+const persistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  "lockfile",
+  "frozen-install",
+  "lint",
+  "typecheck",
+  "unit-tests",
+  "component-tests",
+  "next-build",
+  "opennext-build",
+  "post-change-inference",
+];
+
+const capabilityUpgradePersistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  "lockfile",
+  "frozen-install",
+  "lint",
+  "typecheck",
+  "unit-tests",
+  "component-tests",
+  "next-build",
+  "opennext-build",
+  "post-change-inference",
+];
+
+const capabilityAdditionVerificationChecks = [
+  ...persistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+];
+
+const capabilityRemovalVerificationChecks = [
+  ...persistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+];
+
+const capabilityUpgradeVerificationChecks = [
+  ...capabilityUpgradePersistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+];
+
+const profileTransitionPersistedVerificationChecks = [
+  ...capabilityUpgradePersistedVerificationChecks,
+];
+
+const profileTransitionVerificationChecks = [
+  ...profileTransitionPersistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+];
+
+const readableRecipeVersions = [
+  "0.1.0",
+  "0.2.0",
+  "0.3.0",
+  "0.4.0",
+  "0.5.0",
+  "0.6.0",
+  "0.7.0",
+  "0.8.0",
+  "0.9.0",
+  "0.10.0",
+];
+
 const validState = {
   schemaVersion: "1.0.0",
   builderVersion: "0.0.0",
@@ -186,9 +260,51 @@ function assertMergeTargetIssue(schema, value, path) {
   ]);
 }
 
+test("managed-surface constructors bind target and merge policy without changing ownership", () => {
+  const builderSurface = surfaceTargets.createFileSurfaceDescriptor({
+    identifier: "builder-project-configuration",
+    owner: { kind: "builder-kernel" },
+    path: ".egeria/project.yaml",
+    ownership: "managed",
+  });
+  const capabilitySurface = surfaceTargets.createJsonValueSurfaceDescriptor(
+    {
+      identifier: "standards-package",
+      owner: { kind: "capability", identifier: "standards" },
+      path: "apps/web/package.json",
+      ownership: "merge-managed",
+    },
+    "/devDependencies/@egeria-systems~1standards",
+  );
+
+  assert.deepEqual(builderSurface, {
+    identifier: "builder-project-configuration",
+    owner: { kind: "builder-kernel" },
+    path: ".egeria/project.yaml",
+    ownership: "managed",
+    fingerprintTarget: { kind: "file" },
+    mergeStrategy: "replace-file",
+  });
+  assert.deepEqual(capabilitySurface, {
+    identifier: "standards-package",
+    owner: { kind: "capability", identifier: "standards" },
+    path: "apps/web/package.json",
+    ownership: "merge-managed",
+    fingerprintTarget: {
+      kind: "json-value",
+      pointer: "/devDependencies/@egeria-systems~1standards",
+    },
+    mergeStrategy: "json-property",
+  });
+});
+
 test("builder-core exports the executable contract boundary", () => {
   for (const exportName of [
     "capabilityDeliveryModeSchema",
+    "capabilityUpgradePersistedVerificationChecks",
+    "capabilityUpgradeVerificationChecks",
+    "profileTransitionPersistedVerificationChecks",
+    "profileTransitionVerificationChecks",
     "capabilityDescriptorSchema",
     "capabilityRemovalPolicySchema",
     "capabilityStateClassificationSchema",
@@ -372,56 +488,16 @@ test("probe and managed-surface unions reject mismatched or unsafe structures", 
 });
 
 test("project configuration is strict and materializes safe capability identifiers", () => {
-  assertAccepts(contracts.projectConfigurationSchema, validProject);
-  assertAccepts(contracts.profileRecipeSchema, validProfile);
-  assertAccepts(contracts.projectConfigurationSchema, {
-    ...validProject,
-    recipeVersion: "0.2.0",
-  });
-  assertAccepts(contracts.profileRecipeSchema, {
-    ...validProfile,
-    recipeVersion: "0.2.0",
-  });
-  assertAccepts(contracts.projectConfigurationSchema, {
-    ...validProject,
-    recipeVersion: "0.3.0",
-  });
-  assertAccepts(contracts.profileRecipeSchema, {
-    ...validProfile,
-    recipeVersion: "0.3.0",
-  });
-  assertAccepts(contracts.projectConfigurationSchema, {
-    ...validProject,
-    recipeVersion: "0.4.0",
-  });
-  assertAccepts(contracts.profileRecipeSchema, {
-    ...validProfile,
-    recipeVersion: "0.4.0",
-  });
-  assertAccepts(contracts.projectConfigurationSchema, {
-    ...validProject,
-    recipeVersion: "0.5.0",
-  });
-  assertAccepts(contracts.profileRecipeSchema, {
-    ...validProfile,
-    recipeVersion: "0.5.0",
-  });
-  assertAccepts(contracts.projectConfigurationSchema, {
-    ...validProject,
-    recipeVersion: "0.6.0",
-  });
-  assertAccepts(contracts.profileRecipeSchema, {
-    ...validProfile,
-    recipeVersion: "0.6.0",
-  });
-  assertAccepts(contracts.projectConfigurationSchema, {
-    ...validProject,
-    recipeVersion: "0.7.0",
-  });
-  assertAccepts(contracts.profileRecipeSchema, {
-    ...validProfile,
-    recipeVersion: "0.7.0",
-  });
+  for (const recipeVersion of readableRecipeVersions) {
+    assertAccepts(contracts.projectConfigurationSchema, {
+      ...validProject,
+      recipeVersion,
+    });
+    assertAccepts(contracts.profileRecipeSchema, {
+      ...validProfile,
+      recipeVersion,
+    });
+  }
 
   assertRejects(contracts.projectConfigurationSchema, {
     ...validProject,
@@ -443,14 +519,16 @@ test("project configuration is strict and materializes safe capability identifie
     ...validProfile,
     identifier: "app",
   });
-  assertRejects(contracts.projectConfigurationSchema, {
-    ...validProject,
-    recipeVersion: "0.8.0",
-  });
-  assertRejects(contracts.profileRecipeSchema, {
-    ...validProfile,
-    recipeVersion: "0.8.0",
-  });
+  for (const recipeVersion of ["0.11.0", "0.10", "latest"]) {
+    assertRejects(contracts.projectConfigurationSchema, {
+      ...validProject,
+      recipeVersion,
+    });
+    assertRejects(contracts.profileRecipeSchema, {
+      ...validProfile,
+      recipeVersion,
+    });
+  }
 });
 
 test("Calendly settings enforce paired capability state and sanitized destinations", () => {
@@ -613,7 +691,14 @@ test("project display names preserve Unicode while rejecting controls and whites
 
 test("installed state is strict and records the exact successful generation checks", () => {
   assertAccepts(contracts.installedStateSchema, validState);
-  for (const recipeVersion of ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0"]) {
+  for (const recipeVersion of [
+    "0.1.0",
+    "0.2.0",
+    "0.3.0",
+    "0.4.0",
+    "0.5.0",
+    "0.6.0",
+  ]) {
     assertAccepts(contracts.installedStateSchema, {
       ...validState,
       origin: { ...validState.origin, recipeVersion },
@@ -622,13 +707,49 @@ test("installed state is strict and records the exact successful generation chec
         checks: legacyVerificationChecks,
       },
     });
+    assertRejects(contracts.installedStateSchema, {
+      ...validState,
+      origin: { ...validState.origin, recipeVersion },
+    });
   }
-  assertRejects(contracts.installedStateSchema, {
+  assertAccepts(contracts.installedStateSchema, {
     ...validState,
-    origin: { ...validState.origin, recipeVersion: "0.6.0" },
+    origin: { ...validState.origin, recipeVersion: "0.8.0" },
+  });
+  assertAccepts(contracts.installedStateSchema, {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.9.0" },
+  });
+  assertAccepts(contracts.installedStateSchema, {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.10.0" },
   });
   assertRejects(contracts.installedStateSchema, {
     ...validState,
+    lastSuccessfulVerification: {
+      kind: "generation",
+      checks: legacyVerificationChecks,
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.8.0" },
+    lastSuccessfulVerification: {
+      kind: "generation",
+      checks: legacyVerificationChecks,
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.9.0" },
+    lastSuccessfulVerification: {
+      kind: "generation",
+      checks: legacyVerificationChecks,
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.10.0" },
     lastSuccessfulVerification: {
       kind: "generation",
       checks: legacyVerificationChecks,
@@ -675,10 +796,138 @@ test("installed state is strict and records the exact successful generation chec
     ...validState,
     credentials: { token: "must-not-exist" },
   });
-  assertRejects(contracts.installedStateSchema, {
+});
+
+test("installed state records only the exact capability-addition verification receipt", () => {
+  const capabilityAdditionState = {
     ...validState,
-    origin: { ...validState.origin, recipeVersion: "0.8.0" },
+    origin: { ...validState.origin, recipeVersion: "0.10.0" },
+    appliedMigrations: ["add-booking-calendly-0-1-0"],
+    lastSuccessfulVerification: {
+      kind: "capability-addition",
+      checks: persistedVerificationChecks,
+    },
+  };
+
+  assertAccepts(contracts.installedStateSchema, capabilityAdditionState);
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityAdditionState,
+    lastSuccessfulVerification: {
+      ...capabilityAdditionState.lastSuccessfulVerification,
+      checks: persistedVerificationChecks.slice(0, -1),
+    },
   });
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityAdditionState,
+    lastSuccessfulVerification: {
+      kind: "generation",
+      checks: persistedVerificationChecks,
+    },
+  });
+});
+
+test("installed state records only the exact capability-removal verification receipt", () => {
+  const capabilityRemovalState = {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.10.0" },
+    appliedMigrations: ["remove-booking-calendly-0-1-0"],
+    lastSuccessfulVerification: {
+      kind: "capability-removal",
+      checks: persistedVerificationChecks,
+    },
+  };
+
+  assertAccepts(contracts.installedStateSchema, capabilityRemovalState);
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityRemovalState,
+    lastSuccessfulVerification: {
+      ...capabilityRemovalState.lastSuccessfulVerification,
+      checks: persistedVerificationChecks.slice(0, -1),
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityRemovalState,
+    lastSuccessfulVerification: {
+      ...capabilityRemovalState.lastSuccessfulVerification,
+      checks: [...persistedVerificationChecks, "unexpected-check"],
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityRemovalState,
+    lastSuccessfulVerification: {
+      ...capabilityRemovalState.lastSuccessfulVerification,
+      checks: [
+        persistedVerificationChecks[1],
+        persistedVerificationChecks[0],
+        ...persistedVerificationChecks.slice(2),
+      ],
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityRemovalState,
+    lastSuccessfulVerification: {
+      ...capabilityRemovalState.lastSuccessfulVerification,
+      checks: [
+        ...persistedVerificationChecks,
+        "migration-record",
+        "post-state-inference",
+      ],
+    },
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...capabilityRemovalState,
+    lastSuccessfulVerification: {
+      kind: "generation",
+      checks: persistedVerificationChecks,
+    },
+  });
+});
+
+test("installed state records only the exact capability-upgrade verification receipt", () => {
+  const capabilityUpgradeState = {
+    ...validState,
+    origin: { ...validState.origin, recipeVersion: "0.10.0" },
+    appliedMigrations: ["upgrade-standards-0-3-0-to-0-4-0"],
+    lastSuccessfulVerification: {
+      kind: "capability-upgrade",
+      checks: capabilityUpgradePersistedVerificationChecks,
+    },
+  };
+
+  assert.deepEqual(
+    contracts.capabilityUpgradePersistedVerificationChecks,
+    capabilityUpgradePersistedVerificationChecks,
+  );
+  assert.deepEqual(
+    contracts.capabilityUpgradeVerificationChecks,
+    capabilityUpgradeVerificationChecks,
+  );
+  assertAccepts(contracts.installedStateSchema, capabilityUpgradeState);
+  for (const checks of [
+    capabilityUpgradePersistedVerificationChecks.slice(0, -1),
+    [
+      capabilityUpgradePersistedVerificationChecks[1],
+      capabilityUpgradePersistedVerificationChecks[0],
+      ...capabilityUpgradePersistedVerificationChecks.slice(2),
+    ],
+    [
+      capabilityUpgradePersistedVerificationChecks[0],
+      capabilityUpgradePersistedVerificationChecks[0],
+      ...capabilityUpgradePersistedVerificationChecks.slice(2),
+    ],
+    [...capabilityUpgradePersistedVerificationChecks, "unexpected-check"],
+    currentVerificationChecks,
+    capabilityAdditionVerificationChecks,
+    capabilityRemovalVerificationChecks,
+  ]) {
+    assertRejects(contracts.installedStateSchema, {
+      ...capabilityUpgradeState,
+      lastSuccessfulVerification: {
+        kind: "capability-upgrade",
+        checks,
+      },
+    });
+  }
 });
 
 test("migration records describe only completed migration or reconciliation work", () => {
@@ -734,9 +983,65 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
     generated["certification-registry.schema.json"].title,
     "Egeria capability certification coverage registry",
   );
+  for (const [artifactName, recipeVersionSchema] of [
+    [
+      "profile.schema.json",
+      generated["profile.schema.json"].properties.recipeVersion,
+    ],
+    [
+      "project.schema.json",
+      generated["project.schema.json"].properties.recipeVersion,
+    ],
+    [
+      "state.schema.json",
+      generated["state.schema.json"].properties.origin.properties.recipeVersion,
+    ],
+  ]) {
+    assert.deepEqual(
+      recipeVersionSchema.enum,
+      readableRecipeVersions,
+      `${artifactName} must retain every readable recipe version`,
+    );
+  }
   const verificationCheckTuples =
-    generated["state.schema.json"].properties.lastSuccessfulVerification
-      .properties.checks.anyOf;
+    generated["state.schema.json"].properties.lastSuccessfulVerification.oneOf
+      .flatMap(({ properties }) =>
+        properties.checks.anyOf ?? [properties.checks],
+      );
+  assert.equal(
+    generated["state.schema.json"].properties.schemaVersion.const,
+    "1.0.0",
+  );
+  assert.deepEqual(
+    generated["state.schema.json"].properties.lastSuccessfulVerification.oneOf.map(
+      ({ properties }) => properties.kind.const,
+    ),
+    [
+      "generation",
+      "capability-addition",
+      "capability-removal",
+      "capability-upgrade",
+      "profile-transition",
+    ],
+  );
+  const capabilityUpgradeSchema =
+    generated["state.schema.json"].properties.lastSuccessfulVerification.oneOf.find(
+      ({ properties }) => properties.kind.const === "capability-upgrade",
+    );
+  assert.deepEqual(
+    capabilityUpgradeSchema.properties.checks.prefixItems.map(({ const: value }) => value),
+    capabilityUpgradePersistedVerificationChecks,
+  );
+  const profileTransitionSchema =
+    generated["state.schema.json"].properties.lastSuccessfulVerification.oneOf.find(
+      ({ properties }) => properties.kind.const === "profile-transition",
+    );
+  assert.deepEqual(
+    profileTransitionSchema.properties.checks.prefixItems.map(
+      ({ const: value }) => value,
+    ),
+    profileTransitionPersistedVerificationChecks,
+  );
   for (const tuple of verificationCheckTuples) {
     assert.equal(tuple.minItems, tuple.prefixItems.length);
     assert.equal(tuple.maxItems, tuple.prefixItems.length);

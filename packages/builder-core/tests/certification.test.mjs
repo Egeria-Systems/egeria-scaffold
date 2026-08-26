@@ -1,26 +1,59 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 import * as core from "../dist/index.js";
+import { requiredEvidence } from "./certification-contracts.mjs";
 
 const planPath =
-  "docs/superpowers/plans/2026-08-10-booking-calendly-certification.md";
+  "docs/superpowers/plans/2026-08-24-booking-calendly-lifecycle-certification.md";
 const evidencePath =
   "docs/implementation-evidence/2026-08-10-booking-calendly-certification-verification.md";
 const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
-const evidenceDocumentSource = readFileSync(
-  new URL(`../../../${evidencePath}`, import.meta.url),
-  "utf8",
-);
+const bookingLifecycleEvidencePath =
+  "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md";
+const bookingLifecycleEvidenceRevision =
+  "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059";
+const bookingProviderEvidencePath =
+  "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md";
+const bookingProviderEvidenceRevision =
+  "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d";
 const observabilityPlanPath =
-  "docs/superpowers/plans/2026-08-10-production-observability-certification.md";
+  "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md";
+const observabilityEvidencePath =
+  "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md";
+const observabilityEvidenceRevision =
+  "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad";
 const standardsPlanPath =
-  "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md";
+  "docs/superpowers/plans/2026-08-25-standards-lifecycle-certification.md";
 const standardsEvidencePath =
-  "docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-verification.md";
+  "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md";
 const standardsEvidenceRevision =
-  "d7c63b0aaa9bebd56c075f16f1e5d86519853698";
+  "d7f9dac6e25d5dde32015968d0912b45e73644e7";
+const contentFilesPlanPath =
+  "docs/superpowers/plans/2026-08-25-content-files-certification.md";
+const contentFilesEvidencePath =
+  "docs/implementation-evidence/2026-08-25-content-files-certification-receipt.md";
+const contentFilesEvidenceRevision =
+  "f03b9f624c370728f678924ce34e5287558d2a87";
+const sectionCompositionPlanPath =
+  "docs/superpowers/plans/2026-08-26-section-composition-certification.md";
+const sectionCompositionEvidencePath =
+  "docs/implementation-evidence/2026-08-26-section-composition-certification-receipt.md";
+const sectionCompositionEvidenceRevision =
+  "f74459c8833833186bb651c116ed524e51044677";
+const siteRoutingPlanPath =
+  "docs/superpowers/plans/2026-08-26-site-routing-certification.md";
+const siteRoutingEvidencePath =
+  "docs/implementation-evidence/2026-08-26-site-routing-certification-receipt.md";
+const siteRoutingEvidenceRevision =
+  "77cea944513e521939bf4de088048f67acdfbc3c";
+const deploymentPlanPath =
+  "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
+const deploymentEvidencePath =
+  "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md";
+const deploymentEvidenceRevision =
+  "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2";
 const committedRegistry = JSON.parse(
   readFileSync(
     new URL("../../../certifications/capabilities.json", import.meta.url),
@@ -30,13 +63,13 @@ const committedRegistry = JSON.parse(
 
 const descriptorDigests = Object.freeze({
   "booking-calendly":
-    "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab",
+    "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2",
   "content-files":
     "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05",
   "deployment-cloudflare":
-    "sha256:846ae45d15ba9d8f256a9b7a1d8a4f3cda1b871a3b3f79f7656fd621050e8273",
+    "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41",
   observability:
-    "sha256:937a3dcad0c96b45ae9f4acb977bd65e46e2caa50bd3fc6dfb29561a1ab637b9",
+    "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99",
   "section-composition":
     "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
   "site-routing":
@@ -45,27 +78,33 @@ const descriptorDigests = Object.freeze({
     "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb",
 });
 
-const requiredEvidence = Object.freeze({
-  "booking-calendly": Object.freeze([
-    "cleanup-recovery",
-    "deployed-application",
-    "fresh-scaffold",
-    "provider-confirmed",
-  ]),
-  "content-files": Object.freeze(["fresh-scaffold"]),
-  "deployment-cloudflare": Object.freeze([
-    "cleanup-recovery",
-    "deployed-application",
-    "fresh-scaffold",
-  ]),
-  observability: Object.freeze([
-    "deployed-application",
-    "fresh-scaffold",
-  ]),
-  "section-composition": Object.freeze(["fresh-scaffold"]),
-  "site-routing": Object.freeze(["fresh-scaffold"]),
-  standards: Object.freeze(["fresh-scaffold"]),
-});
+function createEvidenceDocument({
+  capability = "booking-calendly",
+  descriptorVersion = "0.1.0",
+  behaviorContractDigest = descriptorDigests["booking-calendly"],
+  revision = evidenceRevision,
+  passed = "fresh-scaffold",
+  reviewed = "fresh-scaffold",
+  status = "complete",
+  decision = "accepted",
+  unresolvedPrompts = "none",
+  additionalLines = [],
+} = {}) {
+  return [
+    `**Certification capability:** \`${capability}\``,
+    `**Certification descriptor version:** \`${descriptorVersion}\``,
+    `**Certification behavior-contract digest:** \`${behaviorContractDigest}\``,
+    `**Certification evidence revision:** \`${revision}\``,
+    `**Passed certification outcomes:** \`${passed}\``,
+    `**Reviewed certification outcomes:** \`${reviewed}\``,
+    `**Certification receipt status:** \`${status}\``,
+    `**Certification reviewer decision:** \`${decision}\``,
+    `**Certification unresolved prompts:** \`${unresolvedPrompts}\``,
+    ...additionalLines,
+  ].join("\n");
+}
+
+const evidenceDocumentSource = createEvidenceDocument();
 
 function assertSuccess(result) {
   assert.equal(result.ok, true, JSON.stringify(result.issues));
@@ -84,20 +123,29 @@ function createRecord(identifier) {
   const taskPlan =
     identifier === "booking-calendly"
       ? planPath
-      : identifier === "observability"
-        ? observabilityPlanPath
-        : identifier === "standards"
-          ? standardsPlanPath
-        : null;
+      : identifier === "deployment-cloudflare"
+        ? deploymentPlanPath
+        : identifier === "observability"
+          ? observabilityPlanPath
+          : identifier === "standards"
+            ? standardsPlanPath
+            : null;
 
   return {
     subject: {
       descriptorVersion: descriptor.version,
-      behaviorContractDigest: descriptorDigests[identifier],
+      behaviorContractDigest:
+        identifier === "standards"
+          ? core.createCertificationSubject(
+              descriptor,
+              requiredEvidence[identifier],
+            ).behaviorContractDigest
+          : descriptorDigests[identifier],
     },
     requiredEvidence: requiredEvidence[identifier],
     status:
       identifier === "booking-calendly" ||
+      identifier === "deployment-cloudflare" ||
       identifier === "observability" ||
       identifier === "standards"
         ? "pending"
@@ -195,7 +243,7 @@ test("certification subjects bind the descriptor and required evidence", () => {
     {
       descriptorVersion: "0.1.0",
       behaviorContractDigest:
-        "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab",
+        "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2",
     },
   );
 
@@ -203,6 +251,219 @@ test("certification subjects bind the descriptor and required evidence", () => {
     core.createCertificationSubject(bookingDescriptor, ["fresh-scaffold"])
       .behaviorContractDigest,
     descriptorDigests["booking-calendly"],
+  );
+});
+
+test("current Calendly lifecycle subject has exact reviewed certification evidence", () => {
+  const bookingDescriptor = descriptorsByIdentifier.get("booking-calendly");
+  assert.notEqual(bookingDescriptor, undefined);
+  const subject = core.createCertificationSubject(
+    bookingDescriptor,
+    requiredEvidence["booking-calendly"],
+  );
+
+  assert.deepEqual(committedRegistry.records["booking-calendly"], {
+    subject,
+    requiredEvidence: [
+      "cleanup-recovery",
+      "deployed-application",
+      "existing-repository-lifecycle",
+      "fresh-scaffold",
+      "provider-confirmed",
+    ],
+    status: "certified",
+    taskPlan: planPath,
+    evidence: [
+      {
+        kind: "cleanup-recovery",
+        path: bookingProviderEvidencePath,
+        outcome: "passed",
+        revision: bookingProviderEvidenceRevision,
+        subject,
+      },
+      {
+        kind: "deployed-application",
+        path: bookingProviderEvidencePath,
+        outcome: "passed",
+        revision: bookingProviderEvidenceRevision,
+        subject,
+      },
+      {
+        kind: "existing-repository-lifecycle",
+        path: bookingLifecycleEvidencePath,
+        outcome: "passed",
+        revision: bookingLifecycleEvidenceRevision,
+        subject,
+      },
+      {
+        kind: "fresh-scaffold",
+        path: bookingLifecycleEvidencePath,
+        outcome: "passed",
+        revision: bookingLifecycleEvidenceRevision,
+        subject,
+      },
+      {
+        kind: "provider-confirmed",
+        path: bookingProviderEvidencePath,
+        outcome: "passed",
+        revision: bookingProviderEvidenceRevision,
+        subject,
+      },
+    ],
+  });
+});
+
+test("current content files subject has exact reviewed fresh-scaffold evidence", () => {
+  const descriptor = descriptorsByIdentifier.get("content-files");
+  assert.notEqual(descriptor, undefined);
+  const subject = core.createCertificationSubject(
+    descriptor,
+    requiredEvidence["content-files"],
+  );
+
+  assert.deepEqual(committedRegistry.records["content-files"], {
+    subject,
+    requiredEvidence: ["fresh-scaffold"],
+    status: "certified",
+    taskPlan: contentFilesPlanPath,
+    evidence: [
+      {
+        kind: "fresh-scaffold",
+        path: contentFilesEvidencePath,
+        outcome: "passed",
+        revision: contentFilesEvidenceRevision,
+        subject,
+      },
+    ],
+  });
+});
+
+test("accepted content files receipt binds the reviewed fresh-scaffold outcome", () => {
+  const acceptedRecord = committedRegistry.records["content-files"];
+  const acceptedReceiptUrl = new URL(
+    `../../../${contentFilesEvidencePath}`,
+    import.meta.url,
+  );
+
+  assert.equal(existsSync(acceptedReceiptUrl), true, contentFilesEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { "content-files": acceptedRecord },
+      },
+      artifacts: {
+        [contentFilesPlanPath]: "# approved plan",
+        [contentFilesEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [contentFilesEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
+});
+
+test("current section composition subject has exact reviewed fresh-scaffold evidence", () => {
+  const descriptor = descriptorsByIdentifier.get("section-composition");
+  assert.notEqual(descriptor, undefined);
+  const subject = core.createCertificationSubject(
+    descriptor,
+    requiredEvidence["section-composition"],
+  );
+
+  assert.deepEqual(committedRegistry.records["section-composition"], {
+    subject,
+    requiredEvidence: ["fresh-scaffold"],
+    status: "certified",
+    taskPlan: sectionCompositionPlanPath,
+    evidence: [
+      {
+        kind: "fresh-scaffold",
+        path: sectionCompositionEvidencePath,
+        outcome: "passed",
+        revision: sectionCompositionEvidenceRevision,
+        subject,
+      },
+    ],
+  });
+});
+
+test("accepted section composition receipt binds the reviewed fresh-scaffold outcome", () => {
+  const acceptedRecord = committedRegistry.records["section-composition"];
+  const acceptedReceiptUrl = new URL(
+    `../../../${sectionCompositionEvidencePath}`,
+    import.meta.url,
+  );
+
+  assert.equal(
+    existsSync(acceptedReceiptUrl),
+    true,
+    sectionCompositionEvidencePath,
+  );
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { "section-composition": acceptedRecord },
+      },
+      artifacts: {
+        [sectionCompositionPlanPath]: "# approved plan",
+        [sectionCompositionEvidencePath]: readFileSync(
+          acceptedReceiptUrl,
+          "utf8",
+        ),
+      },
+      validRevisions: [sectionCompositionEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
+});
+
+test("current site routing subject has exact reviewed fresh-scaffold evidence", () => {
+  const descriptor = descriptorsByIdentifier.get("site-routing");
+  assert.notEqual(descriptor, undefined);
+  const subject = core.createCertificationSubject(
+    descriptor,
+    requiredEvidence["site-routing"],
+  );
+
+  assert.deepEqual(committedRegistry.records["site-routing"], {
+    subject,
+    requiredEvidence: ["fresh-scaffold"],
+    status: "certified",
+    taskPlan: siteRoutingPlanPath,
+    evidence: [
+      {
+        kind: "fresh-scaffold",
+        path: siteRoutingEvidencePath,
+        outcome: "passed",
+        revision: siteRoutingEvidenceRevision,
+        subject,
+      },
+    ],
+  });
+});
+
+test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", () => {
+  const acceptedRecord = committedRegistry.records["site-routing"];
+  const acceptedReceiptUrl = new URL(
+    `../../../${siteRoutingEvidencePath}`,
+    import.meta.url,
+  );
+
+  assert.equal(existsSync(acceptedReceiptUrl), true, siteRoutingEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { "site-routing": acceptedRecord },
+      },
+      artifacts: {
+        [siteRoutingPlanPath]: "# approved plan",
+        [siteRoutingEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [siteRoutingEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
   );
 });
 
@@ -328,47 +589,49 @@ test("descriptor admission rejects incomplete, stale, extra, and false-legacy co
   );
 });
 
-test("material observability is certified from reviewed deployed and fresh-scaffold evidence", () => {
+test("material observability diagnostics have exact reviewed certification evidence", () => {
   const observabilityDescriptor = descriptorsByIdentifier.get("observability");
   assert.notEqual(observabilityDescriptor, undefined);
   const observabilityRecord = committedRegistry.records.observability;
-
-  assert.equal(observabilityDescriptor.version, "0.2.0");
-  assert.deepEqual(observabilityRecord, {
-    subject: core.createCertificationSubject(
-      observabilityDescriptor,
-      ["deployed-application", "fresh-scaffold"],
-    ),
-    requiredEvidence: ["deployed-application", "fresh-scaffold"],
-    status: "certified",
-    taskPlan: observabilityPlanPath,
-    evidence: [
-      {
-        kind: "deployed-application",
-        path: "docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md",
-        outcome: "passed",
-        revision: "ee1e1df10fa2be2f09333efecd86de7f7a131d49",
-        subject: core.createCertificationSubject(
-          observabilityDescriptor,
-          ["deployed-application", "fresh-scaffold"],
-        ),
-      },
-      {
-        kind: "fresh-scaffold",
-        path: "docs/implementation-evidence/2026-08-12-production-observability-certification-provider-receipt.md",
-        outcome: "passed",
-        revision: "ee1e1df10fa2be2f09333efecd86de7f7a131d49",
-        subject: core.createCertificationSubject(
-          observabilityDescriptor,
-          ["deployed-application", "fresh-scaffold"],
-        ),
-      },
-    ],
-  });
-  assert.doesNotThrow(() =>
-    readFileSync(new URL(`../../../${observabilityPlanPath}`, import.meta.url)),
+  const subject = core.createCertificationSubject(
+    observabilityDescriptor,
+    requiredEvidence.observability,
   );
 
+  assert.equal(observabilityDescriptor.version, "0.3.0");
+  assert.deepEqual(observabilityRecord, {
+    subject,
+    requiredEvidence: requiredEvidence.observability,
+    status: "certified",
+    taskPlan: observabilityPlanPath,
+    evidence: requiredEvidence.observability.map((kind) => ({
+      kind,
+      path: observabilityEvidencePath,
+      outcome: "passed",
+      revision: observabilityEvidenceRevision,
+      subject,
+    })),
+  });
+  const acceptedReceiptUrl = new URL(
+    `../../../${observabilityEvidencePath}`,
+    import.meta.url,
+  );
+  assert.equal(existsSync(acceptedReceiptUrl), true, observabilityEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { observability: observabilityRecord },
+      },
+      artifacts: {
+        [deploymentPlanPath]: "# approved plan",
+        [observabilityPlanPath]: "# approved plan",
+        [observabilityEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [observabilityEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
   const falseLegacy = structuredClone(committedRegistry);
   falseLegacy.records.observability.status = "backfill-pending";
   falseLegacy.records.observability.taskPlan = null;
@@ -387,32 +650,112 @@ test("material observability is certified from reviewed deployed and fresh-scaff
   );
 });
 
-test("material standards testing changes have exact reviewed certification evidence", () => {
+test("standards has exact accepted fresh-scaffold and lifecycle evidence", () => {
   const standardsDescriptor = descriptorsByIdentifier.get("standards");
   assert.notEqual(standardsDescriptor, undefined);
 
-  assert.equal(standardsDescriptor.version, "0.3.0");
+  const subject = core.createCertificationSubject(standardsDescriptor, [
+    "existing-repository-lifecycle",
+    "fresh-scaffold",
+  ]);
+
+  assert.equal(standardsDescriptor.version, "0.4.0");
+  assert.notEqual(
+    subject.behaviorContractDigest,
+    descriptorDigests.standards,
+  );
   assert.deepEqual(committedRegistry.records.standards, {
-    subject: core.createCertificationSubject(standardsDescriptor, [
-      "fresh-scaffold",
-    ]),
-    requiredEvidence: ["fresh-scaffold"],
+    subject,
+    requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
     status: "certified",
     taskPlan: standardsPlanPath,
-    evidence: [
-      {
-        kind: "fresh-scaffold",
+    evidence: ["existing-repository-lifecycle", "fresh-scaffold"].map(
+      (kind) => ({
+        kind,
         path: standardsEvidencePath,
         outcome: "passed",
         revision: standardsEvidenceRevision,
-        subject: core.createCertificationSubject(standardsDescriptor, [
-          "fresh-scaffold",
-        ]),
-      },
-    ],
+        subject,
+      }),
+    ),
   });
-  assert.doesNotThrow(() =>
-    readFileSync(new URL(`../../../${standardsPlanPath}`, import.meta.url)),
+});
+
+test("accepted standards receipt binds the reviewed fresh-scaffold and lifecycle outcomes", () => {
+  const standardsDescriptor = descriptorsByIdentifier.get("standards");
+  assert.notEqual(standardsDescriptor, undefined);
+
+  const subject = core.createCertificationSubject(standardsDescriptor, [
+    "existing-repository-lifecycle",
+    "fresh-scaffold",
+  ]);
+  const acceptedRecord = {
+    subject,
+    requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
+    status: "certified",
+    taskPlan: standardsPlanPath,
+    evidence: ["existing-repository-lifecycle", "fresh-scaffold"].map(
+      (kind) => ({
+        kind,
+        path: standardsEvidencePath,
+        outcome: "passed",
+        revision: standardsEvidenceRevision,
+        subject,
+      }),
+    ),
+  };
+  const acceptedReceiptUrl = new URL(
+    `../../../${standardsEvidencePath}`,
+    import.meta.url,
+  );
+
+  assert.equal(existsSync(acceptedReceiptUrl), true, standardsEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { standards: acceptedRecord },
+      },
+      artifacts: {
+        [standardsPlanPath]: "# approved plan",
+        [standardsEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [standardsEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
+});
+
+test("material generated deployment changes have exact reviewed certification evidence", () => {
+  const deploymentRecord = committedRegistry.records["deployment-cloudflare"];
+
+  assert.equal(deploymentRecord.subject.descriptorVersion, "0.3.0");
+  assert.match(
+    deploymentRecord.subject.behaviorContractDigest,
+    /^sha256:[0-9a-f]{64}$/u,
+  );
+  assert.deepEqual(deploymentRecord.requiredEvidence, [
+    "cleanup-recovery",
+    "deployed-application",
+    "fresh-scaffold",
+  ]);
+  assert.equal(deploymentRecord.status, "certified");
+  assert.equal(deploymentRecord.taskPlan, deploymentPlanPath);
+  assert.deepEqual(
+    deploymentRecord.evidence.map(({ kind, path, outcome, revision }) => ({
+      kind,
+      path,
+      outcome,
+      revision,
+    })),
+    ["cleanup-recovery", "deployed-application", "fresh-scaffold"].map(
+      (kind) => ({
+        kind,
+        path: deploymentEvidencePath,
+        outcome: "passed",
+        revision: deploymentEvidenceRevision,
+      }),
+    ),
   );
 });
 
@@ -425,6 +768,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
@@ -439,6 +783,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
@@ -463,6 +808,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
     core.validateCertificationArtifacts({
       registry: relabeled,
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
@@ -502,6 +848,7 @@ test("repository artifacts reject revisions outside the checked Git history", ()
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
@@ -523,34 +870,18 @@ test("repository artifacts reject incomplete or unresolved reviewer receipts", (
   const recorded = cloneRegistry();
   const booking = recorded.records["booking-calendly"];
   booking.evidence = evidenceFor(booking, ["fresh-scaffold"]);
-  const incompleteReceipt = [
-    "# Incomplete receipt",
-    "",
-    "**Certification capability:** `booking-calendly`",
-    "",
-    "**Certification descriptor version:** `0.1.0`",
-    "",
-    `**Certification behavior-contract digest:** \`${descriptorDigests["booking-calendly"]}\``,
-    "",
-    `**Certification evidence revision:** \`${evidenceRevision}\``,
-    "",
-    "**Passed certification outcomes:** `fresh-scaffold`",
-    "",
-    "**Reviewed certification outcomes:** `fresh-scaffold`",
-    "",
-    "**Certification receipt status:** `incomplete`",
-    "",
-    "**Certification reviewer decision:** `rejected`",
-    "",
-    "**Certification unresolved prompts:** `present`",
-    "",
-    "- Remaining evidence: [replace before review]",
-  ].join("\n");
+  const incompleteReceipt = createEvidenceDocument({
+    status: "incomplete",
+    decision: "rejected",
+    unresolvedPrompts: "present",
+    additionalLines: ["- Remaining evidence: [replace before review]"],
+  });
 
   assert.deepEqual(
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
@@ -582,32 +913,15 @@ test("repository artifacts require affirmative review of every claimed outcome",
   const recorded = cloneRegistry();
   const booking = recorded.records["booking-calendly"];
   booking.evidence = evidenceFor(booking, ["fresh-scaffold"]);
-  const mismatchedReview = [
-    "# Mismatched review",
-    "",
-    "**Certification capability:** `booking-calendly`",
-    "",
-    "**Certification descriptor version:** `0.1.0`",
-    "",
-    `**Certification behavior-contract digest:** \`${descriptorDigests["booking-calendly"]}\``,
-    "",
-    `**Certification evidence revision:** \`${evidenceRevision}\``,
-    "",
-    "**Passed certification outcomes:** `fresh-scaffold`",
-    "",
-    "**Reviewed certification outcomes:** `deployed-application`",
-    "",
-    "**Certification receipt status:** `complete`",
-    "",
-    "**Certification reviewer decision:** `accepted`",
-    "",
-    "**Certification unresolved prompts:** `none`",
-  ].join("\n");
+  const mismatchedReview = createEvidenceDocument({
+    reviewed: "deployed-application",
+  });
 
   assert.deepEqual(
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
@@ -635,6 +949,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "booking-calendly", "status"],
+        context: { reason: "pending" },
+      },
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "deployment-cloudflare", "status"],
         context: { reason: "pending" },
       },
       {
@@ -670,6 +989,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       policy: "legacy-backfill-exempt",
     }).issues,
     [
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "deployment-cloudflare", "status"],
+        context: { reason: "pending" },
+      },
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "standards", "status"],

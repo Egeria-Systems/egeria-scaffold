@@ -1,5 +1,18 @@
 import assert from "node:assert/strict";
-import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  cp,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rename,
+  readdir,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -8,13 +21,16 @@ import test from "node:test";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const reviewedRecipeLockfile = resolve(
   packageRoot,
-  "../../fixtures/generated/portfolio/pnpm-lock.yaml",
+  "lockfiles/web-recipe-0.8.0/pnpm-lock.yaml",
 );
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
 const verifierModule = await import(
   pathToFileURL(
     resolve(packageRoot, "dist/generation/verify-generated-project.js"),
   ),
+);
+const sourceTreeSafety = await import(
+  pathToFileURL(resolve(packageRoot, "dist/generation/source-tree-safety.js")),
 );
 
 const generatedChecks = [
@@ -34,6 +50,7 @@ const completeChecks = [
   "post-state-inference",
 ];
 const portfolioRenderedPaths = [
+  ".github/workflows/deploy.yml",
   ".github/workflows/quality.yml",
   ".gitignore",
   ".nvmrc",
@@ -41,11 +58,14 @@ const portfolioRenderedPaths = [
   "README.md",
   "apps/web/AGENTS.md",
   "apps/web/app/api/observability/route.ts",
+  "apps/web/app/error.tsx",
+  "apps/web/app/global-error.tsx",
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
   "apps/web/app/page.tsx",
   "apps/web/content/content.config.yaml",
   "apps/web/content/en-CA/long-form/introduction.md",
+  "apps/web/content/en-CA/observability.yaml",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/instrumentation-client.ts",
@@ -57,21 +77,27 @@ const portfolioRenderedPaths = [
   "apps/web/playwright.deployed.config.ts",
   "apps/web/playwright.dev.config.ts",
   "apps/web/playwright.preview.config.ts",
+  "apps/web/playwright.visual.config.ts",
   "apps/web/postcss.config.mjs",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
   "apps/web/src/infrastructure/cloudflare/observability-context.ts",
   "apps/web/src/infrastructure/observability/browser-reporter.ts",
+  "apps/web/src/infrastructure/observability/error-copy.ts",
   "apps/web/src/infrastructure/observability/installed-capability.ts",
   "apps/web/src/infrastructure/observability/server-reporter.ts",
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
+  "apps/web/src/presentation/error-fallback.tsx",
   "apps/web/src/sections/section-registry.tsx",
   "apps/web/tests/component/content-page.test.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
   "apps/web/tests/setup/component.ts",
   "apps/web/tests/unit/content-schema.test.ts",
+  "apps/web/tests/visual/home-visual.spec.ts",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
   "apps/web/tsconfig.json",
   "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
@@ -127,6 +153,167 @@ async function exists(path) {
     throw error;
   }
 }
+
+test(
+  "owned temporary directories are sibling-scoped, identity-bound, private, and safely cleaned up",
+  async (context) => {
+    const parent = await mkdtemp(join(tmpdir(), "egeria-owned-parent-"));
+    context.after(() => rm(parent, { recursive: true, force: true }));
+
+    const created = await sourceTreeSafety.createOwnedTemporaryDirectory(
+      parent,
+      ".egeria-owned-",
+    );
+    assert.equal(created.ok, true);
+
+    const identity = created.value;
+    const stats = await lstat(identity.path, { bigint: true });
+    assert.equal(await realpath(dirname(identity.path)), await realpath(parent));
+    assert.match(identity.path, /\/\.egeria-owned-[^/]+$/);
+    assert.equal(stats.isSymbolicLink(), false);
+    assert.equal(stats.isDirectory(), true);
+    assert.equal(stats.dev, identity.device);
+    assert.equal(stats.ino, identity.inode);
+    assert.equal(Number(stats.mode & 0o777n), 0o700);
+
+    assert.equal(await sourceTreeSafety.cleanupOwnedDirectory(identity), true);
+    assert.equal(await exists(identity.path), false);
+  },
+);
+
+test("source snapshots reject a symbolic-link root", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-snapshot-root-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const source = join(parent, "source");
+  const linkedSource = join(parent, "linked-source");
+  await mkdir(source);
+  await writeFile(join(source, "package.json"), "{}\n");
+  await symlink(source, linkedSource, "dir");
+
+  assert.equal(
+    await sourceTreeSafety.snapshotSourceTree(linkedSource),
+    undefined,
+  );
+});
+
+test("lockfile preparation rejects a byte-identical replacement root", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-lockfile-root-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const source = join(parent, "source");
+  const originalSource = join(parent, "original-source");
+  await mkdir(source);
+  await writeFile(join(source, "package.json"), "{}\n");
+
+  const result = await verifierModule.prepareLockfile(
+    source,
+    async (lockfilePath, content) => {
+      await rename(source, originalSource);
+      await cp(originalSource, source, {
+        recursive: true,
+        force: false,
+        errorOnExist: true,
+      });
+      await writeFile(lockfilePath, content, { flag: "wx" });
+      return { ok: true };
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: false,
+    issues: [
+      {
+        code: "LOCKFILE_PREPARATION_FAILED",
+        path: [],
+        context: { reason: "source-changed" },
+      },
+    ],
+  });
+});
+
+test("lockfile-only transition classification preserves inventory and source-change distinctions", () => {
+  const packageEntry = { kind: "file", fingerprint: "sha256:package" };
+  const directoryEntry = { kind: "directory" };
+  const lockfileEntry = { kind: "file", fingerprint: "sha256:lockfile" };
+  const unchanged = new Map([
+    ["package.json", packageEntry],
+    ["src", directoryEntry],
+  ]);
+
+  for (const scenario of [
+    {
+      name: "valid",
+      before: unchanged,
+      after: new Map([...unchanged, ["pnpm-lock.yaml", lockfileEntry]]),
+      expected: "valid",
+    },
+    {
+      name: "pre-existing lockfile",
+      before: new Map([...unchanged, ["pnpm-lock.yaml", lockfileEntry]]),
+      after: new Map([...unchanged, ["pnpm-lock.yaml", lockfileEntry]]),
+      expected: "unexpected-inventory",
+    },
+    {
+      name: "missing lockfile",
+      before: unchanged,
+      after: unchanged,
+      expected: "unexpected-inventory",
+    },
+    {
+      name: "non-file lockfile",
+      before: unchanged,
+      after: new Map([...unchanged, ["pnpm-lock.yaml", directoryEntry]]),
+      expected: "unexpected-inventory",
+    },
+    {
+      name: "extra entry",
+      before: unchanged,
+      after: new Map([
+        ...unchanged,
+        ["pnpm-lock.yaml", lockfileEntry],
+        ["unexpected", packageEntry],
+      ]),
+      expected: "unexpected-inventory",
+    },
+    {
+      name: "removed prior entry",
+      before: unchanged,
+      after: new Map([
+        ["package.json", packageEntry],
+        ["pnpm-lock.yaml", lockfileEntry],
+      ]),
+      expected: "source-changed",
+    },
+    {
+      name: "changed prior file",
+      before: unchanged,
+      after: new Map([
+        ["package.json", { kind: "file", fingerprint: "sha256:changed" }],
+        ["src", directoryEntry],
+        ["pnpm-lock.yaml", lockfileEntry],
+      ]),
+      expected: "source-changed",
+    },
+    {
+      name: "changed prior kind",
+      before: unchanged,
+      after: new Map([
+        ["package.json", directoryEntry],
+        ["src", directoryEntry],
+        ["pnpm-lock.yaml", lockfileEntry],
+      ]),
+      expected: "source-changed",
+    },
+  ]) {
+    assert.equal(
+      sourceTreeSafety.classifyLockfileOnlyTransition(
+        scenario.before,
+        scenario.after,
+      ),
+      scenario.expected,
+      scenario.name,
+    );
+  }
+});
 
 async function listFiles(root) {
   const files = [];
@@ -211,15 +398,20 @@ async function createFakePnpmExecutable(owner) {
   const executable = join(owner, "fake-pnpm");
   const controlPath = join(owner, "fake-pnpm-control.json");
   const logPath = join(owner, "fake-pnpm-log.jsonl");
-  const source = `#!${process.execPath}
-import { appendFileSync, readFileSync } from "node:fs";
+const source = `#!${process.execPath}
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 const control = JSON.parse(readFileSync(${JSON.stringify(controlPath)}, "utf8"));
 const arguments_ = process.argv.slice(2);
 const operation = arguments_.join(" ");
 appendFileSync(
   ${JSON.stringify(logPath)},
-  JSON.stringify({ arguments: arguments_, cwd: process.cwd(), environment: process.env }) + "\\n",
+  JSON.stringify({
+    arguments: arguments_,
+    cwd: process.cwd(),
+    environment: process.env,
+    gitControlPresent: existsSync(".git"),
+  }) + "\\n",
 );
 
 if (control.overflowOperation === operation) {
@@ -259,6 +451,18 @@ if (operation === "--version") {
         .map((line) => JSON.parse(line));
     },
   };
+}
+
+async function createFakeVoltaPnpmExecutable(owner) {
+  const fake = await createFakePnpmExecutable(owner);
+  const voltaHome = join(owner, ".volta");
+  const bin = join(voltaHome, "bin");
+  const shim = join(bin, "volta-shim");
+  const executable = join(bin, "pnpm");
+  await mkdir(bin, { recursive: true });
+  await rename(fake.executable, shim);
+  await symlink("volta-shim", executable);
+  return { ...fake, executable, voltaHome };
 }
 
 async function createVerifierSource(owner, name = "source") {
@@ -377,6 +581,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
   await withTestRoot(async (owner) => {
     const fakePnpm = await createFakePnpmExecutable(owner);
     const source = await createVerifierSource(owner);
+    await writeFile(join(source, ".git"), "gitdir: /private/shared-git-authority\n");
     const canonicalSource = await realpath(source);
     const verifier = core.createPnpmGeneratedProjectVerifier({
       pnpmExecutable: fakePnpm.executable,
@@ -422,6 +627,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
     );
     assert.notEqual(calls[0].cwd, canonicalSource);
     assert.ok(calls.every(({ cwd }) => cwd === calls[0].cwd));
+    assert.ok(calls.every(({ gitControlPresent }) => gitControlPresent === false));
 
     const forbiddenEnvironmentKeys = [
       "TOKEN",
@@ -470,6 +676,56 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
     assert.doesNotMatch(
       commandText,
       /preview|deploy|upload|wrangler|git|npm publish|--force|--update-checksums|[;&|`$<>]/i,
+    );
+  });
+});
+
+test("the pnpm verifier preserves only derived Volta tool resolution with an isolated home", async () => {
+  await withTestRoot(async (owner) => {
+    const fakePnpm = await createFakeVoltaPnpmExecutable(owner);
+    const source = await createVerifierSource(owner);
+    const verifier = core.createPnpmGeneratedProjectVerifier({
+      pnpmExecutable: fakePnpm.executable,
+    });
+
+    assert.deepEqual(assertSuccess(await verifier.verifyInIsolatedCopy(source)), {
+      checks: generatedChecks,
+    });
+    const calls = await fakePnpm.readCalls();
+    const canonicalVoltaHome = await realpath(fakePnpm.voltaHome);
+    assert.equal(calls.length, 8);
+    for (const { environment } of calls) {
+      assert.equal(environment.VOLTA_HOME, canonicalVoltaHome);
+      assert.equal(environment.VOLTA_FEATURE_PNPM, "1");
+      assert.notEqual(environment.HOME, canonicalVoltaHome);
+    }
+  });
+});
+
+test("Windows pnpm resolution applies PATHEXT and recognizes a copied Volta shim", async () => {
+  await withTestRoot(async (owner) => {
+    const voltaHome = join(owner, "windows-volta");
+    const bin = join(voltaHome, "bin");
+    const shim = join(bin, "volta-shim.exe");
+    const executable = join(bin, "pnpm.EXE");
+    await mkdir(bin, { recursive: true });
+    await writeFile(shim, "copied volta shim\n");
+    await writeFile(executable, "copied volta shim\n");
+    const options = {
+      platform: "win32",
+      environment: { PATH: bin, PATHEXT: ".EXE;.CMD" },
+    };
+
+    assert.equal(
+      await verifierModule.resolveExecutablePath("pnpm", options),
+      resolve(executable),
+    );
+    assert.deepEqual(
+      await verifierModule.derivePnpmToolEnvironment("pnpm", options),
+      {
+        VOLTA_HOME: await realpath(voltaHome),
+        VOLTA_FEATURE_PNPM: "1",
+      },
     );
   });
 });
@@ -641,22 +897,28 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
-      assert.equal(generated.state.origin.recipeVersion, "0.7.0");
+      assert.equal(generated.state.origin.recipeVersion, "0.10.0");
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 95 : 97,
+        profile === "portfolio" ? 106 : 108,
+      );
+      assert.equal(
+        generated.state.installedCapabilities.find(
+          ({ identifier }) => identifier === "deployment-cloudflare",
+        )?.version,
+        "0.3.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "observability",
         )?.version,
-        "0.2.0",
+        "0.3.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "standards",
         )?.version,
-        "0.3.0",
+        "0.4.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -824,7 +1086,7 @@ test("portfolio and site generation writes exact state-last repositories", async
       assert.equal(webManifest.devDependencies.tailwindcss, "4.3.3");
       assert.equal(
         webManifest.dependencies["@egeria-systems/observability"],
-        "0.2.0",
+        "0.3.0",
       );
 
       const deliveredPaths = await listFiles(destination);
@@ -926,7 +1188,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
       accepted.state.installedCapabilities,
       core.createInstalledManifest(resolved),
     );
-    assert.equal(accepted.state.managedSurfaces.length, 100);
+    assert.equal(accepted.state.managedSurfaces.length, 111);
     assert.equal(
       accepted.state.managedSurfaces.filter(
         ({ owner }) =>
@@ -1120,10 +1382,12 @@ test("lockfile preparation may add only one regular lockfile without mutations",
     const cases = [
       {
         name: "missing-lockfile",
+        reason: "unexpected-inventory",
         prepare: async () => ({ ok: true, value: undefined }),
       },
       {
         name: "changed-manifest",
+        reason: "source-changed",
         prepare: async (root) => {
           await writeFile(join(root, "package.json"), "{}\n");
           await writeFile(
@@ -1135,6 +1399,7 @@ test("lockfile preparation may add only one regular lockfile without mutations",
       },
       {
         name: "extra-file",
+        reason: "unexpected-inventory",
         prepare: async (root) => {
           await writeFile(join(root, "unexpected"), "unexpected");
           await writeFile(
@@ -1146,6 +1411,7 @@ test("lockfile preparation may add only one regular lockfile without mutations",
       },
       {
         name: "symlink-lockfile",
+        reason: "source-inventory-invalid",
         prepare: async (root) => {
           await symlink("package.json", join(root, "pnpm-lock.yaml"));
           return { ok: true, value: undefined };
@@ -1163,6 +1429,7 @@ test("lockfile preparation may add only one regular lockfile without mutations",
       });
 
       assertFailure(result, "LOCKFILE_PREPARATION_INVALID");
+      assert.equal(result.issues[0].context.reason, scenario.reason);
       assert.equal(await exists(destination), false);
       assert.equal(await exists(fake.roots[0]), false);
       assert.deepEqual(fake.calls, ["prepare-lockfile"]);

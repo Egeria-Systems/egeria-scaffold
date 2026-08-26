@@ -86,11 +86,13 @@ export type SiteContent = Readonly<{
   navigation: readonly NavigationItem[];
 }>;
 
-function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+export function isUnknownRecord(
+  value: unknown,
+): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function hasExactKeys(
+export function hasExactKeys(
   value: Record<string, unknown>,
   keys: readonly string[],
 ): boolean {
@@ -103,7 +105,7 @@ function hasExactKeys(
   );
 }
 
-function isNonEmptyString(value: unknown): value is string {
+export function isNonEmptyString(value: unknown): value is string {
   return (
     typeof value === "string" &&
     value.trim().length > 0 &&

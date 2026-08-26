@@ -15,6 +15,10 @@ import type {
   ValidationResult,
 } from "../contracts/result.js";
 import { validateContract } from "../contracts/result.js";
+import {
+  createFileSurfaceDescriptor,
+  createJsonValueSurfaceDescriptor,
+} from "../contracts/surface-target.js";
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
 import { profileRecipes } from "../profiles/profile-recipes.js";
 import {
@@ -105,12 +109,32 @@ function remapTokenIssues(
   }));
 }
 
-async function renderEntry(
+export async function renderTemplateCatalogEntry(
   entry: TemplateCatalogEntry,
   index: number,
   root: URL,
   tokens: TemplateTokens,
 ): Promise<ValidationResult<GeneratedFile>> {
+  if (entry.contentKind === "binary") {
+    try {
+      const source = await readFile(new URL(entry.source, root));
+
+      return {
+        ok: true,
+        value: {
+          path: entry.destination,
+          content: new Uint8Array(source),
+        },
+      };
+    } catch {
+      return generatedIssue(
+        "TEMPLATE_READ_FAILED",
+        ["templates", index, "source"],
+        "read-failed",
+      );
+    }
+  }
+
   let source: string;
 
   try {
@@ -223,28 +247,27 @@ function createFileSurface(
   path: string,
   ownership: "managed" | "application-owned",
 ): ManagedSurfaceDescriptor {
-  return {
+  return createFileSurfaceDescriptor({
     identifier,
     owner: { kind: "builder-kernel" },
     path,
     ownership,
-    fingerprintTarget: { kind: "file" },
-    mergeStrategy: "replace-file",
-  };
+  });
 }
 
 function createPackageSurface(
   identifier: string,
   pointer: string,
 ): ManagedSurfaceDescriptor {
-  return {
-    identifier,
-    owner: { kind: "builder-kernel" },
-    path: "apps/web/package.json",
-    ownership: "merge-managed",
-    fingerprintTarget: { kind: "json-value", pointer },
-    mergeStrategy: "json-property",
-  };
+  return createJsonValueSurfaceDescriptor(
+    {
+      identifier,
+      owner: { kind: "builder-kernel" },
+      path: "apps/web/package.json",
+      ownership: "merge-managed",
+    },
+    pointer,
+  );
 }
 
 function createBuilderSurfaces(): readonly ManagedSurfaceDescriptor[] {
@@ -404,7 +427,12 @@ export async function renderSkeleton(
   const files: GeneratedFile[] = [];
 
   for (const [index, entry] of templateCatalogResult.value.entries()) {
-    const result = await renderEntry(entry, index, templateRoot, tokens);
+    const result = await renderTemplateCatalogEntry(
+      entry,
+      index,
+      templateRoot,
+      tokens,
+    );
     if (!result.ok) {
       return result;
     }

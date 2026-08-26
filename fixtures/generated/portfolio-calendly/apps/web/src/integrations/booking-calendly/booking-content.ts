@@ -1,6 +1,9 @@
 import bookingContentSource from "../../../content/en-CA/booking-calendly.yaml";
 
 import {
+  hasExactKeys,
+  isNonEmptyString,
+  isUnknownRecord,
   parseYamlContent,
 } from "../../content/content-schema";
 
@@ -22,53 +25,19 @@ const bookingContentKeys = [
   "closeLabel",
 ] as const;
 
-function isUnknownRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function hasDisallowedControlCharacter(value: string): boolean {
-  for (const character of value) {
-    const codeUnit = character.charCodeAt(0);
-
-    if (
-      codeUnit <= 0x08 ||
-      codeUnit === 0x0b ||
-      codeUnit === 0x0c ||
-      (codeUnit >= 0x0e && codeUnit <= 0x1f) ||
-      (codeUnit >= 0x7f && codeUnit <= 0x9f)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function isCopyValue(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    value.trim().length > 0 &&
-    !hasDisallowedControlCharacter(value)
-  );
-}
-
 export function parseBookingContent(value: unknown): BookingContent {
   if (!isUnknownRecord(value)) {
     throw new TypeError("CONTENT_INVALID");
   }
 
-  const keys = Object.keys(value).sort();
-  const expectedKeys = [...bookingContentKeys].sort();
-
   if (
-    keys.length !== expectedKeys.length ||
-    !keys.every((key, index) => key === expectedKeys[index]) ||
-    !isCopyValue(value.heading) ||
-    !isCopyValue(value.summary) ||
-    !isCopyValue(value.linkLabel) ||
-    !isCopyValue(value.frameTitle) ||
-    !isCopyValue(value.popupHeading) ||
-    !isCopyValue(value.closeLabel)
+    !hasExactKeys(value, bookingContentKeys) ||
+    !isNonEmptyString(value.heading) ||
+    !isNonEmptyString(value.summary) ||
+    !isNonEmptyString(value.linkLabel) ||
+    !isNonEmptyString(value.frameTitle) ||
+    !isNonEmptyString(value.popupHeading) ||
+    !isNonEmptyString(value.closeLabel)
   ) {
     throw new TypeError("CONTENT_INVALID");
   }

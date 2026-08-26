@@ -1,1 +1,3 @@
 fixtures/generated/** text eol=lf
+packages/builder-core/templates/**/*.png binary
+fixtures/generated/**/*.png binary

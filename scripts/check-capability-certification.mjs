@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { isDeepStrictEqual, promisify } from "node:util";
 
 import {
   certificationRegistrySchema,
@@ -23,6 +23,9 @@ const executeFile = promisify(execFile);
 function parseArguments(arguments_) {
   if (arguments_.length === 0) {
     return { kind: "admission" };
+  }
+  if (arguments_.length === 1 && arguments_[0] === "--artifacts") {
+    return { kind: "artifacts" };
   }
   if (
     arguments_.length === 2 &&
@@ -64,11 +67,7 @@ async function revisionIsInCheckedHistory(revision) {
   const options = {
     cwd: repositoryRoot,
     encoding: "utf8",
-    env: {
-      HOME: process.env.HOME,
-      PATH: process.env.PATH,
-      TMPDIR: process.env.TMPDIR,
-    },
+    env: { PATH: process.env.PATH },
     windowsHide: true,
   };
 
@@ -83,6 +82,143 @@ async function revisionIsInCheckedHistory(revision) {
   } catch {
     return false;
   }
+}
+
+async function readAcceptedBaselineRegistry() {
+  const options = {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: { PATH: process.env.PATH },
+    windowsHide: true,
+  };
+
+  try {
+    const { stdout: baselineRevisionOutput } = await executeFile(
+      "git",
+      ["merge-base", "HEAD", "refs/remotes/origin/main"],
+      options,
+    );
+    const baselineRevision = baselineRevisionOutput.trim();
+    const { stdout: registryOutput } = await executeFile(
+      "git",
+      ["show", `${baselineRevision}:certifications/capabilities.json`],
+      options,
+    );
+    const registry = validateContract(
+      certificationRegistrySchema,
+      JSON.parse(registryOutput),
+    );
+    return registry.ok
+      ? { registry: registry.value, revision: baselineRevision }
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function readChangedPaths(baselineRevision) {
+  const options = {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: { PATH: process.env.PATH },
+    windowsHide: true,
+  };
+
+  try {
+    const { stdout } = await executeFile(
+      "git",
+      ["diff", "--name-only", "--no-renames", "-z", baselineRevision, "--"],
+      options,
+    );
+    return new Set(stdout.split("\0").filter(Boolean));
+  } catch {
+    return undefined;
+  }
+}
+
+function recordReferencesChangedArtifact(record, changedPaths) {
+  return (
+    (record.taskPlan !== null && changedPaths.has(record.taskPlan)) ||
+    record.evidence.some((evidence) => changedPaths.has(evidence.path))
+  );
+}
+
+function selectChangedCertificationRecords(
+  registry,
+  baselineRegistry,
+  changedPaths,
+) {
+  if (
+    baselineRegistry === undefined ||
+    changedPaths === undefined ||
+    baselineRegistry.schemaVersion !== registry.schemaVersion
+  ) {
+    return registry;
+  }
+
+  return {
+    ...registry,
+    records: Object.fromEntries(
+      Object.entries(registry.records).filter(
+        ([identifier, record]) =>
+          !isDeepStrictEqual(record, baselineRegistry.records[identifier]) ||
+          recordReferencesChangedArtifact(record, changedPaths),
+      ),
+    ),
+  };
+}
+
+async function validatePrivateArtifacts(registry) {
+  const acceptedBaseline = await readAcceptedBaselineRegistry();
+  const selectedRegistry = selectChangedCertificationRecords(
+    registry,
+    acceptedBaseline?.registry,
+    acceptedBaseline === undefined
+      ? undefined
+      : await readChangedPaths(acceptedBaseline.revision),
+  );
+  const artifactPaths = new Set();
+  for (const record of Object.values(selectedRegistry.records)) {
+    if (record.taskPlan !== null) {
+      artifactPaths.add(record.taskPlan);
+    }
+    for (const evidence of record.evidence) {
+      artifactPaths.add(evidence.path);
+    }
+  }
+  const artifacts = Object.fromEntries(
+    await Promise.all(
+      [...artifactPaths]
+        .sort()
+        .map(async (path) => [path, await readArtifact(path)]),
+    ),
+  );
+  const evidenceRevisions = [
+    ...new Set(
+      Object.values(selectedRegistry.records).flatMap((record) =>
+        record.evidence.map((evidence) => evidence.revision),
+      ),
+    ),
+  ].sort();
+  const validRevisions = (
+    await Promise.all(
+      evidenceRevisions.map(async (revision) => ({
+        revision,
+        valid: await revisionIsInCheckedHistory(revision),
+      })),
+    )
+  )
+    .filter(({ valid }) => valid)
+    .map(({ revision }) => revision);
+
+  return {
+    result: validateCertificationArtifacts({
+      registry: selectedRegistry,
+      artifacts,
+      validRevisions,
+    }),
+    recordCount: Object.keys(selectedRegistry.records).length,
+  };
 }
 
 async function runMain() {
@@ -101,60 +237,41 @@ async function runMain() {
   }
 
   const registry = validateContract(certificationRegistrySchema, rawRegistry);
-  const catalog = createVerifiedCapabilityCatalog();
-  if (!registry.ok || !catalog.ok) {
+  if (!registry.ok) {
     writeStandard({
       ok: false,
       gate: "contract",
-      issues: registry.ok ? catalog.issues : registry.issues,
+      issues: registry.issues,
     });
     process.exitCode = 1;
     return;
   }
 
-  const artifactPaths = new Set();
-  for (const record of Object.values(registry.value.records)) {
-    if (record.taskPlan !== null) {
-      artifactPaths.add(record.taskPlan);
+  if (command.kind === "artifacts") {
+    const artifactValidation = await validatePrivateArtifacts(registry.value);
+    if (!artifactValidation.result.ok) {
+      writeStandard({
+        ok: false,
+        gate: "artifacts",
+        issues: artifactValidation.result.issues,
+      });
+      process.exitCode = 1;
+      return;
     }
-    for (const evidence of record.evidence) {
-      artifactPaths.add(evidence.path);
-    }
+    writeStandard({
+      ok: true,
+      gate: "artifacts",
+      records: artifactValidation.recordCount,
+    });
+    return;
   }
-  const artifacts = Object.fromEntries(
-    await Promise.all(
-      [...artifactPaths]
-        .sort()
-        .map(async (path) => [path, await readArtifact(path)]),
-    ),
-  );
-  const evidenceRevisions = [
-    ...new Set(
-      Object.values(registry.value.records).flatMap((record) =>
-        record.evidence.map((evidence) => evidence.revision),
-      ),
-    ),
-  ].sort();
-  const validRevisions = (
-    await Promise.all(
-      evidenceRevisions.map(async (revision) => ({
-        revision,
-        valid: await revisionIsInCheckedHistory(revision),
-      })),
-    )
-  )
-    .filter(({ valid }) => valid)
-    .map(({ revision }) => revision);
-  const artifactValidation = validateCertificationArtifacts({
-    registry: registry.value,
-    artifacts,
-    validRevisions,
-  });
-  if (!artifactValidation.ok) {
+
+  const catalog = createVerifiedCapabilityCatalog();
+  if (!catalog.ok) {
     writeStandard({
       ok: false,
-      gate: "artifacts",
-      issues: artifactValidation.issues,
+      gate: "contract",
+      issues: catalog.issues,
     });
     process.exitCode = 1;
     return;

@@ -1,16 +1,22 @@
 import { execFile } from "node:child_process";
-import { chmod, lstat, mkdtemp, rm } from "node:fs/promises";
+import { chmod, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 import { verifyGeneratedProject } from "../verify-generated-skeletons.mjs";
+import {
+  cleanupOwnedDirectory,
+  createIsolatedProcessEnvironment,
+  isolatedProcessOptions,
+  pathIdentityMatches,
+  readPathIdentity,
+} from "./isolated-process.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const cliEntry = resolve(repositoryRoot, "apps/cli/dist/index.js");
-const maximumOutputBytes = 1024 * 1024;
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const certificationChecks = Object.freeze([
   "compiled-cli-create",
@@ -23,87 +29,15 @@ function fail(configuration, code) {
   throw configuration.createError(code);
 }
 
-function findEnvironmentValue(name) {
-  const normalizedName = name.toLowerCase();
-  return Object.entries(process.env).find(
-    ([key, value]) =>
-      key.toLowerCase() === normalizedName && value !== undefined,
-  )?.[1];
-}
-
-function createChildEnvironment() {
-  const environment = {};
-
-  for (const key of ["PATH", "SystemRoot", "ComSpec", "PATHEXT", "LANG"]) {
-    const value = findEnvironmentValue(key);
-    if (value !== undefined) {
-      environment[key] = value;
-    }
-  }
-  if (process.platform === "darwin") {
-    environment.__CF_USER_TEXT_ENCODING = "0x0:0x0:0x0";
-  }
-
-  return {
-    ...environment,
-    CI: "true",
-    NEXT_TELEMETRY_DISABLED: "1",
-  };
-}
-
-async function pathIdentityMatches(identity) {
-  try {
-    const stats = await lstat(identity.path, { bigint: true });
-    return (
-      !stats.isSymbolicLink() &&
-      stats.isDirectory() &&
-      stats.dev === identity.device &&
-      stats.ino === identity.inode
-    );
-  } catch {
-    return false;
-  }
-}
-
-async function createOwnedDirectory() {
-  const path = await mkdtemp(
-    join(tmpdir(), "egeria-fresh-scaffold-certification-"),
-  );
-  await chmod(path, 0o700);
-  const stats = await lstat(path, { bigint: true });
-
-  if (stats.isSymbolicLink() || !stats.isDirectory()) {
-    throw new Error("owned directory setup failed");
-  }
-
-  return { path, device: stats.dev, inode: stats.ino };
-}
-
-async function cleanupOwnedDirectory(identity) {
-  if (!(await pathIdentityMatches(identity))) {
-    return false;
-  }
-
-  try {
-    await rm(identity.path, { recursive: true });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function defaultRunCommand(input) {
   const { stdout } = await execFileAsync(
     input.executable,
     [...input.arguments],
     {
       cwd: input.cwd,
-      encoding: "utf8",
       env: input.environment,
-      maxBuffer: maximumOutputBytes,
-      shell: false,
       timeout: commandTimeoutMilliseconds,
-      windowsHide: true,
+      ...isolatedProcessOptions,
     },
   );
   return stdout;
@@ -144,7 +78,7 @@ async function runCliCommand(configuration, adapters, arguments_, failureCode) {
       executable: process.execPath,
       arguments: [cliEntry, ...arguments_],
       cwd: repositoryRoot,
-      environment: createChildEnvironment(),
+      environment: createIsolatedProcessEnvironment(),
     });
   } catch {
     fail(configuration, failureCode);
@@ -211,26 +145,70 @@ function requireDiffResult(configuration, value) {
   }
 }
 
+async function requireRecipeVersion(configuration, projectRoot) {
+  if (configuration.expectedRecipeVersion === undefined) return;
+
+  let source;
+  try {
+    source = await readFile(join(projectRoot, ".egeria/project.yaml"), "utf8");
+  } catch {
+    fail(configuration, "FRESH_SCAFFOLD_RECIPE_INVALID");
+  }
+  const recipeLines = source
+    .split("\n")
+    .filter((line) => line.startsWith("recipeVersion:"));
+  if (
+    recipeLines.length !== 1 ||
+    recipeLines[0] !== `recipeVersion: ${configuration.expectedRecipeVersion}`
+  ) {
+    fail(configuration, "FRESH_SCAFFOLD_RECIPE_INVALID");
+  }
+}
+
 function requireAdapters(configuration, adapters) {
   if (
     adapters === null ||
     typeof adapters !== "object" ||
     typeof adapters.runCommand !== "function" ||
-    typeof adapters.verifyProject !== "function"
+    typeof adapters.verifyProject !== "function" ||
+    (configuration.expectedFixtureChecks !== undefined &&
+      typeof adapters.verifyFixture !== "function")
   ) {
     fail(configuration, "CERTIFICATION_ADAPTER_INVALID");
   }
 }
 
-function productionAdapters() {
+function productionAdapters(verifyFixture) {
   return {
     runCommand: defaultRunCommand,
     verifyProject: verifyGeneratedProject,
+    ...(verifyFixture === undefined ? {} : { verifyFixture }),
   };
 }
 
-export function certifyFreshScaffold(configuration) {
-  return certifyFreshScaffoldForTesting(configuration, productionAdapters());
+async function createOwnedDirectory() {
+  const path = await mkdtemp(
+    join(tmpdir(), "egeria-fresh-scaffold-certification-"),
+  );
+  await chmod(path, 0o700);
+  const identity = await readPathIdentity(path);
+
+  if (identity.isSymbolicLink || !identity.isDirectory) {
+    throw new Error("owned directory setup failed");
+  }
+
+  return {
+    path: identity.path,
+    device: identity.device,
+    inode: identity.inode,
+  };
+}
+
+export function certifyFreshScaffold(configuration, verifyFixture) {
+  return certifyFreshScaffoldForTesting(
+    configuration,
+    productionAdapters(verifyFixture),
+  );
 }
 
 export async function certifyFreshScaffoldForTesting(configuration, adapters) {
@@ -292,11 +270,15 @@ export async function certifyFreshScaffoldForTesting(configuration, adapters) {
     );
     requireDiffResult(configuration, diff);
 
+    await requireRecipeVersion(configuration, projectRoot);
+
     let generatedVerification;
     try {
       generatedVerification = await adapters.verifyProject(
         projectRoot,
         configuration.verifierIdentifier,
+        configuration.projectName,
+        configuration.verificationOptions,
       );
     } catch {
       fail(configuration, "GENERATED_PROJECT_VERIFICATION_FAILED");
@@ -317,13 +299,40 @@ export async function certifyFreshScaffoldForTesting(configuration, adapters) {
       fail(configuration, "GENERATED_PROJECT_VERIFICATION_INVALID");
     }
 
+    let fixtureVerification;
+    if (configuration.expectedFixtureChecks !== undefined) {
+      try {
+        fixtureVerification = await adapters.verifyFixture({
+          projectRoot,
+          runCommand: adapters.runCommand,
+          environment: createIsolatedProcessEnvironment(),
+        });
+      } catch (error) {
+        if (configuration.isCertificationError(error)) throw error;
+        fail(configuration, "CERTIFICATION_FIXTURE_VERIFICATION_FAILED");
+      }
+      if (
+        fixtureVerification?.ok !== true ||
+        !arraysEqual(
+          fixtureVerification.checks,
+          configuration.expectedFixtureChecks,
+        )
+      ) {
+        fail(configuration, "CERTIFICATION_FIXTURE_VERIFICATION_INVALID");
+      }
+    }
+
     result = {
       ok: true,
       capability: configuration.capabilityIdentifier,
       version: configuration.capabilityVersion,
       profile: configuration.profile,
       ...configuration.receipt,
-      checks: [...certificationChecks, ...generatedVerification.checks],
+      checks: [
+        ...certificationChecks,
+        ...generatedVerification.checks,
+        ...(fixtureVerification?.checks ?? []),
+      ],
     };
   } catch (error) {
     pendingError = configuration.isCertificationError(error)
