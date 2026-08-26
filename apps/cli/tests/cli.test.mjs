@@ -3342,11 +3342,12 @@ async function executeBuiltApplyUpgrade(
   directory,
   approvedPlan,
   environment = {},
+  capability = "standards",
 ) {
   return executeNode(
     [
       resolve(packageRoot, "dist/index.js"),
-      ...applyUpgradeArguments(directory, approvedPlan),
+      ...applyUpgradeArguments(directory, approvedPlan, capability),
     ],
     environment,
   );
@@ -4262,6 +4263,179 @@ test("the compiled apply-upgrade command completes the exact portfolio and site 
       },
     );
   }
+});
+
+test("the compiled site-routing upgrade converges on the exact current site", async () => {
+  await withGitFixture(
+    "site",
+    async ({ linked, primary }) => {
+      const linkedBefore = await gitRepositorySnapshot(linked);
+      const primaryBefore = await gitRepositorySnapshot(primary);
+      const initialInspection = await core.inspectGitWorktree({ root: linked });
+      assert.equal(initialInspection.ok, true);
+      const initialState = core.parseStateJson(
+        await readFile(join(linked, ".egeria/state.json"), "utf8"),
+      );
+      const initialMigrationSource = await readFile(
+        join(linked, ".egeria/migrations.jsonl"),
+        "utf8",
+      );
+      assert.equal(initialState.ok, true);
+
+      const planExecution = await executeBuiltPlanUpgrade(
+        linked,
+        "site-routing",
+      );
+      assert.equal(planExecution.exitCode, 0, planExecution.stderr);
+      assert.equal(planExecution.stderr, "");
+      const plan = JSON.parse(planExecution.stdout).plan;
+      assert.deepEqual(await gitRepositorySnapshot(linked), linkedBefore);
+
+      const execution = await executeBuiltApplyUpgrade(
+        linked,
+        plan.planFingerprint,
+        {},
+        "site-routing",
+      );
+      assert.equal(execution.exitCode, 0, execution.stderr);
+      assert.equal(execution.stderr, "");
+      const emitted = JSON.parse(execution.stdout);
+      const expectedChangedPaths = [
+        ...plan.actions.map(({ path }) => path),
+        ".egeria/migrations.jsonl",
+        ".egeria/state.json",
+      ].sort();
+      assert.deepEqual(emitted, {
+        ok: true,
+        command: "apply-upgrade",
+        result: {
+          status: "verified-final-diff-approval-required",
+          baseRevision: Buffer.from(linkedBefore.head).toString("utf8").trim(),
+          capability: {
+            identifier: "site-routing",
+            fromVersion: "0.3.0",
+            toVersion: "0.4.0",
+          },
+          migration: "upgrade-site-routing-0-3-0-to-0-4-0",
+          changedPaths: expectedChangedPaths,
+          verificationChecks: core.capabilityUpgradeVerificationChecks,
+        },
+      });
+
+      for (const { path } of plan.actions) {
+        assert.deepEqual(
+          await readFile(join(linked, path)),
+          await readFile(resolve(repositoryRoot, "fixtures/generated/site", path)),
+          path,
+        );
+      }
+
+      const migrationSource = await readFile(
+        join(linked, ".egeria/migrations.jsonl"),
+        "utf8",
+      );
+      const migrations = core.parseMigrationLog(migrationSource);
+      assert.equal(migrations.ok, true);
+      assert.equal(migrations.value.length, 1);
+      const migration = migrations.value[0];
+      assert.deepEqual(migration, {
+        schemaVersion: "1.0.0",
+        identifier: "upgrade-site-routing-0-3-0-to-0-4-0",
+        kind: "migration",
+        outcome: "succeeded",
+        completedAt: migration.completedAt,
+        fromBuilderVersion: "0.0.0",
+        toBuilderVersion: "0.0.0",
+        capabilities: plan.desiredCapabilities,
+        persistentDataAuthorizations: [],
+        remainingKnownDrift: [],
+        verificationChecks: core.capabilityUpgradePersistedVerificationChecks,
+      });
+      const migrationSeparator =
+        initialMigrationSource.length > 0 &&
+        !initialMigrationSource.endsWith("\n")
+          ? "\n"
+          : "";
+      assert.equal(
+        migrationSource,
+        `${initialMigrationSource}${migrationSeparator}${core.serializeMigrationRecord(
+          migration,
+        )}`,
+      );
+
+      const targetState = core.parseStateJson(
+        await readFile(
+          resolve(repositoryRoot, "fixtures/generated/site/.egeria/state.json"),
+          "utf8",
+        ),
+      );
+      assert.equal(targetState.ok, true);
+      const expectedManagedSurfaces = targetState.value.managedSurfaces.map(
+        (surface) =>
+          surface.path === ".egeria/migrations.jsonl"
+            ? {
+                ...surface,
+                fingerprint: core.fingerprintFileContent(
+                  new TextEncoder().encode(migrationSource),
+                ),
+              }
+            : surface,
+      );
+      const expectedStateSource = core.serializeStateJson({
+        ...targetState.value,
+        appliedMigrations: [
+          ...initialState.value.appliedMigrations,
+          "upgrade-site-routing-0-3-0-to-0-4-0",
+        ],
+        managedSurfaces: expectedManagedSurfaces,
+        lastSuccessfulVerification: {
+          kind: "capability-upgrade",
+          checks: core.capabilityUpgradePersistedVerificationChecks,
+        },
+      });
+      assert.equal(
+        await readFile(join(linked, ".egeria/state.json"), "utf8"),
+        expectedStateSource,
+      );
+
+      const status = Buffer.from(
+        await executeGit(
+          linked,
+          ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+          true,
+        ),
+      ).toString("utf8");
+      assert.deepEqual(
+        status
+          .split("\0")
+          .filter(Boolean)
+          .map((entry) => entry.slice(3))
+          .sort(),
+        expectedChangedPaths,
+      );
+      assert.deepEqual(
+        await core.inspectGitExpectedChanges({
+          root: linked,
+          identity: initialInspection.identity,
+          expectedPaths: expectedChangedPaths,
+        }),
+        { ok: true },
+      );
+      assert.deepEqual(
+        withoutSharedRefs(await gitRepositorySnapshot(primary)),
+        withoutSharedRefs(primaryBefore),
+      );
+      assert.doesNotMatch(
+        execution.stdout,
+        /refs\/heads|\.git\/worktrees|acme-site/u,
+      );
+    },
+    {
+      branch: "site-routing-upgrade-success",
+      preparePrimary: (root) =>
+        prepareHistoricalUpgradeFixture(root, { downgradeStandards: false }),
+    },
+  );
 });
 
 test("the compiled standards upgrade verification failure retains transformed source and old controls", async () => {

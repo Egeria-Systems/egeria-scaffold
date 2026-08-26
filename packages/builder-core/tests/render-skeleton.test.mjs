@@ -767,6 +767,13 @@ async function readCommonWebTemplate(path) {
   );
 }
 
+async function readSiteWebTemplate(path) {
+  return readFile(
+    new URL(`../templates/site/apps/web/${path}`, import.meta.url),
+    "utf8",
+  );
+}
+
 async function loadErrorCopyModule(files) {
   const [source, copySource] = await Promise.all([
     readCommonWebTemplate("src/infrastructure/observability/error-copy.ts"),
@@ -831,8 +838,8 @@ async function loadErrorFallbackModule() {
 
 let errorBoundaryLoad = 0;
 
-async function loadErrorBoundaryModule(path) {
-  const source = await readCommonWebTemplate(path);
+async function loadErrorBoundaryModule(path, readTemplate = readCommonWebTemplate) {
+  const source = await readTemplate(path);
   const typescriptModule = await import("typescript");
   const typescript = typescriptModule.default ?? typescriptModule;
   const transpiled = typescript.transpileModule(source, {
@@ -860,15 +867,15 @@ async function loadErrorBoundaryModule(path) {
   const executable = transpiled
     .replace('from "react"', `from ${JSON.stringify(reactModule)}`)
     .replace(
-      /from "\.\.\/src\/infrastructure\/observability\/error-copy"/u,
+      /from "\.\.\/(?:\.\.\/)?src\/infrastructure\/observability\/error-copy"/u,
       `from ${JSON.stringify(copyModule)}`,
     )
     .replace(
-      /from "\.\.\/src\/infrastructure\/observability\/browser-reporter"/u,
+      /from "\.\.\/(?:\.\.\/)?src\/infrastructure\/observability\/browser-reporter"/u,
       `from ${JSON.stringify(reporterModule)}`,
     )
     .replace(
-      /from "\.\.\/src\/presentation\/error-fallback"/u,
+      /from "\.\.\/(?:\.\.\/)?src\/presentation\/error-fallback"/u,
       `from ${JSON.stringify(fallbackModule)}`,
     )
     .replace(
@@ -2150,6 +2157,34 @@ test("page and global boundaries report once and render the required roots", asy
   const globalFallbackElement = globalResult.props.children.props.children;
   const globalFallback = globalFallbackElement.type(globalFallbackElement.props);
   assert.equal(globalFallback.type, "error-fallback");
+});
+
+test("the nested work boundary reports once and preserves fallback retry behavior", async () => {
+  const workBoundary = await loadErrorBoundaryModule(
+    "app/work/error.tsx",
+    readSiteWebTemplate,
+  );
+  const error = new Error("work boundary failure");
+  let resetCount = 0;
+  const reset = () => {
+    resetCount += 1;
+  };
+
+  const result = workBoundary.module.default({ error, reset });
+
+  assert.deepEqual(workBoundary.reports, [
+    { error, context: { boundary: "page" } },
+  ]);
+  const fallback = result.type(result.props);
+  assert.equal(fallback.type, "error-fallback");
+  assert.deepEqual(fallback.props.copy, {
+    heading: "Something went wrong",
+    summary: "We could not complete this page. Please try again.",
+    retryLabel: "Try again",
+  });
+  assert.equal(fallback.props.onRetry, reset);
+  fallback.props.onRetry();
+  assert.equal(resetCount, 1);
 });
 
 

@@ -2926,8 +2926,12 @@ test("canonical documentation records visual regression and the client-ready clo
     );
     assert.match(
       sequencingOwner,
+      /explicit[^\n]+independent-work exception[^\n]+e354c4b36a6c1c30bd10b6ac9a7ea42678399fe9[^\n]+7645b65a056c643e775987679eeb922e5d5b6ff6[^\n]+33000891104[^\n]+reconciliation[^\n]+satisfying[^\n]+merge gate/iu,
+    );
+    assert.match(
+      sequencingOwner,
       new RegExp(
-        `explicit[^\\n]+independent-work exception[^\\n]+${escapeRegularExpression(clientExpansionPhase)}[^\\n]+(?:implementation|production)[^\\n]+(?:cannot|must not)[^\\n]+merge`,
+        `${escapeRegularExpression(clientExpansionPhase)}[^\\n]+next eligible`,
         "iu",
       ),
     );
@@ -3032,10 +3036,7 @@ test("canonical documentation accepts profile-transition execution and records t
     );
     assert.match(
       sequencingOwner,
-      new RegExp(
-        `independent-work exception[^\\n]+${escapeRegularExpression(clientExpansionPhase)}[^\\n]+(?:implementation|production)[^\\n]+(?:cannot|must not)[^\\n]+merge[^\\n]+${escapeRegularExpression(lifecyclePhase)}`,
-        "iu",
-      ),
+      /independent-work exception[^\n]+e354c4b36a6c1c30bd10b6ac9a7ea42678399fe9[^\n]+reconciliation[^\n]+merge gate/iu,
     );
   }
 
@@ -3550,19 +3551,19 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   );
   assert.match(
     sourcePlan,
-    /production-site-profile[^.]+isolated worktree/iu,
+    /reconciliation[^.]+isolated `production-site-profile` branch[^.]+accepted closure/iu,
   );
   assert.match(
     sourcePlan,
     new RegExp(
-      `${escapeRegularExpression(closureGate)}[^.]+must remain unchanged`,
+      `${escapeRegularExpression(closureGate)}[^.]+e354c4b36a6c1c30bd10b6ac9a7ea42678399fe9`,
       "iu",
     ),
   );
   assert.match(
     sourcePlan,
     new RegExp(
-      `${escapeRegularExpression(publicSitePhase)}[^.]+must not merge[^.]+${escapeRegularExpression(closureGate)}[^.]+integrated[^.]+reconciliation`,
+      `${escapeRegularExpression(publicSitePhase)}[^.]+next eligible`,
       "iu",
     ),
   );
@@ -3605,19 +3606,19 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   );
   assert.match(
     roadmap,
-    /production-site-profile[^.]+isolated worktree/iu,
+    /reconciliation[^.]+isolated `production-site-profile` branch[^.]+accepted closure/iu,
   );
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(closureGate)}[^.]+must remain unchanged`,
+      `${escapeRegularExpression(closureGate)}[^.]+e354c4b36a6c1c30bd10b6ac9a7ea42678399fe9`,
       "iu",
     ),
   );
   assert.match(
     roadmap,
     new RegExp(
-      `${escapeRegularExpression(publicSitePhase)}[^.]+must not merge[^.]+${escapeRegularExpression(closureGate)}[^.]+integrated[^.]+reconciliation`,
+      `${escapeRegularExpression(publicSitePhase)}[^.]+next eligible`,
       "iu",
     ),
   );
