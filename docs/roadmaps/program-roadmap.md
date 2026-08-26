@@ -80,6 +80,8 @@ The approved source plan owns the [first supported upgrade planning boundary](20
 
 After the internal extraction and exact Calendly, standards, portfolio-to-site transition, `content-files@0.4.0`, `section-composition@0.3.0`, and `site-routing@0.3.0` certifications are complete, with site-routing evidence bound to `77cea944513e521939bf4de088048f67acdfbc3c`, no capability-certification backfill increment remains. P3 Gate 3 closure is approved and closed.
 
+Under the explicit 2026-08-26 independent-work exception, production `site` implementation proceeded locally from accepted `main@392f2e27de1d4a24124d51daf059b1667207436e` and its tracked site-routing certification receipt while the closure audit completed. P3 Gate 3 subsequently merged through pull request 59 at `main@e354c4b36a6c1c30bd10b6ac9a7ea42678399fe9`; accepted tree `7645b65a056c643e775987679eeb922e5d5b6ff6` exactly matches the reviewed closure candidate, and accepted-main workflow `33000891104` passed every applicable job. Reconciliation rebases the isolated `production-site-profile` branch onto that accepted closure, satisfying the exception's merge gate. The exception never authorized multilingual, analytics, capability certification, deployment, providers, publication, or production action.
+
 Each backfill increment may map unchanged valid accepted evidence, but its currently empty task/evidence record is a subject-binding gap and only its material missing checks may be rerun. P3 Gate 3 closure followed these increments and is approved and closed as an approval gate, not another implementation increment.
 
 **Stop gate:** Transactional failure and recovery fixtures pass and the P3 packet is approved.

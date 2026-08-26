@@ -3474,6 +3474,8 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   const independentStream = namedLabel("Task", "6B");
   const diagnosticsReleaseTask = namedLabel("Task", "5");
   const portfolioPhase = compactLabel("P", "2");
+  const publicSitePhase = compactLabel("P", "3B");
+  const closureGate = `${compactLabel("P", "3")} Gate 3`;
 
   assert.match(reviewProtocol, /^### Direct-predecessor gate$/mu);
   assert.match(
@@ -3525,6 +3527,32 @@ test("execution plans enforce direct predecessors and bounded independent-work e
     ),
   );
   assert.match(sourcePlan, /reconciliation[^.]+separate review/iu);
+  assert.match(
+    sourcePlan,
+    /2026-08-26[^.]+independent-work exception/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /main@392f2e27de1d4a24124d51daf059b1667207436e[^.]+site-routing certification receipt/iu,
+  );
+  assert.match(
+    sourcePlan,
+    /production-site-profile[^.]+isolated worktree/iu,
+  );
+  assert.match(
+    sourcePlan,
+    new RegExp(
+      `${escapeRegularExpression(closureGate)}[^.]+must remain unchanged`,
+      "iu",
+    ),
+  );
+  assert.match(
+    sourcePlan,
+    new RegExp(
+      `${escapeRegularExpression(publicSitePhase)}[^.]+must not merge[^.]+${escapeRegularExpression(closureGate)}[^.]+integrated[^.]+reconciliation`,
+      "iu",
+    ),
+  );
 
   assert.match(
     roadmap,
@@ -3555,6 +3583,28 @@ test("execution plans enforce direct predecessors and bounded independent-work e
     roadmap,
     new RegExp(
       `diagnostics ${escapeRegularExpression(diagnosticsReleaseTask)}[^.]+selected[^.]+next increment[^.]+certification transition[^.]+integrated`,
+      "iu",
+    ),
+  );
+  assert.match(
+    roadmap,
+    /2026-08-26[^.]+independent-work exception[^.]+main@392f2e27de1d4a24124d51daf059b1667207436e/iu,
+  );
+  assert.match(
+    roadmap,
+    /production-site-profile[^.]+isolated worktree/iu,
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${escapeRegularExpression(closureGate)}[^.]+must remain unchanged`,
+      "iu",
+    ),
+  );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${escapeRegularExpression(publicSitePhase)}[^.]+must not merge[^.]+${escapeRegularExpression(closureGate)}[^.]+integrated[^.]+reconciliation`,
       "iu",
     ),
   );
