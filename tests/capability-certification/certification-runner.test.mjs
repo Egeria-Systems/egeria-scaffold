@@ -1646,7 +1646,6 @@ test("the repository registry admits certified capabilities and retains only his
       gate: "closure",
       policy: "all-certified",
       issues: [
-        ["section-composition", "backfill-pending"],
         ["site-routing", "backfill-pending"],
       ].map(([capabilityIdentifier, reason]) => ({
         code: "CAPABILITY_CERTIFICATION_PENDING",
