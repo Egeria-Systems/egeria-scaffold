@@ -4,6 +4,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+import { exactSemanticVersionPattern } from "../helpers/semantic-version.mjs";
+
 const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../..",
@@ -31,7 +33,10 @@ test("standards exposes only its approved public configuration APIs", async () =
     "the public standards manifest must exist",
   );
 
-  assert.deepEqual(await readJson("packages/standards/package.json"), {
+  const standardsManifest = await readJson("packages/standards/package.json");
+  const { dependencies, ...stableManifest } = standardsManifest;
+
+  assert.deepEqual(stableManifest, {
     name: "@egeria-systems/standards",
     version: "0.2.0",
     type: "module",
@@ -59,9 +64,6 @@ test("standards exposes only its approved public configuration APIs", async () =
     peerDependencies: {
       eslint: "^9.39.5 || ^10.8.0",
     },
-    dependencies: {
-      "typescript-eslint": "8.66.0",
-    },
     devDependencies: {
       eslint: "9.39.5",
       "eslint-10": "npm:eslint@10.8.0",
@@ -73,6 +75,15 @@ test("standards exposes only its approved public configuration APIs", async () =
       registry: "https://registry.npmjs.org/",
     },
   });
+  assert.deepEqual(Object.keys(dependencies ?? {}), ["typescript-eslint"]);
+  const typescriptEslintVersion = dependencies?.["typescript-eslint"];
+  assert.equal(typeof typescriptEslintVersion, "string");
+  assert.match(typescriptEslintVersion, exactSemanticVersionPattern);
+  assert.equal(
+    typescriptEslintVersion.split(".", 1)[0],
+    "8",
+    "the strict preset provider must remain on its supported major",
+  );
 
   assert.equal(await pathExists("packages/standards/AGENTS.md"), true);
   assert.equal(await pathExists("packages/standards/README.md"), true);

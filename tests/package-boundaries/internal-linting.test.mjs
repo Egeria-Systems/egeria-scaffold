@@ -4,6 +4,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+import { exactSemanticVersionPattern } from "../helpers/semantic-version.mjs";
+
 const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../..",
@@ -294,18 +296,30 @@ test("each immediate builder application and package delegates zero-warning lint
 
 test("the accepted Next proof keeps its package-local ESLint 9 boundary", async () => {
   const proofManifest = await readJson("proofs/nextjs-cloudflare/package.json");
+  const nextVersion = proofManifest.dependencies?.next;
+  const nextEslintConfigVersion =
+    proofManifest.devDependencies?.["eslint-config-next"];
+  const typescriptEslintVersion =
+    proofManifest.devDependencies?.["typescript-eslint"];
 
   assert.equal(proofManifest.scripts?.lint, "eslint . --max-warnings 0");
+  assert.equal(proofManifest.devDependencies?.eslint, "9.39.5");
+  for (const [surface, version] of [
+    ["Next.js", nextVersion],
+    ["Next ESLint config", nextEslintConfigVersion],
+    ["typescript-eslint", typescriptEslintVersion],
+  ]) {
+    assert.equal(typeof version, "string", surface);
+    assert.match(version, exactSemanticVersionPattern, surface);
+  }
   assert.deepEqual(
-    {
-      eslint: proofManifest.devDependencies?.eslint,
-      next: proofManifest.devDependencies?.["eslint-config-next"],
-      typescriptEslint: proofManifest.devDependencies?.["typescript-eslint"],
-    },
-    {
-      eslint: "9.39.5",
-      next: "16.3.0",
-      typescriptEslint: "8.66.0",
-    },
+    nextEslintConfigVersion.split(".").slice(0, 2),
+    nextVersion.split(".").slice(0, 2),
+    "the Next ESLint config must match the installed Next major and minor",
+  );
+  assert.equal(
+    typescriptEslintVersion.split(".", 1)[0],
+    "8",
+    "the proof must retain the supported typescript-eslint major",
   );
 });
