@@ -2262,6 +2262,16 @@ test("content files fixture verification applies the exact isolated overlay and 
         command.environment.NPM_CONFIG_REGISTRY,
         "https://registry.npmjs.org/",
       );
+      assert.equal(
+        command.environment.TMPDIR,
+        join(supportRoot, "temporary"),
+      );
+      assert.equal(command.environment.TMP, join(supportRoot, "temporary"));
+      assert.equal(command.environment.TEMP, join(supportRoot, "temporary"));
+      assert.equal(
+        command.environment.XDG_CACHE_HOME,
+        join(supportRoot, "cache"),
+      );
     }
   } finally {
     await rm(ownedRoot, { recursive: true, force: true });
