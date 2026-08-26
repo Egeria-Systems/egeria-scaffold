@@ -7,6 +7,7 @@ import {
   type ValidationResult,
 } from "@egeria-systems/builder-core";
 import { parseArgs } from "node:util";
+import { isAbsolute } from "node:path";
 
 export type CliCommand =
   | Readonly<{
@@ -20,6 +21,54 @@ export type CliCommand =
   | Readonly<{
       kind: "infer" | "doctor" | "diff";
       directory: string;
+    }>
+  | Readonly<{
+      kind: "plan-add";
+      directory: string;
+      capability: "booking-calendly";
+      settings: CalendlyBookingSettings;
+    }>
+  | Readonly<{
+      kind: "plan-remove";
+      directory: string;
+      capability: "booking-calendly";
+    }>
+  | Readonly<{
+      kind: "plan-upgrade";
+      directory: string;
+      capability: "standards";
+      toVersion: "0.4.0";
+    }>
+  | Readonly<{
+      kind: "plan-profile-transition";
+      directory: string;
+      toProfile: "site";
+    }>
+  | Readonly<{
+      kind: "apply-add";
+      directory: string;
+      capability: "booking-calendly";
+      settings: CalendlyBookingSettings;
+      approvedPlanFingerprint: string;
+    }>
+  | Readonly<{
+      kind: "apply-remove";
+      directory: string;
+      capability: "booking-calendly";
+      approvedPlanFingerprint: string;
+    }>
+  | Readonly<{
+      kind: "apply-upgrade";
+      directory: string;
+      capability: "standards";
+      toVersion: "0.4.0";
+      approvedPlanFingerprint: string;
+    }>
+  | Readonly<{
+      kind: "apply-profile-transition";
+      directory: string;
+      toProfile: "site";
+      approvedPlanFingerprint: string;
     }>;
 
 const projectFields = projectConfigurationSchema
@@ -56,6 +105,10 @@ function hasExactOptions(
 
 function validDirectory(value: string | undefined): value is string {
   return value !== undefined && value.length > 0 && !value.includes("\0");
+}
+
+function validAbsoluteDirectory(value: string | undefined): value is string {
+  return validDirectory(value) && isAbsolute(value);
 }
 
 function parseCreate(
@@ -159,6 +212,374 @@ function parseReadOnly(
   }
 }
 
+function parsePlanAdd(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        capability: { type: "string" },
+        "calendly-url": { type: "string" },
+        "calendly-mode": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const capability = values.capability;
+    const settings = calendlyBookingSettingsSchema.safeParse({
+      destination: values["calendly-url"],
+      mode: values["calendly-mode"],
+    });
+
+    if (
+      !hasExactOptions(tokens, [
+        "directory",
+        "capability",
+        "calendly-url",
+        "calendly-mode",
+      ]) ||
+      !validDirectory(directory) ||
+      capability !== "booking-calendly" ||
+      !settings.success
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "plan-add",
+        directory,
+        capability,
+        settings: settings.data,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
+function parsePlanRemove(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        capability: { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const capability = values.capability;
+
+    if (
+      !hasExactOptions(tokens, ["directory", "capability"]) ||
+      !validDirectory(directory) ||
+      capability !== "booking-calendly"
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: { kind: "plan-remove", directory, capability },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
+function parsePlanUpgrade(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        capability: { type: "string" },
+        "to-version": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const capability = values.capability;
+    const toVersion = values["to-version"];
+
+    if (
+      !hasExactOptions(tokens, ["directory", "capability", "to-version"]) ||
+      !validAbsoluteDirectory(directory) ||
+      capability !== "standards" ||
+      toVersion !== "0.4.0"
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "plan-upgrade",
+        directory,
+        capability,
+        toVersion,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
+function parsePlanProfileTransition(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        "to-profile": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const toProfile = values["to-profile"];
+
+    if (
+      !hasExactOptions(tokens, ["directory", "to-profile"]) ||
+      !validAbsoluteDirectory(directory) ||
+      toProfile !== "site"
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "plan-profile-transition",
+        directory,
+        toProfile,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
+function parseApplyAdd(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        capability: { type: "string" },
+        "calendly-url": { type: "string" },
+        "calendly-mode": { type: "string" },
+        "approved-plan": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const capability = values.capability;
+    const approvedPlanFingerprint = values["approved-plan"];
+    const settings = calendlyBookingSettingsSchema.safeParse({
+      destination: values["calendly-url"],
+      mode: values["calendly-mode"],
+    });
+
+    if (
+      !hasExactOptions(tokens, [
+        "directory",
+        "capability",
+        "calendly-url",
+        "calendly-mode",
+        "approved-plan",
+      ]) ||
+      !validDirectory(directory) ||
+      capability !== "booking-calendly" ||
+      !settings.success ||
+      approvedPlanFingerprint === undefined ||
+      !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "apply-add",
+        directory,
+        capability,
+        settings: settings.data,
+        approvedPlanFingerprint,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
+function parseApplyRemove(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        capability: { type: "string" },
+        "approved-plan": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const capability = values.capability;
+    const approvedPlanFingerprint = values["approved-plan"];
+
+    if (
+      !hasExactOptions(tokens, [
+        "directory",
+        "capability",
+        "approved-plan",
+      ]) ||
+      !validDirectory(directory) ||
+      capability !== "booking-calendly" ||
+      approvedPlanFingerprint === undefined ||
+      !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "apply-remove",
+        directory,
+        capability,
+        approvedPlanFingerprint,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
+function parseApplyUpgrade(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        capability: { type: "string" },
+        "to-version": { type: "string" },
+        "approved-plan": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const capability = values.capability;
+    const toVersion = values["to-version"];
+    const approvedPlanFingerprint = values["approved-plan"];
+
+    if (
+      !hasExactOptions(tokens, [
+        "directory",
+        "capability",
+        "to-version",
+        "approved-plan",
+      ]) ||
+      !validAbsoluteDirectory(directory) ||
+      capability !== "standards" ||
+      toVersion !== "0.4.0" ||
+      approvedPlanFingerprint === undefined ||
+      !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "apply-upgrade",
+        directory,
+        capability,
+        toVersion,
+        approvedPlanFingerprint,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
+function parseApplyProfileTransition(
+  arguments_: readonly string[],
+): ValidationResult<CliCommand> {
+  try {
+    const { values, tokens } = parseArgs({
+      args: [...arguments_],
+      options: {
+        directory: { type: "string" },
+        "to-profile": { type: "string" },
+        "approved-plan": { type: "string" },
+      },
+      strict: true,
+      allowPositionals: false,
+      tokens: true,
+    });
+    const directory = values.directory;
+    const toProfile = values["to-profile"];
+    const approvedPlanFingerprint = values["approved-plan"];
+
+    if (
+      !hasExactOptions(tokens, [
+        "directory",
+        "to-profile",
+        "approved-plan",
+      ]) ||
+      !validAbsoluteDirectory(directory) ||
+      toProfile !== "site" ||
+      approvedPlanFingerprint === undefined ||
+      !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
+    ) {
+      return invalidArguments();
+    }
+
+    return {
+      ok: true,
+      value: {
+        kind: "apply-profile-transition",
+        directory,
+        toProfile,
+        approvedPlanFingerprint,
+      },
+    };
+  } catch {
+    return invalidArguments();
+  }
+}
+
 export function parseCliArguments(
   arguments_: readonly string[],
 ): ValidationResult<CliCommand> {
@@ -171,6 +592,22 @@ export function parseCliArguments(
     case "doctor":
     case "diff":
       return parseReadOnly(command, commandArguments);
+    case "plan-add":
+      return parsePlanAdd(commandArguments);
+    case "plan-remove":
+      return parsePlanRemove(commandArguments);
+    case "plan-upgrade":
+      return parsePlanUpgrade(commandArguments);
+    case "plan-profile-transition":
+      return parsePlanProfileTransition(commandArguments);
+    case "apply-add":
+      return parseApplyAdd(commandArguments);
+    case "apply-remove":
+      return parseApplyRemove(commandArguments);
+    case "apply-upgrade":
+      return parseApplyUpgrade(commandArguments);
+    case "apply-profile-transition":
+      return parseApplyProfileTransition(commandArguments);
     default:
       return invalidArguments();
   }

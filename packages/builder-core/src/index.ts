@@ -3,6 +3,7 @@ export * from "./catalog/verified-package-versions.js";
 export * from "./certification/capability-certification.js";
 export * from "./contracts/capability.js";
 export * from "./contracts/certification.js";
+export * from "./contracts/generation-verification.js";
 export * from "./contracts/identifiers.js";
 export * from "./contracts/json-schemas.js";
 export * from "./contracts/migration.js";
@@ -30,6 +31,21 @@ export type {
   GeneratedProject,
   ProjectGenerationRequest,
 } from "./generation/write-generated-project.js";
+export * from "./lifecycle/git-worktree-inspection.js";
+export * from "./lifecycle/apply-capability-addition.js";
+export * from "./lifecycle/apply-capability-removal.js";
+export * from "./lifecycle/apply-capability-upgrade.js";
+export * from "./lifecycle/apply-profile-transition.js";
+export * from "./lifecycle/capability-addition-writer.js";
+export * from "./lifecycle/capability-removal-writer.js";
+export * from "./lifecycle/capability-upgrade-writer.js";
+export * from "./lifecycle/profile-transition-writer.js";
+export * from "./lifecycle/plan-capability-addition.js";
+export * from "./lifecycle/plan-capability-removal.js";
+export * from "./lifecycle/plan-capability-upgrade.js";
+export * from "./lifecycle/supported-capability-upgrades.js";
+export * from "./lifecycle/plan-profile-transition.js";
+export * from "./lifecycle/supported-profile-transitions.js";
 export type {
   ProbeEvidence,
   ProbeEvidenceStatus,

@@ -5,8 +5,17 @@ import {
   mkdir,
   open,
   readFile,
+  realpath,
 } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import {
+  delimiter,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 import { promisify } from "node:util";
 
 import { ordinaryGenerationVerificationChecks } from "../contracts/generation-verification.js";
@@ -32,6 +41,11 @@ export interface GeneratedProjectVerifier {
     root: string,
   ): Promise<ValidationResult<GeneratedProjectVerification>>;
 }
+
+type ToolResolutionOptions = Readonly<{
+  platform?: "win32" | "posix";
+  environment?: Readonly<Record<string, string | undefined>>;
+}>;
 
 type SupportPaths = Readonly<{
   identity: PathIdentity;
@@ -85,14 +99,20 @@ function issue<T>(code: string, reason: string): ValidationResult<T> {
   };
 }
 
-function findEnvironmentValue(name: string): string | undefined {
+function findEnvironmentValue(
+  name: string,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): string | undefined {
   const normalizedName = name.toLowerCase();
-  return Object.entries(process.env).find(
+  return Object.entries(environment).find(
     ([key, value]) => key.toLowerCase() === normalizedName && value !== undefined,
   )?.[1];
 }
 
-function createChildEnvironment(support: SupportPaths): NodeJS.ProcessEnv {
+function createChildEnvironment(
+  support: SupportPaths,
+  toolEnvironment: Readonly<Record<string, string>> = {},
+): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = {};
 
   for (const key of ["PATH", "SystemRoot", "ComSpec", "PATHEXT", "LANG"] as const) {
@@ -107,6 +127,7 @@ function createChildEnvironment(support: SupportPaths): NodeJS.ProcessEnv {
 
   return {
     ...environment,
+    ...toolEnvironment,
     CI: "true",
     NEXT_TELEMETRY_DISABLED: "1",
     HOME: support.home,
@@ -117,6 +138,120 @@ function createChildEnvironment(support: SupportPaths): NodeJS.ProcessEnv {
     NPM_CONFIG_REGISTRY: publicRegistry,
     NPM_CONFIG_USERCONFIG: support.userConfiguration,
   };
+}
+
+function executableNames(
+  executable: string,
+  options: ToolResolutionOptions,
+): readonly string[] {
+  if (options.platform !== "win32") {
+    return [executable];
+  }
+
+  const extensions = (findEnvironmentValue("PATHEXT", options.environment) ?? "")
+    .split(";")
+    .filter((extension) => extension.length > 0)
+    .map((extension) =>
+      extension.startsWith(".") ? extension : `.${extension}`,
+    );
+  const executableLower = executable.toLowerCase();
+  return extensions.some((extension) =>
+    executableLower.endsWith(extension.toLowerCase()),
+  )
+    ? [executable]
+    : [executable, ...extensions.map((extension) => `${executable}${extension}`)];
+}
+
+export async function resolveExecutablePath(
+  executable: string,
+  options: ToolResolutionOptions = {},
+): Promise<string | undefined> {
+  const platform =
+    options.platform ?? (process.platform === "win32" ? "win32" : "posix");
+  const candidates = isAbsolute(executable)
+    ? [executable]
+    : (findEnvironmentValue("PATH", options.environment) ?? "")
+        .split(platform === "win32" ? ";" : delimiter)
+        .filter((entry) => entry.length > 0)
+        .flatMap((entry) =>
+          executableNames(executable, { ...options, platform }).map((name) =>
+            join(entry, name),
+          ),
+        );
+
+  for (const candidate of candidates) {
+    try {
+      const stats = await lstat(candidate);
+      if (stats.isFile() || stats.isSymbolicLink()) {
+        return resolve(candidate);
+      }
+    } catch {
+      // Continue to the next fixed PATH candidate.
+    }
+  }
+
+  return undefined;
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  return (
+    left.length === right.length &&
+    left.every((byte, index) => byte === right[index])
+  );
+}
+
+async function isVoltaShim(
+  executablePath: string,
+  bin: string,
+  platform: "win32" | "posix",
+): Promise<boolean> {
+  const executable = await realpath(executablePath);
+  const expectedShim = await realpath(
+    join(bin, platform === "win32" ? "volta-shim.exe" : "volta-shim"),
+  );
+  if (executable === expectedShim) {
+    return true;
+  }
+
+  if (platform !== "win32") {
+    return false;
+  }
+
+  const [executableContent, expectedShimContent] = await Promise.all([
+    readFile(executable),
+    readFile(expectedShim),
+  ]);
+  return sameBytes(executableContent, expectedShimContent);
+}
+
+export async function derivePnpmToolEnvironment(
+  executable: string,
+  options: ToolResolutionOptions = {},
+): Promise<Readonly<Record<string, string>>> {
+  const platform =
+    options.platform ?? (process.platform === "win32" ? "win32" : "posix");
+  const executablePath = await resolveExecutablePath(executable, {
+    ...options,
+    platform,
+  });
+  if (executablePath === undefined) {
+    return {};
+  }
+
+  try {
+    const bin = await realpath(dirname(executablePath));
+    if (!(await isVoltaShim(executablePath, bin, platform))) {
+      return {};
+    }
+
+    const voltaHome = await realpath(dirname(bin));
+    const stats = await lstat(voltaHome);
+    return stats.isDirectory() && !stats.isSymbolicLink()
+      ? { VOLTA_HOME: voltaHome, VOLTA_FEATURE_PNPM: "1" }
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 export async function writeExclusive(
@@ -332,6 +467,8 @@ async function verifyInIsolatedCopy(
       force: false,
       errorOnExist: true,
       dereference: false,
+      filter: (source) =>
+        !relative(fixedRoot, source).split(sep).includes(".git"),
     });
     await mkdir(supportRoot, { mode: 0o700 });
     const supportStats = await lstat(supportRoot, { bigint: true });
@@ -344,7 +481,10 @@ async function verifyInIsolatedCopy(
     if (!support.ok) {
       result = issue("FROZEN_INSTALL_FAILED", "support-creation-failed");
     } else {
-      const environment = createChildEnvironment(support.value);
+      const environment = createChildEnvironment(
+        support.value,
+        await derivePnpmToolEnvironment(executable),
+      );
       const version = await requirePnpmVersion({
         executable,
         cwd: validationRoot,
