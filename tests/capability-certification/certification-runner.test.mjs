@@ -1212,7 +1212,7 @@ async function runCheck(
   }
 }
 
-test("the repository registry admits the certified Calendly lifecycle and retains only historical backfills", async () => {
+test("the repository registry admits certified capabilities and retains only historical backfills", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -1243,7 +1243,6 @@ test("the repository registry admits the certified Calendly lifecycle and retain
       gate: "closure",
       policy: "all-certified",
       issues: [
-        ["content-files", "backfill-pending"],
         ["section-composition", "backfill-pending"],
         ["site-routing", "backfill-pending"],
       ].map(([capabilityIdentifier, reason]) => ({

@@ -74,9 +74,20 @@
         "behaviorContractDigest": "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05"
       },
       "requiredEvidence": ["fresh-scaffold"],
-      "status": "backfill-pending",
-      "taskPlan": null,
-      "evidence": []
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-08-25-content-files-certification.md",
+      "evidence": [
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-08-25-content-files-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "591a6d2ee45ee02dd059e46dae7c6c2b1a10c96f",
+          "subject": {
+            "descriptorVersion": "0.4.0",
+            "behaviorContractDigest": "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05"
+          }
+        }
+      ]
     },
     "deployment-cloudflare": {
       "subject": {
