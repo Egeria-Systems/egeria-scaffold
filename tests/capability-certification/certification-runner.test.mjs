@@ -3030,8 +3030,8 @@ test("site routing fixture verification applies the exact isolated overlay and c
     assert.deepEqual(result, { ok: true, checks: siteRoutingFixtureChecks });
     for (const [source, destination] of [
       [
-        "site-routing-certification.test.ts",
-        "apps/web/tests/unit/site-routing-certification.test.ts",
+        "site-routing-certification.test.tsx",
+        "apps/web/tests/unit/site-routing-certification.test.tsx",
       ],
       [
         "site-routing-certification.spec.ts",
@@ -3080,7 +3080,7 @@ test("site routing fixture verification applies the exact isolated overlay and c
             "run",
             "--project",
             "unit",
-            "tests/unit/site-routing-certification.test.ts",
+            "tests/unit/site-routing-certification.test.tsx",
           ],
           cwd: projectRoot,
           timeout: 15 * 60 * 1000,

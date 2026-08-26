@@ -1,8 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import About from "../../app/about/page";
 import {
   parsePageContent,
   parseYamlContent,
@@ -74,7 +76,7 @@ describe("site routing generated ownership", () => {
     ).toBe(true);
   });
 
-  it("parses the exact generated about-route content", async () => {
+  it("renders the actual generated about route from its exact content", async () => {
     const source = await readFile(
       resolve(webRoot, "content/en-CA/about.yaml"),
       "utf8",
@@ -104,5 +106,28 @@ describe("site routing generated ownership", () => {
         },
       ],
     });
+
+    render(<About />);
+
+    expect(
+      screen.getByRole("heading", { level: 1, name: "About" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Background and approach.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Working principles" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Clear communication, careful craft, and practical outcomes guide the work.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    expect(screen.getByRole("link", { name: "About" })).toHaveAttribute(
+      "href",
+      "/about",
+    );
   });
 });

@@ -62,8 +62,8 @@ const fixtureRoot = resolve(
 );
 const fixtureMappings = Object.freeze([
   Object.freeze({
-    source: "site-routing-certification.test.ts",
-    destination: "apps/web/tests/unit/site-routing-certification.test.ts",
+    source: "site-routing-certification.test.tsx",
+    destination: "apps/web/tests/unit/site-routing-certification.test.tsx",
   }),
   Object.freeze({
     source: "site-routing-certification.spec.ts",
@@ -326,7 +326,7 @@ async function verifySiteRoutingFixture({
       "run",
       "--project",
       "unit",
-      "tests/unit/site-routing-certification.test.ts",
+      "tests/unit/site-routing-certification.test.tsx",
     ],
     "CERTIFICATION_FIXTURE_UNIT_FAILED",
   );
