@@ -39,13 +39,13 @@ function resolveRequest(
   return core.resolveCapabilities(request, catalog, profiles);
 }
 
-test("standards hybrid ownership declares generated unit, component, and browser quality", () => {
+test("standards hybrid ownership declares generated unit, component, browser, and visual quality", () => {
   const standards = createCatalog().find(
     ({ identifier }) => identifier === "standards",
   );
 
   assert.notEqual(standards, undefined);
-  assert.equal(standards.version, "0.3.0");
+  assert.equal(standards.version, "0.4.0");
   assert.equal(standards.deliveryMode, "hybrid");
   assert.deepEqual(standards.requiredPackages, [
     "@axe-core/playwright",
@@ -98,6 +98,7 @@ test("standards hybrid ownership declares generated unit, component, and browser
       "standards-playwright-package",
       "standards-playwright-preview-configuration",
       "standards-playwright-shared-configuration",
+      "standards-playwright-visual-configuration",
       "standards-preview-browser-test-script",
       "standards-package",
       "standards-quality-workflow",
@@ -110,11 +111,69 @@ test("standards hybrid ownership declares generated unit, component, and browser
       "standards-unit-watch-script",
       "standards-user-event-package",
       "standards-vite-react-package",
+      "standards-visual-regression-desktop-baseline",
+      "standards-visual-regression-mobile-baseline",
+      "standards-visual-regression-specification",
+      "standards-visual-regression-test-script",
       "standards-vitest-configuration",
       "standards-vitest-package",
     ].toSorted(),
   );
-  assert.equal(standards.inferenceProbes.length, 33);
+  assert.equal(standards.inferenceProbes.length, 36);
+  const visualSurfaces = new Map(
+    standards.managedSurfaces
+      .filter(({ identifier }) => identifier.includes("visual"))
+      .toSorted((left, right) =>
+        left.identifier < right.identifier
+          ? -1
+          : left.identifier > right.identifier
+            ? 1
+            : 0,
+      )
+      .map((surface) => [surface.identifier, surface]),
+  );
+  assert.deepEqual(
+    [...visualSurfaces].map(([identifier, surface]) => ({
+      identifier,
+      path: surface.path,
+      ownership: surface.ownership,
+      target: surface.fingerprintTarget,
+    })),
+    [
+      {
+        identifier: "standards-playwright-visual-configuration",
+        path: "apps/web/playwright.visual.config.ts",
+        ownership: "managed",
+        target: { kind: "file" },
+      },
+      {
+        identifier: "standards-visual-regression-desktop-baseline",
+        path:
+          "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+        ownership: "application-owned",
+        target: { kind: "file" },
+      },
+      {
+        identifier: "standards-visual-regression-mobile-baseline",
+        path:
+          "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+        ownership: "application-owned",
+        target: { kind: "file" },
+      },
+      {
+        identifier: "standards-visual-regression-specification",
+        path: "apps/web/tests/visual/home-visual.spec.ts",
+        ownership: "application-owned",
+        target: { kind: "file" },
+      },
+      {
+        identifier: "standards-visual-regression-test-script",
+        path: "apps/web/package.json",
+        ownership: "merge-managed",
+        target: { kind: "json-value", pointer: "/scripts/test:visual" },
+      },
+    ],
+  );
   assert.deepEqual(standards.verificationPlan, [
     "package-resolution",
     "lint",
@@ -124,17 +183,20 @@ test("standards hybrid ownership declares generated unit, component, and browser
     "browser-development",
     "browser-preview",
     "deployed-configuration",
+    "visual-regression",
     "workflow-contracts",
   ]);
   assert.deepEqual(standards.documentationEvidenceRequirements, [
     "public-package-version-and-provenance",
     "unit-and-component-testing-claim-boundaries",
     "browser-testing-claim-boundaries",
+    "visual-regression-baseline-and-claim-boundaries",
   ]);
   assert.deepEqual(standards.removalAndRecoveryRequirements, [
     "review-package-and-configuration-removal",
     "review-generated-test-surface-removal",
     "review-generated-quality-surface-removal",
+    "review-visual-regression-configuration-and-baselines",
   ]);
 });
 
@@ -1100,7 +1162,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.9.0",
+      recipeVersion: "0.10.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1112,7 +1174,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.9.0",
+      recipeVersion: "0.10.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1143,7 +1205,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.9.0");
+  assert.equal(portfolio.recipeVersion, "0.10.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1177,7 +1239,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
       ({ identifier }) => identifier,
     );
 
-    assert.equal(selected.recipeVersion, "0.9.0");
+    assert.equal(selected.recipeVersion, "0.10.0");
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
         selectedIdentifiers.indexOf("booking-calendly"),
@@ -1196,7 +1258,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   assert.deepEqual(core.createInstalledManifest(site), [
     {
       identifier: "standards",
-      version: "0.3.0",
+      version: "0.4.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",

@@ -65,6 +65,9 @@ jobs:
         if: "!cancelled()"
         run: pnpm --dir apps/web run test:e2e:preview
 
+      - name: Compare OpenNext visual baselines
+        run: pnpm --dir apps/web run test:visual
+
       - name: Upload browser failure artifacts
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

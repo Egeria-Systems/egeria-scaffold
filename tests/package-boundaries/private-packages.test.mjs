@@ -221,7 +221,7 @@ test("the root copy lint covers integration presentation templates", async () =>
   );
 });
 
-test("the CLI is a thin command adapter while builder-core owns generation", async () => {
+test("the CLI is a thin command adapter while builder-core owns generation and lifecycle execution", async () => {
   const expectedEntry = `#!/usr/bin/env node
 
 import { runCli } from "./run-cli.js";
@@ -265,6 +265,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "diagnostics/diff-project.ts",
       "diagnostics/doctor.ts",
       "diagnostics/project-inspection.ts",
+      "generation/builder-state-surfaces.ts",
       "generation/render-skeleton.ts",
       "generation/render-template.ts",
       "generation/source-tree-safety.ts",
@@ -274,6 +275,23 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "index.ts",
       "inference/evaluate-probe.ts",
       "inference/infer-repository.ts",
+      "lifecycle/apply-capability-addition.ts",
+      "lifecycle/apply-capability-removal.ts",
+      "lifecycle/apply-capability-upgrade.ts",
+      "lifecycle/apply-profile-transition.ts",
+      "lifecycle/capability-addition-writer.ts",
+      "lifecycle/capability-removal-file-operation.ts",
+      "lifecycle/capability-removal-writer.ts",
+      "lifecycle/capability-upgrade-writer.ts",
+      "lifecycle/git-worktree-inspection.ts",
+      "lifecycle/lifecycle-control-persistence.ts",
+      "lifecycle/plan-capability-addition.ts",
+      "lifecycle/plan-capability-removal.ts",
+      "lifecycle/plan-capability-upgrade.ts",
+      "lifecycle/plan-profile-transition.ts",
+      "lifecycle/profile-transition-writer.ts",
+      "lifecycle/supported-capability-upgrades.ts",
+      "lifecycle/supported-profile-transitions.ts",
       "manifest/create-installed-manifest.ts",
       "ownership/fingerprint.ts",
       "ownership/materialize-surfaces.ts",
@@ -319,6 +337,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/playwright.deployed.config.ts",
       "common/apps/web/playwright.dev.config.ts",
       "common/apps/web/playwright.preview.config.ts",
+      "common/apps/web/playwright.visual.config.ts",
       "common/apps/web/postcss.config.mjs",
       "common/apps/web/src/content/content-schema.ts",
       "common/apps/web/src/content/content-source.d.ts",
@@ -336,6 +355,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/tests/e2e/site-quality.spec.ts",
       "common/apps/web/tests/setup/component.ts",
       "common/apps/web/tests/unit/content-schema.test.ts",
+      "common/apps/web/tests/visual/home-visual.spec.ts",
       "common/apps/web/tsconfig.json",
       "common/apps/web/vitest.config.ts",
       "common/apps/web/wrangler.jsonc.template",
@@ -343,10 +363,14 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/pnpm-workspace.yaml",
       "portfolio/apps/web/content/en-CA/long-form/introduction.md.template",
       "portfolio/apps/web/content/en-CA/site.yaml.template",
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
       "site/apps/web/app/about/page.tsx",
       "site/apps/web/content/en-CA/about.yaml.template",
       "site/apps/web/content/en-CA/long-form/introduction.md.template",
       "site/apps/web/content/en-CA/site.yaml.template",
+      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
     ],
   );
 });
@@ -372,6 +396,10 @@ test("builder-core direct consumers describe the private generation boundary", a
     resolve(repositoryRoot, "docs/architecture/package-ownership.md"),
     "utf8",
   );
+  const rootReadme = await readFile(
+    resolve(repositoryRoot, "README.md"),
+    "utf8",
+  );
   const enforcementMap = await readFile(
     resolve(repositoryRoot, "docs/architecture/enforcement-map.md"),
     "utf8",
@@ -382,34 +410,50 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /content-safe read-only diagnostics/);
   assert.match(builderInstructions, /neither authorize nor perform a repository change/);
   assert.match(builderInstructions, /deterministic in-memory rendering/);
-  assert.match(builderInstructions, /explicit allowlisted templates/);
+  assert.match(builderInstructions, /explicit allowlisted[^\n]+templates/);
   assert.match(builderInstructions, /YAML 1.2/);
   assert.match(builderInstructions, /Markdown with validated YAML front matter/);
-  assert.match(builderInstructions, /recipe `0.9.0`/);
+  assert.match(builderInstructions, /recipe `0.10.0`/);
   assert.match(builderInstructions, /source-owned typed section registry/);
   assert.match(builderInstructions, /Tailwind CSS and PostCSS/);
   assert.match(builderInstructions, /Vitest Node\/jsdom/);
   assert.match(builderInstructions, /Playwright\/axe/);
+  assert.match(builderInstructions, /verify:generated-visuals/);
   assert.match(builderInstructions, /state-last generation/);
   assert.match(builderInstructions, /exact verified public package versions/);
   assert.match(builderInstructions, /identity-recorded sibling temporary directory/);
   assert.match(builderInstructions, /portable rename/);
   assert.match(builderInstructions, /disabled Next telemetry/);
   assert.match(builderInstructions, /argument-array `execFile`/);
+  assert.match(builderInstructions, /clean attached linked worktree/);
+  assert.match(builderInstructions, /all non-ignored untracked files/);
+  assert.match(builderInstructions, /`assume-unchanged` and `skip-worktree`/);
+  assert.match(builderInstructions, /absent but Git-ignored create targets/);
+  assert.match(builderInstructions, /every installed application-owned surface/);
+  assert.match(builderInstructions, /canonical managed-surface inventory/);
+  assert.match(
+    builderInstructions,
+    /Git preflight, deterministic addition, removal, exact supported-upgrade planning, and exact `portfolio@0\.10\.0` to `site@0\.10\.0` profile-transition planning, exact-diff inspection/,
+  );
+  assert.match(builderInstructions, /`applyCapabilityAddition`/);
+  assert.match(builderInstructions, /`applyCapabilityRemoval`/);
+  assert.match(builderInstructions, /persist state last/);
+  assert.match(builderInstructions, /no transform, migration, state update, or provider action/);
 
   assert.match(builderReadme, /1 MiB/);
   assert.match(builderReadme, /doctorRepository/);
   assert.match(builderReadme, /diffProject/);
   assert.match(builderReadme, /renderSkeleton/);
   assert.match(builderReadme, /deterministic in-memory rendering/);
-  assert.match(builderReadme, /explicit allowlisted templates/);
+  assert.match(builderReadme, /explicit allowlisted[^\n]+templates/);
   assert.match(builderReadme, /YAML 1.2/);
   assert.match(builderReadme, /Markdown with validated YAML front matter/);
-  assert.match(builderReadme, /recipe `0.9.0`/);
+  assert.match(builderReadme, /recipe `0.10.0`/);
   assert.match(builderReadme, /four source-registered typed section shapes/);
   assert.match(builderReadme, /Tailwind CSS and PostCSS/);
   assert.match(builderReadme, /named generated Vitest unit\/component projects/);
   assert.match(builderReadme, /Playwright\/axe/);
+  assert.match(builderReadme, /verify:generated-visuals/);
   assert.match(builderReadme, /generateProject/);
   assert.match(builderReadme, /previously absent destination/);
   assert.match(builderReadme, /installed state last/);
@@ -417,32 +461,206 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /createPnpmGeneratedProjectVerifier/);
   assert.match(builderReadme, /Child processes receive only a narrow/);
   assert.match(builderReadme, /child output is never returned/i);
+  assert.match(builderReadme, /planCapabilityAddition/);
+  assert.match(builderReadme, /applyCapabilityAddition/);
+  assert.match(builderReadme, /applyCapabilityRemoval/);
+  assert.match(builderReadme, /planCapabilityRemoval/);
+  assert.match(builderReadme, /planCapabilityUpgrade/);
+  assert.match(builderReadme, /preserve-file-and-eject/);
+  assert.match(builderReadme, /CAPABILITY_NOT_INSTALLED/);
+  assert.match(builderReadme, /verified-final-diff approval/);
+  assert.match(builderReadme, /clean attached linked worktree/);
+  assert.match(builderReadme, /all non-ignored untracked files/);
+  assert.match(builderReadme, /`assume-unchanged` and `skip-worktree`/);
+  assert.match(builderReadme, /absent but Git-ignored create target/);
+  assert.match(builderReadme, /every installed application-owned surface/);
+  assert.match(builderReadme, /canonical managed-surface inventory/);
+  assert.match(builderReadme, /redacts settings and repository metadata/);
+  assert.match(builderReadme, /never resets, cleans, commits, creates a branch\/worktree, auto-rolls back, or contacts a provider/);
   assert.doesNotMatch(builderReadme, /The CLI remains empty/);
-  assert.match(cliInstructions, /four commands exact/);
+
+  const builderIndex = await readFile(
+    resolve(repositoryRoot, "packages/builder-core/src/index.ts"),
+    "utf8",
+  );
+  const capabilityUpgradeExecutor = await readFile(
+    resolve(
+      repositoryRoot,
+      "packages/builder-core/src/lifecycle/apply-capability-upgrade.ts",
+    ),
+    "utf8",
+  );
+  const capabilityUpgradeWriter = await readFile(
+    resolve(
+      repositoryRoot,
+      "packages/builder-core/src/lifecycle/capability-upgrade-writer.ts",
+    ),
+    "utf8",
+  );
+  const profileTransitionExecutor = await readFile(
+    resolve(
+      repositoryRoot,
+      "packages/builder-core/src/lifecycle/apply-profile-transition.ts",
+    ),
+    "utf8",
+  );
+  const profileTransitionWriter = await readFile(
+    resolve(
+      repositoryRoot,
+      "packages/builder-core/src/lifecycle/profile-transition-writer.ts",
+    ),
+    "utf8",
+  );
+  assert.match(builderIndex, /apply-capability-removal\.js/);
+  assert.match(builderIndex, /capability-removal-writer\.js/);
+  assert.match(builderIndex, /plan-capability-upgrade\.js/);
+  assert.match(builderIndex, /plan-profile-transition\.js/);
+  assert.match(builderIndex, /supported-profile-transitions\.js/);
+  assert.match(builderIndex, /apply-capability-upgrade\.js/);
+  assert.match(builderIndex, /capability-upgrade-writer\.js/);
+  assert.match(builderIndex, /apply-profile-transition\.js/);
+  assert.match(builderIndex, /profile-transition-writer\.js/);
+  assert.doesNotMatch(builderIndex, /lifecycle-control-persistence\.js/);
+  assert.match(
+    capabilityUpgradeExecutor,
+    /export async function applyCapabilityUpgrade\(/,
+  );
+  assert.match(
+    capabilityUpgradeWriter,
+    /export function createFileSystemCapabilityUpgradeWriter\(/,
+  );
+  assert.match(
+    profileTransitionExecutor,
+    /export async function applyProfileTransition\(/,
+  );
+  assert.match(
+    profileTransitionWriter,
+    /export function createFileSystemProfileTransitionWriter\(/,
+  );
+  assert.match(builderInstructions, /`applyCapabilityUpgrade`/);
+  assert.match(builderInstructions, /`planProfileTransition`/);
+  assert.match(builderInstructions, /`applyProfileTransition`/);
+  assert.match(builderInstructions, /text and byte reads at 1 MiB/);
+  assert.match(
+    builderInstructions,
+    /`createFileSystemCapabilityUpgradeWriter`[^\n]+upgrade-specific/,
+  );
+  assert.match(builderReadme, /applyCapabilityUpgrade/);
+  assert.match(builderReadme, /createFileSystemCapabilityUpgradeWriter/);
+  assert.match(builderReadme, /planProfileTransition/);
+  assert.match(builderReadme, /applyProfileTransition/);
+  assert.match(builderReadme, /createFileSystemProfileTransitionWriter/);
+  assert.match(builderReadme, /binary visual baseline drift/);
+  assert.match(
+    builderReadme,
+    /lastSuccessfulVerification\.kind[^\n]+`capability-upgrade`/,
+  );
+  assert.match(
+    builderReadme,
+    /contracts[^\n]+plan-approval[^\n]+pre-state-inference[^\n]+lockfile[^\n]+frozen-install[^\n]+lint[^\n]+typecheck[^\n]+unit-tests[^\n]+component-tests[^\n]+next-build[^\n]+opennext-build[^\n]+post-change-inference[^\n]+migration-record[^\n]+post-state-inference/,
+  );
+  assert.match(cliInstructions, /twelve commands exact/);
+  assert.match(cliInstructions, /`plan-add` remains read-only/);
+  assert.match(cliInstructions, /`apply-add` is limited/);
+  assert.match(cliInstructions, /`plan-remove` remains read-only/);
+  assert.match(cliInstructions, /`apply-remove` is the exact current removal command/);
+  assert.match(cliInstructions, /exact `plan-remove` fingerprint/);
+  assert.match(cliInstructions, /`plan-upgrade` remains read-only/);
+  assert.match(cliInstructions, /`apply-upgrade` is limited/);
+  assert.match(cliInstructions, /`plan-profile-transition` remains read-only/);
+  assert.match(cliInstructions, /`apply-profile-transition` is limited/);
+  assert.match(
+    cliInstructions,
+    /`plan-profile-transition`[^\n]+`--directory`[^\n]+`--to-profile site`[^\n]+no[^\n]+`--from-profile`/,
+  );
+  assert.match(
+    cliInstructions,
+    /`apply-upgrade`[^\n]+`--directory`[^\n]+`--capability`[^\n]+`--to-version`[^\n]+`--approved-plan`/,
+  );
+  assert.match(
+    cliInstructions,
+    /standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+single[^\n]+edge/,
+  );
+  assert.match(cliInstructions, /modified[^\n]+application-owned[^\n]+preserv[^\n]+eject/);
   assert.match(cliInstructions, /remain read-only/);
   assert.match(cliInstructions, /does not add overwrite/);
-  assert.match(cliReadme, /four exact commands/);
+  assert.match(cliReadme, /twelve exact commands/);
+  assert.match(cliReadme, /`apply-add` accepts/);
+  assert.match(cliReadme, /`plan-remove` is also read-only/);
+  assert.match(cliReadme, /`apply-remove --directory/);
+  assert.match(cliReadme, /`plan-upgrade --directory/);
+  assert.match(
+    cliReadme,
+    /`apply-upgrade --directory <absolute-existing-linked-worktree> --capability standards --to-version 0\.4\.0 --approved-plan sha256:<digest>`/,
+  );
+  assert.match(
+    cliReadme,
+    /`plan-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site`/,
+  );
+  assert.match(
+    cliReadme,
+    /`apply-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site --approved-plan sha256:<digest>`/,
+  );
+  assert.match(cliReadme, /recovery[^\n]+`not-required`/);
+  assert.match(cliReadme, /migration append[^\n]+state-last persistence/);
+  assert.match(cliReadme, /preserve[^\n]+eject/);
+  assert.match(cliReadme, /verified-final-diff approval/);
+  assert.match(cliReadme, /CAPABILITY_NOT_INSTALLED/);
+  assert.match(cliReadme, /clean attached linked worktree/);
+  assert.match(cliReadme, /never creates the worktree or branch/);
+  assert.match(cliReadme, /`assume-unchanged` and `skip-worktree`/);
+  assert.match(cliReadme, /absent but ignored create targets/);
+  assert.match(cliReadme, /canonical managed-surface inventory/);
   assert.match(cliReadme, /one content-safe JSON line/);
   assert.match(cliReadme, /no prompt, overwrite mode/);
 
-  assert.match(packageOwnership, /through verified new-directory generation/);
+  assert.match(packageOwnership, /exact Calendly and standards transactions/);
   assert.match(packageOwnership, /canonical private owner/i);
   assert.match(packageOwnership, /deterministic in-memory rendering/);
   assert.match(packageOwnership, /explicit allowlisted templates/);
   assert.match(packageOwnership, /YAML 1.2/);
   assert.match(packageOwnership, /Markdown with validated YAML front matter/);
   assert.match(packageOwnership, /strict `.egeria` codecs/);
-  assert.match(packageOwnership, /read-only repository inference/);
+  assert.match(packageOwnership, /fixed-root repository inference/);
   assert.match(packageOwnership, /doctorRepository/);
   assert.match(packageOwnership, /diffProject/);
   assert.match(packageOwnership, /state-last new-directory generation/);
   assert.match(packageOwnership, /portable-rename race limit/);
   assert.match(packageOwnership, /pnpm `11.20.0`/);
   assert.match(packageOwnership, /disabled Next telemetry/);
-  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, and `diff`/);
+  assert.match(packageOwnership, /Exact `create`, `infer`, `doctor`, `diff`, `plan-add`, `apply-add`, `plan-remove`, `apply-remove`, `plan-upgrade`, `apply-upgrade`, `plan-profile-transition`, and `apply-profile-transition`/);
   assert.match(packageOwnership, /one-line JSON output/);
+  assert.match(packageOwnership, /clean attached linked worktree/);
+  assert.match(packageOwnership, /all non-ignored untracked files/);
+  assert.match(packageOwnership, /`assume-unchanged` and `skip-worktree`/);
+  assert.match(packageOwnership, /absent but Git-ignored create targets/);
+  assert.match(packageOwnership, /every installed application-owned surface/);
+  assert.match(packageOwnership, /canonical managed-surface inventory/);
+  assert.match(packageOwnership, /redact settings and repository metadata/);
+  assert.match(packageOwnership, /writes state last/);
+  assert.match(packageOwnership, /removal planning[^\n]+read-only/);
   assert.doesNotMatch(packageOwnership, /future CLI consumer/);
   assert.match(packageOwnership, /existing-repository transformation/);
+  assert.match(rootReadme, /twelve exact commands/);
+  assert.match(rootReadme, /`apply-remove` is the exact current removal command|`apply-remove --directory/);
+  assert.match(rootReadme, /transaction evidence awaiting verified-final-diff approval/);
+  assert.match(rootReadme, /`plan-remove`/);
+  assert.match(rootReadme, /egeria plan-upgrade/);
+  assert.match(
+    rootReadme,
+    /egeria apply-upgrade --directory <absolute-existing-linked-worktree> --capability standards --to-version 0\.4\.0 --approved-plan sha256:<digest>/,
+  );
+  assert.match(
+    rootReadme,
+    /egeria plan-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site/,
+  );
+  assert.match(
+    rootReadme,
+    /egeria apply-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site --approved-plan sha256:<digest>/,
+  );
+  assert.match(rootReadme, /`assume-unchanged` and `skip-worktree`/);
+  assert.match(rootReadme, /canonical managed-surface inventory/);
+  assert.match(rootReadme, /No lifecycle command creates the branch\/worktree/);
   assert.match(enforcementMap, /desired, installed, and inferred/);
   assert.match(enforcementMap, /read-only diagnostics/);
   assert.match(enforcementMap, /exact source and template allowlists/);
@@ -450,7 +668,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(enforcementMap, /deterministic in-memory rendering/);
   assert.match(enforcementMap, /YAML 1.2/);
   assert.match(enforcementMap, /new-directory manifest\/pre-state\/post-state agreement/);
-  assert.match(enforcementMap, /state-last failure-injection/);
+  assert.match(enforcementMap, /state-last failure injection/);
   assert.match(enforcementMap, /public installed generated-repository/);
   assert.match(enforcementMap, /execution-time moderate advisory/);
   assert.doesNotMatch(

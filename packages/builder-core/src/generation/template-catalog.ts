@@ -4,9 +4,19 @@ import { deriveTemplateDestination } from "./render-template.js";
 export type TemplateCatalogEntry = Readonly<{
   source: string;
   destination: string;
+  contentKind: "text" | "binary";
 }>;
 
-const commonTemplateSources = [
+type TemplateSource = Readonly<{
+  source: string;
+  contentKind: TemplateCatalogEntry["contentKind"];
+}>;
+
+function textTemplateSources(sources: readonly string[]): readonly TemplateSource[] {
+  return sources.map((source) => ({ source, contentKind: "text" }));
+}
+
+const commonTemplateSources = textTemplateSources([
   "common/.github/workflows/deploy.yml.template",
   "common/.github/workflows/quality.yml.template",
   "common/.gitignore.template",
@@ -28,6 +38,7 @@ const commonTemplateSources = [
   "common/apps/web/playwright.deployed.config.ts",
   "common/apps/web/playwright.dev.config.ts",
   "common/apps/web/playwright.preview.config.ts",
+  "common/apps/web/playwright.visual.config.ts",
   "common/apps/web/wrangler.jsonc.template",
   "common/apps/web/app/globals.css",
   "common/apps/web/app/layout.tsx",
@@ -53,29 +64,54 @@ const commonTemplateSources = [
   "common/apps/web/tests/e2e/site-quality.spec.ts",
   "common/apps/web/tests/setup/component.ts",
   "common/apps/web/tests/unit/content-schema.test.ts",
+  "common/apps/web/tests/visual/home-visual.spec.ts",
   "common/apps/web/vitest.config.ts",
-] as const;
+] as const);
 
-const portfolioTemplateSources = [
-  "portfolio/apps/web/content/en-CA/long-form/introduction.md.template",
-  "portfolio/apps/web/content/en-CA/site.yaml.template",
-] as const;
+const portfolioTemplateSources: readonly TemplateSource[] = [
+  ...textTemplateSources([
+    "portfolio/apps/web/content/en-CA/long-form/introduction.md.template",
+    "portfolio/apps/web/content/en-CA/site.yaml.template",
+  ] as const),
+  {
+    source:
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+    contentKind: "binary",
+  },
+  {
+    source:
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+    contentKind: "binary",
+  },
+];
 
-const siteTemplateSources = [
-  "site/apps/web/content/en-CA/site.yaml.template",
-  "site/apps/web/content/en-CA/about.yaml.template",
-  "site/apps/web/content/en-CA/long-form/introduction.md.template",
-  "site/apps/web/app/about/page.tsx",
-] as const;
+const siteTemplateSources: readonly TemplateSource[] = [
+  ...textTemplateSources([
+    "site/apps/web/content/en-CA/site.yaml.template",
+    "site/apps/web/content/en-CA/about.yaml.template",
+    "site/apps/web/content/en-CA/long-form/introduction.md.template",
+    "site/apps/web/app/about/page.tsx",
+  ] as const),
+  {
+    source:
+      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+    contentKind: "binary",
+  },
+  {
+    source:
+      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+    contentKind: "binary",
+  },
+];
 
-const bookingCalendlyTemplateSources = [
+const bookingCalendlyTemplateSources = textTemplateSources([
   "booking-calendly/apps/web/app/page.tsx",
   "booking-calendly/apps/web/content/en-CA/booking-calendly.yaml",
   "booking-calendly/apps/web/src/integrations/booking-calendly/booking-content.ts",
   "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template",
   "booking-calendly/apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
   "booking-calendly/apps/web/tests/e2e/calendly-booking.spec.ts",
-] as const;
+] as const);
 
 const commonHomeRouteSource = "common/apps/web/app/page.tsx";
 
@@ -99,7 +135,7 @@ export function createTemplateCatalog(
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   const sources = [
     ...commonTemplateSources.filter(
-      (source) => !includeBookingCalendly || source !== commonHomeRouteSource,
+      ({ source }) => !includeBookingCalendly || source !== commonHomeRouteSource,
     ),
     ...(profile === "portfolio"
       ? portfolioTemplateSources
@@ -109,7 +145,7 @@ export function createTemplateCatalog(
   const destinations = new Set<string>();
   const entries: TemplateCatalogEntry[] = [];
 
-  for (const [index, source] of sources.entries()) {
+  for (const [index, { source, contentKind }] of sources.entries()) {
     const destinationResult = deriveTemplateDestination(source);
 
     if (!destinationResult.ok) {
@@ -135,7 +171,7 @@ export function createTemplateCatalog(
     }
 
     destinations.add(destinationResult.value);
-    entries.push({ source, destination: destinationResult.value });
+    entries.push({ source, destination: destinationResult.value, contentKind });
   }
 
   return {

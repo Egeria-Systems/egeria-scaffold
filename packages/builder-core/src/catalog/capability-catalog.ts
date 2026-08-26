@@ -19,6 +19,20 @@ export type CapabilityPackageVersions = Readonly<{
   observability: string;
 }>;
 
+export type CapabilityCatalogSnapshot = Readonly<{
+  standards: "0.3.0" | "0.4.0";
+}>;
+
+const currentCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = {
+  standards: "0.4.0",
+};
+
+function isSupportedStandardsSnapshotVersion(
+  value: string,
+): value is CapabilityCatalogSnapshot["standards"] {
+  return value === "0.3.0" || value === "0.4.0";
+}
+
 const sharedCapabilityMetadata = {
   optionalIntegrations: [],
   conflicts: [],
@@ -175,6 +189,7 @@ function projectEvidencePoints(
 
 function createDescriptors(
   packageVersions: CapabilityPackageVersions,
+  snapshot: CapabilityCatalogSnapshot,
 ): readonly CapabilityDescriptor[] {
   const standardsEvidencePoints = [
     createPackageEvidencePoint(
@@ -298,6 +313,12 @@ function createDescriptors(
       "managed",
     ),
     createFileEvidencePoint(
+      "standards-playwright-visual-configuration",
+      "standards",
+      "apps/web/playwright.visual.config.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
       "standards-playwright-shared-configuration",
       "standards",
       "apps/web/playwright.config.shared.ts",
@@ -385,7 +406,48 @@ function createDescriptors(
       "vitest",
       "4.1.10",
     ),
+    createFileEvidencePoint(
+      "standards-visual-regression-specification",
+      "standards",
+      "apps/web/tests/visual/home-visual.spec.ts",
+      "application-owned",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "standards-visual-regression-test-script",
+      "standards",
+      "/scripts/test:visual",
+      "playwright test --config playwright.visual.config.ts",
+    ),
   ] as const;
+
+  const standardsVisualBaselineSurfaces = [
+    createFileSurface(
+      "standards-visual-regression-desktop-baseline",
+      "standards",
+      "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "application-owned",
+    ),
+    createFileSurface(
+      "standards-visual-regression-mobile-baseline",
+      "standards",
+      "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "application-owned",
+    ),
+  ] as const;
+  const currentStandardsEvidenceIdentifiers = new Set([
+    "standards-playwright-visual-configuration",
+    "standards-visual-regression-specification",
+    "standards-visual-regression-test-script",
+  ]);
+  const selectedStandardsEvidencePoints =
+    snapshot.standards === "0.4.0"
+      ? standardsEvidencePoints
+      : standardsEvidencePoints.filter(
+          ({ managedSurface }) =>
+            !currentStandardsEvidenceIdentifiers.has(
+              managedSurface.identifier,
+            ),
+        );
 
   const contentFilesEvidencePoints = [
     createPackageEvidencePoint(
@@ -664,7 +726,7 @@ function createDescriptors(
   return [
     {
       identifier: "standards",
-      version: "0.3.0",
+      version: snapshot.standards,
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -697,7 +759,15 @@ function createDescriptors(
       threatReviewLevel: "elevated",
       platformResources: [],
       adapterSemanticRequirements: [],
-      ...projectEvidencePoints(standardsEvidencePoints),
+      managedSurfaces: [
+        ...projectManagedSurfaces(selectedStandardsEvidencePoints),
+        ...(snapshot.standards === "0.4.0"
+          ? standardsVisualBaselineSurfaces
+          : []),
+      ],
+      inferenceProbes: projectInferenceProbes(
+        selectedStandardsEvidencePoints,
+      ),
       verificationPlan: [
         "package-resolution",
         "lint",
@@ -707,17 +777,26 @@ function createDescriptors(
         "browser-development",
         "browser-preview",
         "deployed-configuration",
+        ...(snapshot.standards === "0.4.0"
+          ? (["visual-regression"] as const)
+          : []),
         "workflow-contracts",
       ],
       documentationEvidenceRequirements: [
         "public-package-version-and-provenance",
         "unit-and-component-testing-claim-boundaries",
         "browser-testing-claim-boundaries",
+        ...(snapshot.standards === "0.4.0"
+          ? (["visual-regression-baseline-and-claim-boundaries"] as const)
+          : []),
       ],
       removalAndRecoveryRequirements: [
         "review-package-and-configuration-removal",
         "review-generated-test-surface-removal",
         "review-generated-quality-surface-removal",
+        ...(snapshot.standards === "0.4.0"
+          ? (["review-visual-regression-configuration-and-baselines"] as const)
+          : []),
       ],
     },
     {
@@ -992,10 +1071,21 @@ function createPackageVersionIssue(
   };
 }
 
-export function createCapabilityCatalog(
+export function createCapabilityCatalogSnapshot(
   packageVersions: CapabilityPackageVersions,
+  snapshot: CapabilityCatalogSnapshot,
 ): ValidationResult<readonly CapabilityDescriptor[]> {
   const versionIssues: ContractIssue[] = [];
+  const snapshotValue: unknown = snapshot;
+  const standardsSnapshot =
+    typeof snapshotValue === "object" && snapshotValue !== null
+      ? (Reflect.get(snapshotValue, "standards") as unknown)
+      : undefined;
+  const supportedSnapshot =
+    typeof standardsSnapshot === "string" &&
+    isSupportedStandardsSnapshotVersion(standardsSnapshot)
+      ? ({ standards: standardsSnapshot } as const)
+      : undefined;
 
   if (!semanticVersionSchema.safeParse(packageVersions.standards).success) {
     versionIssues.push(
@@ -1010,15 +1100,25 @@ export function createCapabilityCatalog(
       ),
     );
   }
+  if (supportedSnapshot === undefined) {
+    versionIssues.push({
+      code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID",
+      path: ["snapshot", "standards"],
+      context: { reason: "unsupported-version" },
+    });
+  }
 
-  if (versionIssues.length > 0) {
+  if (versionIssues.length > 0 || supportedSnapshot === undefined) {
     return { ok: false, issues: versionIssues };
   }
 
   const catalog: CapabilityDescriptor[] = [];
   const catalogIssues: ContractIssue[] = [];
 
-  for (const [index, descriptor] of createDescriptors(packageVersions).entries()) {
+  for (const [index, descriptor] of createDescriptors(
+    packageVersions,
+    supportedSnapshot,
+  ).entries()) {
     const parsed = capabilityDescriptorSchema.safeParse(descriptor);
 
     if (parsed.success) {
@@ -1035,4 +1135,13 @@ export function createCapabilityCatalog(
   return catalogIssues.length > 0
     ? { ok: false, issues: catalogIssues }
     : { ok: true, value: catalog };
+}
+
+export function createCapabilityCatalog(
+  packageVersions: CapabilityPackageVersions,
+): ValidationResult<readonly CapabilityDescriptor[]> {
+  return createCapabilityCatalogSnapshot(
+    packageVersions,
+    currentCapabilityCatalogSnapshot,
+  );
 }

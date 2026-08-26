@@ -15,7 +15,7 @@
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.3.0"
+      "version": "0.4.0"
     },
     {
       "deliveryMode": "source-generated",
@@ -139,7 +139,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:61896aa2a0be31b6a50dcd8180692290ea4c98163c0aae48df15807467bcb0b0",
+      "fingerprint": "sha256:fcddb326e8abc4789390056d13b8cc0a38fbcad6569b6f7d3c564bac378f4fa6",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -152,7 +152,7 @@
       "path": ".egeria/project.yaml"
     },
     {
-      "fingerprint": "sha256:8a9d8f668c6ab40294846a0757daeaf99fbdd01bc5812c16628fb697d6e10757",
+      "fingerprint": "sha256:55c237b6dde3974afd89d3c44230f4db4d8b192386d79ea68ab6dbb236b7959b",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -165,7 +165,7 @@
       "path": "README.md"
     },
     {
-      "fingerprint": "sha256:6bb40d30bbd0e3753a5b7a82c5d5ecd0325239191d8d487d49f5283eeebf8c41",
+      "fingerprint": "sha256:fe7457fa07bdb5f343d0c4cc9e6abbd3ed665194da52b66a2893199b091b8e79",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -260,7 +260,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:724e108ef190e8dce0dac43addd5cf5b88f61dc577cb59e5e4b5829f275798f9",
+      "fingerprint": "sha256:0d9ff48ea2604068de7a5926ce081bc1433047c168dd116e45549618e2ec465b",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1314,6 +1314,20 @@
       "path": "apps/web/playwright.config.shared.ts"
     },
     {
+      "fingerprint": "sha256:eacad1190c4dec110b823210773f670b017822237afbd1c21889f0fc489de879",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-playwright-visual-configuration",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/playwright.visual.config.ts"
+    },
+    {
       "fingerprint": "sha256:be381fd0767cc44566010e2f4c8936e50eeb0470eaa5a69082d52100dce4b3e8",
       "fingerprintTarget": {
         "kind": "json-value",
@@ -1329,7 +1343,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:545e8da83040b719bd04a360de3078dda6a1db1c1ca3cf7f235155a79c02cbdc",
+      "fingerprint": "sha256:188a4d93a9d6ef7493e569d4851bbb408f0ac6c21620000b5620a5ab9be4f8cc",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1461,6 +1475,63 @@
       "path": "apps/web/package.json"
     },
     {
+      "fingerprint": "sha256:75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-visual-regression-desktop-baseline",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png"
+    },
+    {
+      "fingerprint": "sha256:455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-visual-regression-mobile-baseline",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png"
+    },
+    {
+      "fingerprint": "sha256:566990fcd546fa8f1ec43ca64456e3b6eddd5ff90948d21085074dda98a56eac",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "standards-visual-regression-specification",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/visual/home-visual.spec.ts"
+    },
+    {
+      "fingerprint": "sha256:ed74e7af1aa0e964e79c6884ee8d8c72b2ba76d99c6f903e285f4dba6cbd5d17",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/scripts/test:visual"
+      },
+      "identifier": "standards-visual-regression-test-script",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "standards",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
+    },
+    {
       "fingerprint": "sha256:407c0a101a59d2b970f8a4ee46a82f521d5059c0da5415fffd68fc8576c967e1",
       "fingerprintTarget": {
         "kind": "json-value",
@@ -1507,7 +1578,7 @@
   ],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.9.0"
+    "recipeVersion": "0.10.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

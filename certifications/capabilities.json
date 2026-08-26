@@ -4,55 +4,66 @@
     "booking-calendly": {
       "subject": {
         "descriptorVersion": "0.1.0",
-        "behaviorContractDigest": "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab"
+        "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
       },
       "requiredEvidence": [
         "cleanup-recovery",
         "deployed-application",
+        "existing-repository-lifecycle",
         "fresh-scaffold",
         "provider-confirmed"
       ],
       "status": "certified",
-      "taskPlan": "docs/superpowers/plans/2026-08-10-booking-calendly-certification.md",
+      "taskPlan": "docs/superpowers/plans/2026-08-24-booking-calendly-lifecycle-certification.md",
       "evidence": [
         {
           "kind": "cleanup-recovery",
-          "path": "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
+          "path": "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
           "outcome": "passed",
-          "revision": "f9ccb143724b4f1dd7f05a2ee8e3219c224d5558",
+          "revision": "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
           "subject": {
             "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab"
+            "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
           }
         },
         {
           "kind": "deployed-application",
-          "path": "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
+          "path": "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
           "outcome": "passed",
-          "revision": "f9ccb143724b4f1dd7f05a2ee8e3219c224d5558",
+          "revision": "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
           "subject": {
             "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab"
+            "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
+          }
+        },
+        {
+          "kind": "existing-repository-lifecycle",
+          "path": "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md",
+          "outcome": "passed",
+          "revision": "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
           }
         },
         {
           "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-10-booking-calendly-certification-verification.md",
+          "path": "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md",
           "outcome": "passed",
-          "revision": "636df53958c0e3421b7f493d83493724b67b41f3",
+          "revision": "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059",
           "subject": {
             "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab"
+            "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
           }
         },
         {
           "kind": "provider-confirmed",
-          "path": "docs/implementation-evidence/2026-08-10-booking-calendly-provider-receipt.md",
+          "path": "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
           "outcome": "passed",
-          "revision": "f9ccb143724b4f1dd7f05a2ee8e3219c224d5558",
+          "revision": "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
           "subject": {
             "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:339462dc3cc43065aeeb2eabc0556960d07c4c6b3e1e13738715fc7e0cedc8ab"
+            "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
           }
         }
       ]
@@ -63,9 +74,20 @@
         "behaviorContractDigest": "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05"
       },
       "requiredEvidence": ["fresh-scaffold"],
-      "status": "backfill-pending",
-      "taskPlan": null,
-      "evidence": []
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-08-25-content-files-certification.md",
+      "evidence": [
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-08-25-content-files-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "f03b9f624c370728f678924ce34e5287558d2a87",
+          "subject": {
+            "descriptorVersion": "0.4.0",
+            "behaviorContractDigest": "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05"
+          }
+        }
+      ]
     },
     "deployment-cloudflare": {
       "subject": {
@@ -163,9 +185,20 @@
         "behaviorContractDigest": "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696"
       },
       "requiredEvidence": ["fresh-scaffold"],
-      "status": "backfill-pending",
-      "taskPlan": null,
-      "evidence": []
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-08-26-section-composition-certification.md",
+      "evidence": [
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-08-26-section-composition-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "f74459c8833833186bb651c116ed524e51044677",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696"
+          }
+        }
+      ]
     },
     "site-routing": {
       "subject": {
@@ -173,27 +206,51 @@
         "behaviorContractDigest": "sha256:d716a1c93f8f40db33e54612c85d521fbd6ba13cd142d35ab0c39fa9c4b9647e"
       },
       "requiredEvidence": ["fresh-scaffold"],
-      "status": "backfill-pending",
-      "taskPlan": null,
-      "evidence": []
-    },
-    "standards": {
-      "subject": {
-        "descriptorVersion": "0.3.0",
-        "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
-      },
-      "requiredEvidence": ["fresh-scaffold"],
       "status": "certified",
-      "taskPlan": "docs/superpowers/plans/2026-08-10-generated-unit-component-testing-certification.md",
+      "taskPlan": "docs/superpowers/plans/2026-08-26-site-routing-certification.md",
       "evidence": [
         {
           "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-12-generated-unit-component-testing-certification-verification.md",
+          "path": "docs/implementation-evidence/2026-08-26-site-routing-certification-receipt.md",
           "outcome": "passed",
-          "revision": "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2",
+          "revision": "77cea944513e521939bf4de088048f67acdfbc3c",
           "subject": {
             "descriptorVersion": "0.3.0",
-            "behaviorContractDigest": "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb"
+            "behaviorContractDigest": "sha256:d716a1c93f8f40db33e54612c85d521fbd6ba13cd142d35ab0c39fa9c4b9647e"
+          }
+        }
+      ]
+    },
+    "standards": {
+      "subject": {
+        "descriptorVersion": "0.4.0",
+        "behaviorContractDigest": "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4"
+      },
+      "requiredEvidence": [
+        "existing-repository-lifecycle",
+        "fresh-scaffold"
+      ],
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-08-25-standards-lifecycle-certification.md",
+      "evidence": [
+        {
+          "kind": "existing-repository-lifecycle",
+          "path": "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "d7f9dac6e25d5dde32015968d0912b45e73644e7",
+          "subject": {
+            "descriptorVersion": "0.4.0",
+            "behaviorContractDigest": "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4"
+          }
+        },
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "d7f9dac6e25d5dde32015968d0912b45e73644e7",
+          "subject": {
+            "descriptorVersion": "0.4.0",
+            "behaviorContractDigest": "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4"
           }
         }
       ]
