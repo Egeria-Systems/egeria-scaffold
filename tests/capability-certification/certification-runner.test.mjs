@@ -123,6 +123,17 @@ const builderUpgradeCertificationTests = [
   "standards capability upgrade retains the full prefix on post-state state and inference disagreement",
   "standards capability upgrade reports final Git and exact-byte failures after persistence",
 ];
+const compiledSiteRoutingLifecycleTests = [
+  "the compiled plan-upgrade command plans the exact production site edge without writes",
+  "the compiled site-routing upgrade converges on the exact current site",
+  "the compiled site-routing upgrade verification failure retains transformed source and old state and migration controls",
+  "the compiled site-routing planner refuses already-current and managed-drift repositories without writes",
+];
+const builderSiteRoutingLifecycleTests = [
+  "site-routing upgrade replaces the exact production recipe and persists state last",
+  "site-routing upgrade retains transformed source and old state and migration controls when verification fails",
+  "site-routing upgrade rejects changed final bytes after state persistence",
+];
 const compiledProfileTransitionCertificationTests = [
   "the compiled profile-transition planner is repeatable and leaves portfolio controls and Git unchanged",
   "the compiled profile-transition planner refuses an already-site project without mutation",
@@ -1018,6 +1029,7 @@ function createSuccessfulScaffoldAdapters({
   readRepositoryStatus = async () => "",
   readRepositoryIndexEntries = async () =>
     "H selected-evidence.test.mjs\0",
+  runLifecycleCommand,
   postCreate = async () => {},
   verifyFixture,
   verificationChecks = fixedChecks,
@@ -1032,6 +1044,7 @@ function createSuccessfulScaffoldAdapters({
     verifiedRoot: undefined,
     verificationOptions: undefined,
     fixtureInput: undefined,
+    lifecycleCommands: [],
   };
 
   return {
@@ -1040,6 +1053,14 @@ function createSuccessfulScaffoldAdapters({
       readCurrentRevision,
       readRepositoryStatus,
       readRepositoryIndexEntries,
+      ...(runLifecycleCommand === undefined
+        ? {}
+        : {
+            async runLifecycleCommand(input) {
+              state.lifecycleCommands.push(input);
+              return runLifecycleCommand(input);
+            },
+          }),
       async runCommand(input) {
         state.commands.push(input);
         assert.equal(input.executable, process.execPath);
@@ -2926,7 +2947,7 @@ test("the content files certification command requires one exact revision withou
   }
 });
 
-test("site routing certification binds a clean exact revision to causal fresh-scaffold evidence", async () => {
+test("site routing certification binds a clean exact revision to causal fresh-scaffold and lifecycle evidence", async () => {
   const revision = "a".repeat(40);
   let revisionReads = 0;
   let statusReads = 0;
@@ -2940,7 +2961,7 @@ test("site routing certification binds a clean exact revision to causal fresh-sc
       "observability",
       "site-routing",
     ]),
-    inferredCapability: { identifier: "site-routing", version: "0.3.0" },
+    inferredCapability: { identifier: "site-routing", version: "0.4.0" },
     profile: "site",
     readCurrentRevision: async () => {
       revisionReads += 1;
@@ -2954,7 +2975,15 @@ test("site routing certification binds a clean exact revision to causal fresh-sc
       indexReads += 1;
       return "H selected-evidence.test.mjs\0";
     },
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.0"),
+    runLifecycleCommand: async (input) => ({
+      stdout: successfulTap(
+        input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
+          ? compiledSiteRoutingLifecycleTests
+          : builderSiteRoutingLifecycleTests,
+      ),
+    }),
+    verificationChecks: visualChecks,
     verifierIdentifier: "site",
     verifyFixture: async ({ projectRoot, environment }) => {
       assert.equal(projectRoot, scaffold.state.projectRoot);
@@ -2974,23 +3003,32 @@ test("site routing certification binds a clean exact revision to causal fresh-sc
   assert.deepEqual(result, {
     ok: true,
     capability: "site-routing",
-    version: "0.3.0",
+    version: "0.4.0",
     profile: "site",
     subject: {
-      descriptorVersion: "0.3.0",
+      descriptorVersion: "0.4.0",
       behaviorContractDigest:
-        "sha256:d716a1c93f8f40db33e54612c85d521fbd6ba13cd142d35ab0c39fa9c4b9647e",
+        "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3",
     },
-    recipeVersion: "0.10.0",
+    recipeVersion: "0.11.0",
     locale: "en-CA",
     evidenceRevision: revision,
+    outcomes: ["existing-repository-lifecycle", "fresh-scaffold"],
     checks: [
       "compiled-cli-create",
       "state-inference",
       "healthy-diagnostics",
       "exact-diff",
       ...fixedChecks,
+      "visual-regression",
       ...siteRoutingFixtureChecks,
+      "compiled-plan-site-routing-upgrade",
+      "compiled-apply-site-routing-upgrade",
+      "already-current-and-drift-refusal",
+      "verification-failure-prefix",
+      "migration-before-state",
+      "exact-final-state",
+      "final-byte-reread",
       "repository-sources-unchanged",
     ],
   });
@@ -3017,6 +3055,28 @@ test("site routing certification binds a clean exact revision to causal fresh-sc
   );
   assert.equal(scaffold.state.verifiedRoot, scaffold.state.projectRoot);
   assert.equal(scaffold.state.fixtureInput.projectRoot, scaffold.state.projectRoot);
+  assert.deepEqual(scaffold.state.verificationOptions, { includeVisual: true });
+  assert.deepEqual(
+    scaffold.state.lifecycleCommands.map(({ arguments: arguments_ }) =>
+      arguments_,
+    ),
+    [
+      [
+        "--test",
+        "--test-reporter=tap",
+        "--test-name-pattern",
+        "^the compiled (?:plan-upgrade command plans the exact production site edge without writes|site-routing upgrade converges on the exact current site|site-routing upgrade verification failure retains transformed source and old state and migration controls|site-routing planner refuses already-current and managed-drift repositories without writes)$",
+        "apps/cli/tests/cli.test.mjs",
+      ],
+      [
+        "--test",
+        "--test-reporter=tap",
+        "--test-name-pattern",
+        "^site-routing upgrade (?:replaces the exact production recipe and persists state last|retains transformed source and old state and migration controls when verification fails|rejects changed final bytes after state persistence)$",
+        "packages/builder-core/tests/apply-capability-upgrade.test.mjs",
+      ],
+    ],
+  );
   assert.equal(revisionReads, 2);
   assert.equal(statusReads, 2);
   assert.equal(indexReads, 2);
@@ -3222,10 +3282,18 @@ test("site routing certification fails closed on invalid authority and evidence 
         "observability",
         "site-routing",
       ]),
-      inferredCapability: { identifier: "site-routing", version: "0.3.0" },
+      inferredCapability: { identifier: "site-routing", version: "0.4.0" },
       profile: "site",
       readCurrentRevision: async () => revision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.0"),
+      runLifecycleCommand: async (input) => ({
+        stdout: successfulTap(
+          input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
+            ? compiledSiteRoutingLifecycleTests
+            : builderSiteRoutingLifecycleTests,
+        ),
+      }),
+      verificationChecks: visualChecks,
       verifierIdentifier: "site",
       verifyFixture: async () => ({ ok: true, checks: siteRoutingFixtureChecks }),
       ...overrides,
@@ -3328,6 +3396,52 @@ test("site routing certification fails closed on invalid authority and evidence 
     );
     assert.equal(await pathExists(scaffold.state.ownedPath), false);
   });
+
+  for (const [name, runLifecycleCommand] of [
+    [
+      "rejects successful zero-match lifecycle evidence",
+      async () => ({
+        stdout:
+          "TAP version 13\n1..0\n# tests 0\n# pass 0\n# fail 0\n",
+      }),
+    ],
+    [
+      "rejects selected skipped lifecycle evidence",
+      async (input) => {
+        const selected =
+          input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
+            ? compiledSiteRoutingLifecycleTests
+            : builderSiteRoutingLifecycleTests;
+        return {
+          stdout: [
+            "TAP version 13",
+            `# Subtest: ${selected[0]}`,
+            `ok 1 - ${selected[0]} # SKIP private refusal`,
+            "1..1",
+            "# tests 1",
+            "# pass 0",
+            "# fail 0",
+            "",
+          ].join("\n"),
+        };
+      },
+    ],
+    [
+      "contains a lifecycle command failure",
+      async () => {
+        throw new Error("private lifecycle failure");
+      },
+    ],
+  ]) {
+    await context.test(name, async () => {
+      const scaffold = createScaffold({ runLifecycleCommand });
+      await assert.rejects(
+        certifySiteRoutingForTesting({ revision }, scaffold.adapters),
+        (error) => error?.code === "CERTIFICATION_LIFECYCLE_EVIDENCE_FAILED",
+      );
+      assert.equal(await pathExists(scaffold.state.ownedPath), false);
+    });
+  }
 });
 
 test("the site routing certification command requires one exact revision without echoing rejected values", async () => {
