@@ -17,6 +17,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 
 import { isPinnedGitHubActionReference } from "../helpers/github-actions.mjs";
+import { exactSemanticVersionPattern } from "../helpers/semantic-version.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -33,9 +34,6 @@ const namedLabel = (prefix, ordinal, separator = " ") =>
   [prefix, separator, ordinal].join("");
 const credentialBoundPackageCommandPattern =
   /\b(?:pnpm|npm|yarn)\b[^\n]*(?:\bbuild|\btest)(?=[:\s]|$)/iu;
-const exactSemanticVersionPattern =
-  /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:(?:0|[1-9]\d*)|(?:\d*[A-Za-z-][0-9A-Za-z-]*))(?:\.(?:(?:0|[1-9]\d*)|(?:\d*[A-Za-z-][0-9A-Za-z-]*)))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u;
-
 async function runRepositoryQualityScopeClassifier(input) {
   const executionRoot = await mkdtemp(
     join(tmpdir(), "egeria-quality-scope-execution-"),
