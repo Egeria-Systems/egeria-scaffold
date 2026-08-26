@@ -1722,7 +1722,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:59d34f807a3635b77a761c2c4cedfac799819cb7fcecec4edb13f6e5f84dd878",
+      "fingerprint": "sha256:0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1736,7 +1736,7 @@
       "path": "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png"
     },
     {
-      "fingerprint": "sha256:5ee6e7436f7128c75c7266c32f417bd2d098c7b4b03d3bcfd175554e49f4294c",
+      "fingerprint": "sha256:c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6",
       "fingerprintTarget": {
         "kind": "file"
       },
