@@ -1440,6 +1440,48 @@ test("section composition certification fails closed on authority and journey dr
     assert.equal(setup.site.state.commands.length, 0);
   });
 
+  await context.test("rejects worktree drift after both contained journeys", async () => {
+    let statusReads = 0;
+    const setup = createJourneys({
+      readRepositoryStatus: async () => {
+        statusReads += 1;
+        return statusReads === 1 ? "" : "?? private-source.ts\0";
+      },
+    });
+    await assert.rejects(
+      certifySectionCompositionForTesting({ revision }, setup.adapters),
+      (error) => error?.code === "CERTIFICATION_WORKTREE_DIRTY",
+    );
+    assert.equal(
+      setup.portfolio.state.verifiedRoot,
+      setup.portfolio.state.projectRoot,
+    );
+    assert.equal(setup.site.state.verifiedRoot, setup.site.state.projectRoot);
+    assert.equal(await pathExists(setup.portfolio.state.ownedPath), false);
+    assert.equal(await pathExists(setup.site.state.ownedPath), false);
+  });
+
+  await context.test("rejects index-flag drift after both contained journeys", async () => {
+    let indexReads = 0;
+    const setup = createJourneys({
+      readRepositoryIndexEntries: async () => {
+        indexReads += 1;
+        return `${indexReads === 1 ? "H" : "S"} selected-evidence.test.mjs\0`;
+      },
+    });
+    await assert.rejects(
+      certifySectionCompositionForTesting({ revision }, setup.adapters),
+      (error) => error?.code === "CERTIFICATION_INDEX_FLAGS",
+    );
+    assert.equal(
+      setup.portfolio.state.verifiedRoot,
+      setup.portfolio.state.projectRoot,
+    );
+    assert.equal(setup.site.state.verifiedRoot, setup.site.state.projectRoot);
+    assert.equal(await pathExists(setup.portfolio.state.ownedPath), false);
+    assert.equal(await pathExists(setup.site.state.ownedPath), false);
+  });
+
   await context.test("rejects an invalid site verification identity", async () => {
     const setup = createJourneys({}, { verificationChecks: fixedChecks.slice(1) });
     await assert.rejects(
