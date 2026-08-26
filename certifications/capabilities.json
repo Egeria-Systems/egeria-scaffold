@@ -185,9 +185,20 @@
         "behaviorContractDigest": "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696"
       },
       "requiredEvidence": ["fresh-scaffold"],
-      "status": "backfill-pending",
-      "taskPlan": null,
-      "evidence": []
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-08-26-section-composition-certification.md",
+      "evidence": [
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-08-26-section-composition-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "f74459c8833833186bb651c116ed524e51044677",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696"
+          }
+        }
+      ]
     },
     "site-routing": {
       "subject": {

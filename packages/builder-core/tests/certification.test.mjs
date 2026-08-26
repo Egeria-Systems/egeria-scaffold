@@ -36,6 +36,12 @@ const contentFilesEvidencePath =
   "docs/implementation-evidence/2026-08-25-content-files-certification-receipt.md";
 const contentFilesEvidenceRevision =
   "f03b9f624c370728f678924ce34e5287558d2a87";
+const sectionCompositionPlanPath =
+  "docs/superpowers/plans/2026-08-26-section-composition-certification.md";
+const sectionCompositionEvidencePath =
+  "docs/implementation-evidence/2026-08-26-section-composition-certification-receipt.md";
+const sectionCompositionEvidenceRevision =
+  "f74459c8833833186bb651c116ed524e51044677";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const deploymentEvidencePath =
@@ -345,6 +351,62 @@ test("accepted content files receipt binds the reviewed fresh-scaffold outcome",
         [contentFilesEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
       },
       validRevisions: [contentFilesEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
+});
+
+test("current section composition subject has exact reviewed fresh-scaffold evidence", () => {
+  const descriptor = descriptorsByIdentifier.get("section-composition");
+  assert.notEqual(descriptor, undefined);
+  const subject = core.createCertificationSubject(
+    descriptor,
+    requiredEvidence["section-composition"],
+  );
+
+  assert.deepEqual(committedRegistry.records["section-composition"], {
+    subject,
+    requiredEvidence: ["fresh-scaffold"],
+    status: "certified",
+    taskPlan: sectionCompositionPlanPath,
+    evidence: [
+      {
+        kind: "fresh-scaffold",
+        path: sectionCompositionEvidencePath,
+        outcome: "passed",
+        revision: sectionCompositionEvidenceRevision,
+        subject,
+      },
+    ],
+  });
+});
+
+test("accepted section composition receipt binds the reviewed fresh-scaffold outcome", () => {
+  const acceptedRecord = committedRegistry.records["section-composition"];
+  const acceptedReceiptUrl = new URL(
+    `../../../${sectionCompositionEvidencePath}`,
+    import.meta.url,
+  );
+
+  assert.equal(
+    existsSync(acceptedReceiptUrl),
+    true,
+    sectionCompositionEvidencePath,
+  );
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { "section-composition": acceptedRecord },
+      },
+      artifacts: {
+        [sectionCompositionPlanPath]: "# approved plan",
+        [sectionCompositionEvidencePath]: readFileSync(
+          acceptedReceiptUrl,
+          "utf8",
+        ),
+      },
+      validRevisions: [sectionCompositionEvidenceRevision],
     }),
     { ok: true, value: undefined },
   );
