@@ -52,7 +52,7 @@ const expectedVerificationChecks = Object.freeze([
 const expectedFixtureChecks = Object.freeze([
   "site-routing-fixture-overlay",
   "site-routing-fixture-frozen-install",
-  "site-routing-fixture-unit-contract",
+  "site-routing-fixture-component-contract",
   "site-routing-fixture-browser-install",
   "site-routing-fixture-browser-development",
 ]);
@@ -63,7 +63,11 @@ const fixtureRoot = resolve(
 const fixtureMappings = Object.freeze([
   Object.freeze({
     source: "site-routing-certification.test.tsx",
-    destination: "apps/web/tests/unit/site-routing-certification.test.tsx",
+    destination: "apps/web/tests/component/site-routing-certification.test.tsx",
+  }),
+  Object.freeze({
+    source: "site-routing-vitest.config.ts",
+    destination: "apps/web/tests/component/site-routing-vitest.config.ts",
   }),
   Object.freeze({
     source: "site-routing-certification.spec.ts",
@@ -324,9 +328,9 @@ async function verifySiteRoutingFixture({
       "exec",
       "vitest",
       "run",
-      "--project",
-      "unit",
-      "tests/unit/site-routing-certification.test.tsx",
+      "--config",
+      "tests/component/site-routing-vitest.config.ts",
+      "tests/component/site-routing-certification.test.tsx",
     ],
     "CERTIFICATION_FIXTURE_UNIT_FAILED",
   );

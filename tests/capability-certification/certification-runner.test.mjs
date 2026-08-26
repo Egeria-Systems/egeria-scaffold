@@ -854,7 +854,7 @@ const sectionCompositionFixtureChecks = Object.freeze([
 const siteRoutingFixtureChecks = Object.freeze([
   "site-routing-fixture-overlay",
   "site-routing-fixture-frozen-install",
-  "site-routing-fixture-unit-contract",
+  "site-routing-fixture-component-contract",
   "site-routing-fixture-browser-install",
   "site-routing-fixture-browser-development",
 ]);
@@ -3031,7 +3031,11 @@ test("site routing fixture verification applies the exact isolated overlay and c
     for (const [source, destination] of [
       [
         "site-routing-certification.test.tsx",
-        "apps/web/tests/unit/site-routing-certification.test.tsx",
+        "apps/web/tests/component/site-routing-certification.test.tsx",
+      ],
+      [
+        "site-routing-vitest.config.ts",
+        "apps/web/tests/component/site-routing-vitest.config.ts",
       ],
       [
         "site-routing-certification.spec.ts",
@@ -3078,9 +3082,9 @@ test("site routing fixture verification applies the exact isolated overlay and c
             "exec",
             "vitest",
             "run",
-            "--project",
-            "unit",
-            "tests/unit/site-routing-certification.test.tsx",
+            "--config",
+            "tests/component/site-routing-vitest.config.ts",
+            "tests/component/site-routing-certification.test.tsx",
           ],
           cwd: projectRoot,
           timeout: 15 * 60 * 1000,
