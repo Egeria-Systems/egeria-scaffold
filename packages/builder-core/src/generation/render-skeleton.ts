@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 
 import {
   createCapabilityCatalog,
+  createCapabilityCatalogSnapshot,
+  type CapabilityCatalogSnapshot,
   type CapabilityPackageVersions,
 } from "../catalog/capability-catalog.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
@@ -21,6 +23,7 @@ import {
 } from "../contracts/surface-target.js";
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
 import { profileRecipes } from "../profiles/profile-recipes.js";
+import type { ProfileRecipe } from "../contracts/profile.js";
 import {
   resolveCapabilities,
   type ResolvedCapabilities,
@@ -53,6 +56,11 @@ export type RenderedSkeleton = Readonly<{
   resolved: ResolvedCapabilities;
   files: readonly GeneratedFile[];
   surfaces: readonly ManagedSurfaceDescriptor[];
+}>;
+
+export type SkeletonRenderingContext = Readonly<{
+  catalogSnapshot: CapabilityCatalogSnapshot;
+  profiles: readonly ProfileRecipe[];
 }>;
 
 const encoder = new TextEncoder();
@@ -182,6 +190,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function enrichApplicationManifest(
   files: readonly GeneratedFile[],
   packageVersions: CapabilityPackageVersions,
+  recipeVersion: string,
 ): ValidationResult<readonly GeneratedFile[]> {
   const manifestIndex = files.findIndex(
     ({ path }) => path === "apps/web/package.json",
@@ -224,10 +233,14 @@ function enrichApplicationManifest(
     dependencies: {
       ...manifest.dependencies,
       "@egeria-systems/observability": packageVersions.observability,
+      ...(recipeVersion === "0.11.0" ? { next: "16.3.3" } : {}),
     },
     devDependencies: {
       ...manifest.devDependencies,
       "@egeria-systems/standards": packageVersions.standards,
+      ...(recipeVersion === "0.11.0"
+        ? { "eslint-config-next": "16.3.3" }
+        : {}),
     },
   };
   const nextFiles = files.map((file, index) =>
@@ -373,12 +386,19 @@ function createDesiredSurfaces(
 
 export async function renderSkeleton(
   request: GenerationRequest,
+  context?: SkeletonRenderingContext,
 ): Promise<ValidationResult<RenderedSkeleton>> {
   const packageVersions: CapabilityPackageVersions = {
     standards: request.packageVersions.standards,
     observability: request.packageVersions.observability,
   };
-  const catalogResult = createCapabilityCatalog(packageVersions);
+  const catalogResult =
+    context === undefined
+      ? createCapabilityCatalog(packageVersions)
+      : createCapabilityCatalogSnapshot(
+          packageVersions,
+          context.catalogSnapshot,
+        );
   if (!catalogResult.ok) {
     return catalogResult;
   }
@@ -391,7 +411,7 @@ export async function renderSkeleton(
         : { requestedCapabilities: ["booking-calendly"] }),
     },
     catalogResult.value,
-    profileRecipes,
+    context?.profiles ?? profileRecipes,
   );
   if (!resolutionResult.ok) {
     return resolutionResult;
@@ -405,6 +425,7 @@ export async function renderSkeleton(
   const templateCatalogResult = createTemplateCatalog(
     request.profile,
     request.bookingCalendly !== undefined,
+    resolutionResult.value.recipeVersion,
   );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;
@@ -439,7 +460,11 @@ export async function renderSkeleton(
     files.push(result.value);
   }
 
-  const manifestResult = enrichApplicationManifest(files, packageVersions);
+  const manifestResult = enrichApplicationManifest(
+    files,
+    packageVersions,
+    resolutionResult.value.recipeVersion,
+  );
   if (!manifestResult.ok) {
     return manifestResult;
   }

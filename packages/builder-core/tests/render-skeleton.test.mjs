@@ -93,12 +93,21 @@ const sitePaths = [
   "apps/web/app/global-error.tsx",
   "apps/web/app/globals.css",
   "apps/web/app/layout.tsx",
+  "apps/web/app/not-found.tsx",
   "apps/web/app/page.tsx",
+  "apps/web/app/robots.ts",
+  "apps/web/app/sitemap.ts",
+  "apps/web/app/work/error.tsx",
+  "apps/web/app/work/featured/page.tsx",
+  "apps/web/app/work/page.tsx",
   "apps/web/content/content.config.yaml",
   "apps/web/content/en-CA/about.yaml",
   "apps/web/content/en-CA/long-form/introduction.md",
+  "apps/web/content/en-CA/not-found.yaml",
   "apps/web/content/en-CA/observability.yaml",
+  "apps/web/content/en-CA/routing.yaml",
   "apps/web/content/en-CA/site.yaml",
+  "apps/web/content/en-CA/work-featured.yaml",
   "apps/web/eslint.config.mjs",
   "apps/web/instrumentation-client.ts",
   "apps/web/instrumentation.ts",
@@ -122,11 +131,17 @@ const sitePaths = [
   "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/presentation/error-fallback.tsx",
+  "apps/web/src/routing/read-routing-content.ts",
+  "apps/web/src/routing/routing-content-schema.ts",
+  "apps/web/src/routing/site-page.tsx",
   "apps/web/src/sections/section-registry.tsx",
   "apps/web/tests/component/content-page.test.tsx",
+  "apps/web/tests/component/site-page.test.tsx",
   "apps/web/tests/e2e/site-quality.spec.ts",
+  "apps/web/tests/e2e/site-routing.spec.ts",
   "apps/web/tests/setup/component.ts",
   "apps/web/tests/unit/content-schema.test.ts",
+  "apps/web/tests/unit/routing-content.test.ts",
   "apps/web/tests/visual/home-visual.spec.ts",
   ...visualBaselinePaths,
   "apps/web/tsconfig.json",
@@ -334,6 +349,31 @@ async function compileGeneratedContentModule(files) {
 
 async function loadGeneratedContentModule(files) {
   return (await compileGeneratedContentModule(files)).module;
+}
+
+async function loadGeneratedRoutingContentModule(files) {
+  const source = indexFiles(files).get(
+    "apps/web/src/routing/routing-content-schema.ts",
+  );
+  assert.notEqual(source, undefined);
+  const typescriptModule = await import("typescript");
+  const typescript = typescriptModule.default ?? typescriptModule;
+  const transpiled = typescript.transpileModule(source, {
+    compilerOptions: {
+      module: typescript.ModuleKind.ESNext,
+      target: typescript.ScriptTarget.ES2022,
+    },
+  }).outputText;
+  const contentModule = await compileGeneratedContentModule(files);
+  const executable = transpiled.replace(
+    'from "../content/content-schema"',
+    `from ${JSON.stringify(contentModule.moduleUrl)}`,
+  );
+  assert.notEqual(executable, transpiled);
+
+  return import(
+    `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`
+  );
 }
 
 async function loadGeneratedBookingContentModule(files) {
@@ -727,6 +767,13 @@ async function readCommonWebTemplate(path) {
   );
 }
 
+async function readSiteWebTemplate(path) {
+  return readFile(
+    new URL(`../templates/site/apps/web/${path}`, import.meta.url),
+    "utf8",
+  );
+}
+
 async function loadErrorCopyModule(files) {
   const [source, copySource] = await Promise.all([
     readCommonWebTemplate("src/infrastructure/observability/error-copy.ts"),
@@ -791,8 +838,8 @@ async function loadErrorFallbackModule() {
 
 let errorBoundaryLoad = 0;
 
-async function loadErrorBoundaryModule(path) {
-  const source = await readCommonWebTemplate(path);
+async function loadErrorBoundaryModule(path, readTemplate = readCommonWebTemplate) {
+  const source = await readTemplate(path);
   const typescriptModule = await import("typescript");
   const typescript = typescriptModule.default ?? typescriptModule;
   const transpiled = typescript.transpileModule(source, {
@@ -820,15 +867,15 @@ async function loadErrorBoundaryModule(path) {
   const executable = transpiled
     .replace('from "react"', `from ${JSON.stringify(reactModule)}`)
     .replace(
-      /from "\.\.\/src\/infrastructure\/observability\/error-copy"/u,
+      /from "\.\.\/(?:\.\.\/)?src\/infrastructure\/observability\/error-copy"/u,
       `from ${JSON.stringify(copyModule)}`,
     )
     .replace(
-      /from "\.\.\/src\/infrastructure\/observability\/browser-reporter"/u,
+      /from "\.\.\/(?:\.\.\/)?src\/infrastructure\/observability\/browser-reporter"/u,
       `from ${JSON.stringify(reporterModule)}`,
     )
     .replace(
-      /from "\.\.\/src\/presentation\/error-fallback"/u,
+      /from "\.\.\/(?:\.\.\/)?src\/presentation\/error-fallback"/u,
       `from ${JSON.stringify(fallbackModule)}`,
     )
     .replace(
@@ -1132,8 +1179,8 @@ test("template destinations are safe and strip the template suffix exactly once"
     "example.template",
   );
   assert.equal(
-    assertSuccess(deriveTemplateDestination("site/apps/web/next.config.ts")),
-    "apps/web/next.config.ts",
+    assertSuccess(deriveTemplateDestination("site/apps/web/app/work/page.tsx")),
+    "apps/web/app/work/page.tsx",
   );
 
   for (const source of [
@@ -1244,6 +1291,112 @@ test("portfolio and site render exact sorted deterministic file sets", async () 
       }
     }
   }
+});
+
+test("current site rendering uses the patched framework while historical rendering stays frozen", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const request = {
+    profile: "site",
+    projectName: "acme-studio",
+    displayName: "Acme Studio",
+    packageVersions,
+  };
+  const current = assertSuccess(await renderSkeleton(request));
+  const currentManifest = JSON.parse(
+    indexFiles(current.files).get("apps/web/package.json"),
+  );
+  const historicalProfiles = [
+    {
+      identifier: "portfolio",
+      schemaVersion: "1.0.0",
+      recipeVersion: "0.10.0",
+      defaultCapabilities: [
+        "standards",
+        "content-files",
+        "section-composition",
+        "deployment-cloudflare",
+        "observability",
+      ],
+    },
+    {
+      identifier: "site",
+      schemaVersion: "1.0.0",
+      recipeVersion: "0.10.0",
+      defaultCapabilities: [
+        "standards",
+        "content-files",
+        "section-composition",
+        "deployment-cloudflare",
+        "observability",
+        "site-routing",
+      ],
+    },
+  ];
+  const historicalRendered = assertSuccess(
+    await renderSkeleton(request, {
+      catalogSnapshot: {
+        standards: "0.4.0",
+        siteRouting: "0.3.0",
+      },
+      profiles: historicalProfiles,
+    }),
+  );
+  const historicalManifest = JSON.parse(
+    indexFiles(historicalRendered.files).get("apps/web/package.json"),
+  );
+
+  assert.equal(current.project.recipeVersion, "0.11.0");
+  assert.equal(currentManifest.dependencies.next, "16.3.3");
+  assert.equal(currentManifest.devDependencies["eslint-config-next"], "16.3.3");
+  assert.equal(historicalRendered.project.recipeVersion, "0.10.0");
+  assert.equal(historicalManifest.dependencies.next, "16.3.0");
+  assert.equal(
+    historicalManifest.devDependencies["eslint-config-next"],
+    "16.3.0",
+  );
+});
+
+test("production site rendering materializes route metadata and browser contracts without changing portfolio", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const site = assertSuccess(
+    await renderSkeleton({
+      profile: "site",
+      projectName: "acme-site",
+      displayName: "Acme Site",
+      packageVersions,
+    }),
+  );
+  const portfolio = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-portfolio",
+      displayName: "Acme Portfolio",
+      packageVersions,
+    }),
+  );
+  const siteFiles = indexFiles(site.files);
+  const portfolioFiles = indexFiles(portfolio.files);
+
+  assert.match(siteFiles.get("apps/web/app/sitemap.ts"), /MetadataRoute\.Sitemap/u);
+  assert.match(siteFiles.get("apps/web/app/robots.ts"), /MetadataRoute\.Robots/u);
+  assert.match(
+    siteFiles.get("apps/web/app/not-found.tsx"),
+    /export const metadata: Metadata = notFoundContent\.metadata;/u,
+  );
+  assert.match(
+    siteFiles.get("apps/web/app/work/page.tsx"),
+    /permanentRedirect\("\/work\/featured"\)/u,
+  );
+  assert.match(
+    siteFiles.get("apps/web/src/routing/site-page.tsx"),
+    /aria-current/u,
+  );
+  assert.match(
+    siteFiles.get("apps/web/tests/e2e/site-routing.spec.ts"),
+    /\/work\/featured/u,
+  );
+  assert.equal(portfolioFiles.has("apps/web/app/sitemap.ts"), false);
+  assert.equal(portfolioFiles.has("apps/web/src/routing/site-page.tsx"), false);
 });
 
 test("generated observability guidance preserves restricted diagnostic boundaries", async () => {
@@ -2008,6 +2161,34 @@ test("page and global boundaries report once and render the required roots", asy
   const globalFallbackElement = globalResult.props.children.props.children;
   const globalFallback = globalFallbackElement.type(globalFallbackElement.props);
   assert.equal(globalFallback.type, "error-fallback");
+});
+
+test("the nested work boundary reports once and preserves fallback retry behavior", async () => {
+  const workBoundary = await loadErrorBoundaryModule(
+    "app/work/error.tsx",
+    readSiteWebTemplate,
+  );
+  const error = new Error("work boundary failure");
+  let resetCount = 0;
+  const reset = () => {
+    resetCount += 1;
+  };
+
+  const result = workBoundary.module.default({ error, reset });
+
+  assert.deepEqual(workBoundary.reports, [
+    { error, context: { boundary: "page" } },
+  ]);
+  const fallback = result.type(result.props);
+  assert.equal(fallback.type, "error-fallback");
+  assert.deepEqual(fallback.props.copy, {
+    heading: "Something went wrong",
+    summary: "We could not complete this page. Please try again.",
+    retryLabel: "Try again",
+  });
+  assert.equal(fallback.props.onRetry, reset);
+  fallback.props.onRetry();
+  assert.equal(resetCount, 1);
 });
 
 
@@ -4004,12 +4185,17 @@ test("display names are inserted as YAML 1.2 data and runtime copy stays externa
       navigation: [
         { href: "/", label: "Home" },
         { href: "/about", label: "About" },
+        { href: "/work/featured", label: "Work" },
       ],
     },
   );
   assert.deepEqual(
     parseGeneratedYaml(site.files, "apps/web/content/en-CA/about.yaml"),
     {
+      metadata: {
+        title: "About",
+        description: "Background, working principles, and approach.",
+      },
       sections: [
         {
           id: "introduction",
@@ -4099,7 +4285,7 @@ test("generated content is bundled as text without runtime filesystem access", a
     "apps/web/src/content/read-content.ts",
   );
   const siteReader = indexFiles(site.files).get(
-    "apps/web/app/about/page.tsx",
+    "apps/web/src/routing/read-routing-content.ts",
   );
   const contentDeclarations = indexFiles(portfolio.files).get(
     "apps/web/src/content/content-source.d.ts",
@@ -4141,6 +4327,9 @@ test("the emitted YAML parser rejects unsafe syntax and invalid content shapes",
     }),
   );
   const contentModule = await loadGeneratedContentModule(rendered.files);
+  const routingContentModule = await loadGeneratedRoutingContentModule(
+    rendered.files,
+  );
   const files = indexFiles(rendered.files);
   const configurationSource = files.get("apps/web/content/content.config.yaml");
   const introductionSource = files.get(
@@ -4187,7 +4376,7 @@ test("the emitted YAML parser rejects unsafe syntax and invalid content shapes",
     siteContent,
     parseGeneratedYaml(rendered.files, "apps/web/content/en-CA/site.yaml"),
   );
-  const aboutContent = contentModule.parsePageContent(
+  const aboutContent = routingContentModule.parseRoutedPageContent(
     contentModule.parseYamlContent(aboutSource),
   );
   assert.deepEqual(
@@ -4249,7 +4438,7 @@ test("the emitted YAML parser rejects unsafe syntax and invalid content shapes",
     }),
   );
   assertContentInvalid(() =>
-    contentModule.parsePageContent({
+    routingContentModule.parseRoutedPageContent({
       ...aboutContent,
       extra: true,
     }),
@@ -5031,7 +5220,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
     ["portfolio", 103],
-    ["site", 105],
+    ["site", 120],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({

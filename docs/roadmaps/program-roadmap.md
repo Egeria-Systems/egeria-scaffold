@@ -80,6 +80,8 @@ The approved source plan owns the [first supported upgrade planning boundary](20
 
 After the internal extraction and exact Calendly, standards, portfolio-to-site transition, `content-files@0.4.0`, `section-composition@0.3.0`, and `site-routing@0.3.0` certifications are complete, with site-routing evidence bound to `77cea944513e521939bf4de088048f67acdfbc3c`, no capability-certification backfill increment remains. P3 Gate 3 closure is approved and closed.
 
+Under the explicit 2026-08-26 independent-work exception, production `site` implementation proceeded locally from accepted `main@392f2e27de1d4a24124d51daf059b1667207436e` and its tracked site-routing certification receipt while the closure audit completed. P3 Gate 3 subsequently merged through pull request 59 at `main@e354c4b36a6c1c30bd10b6ac9a7ea42678399fe9`; accepted tree `7645b65a056c643e775987679eeb922e5d5b6ff6` exactly matches the reviewed closure candidate, and accepted-main workflow `33000891104` passed every applicable job. Reconciliation rebases the isolated `production-site-profile` branch onto that accepted closure, satisfying the exception's merge gate. The exception never authorized multilingual, analytics, capability certification, deployment, providers, publication, or production action.
+
 Each backfill increment may map unchanged valid accepted evidence, but its currently empty task/evidence record is a subject-binding gap and only its material missing checks may be rerun. P3 Gate 3 closure followed these increments and is approved and closed as an approval gate, not another implementation increment.
 
 **Stop gate:** Transactional failure and recovery fixtures pass and the P3 packet is approved.
@@ -91,6 +93,8 @@ Every new or materially changed executable capability is delivered through a cap
 Each certification task begins with current planning under the [review and contribution protocol](../governance/review-and-contribution.md). The plan supplies step-by-step human prerequisites or explicitly states that none exist, then defines the fresh-scaffold, lifecycle, local runtime, protected-staging, provider, cleanup, and recovery evidence required for that capability. Local runtime evidence remains separate from protected-staging and provider outcomes, and every external action requires separate authorization. No implementation plan or certification task inherits authority to create an account, configure a provider, use a credential, spend money, deploy, or mutate external or persistent state.
 
 ## P3B — Client-required public-site expansion
+
+**Production-site implementation candidate:** The isolated candidate advances only `site` to recipe `0.11.0` and `site-routing@0.4.0`. It materializes content-backed home, about, featured-work, not-found, and nested error behavior; active navigation; route metadata; sitemap and robots output; redirects; development and OpenNext/workerd browser contracts; and the exact state-last `site-routing@0.3.0` to `0.4.0` upgrade. The new descriptor subject is pending separate `fresh-scaffold` and `existing-repository-lifecycle` certification. This candidate excludes multilingual, analytics, real-client generation, providers, deployment, publication, and production action, and it cannot merge until P3 closure is accepted and reconciled.
 
 P3 remains unchanged and is the prerequisite for this boundary. This part relocates approved client-required public-site work so it is delivered through the same transactional capability lifecycle used by every later generated repository:
 

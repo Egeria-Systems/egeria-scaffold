@@ -140,6 +140,41 @@ test("copy externalization covers canonical builder TSX templates", async () => 
           "packages/builder-core/templates/site/apps/web/app/about/page.tsx",
         messages: [],
       },
+      {
+        filePath:
+          "packages/builder-core/templates/site/apps/web/app/about/production-page.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/site/apps/web/app/not-found.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/site/apps/web/app/page-with-booking.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/site/apps/web/app/page.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/site/apps/web/app/work/error.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/site/apps/web/app/work/featured/page.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/site/apps/web/app/work/page.tsx",
+        messages: [],
+      },
     ],
   );
 

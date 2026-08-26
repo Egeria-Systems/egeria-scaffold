@@ -21,15 +21,23 @@ export type CapabilityPackageVersions = Readonly<{
 
 export type CapabilityCatalogSnapshot = Readonly<{
   standards: "0.3.0" | "0.4.0";
+  siteRouting?: "0.3.0" | "0.4.0";
 }>;
 
 const currentCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = {
   standards: "0.4.0",
+  siteRouting: "0.4.0",
 };
 
 function isSupportedStandardsSnapshotVersion(
   value: string,
 ): value is CapabilityCatalogSnapshot["standards"] {
+  return value === "0.3.0" || value === "0.4.0";
+}
+
+function isSupportedSiteRoutingSnapshotVersion(
+  value: string,
+): value is NonNullable<CapabilityCatalogSnapshot["siteRouting"]> {
   return value === "0.3.0" || value === "0.4.0";
 }
 
@@ -191,6 +199,7 @@ function createDescriptors(
   packageVersions: CapabilityPackageVersions,
   snapshot: CapabilityCatalogSnapshot,
 ): readonly CapabilityDescriptor[] {
+  const siteRoutingVersion = snapshot.siteRouting ?? "0.3.0";
   const standardsEvidencePoints = [
     createPackageEvidencePoint(
       "standards-axe-playwright-package",
@@ -688,6 +697,100 @@ function createDescriptors(
       "apps/web/content/en-CA/about.yaml",
       "application-owned",
     ),
+    ...(siteRoutingVersion === "0.4.0"
+      ? [
+    createFileEvidencePoint(
+      "site-routing-not-found-route",
+      "site-routing",
+      "apps/web/app/not-found.tsx",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-robots-route",
+      "site-routing",
+      "apps/web/app/robots.ts",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-sitemap-route",
+      "site-routing",
+      "apps/web/app/sitemap.ts",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-work-error-boundary",
+      "site-routing",
+      "apps/web/app/work/error.tsx",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-work-index-route",
+      "site-routing",
+      "apps/web/app/work/page.tsx",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-featured-work-route",
+      "site-routing",
+      "apps/web/app/work/featured/page.tsx",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-not-found-content",
+      "site-routing",
+      "apps/web/content/en-CA/not-found.yaml",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-configuration-content",
+      "site-routing",
+      "apps/web/content/en-CA/routing.yaml",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-featured-work-content",
+      "site-routing",
+      "apps/web/content/en-CA/work-featured.yaml",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-content-reader",
+      "site-routing",
+      "apps/web/src/routing/read-routing-content.ts",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-content-schema",
+      "site-routing",
+      "apps/web/src/routing/routing-content-schema.ts",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-presentation",
+      "site-routing",
+      "apps/web/src/routing/site-page.tsx",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-component-test",
+      "site-routing",
+      "apps/web/tests/component/site-page.test.tsx",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-browser-test",
+      "site-routing",
+      "apps/web/tests/e2e/site-routing.spec.ts",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "site-routing-unit-test",
+      "site-routing",
+      "apps/web/tests/unit/routing-content.test.ts",
+      "application-owned",
+    ),
+        ]
+      : []),
   ] as const;
 
   const bookingCalendlyEvidencePoints = [
@@ -1006,20 +1109,52 @@ function createDescriptors(
     },
     {
       identifier: "site-routing",
-      version: "0.3.0",
+      version: siteRoutingVersion,
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
-      dependencies: ["content-files", "section-composition"],
+      dependencies:
+        siteRoutingVersion === "0.4.0"
+          ? ["content-files", "observability", "section-composition"]
+          : ["content-files", "section-composition"],
       ...sharedCapabilityMetadata,
+      migrationPlanners:
+        siteRoutingVersion === "0.4.0"
+          ? ["upgrade-site-routing-0-3-0-to-0-4-0"]
+          : [],
       supportedProfiles: ["site"],
       requiredPackages: [],
       platformResources: [],
       adapterSemanticRequirements: [],
       ...projectEvidencePoints(siteRoutingEvidencePoints),
-      verificationPlan: ["typecheck", "next-build"],
-      documentationEvidenceRequirements: ["multi-page-routing-contract"],
-      removalAndRecoveryRequirements: ["review-route-and-content-removal"],
+      verificationPlan:
+        siteRoutingVersion === "0.4.0"
+          ? [
+              "content-contracts",
+              "component-tests",
+              "typecheck",
+              "next-build",
+              "opennext-build",
+              "browser-development",
+              "browser-preview",
+            ]
+          : ["typecheck", "next-build"],
+      documentationEvidenceRequirements:
+        siteRoutingVersion === "0.4.0"
+          ? [
+              "browser-route-and-navigation-behavior",
+              "crawl-metadata-contract",
+              "nested-error-and-not-found-behavior",
+              "page-and-navigation-migration-contract",
+            ]
+          : ["multi-page-routing-contract"],
+      removalAndRecoveryRequirements:
+        siteRoutingVersion === "0.4.0"
+          ? [
+              "review-route-content-and-crawl-metadata-removal",
+              "review-redirect-and-navigation-recovery",
+            ]
+          : ["review-route-and-content-removal"],
     },
     {
       identifier: "booking-calendly",
@@ -1081,10 +1216,25 @@ export function createCapabilityCatalogSnapshot(
     typeof snapshotValue === "object" && snapshotValue !== null
       ? (Reflect.get(snapshotValue, "standards") as unknown)
       : undefined;
+  const siteRoutingSnapshot =
+    typeof snapshotValue === "object" && snapshotValue !== null
+      ? (Reflect.get(snapshotValue, "siteRouting") as unknown)
+      : undefined;
+  const resolvedSiteRoutingSnapshot =
+    siteRoutingSnapshot === undefined
+      ? "0.3.0"
+      : typeof siteRoutingSnapshot === "string" &&
+          isSupportedSiteRoutingSnapshotVersion(siteRoutingSnapshot)
+        ? siteRoutingSnapshot
+        : undefined;
   const supportedSnapshot =
     typeof standardsSnapshot === "string" &&
-    isSupportedStandardsSnapshotVersion(standardsSnapshot)
-      ? ({ standards: standardsSnapshot } as const)
+    isSupportedStandardsSnapshotVersion(standardsSnapshot) &&
+    resolvedSiteRoutingSnapshot !== undefined
+      ? ({
+          standards: standardsSnapshot,
+          siteRouting: resolvedSiteRoutingSnapshot,
+        } as const)
       : undefined;
 
   if (!semanticVersionSchema.safeParse(packageVersions.standards).success) {
@@ -1104,6 +1254,16 @@ export function createCapabilityCatalogSnapshot(
     versionIssues.push({
       code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID",
       path: ["snapshot", "standards"],
+      context: { reason: "unsupported-version" },
+    });
+  }
+  if (
+    siteRoutingSnapshot !== undefined &&
+    resolvedSiteRoutingSnapshot === undefined
+  ) {
+    versionIssues.push({
+      code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID",
+      path: ["snapshot", "siteRouting"],
       context: { reason: "unsupported-version" },
     });
   }

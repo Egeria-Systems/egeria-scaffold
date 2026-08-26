@@ -11,12 +11,12 @@ export type SupportedCapabilityUpgradeResolutionFailureCode =
   | "CAPABILITY_UPGRADE_UNSUPPORTED";
 
 export type SupportedCapabilityUpgradeEndpoint = Readonly<{
-  recipeVersion: "0.9.0" | "0.10.0";
+  recipeVersion: "0.9.0" | "0.10.0" | "0.11.0";
   evidenceRevision: string;
   subject: CertificationSubject;
 }>;
 
-export type SupportedCapabilityUpgrade = Readonly<{
+type SupportedStandardsUpgrade = Readonly<{
   capability: "standards";
   fromVersion: "0.3.0";
   toVersion: "0.4.0";
@@ -25,6 +25,20 @@ export type SupportedCapabilityUpgrade = Readonly<{
   target: SupportedCapabilityUpgradeEndpoint &
     Readonly<{ recipeVersion: "0.10.0" }>;
 }>;
+
+type SupportedSiteRoutingUpgrade = Readonly<{
+  capability: "site-routing";
+  fromVersion: "0.3.0";
+  toVersion: "0.4.0";
+  source: SupportedCapabilityUpgradeEndpoint &
+    Readonly<{ recipeVersion: "0.10.0" }>;
+  target: SupportedCapabilityUpgradeEndpoint &
+    Readonly<{ recipeVersion: "0.11.0" }>;
+}>;
+
+export type SupportedCapabilityUpgrade =
+  | SupportedStandardsUpgrade
+  | SupportedSiteRoutingUpgrade;
 
 export type SupportedCapabilityUpgradeResolution =
   | Readonly<{ ok: true; value: SupportedCapabilityUpgrade }>
@@ -56,7 +70,7 @@ function standardsDescriptor(
   return descriptor;
 }
 
-function createStandardsUpgrade(): SupportedCapabilityUpgrade {
+function createStandardsUpgrade(): SupportedStandardsUpgrade {
   const sourceRecipes = createProfileRecipeSnapshot("0.9.0");
   const targetRecipes = createProfileRecipeSnapshot("0.10.0");
 
@@ -89,12 +103,60 @@ function createStandardsUpgrade(): SupportedCapabilityUpgrade {
   };
 }
 
+function siteRoutingDescriptor(
+  version: "0.3.0" | "0.4.0",
+): CapabilityDescriptor {
+  const catalog = createCapabilityCatalogSnapshot(
+    verifiedCapabilityPackageVersions,
+    { standards: "0.4.0", siteRouting: version },
+  );
+
+  if (!catalog.ok) {
+    throw new TypeError("supported-upgrade-catalog-invalid");
+  }
+
+  const descriptor = catalog.value.find(
+    ({ identifier }) => identifier === "site-routing",
+  );
+  if (descriptor === undefined) {
+    throw new TypeError("supported-upgrade-descriptor-missing");
+  }
+
+  return descriptor;
+}
+
+function createSiteRoutingUpgrade(): SupportedSiteRoutingUpgrade {
+  return {
+    capability: "site-routing",
+    fromVersion: "0.3.0",
+    toVersion: "0.4.0",
+    source: {
+      recipeVersion: "0.10.0",
+      evidenceRevision: "77cea944513e521939bf4de088048f67acdfbc3c",
+      subject: createCertificationSubject(siteRoutingDescriptor("0.3.0"), [
+        "fresh-scaffold",
+      ]),
+    },
+    target: {
+      recipeVersion: "0.11.0",
+      evidenceRevision: "pending-site-routing-certification",
+      subject: createCertificationSubject(siteRoutingDescriptor("0.4.0"), [
+        "existing-repository-lifecycle",
+        "fresh-scaffold",
+      ]),
+    },
+  };
+}
+
 export function resolveSupportedCapabilityUpgrade(input: Readonly<{
   capability: string;
   fromVersion: string;
   toVersion: string;
 }>): SupportedCapabilityUpgradeResolution {
-  if (input.capability !== "standards" || input.toVersion !== "0.4.0") {
+  if (
+    !["standards", "site-routing"].includes(input.capability) ||
+    input.toVersion !== "0.4.0"
+  ) {
     return { ok: false, code: "CAPABILITY_UPGRADE_UNSUPPORTED" };
   }
 
@@ -106,5 +168,11 @@ export function resolveSupportedCapabilityUpgrade(input: Readonly<{
     return { ok: false, code: "CAPABILITY_UPGRADE_EDGE_MISSING" };
   }
 
-  return { ok: true, value: createStandardsUpgrade() };
+  return {
+    ok: true,
+    value:
+      input.capability === "standards"
+        ? createStandardsUpgrade()
+        : createSiteRoutingUpgrade(),
+  };
 }

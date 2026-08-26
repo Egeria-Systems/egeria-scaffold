@@ -15,6 +15,11 @@ import test from "node:test";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
+const { createBuilderStateSurfaces } = await import(
+  pathToFileURL(
+    resolve(packageRoot, "dist/generation/builder-state-surfaces.js"),
+  )
+);
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const root = "/generated/project";
@@ -97,6 +102,63 @@ async function currentEntries(profile) {
   return loadEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
 }
 
+async function acceptedSiteEntries() {
+  const current = await currentEntries("site");
+  const currentState = core.parseStateJson(
+    decode(current.get(".egeria/state.json")),
+  );
+  assert.equal(currentState.ok, true);
+  const rendered = await core.renderSkeleton(
+    {
+      profile: "site",
+      projectName: "acme-site",
+      displayName: "Acme Site",
+      packageVersions: core.verifiedCapabilityPackageVersions,
+    },
+    {
+      catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+      profiles: core.createProfileRecipeSnapshot("0.10.0"),
+    },
+  );
+  assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
+  const projectSource = core.serializeProjectYaml(rendered.value.project);
+  const lockfile = new Uint8Array(
+    await readFile(
+      resolve(
+        packageRoot,
+        "lockfiles/web-recipe-0.8.0/pnpm-lock.yaml",
+      ),
+    ),
+  );
+  const files = new Map(
+    rendered.value.files.map(({ path, content }) => [path, content]),
+  );
+  files.set(".egeria/project.yaml", encoder.encode(projectSource));
+  files.set(".egeria/migrations.jsonl", new Uint8Array());
+  files.set("pnpm-lock.yaml", lockfile);
+  const materialized = core.materializeInstalledSurfaces({
+    files,
+    surfaces: [...rendered.value.surfaces, ...createBuilderStateSurfaces()].sort(
+      (left, right) => compareText(left.identifier, right.identifier),
+    ),
+  });
+  assert.equal(materialized.ok, true, JSON.stringify(materialized.issues));
+  files.set(
+    ".egeria/state.json",
+    encoder.encode(
+      core.serializeStateJson({
+        ...currentState.value,
+        origin: { profile: "site", recipeVersion: "0.10.0" },
+        installedCapabilities: core.createInstalledManifest(
+          rendered.value.resolved,
+        ),
+        managedSurfaces: materialized.value,
+      }),
+    ),
+  );
+  return files;
+}
+
 function historicalQualitySource(current) {
   const visualStep = [
     "      - name: Compare OpenNext visual baselines",
@@ -108,7 +170,8 @@ function historicalQualitySource(current) {
 }
 
 async function historicalEntries(profile) {
-  const entries = await currentEntries(profile);
+  const entries =
+    profile === "site" ? await acceptedSiteEntries() : await currentEntries(profile);
 
   for (const path of visualPaths) {
     entries.delete(path);
@@ -252,11 +315,15 @@ function createRepository(entries, options = {}) {
   return repository;
 }
 
-async function approvedPlan(reader, gitInspection = git) {
+async function approvedPlan(
+  reader,
+  gitInspection = git,
+  capability = "standards",
+) {
   const result = await core.planCapabilityUpgrade({
     reader,
     git: gitInspection,
-    capability: "standards",
+    capability,
     toVersion: "0.4.0",
   });
   assert.equal(result.ok, true, JSON.stringify(result.issues));
@@ -327,7 +394,11 @@ async function invokeApply(repository, overrides = {}) {
 }
 
 async function runApply(repository, overrides = {}) {
-  const plan = await approvedPlan(repository.reader);
+  const plan = await approvedPlan(
+    repository.reader,
+    overrides.gitInspection ?? git,
+    overrides.capability ?? "standards",
+  );
   await overrides.afterPlan?.({ plan, repository });
   return {
     plan,
@@ -484,7 +555,8 @@ test("standards capability upgrade refuses unsupported capability and target inp
 test("standards capability upgrade transforms, verifies, persists state last, and stops for final-diff approval", async () => {
   for (const profile of ["portfolio", "site"]) {
     const historical = await historicalEntries(profile);
-    const target = await currentEntries(profile);
+    const target =
+      profile === "site" ? await acceptedSiteEntries() : await currentEntries(profile);
     const repository = createRepository(historical);
     const initialProject = new Uint8Array(
       repository.files.get(".egeria/project.yaml"),
@@ -616,6 +688,65 @@ test("standards capability upgrade transforms, verifies, persists state last, an
     });
     assert.doesNotMatch(JSON.stringify(execution.result), /refs\/heads|displayName/u);
   }
+});
+
+test("site-routing upgrade replaces the exact production recipe and persists state last", async () => {
+  const repository = createRepository(await acceptedSiteEntries());
+  const before = snapshotFiles(repository.files);
+  const execution = await runApply(repository, { capability: "site-routing" });
+
+  assert.equal(execution.result.ok, true, JSON.stringify(execution.result));
+  assert.equal(
+    execution.result.value.migration,
+    "upgrade-site-routing-0-3-0-to-0-4-0",
+  );
+  assert.deepEqual(execution.result.value.capability, {
+    identifier: "site-routing",
+    fromVersion: "0.3.0",
+    toVersion: "0.4.0",
+  });
+  assertExactChangedPaths(
+    repository.files,
+    before,
+    [
+      ...execution.plan.actions.map(({ path }) => path),
+      ".egeria/migrations.jsonl",
+      ".egeria/state.json",
+    ].sort(compareText),
+  );
+
+  const project = core.parseProjectYaml(
+    decode(repository.files.get(".egeria/project.yaml")),
+  );
+  const state = core.parseStateJson(
+    decode(repository.files.get(".egeria/state.json")),
+  );
+  const migrations = core.parseMigrationLog(
+    decode(repository.files.get(".egeria/migrations.jsonl")),
+  );
+  assert.equal(project.ok, true);
+  assert.equal(state.ok, true);
+  assert.equal(migrations.ok, true);
+  assert.equal(project.value.recipeVersion, "0.11.0");
+  assert.equal(state.value.origin.recipeVersion, "0.11.0");
+  assert.equal(
+    state.value.installedCapabilities.find(
+      ({ identifier }) => identifier === "site-routing",
+    )?.version,
+    "0.4.0",
+  );
+  assert.deepEqual(state.value.appliedMigrations, [
+    "upgrade-site-routing-0-3-0-to-0-4-0",
+  ]);
+  assert.equal(repository.writes.length, 3);
+  assert.deepEqual(
+    repository.writes.map((batch) => batch.map(({ path }) => path)),
+    [
+      execution.plan.actions.map(({ path }) => path),
+      [".egeria/migrations.jsonl"],
+      [".egeria/state.json"],
+    ],
+  );
 });
 
 test("standards capability upgrade refuses malformed, wrong, and stale plan authority without mutation", async () => {

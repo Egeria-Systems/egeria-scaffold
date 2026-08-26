@@ -230,7 +230,22 @@ export const generatedFixtureContracts = Object.freeze([
     expectedFiles: Object.freeze([
       ...portfolioFiles,
       "apps/web/app/about/page.tsx",
+      "apps/web/app/not-found.tsx",
+      "apps/web/app/robots.ts",
+      "apps/web/app/sitemap.ts",
+      "apps/web/app/work/error.tsx",
+      "apps/web/app/work/featured/page.tsx",
+      "apps/web/app/work/page.tsx",
       "apps/web/content/en-CA/about.yaml",
+      "apps/web/content/en-CA/not-found.yaml",
+      "apps/web/content/en-CA/routing.yaml",
+      "apps/web/content/en-CA/work-featured.yaml",
+      "apps/web/src/routing/read-routing-content.ts",
+      "apps/web/src/routing/routing-content-schema.ts",
+      "apps/web/src/routing/site-page.tsx",
+      "apps/web/tests/component/site-page.test.tsx",
+      "apps/web/tests/e2e/site-routing.spec.ts",
+      "apps/web/tests/unit/routing-content.test.ts",
     ].sort(codePointCompare)),
     expectedCapabilities: Object.freeze([
       "standards",
@@ -240,15 +255,15 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "site-routing",
     ]),
-    expectedRecipeVersion: "0.10.0",
+    expectedRecipeVersion: "0.11.0",
     expectedStandardsVersion: "0.4.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
     expectedDeploymentCloudflareVersion: "0.3.0",
-    expectedSiteRoutingVersion: "0.3.0",
+    expectedSiteRoutingVersion: "0.4.0",
     expectedBookingCalendlyVersion: null,
-    expectedSurfaces: 108,
+    expectedSurfaces: 123,
   }),
 ]);
 
@@ -350,12 +365,12 @@ function expectedRootManifest(projectName) {
   };
 }
 
-function expectedWebManifest(projectName) {
+function expectedWebManifest(projectName, nextVersion) {
   return {
     dependencies: {
       "@egeria-systems/observability": "0.3.0",
       "@opennextjs/cloudflare": "1.20.2",
-      next: "16.3.0",
+      next: nextVersion,
       react: "19.2.8",
       "react-dom": "19.2.8",
       yaml: "2.9.0",
@@ -374,7 +389,7 @@ function expectedWebManifest(projectName) {
       "@types/react-dom": "19.2.4",
       "@vitejs/plugin-react": "6.0.5",
       eslint: "9.39.5",
-      "eslint-config-next": "16.3.0",
+      "eslint-config-next": nextVersion,
       jsdom: "30.0.1",
       postcss: "8.5.26",
       "raw-loader": "4.0.2",
@@ -627,7 +642,13 @@ async function inspectFixture(root, contract) {
   }
   if (
     !jsonMatches(rootManifest, expectedRootManifest(contract.projectName)) ||
-    !jsonMatches(webManifest, expectedWebManifest(contract.projectName))
+    !jsonMatches(
+      webManifest,
+      expectedWebManifest(
+        contract.projectName,
+        contract.identifier === "site" ? "16.3.3" : "16.3.0",
+      ),
+    )
   ) {
     fail("FIXTURE_MANIFEST_INVALID");
   }

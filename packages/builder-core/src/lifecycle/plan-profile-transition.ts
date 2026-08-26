@@ -629,6 +629,26 @@ async function planProfileTransitionInternal(input: Readonly<{
     return planningFailure("PROJECT_EJECTION_UNSUPPORTED");
   }
 
+  const project = controls.project.value;
+  if (
+    project.originProfile !== controls.state.value.origin.profile ||
+    project.recipeVersion !== controls.state.value.origin.recipeVersion
+  ) {
+    return planningFailure("PROJECT_STATE_INCOMPATIBLE");
+  }
+  if (project.originProfile === toProfile) {
+    return planningFailure("PROFILE_ALREADY_CURRENT");
+  }
+  const edge = resolveSupportedProfileTransition({
+    fromProfile: project.originProfile,
+    fromRecipeVersion: project.recipeVersion,
+    toProfile,
+    toRecipeVersion: "0.10.0",
+  });
+  if (!edge.ok) {
+    return planningFailure(edge.code);
+  }
+
   const catalog = createCapabilityCatalogSnapshot(
     verifiedCapabilityPackageVersions,
     { standards: "0.4.0" },
@@ -646,7 +666,6 @@ async function planProfileTransitionInternal(input: Readonly<{
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
   }
 
-  const project = controls.project.value;
   const booking = project.capabilitySettings["booking-calendly"];
   const renderInput = {
     projectName: project.project.name,
@@ -654,10 +673,17 @@ async function planProfileTransitionInternal(input: Readonly<{
     packageVersions: verifiedCapabilityPackageVersions,
     ...(booking === undefined ? {} : { bookingCalendly: booking }),
   };
-  const sourceResult = await renderSkeleton({
-    ...renderInput,
-    profile: project.originProfile,
-  });
+  const historicalContext = {
+    catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+    profiles: createProfileRecipeSnapshot("0.10.0"),
+  } as const;
+  const sourceResult = await renderSkeleton(
+    {
+      ...renderInput,
+      profile: project.originProfile,
+    },
+    historicalContext,
+  );
   if (!sourceResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
@@ -702,20 +728,13 @@ async function planProfileTransitionInternal(input: Readonly<{
     return planningFailure("PROJECT_DRIFT_DETECTED");
   }
 
-  const edge = resolveSupportedProfileTransition({
-    fromProfile: project.originProfile,
-    fromRecipeVersion: project.recipeVersion,
-    toProfile,
-    toRecipeVersion: "0.10.0",
-  });
-  if (!edge.ok) {
-    return planningFailure(edge.code);
-  }
-
-  const targetResult = await renderSkeleton({
-    ...renderInput,
-    profile: "site",
-  });
+  const targetResult = await renderSkeleton(
+    {
+      ...renderInput,
+      profile: "site",
+    },
+    historicalContext,
+  );
   if (!targetResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }

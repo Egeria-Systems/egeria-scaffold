@@ -7,6 +7,13 @@ import test from "node:test";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
+const { createProfileRecipeSnapshot } = await import(
+  pathToFileURL(resolve(packageRoot, "dist/profiles/profile-recipes.js"))
+);
+const historicalTransitionContext = {
+  catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+  profiles: createProfileRecipeSnapshot("0.10.0"),
+};
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const baseGit = Object.freeze({
@@ -181,8 +188,14 @@ async function renderEndpoints(entries) {
     ...(settings === undefined ? {} : { bookingCalendly: settings }),
   };
   const [source, target] = await Promise.all([
-    core.renderSkeleton({ ...common, profile: "portfolio" }),
-    core.renderSkeleton({ ...common, profile: "site" }),
+    core.renderSkeleton(
+      { ...common, profile: "portfolio" },
+      historicalTransitionContext,
+    ),
+    core.renderSkeleton(
+      { ...common, profile: "site" },
+      historicalTransitionContext,
+    ),
   ]);
   assert.equal(source.ok, true);
   assert.equal(target.ok, true);
@@ -271,6 +284,7 @@ test("the supported profile-transition matrix contains only exact portfolio 0.10
 
   const refusals = [
     ["site", "0.10.0", "site", "0.10.0", "PROFILE_ALREADY_CURRENT"],
+    ["site", "0.9.0", "site", "0.10.0", "PROFILE_TRANSITION_SOURCE_UNSUPPORTED"],
     ["app", "0.10.0", "site", "0.10.0", "PROFILE_TRANSITION_SOURCE_UNSUPPORTED"],
     ["portfolio", "0.9.0", "site", "0.10.0", "PROFILE_TRANSITION_EDGE_MISSING"],
     ["portfolio", "0.10.0", "site", "0.9.0", "PROFILE_TRANSITION_EDGE_MISSING"],

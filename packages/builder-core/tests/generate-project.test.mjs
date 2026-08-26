@@ -23,11 +23,18 @@ const reviewedRecipeLockfile = resolve(
   packageRoot,
   "lockfiles/web-recipe-0.8.0/pnpm-lock.yaml",
 );
+const patchedRecipeLockfile = resolve(
+  packageRoot,
+  "lockfiles/web-recipe-0.9.0/pnpm-lock.yaml",
+);
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
 const verifierModule = await import(
   pathToFileURL(
     resolve(packageRoot, "dist/generation/verify-generated-project.js"),
   ),
+);
+const recipeLockfiles = await import(
+  pathToFileURL(resolve(packageRoot, "dist/generation/recipe-lockfiles.js")),
 );
 const sourceTreeSafety = await import(
   pathToFileURL(resolve(packageRoot, "dist/generation/source-tree-safety.js")),
@@ -107,7 +114,22 @@ const portfolioRenderedPaths = [
 const siteRenderedPaths = [
   ...portfolioRenderedPaths,
   "apps/web/app/about/page.tsx",
+  "apps/web/app/not-found.tsx",
+  "apps/web/app/robots.ts",
+  "apps/web/app/sitemap.ts",
+  "apps/web/app/work/error.tsx",
+  "apps/web/app/work/featured/page.tsx",
+  "apps/web/app/work/page.tsx",
   "apps/web/content/en-CA/about.yaml",
+  "apps/web/content/en-CA/not-found.yaml",
+  "apps/web/content/en-CA/routing.yaml",
+  "apps/web/content/en-CA/work-featured.yaml",
+  "apps/web/src/routing/read-routing-content.ts",
+  "apps/web/src/routing/routing-content-schema.ts",
+  "apps/web/src/routing/site-page.tsx",
+  "apps/web/tests/component/site-page.test.tsx",
+  "apps/web/tests/e2e/site-routing.spec.ts",
+  "apps/web/tests/unit/routing-content.test.ts",
 ].sort();
 const bookingCalendlyRenderedPaths = [
   "apps/web/content/en-CA/booking-calendly.yaml",
@@ -141,6 +163,43 @@ function assertFailure(result, code) {
   assert.deepEqual(result.issues.map((issue) => issue.code), [code]);
   assert.ok(result.issues.every((issue) => !("input" in issue)));
 }
+
+test("generated dependency recipes select only their exact reviewed lockfile", async () => {
+  const manifest = (next, eslintConfigNext) => ({
+    dependencies: { next },
+    devDependencies: { "eslint-config-next": eslintConfigNext },
+  });
+
+  assert.equal(
+    recipeLockfiles.resolveRecipeLockfileVersion(
+      manifest("16.3.0", "16.3.0"),
+    ),
+    "0.8.0",
+  );
+  assert.equal(
+    recipeLockfiles.resolveRecipeLockfileVersion(
+      manifest("16.3.3", "16.3.3"),
+    ),
+    "0.9.0",
+  );
+  assert.equal(
+    recipeLockfiles.resolveRecipeLockfileVersion(
+      manifest("16.3.3", "16.3.0"),
+    ),
+    undefined,
+  );
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({}), undefined);
+
+  const patchedLockfile = await readFile(patchedRecipeLockfile, "utf8");
+  assert.match(
+    patchedLockfile,
+    /\n\s+next:\n\s+specifier: 16\.3\.3\n\s+version: 16\.3\.3/u,
+  );
+  assert.match(
+    patchedLockfile,
+    /eslint-config-next:\n\s+specifier: 16\.3\.3\n\s+version: 16\.3\.3/u,
+  );
+});
 
 async function exists(path) {
   try {
@@ -201,8 +260,14 @@ test("lockfile preparation rejects a byte-identical replacement root", async (co
   context.after(() => rm(parent, { recursive: true, force: true }));
   const source = join(parent, "source");
   const originalSource = join(parent, "original-source");
-  await mkdir(source);
-  await writeFile(join(source, "package.json"), "{}\n");
+  await mkdir(join(source, "apps/web"), { recursive: true });
+  await writeFile(
+    join(source, "apps/web/package.json"),
+    `${JSON.stringify({
+      dependencies: { next: "16.3.0" },
+      devDependencies: { "eslint-config-next": "16.3.0" },
+    })}\n`,
+  );
 
   const result = await verifierModule.prepareLockfile(
     source,
@@ -467,8 +532,15 @@ async function createFakeVoltaPnpmExecutable(owner) {
 
 async function createVerifierSource(owner, name = "source") {
   const root = join(owner, name);
-  await mkdir(root);
+  await mkdir(join(root, "apps/web"), { recursive: true });
   await writeFile(join(root, "package.json"), '{"private":true}\n');
+  await writeFile(
+    join(root, "apps/web/package.json"),
+    `${JSON.stringify({
+      dependencies: { next: "16.3.0" },
+      devDependencies: { "eslint-config-next": "16.3.0" },
+    })}\n`,
+  );
   await writeFile(join(root, "marker"), "source-marker\n");
   return root;
 }
@@ -897,10 +969,13 @@ test("portfolio and site generation writes exact state-last repositories", async
         pnpm: "11.20.0",
         platformAdapter: "cloudflare-workers",
       });
-      assert.equal(generated.state.origin.recipeVersion, "0.10.0");
+      assert.equal(
+        generated.state.origin.recipeVersion,
+        profile === "portfolio" ? "0.10.0" : "0.11.0",
+      );
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 106 : 108,
+        profile === "portfolio" ? 106 : 123,
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -936,7 +1011,7 @@ test("portfolio and site generation writes exact state-last repositories", async
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "site-routing",
         )?.version,
-        profile === "site" ? "0.3.0" : undefined,
+        profile === "site" ? "0.4.0" : undefined,
       );
 
       const catalog = assertSuccess(core.createVerifiedCapabilityCatalog());
