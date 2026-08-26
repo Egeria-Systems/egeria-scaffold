@@ -3439,6 +3439,13 @@ test("canonical documentation accepts profile-transition execution and records t
     roadmap,
     /32984587387[^\n]+unavailable[^\n]+outage[^\n]+waiv[^\n]+not[^\n]+passing hosted check/iu,
   );
+  assert.match(
+    roadmap,
+    new RegExp(
+      `${escapeRegularExpression(lifecycleClosureLabel)}[^\\n]+e354c4b36a6c1c30bd10b6ac9a7ea42678399fe9[^\\n]+7645b65a056c643e775987679eeb922e5d5b6ff6[^\\n]+33000891104[^\\n]+attempt 2[^\\n]+passed every applicable job[^\\n]+${escapeRegularExpression(lifecyclePhase)} is complete`,
+      "iu",
+    ),
+  );
 
   for (const certificationStatusOwner of [
     overview,
