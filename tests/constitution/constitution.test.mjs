@@ -2942,18 +2942,22 @@ test("canonical documentation records visual regression and the client-ready clo
   );
 });
 
-test("canonical documentation accepts profile-transition execution and bounds its internal lifecycle extraction", async () => {
+test("canonical documentation accepts profile-transition execution and records transactional-lifecycle closure", async () => {
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3B");
   const [
+    rootReadme,
     sourcePlan,
     roadmap,
     overview,
     capabilityModel,
     packageOwnership,
     enforcementMap,
+    builderCoreInstructions,
+    builderCoreReadme,
   ] =
     await Promise.all([
+      readRepositoryFile("README.md"),
       readRepositoryFile(
         "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
       ),
@@ -2962,6 +2966,8 @@ test("canonical documentation accepts profile-transition execution and bounds it
       readRepositoryFile("docs/architecture/capability-model.md"),
       readRepositoryFile("docs/architecture/package-ownership.md"),
       readRepositoryFile("docs/architecture/enforcement-map.md"),
+      readRepositoryFile("packages/builder-core/AGENTS.md"),
+      readRepositoryFile("packages/builder-core/README.md"),
     ]);
 
   for (const statusOwner of [sourcePlan, roadmap, overview]) {
@@ -3332,10 +3338,24 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
   }
 
+  const lifecycleClosureLabel = [
+    lifecyclePhase,
+    " ",
+    namedLabel("Gate", "3"),
+    " closure",
+  ].join("");
   const finalLifecycleClosurePattern = new RegExp(
-    ["P", "3", " Gate", " 3", " closure", String.raw`[^\n]+next legal action`].join(""),
+    `${escapeRegularExpression(lifecycleClosureLabel)}[^\\n]+approved[^\\n]+closed`,
     "iu",
   );
+  const clientExpansionEligibilityPattern = new RegExp(
+    `${escapeRegularExpression(clientExpansionPhase)}[^\\n]+next eligible[^\\n]+(?:does not authorize|not authorized|separate approval)`,
+    "iu",
+  );
+  const semanticLifecycleClosurePattern =
+    /transactional-lifecycle closure[^\n]+approved[^\n]+closed/iu;
+  const semanticClientExpansionPattern =
+    /client-required public-site expansion[^\n]+next eligible[^\n]+does not authorize[^\n]+automated removal-reference hardening/iu;
 
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.doesNotMatch(sequencingOwner, /minimum one remaining increment/iu);
@@ -3381,7 +3401,30 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
   }
 
-  assert.match(roadmap, finalLifecycleClosurePattern);
+  for (const closureStatusConsumer of [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+    builderCoreInstructions,
+  ]) {
+    assert.match(closureStatusConsumer, finalLifecycleClosurePattern);
+    assert.match(closureStatusConsumer, clientExpansionEligibilityPattern);
+  }
+
+  for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
+    assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);
+    assert.match(semanticStatusConsumer, semanticClientExpansionPattern);
+  }
+
+  assert.match(
+    roadmap,
+    /main@392f2e27de1d4a24124d51daf059b1667207436e[^\n]+0f5b729262237aa6856be4d8e5aa4396584233a2/iu,
+  );
+  assert.match(
+    roadmap,
+    /32984587387[^\n]+unavailable[^\n]+outage[^\n]+waiv[^\n]+not[^\n]+passing hosted check/iu,
+  );
 
   for (const certificationStatusOwner of [
     overview,
