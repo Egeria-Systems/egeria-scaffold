@@ -35,6 +35,7 @@
     "verify:observability-error-diagnostics-certification": "pnpm run build:builder && node scripts/certify-observability-error-diagnostics.mjs",
     "verify:profile-transition-lifecycle-certification": "pnpm run build:builder && node scripts/certify-profile-transition-lifecycle.mjs",
     "verify:section-composition-certification": "pnpm run build:builder && node scripts/certify-section-composition.mjs",
+    "verify:site-routing-certification": "pnpm run build:builder && node scripts/certify-site-routing.mjs",
     "verify:standards-lifecycle-certification": "pnpm run build:builder && node scripts/certify-standards-lifecycle.mjs",
     "verify:generated-visuals": "node scripts/verify-generated-skeletons.mjs --visual",
     "verify:generated-skeletons": "node scripts/verify-generated-skeletons.mjs",
