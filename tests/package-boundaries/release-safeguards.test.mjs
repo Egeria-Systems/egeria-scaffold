@@ -193,7 +193,7 @@ test("public source and package licenses are exact", async () => {
 test("root release commands use the pinned Changesets boundary", async () => {
   const rootManifest = await readJson("package.json");
 
-  assert.equal(rootManifest.devDependencies?.["@changesets/cli"], "2.31.1");
+  assert.equal(rootManifest.devDependencies?.["@changesets/cli"], "3.0.0");
   assert.equal(rootManifest.devDependencies?.npm, "12.0.2");
   assert.deepEqual(
     {
