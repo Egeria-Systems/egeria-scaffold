@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { lstat, open } from "node:fs/promises";
+import { lstat, open, readFile } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 
 import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
@@ -23,6 +23,7 @@ import {
   renderSkeleton,
   type RenderedSkeleton,
 } from "../generation/render-skeleton.js";
+import { createRecipeLockfileUrl } from "../generation/recipe-lockfiles.js";
 import type {
   GeneratedProjectVerification,
   GeneratedProjectVerifier,
@@ -33,6 +34,10 @@ import {
   fingerprintJsonValue,
 } from "../ownership/fingerprint.js";
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
+import {
+  createProfileRecipeSnapshot,
+  profileRecipes,
+} from "../profiles/profile-recipes.js";
 import {
   createFileSystemRepositoryReader,
   type RepositoryReader,
@@ -73,13 +78,14 @@ import {
 } from "./lifecycle-control-persistence.js";
 import {
   planCapabilityUpgrade,
-  type CapabilityUpgradeAction,
   type CapabilityUpgradePlan,
   type CapabilityUpgradePlanningFailureCode,
 } from "./plan-capability-upgrade.js";
 
 const encoder = new TextEncoder();
-const migrationIdentifier = "upgrade-standards-0-3-0-to-0-4-0";
+const standardsMigrationIdentifier = "upgrade-standards-0-3-0-to-0-4-0";
+const siteRoutingMigrationIdentifier =
+  "upgrade-site-routing-0-3-0-to-0-4-0";
 const visualTestScript =
   "playwright test --config playwright.visual.config.ts";
 const maximumExactFileBytes = 16 * 1024 * 1024;
@@ -96,6 +102,30 @@ const exactActionShape = [
     "create-file",
     "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
   ],
+] as const;
+const siteRoutingActionShape = [
+  ["replace-file", ".egeria/project.yaml"],
+  ["replace-file", "apps/web/app/about/page.tsx"],
+  ["create-file", "apps/web/app/not-found.tsx"],
+  ["replace-file", "apps/web/app/page.tsx"],
+  ["create-file", "apps/web/app/robots.ts"],
+  ["create-file", "apps/web/app/sitemap.ts"],
+  ["create-file", "apps/web/app/work/error.tsx"],
+  ["create-file", "apps/web/app/work/featured/page.tsx"],
+  ["create-file", "apps/web/app/work/page.tsx"],
+  ["replace-file", "apps/web/content/en-CA/about.yaml"],
+  ["create-file", "apps/web/content/en-CA/not-found.yaml"],
+  ["create-file", "apps/web/content/en-CA/routing.yaml"],
+  ["replace-file", "apps/web/content/en-CA/site.yaml"],
+  ["create-file", "apps/web/content/en-CA/work-featured.yaml"],
+  ["replace-file", "apps/web/package.json"],
+  ["create-file", "apps/web/src/routing/read-routing-content.ts"],
+  ["create-file", "apps/web/src/routing/routing-content-schema.ts"],
+  ["create-file", "apps/web/src/routing/site-page.tsx"],
+  ["create-file", "apps/web/tests/component/site-page.test.tsx"],
+  ["create-file", "apps/web/tests/e2e/site-routing.spec.ts"],
+  ["create-file", "apps/web/tests/unit/routing-content.test.ts"],
+  ["replace-file", "pnpm-lock.yaml"],
 ] as const;
 
 export type CapabilityUpgradePhase =
@@ -135,11 +165,13 @@ export type CapabilityUpgradeExecutionResult =
         status: "verified-final-diff-approval-required";
         baseRevision: string;
         capability: Readonly<{
-          identifier: "standards";
+          identifier: "site-routing" | "standards";
           fromVersion: "0.3.0";
           toVersion: "0.4.0";
         }>;
-        migration: typeof migrationIdentifier;
+        migration:
+          | typeof siteRoutingMigrationIdentifier
+          | typeof standardsMigrationIdentifier;
         changedPaths: readonly string[];
         verificationChecks: typeof capabilityUpgradeVerificationChecks;
       }>;
@@ -339,10 +371,16 @@ function controlEvidenceMatches(
   );
 }
 
-function hasExactActionShape(actions: readonly CapabilityUpgradeAction[]): boolean {
+function hasExactActionShape(
+  plan: CapabilityUpgradePlan,
+): boolean {
+  const expected =
+    plan.capability.identifier === "standards"
+      ? exactActionShape
+      : siteRoutingActionShape;
   return (
-    JSON.stringify(actions.map(({ kind, path }) => [kind, path])) ===
-    JSON.stringify(exactActionShape)
+    JSON.stringify(plan.actions.map(({ kind, path }) => [kind, path])) ===
+    JSON.stringify(expected)
   );
 }
 
@@ -351,11 +389,11 @@ async function materializeUpgrade(input: Readonly<{
   controls: ControlSnapshot;
   plan: CapabilityUpgradePlan;
 }>): Promise<MaterializedUpgrade | undefined> {
-  if (!hasExactActionShape(input.plan.actions)) {
+  if (!hasExactActionShape(input.plan)) {
     return undefined;
   }
 
-  const rendered = await renderSkeleton({
+  const renderRequest = {
     profile: input.controls.project.value.originProfile,
     projectName: input.controls.project.value.project.name,
     displayName: input.controls.project.value.project.displayName,
@@ -369,7 +407,19 @@ async function materializeUpgrade(input: Readonly<{
               "booking-calendly"
             ],
         }),
-  });
+  } as const;
+  const rendered = await renderSkeleton(
+    renderRequest,
+    input.plan.capability.identifier === "standards"
+      ? {
+          catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+          profiles: createProfileRecipeSnapshot("0.10.0"),
+        }
+      : {
+          catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0" },
+          profiles: profileRecipes,
+        },
+  );
   if (!rendered.ok) {
     return undefined;
   }
@@ -377,6 +427,16 @@ async function materializeUpgrade(input: Readonly<{
   const renderedFiles = new Map(
     rendered.value.files.map(({ path, content }) => [path, content]),
   );
+  if (input.plan.capability.identifier === "site-routing") {
+    renderedFiles.set(
+      ".egeria/project.yaml",
+      encoder.encode(serializeProjectYaml(rendered.value.project)),
+    );
+    renderedFiles.set(
+      "pnpm-lock.yaml",
+      new Uint8Array(await readFile(createRecipeLockfileUrl("0.9.0"))),
+    );
+  }
   const changes: CapabilityUpgradeFileChange[] = [];
   const targetBytes = new Map<string, Uint8Array>();
 
@@ -553,6 +613,7 @@ function requirePendingInference(input: Readonly<{
   inference: Awaited<ReturnType<typeof inferRepository>>;
   currentState: InstalledState;
   desiredCapabilities: readonly string[];
+  upgradedCapability: "site-routing" | "standards";
 }>): boolean {
   if (
     input.inference.state.kind !== "valid" ||
@@ -572,7 +633,7 @@ function requirePendingInference(input: Readonly<{
     capabilities.size !== input.desiredCapabilities.length ||
     input.desiredCapabilities.some((identifier) => {
       const evidence = capabilities.get(identifier);
-      return identifier === "standards"
+      return identifier === input.upgradedCapability
         ? evidence?.category !== "contradictory" ||
             evidence.code !== "CAPABILITY_METADATA_MISMATCH" ||
             evidence.probes.some(({ status }) => status !== "present")
@@ -588,16 +649,25 @@ function requirePendingInference(input: Readonly<{
       surface,
     ]),
   );
+  const driftedIdentifiers =
+    input.upgradedCapability === "standards"
+      ? new Set(["standards-quality-workflow"])
+      : new Set([
+          "builder-dependency-lockfile",
+          "builder-project-configuration",
+          "builder-web-package-eslint-next",
+          "builder-web-package-next",
+        ]);
   return (
     input.inference.surfaces.length === input.currentState.managedSurfaces.length &&
     input.inference.surfaces.every((evidence) => {
       const surface = surfaces.get(evidence.identifier);
       const expectedStatus =
-        surface?.identifier === "standards-quality-workflow"
-          ? "drifted"
-          : surface?.ownership === "application-owned"
+        surface?.ownership === "application-owned"
             ? "application-owned"
-            : "confirmed";
+            : surface !== undefined && driftedIdentifiers.has(surface.identifier)
+              ? "drifted"
+              : "confirmed";
       return (
         evidence.path === surface?.path &&
         evidence.status === expectedStatus
@@ -609,6 +679,7 @@ function requirePendingInference(input: Readonly<{
 function createNextState(input: Readonly<{
   current: InstalledState;
   rendered: RenderedSkeleton;
+  upgradedCapability: "site-routing" | "standards";
   actionPaths: readonly string[];
   files: ReadonlyMap<string, Uint8Array>;
   migration: MigrationRecord;
@@ -654,18 +725,25 @@ function createNextState(input: Readonly<{
     managedSurfaces.push(existing);
   }
 
-  const standards = input.current.installedCapabilities.filter(
-    ({ identifier }) => identifier === "standards",
+  const upgraded = input.current.installedCapabilities.filter(
+    ({ identifier }) => identifier === input.upgradedCapability,
   );
-  if (standards.length !== 1 || standards[0]?.version !== "0.3.0") {
+  if (upgraded.length !== 1 || upgraded[0]?.version !== "0.3.0") {
     return undefined;
   }
 
   const parsed = installedStateSchema.safeParse({
     ...input.current,
+    origin: {
+      ...input.current.origin,
+      recipeVersion:
+        input.upgradedCapability === "site-routing"
+          ? input.rendered.project.recipeVersion
+          : input.current.origin.recipeVersion,
+    },
     installedCapabilities: input.current.installedCapabilities.map(
       (capability) =>
-        capability.identifier === "standards"
+        capability.identifier === input.upgradedCapability
           ? { ...capability, version: "0.4.0" }
           : capability,
     ),
@@ -725,15 +803,15 @@ function requireFinalInference(input: Readonly<{
 
 function finalControlsAgree(input: Readonly<{
   controls: ControlSnapshot;
-  original: ControlSnapshot;
+  expectedProjectSource: string;
   expectedState: InstalledState;
   migrationSource: string;
   desiredCapabilities: readonly string[];
 }>): boolean {
   return (
-    input.controls.projectSource === input.original.projectSource &&
+    input.controls.projectSource === input.expectedProjectSource &&
     serializeProjectYaml(input.controls.project.value) ===
-      input.original.projectSource &&
+      input.expectedProjectSource &&
     input.controls.stateSource === serializeStateJson(input.expectedState) &&
     input.controls.migrationSource === input.migrationSource &&
     sameStringSet(
@@ -741,9 +819,8 @@ function finalControlsAgree(input: Readonly<{
       input.desiredCapabilities,
     ) &&
     input.controls.project.value.recipeVersion ===
-      input.original.project.value.recipeVersion &&
-    input.controls.project.value.originProfile ===
-      input.original.project.value.originProfile &&
+      input.expectedState.origin.recipeVersion &&
+    input.controls.project.value.originProfile === input.expectedState.origin.profile &&
     sameValues(
       input.controls.migrations.value.map(({ identifier }) => identifier),
       input.expectedState.appliedMigrations,
@@ -753,7 +830,7 @@ function finalControlsAgree(input: Readonly<{
 
 export async function applyCapabilityUpgrade(input: Readonly<{
   root: string;
-  capability: "standards";
+  capability: "site-routing" | "standards";
   toVersion: "0.4.0";
   approvedPlanFingerprint: string;
   verifier: GeneratedProjectVerifier;
@@ -822,6 +899,10 @@ export async function applyCapabilityUpgrade(input: Readonly<{
       "not-required",
     );
   }
+  const migrationIdentifier =
+    plan.capability.identifier === "standards"
+      ? standardsMigrationIdentifier
+      : siteRoutingMigrationIdentifier;
 
   let controls: ControlSnapshot | undefined;
   let materialized: MaterializedUpgrade | undefined;
@@ -858,6 +939,21 @@ export async function applyCapabilityUpgrade(input: Readonly<{
   if (materialized === undefined) {
     return failure(
       "CAPABILITY_ACTION_CONFLICT",
+      "precondition",
+      "not-required",
+    );
+  }
+  const expectedProjectBytes =
+    materialized.targetBytes.get(".egeria/project.yaml") ??
+    encoder.encode(controls.projectSource);
+  let expectedProjectSource: string;
+  try {
+    expectedProjectSource = new TextDecoder("utf-8", { fatal: true }).decode(
+      expectedProjectBytes,
+    );
+  } catch {
+    return failure(
+      "PROJECT_INSPECTION_INVALID",
       "precondition",
       "not-required",
     );
@@ -922,7 +1018,9 @@ export async function applyCapabilityUpgrade(input: Readonly<{
 
   const targetCatalog = createCapabilityCatalogSnapshot(
     verifiedCapabilityPackageVersions,
-    { standards: "0.4.0" },
+    plan.capability.identifier === "standards"
+      ? { standards: "0.4.0", siteRouting: "0.3.0" }
+      : { standards: "0.4.0", siteRouting: "0.4.0" },
   );
   if (!targetCatalog.ok) {
     return failure(
@@ -949,13 +1047,14 @@ export async function applyCapabilityUpgrade(input: Readonly<{
   }
   const actionPaths = plan.actions.map(({ path }) => path);
   if (
-    pendingControls?.projectSource !== controls.projectSource ||
+    pendingControls?.projectSource !== expectedProjectSource ||
     pendingControls.stateSource !== controls.stateSource ||
     pendingControls.migrationSource !== controls.migrationSource ||
     !requirePendingInference({
       inference: pendingInference,
       currentState: controls.state.value,
       desiredCapabilities: plan.desiredCapabilities,
+      upgradedCapability: plan.capability.identifier,
     }) ||
     !(await hasExactBytes({
       root,
@@ -1048,6 +1147,7 @@ export async function applyCapabilityUpgrade(input: Readonly<{
     nextState = createNextState({
       current: controls.state.value,
       rendered: materialized.rendered,
+      upgradedCapability: plan.capability.identifier,
       actionPaths,
       files: expectedBytes,
       migration: migration.data,
@@ -1110,7 +1210,7 @@ export async function applyCapabilityUpgrade(input: Readonly<{
     finalControls === undefined ||
     !finalControlsAgree({
       controls: finalControls,
-      original: controls,
+      expectedProjectSource,
       expectedState: nextState,
       migrationSource: persistedMigration.source,
       desiredCapabilities: plan.desiredCapabilities,
@@ -1154,7 +1254,7 @@ export async function applyCapabilityUpgrade(input: Readonly<{
   const finalExpected = new Map(expectedBytes);
   finalExpected.set(
     ".egeria/project.yaml",
-    encoder.encode(controls.projectSource),
+    encoder.encode(expectedProjectSource),
   );
   if (
     !(await hasExactBytes({
@@ -1177,7 +1277,7 @@ export async function applyCapabilityUpgrade(input: Readonly<{
       status: "verified-final-diff-approval-required",
       baseRevision: initialGit.identity.revision,
       capability: {
-        identifier: "standards",
+        identifier: plan.capability.identifier,
         fromVersion: "0.3.0",
         toVersion: "0.4.0",
       },

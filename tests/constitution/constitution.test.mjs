@@ -2396,7 +2396,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/i,
+    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+refuse[^\n]+pending/i,
   );
 });
 
@@ -2552,6 +2552,7 @@ test("executable capability certification ownership is current", async () => {
   const bookingRecord = registry.records["booking-calendly"];
   const deploymentRecord = registry.records["deployment-cloudflare"];
   const observabilityRecord = registry.records.observability;
+  const siteRoutingRecord = registry.records["site-routing"];
   const standardsRecord = registry.records.standards;
   assert.equal(bookingRecord.status, "certified");
   assert.equal(
@@ -2625,6 +2626,18 @@ test("executable capability certification ownership is current", async () => {
     ),
   );
   assert.equal(observabilityRecord.status, "certified");
+  assert.deepEqual(siteRoutingRecord, {
+    subject: {
+      descriptorVersion: "0.4.0",
+      behaviorContractDigest:
+        "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3",
+    },
+    requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
+    status: "pending",
+    taskPlan:
+      "docs/superpowers/plans/2026-08-26-production-site-routing-certification.md",
+    evidence: [],
+  });
   assert.equal(standardsRecord.status, "certified");
   assert.deepEqual(standardsRecord.requiredEvidence, [
     "existing-repository-lifecycle",
@@ -2683,7 +2696,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /portfolio` and `site` recipes are `0\.10\.0`[^\n]+standards@0\.4\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+observability@0\.3\.0/iu,
+    /executable recipes are `portfolio@0\.10\.0` and `site@0\.11\.0`[^\n]+site-routing@0\.4\.0[^\n]+observability@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+deployment-cloudflare@0\.3\.0/iu,
   );
   assert.match(
     capabilityModel,
@@ -2731,7 +2744,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/iu,
+    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+refuse[^\n]+pending/iu,
   );
   assert.match(
     enforcementMap,
@@ -2914,7 +2927,7 @@ test("canonical documentation records visual regression and the client-ready clo
     assert.match(
       sequencingOwner,
       new RegExp(
-        `${escapeRegularExpression(clientExpansionPhase)}[^\\n]+not begin`,
+        `explicit[^\\n]+independent-work exception[^\\n]+${escapeRegularExpression(clientExpansionPhase)}[^\\n]+(?:implementation|production)[^\\n]+(?:cannot|must not)[^\\n]+merge`,
         "iu",
       ),
     );
@@ -3020,7 +3033,7 @@ test("canonical documentation accepts profile-transition execution and records t
     assert.match(
       sequencingOwner,
       new RegExp(
-        `${escapeRegularExpression(clientExpansionPhase)}[^\\n]+must not begin[^\\n]+${escapeRegularExpression(lifecyclePhase)} closes`,
+        `independent-work exception[^\\n]+${escapeRegularExpression(clientExpansionPhase)}[^\\n]+(?:implementation|production)[^\\n]+(?:cannot|must not)[^\\n]+merge[^\\n]+${escapeRegularExpression(lifecyclePhase)}`,
         "iu",
       ),
     );
@@ -3057,13 +3070,13 @@ test("canonical documentation accepts profile-transition execution and records t
     );
     assert.match(
       boundaryOwner,
-      /generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+remain planned/iu,
+      /generic lifecycle executor[^\n]+(?:another|any further) upgrade or profile-transition edge[^\n]+automated recovery[^\n]+remain planned/iu,
     );
   }
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+exact Calendly addition\/removal[^\n]+standards upgrade[^\n]+portfolio-to-site transactions[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+Exact Calendly certification[^\n]+protected-staging\/provider journey[^\n]+Exact standards certification[^\n]+compiled upgrade\/refusal\/recovery[^\n]+renewed fresh-scaffold evidence[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery/iu,
+    /Existing-repository mutation[^\n]+exact Calendly addition\/removal[^\n]+standards upgrade[^\n]+portfolio-to-site transactions[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+Exact Calendly certification[^\n]+protected-staging\/provider journey[^\n]+Exact standards certification[^\n]+compiled upgrade\/refusal\/recovery[^\n]+renewed fresh-scaffold evidence[^\n]+generic lifecycle executor[^\n]+(?:another|any further) upgrade or profile-transition edge[^\n]+automated recovery/iu,
   );
   assert.match(
     overview,
@@ -3080,7 +3093,7 @@ test("canonical documentation accepts profile-transition execution and records t
   );
   assert.match(
     capabilityModel,
-    /Pull requests 48, 49, and 50[^\n]+standards executor[^\n]+portfolio-to-site planner\/executor[^\n]+accepted-main integrated[^\n]+641db9537f5dea4911b0b727eb083f8d6d359204[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+portfolio-to-site transition lifecycle certification[^\n]+complete[^\n]+8098c68c82aaa35a59345706c851e8111d463111[^\n]+generic lifecycle executor[^\n]+another upgrade or profile-transition edge[^\n]+automated recovery[^\n]+remain planned/iu,
+    /Pull requests 48, 49, and 50[^\n]+standards executor[^\n]+portfolio-to-site planner\/executor[^\n]+accepted-main integrated[^\n]+641db9537f5dea4911b0b727eb083f8d6d359204[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+portfolio-to-site transition lifecycle certification[^\n]+complete[^\n]+8098c68c82aaa35a59345706c851e8111d463111[^\n]+generic lifecycle executor[^\n]+(?:another|any further) upgrade or profile-transition edge[^\n]+automated recovery[^\n]+remain planned/iu,
   );
   assert.match(
     enforcementMap,
@@ -3215,7 +3228,7 @@ test("canonical documentation accepts profile-transition execution and records t
   );
   assert.match(
     enforcementMap,
-    /INV-STATE-UPDATE-ORDER[^\n]+standards upgrade[^\n]+migration-before-state[^\n]+verified-final-diff/iu,
+    /INV-STATE-UPDATE-ORDER[^\n]+standards(?: and site-routing)? upgrades?[^\n]+migration-before-state[^\n]+verified-final-diff/iu,
   );
   for (const candidateOwner of [sourcePlan, capabilityModel, enforcementMap]) {
     assert.match(
@@ -3475,7 +3488,7 @@ test("execution plans enforce direct predecessors and bounded independent-work e
   const diagnosticsReleaseTask = namedLabel("Task", "5");
   const portfolioPhase = compactLabel("P", "2");
   const publicSitePhase = compactLabel("P", "3B");
-  const closureGate = `${compactLabel("P", "3")} Gate 3`;
+  const closureGate = `${compactLabel("P", "3")} ${namedLabel("Gate", "3")}`;
 
   assert.match(reviewProtocol, /^### Direct-predecessor gate$/mu);
   assert.match(

@@ -27,6 +27,14 @@ const cli = await import(pathToFileURL(resolve(packageRoot, "dist/run-cli.js")))
 const core = await import(
   pathToFileURL(resolve(repositoryRoot, "packages/builder-core/dist/index.js"))
 );
+const { createBuilderStateSurfaces } = await import(
+  pathToFileURL(
+    resolve(
+      repositoryRoot,
+      "packages/builder-core/dist/generation/builder-state-surfaces.js",
+    ),
+  )
+);
 
 const generatedChecks = [
   "lockfile",
@@ -287,13 +295,13 @@ function planRemoveArguments(directory) {
   ];
 }
 
-function planUpgradeArguments(directory) {
+function planUpgradeArguments(directory, capability = "standards") {
   return [
     "plan-upgrade",
     "--directory",
     directory,
     "--capability",
-    "standards",
+    capability,
     "--to-version",
     "0.4.0",
   ];
@@ -347,13 +355,14 @@ function applyRemoveArguments(
 function applyUpgradeArguments(
   directory,
   approvedPlan = `sha256:${"a".repeat(64)}`,
+  capability = "standards",
 ) {
   return [
     "apply-upgrade",
     "--directory",
     directory,
     "--capability",
-    "standards",
+    capability,
     "--to-version",
     "0.4.0",
     "--approved-plan",
@@ -564,6 +573,9 @@ async function renderProfileTransitionTarget(root) {
     displayName: project.value.project.displayName,
     packageVersions: core.verifiedCapabilityPackageVersions,
     ...(booking === undefined ? {} : { bookingCalendly: booking }),
+  }, {
+    catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+    profiles: core.createProfileRecipeSnapshot("0.10.0"),
   });
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
   return {
@@ -575,7 +587,105 @@ async function renderProfileTransitionTarget(root) {
   };
 }
 
-async function prepareHistoricalUpgradeFixture(root) {
+async function prepareHistoricalUpgradeFixture(
+  root,
+  { downgradeStandards = true } = {},
+) {
+  const initialProject = core.parseProjectYaml(
+    await readFile(join(root, ".egeria/project.yaml"), "utf8"),
+  );
+  const initialState = core.parseStateJson(
+    await readFile(join(root, ".egeria/state.json"), "utf8"),
+  );
+  assert.equal(initialProject.ok, true);
+  assert.equal(initialState.ok, true);
+
+  if (
+    initialProject.value.originProfile === "site" &&
+    initialProject.value.recipeVersion === "0.11.0"
+  ) {
+    const rendered = await core.renderSkeleton(
+      {
+        profile: "site",
+        projectName: initialProject.value.project.name,
+        displayName: initialProject.value.project.displayName,
+        packageVersions: core.verifiedCapabilityPackageVersions,
+      },
+      {
+        catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+        profiles: core.createProfileRecipeSnapshot("0.10.0"),
+      },
+    );
+    assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
+
+    for (const path of [
+      "apps/web/app/not-found.tsx",
+      "apps/web/app/robots.ts",
+      "apps/web/app/sitemap.ts",
+      "apps/web/app/work/error.tsx",
+      "apps/web/app/work/featured/page.tsx",
+      "apps/web/app/work/page.tsx",
+      "apps/web/content/en-CA/not-found.yaml",
+      "apps/web/content/en-CA/routing.yaml",
+      "apps/web/content/en-CA/work-featured.yaml",
+      "apps/web/src/routing/read-routing-content.ts",
+      "apps/web/src/routing/routing-content-schema.ts",
+      "apps/web/src/routing/site-page.tsx",
+      "apps/web/tests/component/site-page.test.tsx",
+      "apps/web/tests/e2e/site-routing.spec.ts",
+      "apps/web/tests/unit/routing-content.test.ts",
+    ]) {
+      await rm(join(root, path), { force: false });
+    }
+    for (const { path, content } of rendered.value.files) {
+      await mkdir(dirname(join(root, path)), { recursive: true });
+      await writeFile(join(root, path), content);
+    }
+
+    const projectSource = core.serializeProjectYaml(rendered.value.project);
+    await writeFile(join(root, ".egeria/project.yaml"), projectSource);
+    await cp(
+      resolve(
+        repositoryRoot,
+        "packages/builder-core/lockfiles/web-recipe-0.8.0/pnpm-lock.yaml",
+      ),
+      join(root, "pnpm-lock.yaml"),
+    );
+    const files = new Map(
+      await Promise.all(
+        [
+          ...rendered.value.files.map(({ path }) => path),
+          ".egeria/project.yaml",
+          ".egeria/migrations.jsonl",
+          "pnpm-lock.yaml",
+        ].map(async (path) => [path, await readFile(join(root, path))]),
+      ),
+    );
+    const surfaces = core.materializeInstalledSurfaces({
+      files,
+      surfaces: [
+        ...rendered.value.surfaces,
+        ...createBuilderStateSurfaces(),
+      ].sort((left, right) => left.identifier.localeCompare(right.identifier)),
+    });
+    assert.equal(surfaces.ok, true, JSON.stringify(surfaces.issues));
+    await writeFile(
+      join(root, ".egeria/state.json"),
+      core.serializeStateJson({
+        ...initialState.value,
+        origin: { profile: "site", recipeVersion: "0.10.0" },
+        installedCapabilities: core.createInstalledManifest(
+          rendered.value.resolved,
+        ),
+        managedSurfaces: surfaces.value,
+      }),
+    );
+  }
+
+  if (!downgradeStandards) {
+    return;
+  }
+
   for (const path of visualUpgradePaths) {
     await rm(join(root, path), { force: false });
   }
@@ -903,6 +1013,18 @@ test("the plan-upgrade parser accepts only its exact absolute-worktree contract"
   );
   assert.deepEqual(
     assertSuccess(
+      cliArguments.parseCliArguments(
+        planUpgradeArguments("/private/tmp/acme-site", "site-routing"),
+      ),
+    ),
+    {
+      ...expected,
+      directory: "/private/tmp/acme-site",
+      capability: "site-routing",
+    },
+  );
+  assert.deepEqual(
+    assertSuccess(
       cliArguments.parseCliArguments([
         "plan-upgrade",
         "--to-version",
@@ -1117,7 +1239,7 @@ test("the apply-remove parser accepts only the exact approved removal arguments"
   }
 });
 
-test("the apply-upgrade parser accepts only the exact approved standards edge", () => {
+test("the apply-upgrade parser accepts only the exact approved capability edges", () => {
   const fingerprint = `sha256:${"a".repeat(64)}`;
   const expected = {
     kind: "apply-upgrade",
@@ -1134,6 +1256,22 @@ test("the apply-upgrade parser accepts only the exact approved standards edge", 
   assert.deepEqual(
     assertSuccess(cliArguments.parseCliArguments(valid)),
     expected,
+  );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments(
+        applyUpgradeArguments(
+          "/private/tmp/acme-site",
+          fingerprint,
+          "site-routing",
+        ),
+      ),
+    ),
+    {
+      ...expected,
+      directory: "/private/tmp/acme-site",
+      capability: "site-routing",
+    },
   );
   assert.deepEqual(
     assertSuccess(
@@ -3086,7 +3224,12 @@ async function assertExactInstalledAgreement(root, options = {}) {
   const stateSource = await readFile(join(root, ".egeria/state.json"), "utf8");
   const project = core.parseProjectYaml(projectSource);
   const state = core.parseStateJson(stateSource);
-  const catalog = core.createVerifiedCapabilityCatalog();
+  const catalog = options.catalogSnapshot
+    ? core.createCapabilityCatalogSnapshot(
+        core.verifiedCapabilityPackageVersions,
+        options.catalogSnapshot,
+      )
+    : core.createVerifiedCapabilityCatalog();
   assert.equal(project.ok, true);
   assert.equal(state.ok, true);
   assert.equal(catalog.ok, true);
@@ -3167,10 +3310,10 @@ async function executeBuiltPlanRemove(directory) {
   ]);
 }
 
-async function executeBuiltPlanUpgrade(directory) {
+async function executeBuiltPlanUpgrade(directory, capability = "standards") {
   return executeNode([
     resolve(packageRoot, "dist/index.js"),
-    ...planUpgradeArguments(directory),
+    ...planUpgradeArguments(directory, capability),
   ]);
 }
 
@@ -3306,6 +3449,36 @@ test("the compiled plan-upgrade command plans both profiles without changing any
       },
     );
   }
+});
+
+test("the compiled plan-upgrade command plans the exact production site edge without writes", async () => {
+  await withGitFixture(
+    "site",
+    async ({ linked }) => {
+      const before = await gitRepositorySnapshot(linked);
+      const execution = await executeBuiltPlanUpgrade(linked, "site-routing");
+      const after = await gitRepositorySnapshot(linked);
+
+      assert.equal(execution.exitCode, 0, execution.stderr);
+      assert.equal(execution.stderr, "");
+      const emitted = JSON.parse(execution.stdout);
+      assert.equal(emitted.ok, true);
+      assert.equal(emitted.command, "plan-upgrade");
+      assert.deepEqual(emitted.plan.capability, {
+        identifier: "site-routing",
+        fromVersion: "0.3.0",
+        toVersion: "0.4.0",
+      });
+      assert.equal(emitted.plan.actions.length, 22);
+      assert.match(emitted.plan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
+      assert.deepEqual(after, before);
+    },
+    {
+      branch: "plan-site-routing-upgrade-test",
+      preparePrimary: (root) =>
+        prepareHistoricalUpgradeFixture(root, { downgradeStandards: false }),
+    },
+  );
 });
 
 test("the compiled profile-transition planner is repeatable and leaves portfolio controls and Git unchanged", async () => {
@@ -3653,7 +3826,9 @@ test("the compiled apply-profile-transition command completes default and Calend
           ).ok,
           true,
         );
-        await assertExactInstalledAgreement(linked);
+        await assertExactInstalledAgreement(linked, {
+          catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+        });
         assert.deepEqual(await gitRepositorySnapshot(primary), primaryBefore);
         assert.doesNotMatch(
           execution.stdout,
@@ -3846,8 +4021,38 @@ test("the compiled apply-upgrade command completes the exact portfolio and site 
           join(linked, ".egeria/migrations.jsonl"),
           "utf8",
         );
+        const initialProject = core.parseProjectYaml(initialProjectSource);
         const initialState = core.parseStateJson(initialStateSource);
+        assert.equal(initialProject.ok, true);
         assert.equal(initialState.ok, true);
+        const historicalSiteTarget =
+          profile === "site"
+            ? await core.renderSkeleton(
+                {
+                  profile: "site",
+                  projectName: initialProject.value.project.name,
+                  displayName: initialProject.value.project.displayName,
+                  packageVersions: core.verifiedCapabilityPackageVersions,
+                },
+                {
+                  catalogSnapshot: {
+                    standards: "0.4.0",
+                    siteRouting: "0.3.0",
+                  },
+                  profiles: core.createProfileRecipeSnapshot("0.10.0"),
+                },
+              )
+            : undefined;
+        assert.notEqual(historicalSiteTarget?.ok, false);
+        const historicalSiteFiles =
+          historicalSiteTarget?.ok === true
+            ? new Map(
+                historicalSiteTarget.value.files.map(({ path, content }) => [
+                  path,
+                  Buffer.from(content),
+                ]),
+              )
+            : undefined;
 
         const planExecution = await executeBuiltPlanUpgrade(linked);
         assert.equal(planExecution.exitCode, 0, planExecution.stderr);
@@ -3889,9 +4094,10 @@ test("the compiled apply-upgrade command completes the exact portfolio and site 
         for (const path of upgradeSourcePaths) {
           assert.deepEqual(
             await readFile(join(linked, path)),
-            await readFile(
-              resolve(repositoryRoot, `fixtures/generated/${profile}`, path),
-            ),
+            historicalSiteFiles?.get(path) ??
+              (await readFile(
+                resolve(repositoryRoot, `fixtures/generated/${profile}`, path),
+              )),
             `${profile}:${path}`,
           );
         }
@@ -3934,16 +4140,40 @@ test("the compiled apply-upgrade command completes the exact portfolio and site 
           )}`,
         );
 
-        const targetState = core.parseStateJson(
-          await readFile(
-            resolve(
-              repositoryRoot,
-              `fixtures/generated/${profile}/.egeria/state.json`,
+        let targetManagedSurfaces;
+        if (historicalSiteTarget?.ok === true) {
+          const surfaceCatalog = [
+            ...historicalSiteTarget.value.surfaces,
+            ...createBuilderStateSurfaces(),
+          ].sort((left, right) =>
+            left.identifier.localeCompare(right.identifier),
+          );
+          const surfaceFiles = new Map(
+            await Promise.all(
+              [...new Set(surfaceCatalog.map(({ path }) => path))].map(
+                async (path) => [path, await readFile(join(linked, path))],
+              ),
             ),
-            "utf8",
-          ),
-        );
-        assert.equal(targetState.ok, true);
+          );
+          const materialized = core.materializeInstalledSurfaces({
+            files: surfaceFiles,
+            surfaces: surfaceCatalog,
+          });
+          assert.equal(materialized.ok, true);
+          targetManagedSurfaces = materialized.value;
+        } else {
+          const targetState = core.parseStateJson(
+            await readFile(
+              resolve(
+                repositoryRoot,
+                `fixtures/generated/${profile}/.egeria/state.json`,
+              ),
+              "utf8",
+            ),
+          );
+          assert.equal(targetState.ok, true);
+          targetManagedSurfaces = targetState.value.managedSurfaces;
+        }
         const initialSurfaces = new Map(
           initialState.value.managedSurfaces.map((surface) => [
             surface.identifier,
@@ -3954,8 +4184,7 @@ test("the compiled apply-upgrade command completes the exact portfolio and site 
           ...upgradeSourcePaths,
           ".egeria/migrations.jsonl",
         ]);
-        const expectedManagedSurfaces = targetState.value.managedSurfaces.map(
-          (surface) => {
+        const expectedManagedSurfaces = targetManagedSurfaces.map((surface) => {
             if (surface.path === ".egeria/migrations.jsonl") {
               return {
                 ...surface,

@@ -31,6 +31,7 @@ import { inferRepository } from "../inference/infer-repository.js";
 import { createInstalledManifest } from "../manifest/create-installed-manifest.js";
 import { fingerprintFileContent } from "../ownership/fingerprint.js";
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
+import { createProfileRecipeSnapshot } from "../profiles/profile-recipes.js";
 import {
   createFileSystemRepositoryReader,
   type RepositoryReader,
@@ -314,21 +315,27 @@ async function materializeTransition(input: Readonly<{
     return undefined;
   }
 
-  const rendered = await renderSkeleton({
-    profile: "site",
-    projectName: input.controls.project.value.project.name,
-    displayName: input.controls.project.value.project.displayName,
-    packageVersions: verifiedCapabilityPackageVersions,
-    ...(input.controls.project.value.capabilitySettings["booking-calendly"] ===
-    undefined
-      ? {}
-      : {
-          bookingCalendly:
-            input.controls.project.value.capabilitySettings[
-              "booking-calendly"
-            ],
-        }),
-  });
+  const rendered = await renderSkeleton(
+    {
+      profile: "site",
+      projectName: input.controls.project.value.project.name,
+      displayName: input.controls.project.value.project.displayName,
+      packageVersions: verifiedCapabilityPackageVersions,
+      ...(input.controls.project.value.capabilitySettings["booking-calendly"] ===
+      undefined
+        ? {}
+        : {
+            bookingCalendly:
+              input.controls.project.value.capabilitySettings[
+                "booking-calendly"
+              ],
+          }),
+    },
+    {
+      catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+      profiles: createProfileRecipeSnapshot("0.10.0"),
+    },
+  );
   if (!rendered.ok) {
     return undefined;
   }

@@ -9,6 +9,7 @@ export type TemplateCatalogEntry = Readonly<{
 
 type TemplateSource = Readonly<{
   source: string;
+  destinationSource?: string;
   contentKind: TemplateCatalogEntry["contentKind"];
 }>;
 
@@ -85,13 +86,60 @@ const portfolioTemplateSources: readonly TemplateSource[] = [
   },
 ];
 
-const siteTemplateSources: readonly TemplateSource[] = [
+const legacySiteTemplateSources: readonly TemplateSource[] = [
   ...textTemplateSources([
     "site/apps/web/content/en-CA/site.yaml.template",
     "site/apps/web/content/en-CA/about.yaml.template",
     "site/apps/web/content/en-CA/long-form/introduction.md.template",
     "site/apps/web/app/about/page.tsx",
   ] as const),
+  {
+    source:
+      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+    contentKind: "binary",
+  },
+  {
+    source:
+      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+    contentKind: "binary",
+  },
+];
+
+const productionSiteTemplateSources: readonly TemplateSource[] = [
+  ...textTemplateSources([
+    "site/apps/web/app/page.tsx",
+    "site/apps/web/app/not-found.tsx",
+    "site/apps/web/app/robots.ts",
+    "site/apps/web/app/sitemap.ts",
+    "site/apps/web/app/work/error.tsx",
+    "site/apps/web/app/work/featured/page.tsx",
+    "site/apps/web/app/work/page.tsx",
+    "site/apps/web/content/en-CA/long-form/introduction.md.template",
+    "site/apps/web/content/en-CA/not-found.yaml.template",
+    "site/apps/web/content/en-CA/routing.yaml",
+    "site/apps/web/content/en-CA/work-featured.yaml.template",
+    "site/apps/web/src/routing/read-routing-content.ts",
+    "site/apps/web/src/routing/routing-content-schema.ts",
+    "site/apps/web/src/routing/site-page.tsx",
+    "site/apps/web/tests/component/site-page.test.tsx",
+    "site/apps/web/tests/e2e/site-routing.spec.ts.template",
+    "site/apps/web/tests/unit/routing-content.test.ts",
+  ] as const),
+  {
+    source: "site/apps/web/app/about/production-page.tsx",
+    destinationSource: "site/apps/web/app/about/page.tsx",
+    contentKind: "text",
+  },
+  {
+    source: "site/apps/web/content/en-CA/about.production.yaml.template",
+    destinationSource: "site/apps/web/content/en-CA/about.yaml.template",
+    contentKind: "text",
+  },
+  {
+    source: "site/apps/web/content/en-CA/site.production.yaml.template",
+    destinationSource: "site/apps/web/content/en-CA/site.yaml.template",
+    contentKind: "text",
+  },
   {
     source:
       "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
@@ -113,6 +161,12 @@ const bookingCalendlyTemplateSources = textTemplateSources([
   "booking-calendly/apps/web/tests/e2e/calendly-booking.spec.ts",
 ] as const);
 
+const productionSiteBookingHome: TemplateSource = {
+  source: "site/apps/web/app/page-with-booking.tsx",
+  destinationSource: "site/apps/web/app/page.tsx",
+  contentKind: "text",
+};
+
 const commonHomeRouteSource = "common/apps/web/app/page.tsx";
 
 function compareText(left: string, right: string): number {
@@ -132,21 +186,42 @@ function remapSourceIssue(
 export function createTemplateCatalog(
   profile: "portfolio" | "site",
   includeBookingCalendly = false,
+  recipeVersion = profile === "site" ? "0.11.0" : "0.10.0",
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
+  const productionSite = profile === "site" && recipeVersion === "0.11.0";
   const sources = [
     ...commonTemplateSources.filter(
-      ({ source }) => !includeBookingCalendly || source !== commonHomeRouteSource,
+      ({ source }) =>
+        !(
+          (includeBookingCalendly || productionSite) &&
+          source === commonHomeRouteSource
+        ),
     ),
     ...(profile === "portfolio"
       ? portfolioTemplateSources
-      : siteTemplateSources),
-    ...(includeBookingCalendly ? bookingCalendlyTemplateSources : []),
+      : productionSite
+        ? productionSiteTemplateSources.filter(
+            ({ source }) =>
+              !includeBookingCalendly || source !== "site/apps/web/app/page.tsx",
+          )
+        : legacySiteTemplateSources),
+    ...(includeBookingCalendly
+      ? bookingCalendlyTemplateSources.filter(
+          ({ source }) =>
+            !productionSite || source !== "booking-calendly/apps/web/app/page.tsx",
+        )
+      : []),
+    ...(includeBookingCalendly && productionSite
+      ? [productionSiteBookingHome]
+      : []),
   ];
   const destinations = new Set<string>();
   const entries: TemplateCatalogEntry[] = [];
 
-  for (const [index, { source, contentKind }] of sources.entries()) {
-    const destinationResult = deriveTemplateDestination(source);
+  for (const [index, { source, destinationSource, contentKind }] of sources.entries()) {
+    const destinationResult = deriveTemplateDestination(
+      destinationSource ?? source,
+    );
 
     if (!destinationResult.ok) {
       return {

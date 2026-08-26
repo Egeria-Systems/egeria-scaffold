@@ -1311,7 +1311,9 @@ The following bullets record completed P3 delivery history rather than active su
 
 #### P3B — Client-required public-site expansion
 
-P3B begins only after P3 closes. It uses the transactional lifecycle rather than creating pre-lifecycle client exceptions.
+The isolated production-site implementation candidate realizes the first P3B item as `site@0.11.0` with `site-routing@0.4.0` and an exact state-last `site-routing@0.3.0` to `0.4.0` upgrade. Its generated route, navigation, metadata, crawl-output, redirect, not-found/error, and development/OpenNext browser contracts are implementation evidence only. The new descriptor subject remains pending its separate `fresh-scaffold` and `existing-repository-lifecycle` certification task; accepted P3 closure is integrated and reconciled. Multilingual, analytics, real-client generation, providers, deployment, publication, and production action remain outside this implementation.
+
+The normal P3B sequence begins only after P3 closes. The explicit independent-work exception above permits only this isolated production-site implementation and review to start early; it does not permit merge before accepted P3 closure or create a reusable pre-lifecycle exception.
 
 - Complete the production-complete `site` profile and the existing `site-routing` capability: multiple public routes, navigation, page-level metadata, multi-page content composition, and page/navigation migration support. Treat the material capability change as a capability implementation task followed by a separate capability-certification task.
 - Deliver `multilingual` as an independently selectable capability for supported public profiles, available during initial scaffolding and addable later. Preserve locale-prefixed routing, strict required translations, missing/unused key and locale-parity validation, localized navigation and metadata, copy externalization, explicit removal/recovery requirements, and a capability implementation task followed by a separate capability-certification task.

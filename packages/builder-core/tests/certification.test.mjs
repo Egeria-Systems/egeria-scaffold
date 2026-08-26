@@ -43,7 +43,7 @@ const sectionCompositionEvidencePath =
 const sectionCompositionEvidenceRevision =
   "f74459c8833833186bb651c116ed524e51044677";
 const siteRoutingPlanPath =
-  "docs/superpowers/plans/2026-08-26-site-routing-certification.md";
+  "docs/superpowers/plans/2026-08-26-production-site-routing-certification.md";
 const siteRoutingEvidencePath =
   "docs/implementation-evidence/2026-08-26-site-routing-certification-receipt.md";
 const siteRoutingEvidenceRevision =
@@ -73,7 +73,7 @@ const descriptorDigests = Object.freeze({
   "section-composition":
     "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
   "site-routing":
-    "sha256:d716a1c93f8f40db33e54612c85d521fbd6ba13cd142d35ab0c39fa9c4b9647e",
+    "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3",
   standards:
     "sha256:be53fdace61b6782e7f0abbbc0af7c333f81122f3a62fcfc7eb0ac687b2ff2fb",
 });
@@ -127,6 +127,8 @@ function createRecord(identifier) {
         ? deploymentPlanPath
         : identifier === "observability"
           ? observabilityPlanPath
+          : identifier === "site-routing"
+            ? siteRoutingPlanPath
           : identifier === "standards"
             ? standardsPlanPath
             : null;
@@ -147,6 +149,7 @@ function createRecord(identifier) {
       identifier === "booking-calendly" ||
       identifier === "deployment-cloudflare" ||
       identifier === "observability" ||
+      identifier === "site-routing" ||
       identifier === "standards"
         ? "pending"
         : "backfill-pending",
@@ -418,7 +421,7 @@ test("accepted section composition receipt binds the reviewed fresh-scaffold out
   );
 });
 
-test("current site routing subject has exact reviewed fresh-scaffold evidence", () => {
+test("current production site routing subject is admitted only as pending certification", () => {
   const descriptor = descriptorsByIdentifier.get("site-routing");
   assert.notEqual(descriptor, undefined);
   const subject = core.createCertificationSubject(
@@ -428,23 +431,34 @@ test("current site routing subject has exact reviewed fresh-scaffold evidence", 
 
   assert.deepEqual(committedRegistry.records["site-routing"], {
     subject,
+    requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
+    status: "pending",
+    taskPlan: siteRoutingPlanPath,
+    evidence: [],
+  });
+});
+
+test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", () => {
+  const historicalSubject = {
+    descriptorVersion: "0.3.0",
+    behaviorContractDigest:
+      "sha256:d716a1c93f8f40db33e54612c85d521fbd6ba13cd142d35ab0c39fa9c4b9647e",
+  };
+  const acceptedRecord = {
+    subject: historicalSubject,
     requiredEvidence: ["fresh-scaffold"],
     status: "certified",
-    taskPlan: siteRoutingPlanPath,
+    taskPlan: "docs/superpowers/plans/2026-08-26-site-routing-certification.md",
     evidence: [
       {
         kind: "fresh-scaffold",
         path: siteRoutingEvidencePath,
         outcome: "passed",
         revision: siteRoutingEvidenceRevision,
-        subject,
+        subject: historicalSubject,
       },
     ],
-  });
-});
-
-test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", () => {
-  const acceptedRecord = committedRegistry.records["site-routing"];
+  };
   const acceptedReceiptUrl = new URL(
     `../../../${siteRoutingEvidencePath}`,
     import.meta.url,
@@ -458,7 +472,7 @@ test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", 
         records: { "site-routing": acceptedRecord },
       },
       artifacts: {
-        [siteRoutingPlanPath]: "# approved plan",
+        [acceptedRecord.taskPlan]: "# approved plan",
         [siteRoutingEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
       },
       validRevisions: [siteRoutingEvidenceRevision],
@@ -771,6 +785,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
+        [siteRoutingPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
       },
@@ -785,6 +800,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
       artifacts: {
         [deploymentPlanPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
+        [siteRoutingPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
       },
@@ -811,6 +827,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
+        [siteRoutingPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
       },
@@ -851,6 +868,7 @@ test("repository artifacts reject revisions outside the checked Git history", ()
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
+        [siteRoutingPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: nonexistentRevisionDocument,
       },
@@ -884,6 +902,7 @@ test("repository artifacts reject incomplete or unresolved reviewer receipts", (
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
+        [siteRoutingPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: incompleteReceipt,
       },
@@ -924,6 +943,7 @@ test("repository artifacts require affirmative review of every claimed outcome",
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
+        [siteRoutingPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: mismatchedReview,
       },
@@ -963,6 +983,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       },
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "site-routing", "status"],
+        context: { reason: "pending" },
+      },
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "standards", "status"],
         context: { reason: "pending" },
       },
@@ -992,6 +1017,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "deployment-cloudflare", "status"],
+        context: { reason: "pending" },
+      },
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "site-routing", "status"],
         context: { reason: "pending" },
       },
       {

@@ -94,6 +94,8 @@ Each certification task begins with current planning under the [review and contr
 
 ## P3B — Client-required public-site expansion
 
+**Production-site implementation candidate:** The isolated candidate advances only `site` to recipe `0.11.0` and `site-routing@0.4.0`. It materializes content-backed home, about, featured-work, not-found, and nested error behavior; active navigation; route metadata; sitemap and robots output; redirects; development and OpenNext/workerd browser contracts; and the exact state-last `site-routing@0.3.0` to `0.4.0` upgrade. The new descriptor subject is pending separate `fresh-scaffold` and `existing-repository-lifecycle` certification. This candidate excludes multilingual, analytics, real-client generation, providers, deployment, publication, and production action, and it cannot merge until P3 closure is accepted and reconciled.
+
 P3 remains unchanged and is the prerequisite for this boundary. This part relocates approved client-required public-site work so it is delivered through the same transactional capability lifecycle used by every later generated repository:
 
 - finish the production-complete `site` profile, including multi-page routing, navigation, active-link semantics, route-aware metadata, sitemap and robots output, redirects, route-level not-found and error handling, and nested-route production verification;

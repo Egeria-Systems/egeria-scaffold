@@ -18,6 +18,13 @@ import test from "node:test";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
+const { createProfileRecipeSnapshot } = await import(
+  pathToFileURL(resolve(packageRoot, "dist/profiles/profile-recipes.js"))
+);
+const historicalTransitionContext = {
+  catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+  profiles: createProfileRecipeSnapshot("0.10.0"),
+};
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const root = "/generated/project";
@@ -102,13 +109,16 @@ async function transitionTargetEntries(source) {
   );
   assert.equal(project.ok, true, JSON.stringify(project.issues));
   const booking = project.value.capabilitySettings["booking-calendly"];
-  const rendered = await core.renderSkeleton({
-    profile: "site",
-    projectName: project.value.project.name,
-    displayName: project.value.project.displayName,
-    packageVersions: core.verifiedCapabilityPackageVersions,
-    ...(booking === undefined ? {} : { bookingCalendly: booking }),
-  });
+  const rendered = await core.renderSkeleton(
+    {
+      profile: "site",
+      projectName: project.value.project.name,
+      displayName: project.value.project.displayName,
+      packageVersions: core.verifiedCapabilityPackageVersions,
+      ...(booking === undefined ? {} : { bookingCalendly: booking }),
+    },
+    historicalTransitionContext,
+  );
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
   return new Map([
     ...rendered.value.files.map(({ path, content }) => [path, content]),

@@ -1,0 +1,20 @@
+metadata:
+  title: Page not found
+  description: The requested page could not be found.
+sections:
+  - id: page-not-found
+    type: hero
+    variant: default
+    enabled: true
+    content:
+      heading: Page not found
+      summary: The requested page could not be found.
+  - id: return-home
+    type: call-to-action
+    variant: default
+    enabled: true
+    content:
+      heading: Return to the homepage
+      summary: Continue from the main page.
+      label: Go home
+      href: /

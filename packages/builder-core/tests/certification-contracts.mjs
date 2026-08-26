@@ -18,7 +18,10 @@ export const requiredEvidence = Object.freeze({
     "fresh-scaffold",
   ]),
   "section-composition": Object.freeze(["fresh-scaffold"]),
-  "site-routing": Object.freeze(["fresh-scaffold"]),
+  "site-routing": Object.freeze([
+    "existing-repository-lifecycle",
+    "fresh-scaffold",
+  ]),
   standards: Object.freeze([
     "existing-repository-lifecycle",
     "fresh-scaffold",

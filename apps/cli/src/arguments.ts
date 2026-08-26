@@ -36,7 +36,7 @@ export type CliCommand =
   | Readonly<{
       kind: "plan-upgrade";
       directory: string;
-      capability: "standards";
+      capability: "site-routing" | "standards";
       toVersion: "0.4.0";
     }>
   | Readonly<{
@@ -60,7 +60,7 @@ export type CliCommand =
   | Readonly<{
       kind: "apply-upgrade";
       directory: string;
-      capability: "standards";
+      capability: "site-routing" | "standards";
       toVersion: "0.4.0";
       approvedPlanFingerprint: string;
     }>
@@ -319,7 +319,7 @@ function parsePlanUpgrade(
     if (
       !hasExactOptions(tokens, ["directory", "capability", "to-version"]) ||
       !validAbsoluteDirectory(directory) ||
-      capability !== "standards" ||
+      (capability !== "standards" && capability !== "site-routing") ||
       toVersion !== "0.4.0"
     ) {
       return invalidArguments();
@@ -510,7 +510,7 @@ function parseApplyUpgrade(
         "approved-plan",
       ]) ||
       !validAbsoluteDirectory(directory) ||
-      capability !== "standards" ||
+      (capability !== "standards" && capability !== "site-routing") ||
       toVersion !== "0.4.0" ||
       approvedPlanFingerprint === undefined ||
       !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
