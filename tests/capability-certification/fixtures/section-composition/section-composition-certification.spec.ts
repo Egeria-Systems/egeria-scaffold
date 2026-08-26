@@ -77,18 +77,26 @@ test("reflows at 320 CSS pixels and applies the responsive project grid", async 
         document.documentElement.clientWidth,
     ),
   ).toBe(false);
-  expect(
-    (await page.locator("#selected-work ul").evaluate((element) =>
-      getComputedStyle(element).gridTemplateColumns.split(" "),
-    )).length,
-  ).toBe(1);
+  const readProjectGrid = () =>
+    page.locator("#selected-work ul").evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        display: style.display,
+        columnCount:
+          style.gridTemplateColumns === "none"
+            ? 0
+            : style.gridTemplateColumns.split(" ").length,
+      };
+    });
+
+  await expect
+    .poll(readProjectGrid)
+    .toEqual({ display: "grid", columnCount: 1 });
 
   await page.setViewportSize({ width: 900, height: 800 });
-  expect(
-    (await page.locator("#selected-work ul").evaluate((element) =>
-      getComputedStyle(element).gridTemplateColumns.split(" "),
-    )).length,
-  ).toBe(2);
+  await expect
+    .poll(readProjectGrid)
+    .toEqual({ display: "grid", columnCount: 2 });
 });
 
 test("honours the reduced-motion preference", async ({ page }) => {
