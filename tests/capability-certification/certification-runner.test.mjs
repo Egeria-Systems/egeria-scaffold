@@ -29,6 +29,7 @@ import { certifyContentFilesForTesting } from "../../scripts/certify-content-fil
 import { certifyGeneratedTestingForTesting } from "../../scripts/certify-generated-testing.mjs";
 import { certifyProfileTransitionLifecycleForTesting } from "../../scripts/certify-profile-transition-lifecycle.mjs";
 import { certifySectionCompositionForTesting } from "../../scripts/certify-section-composition.mjs";
+import { certifySiteRoutingForTesting } from "../../scripts/certify-site-routing.mjs";
 import { certifyStandardsLifecycleForTesting } from "../../scripts/certify-standards-lifecycle.mjs";
 import { runCertificationCli } from "../../scripts/lib/certification-cli.mjs";
 
@@ -89,6 +90,10 @@ const profileTransitionLifecycleCertificationScript = resolve(
 const sectionCompositionCertificationScript = resolve(
   repositoryRoot,
   "scripts/certify-section-composition.mjs",
+);
+const siteRoutingCertificationScript = resolve(
+  repositoryRoot,
+  "scripts/certify-site-routing.mjs",
 );
 const compiledUpgradeCertificationTests = [
   "the compiled plan-upgrade command plans both profiles without changing any byte",
@@ -845,6 +850,13 @@ const sectionCompositionFixtureChecks = Object.freeze([
   "section-composition-fixture-component-contract",
   "section-composition-fixture-browser-install",
   "section-composition-fixture-browser-development",
+]);
+const siteRoutingFixtureChecks = Object.freeze([
+  "site-routing-fixture-overlay",
+  "site-routing-fixture-frozen-install",
+  "site-routing-fixture-unit-contract",
+  "site-routing-fixture-browser-install",
+  "site-routing-fixture-browser-development",
 ]);
 
 function createCertificationCliRuntime(arguments_ = []) {
@@ -2890,6 +2902,406 @@ test("the content files certification command requires one exact revision withou
     const execution = await execFileAsync(
       process.execPath,
       [contentFilesCertificationScript, ...arguments_],
+      {
+        cwd: repositoryRoot,
+        encoding: "utf8",
+        env: { PATH: process.env.PATH },
+      },
+    ).catch((error) => error);
+
+    assert.equal(execution.code, expectedExitCode);
+    assert.equal(execution.stdout, "");
+    assert.deepEqual(JSON.parse(execution.stderr), {
+      ok: false,
+      code: expectedCode,
+    });
+    assert.doesNotMatch(execution.stderr, /private-value/u);
+  }
+});
+
+test("site routing certification binds a clean exact revision to causal fresh-scaffold evidence", async () => {
+  const revision = "a".repeat(40);
+  let revisionReads = 0;
+  let statusReads = 0;
+  let indexReads = 0;
+  const scaffold = createSuccessfulScaffoldAdapters({
+    expectedCapabilities: Object.freeze([
+      "standards",
+      "content-files",
+      "section-composition",
+      "deployment-cloudflare",
+      "observability",
+      "site-routing",
+    ]),
+    inferredCapability: { identifier: "site-routing", version: "0.3.0" },
+    profile: "site",
+    readCurrentRevision: async () => {
+      revisionReads += 1;
+      return revision;
+    },
+    readRepositoryStatus: async () => {
+      statusReads += 1;
+      return "";
+    },
+    readRepositoryIndexEntries: async () => {
+      indexReads += 1;
+      return "H selected-evidence.test.mjs\0";
+    },
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+    verifierIdentifier: "site",
+    verifyFixture: async ({ projectRoot, environment }) => {
+      assert.equal(projectRoot, scaffold.state.projectRoot);
+      assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
+      assert.equal(environment.CLOUDFLARE_ACCOUNT_ID, undefined);
+      assert.equal(environment.NPM_TOKEN, undefined);
+      assert.equal(environment.NODE_OPTIONS, undefined);
+      return { ok: true, checks: siteRoutingFixtureChecks };
+    },
+  });
+
+  const result = await certifySiteRoutingForTesting(
+    { revision },
+    scaffold.adapters,
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    capability: "site-routing",
+    version: "0.3.0",
+    profile: "site",
+    subject: {
+      descriptorVersion: "0.3.0",
+      behaviorContractDigest:
+        "sha256:d716a1c93f8f40db33e54612c85d521fbd6ba13cd142d35ab0c39fa9c4b9647e",
+    },
+    recipeVersion: "0.10.0",
+    locale: "en-CA",
+    evidenceRevision: revision,
+    checks: [
+      "compiled-cli-create",
+      "state-inference",
+      "healthy-diagnostics",
+      "exact-diff",
+      ...fixedChecks,
+      ...siteRoutingFixtureChecks,
+      "repository-sources-unchanged",
+    ],
+  });
+  assert.deepEqual(
+    scaffold.state.commands.map(({ arguments: arguments_ }) =>
+      arguments_.slice(1),
+    ),
+    [
+      [
+        "create",
+        "--profile",
+        "site",
+        "--name",
+        "acme-site",
+        "--display-name",
+        "Acme Site",
+        "--directory",
+        scaffold.state.projectRoot,
+      ],
+      ["infer", "--directory", scaffold.state.projectRoot],
+      ["doctor", "--directory", scaffold.state.projectRoot],
+      ["diff", "--directory", scaffold.state.projectRoot],
+    ],
+  );
+  assert.equal(scaffold.state.verifiedRoot, scaffold.state.projectRoot);
+  assert.equal(scaffold.state.fixtureInput.projectRoot, scaffold.state.projectRoot);
+  assert.equal(revisionReads, 2);
+  assert.equal(statusReads, 2);
+  assert.equal(indexReads, 2);
+  assert.equal(await pathExists(scaffold.state.ownedPath), false);
+});
+
+test("site routing fixture verification applies the exact isolated overlay and command sequence", async () => {
+  const ownedRoot = await mkdtemp(join(tmpdir(), "site-routing-fixture-verifier-"));
+  const projectRoot = join(ownedRoot, "generated-project");
+  const supportRoot = join(ownedRoot, "site-routing-fixture-support");
+  const commands = [];
+
+  try {
+    const { verifySiteRoutingFixtureForTesting } = await import(
+      "../../scripts/certify-site-routing.mjs"
+    );
+    const result = await verifySiteRoutingFixtureForTesting({
+      projectRoot,
+      environment: { PATH: "/verified/bin" },
+      runCommand: async (command) => {
+        commands.push(command);
+      },
+    });
+
+    assert.deepEqual(result, { ok: true, checks: siteRoutingFixtureChecks });
+    for (const [source, destination] of [
+      [
+        "site-routing-certification.test.ts",
+        "apps/web/tests/unit/site-routing-certification.test.ts",
+      ],
+      [
+        "site-routing-certification.spec.ts",
+        "apps/web/tests/e2e/site-routing-certification.spec.ts",
+      ],
+    ]) {
+      assert.equal(
+        await readFile(join(projectRoot, destination), "utf8"),
+        await readFile(
+          join(
+            repositoryRoot,
+            "tests/capability-certification/fixtures/site-routing",
+            source,
+          ),
+          "utf8",
+        ),
+      );
+    }
+    assert.equal(await readFile(join(supportRoot, ".npmrc"), "utf8"), "");
+    assert.deepEqual(
+      commands.map(({ executable, arguments: arguments_, cwd, timeout }) => ({
+        executable,
+        arguments: arguments_,
+        cwd,
+        timeout,
+      })),
+      [
+        {
+          executable: "pnpm",
+          arguments: [
+            "install",
+            "--frozen-lockfile",
+            "--store-dir",
+            join(supportRoot, "store"),
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: [
+            "--dir",
+            "apps/web",
+            "exec",
+            "vitest",
+            "run",
+            "--project",
+            "unit",
+            "tests/unit/site-routing-certification.test.ts",
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["--dir", "apps/web", "run", "browser:install"],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: [
+            "--dir",
+            "apps/web",
+            "exec",
+            "playwright",
+            "test",
+            "--config",
+            "playwright.dev.config.ts",
+            "tests/e2e/site-routing-certification.spec.ts",
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+      ],
+    );
+    for (const command of commands) {
+      assert.equal(command.environment.PATH, "/verified/bin");
+      assert.equal(command.environment.HOME, join(supportRoot, "home"));
+      assert.equal(command.environment.USERPROFILE, join(supportRoot, "home"));
+      assert.equal(
+        command.environment.PLAYWRIGHT_BROWSERS_PATH,
+        join(supportRoot, "playwright-browsers"),
+      );
+      assert.equal(
+        command.environment.NPM_CONFIG_USERCONFIG,
+        join(supportRoot, ".npmrc"),
+      );
+      assert.equal(
+        command.environment.NPM_CONFIG_REGISTRY,
+        "https://registry.npmjs.org/",
+      );
+      assert.equal(command.environment.TMPDIR, join(supportRoot, "temporary"));
+      assert.equal(command.environment.TMP, join(supportRoot, "temporary"));
+      assert.equal(command.environment.TEMP, join(supportRoot, "temporary"));
+      assert.equal(command.environment.XDG_CACHE_HOME, join(supportRoot, "cache"));
+    }
+  } finally {
+    await rm(ownedRoot, { recursive: true, force: true });
+  }
+});
+
+test("site routing fixture verification contains preparation failures", async () => {
+  const ownedRoot = await mkdtemp(join(tmpdir(), "site-routing-fixture-failure-"));
+  const projectRoot = join(ownedRoot, "generated-project");
+  let commandRuns = 0;
+
+  try {
+    await writeFile(join(ownedRoot, "site-routing-fixture-support"), "blocked");
+    const { verifySiteRoutingFixtureForTesting } = await import(
+      "../../scripts/certify-site-routing.mjs"
+    );
+    await assert.rejects(
+      verifySiteRoutingFixtureForTesting({
+        projectRoot,
+        environment: { PATH: "/verified/bin" },
+        runCommand: async () => {
+          commandRuns += 1;
+        },
+      }),
+      (error) =>
+        error?.name === "SiteRoutingCertificationError" &&
+        error.code === "CERTIFICATION_FIXTURE_OVERLAY_FAILED",
+    );
+    assert.equal(commandRuns, 0);
+  } finally {
+    await rm(ownedRoot, { recursive: true, force: true });
+  }
+});
+
+test("site routing certification fails closed on invalid authority and evidence drift", async (context) => {
+  const revision = "a".repeat(40);
+  const createScaffold = (overrides = {}) =>
+    createSuccessfulScaffoldAdapters({
+      expectedCapabilities: Object.freeze([
+        "standards",
+        "content-files",
+        "section-composition",
+        "deployment-cloudflare",
+        "observability",
+        "site-routing",
+      ]),
+      inferredCapability: { identifier: "site-routing", version: "0.3.0" },
+      profile: "site",
+      readCurrentRevision: async () => revision,
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+      verifierIdentifier: "site",
+      verifyFixture: async () => ({ ok: true, checks: siteRoutingFixtureChecks }),
+      ...overrides,
+    });
+
+  await context.test("rejects a non-exact revision before using adapters", async () => {
+    await assert.rejects(
+      certifySiteRoutingForTesting({ revision: "a".repeat(39) }, {}),
+      (error) =>
+        error?.name === "SiteRoutingCertificationError" &&
+        error.code === "CERTIFICATION_REVISION_INVALID",
+    );
+  });
+
+  for (const [name, overrides, expectedCode] of [
+    [
+      "rejects a dirty worktree before scaffolding",
+      { readRepositoryStatus: async () => "?? private-source.ts\0" },
+      "CERTIFICATION_WORKTREE_DIRTY",
+    ],
+    [
+      "rejects non-ordinary index flags before scaffolding",
+      { readRepositoryIndexEntries: async () => "S selected-evidence.test.mjs\0" },
+      "CERTIFICATION_INDEX_FLAGS",
+    ],
+  ]) {
+    await context.test(name, async () => {
+      const scaffold = createScaffold(overrides);
+      await assert.rejects(
+        certifySiteRoutingForTesting({ revision }, scaffold.adapters),
+        (error) => error?.code === expectedCode,
+      );
+      assert.equal(scaffold.state.commands.length, 0);
+    });
+  }
+
+  for (const [name, override, expectedCode] of [
+    [
+      "rejects revision drift after contained evidence",
+      (() => {
+        let reads = 0;
+        return {
+          readCurrentRevision: async () =>
+            (reads += 1) === 1 ? revision : "b".repeat(40),
+        };
+      })(),
+      "CERTIFICATION_REVISION_MISMATCH",
+    ],
+    [
+      "rejects worktree drift after contained evidence",
+      (() => {
+        let reads = 0;
+        return {
+          readRepositoryStatus: async () =>
+            (reads += 1) === 1 ? "" : " M private-source.ts\0",
+        };
+      })(),
+      "CERTIFICATION_WORKTREE_DIRTY",
+    ],
+    [
+      "rejects index-flag drift after contained evidence",
+      (() => {
+        let reads = 0;
+        return {
+          readRepositoryIndexEntries: async () =>
+            `${(reads += 1) === 1 ? "H" : "S"} selected-evidence.test.mjs\0`,
+        };
+      })(),
+      "CERTIFICATION_INDEX_FLAGS",
+    ],
+  ]) {
+    await context.test(name, async () => {
+      const scaffold = createScaffold(override);
+      await assert.rejects(
+        certifySiteRoutingForTesting({ revision }, scaffold.adapters),
+        (error) => error?.code === expectedCode,
+      );
+      assert.equal(await pathExists(scaffold.state.ownedPath), false);
+    });
+  }
+
+  await context.test("rejects invalid fixed-verifier evidence", async () => {
+    const scaffold = createScaffold({ verificationChecks: fixedChecks.slice(1) });
+    await assert.rejects(
+      certifySiteRoutingForTesting({ revision }, scaffold.adapters),
+      (error) => error?.code === "GENERATED_PROJECT_VERIFICATION_INVALID",
+    );
+    assert.equal(await pathExists(scaffold.state.ownedPath), false);
+  });
+
+  await context.test("contains causal fixture failure", async () => {
+    const scaffold = createScaffold({
+      verifyFixture: async () => {
+        throw new Error("private fixture failure");
+      },
+    });
+    await assert.rejects(
+      certifySiteRoutingForTesting({ revision }, scaffold.adapters),
+      (error) => error?.code === "CERTIFICATION_FIXTURE_VERIFICATION_FAILED",
+    );
+    assert.equal(await pathExists(scaffold.state.ownedPath), false);
+  });
+});
+
+test("the site routing certification command requires one exact revision without echoing rejected values", async () => {
+  for (const [arguments_, expectedCode, expectedExitCode] of [
+    [["--revision", "private-value"], "CERTIFICATION_REVISION_INVALID", 1],
+    [
+      ["--", "--revision", "private-value"],
+      "CERTIFICATION_REVISION_INVALID",
+      1,
+    ],
+    [["--unknown", "private-value"], "CERTIFICATION_ARGUMENT_INVALID", 2],
+  ]) {
+    const execution = await execFileAsync(
+      process.execPath,
+      [siteRoutingCertificationScript, ...arguments_],
       {
         cwd: repositoryRoot,
         encoding: "utf8",
