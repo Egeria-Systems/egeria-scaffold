@@ -14,7 +14,7 @@
 
 **Certification behavior-contract digest:** `sha256:d716a1c93f8f40db33e54612c85d521fbd6ba13cd142d35ab0c39fa9c4b9647e`
 
-**Certification evidence revision:** `78d2b0d0e92d68b47d5b4344e7ebdca8e059661e`
+**Certification evidence revision:** `77cea944513e521939bf4de088048f67acdfbc3c`
 
 **Passed certification outcomes:** `fresh-scaffold`
 
@@ -35,12 +35,12 @@ This content-safe receipt records the causal local certification and approved re
 The exact clean revision ran:
 
 ```text
-pnpm run verify:site-routing-certification -- --revision 78d2b0d0e92d68b47d5b4344e7ebdca8e059661e
+pnpm run verify:site-routing-certification -- --revision 77cea944513e521939bf4de088048f67acdfbc3c
 ```
 
 The runner used repository-pinned Node.js `22.23.2` and pnpm `11.20.0`. Frozen dependency installation and Chromium installation used bounded network access inside identity-owned disposable roots. No credential, provider account, deployment, protected environment, persistent external state, or spend was required.
 
-A preliminary invocation supplied a non-HEAD 40-character revision and was rejected with `CERTIFICATION_REVISION_MISMATCH` before any disposable journey began. An earlier candidate journey passed before independent review identified that the focused fixture parsed the route content without rendering the actual route module; that candidate was superseded. The first corrected run failed closed when sandbox DNS denial made its cold-store install time out, and a network-enabled rerun then failed closed because the TSX fixture was routed to the generated Vitest project that accepts only `.test.ts` files. Neither failed attempt is evidence. The final exact revision above routes the TSX render through a fixture-only jsdom configuration, mirrors the generated Next raw-content file classes within the generated content root, and passed the complete causal journey.
+A preliminary invocation supplied a non-HEAD 40-character revision and was rejected with `CERTIFICATION_REVISION_MISMATCH` before any disposable journey began. An earlier candidate journey passed before independent review identified that the focused fixture parsed the route content without rendering the actual route module; that candidate was superseded. The first corrected run failed closed when sandbox DNS denial made its cold-store install time out, and a network-enabled rerun then failed closed because the TSX fixture was routed to the generated Vitest project that accepts only `.test.ts` files. Neither failed attempt is evidence. The final exact revision above routes the TSX render through a fixture-only jsdom configuration, mirrors the generated Next raw-content file classes within the generated content root, uses component-specific failure terminology, strengthens the exact next-gate documentation contract, and passed the complete causal journey after those review corrections.
 
 ## Fresh-scaffold outcome
 
@@ -82,5 +82,5 @@ It does not establish route-aware metadata, production-complete navigation seman
 - Exact ownership, state, content, direct-route, and navigation fixture results accepted: `yes`
 - Cleanup, privacy exclusions, and claim boundary accepted: `yes`
 - Registry transition approved: `yes`
-- Review revision: `78d2b0d0e92d68b47d5b4344e7ebdca8e059661e`
+- Review revision: `77cea944513e521939bf4de088048f67acdfbc3c`
 - Rerun trigger: any material descriptor, required-evidence contract, runner, fixture, owned generated surface, route/content behavior, registry, verifier, or evidence defect requires a new clean evidence revision and complete affected rerun

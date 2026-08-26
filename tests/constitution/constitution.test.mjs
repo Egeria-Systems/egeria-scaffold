@@ -2388,7 +2388,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /standards@0\.4\.0[^\n]+certified[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+content-files@0\.4\.0[^\n]+certified[^\n]+f03b9f624c370728f678924ce34e5287558d2a87[^\n]+section-composition@0\.3\.0[^\n]+certified[^\n]+f74459c8833833186bb651c116ed524e51044677[^\n]+site-routing@0\.3\.0[^\n]+certified[^\n]+78d2b0d0e92d68b47d5b4344e7ebdca8e059661e/i,
+    /standards@0\.4\.0[^\n]+certified[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+content-files@0\.4\.0[^\n]+certified[^\n]+f03b9f624c370728f678924ce34e5287558d2a87[^\n]+section-composition@0\.3\.0[^\n]+certified[^\n]+f74459c8833833186bb651c116ed524e51044677[^\n]+site-routing@0\.3\.0[^\n]+certified[^\n]+77cea944513e521939bf4de088048f67acdfbc3c/i,
   );
   assert.match(
     enforcementMap,
@@ -3356,7 +3356,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
     assert.match(
       sequencingOwner,
-      /site-routing@0\.3\.0[^\n]+certification[^\n]+complete[^\n]+78d2b0d0e92d68b47d5b4344e7ebdca8e059661e/iu,
+      /site-routing@0\.3\.0[^\n]+certification[^\n]+complete[^\n]+77cea944513e521939bf4de088048f67acdfbc3c/iu,
     );
     assert.match(
       sequencingOwner,
@@ -3397,7 +3397,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
     assert.match(
       certificationStatusOwner,
-      /site-routing@0\.3\.0[^\n]+certified[^\n]+78d2b0d0e92d68b47d5b4344e7ebdca8e059661e/iu,
+      /site-routing@0\.3\.0[^\n]+certified[^\n]+77cea944513e521939bf4de088048f67acdfbc3c/iu,
     );
   }
 
