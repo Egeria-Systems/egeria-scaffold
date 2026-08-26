@@ -47,7 +47,7 @@ const siteRoutingPlanPath =
 const siteRoutingEvidencePath =
   "docs/implementation-evidence/2026-08-26-site-routing-certification-receipt.md";
 const siteRoutingEvidenceRevision =
-  "0e6875148915327f86589eda24b1b2cf083144ec";
+  "78d2b0d0e92d68b47d5b4344e7ebdca8e059661e";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const deploymentEvidencePath =

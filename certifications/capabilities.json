@@ -213,7 +213,7 @@
           "kind": "fresh-scaffold",
           "path": "docs/implementation-evidence/2026-08-26-site-routing-certification-receipt.md",
           "outcome": "passed",
-          "revision": "0e6875148915327f86589eda24b1b2cf083144ec",
+          "revision": "78d2b0d0e92d68b47d5b4344e7ebdca8e059661e",
           "subject": {
             "descriptorVersion": "0.3.0",
             "behaviorContractDigest": "sha256:d716a1c93f8f40db33e54612c85d521fbd6ba13cd142d35ab0c39fa9c4b9647e"
