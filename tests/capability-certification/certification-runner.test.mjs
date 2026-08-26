@@ -1669,7 +1669,7 @@ async function runCheck(
   }
 }
 
-test("the repository registry admits certified capabilities and retains only historical backfills", async () => {
+test("the repository registry admits all certified capabilities", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -1694,18 +1694,11 @@ test("the repository registry admits certified capabilities and retains only his
 
   const fullClosure = await runCheck(["--closure", "all-certified"]);
   assert.deepEqual(fullClosure, {
-    exitCode: 1,
+    exitCode: 0,
     stdout: `${JSON.stringify({
-      ok: false,
+      ok: true,
       gate: "closure",
       policy: "all-certified",
-      issues: [
-        ["site-routing", "backfill-pending"],
-      ].map(([capabilityIdentifier, reason]) => ({
-        code: "CAPABILITY_CERTIFICATION_PENDING",
-        path: ["records", capabilityIdentifier, "status"],
-        context: { reason },
-      })),
     })}\n`,
     stderr: "",
   });

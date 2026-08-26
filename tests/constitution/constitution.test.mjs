@@ -2388,7 +2388,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /standards@0\.4\.0[^\n]+certified[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+content-files@0\.4\.0[^\n]+certified[^\n]+f03b9f624c370728f678924ce34e5287558d2a87[^\n]+section-composition@0\.3\.0[^\n]+certified[^\n]+f74459c8833833186bb651c116ed524e51044677[^\n]+one unchanged subject[^\n]+backfill-pending/i,
+    /standards@0\.4\.0[^\n]+certified[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+content-files@0\.4\.0[^\n]+certified[^\n]+f03b9f624c370728f678924ce34e5287558d2a87[^\n]+section-composition@0\.3\.0[^\n]+certified[^\n]+f74459c8833833186bb651c116ed524e51044677[^\n]+site-routing@0\.3\.0[^\n]+certified[^\n]+0e6875148915327f86589eda24b1b2cf083144ec/i,
   );
   assert.match(
     enforcementMap,
@@ -2396,7 +2396,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+pass[^\n]+all-certified[^\n]+rejects only[^\n]+backfill record/i,
+    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/i,
   );
 });
 
@@ -2731,7 +2731,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+pass[^\n]+all-certified[^\n]+rejects only[^\n]+backfill record/iu,
+    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/iu,
   );
   assert.match(
     enforcementMap,
@@ -3333,10 +3333,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
   }
 
   for (const sequencingOwner of [sourcePlan, roadmap]) {
-    assert.match(
-      sequencingOwner,
-      /minimum one remaining increment/iu,
-    );
+    assert.doesNotMatch(sequencingOwner, /minimum one remaining increment/iu);
     assert.match(
       sequencingOwner,
       /booking-calendly@0\.1\.0[^\n]+lifecycle certification[^\n]+complete/iu,
@@ -3359,7 +3356,11 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
     assert.match(
       sequencingOwner,
-      /(?:site-routing@0\.3\.0[^\n]+next[^\n]+certification increment|next[^\n]+certification increment[^\n]+site-routing@0\.3\.0)/iu,
+      /site-routing@0\.3\.0[^\n]+certification[^\n]+complete[^\n]+0e6875148915327f86589eda24b1b2cf083144ec/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /closure[^\n]+next legal action/iu,
     );
     assert.doesNotMatch(sequencingOwner, /minimum two remaining increments/iu);
     assert.doesNotMatch(sequencingOwner, /minimum three remaining increments/iu);
@@ -3369,21 +3370,13 @@ test("canonical documentation accepts profile-transition execution and bounds it
       sequencingOwner,
       /selected next increment[^\n]+portfolio-to-site transition lifecycle certification/iu,
     );
-    for (const backfillSubject of ["site-routing"]) {
-      assert.match(
-        sequencingOwner,
-        new RegExp(
-          `${escapeRegularExpression(backfillSubject)}@[^\\s,;]+[^\\n]+separate certification increment`,
-          "iu",
-        ),
-      );
-    }
+    assert.doesNotMatch(
+      sequencingOwner,
+      /site-routing@0\.3\.0[^\n]+next[^\n]+certification increment/iu,
+    );
   }
 
-  assert.match(
-    roadmap,
-    /1\. reconcile `site-routing@0\.3\.0` in a separate certification increment/iu,
-  );
+  assert.match(roadmap, /closure[^\n]+next legal action/iu);
 
   for (const certificationStatusOwner of [
     overview,
@@ -3401,6 +3394,10 @@ test("canonical documentation accepts profile-transition execution and bounds it
     assert.match(
       certificationStatusOwner,
       /section-composition@0\.3\.0[^\n]+certified[^\n]+f74459c8833833186bb651c116ed524e51044677/iu,
+    );
+    assert.match(
+      certificationStatusOwner,
+      /site-routing@0\.3\.0[^\n]+certified[^\n]+0e6875148915327f86589eda24b1b2cf083144ec/iu,
     );
   }
 

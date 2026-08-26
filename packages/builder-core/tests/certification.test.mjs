@@ -42,6 +42,12 @@ const sectionCompositionEvidencePath =
   "docs/implementation-evidence/2026-08-26-section-composition-certification-receipt.md";
 const sectionCompositionEvidenceRevision =
   "f74459c8833833186bb651c116ed524e51044677";
+const siteRoutingPlanPath =
+  "docs/superpowers/plans/2026-08-26-site-routing-certification.md";
+const siteRoutingEvidencePath =
+  "docs/implementation-evidence/2026-08-26-site-routing-certification-receipt.md";
+const siteRoutingEvidenceRevision =
+  "0e6875148915327f86589eda24b1b2cf083144ec";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const deploymentEvidencePath =
@@ -407,6 +413,55 @@ test("accepted section composition receipt binds the reviewed fresh-scaffold out
         ),
       },
       validRevisions: [sectionCompositionEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
+});
+
+test("current site routing subject has exact reviewed fresh-scaffold evidence", () => {
+  const descriptor = descriptorsByIdentifier.get("site-routing");
+  assert.notEqual(descriptor, undefined);
+  const subject = core.createCertificationSubject(
+    descriptor,
+    requiredEvidence["site-routing"],
+  );
+
+  assert.deepEqual(committedRegistry.records["site-routing"], {
+    subject,
+    requiredEvidence: ["fresh-scaffold"],
+    status: "certified",
+    taskPlan: siteRoutingPlanPath,
+    evidence: [
+      {
+        kind: "fresh-scaffold",
+        path: siteRoutingEvidencePath,
+        outcome: "passed",
+        revision: siteRoutingEvidenceRevision,
+        subject,
+      },
+    ],
+  });
+});
+
+test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", () => {
+  const acceptedRecord = committedRegistry.records["site-routing"];
+  const acceptedReceiptUrl = new URL(
+    `../../../${siteRoutingEvidencePath}`,
+    import.meta.url,
+  );
+
+  assert.equal(existsSync(acceptedReceiptUrl), true, siteRoutingEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { "site-routing": acceptedRecord },
+      },
+      artifacts: {
+        [siteRoutingPlanPath]: "# approved plan",
+        [siteRoutingEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [siteRoutingEvidenceRevision],
     }),
     { ok: true, value: undefined },
   );

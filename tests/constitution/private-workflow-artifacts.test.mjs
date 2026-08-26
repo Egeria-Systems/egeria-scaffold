@@ -20,6 +20,7 @@ const trackedAcceptedReceipts = Object.freeze([
   "docs/implementation-evidence/2026-08-25-profile-transition-lifecycle-certification-receipt.md",
   "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md",
   "docs/implementation-evidence/2026-08-26-section-composition-certification-receipt.md",
+  "docs/implementation-evidence/2026-08-26-site-routing-certification-receipt.md",
 ]);
 const syntheticMacHome = (...segments) =>
   ["", "Users", ...segments, ""].join("/");
