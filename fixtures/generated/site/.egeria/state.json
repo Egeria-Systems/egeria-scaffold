@@ -1059,7 +1059,7 @@
       "path": "apps/web/app/about/page.tsx"
     },
     {
-      "fingerprint": "sha256:77662293e4dd75bf6f6070a6bba61757c83a212d2978327728688df965d8bc26",
+      "fingerprint": "sha256:9e41a5a8c6c64345095e28ba13bba770a2b9924a6d681490f18907bcb927a66d",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1171,7 +1171,7 @@
       "path": "apps/web/content/en-CA/not-found.yaml"
     },
     {
-      "fingerprint": "sha256:2c4710ee06d859581b0a0b5ca90c96d3fc6b877968f4bfbed2f40d241213d819",
+      "fingerprint": "sha256:cf31de6de404c8b2c140d3429a219c9a681f4307c3f19485676f0aa4c6c24337",
       "fingerprintTarget": {
         "kind": "file"
       },

@@ -1380,6 +1380,10 @@ test("production site rendering materializes route metadata and browser contract
   assert.match(siteFiles.get("apps/web/app/sitemap.ts"), /MetadataRoute\.Sitemap/u);
   assert.match(siteFiles.get("apps/web/app/robots.ts"), /MetadataRoute\.Robots/u);
   assert.match(
+    siteFiles.get("apps/web/app/not-found.tsx"),
+    /export const metadata: Metadata = notFoundContent\.metadata;/u,
+  );
+  assert.match(
     siteFiles.get("apps/web/app/work/page.tsx"),
     /permanentRedirect\("\/work\/featured"\)/u,
   );

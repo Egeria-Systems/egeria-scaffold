@@ -191,7 +191,10 @@ test("generated dependency recipes select only their exact reviewed lockfile", a
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({}), undefined);
 
   const patchedLockfile = await readFile(patchedRecipeLockfile, "utf8");
-  assert.match(patchedLockfile, /next:\n\s+specifier: 16\.3\.3\n\s+version: 16\.3\.3/u);
+  assert.match(
+    patchedLockfile,
+    /\n\s+next:\n\s+specifier: 16\.3\.3\n\s+version: 16\.3\.3/u,
+  );
   assert.match(
     patchedLockfile,
     /eslint-config-next:\n\s+specifier: 16\.3\.3\n\s+version: 16\.3\.3/u,
