@@ -2300,6 +2300,7 @@ test("content files fixture verification contains preparation and overlay filesy
     },
     {
       name: "navigation overlay write",
+      skip: process.getuid?.() === 0,
       prepare: async ({ siteContentPath }) => {
         await mkdir(dirname(siteContentPath), { recursive: true });
         await writeFile(siteContentPath, "navigation: []\n", { mode: 0o400 });
@@ -2307,8 +2308,8 @@ test("content files fixture verification contains preparation and overlay filesy
     },
   ];
 
-  for (const { name, prepare } of cases) {
-    await context.test(name, async () => {
+  for (const { name, prepare, skip = false } of cases) {
+    await context.test(name, { skip }, async () => {
       const ownedRoot = await mkdtemp(
         join(tmpdir(), "content-fixture-failure-"),
       );
