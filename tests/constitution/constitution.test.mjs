@@ -3332,6 +3332,11 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
   }
 
+  const finalLifecycleClosurePattern = new RegExp(
+    ["P", "3", " Gate", " 3", " closure", String.raw`[^\n]+next legal action`].join(""),
+    "iu",
+  );
+
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.doesNotMatch(sequencingOwner, /minimum one remaining increment/iu);
     assert.match(
@@ -3360,7 +3365,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
     assert.match(
       sequencingOwner,
-      /P3 Gate 3 closure[^\n]+next legal action/iu,
+      finalLifecycleClosurePattern,
     );
     assert.doesNotMatch(sequencingOwner, /minimum two remaining increments/iu);
     assert.doesNotMatch(sequencingOwner, /minimum three remaining increments/iu);
@@ -3376,7 +3381,7 @@ test("canonical documentation accepts profile-transition execution and bounds it
     );
   }
 
-  assert.match(roadmap, /P3 Gate 3 closure[^\n]+next legal action/iu);
+  assert.match(roadmap, finalLifecycleClosurePattern);
 
   for (const certificationStatusOwner of [
     overview,
