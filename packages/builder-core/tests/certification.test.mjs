@@ -30,6 +30,12 @@ const standardsEvidencePath =
   "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md";
 const standardsEvidenceRevision =
   "d7f9dac6e25d5dde32015968d0912b45e73644e7";
+const contentFilesPlanPath =
+  "docs/superpowers/plans/2026-08-25-content-files-certification.md";
+const contentFilesEvidencePath =
+  "docs/implementation-evidence/2026-08-25-content-files-certification-receipt.md";
+const contentFilesEvidenceRevision =
+  "f03b9f624c370728f678924ce34e5287558d2a87";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const deploymentEvidencePath =
@@ -293,6 +299,55 @@ test("current Calendly lifecycle subject has exact reviewed certification eviden
       },
     ],
   });
+});
+
+test("current content files subject has exact reviewed fresh-scaffold evidence", () => {
+  const descriptor = descriptorsByIdentifier.get("content-files");
+  assert.notEqual(descriptor, undefined);
+  const subject = core.createCertificationSubject(
+    descriptor,
+    requiredEvidence["content-files"],
+  );
+
+  assert.deepEqual(committedRegistry.records["content-files"], {
+    subject,
+    requiredEvidence: ["fresh-scaffold"],
+    status: "certified",
+    taskPlan: contentFilesPlanPath,
+    evidence: [
+      {
+        kind: "fresh-scaffold",
+        path: contentFilesEvidencePath,
+        outcome: "passed",
+        revision: contentFilesEvidenceRevision,
+        subject,
+      },
+    ],
+  });
+});
+
+test("accepted content files receipt binds the reviewed fresh-scaffold outcome", () => {
+  const acceptedRecord = committedRegistry.records["content-files"];
+  const acceptedReceiptUrl = new URL(
+    `../../../${contentFilesEvidencePath}`,
+    import.meta.url,
+  );
+
+  assert.equal(existsSync(acceptedReceiptUrl), true, contentFilesEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { "content-files": acceptedRecord },
+      },
+      artifacts: {
+        [contentFilesPlanPath]: "# approved plan",
+        [contentFilesEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [contentFilesEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
 });
 
 test("descriptor admission rejects incomplete, stale, extra, and false-legacy coverage", () => {

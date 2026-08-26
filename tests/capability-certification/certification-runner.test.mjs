@@ -8,6 +8,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  readFile,
   realpath,
   rm,
   symlink,
@@ -24,6 +25,7 @@ import {
   certifyCloudflareDeploymentForTesting,
   readCloudflareDeploymentRevisionForTesting,
 } from "../../scripts/certify-cloudflare-deployment.mjs";
+import { certifyContentFilesForTesting } from "../../scripts/certify-content-files.mjs";
 import { certifyGeneratedTestingForTesting } from "../../scripts/certify-generated-testing.mjs";
 import { certifyProfileTransitionLifecycleForTesting } from "../../scripts/certify-profile-transition-lifecycle.mjs";
 import { certifyStandardsLifecycleForTesting } from "../../scripts/certify-standards-lifecycle.mjs";
@@ -66,6 +68,10 @@ const certificationScript = resolve(
 const cloudflareDeploymentCertificationScript = resolve(
   repositoryRoot,
   "scripts/certify-cloudflare-deployment.mjs",
+);
+const contentFilesCertificationScript = resolve(
+  repositoryRoot,
+  "scripts/certify-content-files.mjs",
 );
 const generatedTestingCertificationScript = resolve(
   repositoryRoot,
@@ -820,6 +826,13 @@ const fixedChecks = Object.freeze([
   "browser-preview",
 ]);
 const visualChecks = Object.freeze([...fixedChecks, "visual-regression"]);
+const contentFixtureChecks = Object.freeze([
+  "content-fixture-overlay",
+  "content-fixture-frozen-install",
+  "content-fixture-unit-contract",
+  "content-fixture-browser-install",
+  "content-fixture-browser-development",
+]);
 
 function createCertificationCliRuntime(arguments_ = []) {
   const scriptPath = resolve(
@@ -969,7 +982,11 @@ function createSuccessfulScaffoldAdapters({
   differences = Object.freeze({ equal: true, differences: [] }),
   inferredCapability,
   readCurrentRevision,
+  readRepositoryStatus = async () => "",
+  readRepositoryIndexEntries = async () =>
+    "H selected-evidence.test.mjs\0",
   postCreate = async () => {},
+  verifyFixture,
   verificationChecks = fixedChecks,
   verificationFixtures,
   verifierIdentifier = "portfolio",
@@ -981,12 +998,15 @@ function createSuccessfulScaffoldAdapters({
     verifiedProjectName: undefined,
     verifiedRoot: undefined,
     verificationOptions: undefined,
+    fixtureInput: undefined,
   };
 
   return {
     state,
     adapters: {
       readCurrentRevision,
+      readRepositoryStatus,
+      readRepositoryIndexEntries,
       async runCommand(input) {
         state.commands.push(input);
         assert.equal(input.executable, process.execPath);
@@ -1063,6 +1083,14 @@ function createSuccessfulScaffoldAdapters({
           checks: verificationChecks,
         };
       },
+      ...(verifyFixture === undefined
+        ? {}
+        : {
+            async verifyFixture(input) {
+              state.fixtureInput = input;
+              return verifyFixture(input);
+            },
+          }),
     },
   };
 }
@@ -1185,7 +1213,7 @@ async function runCheck(
   }
 }
 
-test("the repository registry admits the certified Calendly lifecycle and retains only historical backfills", async () => {
+test("the repository registry admits certified capabilities and retains only historical backfills", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -1216,7 +1244,6 @@ test("the repository registry admits the certified Calendly lifecycle and retain
       gate: "closure",
       policy: "all-certified",
       issues: [
-        ["content-files", "backfill-pending"],
         ["section-composition", "backfill-pending"],
         ["site-routing", "backfill-pending"],
       ].map(([capabilityIdentifier, reason]) => ({
@@ -2004,6 +2031,437 @@ test("the generated testing certification entry rejects unknown arguments withou
     })}\n`,
   );
   assert.doesNotMatch(result.stderr, /private-value/u);
+});
+
+test("content files certification binds a clean exact revision to causal fresh-scaffold evidence", async () => {
+  const revision = "a".repeat(40);
+  let revisionReads = 0;
+  let statusReads = 0;
+  let indexReads = 0;
+  const scaffold = createSuccessfulScaffoldAdapters({
+    inferredCapability: { identifier: "content-files", version: "0.4.0" },
+    readCurrentRevision: async () => {
+      revisionReads += 1;
+      return revision;
+    },
+    readRepositoryStatus: async () => {
+      statusReads += 1;
+      return "";
+    },
+    readRepositoryIndexEntries: async () => {
+      indexReads += 1;
+      return "H selected-evidence.test.mjs\0";
+    },
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+    verifyFixture: async ({ projectRoot, environment }) => {
+      assert.equal(projectRoot, scaffold.state.projectRoot);
+      assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
+      assert.equal(environment.CLOUDFLARE_ACCOUNT_ID, undefined);
+      assert.equal(environment.NPM_TOKEN, undefined);
+      assert.equal(environment.NODE_OPTIONS, undefined);
+      return { ok: true, checks: contentFixtureChecks };
+    },
+  });
+
+  const result = await certifyContentFilesForTesting(
+    { revision },
+    scaffold.adapters,
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    capability: "content-files",
+    version: "0.4.0",
+    profile: "portfolio",
+    subject: {
+      descriptorVersion: "0.4.0",
+      behaviorContractDigest:
+        "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05",
+    },
+    recipeVersion: "0.10.0",
+    locale: "en-CA",
+    evidenceRevision: revision,
+    checks: [
+      "compiled-cli-create",
+      "state-inference",
+      "healthy-diagnostics",
+      "exact-diff",
+      ...fixedChecks,
+      ...contentFixtureChecks,
+      "repository-sources-unchanged",
+    ],
+  });
+  assert.deepEqual(
+    scaffold.state.commands.map(({ arguments: arguments_ }) =>
+      arguments_.slice(1),
+    ),
+    [
+      [
+        "create",
+        "--profile",
+        "portfolio",
+        "--name",
+        "acme-portfolio",
+        "--display-name",
+        "Acme Portfolio",
+        "--directory",
+        scaffold.state.projectRoot,
+      ],
+      ["infer", "--directory", scaffold.state.projectRoot],
+      ["doctor", "--directory", scaffold.state.projectRoot],
+      ["diff", "--directory", scaffold.state.projectRoot],
+    ],
+  );
+  assert.equal(scaffold.state.verifiedRoot, scaffold.state.projectRoot);
+  assert.equal(scaffold.state.fixtureInput.projectRoot, scaffold.state.projectRoot);
+  assert.equal(revisionReads, 2);
+  assert.equal(statusReads, 2);
+  assert.equal(indexReads, 2);
+  assert.equal(await pathExists(scaffold.state.ownedPath), false);
+});
+
+test("content files fixture verification applies the exact isolated overlay and command sequence", async () => {
+  const ownedRoot = await mkdtemp(join(tmpdir(), "content-fixture-verifier-"));
+  const projectRoot = join(ownedRoot, "generated-project");
+  const supportRoot = join(ownedRoot, "content-fixture-support");
+  const siteContentPath = join(
+    projectRoot,
+    "apps/web/content/en-CA/site.yaml",
+  );
+  const commands = [];
+
+  try {
+    await mkdir(dirname(siteContentPath), { recursive: true });
+    await writeFile(
+      siteContentPath,
+      "schemaVersion: 1.0.0\nnavigation: []\n",
+    );
+    const { verifyContentFixtureForTesting } = await import(
+      "../../scripts/certify-content-files.mjs"
+    );
+
+    const result = await verifyContentFixtureForTesting({
+      projectRoot,
+      environment: { PATH: "/verified/bin" },
+      runCommand: async (command) => {
+        commands.push(command);
+      },
+    });
+
+    assert.deepEqual(result, { ok: true, checks: contentFixtureChecks });
+    assert.equal(
+      await readFile(siteContentPath, "utf8"),
+      "schemaVersion: 1.0.0\nnavigation:\n  - href: \"#introduction\"\n    label: Introduction\n",
+    );
+    assert.equal(
+      await readFile(
+        join(
+          projectRoot,
+          "apps/web/tests/unit/content-files-certification.test.ts",
+        ),
+        "utf8",
+      ),
+      await readFile(
+        join(
+          repositoryRoot,
+          "tests/capability-certification/fixtures/content-files/content-files-certification.test.ts",
+        ),
+        "utf8",
+      ),
+    );
+    assert.equal(
+      await readFile(
+        join(
+          projectRoot,
+          "apps/web/tests/e2e/content-files-certification.spec.ts",
+        ),
+        "utf8",
+      ),
+      await readFile(
+        join(
+          repositoryRoot,
+          "tests/capability-certification/fixtures/content-files/content-files-certification.spec.ts",
+        ),
+        "utf8",
+      ),
+    );
+    assert.equal(await readFile(join(supportRoot, ".npmrc"), "utf8"), "");
+    assert.deepEqual(
+      commands.map(({ executable, arguments: arguments_, cwd, timeout }) => ({
+        executable,
+        arguments: arguments_,
+        cwd,
+        timeout,
+      })),
+      [
+        {
+          executable: "pnpm",
+          arguments: [
+            "install",
+            "--frozen-lockfile",
+            "--store-dir",
+            join(supportRoot, "store"),
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: [
+            "--dir",
+            "apps/web",
+            "exec",
+            "vitest",
+            "run",
+            "--project",
+            "unit",
+            "tests/unit/content-files-certification.test.ts",
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["--dir", "apps/web", "run", "browser:install"],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+        {
+          executable: "pnpm",
+          arguments: [
+            "--dir",
+            "apps/web",
+            "exec",
+            "playwright",
+            "test",
+            "--config",
+            "playwright.dev.config.ts",
+            "tests/e2e/content-files-certification.spec.ts",
+          ],
+          cwd: projectRoot,
+          timeout: 15 * 60 * 1000,
+        },
+      ],
+    );
+    for (const command of commands) {
+      assert.equal(command.environment.PATH, "/verified/bin");
+      assert.equal(command.environment.HOME, join(supportRoot, "home"));
+      assert.equal(
+        command.environment.USERPROFILE,
+        join(supportRoot, "home"),
+      );
+      assert.equal(
+        command.environment.PLAYWRIGHT_BROWSERS_PATH,
+        join(supportRoot, "playwright-browsers"),
+      );
+      assert.equal(
+        command.environment.NPM_CONFIG_USERCONFIG,
+        join(supportRoot, ".npmrc"),
+      );
+      assert.equal(
+        command.environment.NPM_CONFIG_REGISTRY,
+        "https://registry.npmjs.org/",
+      );
+      assert.equal(
+        command.environment.TMPDIR,
+        join(supportRoot, "temporary"),
+      );
+      assert.equal(command.environment.TMP, join(supportRoot, "temporary"));
+      assert.equal(command.environment.TEMP, join(supportRoot, "temporary"));
+      assert.equal(
+        command.environment.XDG_CACHE_HOME,
+        join(supportRoot, "cache"),
+      );
+    }
+  } finally {
+    await rm(ownedRoot, { recursive: true, force: true });
+  }
+});
+
+test("content files fixture verification contains preparation and overlay filesystem failures", async (context) => {
+  const { verifyContentFixtureForTesting } = await import(
+    "../../scripts/certify-content-files.mjs"
+  );
+  const cases = [
+    {
+      name: "support-root preparation",
+      prepare: async ({ ownedRoot }) => {
+        await writeFile(join(ownedRoot, "content-fixture-support"), "blocked");
+      },
+    },
+    {
+      name: "fixture destination creation",
+      prepare: async ({ projectRoot, siteContentPath }) => {
+        await mkdir(dirname(siteContentPath), { recursive: true });
+        await writeFile(siteContentPath, "navigation: []\n");
+        await mkdir(join(projectRoot, "apps/web"), { recursive: true });
+        await writeFile(join(projectRoot, "apps/web/tests"), "blocked");
+      },
+    },
+    {
+      name: "navigation overlay write",
+      skip: process.getuid?.() === 0,
+      prepare: async ({ siteContentPath }) => {
+        await mkdir(dirname(siteContentPath), { recursive: true });
+        await writeFile(siteContentPath, "navigation: []\n", { mode: 0o400 });
+      },
+    },
+  ];
+
+  for (const { name, prepare, skip = false } of cases) {
+    await context.test(name, { skip }, async () => {
+      const ownedRoot = await mkdtemp(
+        join(tmpdir(), "content-fixture-failure-"),
+      );
+      const projectRoot = join(ownedRoot, "generated-project");
+      const siteContentPath = join(
+        projectRoot,
+        "apps/web/content/en-CA/site.yaml",
+      );
+      let commandRuns = 0;
+
+      try {
+        await prepare({ ownedRoot, projectRoot, siteContentPath });
+        await assert.rejects(
+          verifyContentFixtureForTesting({
+            projectRoot,
+            environment: { PATH: "/verified/bin" },
+            runCommand: async () => {
+              commandRuns += 1;
+            },
+          }),
+          (error) =>
+            error?.name === "ContentFilesCertificationError" &&
+            error.code === "CERTIFICATION_FIXTURE_OVERLAY_FAILED",
+        );
+        assert.equal(commandRuns, 0);
+      } finally {
+        await rm(ownedRoot, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test("content files certification fails closed on invalid authority and evidence drift", async (context) => {
+  const revision = "a".repeat(40);
+  const createScaffold = (overrides = {}) =>
+    createSuccessfulScaffoldAdapters({
+      inferredCapability: { identifier: "content-files", version: "0.4.0" },
+      readCurrentRevision: async () => revision,
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+      verifyFixture: async () => ({ ok: true, checks: contentFixtureChecks }),
+      ...overrides,
+    });
+
+  await context.test("rejects a non-exact revision before using adapters", async () => {
+    await assert.rejects(
+      certifyContentFilesForTesting({ revision: "a".repeat(39) }, {}),
+      (error) =>
+        error?.name === "ContentFilesCertificationError" &&
+        error.code === "CERTIFICATION_REVISION_INVALID",
+    );
+  });
+
+  for (const [name, overrides, expectedCode] of [
+    [
+      "rejects a dirty worktree before scaffolding",
+      { readRepositoryStatus: async () => "?? private-source.ts\0" },
+      "CERTIFICATION_WORKTREE_DIRTY",
+    ],
+    [
+      "rejects non-ordinary index flags before scaffolding",
+      { readRepositoryIndexEntries: async () => "S selected-evidence.test.mjs\0" },
+      "CERTIFICATION_INDEX_FLAGS",
+    ],
+  ]) {
+    await context.test(name, async () => {
+      const scaffold = createScaffold(overrides);
+      await assert.rejects(
+        certifyContentFilesForTesting({ revision }, scaffold.adapters),
+        (error) =>
+          error?.name === "ContentFilesCertificationError" &&
+          error.code === expectedCode,
+      );
+      assert.equal(scaffold.state.commands.length, 0);
+    });
+  }
+
+  await context.test("rejects revision drift after contained evidence", async () => {
+    let reads = 0;
+    const scaffold = createScaffold({
+      readCurrentRevision: async () => {
+        reads += 1;
+        return reads === 1 ? revision : "b".repeat(40);
+      },
+    });
+    await assert.rejects(
+      certifyContentFilesForTesting({ revision }, scaffold.adapters),
+      (error) => error?.code === "CERTIFICATION_REVISION_MISMATCH",
+    );
+    assert.equal(await pathExists(scaffold.state.ownedPath), false);
+  });
+
+  await context.test("contains causal fixture failure", async () => {
+    const scaffold = createScaffold({
+      verifyFixture: async () => {
+        throw new Error("private fixture failure");
+      },
+    });
+    await assert.rejects(
+      certifyContentFilesForTesting({ revision }, scaffold.adapters),
+      (error) => error?.code === "CERTIFICATION_FIXTURE_VERIFICATION_FAILED",
+    );
+    assert.equal(await pathExists(scaffold.state.ownedPath), false);
+  });
+
+  await context.test("rejects worktree drift after contained evidence", async () => {
+    let reads = 0;
+    const scaffold = createScaffold({
+      readRepositoryStatus: async () => {
+        reads += 1;
+        return reads === 1 ? "" : " M private-source.ts\0";
+      },
+    });
+    await assert.rejects(
+      certifyContentFilesForTesting({ revision }, scaffold.adapters),
+      (error) => error?.code === "CERTIFICATION_WORKTREE_DIRTY",
+    );
+    assert.equal(await pathExists(scaffold.state.ownedPath), false);
+  });
+});
+
+test("the content files certification command requires one exact revision without echoing rejected values", async () => {
+  for (const [arguments_, expectedCode, expectedExitCode] of [
+    [
+      ["--revision", "private-value"],
+      "CERTIFICATION_REVISION_INVALID",
+      1,
+    ],
+    [
+      ["--", "--revision", "private-value"],
+      "CERTIFICATION_REVISION_INVALID",
+      1,
+    ],
+    [["--unknown", "private-value"], "CERTIFICATION_ARGUMENT_INVALID", 2],
+  ]) {
+    const execution = await execFileAsync(
+      process.execPath,
+      [contentFilesCertificationScript, ...arguments_],
+      {
+        cwd: repositoryRoot,
+        encoding: "utf8",
+        env: { PATH: process.env.PATH },
+      },
+    ).catch((error) => error);
+
+    assert.equal(execution.code, expectedExitCode);
+    assert.equal(execution.stdout, "");
+    assert.deepEqual(JSON.parse(execution.stderr), {
+      ok: false,
+      code: expectedCode,
+    });
+    assert.doesNotMatch(execution.stderr, /private-value/u);
+  }
 });
 
 test("the registry command rejects unknown arguments without registry content", async () => {
