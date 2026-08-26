@@ -4,7 +4,7 @@ import {
   parseContentConfiguration,
   parseMarkdownContent,
   parseYamlContent,
-} from "../../../src/content/content-schema";
+} from "../../src/content/content-schema";
 
 describe("content files certification", () => {
   it("uses strict YAML 1.2 core parsing without aliases", () => {
