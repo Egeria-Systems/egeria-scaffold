@@ -878,11 +878,11 @@ test("the portfolio and site catalog declares the exact seven executable capabil
     },
     {
       identifier: "site-routing",
-      version: "0.3.0",
+      version: "0.4.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
-      dependencies: ["content-files", "section-composition"],
+      dependencies: ["content-files", "observability", "section-composition"],
       optionalIntegrations: [],
       conflicts: [],
       supportedProfiles: ["site"],
@@ -915,15 +915,99 @@ test("the portfolio and site catalog declares the exact seven executable capabil
           fingerprintTarget: { kind: "file" },
           mergeStrategy: "replace-file",
         },
+        ...[
+          ["site-routing-not-found-route", "apps/web/app/not-found.tsx"],
+          ["site-routing-robots-route", "apps/web/app/robots.ts"],
+          ["site-routing-sitemap-route", "apps/web/app/sitemap.ts"],
+          ["site-routing-work-error-boundary", "apps/web/app/work/error.tsx"],
+          ["site-routing-work-index-route", "apps/web/app/work/page.tsx"],
+          [
+            "site-routing-featured-work-route",
+            "apps/web/app/work/featured/page.tsx",
+          ],
+          [
+            "site-routing-not-found-content",
+            "apps/web/content/en-CA/not-found.yaml",
+          ],
+          [
+            "site-routing-configuration-content",
+            "apps/web/content/en-CA/routing.yaml",
+          ],
+          [
+            "site-routing-featured-work-content",
+            "apps/web/content/en-CA/work-featured.yaml",
+          ],
+          [
+            "site-routing-content-reader",
+            "apps/web/src/routing/read-routing-content.ts",
+          ],
+          [
+            "site-routing-content-schema",
+            "apps/web/src/routing/routing-content-schema.ts",
+          ],
+          ["site-routing-presentation", "apps/web/src/routing/site-page.tsx"],
+          [
+            "site-routing-component-test",
+            "apps/web/tests/component/site-page.test.tsx",
+          ],
+          [
+            "site-routing-browser-test",
+            "apps/web/tests/e2e/site-routing.spec.ts",
+          ],
+          [
+            "site-routing-unit-test",
+            "apps/web/tests/unit/routing-content.test.ts",
+          ],
+        ].map(([identifier, path]) => ({
+          identifier,
+          owner: { kind: "capability", identifier: "site-routing" },
+          path,
+          ownership: "application-owned",
+          fingerprintTarget: { kind: "file" },
+          mergeStrategy: "replace-file",
+        })),
       ],
       inferenceProbes: [
         { kind: "file", path: "apps/web/app/about/page.tsx" },
         { kind: "file", path: "apps/web/content/en-CA/about.yaml" },
+        ...[
+          "apps/web/app/not-found.tsx",
+          "apps/web/app/robots.ts",
+          "apps/web/app/sitemap.ts",
+          "apps/web/app/work/error.tsx",
+          "apps/web/app/work/page.tsx",
+          "apps/web/app/work/featured/page.tsx",
+          "apps/web/content/en-CA/not-found.yaml",
+          "apps/web/content/en-CA/routing.yaml",
+          "apps/web/content/en-CA/work-featured.yaml",
+          "apps/web/src/routing/read-routing-content.ts",
+          "apps/web/src/routing/routing-content-schema.ts",
+          "apps/web/src/routing/site-page.tsx",
+          "apps/web/tests/component/site-page.test.tsx",
+          "apps/web/tests/e2e/site-routing.spec.ts",
+          "apps/web/tests/unit/routing-content.test.ts",
+        ].map((path) => ({ kind: "file", path })),
       ],
-      migrationPlanners: [],
-      verificationPlan: ["typecheck", "next-build"],
-      documentationEvidenceRequirements: ["multi-page-routing-contract"],
-      removalAndRecoveryRequirements: ["review-route-and-content-removal"],
+      migrationPlanners: ["upgrade-site-routing-0-3-0-to-0-4-0"],
+      verificationPlan: [
+        "content-contracts",
+        "component-tests",
+        "typecheck",
+        "next-build",
+        "opennext-build",
+        "browser-development",
+        "browser-preview",
+      ],
+      documentationEvidenceRequirements: [
+        "browser-route-and-navigation-behavior",
+        "crawl-metadata-contract",
+        "nested-error-and-not-found-behavior",
+        "page-and-navigation-migration-contract",
+      ],
+      removalAndRecoveryRequirements: [
+        "review-route-content-and-crawl-metadata-removal",
+        "review-redirect-and-navigation-recovery",
+      ],
     },
     {
       identifier: "booking-calendly",
@@ -1174,7 +1258,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.10.0",
+      recipeVersion: "0.11.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1239,7 +1323,10 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
       ({ identifier }) => identifier,
     );
 
-    assert.equal(selected.recipeVersion, "0.10.0");
+    assert.equal(
+      selected.recipeVersion,
+      profile === "portfolio" ? "0.10.0" : "0.11.0",
+    );
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
         selectedIdentifiers.indexOf("booking-calendly"),
@@ -1293,11 +1380,48 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     },
     {
       identifier: "site-routing",
-      version: "0.3.0",
+      version: "0.4.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
     },
+  ]);
+});
+
+test("current public recipes advance only the production site subject", () => {
+  assert.deepEqual(
+    core.profileRecipes.map(({ identifier, recipeVersion }) => ({
+      identifier,
+      recipeVersion,
+    })),
+    [
+      { identifier: "portfolio", recipeVersion: "0.10.0" },
+      { identifier: "site", recipeVersion: "0.11.0" },
+    ],
+  );
+
+  const currentSiteRouting = createCatalog().find(
+    ({ identifier }) => identifier === "site-routing",
+  );
+  assert.equal(currentSiteRouting?.version, "0.4.0");
+  assert.deepEqual(currentSiteRouting?.migrationPlanners, [
+    "upgrade-site-routing-0-3-0-to-0-4-0",
+  ]);
+
+  const historicalCatalog = assertOk(
+    core.createCapabilityCatalogSnapshot(packageVersions, {
+      standards: "0.4.0",
+      siteRouting: "0.3.0",
+    }),
+  );
+  assert.equal(
+    historicalCatalog.find(({ identifier }) => identifier === "site-routing")
+      ?.version,
+    "0.3.0",
+  );
+  assert.deepEqual(core.createProfileRecipeSnapshot("0.10.0"), [
+    { ...core.profileRecipes[0], recipeVersion: "0.10.0" },
+    { ...core.profileRecipes[1], recipeVersion: "0.10.0" },
   ]);
 });
 

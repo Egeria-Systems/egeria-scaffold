@@ -21,6 +21,10 @@ import { promisify } from "node:util";
 import { ordinaryGenerationVerificationChecks } from "../contracts/generation-verification.js";
 import type { ValidationResult } from "../contracts/result.js";
 import {
+  createRecipeLockfileUrl,
+  resolveRecipeLockfileVersion,
+} from "./recipe-lockfiles.js";
+import {
   classifyLockfileOnlyTransition,
   cleanupOwnedDirectory,
   createOwnedTemporaryDirectory,
@@ -83,10 +87,6 @@ const versionTimeoutMilliseconds = 30 * 1000;
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const requiredPnpmVersion = "11.20.0";
 const publicRegistry = "https://registry.npmjs.org/";
-const recipeLockfile = new URL(
-  "../../lockfiles/web-recipe-0.8.0/pnpm-lock.yaml",
-  import.meta.url,
-);
 const exclusiveFileOperations: ExclusiveFileOperations = {
   open,
 };
@@ -411,7 +411,20 @@ export async function prepareLockfile(
 
   let lockfileBytes: Uint8Array;
   try {
-    lockfileBytes = await readFile(recipeLockfile);
+    const manifestSource = await readFile(
+      join(fixedRoot, "apps/web/package.json"),
+      "utf8",
+    );
+    const lockfileVersion = resolveRecipeLockfileVersion(
+      JSON.parse(manifestSource) as unknown,
+    );
+    if (lockfileVersion === undefined) {
+      return issue(
+        "LOCKFILE_PREPARATION_FAILED",
+        "recipe-lockfile-unavailable",
+      );
+    }
+    lockfileBytes = await readFile(createRecipeLockfileUrl(lockfileVersion));
   } catch {
     return issue("LOCKFILE_PREPARATION_FAILED", "recipe-lockfile-unavailable");
   }

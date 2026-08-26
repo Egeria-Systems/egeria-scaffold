@@ -548,7 +548,7 @@ test("restricted error diagnostics admission advances every direct owner togethe
     })),
     [
       { identifier: "portfolio", recipeVersion: "0.10.0" },
-      { identifier: "site", recipeVersion: "0.10.0" },
+      { identifier: "site", recipeVersion: "0.11.0" },
     ],
   );
 

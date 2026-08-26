@@ -6,6 +6,11 @@ import test from "node:test";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
+const { createBuilderStateSurfaces } = await import(
+  pathToFileURL(
+    resolve(packageRoot, "dist/generation/builder-state-surfaces.js"),
+  )
+);
 const repositoryRoot = resolve(packageRoot, "../..");
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -67,6 +72,64 @@ async function currentEntries(profile) {
   return loadEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
 }
 
+async function acceptedSiteEntries() {
+  const current = await currentEntries("site");
+  const currentState = core.parseStateJson(current.get(".egeria/state.json"));
+  assert.equal(currentState.ok, true);
+  const rendered = await core.renderSkeleton(
+    {
+      profile: "site",
+      projectName: "acme-site",
+      displayName: "Acme Site",
+      packageVersions: core.verifiedCapabilityPackageVersions,
+    },
+    {
+      catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+      profiles: core.createProfileRecipeSnapshot("0.10.0"),
+    },
+  );
+  assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
+  const projectSource = core.serializeProjectYaml(rendered.value.project);
+  const lockfile = await readFile(
+    resolve(packageRoot, "lockfiles/web-recipe-0.8.0/pnpm-lock.yaml"),
+  );
+  const byteFiles = new Map(
+    rendered.value.files.map(({ path, content }) => [path, content]),
+  );
+  byteFiles.set(".egeria/project.yaml", encoder.encode(projectSource));
+  byteFiles.set(".egeria/migrations.jsonl", new Uint8Array());
+  byteFiles.set("pnpm-lock.yaml", new Uint8Array(lockfile));
+  const materialized = core.materializeInstalledSurfaces({
+    files: byteFiles,
+    surfaces: [...rendered.value.surfaces, ...createBuilderStateSurfaces()].sort(
+      (left, right) => compareText(left.identifier, right.identifier),
+    ),
+  });
+  assert.equal(materialized.ok, true, JSON.stringify(materialized.issues));
+  byteFiles.set(
+    ".egeria/state.json",
+    encoder.encode(
+      core.serializeStateJson({
+        ...currentState.value,
+        origin: { profile: "site", recipeVersion: "0.10.0" },
+        installedCapabilities: core.createInstalledManifest(
+          rendered.value.resolved,
+        ),
+        managedSurfaces: materialized.value,
+      }),
+    ),
+  );
+  const entries = new Map();
+  for (const [path, content] of byteFiles) {
+    try {
+      entries.set(path, decoder.decode(content));
+    } catch {
+      entries.set(path, { kind: "error", code: "FILE_ENCODING_INVALID" });
+    }
+  }
+  return entries;
+}
+
 function historicalQualitySource(current) {
   const visualStep = [
     "      - name: Compare OpenNext visual baselines",
@@ -78,7 +141,8 @@ function historicalQualitySource(current) {
 }
 
 async function historicalEntries(profile) {
-  const entries = await currentEntries(profile);
+  const entries =
+    profile === "site" ? await acceptedSiteEntries() : await currentEntries(profile);
 
   for (const path of visualPaths) {
     entries.delete(path);
@@ -359,6 +423,61 @@ test("the supported standards edge refuses every undeclared pair", () => {
       code,
     });
   }
+});
+
+test("the production site recipe has one exact pending site-routing upgrade edge", async () => {
+  const edge = core.resolveSupportedCapabilityUpgrade({
+    capability: "site-routing",
+    fromVersion: "0.3.0",
+    toVersion: "0.4.0",
+  });
+  assert.equal(edge.ok, true);
+  assert.equal(edge.value.source.recipeVersion, "0.10.0");
+  assert.equal(edge.value.target.recipeVersion, "0.11.0");
+  assert.equal(
+    edge.value.target.evidenceRevision,
+    "pending-site-routing-certification",
+  );
+
+  const entries = await acceptedSiteEntries();
+  const result = await planFromEntries(entries, {
+    capability: "site-routing",
+  });
+  assert.equal(result.ok, true, JSON.stringify(result.issues));
+  assert.deepEqual(result.value.capability, {
+    identifier: "site-routing",
+    fromVersion: "0.3.0",
+    toVersion: "0.4.0",
+  });
+  assert.deepEqual(
+    result.value.actions.map(({ kind, path }) => [kind, path]),
+    [
+      ["replace-file", ".egeria/project.yaml"],
+      ["replace-file", "apps/web/app/about/page.tsx"],
+      ["create-file", "apps/web/app/not-found.tsx"],
+      ["replace-file", "apps/web/app/page.tsx"],
+      ["create-file", "apps/web/app/robots.ts"],
+      ["create-file", "apps/web/app/sitemap.ts"],
+      ["create-file", "apps/web/app/work/error.tsx"],
+      ["create-file", "apps/web/app/work/featured/page.tsx"],
+      ["create-file", "apps/web/app/work/page.tsx"],
+      ["replace-file", "apps/web/content/en-CA/about.yaml"],
+      ["create-file", "apps/web/content/en-CA/not-found.yaml"],
+      ["create-file", "apps/web/content/en-CA/routing.yaml"],
+      ["replace-file", "apps/web/content/en-CA/site.yaml"],
+      ["create-file", "apps/web/content/en-CA/work-featured.yaml"],
+      ["replace-file", "apps/web/package.json"],
+      ["create-file", "apps/web/src/routing/read-routing-content.ts"],
+      ["create-file", "apps/web/src/routing/routing-content-schema.ts"],
+      ["create-file", "apps/web/src/routing/site-page.tsx"],
+      ["create-file", "apps/web/tests/component/site-page.test.tsx"],
+      ["create-file", "apps/web/tests/e2e/site-routing.spec.ts"],
+      ["create-file", "apps/web/tests/unit/routing-content.test.ts"],
+      ["replace-file", "pnpm-lock.yaml"],
+    ],
+  );
+  assert.equal(result.value.profile, "site");
+  assert.match(result.value.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
 });
 
 test("upgrade planning is exact, fingerprinted, and read-only for both profiles", async () => {

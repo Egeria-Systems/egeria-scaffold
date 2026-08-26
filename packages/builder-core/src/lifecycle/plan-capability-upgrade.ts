@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 
 import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
 import { verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
@@ -16,8 +17,12 @@ import {
   type GeneratedFile,
   type RenderedSkeleton,
 } from "../generation/render-skeleton.js";
+import { createRecipeLockfileUrl } from "../generation/recipe-lockfiles.js";
 import { fingerprintFileContent, fingerprintJsonValue } from "../ownership/fingerprint.js";
-import { createProfileRecipeSnapshot } from "../profiles/profile-recipes.js";
+import {
+  createProfileRecipeSnapshot,
+  profileRecipes,
+} from "../profiles/profile-recipes.js";
 import { createCachingRepositoryReader } from "../repository/cache-reader.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
 import {
@@ -60,8 +65,13 @@ export type CapabilityUpgradeControlFileEvidence = Readonly<{
 type CapabilityUpgradeFileAction = Readonly<{
   kind: "create-file" | "replace-file";
   path: string;
-  ownership: "application-owned" | "managed";
-  owner: "standards";
+  ownership: "application-owned" | "managed" | "merge-managed";
+  owner:
+    | "builder-kernel"
+    | "content-files"
+    | "deployment-cloudflare"
+    | "site-routing"
+    | "standards";
   targetFingerprint: `sha256:${string}`;
 }>;
 
@@ -85,7 +95,7 @@ export type CapabilityUpgradePlan = Readonly<{
   baseRevision: string;
   profile: "portfolio" | "site";
   capability: Readonly<{
-    identifier: "standards";
+    identifier: "site-routing" | "standards";
     fromVersion: "0.3.0";
     toVersion: "0.4.0";
   }>;
@@ -268,12 +278,15 @@ async function readControlSources(
     : { ok: false };
 }
 
-function sourceVersion(state: InstalledState): string | undefined {
-  const standards = state.installedCapabilities.filter(
-    ({ identifier }) => identifier === "standards",
+function sourceVersion(
+  state: InstalledState,
+  capability: "site-routing" | "standards",
+): string | undefined {
+  const matches = state.installedCapabilities.filter(
+    ({ identifier }) => identifier === capability,
   );
 
-  return standards.length === 1 ? standards[0]?.version : undefined;
+  return matches.length === 1 ? matches[0]?.version : undefined;
 }
 
 function validInspection(
@@ -319,7 +332,7 @@ function hasExactAgreement(
     state.origin.profile === project.originProfile &&
     state.origin.recipeVersion === project.recipeVersion &&
     resolved.recipeVersion === project.recipeVersion &&
-    project.selectedCapabilities.includes("standards") &&
+    project.selectedCapabilities.includes(edge.capability) &&
     sameStringSet(project.selectedCapabilities, desiredIdentifiers) &&
     sameStringSet(installedIdentifiers, desiredIdentifiers) &&
     installedVersionsAgree &&
@@ -581,17 +594,323 @@ function fingerprintPlan(input: Readonly<{
   return `sha256:${digest}`;
 }
 
+const siteRoutingUpgradePaths = [
+  ".egeria/project.yaml",
+  "apps/web/app/about/page.tsx",
+  "apps/web/app/not-found.tsx",
+  "apps/web/app/page.tsx",
+  "apps/web/app/robots.ts",
+  "apps/web/app/sitemap.ts",
+  "apps/web/app/work/error.tsx",
+  "apps/web/app/work/featured/page.tsx",
+  "apps/web/app/work/page.tsx",
+  "apps/web/content/en-CA/about.yaml",
+  "apps/web/content/en-CA/not-found.yaml",
+  "apps/web/content/en-CA/routing.yaml",
+  "apps/web/content/en-CA/site.yaml",
+  "apps/web/content/en-CA/work-featured.yaml",
+  "apps/web/package.json",
+  "apps/web/src/routing/read-routing-content.ts",
+  "apps/web/src/routing/routing-content-schema.ts",
+  "apps/web/src/routing/site-page.tsx",
+  "apps/web/tests/component/site-page.test.tsx",
+  "apps/web/tests/e2e/site-routing.spec.ts",
+  "apps/web/tests/unit/routing-content.test.ts",
+  "pnpm-lock.yaml",
+] as const;
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  return (
+    left.length === right.length &&
+    left.every((byte, index) => byte === right[index])
+  );
+}
+
+async function readRepositoryBytes(
+  reader: RepositoryReader,
+  path: string,
+): Promise<
+  | Readonly<{ kind: "file"; content: Uint8Array }>
+  | Readonly<{ kind: "missing" }>
+  | Readonly<{ kind: "invalid" }>
+> {
+  if (reader.readBytes !== undefined) {
+    const result = await reader.readBytes(path);
+    return result.kind === "file" || result.kind === "missing"
+      ? result
+      : { kind: "invalid" };
+  }
+
+  const result = await reader.readText(path);
+  return result.kind === "file"
+    ? { kind: "file", content: encoder.encode(result.content) }
+    : result.kind === "missing"
+      ? result
+      : { kind: "invalid" };
+}
+
+function siteRoutingActionOwner(
+  path: string,
+  target: RenderedSkeleton,
+): Pick<CapabilityUpgradeFileAction, "owner" | "ownership"> | undefined {
+  if (
+    path === ".egeria/project.yaml" ||
+    path === "apps/web/app/page.tsx" ||
+    path === "pnpm-lock.yaml"
+  ) {
+    return { owner: "builder-kernel", ownership: "managed" };
+  }
+  if (path === "apps/web/package.json") {
+    return { owner: "builder-kernel", ownership: "merge-managed" };
+  }
+
+  const descriptor = target.surfaces.find(
+    (surface) =>
+      surface.path === path && surface.fingerprintTarget.kind === "file",
+  );
+  if (descriptor === undefined) {
+    return undefined;
+  }
+
+  return {
+    owner:
+      descriptor.owner.kind === "builder-kernel"
+        ? "builder-kernel"
+        : descriptor.owner.identifier as CapabilityUpgradeFileAction["owner"],
+    ownership: descriptor.ownership,
+  };
+}
+
+async function deriveSiteRoutingActions(input: Readonly<{
+  reader: RepositoryReader;
+  source: RenderedSkeleton;
+  target: RenderedSkeleton;
+}>): Promise<PlanningResult<readonly CapabilityUpgradeAction[]>> {
+  const [sourceLockfile, targetLockfile] = await Promise.all([
+    readFile(createRecipeLockfileUrl("0.8.0")),
+    readFile(createRecipeLockfileUrl("0.9.0")),
+  ]);
+  const sourceBytes = new Map(
+    input.source.files.map(({ path, content }) => [path, content]),
+  );
+  sourceBytes.set(
+    ".egeria/project.yaml",
+    encoder.encode(serializeProjectYaml(input.source.project)),
+  );
+  sourceBytes.set("pnpm-lock.yaml", new Uint8Array(sourceLockfile));
+  const targetBytes = new Map(
+    input.target.files.map(({ path, content }) => [path, content]),
+  );
+  targetBytes.set(
+    ".egeria/project.yaml",
+    encoder.encode(serializeProjectYaml(input.target.project)),
+  );
+  targetBytes.set("pnpm-lock.yaml", new Uint8Array(targetLockfile));
+
+  const changedPaths = [...targetBytes]
+    .filter(([path, content]) => {
+      const source = sourceBytes.get(path);
+      return source === undefined || !sameBytes(source, content);
+    })
+    .map(([path]) => path)
+    .sort(compareText);
+  if (!sameOrderedValues(changedPaths, siteRoutingUpgradePaths)) {
+    return planningFailure("PROJECT_INSPECTION_INVALID");
+  }
+
+  const actions: CapabilityUpgradeAction[] = [];
+  for (const path of siteRoutingUpgradePaths) {
+    const source = sourceBytes.get(path);
+    const target = targetBytes.get(path);
+    const owner = siteRoutingActionOwner(path, input.target);
+    if (target === undefined || owner === undefined) {
+      return planningFailure("PROJECT_INSPECTION_INVALID");
+    }
+
+    const current = await readRepositoryBytes(input.reader, path);
+    if (source === undefined) {
+      if (current.kind !== "missing") {
+        return planningFailure("CAPABILITY_ACTION_CONFLICT");
+      }
+      actions.push({
+        kind: "create-file",
+        path,
+        ...owner,
+        targetFingerprint: fingerprintFileContent(target),
+      });
+      continue;
+    }
+    if (current.kind !== "file" || !sameBytes(current.content, source)) {
+      return planningFailure("PROJECT_DRIFT_DETECTED");
+    }
+    actions.push({
+      kind: "replace-file",
+      path,
+      ...owner,
+      targetFingerprint: fingerprintFileContent(target),
+    });
+  }
+
+  return { ok: true, value: actions };
+}
+
+async function planSiteRoutingUpgrade(input: Readonly<{
+  reader: RepositoryReader;
+  git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
+}>): Promise<PlanningResult<CapabilityUpgradePlan>> {
+  const reader = createCachingRepositoryReader(input.reader);
+  const controls = await readControlSources(reader);
+  if (!controls.ok) {
+    return planningFailure("PROJECT_STATE_INCOMPATIBLE");
+  }
+
+  const installedVersion = sourceVersion(controls.state, "site-routing");
+  if (installedVersion === undefined) {
+    return planningFailure("CAPABILITY_VERSION_AMBIGUOUS");
+  }
+  const edge = resolveSupportedCapabilityUpgrade({
+    capability: "site-routing",
+    fromVersion: installedVersion,
+    toVersion: "0.4.0",
+  });
+  if (!edge.ok) {
+    return planningFailure(edge.code);
+  }
+
+  const sourceCatalog = createCapabilityCatalogSnapshot(
+    verifiedCapabilityPackageVersions,
+    { standards: "0.4.0", siteRouting: "0.3.0" },
+  );
+  if (!sourceCatalog.ok) {
+    return planningFailure("PROJECT_INSPECTION_INVALID");
+  }
+  const sourceProfiles = createProfileRecipeSnapshot("0.10.0");
+  const inspectionCandidate = await inspectProject({
+    reader,
+    catalog: sourceCatalog.value,
+    profiles: sourceProfiles,
+  });
+  if (
+    inspectionCandidate.inference.capabilities.find(
+      ({ identifier }) => identifier === "site-routing",
+    )?.category === "ambiguous"
+  ) {
+    return planningFailure("CAPABILITY_VERSION_AMBIGUOUS");
+  }
+  const inspection = validInspection(inspectionCandidate);
+  if (inspection?.project.value.originProfile !== "site") {
+    return planningFailure("PROJECT_STATE_INCOMPATIBLE");
+  }
+  if (!hasExactAgreement(inspection, edge.value)) {
+    return planningFailure("PROJECT_STATE_INCOMPATIBLE");
+  }
+  if (hasUnsupportedEjection(inspection)) {
+    return planningFailure("PROJECT_EJECTION_UNSUPPORTED");
+  }
+  if (hasMaterialDrift(inspection)) {
+    return planningFailure("PROJECT_DRIFT_DETECTED");
+  }
+
+  const project = inspection.project.value;
+  if (
+    controls.sources.get(".egeria/project.yaml") !== serializeProjectYaml(project)
+  ) {
+    return planningFailure("PROJECT_DRIFT_DETECTED");
+  }
+  const booking = project.capabilitySettings["booking-calendly"];
+  const request = {
+    profile: "site" as const,
+    projectName: project.project.name,
+    displayName: project.project.displayName,
+    packageVersions: verifiedCapabilityPackageVersions,
+    ...(booking === undefined ? {} : { bookingCalendly: booking }),
+  };
+  const [sourceResult, targetResult] = await Promise.all([
+    renderSkeleton(request, {
+      catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+      profiles: sourceProfiles,
+    }),
+    renderSkeleton(request, {
+      catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0" },
+      profiles: profileRecipes,
+    }),
+  ]);
+  if (!sourceResult.ok || !targetResult.ok) {
+    return planningFailure("PROJECT_INSPECTION_INVALID");
+  }
+  if (
+    hasSurfaceInventoryDrift(controls.state.managedSurfaces, [
+      ...sourceResult.value.surfaces,
+      ...createBuilderStateSurfaces(),
+    ])
+  ) {
+    return planningFailure("PROJECT_DRIFT_DETECTED");
+  }
+
+  const actions = await deriveSiteRoutingActions({
+    reader,
+    source: sourceResult.value,
+    target: targetResult.value,
+  });
+  if (!actions.ok) {
+    return actions;
+  }
+  const capabilities = inspection.resolution.value.capabilities
+    .map(({ identifier }) => identifier)
+    .sort(compareText);
+  const plan: CapabilityUpgradePlanBody = {
+    operation: "upgrade-capability",
+    status: "approval-required",
+    baseRevision: input.git.identity.revision,
+    profile: "site",
+    capability: {
+      identifier: "site-routing",
+      fromVersion: "0.3.0",
+      toVersion: "0.4.0",
+    },
+    source: edge.value.source,
+    target: edge.value.target,
+    controlFiles: controlFileEvidence(controls.sources),
+    currentCapabilities: capabilities,
+    desiredCapabilities: capabilities,
+    actions: actions.value,
+    requiredApprovals: ["transform", "verified-final-diff"],
+    persistenceOrder: [
+      "transform",
+      "verify",
+      "re-infer",
+      "append-migration-record",
+      "persist-state",
+      "verify-state-and-inference",
+    ],
+  };
+  return {
+    ok: true,
+    value: {
+      ...plan,
+      planFingerprint: fingerprintPlan({ plan, git: input.git }),
+    },
+  };
+}
+
 export async function planCapabilityUpgrade(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "standards";
+  capability: "site-routing" | "standards";
   toVersion: "0.4.0";
 }>): Promise<PlanningResult<CapabilityUpgradePlan>> {
   const capability: unknown = Reflect.get(input, "capability");
   const toVersion: unknown = Reflect.get(input, "toVersion");
 
-  if (capability !== "standards" || toVersion !== "0.4.0") {
+  if (
+    (capability !== "standards" && capability !== "site-routing") ||
+    toVersion !== "0.4.0"
+  ) {
     return planningFailure("CAPABILITY_UPGRADE_UNSUPPORTED");
+  }
+
+  if (capability === "site-routing") {
+    return planSiteRoutingUpgrade({ reader: input.reader, git: input.git });
   }
 
   const reader = createCachingRepositoryReader(input.reader);
@@ -601,7 +920,7 @@ export async function planCapabilityUpgrade(input: Readonly<{
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
   }
 
-  const installedVersion = sourceVersion(controls.state);
+  const installedVersion = sourceVersion(controls.state, "standards");
   if (installedVersion === undefined) {
     return planningFailure("CAPABILITY_VERSION_AMBIGUOUS");
   }
@@ -666,18 +985,24 @@ export async function planCapabilityUpgrade(input: Readonly<{
     return planningFailure("PROJECT_DRIFT_DETECTED");
   }
 
-  const rendered = await renderSkeleton({
-    profile: project.originProfile,
-    projectName: project.project.name,
-    displayName: project.project.displayName,
-    packageVersions: verifiedCapabilityPackageVersions,
-    ...(project.capabilitySettings["booking-calendly"] === undefined
-      ? {}
-      : {
-          bookingCalendly:
-            project.capabilitySettings["booking-calendly"],
-        }),
-  });
+  const rendered = await renderSkeleton(
+    {
+      profile: project.originProfile,
+      projectName: project.project.name,
+      displayName: project.project.displayName,
+      packageVersions: verifiedCapabilityPackageVersions,
+      ...(project.capabilitySettings["booking-calendly"] === undefined
+        ? {}
+        : {
+            bookingCalendly:
+              project.capabilitySettings["booking-calendly"],
+          }),
+    },
+    {
+      catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+      profiles: createProfileRecipeSnapshot("0.10.0"),
+    },
+  );
 
   if (!rendered.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");

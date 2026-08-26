@@ -266,6 +266,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "diagnostics/doctor.ts",
       "diagnostics/project-inspection.ts",
       "generation/builder-state-surfaces.ts",
+      "generation/recipe-lockfiles.ts",
       "generation/render-skeleton.ts",
       "generation/render-template.ts",
       "generation/source-tree-safety.ts",
@@ -366,9 +367,29 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
       "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
       "site/apps/web/app/about/page.tsx",
+      "site/apps/web/app/about/production-page.tsx",
+      "site/apps/web/app/not-found.tsx",
+      "site/apps/web/app/page-with-booking.tsx",
+      "site/apps/web/app/page.tsx",
+      "site/apps/web/app/robots.ts",
+      "site/apps/web/app/sitemap.ts",
+      "site/apps/web/app/work/error.tsx",
+      "site/apps/web/app/work/featured/page.tsx",
+      "site/apps/web/app/work/page.tsx",
+      "site/apps/web/content/en-CA/about.production.yaml.template",
       "site/apps/web/content/en-CA/about.yaml.template",
       "site/apps/web/content/en-CA/long-form/introduction.md.template",
+      "site/apps/web/content/en-CA/not-found.yaml.template",
+      "site/apps/web/content/en-CA/routing.yaml",
+      "site/apps/web/content/en-CA/site.production.yaml.template",
       "site/apps/web/content/en-CA/site.yaml.template",
+      "site/apps/web/content/en-CA/work-featured.yaml.template",
+      "site/apps/web/src/routing/read-routing-content.ts",
+      "site/apps/web/src/routing/routing-content-schema.ts",
+      "site/apps/web/src/routing/site-page.tsx",
+      "site/apps/web/tests/component/site-page.test.tsx",
+      "site/apps/web/tests/e2e/site-routing.spec.ts.template",
+      "site/apps/web/tests/unit/routing-content.test.ts",
       "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
       "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
     ],
@@ -433,7 +454,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /canonical managed-surface inventory/);
   assert.match(
     builderInstructions,
-    /Git preflight, deterministic addition, removal, exact supported-upgrade planning, and exact `portfolio@0\.10\.0` to `site@0\.10\.0` profile-transition planning, exact-diff inspection/,
+    /Git preflight, deterministic addition, removal, exact supported-upgrade planning, and exact `portfolio@0\.10\.0` to historical `site@0\.10\.0` profile-transition planning, exact-diff inspection/,
   );
   assert.match(builderInstructions, /`applyCapabilityAddition`/);
   assert.match(builderInstructions, /`applyCapabilityRemoval`/);
@@ -448,7 +469,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /explicit allowlisted[^\n]+templates/);
   assert.match(builderReadme, /YAML 1.2/);
   assert.match(builderReadme, /Markdown with validated YAML front matter/);
-  assert.match(builderReadme, /recipe `0.10.0`/);
+  assert.match(builderReadme, /portfolio@0.10.0/);
   assert.match(builderReadme, /four source-registered typed section shapes/);
   assert.match(builderReadme, /Tailwind CSS and PostCSS/);
   assert.match(builderReadme, /named generated Vitest unit\/component projects/);
@@ -543,7 +564,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /text and byte reads at 1 MiB/);
   assert.match(
     builderInstructions,
-    /`createFileSystemCapabilityUpgradeWriter`[^\n]+upgrade-specific/,
+    /`createFileSystemCapabilityUpgradeWriter`[^\n]+operation-specific/,
   );
   assert.match(builderReadme, /applyCapabilityUpgrade/);
   assert.match(builderReadme, /createFileSystemCapabilityUpgradeWriter/);
@@ -579,7 +600,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   );
   assert.match(
     cliInstructions,
-    /standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+single[^\n]+edge/,
+    /standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+site-routing@0\.3\.0[^\n]+site-routing@0\.4\.0[^\n]+edges/,
   );
   assert.match(cliInstructions, /modified[^\n]+application-owned[^\n]+preserv[^\n]+eject/);
   assert.match(cliInstructions, /remain read-only/);
@@ -614,7 +635,10 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliReadme, /one content-safe JSON line/);
   assert.match(cliReadme, /no prompt, overwrite mode/);
 
-  assert.match(packageOwnership, /exact Calendly and standards transactions/);
+  assert.match(
+    packageOwnership,
+    /standards@0\.3\.0[^\n]+site-routing@0\.3\.0[^\n]+exact Calendly transactions/,
+  );
   assert.match(packageOwnership, /canonical private owner/i);
   assert.match(packageOwnership, /deterministic in-memory rendering/);
   assert.match(packageOwnership, /explicit allowlisted templates/);

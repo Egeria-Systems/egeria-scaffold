@@ -62,7 +62,7 @@
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.3.0"
+      "version": "0.4.0"
     }
   ],
   "lastSuccessfulVerification": {
@@ -83,7 +83,7 @@
   },
   "managedSurfaces": [
     {
-      "fingerprint": "sha256:020061380ecdf4eaafdff982bc2cc3be4a7867f752f874bfc1eb6dbc1c983952",
+      "fingerprint": "sha256:7e115ec3054a0f47f81482dce1ec9ac991a4d4120b7284ebcfb15b3a71f8d290",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -109,7 +109,7 @@
       "path": ".gitignore"
     },
     {
-      "fingerprint": "sha256:5affb1baee147023b57f32c9947fab4c64de9afe613fe89d28c6ff4e2a2231e8",
+      "fingerprint": "sha256:5a8e69d58a8f32818f68e91e6d1815b04d44ce909e391245e980422ee7d2cfa9",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -148,7 +148,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:c88a527b10d5b1a6291884f35d545520a0dab86673b018b91e0831a0e18e6e7e",
+      "fingerprint": "sha256:de4d70b8efbeb996b121bf739b0200334fddaa03e8dfabbf2e2d949a00f9886d",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -310,7 +310,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:d222cfa0584fae41d281a13a335190e015bbdb66d2578b34113db365fa13f0c2",
+      "fingerprint": "sha256:4e824eb6621057d8bbcf84dd8ab707616492dd66e5ed634a82d5360a36be3fa2",
       "fingerprintTarget": {
         "kind": "json-value",
         "pointer": "/devDependencies/eslint-config-next"
@@ -338,7 +338,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:d222cfa0584fae41d281a13a335190e015bbdb66d2578b34113db365fa13f0c2",
+      "fingerprint": "sha256:4e824eb6621057d8bbcf84dd8ab707616492dd66e5ed634a82d5360a36be3fa2",
       "fingerprintTarget": {
         "kind": "json-value",
         "pointer": "/dependencies/next"
@@ -604,7 +604,7 @@
       "path": "apps/web/src/content/content-schema.ts"
     },
     {
-      "fingerprint": "sha256:e70c4d0c8193f5695fd7eb43b7f037fb16594476e2e76a7723c6a706823a1687",
+      "fingerprint": "sha256:2c6024a6f4d06f397f2ab3af31d2b6a2065316ec710d9e78199c4d9f5a48b28b",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1031,7 +1031,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:da0b64a7e507af85066af37d6fc7292e296d87590305ec2c7d71b5fa0db2a857",
+      "fingerprint": "sha256:33309063be899f2fc636ece1110b3f6fdd9325e5c96cbdf3eb5b635898bfdf26",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1045,7 +1045,7 @@
       "path": "apps/web/content/en-CA/about.yaml"
     },
     {
-      "fingerprint": "sha256:42b9a5777cd82f9ddedab4f5e82ea23cc2ae3dcce22d05e5e8deb1ce05d7ce7c",
+      "fingerprint": "sha256:639171f5b67d74acb8b1c8ee5886285f0441c75a2d98eb4b7d94378300a22d54",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1057,6 +1057,216 @@
       },
       "ownership": "application-owned",
       "path": "apps/web/app/about/page.tsx"
+    },
+    {
+      "fingerprint": "sha256:9e41a5a8c6c64345095e28ba13bba770a2b9924a6d681490f18907bcb927a66d",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-browser-test",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/e2e/site-routing.spec.ts"
+    },
+    {
+      "fingerprint": "sha256:e241fffe579bb264830a927f258fb4ec287b42e86cd1452e4dab950d90e2c90c",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-component-test",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/component/site-page.test.tsx"
+    },
+    {
+      "fingerprint": "sha256:43a2836aef1d37c9d2e43b8ba39cce466fad65873c303c810d00bf3fa6010393",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-configuration-content",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/content/en-CA/routing.yaml"
+    },
+    {
+      "fingerprint": "sha256:1a0ba418c242837cfc63b7d3226f8fcdfe9c6994d945fe88db34a232b6c954c9",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-content-reader",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/routing/read-routing-content.ts"
+    },
+    {
+      "fingerprint": "sha256:ce8f178e035a9571b434ebd526295217dfd20baa4bdece4affe26737ed49f3e3",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-content-schema",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/routing/routing-content-schema.ts"
+    },
+    {
+      "fingerprint": "sha256:c9d7438159d6646f39a7dc96c0adb07e6d3e316b48c8d83f10856476c4f7e406",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-featured-work-content",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/content/en-CA/work-featured.yaml"
+    },
+    {
+      "fingerprint": "sha256:0f5ecaaff1b3794d0fdce1865bdb8a1d80e721e3b1afe27344bdf8c0a4b952b0",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-featured-work-route",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/app/work/featured/page.tsx"
+    },
+    {
+      "fingerprint": "sha256:6b128e47d783c9cbff20fea5b0cf1b992edd2008934250ddede992313dfac4ca",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-not-found-content",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/content/en-CA/not-found.yaml"
+    },
+    {
+      "fingerprint": "sha256:cf31de6de404c8b2c140d3429a219c9a681f4307c3f19485676f0aa4c6c24337",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-not-found-route",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/app/not-found.tsx"
+    },
+    {
+      "fingerprint": "sha256:79a0722274b461256e450c4406fd068d6dab60e28dc6b7cfaa4fc7a00fc2cb72",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-presentation",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/src/routing/site-page.tsx"
+    },
+    {
+      "fingerprint": "sha256:eaefccadfa25577374cece3d88d34a14adc281046f65eb6296388512e8e73a45",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-robots-route",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/app/robots.ts"
+    },
+    {
+      "fingerprint": "sha256:59e48bad4ef7e42344057382cfa0352864cfaa80dc12a9eb59dbf0fd64d308a5",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-sitemap-route",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/app/sitemap.ts"
+    },
+    {
+      "fingerprint": "sha256:96a753f48540d23a52452bf1114c957af8b7c037c56373e05ae4ec8d77e1aaa5",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-unit-test",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/tests/unit/routing-content.test.ts"
+    },
+    {
+      "fingerprint": "sha256:74dac5954dec142c19ab5e837655875f2bb5582cd793679c4596d665e4b9321c",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-work-error-boundary",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/app/work/error.tsx"
+    },
+    {
+      "fingerprint": "sha256:19f511d2a798724ff35d935743b4720c79c63d4883f0b239c22dcbddfc1916f5",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "site-routing-work-index-route",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "site-routing",
+        "kind": "capability"
+      },
+      "ownership": "application-owned",
+      "path": "apps/web/app/work/page.tsx"
     },
     {
       "fingerprint": "sha256:a34b8455789ad192f62d9d3e732553d26494caf9d900efc45a6976345799b6b3",
@@ -1512,7 +1722,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:59d34f807a3635b77a761c2c4cedfac799819cb7fcecec4edb13f6e5f84dd878",
+      "fingerprint": "sha256:0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1526,7 +1736,7 @@
       "path": "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png"
     },
     {
-      "fingerprint": "sha256:5ee6e7436f7128c75c7266c32f417bd2d098c7b4b03d3bcfd175554e49f4294c",
+      "fingerprint": "sha256:c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1615,7 +1825,7 @@
   ],
   "origin": {
     "profile": "site",
-    "recipeVersion": "0.10.0"
+    "recipeVersion": "0.11.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

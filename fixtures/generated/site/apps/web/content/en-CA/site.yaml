@@ -33,3 +33,5 @@ navigation:
     label: Home
   - href: /about
     label: About
+  - href: /work/featured
+    label: Work
