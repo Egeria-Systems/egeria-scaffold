@@ -2,6 +2,7 @@ export const requiredEvidence = Object.freeze({
   "booking-calendly": Object.freeze([
     "cleanup-recovery",
     "deployed-application",
+    "existing-repository-lifecycle",
     "fresh-scaffold",
     "provider-confirmed",
   ]),
@@ -18,5 +19,8 @@ export const requiredEvidence = Object.freeze({
   ]),
   "section-composition": Object.freeze(["fresh-scaffold"]),
   "site-routing": Object.freeze(["fresh-scaffold"]),
-  standards: Object.freeze(["fresh-scaffold"]),
+  standards: Object.freeze([
+    "existing-repository-lifecycle",
+    "fresh-scaffold",
+  ]),
 });

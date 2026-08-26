@@ -278,6 +278,7 @@ export async function certifyFreshScaffoldForTesting(configuration, adapters) {
         projectRoot,
         configuration.verifierIdentifier,
         configuration.projectName,
+        configuration.verificationOptions,
       );
     } catch {
       fail(configuration, "GENERATED_PROJECT_VERIFICATION_FAILED");

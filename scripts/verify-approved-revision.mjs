@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 
 const canonicalRevisionPattern = /^[0-9a-f]{40}$/u;
 const admissionFailureMessage = "Approved revision admission failed.\n";
+const approvedRef = "refs/heads/main";
 
 function rejectAdmission() {
   process.stderr.write(admissionFailureMessage);
@@ -14,7 +15,7 @@ function revisionIsApproved() {
   const expectedRevision = process.env.EXPECTED_REVISION;
   const eventRevision = process.env.GITHUB_SHA;
   if (
-    process.env.GITHUB_REF !== "refs/heads/main" ||
+    process.env.GITHUB_REF !== approvedRef ||
     typeof expectedRevision !== "string" ||
     !canonicalRevisionPattern.test(expectedRevision) ||
     eventRevision !== expectedRevision
