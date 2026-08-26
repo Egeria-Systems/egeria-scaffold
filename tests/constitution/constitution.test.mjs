@@ -2506,6 +2506,116 @@ test("client-required public-site work is relocated after lifecycle without requ
   );
 });
 
+test("multilingual implementation is exact and serialized behind routing certification", async () => {
+  const [
+    sourcePlan,
+    programRoadmap,
+    overview,
+    capabilityModel,
+    enforcementMap,
+    packageOwnership,
+    cliInstructions,
+    builderCoreInstructions,
+  ] = await Promise.all([
+    readRepositoryFile(
+      "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+    ),
+    readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+    readRepositoryFile("docs/architecture/overview.md"),
+    readRepositoryFile("docs/architecture/capability-model.md"),
+    readRepositoryFile("docs/architecture/enforcement-map.md"),
+    readRepositoryFile("docs/architecture/package-ownership.md"),
+    readRepositoryFile("apps/cli/AGENTS.md"),
+    readRepositoryFile("packages/builder-core/AGENTS.md"),
+  ]);
+  const clientExpansionPhase = compactLabel("P", "3", "B");
+
+  for (const roadmap of [sourcePlan, programRoadmap]) {
+    assert.match(
+      roadmap,
+      /one-time 2026-08-26 multilingual implementation-lane exception/iu,
+    );
+    assert.match(
+      roadmap,
+      /0a699d26198e94ddfaa596d812ad175284d05c49[\s\S]+a66890a6c30a275818e7b51f22ded987cc1d52ff/iu,
+    );
+    assert.match(
+      roadmap,
+      /Lane A[\s\S]+site-routing@0\.4\.0[\s\S]+accepted-main[\s\S]+Lane B[\s\S]+merge/iu,
+    );
+    assert.match(
+      roadmap,
+      /does not authorize[\s\S]+multilingual certification[\s\S]+analytics implementation[\s\S]+real client project/iu,
+    );
+  }
+
+  assert.match(
+    sourcePlan,
+    new RegExp(
+      `${escapeRegularExpression(clientExpansionPhase)}[\\s\\S]+multilingual@0\\.1\\.0[\\s\\S]+portfolio[\\s\\S]+site`,
+      "iu",
+    ),
+  );
+  assert.match(capabilityModel, /^### Executable multilingual boundary$/mu);
+  const multilingualBoundary = capabilityModel
+    .split("### Executable multilingual boundary\n", 2)[1]
+    .split("\n### ", 1)[0];
+  assert.ok(multilingualBoundary, "executable multilingual boundary is missing");
+  assert.match(
+    multilingualBoundary,
+    /multilingual@0\.1\.0[\s\S]+source-generated[\s\S]+portfolio[\s\S]+site/iu,
+  );
+  assert.match(
+    multilingualBoundary,
+    /supported locales are exactly `en-CA` and `fr-CA`[\s\S]+default locale is `en-CA`/u,
+  );
+  assert.match(
+    multilingualBoundary,
+    /every public URL[\s\S]+default locale[\s\S]+locale-prefixed[\s\S]+Accept-Language/iu,
+  );
+  assert.match(
+    multilingualBoundary,
+    /explicit unsupported locale[\s\S]+not-found[\s\S]+no runtime translation fallback/iu,
+  );
+  assert.match(
+    multilingualBoundary,
+    /missing[\s\S]+unused[\s\S]+structural parity[\s\S]+fail closed/iu,
+  );
+  assert.match(
+    multilingualBoundary,
+    /application-owned locale catalogs[\s\S]+preservation or ejection[\s\S]+removal/iu,
+  );
+  assert.match(
+    multilingualBoundary,
+    /certification[\s\S]+separate[\s\S]+pending[\s\S]+linguistic quality[\s\S]+WCAG conformance/iu,
+  );
+
+  assert.match(
+    overview,
+    /multilingual@0\.1\.0[\s\S]+exact addition and removal[\s\S]+certification remains separate/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-MULTILINGUAL-ROUTING[^\n]+actual[^\n]+locale-prefixed[^\n]+no fallback/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-MULTILINGUAL-CONTENT[^\n]+actual[^\n]+missing[^\n]+unused[^\n]+parity/iu,
+  );
+  assert.match(
+    packageOwnership,
+    /eight capability descriptors[\s\S]+multilingual@0\.1\.0[\s\S]+initial generation[\s\S]+exact addition and removal/iu,
+  );
+
+  for (const instructions of [cliInstructions, builderCoreInstructions]) {
+    assert.match(
+      instructions,
+      /booking-calendly@0\.1\.0[\s\S]+multilingual@0\.1\.0/iu,
+    );
+    assert.match(instructions, /multilingual certification remains separate/iu);
+  }
+});
+
 test("executable capability certification ownership is current", async () => {
   const [
     rootReadme,
