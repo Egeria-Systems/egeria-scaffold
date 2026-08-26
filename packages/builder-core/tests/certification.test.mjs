@@ -35,7 +35,7 @@ const contentFilesPlanPath =
 const contentFilesEvidencePath =
   "docs/implementation-evidence/2026-08-25-content-files-certification-receipt.md";
 const contentFilesEvidenceRevision =
-  "28b5769e42a9d7b3c6df47338536c56e630aafc4";
+  "f03b9f624c370728f678924ce34e5287558d2a87";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const deploymentEvidencePath =

@@ -14,7 +14,7 @@
 
 **Certification behavior-contract digest:** `sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05`
 
-**Certification evidence revision:** `28b5769e42a9d7b3c6df47338536c56e630aafc4`
+**Certification evidence revision:** `f03b9f624c370728f678924ce34e5287558d2a87`
 
 **Passed certification outcomes:** `fresh-scaffold`
 
@@ -35,14 +35,16 @@ This content-safe receipt records the causal local certification and approved re
 The exact clean revision ran:
 
 ```text
-pnpm run verify:content-files-certification -- --revision 28b5769e42a9d7b3c6df47338536c56e630aafc4
+pnpm run verify:content-files-certification -- --revision f03b9f624c370728f678924ce34e5287558d2a87
 ```
 
 The runner used repository-pinned Node.js `22.23.2` and pnpm `11.20.0`. Frozen dependency installation and Chromium installation used bounded network access inside identity-owned disposable roots. No credential, provider account, deployment, protected environment, persistent external state, or spend was required.
 
 Two failed pre-evidence attempts were rejected and produced no accepted receipt: the first exposed unsupported package-script separator handling, and the second exposed an incorrect disposable fixture import. Both defects were corrected under a failing test or failing causal certification check, committed, and the complete journey reran at the recorded revision.
 
-After the initial causal success, independent test-evidence review found three coverage gaps: ordinary-suite receipt binding, direct protection of the production fixture verifier's overlay and command sequence, and a YAML core-schema discriminator. The accepted validation core already enforced receipt binding; the normal builder suite now exercises it. The production verifier is now tested directly, and the generated unit fixture distinguishes core from JSON and failsafe schemas. Because the runner and fixture are evidence inputs, the complete journey reran at the recorded revision. Earlier revision `591a6d2ee45ee02dd059e46dae7c6c2b1a10c96f` is superseded and is not registry evidence.
+After the initial causal success, independent test-evidence review found three coverage gaps: ordinary-suite receipt binding, direct protection of the production fixture verifier's overlay and command sequence, and a YAML core-schema discriminator. The accepted validation core already enforced receipt binding; the normal builder suite now exercises it. The production verifier is now tested directly, and the generated unit fixture distinguishes core from JSON and failsafe schemas.
+
+Final CodeRabbit review then found that support-root preparation, fixture-destination creation, and navigation-overlay writes could bypass the production verifier's specific opaque filesystem error. Three failing regression cases reproduced the raw failures before the runner mapped each to `CERTIFICATION_FIXTURE_OVERLAY_FAILED`. Because the runner and fixture are evidence inputs, the complete journey reran at the recorded revision after all corrections. Earlier revisions `591a6d2ee45ee02dd059e46dae7c6c2b1a10c96f` and `28b5769e42a9d7b3c6df47338536c56e630aafc4` are superseded and are not registry evidence.
 
 ## Fresh-scaffold outcome
 
@@ -78,5 +80,5 @@ It does not establish translation quality, arbitrary content safety, visual or d
 - Strict parser and exact rendered-copy fixture result accepted: `yes`
 - Cleanup, privacy exclusions, and claim boundary accepted: `yes`
 - Registry transition approved: `yes`
-- Review revision: `28b5769e42a9d7b3c6df47338536c56e630aafc4`
+- Review revision: `f03b9f624c370728f678924ce34e5287558d2a87`
 - Rerun trigger: any material descriptor, required-evidence contract, runner, fixture, parser, content reader, generated output, verifier, or evidence defect requires a new clean evidence revision and complete affected rerun
