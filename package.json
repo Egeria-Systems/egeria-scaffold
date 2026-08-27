@@ -46,7 +46,7 @@
     "@changesets/cli": "3.0.0",
     "@egeria-systems/standards": "workspace:*",
     "@eslint/js": "10.0.1",
-    "eslint": "10.8.0",
+    "eslint": "10.9.0",
     "npm": "12.0.2"
   },
   "packageManager": "pnpm@11.20.0",
