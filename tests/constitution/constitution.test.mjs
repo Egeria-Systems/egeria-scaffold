@@ -2639,7 +2639,7 @@ test("executable capability certification ownership is current", async () => {
         kind,
         path: "docs/implementation-evidence/2026-08-26-production-site-routing-certification-receipt.md",
         outcome: "passed",
-        revision: "e69c28ec4228622fd34517a72858e2ac55401a5a",
+        revision: "6034d7330af912d1a1b9bcff3323ed360ebee2d0",
         subject: {
           descriptorVersion: "0.4.0",
           behaviorContractDigest:
@@ -3406,7 +3406,7 @@ test("canonical documentation accepts profile-transition execution and records t
     );
     assert.match(
       sequencingOwner,
-      /site-routing@0\.4\.0[^\n]+certif(?:ied|ication)[^\n]+e69c28ec4228622fd34517a72858e2ac55401a5a/iu,
+      /site-routing@0\.4\.0[^\n]+certif(?:ied|ication)[^\n]+6034d7330af912d1a1b9bcff3323ed360ebee2d0/iu,
     );
     assert.match(
       sequencingOwner,
