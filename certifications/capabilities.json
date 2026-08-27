@@ -143,9 +143,30 @@
         "existing-repository-lifecycle",
         "fresh-scaffold"
       ],
-      "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-08-26-multilingual-capability-implementation.md",
-      "evidence": []
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-08-27-multilingual-certification.md",
+      "evidence": [
+        {
+          "kind": "existing-repository-lifecycle",
+          "path": "docs/implementation-evidence/2026-08-27-multilingual-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "96b587a254cf6fc859867d6fc66c7e0c900c4cfd",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41"
+          }
+        },
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-08-27-multilingual-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "96b587a254cf6fc859867d6fc66c7e0c900c4cfd",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41"
+          }
+        }
+      ]
     },
     "observability": {
       "subject": {

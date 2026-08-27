@@ -294,6 +294,29 @@ test("multilingual addition plans the exact locale overlay with or without Calen
   }
 });
 
+test("multilingual addition plan refuses managed drift without writes", async () => {
+  const base = await fixtureEntries("portfolio");
+  const cases = [
+    new Map([
+      [
+        "apps/web/next.config.ts",
+        { kind: "file", content: "private managed drift\n" },
+      ],
+    ]),
+    new Map([["apps/web/app/layout.tsx", { kind: "missing" }]]),
+  ];
+
+  for (const overrides of cases) {
+    assertFailure(
+      await planFromEntries(base, {
+        capability: "multilingual",
+        overrides,
+      }),
+      "PROJECT_DRIFT_DETECTED",
+    );
+  }
+});
+
 test("capability addition plan refuses invalid controls and historical recipes", async () => {
   const base = await fixtureEntries("portfolio");
   const invalidCases = [
