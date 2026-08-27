@@ -332,6 +332,7 @@ test("the release candidate materializes only the approved public versions", asy
   const changesetFiles = await loadPendingChangesets();
   assert.deepEqual(changesetFiles, [
     "observability-sink-identifiers.md",
+    "update-typescript-eslint.md",
   ]);
 
   const observabilityManifest = await readJson(
