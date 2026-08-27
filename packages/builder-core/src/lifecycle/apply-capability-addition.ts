@@ -442,7 +442,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       ? analyticsSettingsSchema.safeParse(input.settings)
       : input.capability === "booking-calendly"
         ? calendlyBookingSettingsSchema.safeParse(input.settings)
-        : input.capability === "multilingual" && input.settings === undefined
+        : input.settings === undefined
           ? { success: true as const, data: undefined }
           : { success: false as const };
   if (!settingsSnapshotResult.success) {
