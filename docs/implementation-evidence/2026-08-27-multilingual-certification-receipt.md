@@ -14,7 +14,7 @@
 
 **Certification behavior-contract digest:** `sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41`
 
-**Certification evidence revision:** `372761ac1e96eb6cbc5591c0825b124c5493244b`
+**Certification evidence revision:** `96b587a254cf6fc859867d6fc66c7e0c900c4cfd`
 
 **Passed certification outcomes:** `existing-repository-lifecycle, fresh-scaffold`
 
@@ -25,8 +25,8 @@ This content-safe receipt records causal local certification and the approved re
 ## Direct predecessor and authority
 
 - Direct implementation predecessor: pull request `#64`, merged at `main@2033048c79a777af7e7d2725784bac6e9be3433f`, accepted tree `35e605cc47c03bbaab8a7d529d27c0c5c1c4fbcf`, with successful Repository quality run `33063099192`.
-- Refreshed evidence base: accepted `main@cddc2d461f1fca3c58ca149f18abd4f943567a1a`, after dependency-only pull requests `#69` and `#67`, with successful exact-sha Repository quality run `33095070288`.
-- Evidence revision parent: `cddc2d461f1fca3c58ca149f18abd4f943567a1a`; the implementation merge remains an ancestor.
+- Refreshed evidence base: accepted `main@a5308ed60027929a5796411b5b020e1c5d5d5e3e`, after dependency and release-boundary pull requests `#69`, `#67`, `#71`, `#68`, and `#66`, with successful exact-sha Repository quality run `33104813288`.
+- The runner-introducing commit is based directly on `a5308ed60027929a5796411b5b020e1c5d5d5e3e`; the final evidence revision adds only the registry transition and exact lifecycle-evidence correction, and the implementation merge remains an ancestor.
 - Human authority: the user preapproved the exact subject and outcomes, bounded plan amendments, local harness and evidence, registry transition, commits, pull-request delivery, material CI and CodeRabbit corrections, merge, and accepted-main verification.
 - Excluded authority: no live provider, deployment, credential, spending, publication, linguistic-quality, visual-quality, WCAG, or production-readiness action or claim was authorized or performed.
 
@@ -35,14 +35,14 @@ This content-safe receipt records causal local certification and the approved re
 The exact clean revision ran:
 
 ```text
-pnpm run verify:multilingual-certification -- --revision 372761ac1e96eb6cbc5591c0825b124c5493244b
+pnpm run verify:multilingual-certification -- --revision 96b587a254cf6fc859867d6fc66c7e0c900c4cfd
 ```
 
 The successful run used the repository-pinned `linux/amd64` Playwright `v1.62.1-noble` image at digest `sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e`, 1 GiB shared memory, Node `22.23.2`, pnpm `11.20.0`, and disposable Git `2.55.0`. The derived disposable toolchain image had manifest-list digest `sha256:29eae8956e818c3d38ec08bb05e5757914cb1e7e8ec7d02f61c15bccbe1fdb16` and supplied the exact Playwright Chromium `1234`, Chromium headless shell `1234`, and FFmpeg `1011` artifacts to isolated verifier caches.
 
-An initial complete run at `139a141af262d2b21d25222e8572cb35f75b4a05` passed but was superseded after accepted main advanced through the two dependency-only merges. The rebased runner's first complete attempt failed closed immediately after a portfolio preview process. A bounded diagnostic recreation at the same detached revision passed that exact OpenNext/workerd preview with thirteen tests passed and one intentional environment-dependent skip. The unchanged complete certificate then passed at the evidence revision. The superseded, failed, and diagnostic attempts are not accepted evidence.
+An initial complete run at `139a141af262d2b21d25222e8572cb35f75b4a05` passed but was superseded when accepted main advanced. A later rebased run passed but was superseded after independent review found that several selected negative-path tests exercised the default Calendly subject rather than multilingual. Exact multilingual refusal, drift, transform/verification-prefix, state-last, and final-byte tests were added and selected; complete evidence at `6e8dbc206b345ec14634f9aa495a033f19eee297` passed but was superseded when accepted main advanced through the release-boundary and Wrangler dependency changes. After rebasing onto the final accepted base, the first complete attempt at the final evidence revision failed closed at `FRESH_SCAFFOLD_CREATE_FAILED`; a bounded recreation of that exact portfolio create command passed unchanged with the expected capability set. The unchanged complete certificate then passed at the final evidence revision. All superseded, failed, and diagnostic attempts are excluded from accepted evidence.
 
-Source reached each disposable container only as a complete read-only Git bundle for the exact revision. Both bundles were deleted immediately after their containers exited. No credential, provider state, private registry, deployment target, raw generated source, raw child log, advisory response, browser profile, screenshot, secret, environment value, private URL, or machine-specific path is retained here.
+Source reached each disposable container only as a complete read-only Git bundle for the exact revision. Every bundle was deleted after its bounded run or diagnostic series completed. No credential, provider state, private registry, deployment target, raw generated source, raw child log, advisory response, browser profile, screenshot, secret, environment value, private URL, or machine-specific path is retained here.
 
 ## Fresh-scaffold outcome
 
@@ -83,5 +83,5 @@ It does not establish another capability version, arbitrary locale, translation 
 - Add, remove, re-add, refusal, drift, ejection, failure-prefix, inference, migration, state-last, and final-byte evidence accepted: `yes`
 - Superseded and failed-attempt disposition, cleanup, privacy exclusions, and claim boundary accepted: `yes`
 - Registry transition approved: `yes`
-- Review revision: `372761ac1e96eb6cbc5591c0825b124c5493244b`
+- Review revision: `96b587a254cf6fc859867d6fc66c7e0c900c4cfd`
 - Rerun trigger: any material descriptor, required-evidence contract, runner, verifier, lifecycle selection, generated output, registry, receipt, or evidence defect requires a new clean evidence revision and complete affected rerun

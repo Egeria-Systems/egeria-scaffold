@@ -2587,12 +2587,12 @@ test("multilingual implementation and certification remain exact and claim-limit
   );
   assert.match(
     multilingualBoundary,
-    /multilingual@0\.1\.0[\s\S]+certified[\s\S]+372761ac1e96eb6cbc5591c0825b124c5493244b[\s\S]+linguistic quality[\s\S]+WCAG conformance/iu,
+    /multilingual@0\.1\.0[\s\S]+certified[\s\S]+96b587a254cf6fc859867d6fc66c7e0c900c4cfd[\s\S]+linguistic quality[\s\S]+WCAG conformance/iu,
   );
 
   assert.match(
     overview,
-    /multilingual@0\.1\.0[\s\S]+exact addition and removal[\s\S]+certified[\s\S]+372761ac1e96eb6cbc5591c0825b124c5493244b/iu,
+    /multilingual@0\.1\.0[\s\S]+exact addition and removal[\s\S]+certified[\s\S]+96b587a254cf6fc859867d6fc66c7e0c900c4cfd/iu,
   );
   assert.match(
     enforcementMap,
@@ -2614,7 +2614,7 @@ test("multilingual implementation and certification remain exact and claim-limit
     );
     assert.match(
       instructions,
-      /multilingual@0\.1\.0[\s\S]+certified[\s\S]+372761ac1e96eb6cbc5591c0825b124c5493244b/iu,
+      /multilingual@0\.1\.0[\s\S]+certified[\s\S]+96b587a254cf6fc859867d6fc66c7e0c900c4cfd/iu,
     );
   }
 });
@@ -2752,7 +2752,7 @@ test("executable capability certification ownership is current", async () => {
         kind,
         path: "docs/implementation-evidence/2026-08-27-multilingual-certification-receipt.md",
         outcome: "passed",
-        revision: "372761ac1e96eb6cbc5591c0825b124c5493244b",
+        revision: "96b587a254cf6fc859867d6fc66c7e0c900c4cfd",
         subject: {
           descriptorVersion: "0.1.0",
           behaviorContractDigest:
@@ -2864,7 +2864,7 @@ test("executable capability certification ownership is current", async () => {
     );
     assert.match(
       document,
-      /multilingual@0\.1\.0[^\n]+certified[^\n]+372761ac1e96eb6cbc5591c0825b124c5493244b/iu,
+      /multilingual@0\.1\.0[^\n]+certified[^\n]+96b587a254cf6fc859867d6fc66c7e0c900c4cfd/iu,
     );
   }
   for (const document of [
@@ -3513,11 +3513,11 @@ test("canonical documentation accepts profile-transition execution and records t
     "iu",
   );
   const multilingualEligibilityPattern =
-    /multilingual@0\.1\.0[^\n]+certified[^\n]+372761ac1e96eb6cbc5591c0825b124c5493244b/iu;
+    /multilingual@0\.1\.0[^\n]+certified[^\n]+96b587a254cf6fc859867d6fc66c7e0c900c4cfd/iu;
   const semanticLifecycleClosurePattern =
     /transactional-lifecycle closure[^\n]+approved[^\n]+closed/iu;
   const semanticMultilingualPattern =
-    /multilingual@0\.1\.0[^\n]+certified[^\n]+372761ac1e96eb6cbc5591c0825b124c5493244b/iu;
+    /multilingual@0\.1\.0[^\n]+certified[^\n]+96b587a254cf6fc859867d6fc66c7e0c900c4cfd/iu;
 
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.doesNotMatch(sequencingOwner, /minimum one remaining increment/iu);

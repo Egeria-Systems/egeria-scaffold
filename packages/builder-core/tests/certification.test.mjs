@@ -59,7 +59,7 @@ const multilingualPlanPath =
 const multilingualEvidencePath =
   "docs/implementation-evidence/2026-08-27-multilingual-certification-receipt.md";
 const multilingualEvidenceRevision =
-  "372761ac1e96eb6cbc5591c0825b124c5493244b";
+  "96b587a254cf6fc859867d6fc66c7e0c900c4cfd";
 const deploymentEvidencePath =
   "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md";
 const deploymentEvidenceRevision =
