@@ -14,7 +14,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
@@ -110,13 +110,18 @@ test("fixture inspection accepts only the exact portable generated trees", async
         profile: "site",
         relativeRoot: "fixtures/generated/site",
       },
+      {
+        identifier: "site-multilingual",
+        profile: "site",
+        relativeRoot: "fixtures/generated/site-multilingual",
+      },
     ],
   );
 
   for (const contract of generatedFixtureContracts) {
     assert.equal(
       contract.expectedRecipeVersion,
-      contract.identifier === "site" ? "0.11.0" : "0.10.0",
+      contract.profile === "site" ? "0.11.0" : "0.10.0",
     );
     assert.equal(contract.expectedStandardsVersion, "0.4.0");
     assert.equal(contract.expectedObservabilityVersion, "0.3.0");
@@ -124,11 +129,15 @@ test("fixture inspection accepts only the exact portable generated trees", async
     assert.equal(contract.expectedDeploymentCloudflareVersion, "0.3.0");
     assert.equal(
       contract.expectedSiteRoutingVersion,
-      contract.identifier === "site" ? "0.4.0" : null,
+      contract.profile === "site" ? "0.4.0" : null,
     );
     assert.equal(
       contract.expectedBookingCalendlyVersion,
       contract.identifier === "portfolio-calendly" ? "0.1.0" : null,
+    );
+    assert.equal(
+      contract.expectedMultilingualVersion,
+      contract.identifier === "site-multilingual" ? "0.1.0" : null,
     );
     assert.equal(
       contract.expectedSurfaces,
@@ -136,7 +145,13 @@ test("fixture inspection accepts only the exact portable generated trees", async
         ? 111
         : contract.identifier === "portfolio"
           ? 106
-          : 123,
+          : contract.identifier === "site"
+            ? 123
+            : 139,
+    );
+    assert.equal(
+      contract.visualRegression,
+      contract.identifier !== "site-multilingual",
     );
     const snapshot = await inspectGeneratedFixture(
       resolve(repositoryRoot, contract.relativeRoot),
@@ -158,8 +173,12 @@ test("fixture inspection accepts only the exact portable generated trees", async
   const site = generatedFixtureContracts.find(
     ({ identifier }) => identifier === "site",
   );
+  const multilingualSite = generatedFixtureContracts.find(
+    ({ identifier }) => identifier === "site-multilingual",
+  );
   assert.equal(basePortfolio.expectedFiles.length, 57);
   assert.equal(site.expectedFiles.length, 74);
+  assert.equal(multilingualSite.expectedFiles.length, 90);
   assert.equal(
     calendlyPortfolio.expectedFiles.length,
     57 - 1 + 6,
@@ -191,6 +210,48 @@ test("fixture inspection accepts only the exact portable generated trees", async
     "observability",
     "booking-calendly",
   ]);
+  assert.deepEqual(multilingualSite.createArguments, [
+    "--profile",
+    "site",
+    "--name",
+    "acme-site-multilingual",
+    "--display-name",
+    "Acme Site Multilingual",
+    "--multilingual",
+  ]);
+  assert.deepEqual(multilingualSite.expectedCapabilitySettings, {});
+  assert.deepEqual(multilingualSite.expectedCapabilities, [
+    "standards",
+    "content-files",
+    "section-composition",
+    "deployment-cloudflare",
+    "observability",
+    "site-routing",
+    "multilingual",
+  ]);
+  assert.deepEqual(
+    multilingualSite.expectedFiles.filter(
+      (path) => !site.expectedFiles.includes(path),
+    ),
+    [
+      "apps/web/app/[locale]/[[...segments]]/page.tsx",
+      "apps/web/app/[locale]/layout.tsx",
+      "apps/web/app/[locale]/not-found.tsx",
+      "apps/web/content/en-CA/localized-content.yaml",
+      "apps/web/content/fr-CA/localized-content.yaml",
+      "apps/web/middleware.ts",
+      "apps/web/src/i18n/locale.ts",
+      "apps/web/src/i18n/localized-content.ts",
+      "apps/web/src/i18n/localized-profile.ts",
+      "apps/web/src/i18n/read-localized-content.ts",
+      "apps/web/src/integrations/booking/localized-booking.tsx",
+      "apps/web/src/presentation/localized-page.tsx",
+      "apps/web/tests/component/multilingual-page.test.tsx",
+      "apps/web/tests/e2e/multilingual-routing.spec.ts",
+      "apps/web/tests/unit/locale.test.ts",
+      "apps/web/tests/unit/localized-content.test.ts",
+    ],
+  );
   assert.deepEqual(
     calendlyPortfolio.expectedFiles.filter(
       (path) => !basePortfolio.expectedFiles.includes(path),
@@ -229,6 +290,8 @@ test("generated fixture text and visual baseline attributes are explicit", async
     "fixtures/generated/portfolio-calendly/package.json: eol: lf",
     "fixtures/generated/site/package.json: text: set",
     "fixtures/generated/site/package.json: eol: lf",
+    "fixtures/generated/site-multilingual/package.json: text: set",
+    "fixtures/generated/site-multilingual/package.json: eol: lf",
   ]);
 
   const baselineDirectory =
@@ -258,7 +321,7 @@ test("generated fixture text and visual baseline attributes are explicit", async
     { cwd: repositoryRoot, encoding: "utf8" },
   );
 
-  assert.equal(baselinePaths.length, 10);
+  assert.equal(baselinePaths.length, 12);
   assert.deepEqual(
     binaryAttributes.trimEnd().split("\n"),
     baselinePaths.flatMap((path) => [
@@ -507,6 +570,73 @@ test("single-root verification runs the exact fixed checks against caller output
   }
 });
 
+test("multilingual browser verification injects its error-boundary proof only into the isolated copy", async () => {
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-multilingual-error-proof-"));
+  const sourceRoot = await copyFixture(
+    ownerParent,
+    "site-multilingual",
+    "source",
+  );
+  const sourceBefore = await inspectGeneratedFixture(
+    sourceRoot,
+    "site-multilingual",
+  );
+  const routePath = join(
+    "apps/web/app/[locale]/error-boundary-proof/page.tsx",
+  );
+  const specificationPath = join(
+    "apps/web/tests/e2e/multilingual-error-boundary.spec.ts",
+  );
+  let inspectedCopy = false;
+  let ownedPath;
+
+  try {
+    assert.equal(await pathExists(join(sourceRoot, routePath)), false);
+    assert.equal(await pathExists(join(sourceRoot, specificationPath)), false);
+
+    const result = await verifyGeneratedProjectForTesting(
+      sourceRoot,
+      "site-multilingual",
+      {
+        async createOwner() {
+          const identity = await createKnownOwner(ownerParent);
+          ownedPath = identity.path;
+          return identity;
+        },
+        async runCommand(input) {
+          if (!inspectedCopy) {
+            inspectedCopy = true;
+            const routeSource = await readFile(
+              join(input.cwd, routePath),
+              "utf8",
+            );
+            assert.match(routeSource, /throw new Error/u);
+            assert.match(routeSource, /sessionStorage/u);
+            assert.match(routeSource, /data-testid="verifier-recovery"/u);
+            assert.match(
+              await readFile(join(input.cwd, specificationPath), "utf8"),
+              /toHaveAttribute\("lang", "fr-CA"\)[\s\S]+main\[aria-labelledby="error-fallback-heading"\][\s\S]+fallback\.getByRole\("heading", \{ level: 1 \}\)[\s\S]+fallback\.getByRole\("button"\)[\s\S]+sessionStorage[\s\S]+retry\.click\(\)[\s\S]+getByTestId\("verifier-recovery"\)/u,
+            );
+          }
+          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+        },
+      },
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(inspectedCopy, true);
+    assert.equal(await pathExists(ownedPath), false);
+    assert.deepEqual(
+      await inspectGeneratedFixture(sourceRoot, "site-multilingual"),
+      sourceBefore,
+    );
+    assert.equal(await pathExists(join(sourceRoot, routePath)), false);
+    assert.equal(await pathExists(join(sourceRoot, specificationPath)), false);
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
+});
+
 test("visual verification accepts only the exact opt-in argument", () => {
   assert.deepEqual(parseVerificationArguments([]), { includeVisual: false });
   assert.deepEqual(parseVerificationArguments(["--visual"]), {
@@ -575,6 +705,78 @@ test("visual verification runs after prepared preview behavior", async () => {
       "test:visual",
     ]);
   });
+});
+
+test("visual opt-in leaves the multilingual fixture outside the established matrix", async () => {
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-visual-matrix-"));
+  const commands = [];
+
+  try {
+    const result = await verifyGeneratedSkeletonsForTesting(
+      {
+        async createOwner() {
+          return createKnownOwner(ownerParent);
+        },
+        async runCommand(input) {
+          commands.push(input);
+          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+        },
+      },
+      { includeVisual: true },
+    );
+
+    assert.equal(result.checks.includes("visual-regression"), true);
+    assert.deepEqual(
+      commands
+        .filter(({ arguments: arguments_ }) =>
+          arguments_.includes("test:visual"),
+        )
+        .map(({ cwd }) => basename(cwd))
+        .sort(),
+      ["portfolio-calendly-project", "portfolio-project", "site-project"],
+    );
+    assert.equal(
+      commands.some(
+        ({ arguments: arguments_, cwd }) =>
+          arguments_.includes("test:visual") &&
+          basename(cwd) === "site-multilingual-project",
+      ),
+      false,
+    );
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
+});
+
+test("single-project visual opt-in reports only checks that actually run", async () => {
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-visual-receipt-"));
+  const commands = [];
+
+  try {
+    const result = await verifyGeneratedProjectForTesting(
+      resolve(repositoryRoot, "fixtures/generated/site-multilingual"),
+      "site-multilingual",
+      {
+        async createOwner() {
+          return createKnownOwner(ownerParent);
+        },
+        async runCommand(input) {
+          commands.push(input.arguments);
+          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+        },
+      },
+      undefined,
+      { includeVisual: true },
+    );
+
+    assert.equal(result.checks.includes("visual-regression"), false);
+    assert.equal(
+      commands.some((arguments_) => arguments_.includes("test:visual")),
+      false,
+    );
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
 });
 
 test("visual failures export artifacts before owned cleanup", async () => {
@@ -883,7 +1085,12 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
 
     assert.deepEqual(result, {
       ok: true,
-      fixtures: ["portfolio", "portfolio-calendly", "site"],
+      fixtures: [
+        "portfolio",
+        "portfolio-calendly",
+        "site",
+        "site-multilingual",
+      ],
       profiles: ["portfolio", "site"],
       checks: [
         "pnpm-version",
@@ -924,7 +1131,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   const firstCommands = fixtureCommands.map(
     ([command]) => command,
   );
-  assert.equal(new Set(firstCommands.map(({ cwd }) => cwd)).size, 3);
+  assert.equal(new Set(firstCommands.map(({ cwd }) => cwd)).size, 4);
   for (const key of [
     "HOME",
     "USERPROFILE",
@@ -937,13 +1144,13 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   ]) {
     assert.equal(
       new Set(firstCommands.map(({ environment }) => environment[key])).size,
-      3,
+      4,
       `${key} must be isolated per fixture identifier`,
     );
   }
   assert.equal(
     new Set(fixtureCommands.map((entries) => entries[1].arguments.at(-1))).size,
-    3,
+    4,
     "pnpm stores must be isolated per fixture identifier",
   );
 

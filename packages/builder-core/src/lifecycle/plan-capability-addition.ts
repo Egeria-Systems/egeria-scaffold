@@ -39,13 +39,15 @@ export type CapabilityAdditionPlan = Readonly<{
   baseRevision: string;
   profile: "portfolio" | "site";
   capability: Readonly<{
-    identifier: "booking-calendly";
+    identifier: "booking-calendly" | "multilingual";
     version: "0.1.0";
   }>;
-  settings: Readonly<{
-    mode: "link" | "inline" | "popup";
-    destination: "redacted";
-  }>;
+  settings:
+    | Readonly<{
+        mode: "link" | "inline" | "popup";
+        destination: "redacted";
+      }>
+    | null;
   currentCapabilities: readonly string[];
   desiredCapabilities: readonly string[];
   actions: readonly CapabilityAdditionAction[];
@@ -137,7 +139,7 @@ function sameOrderedValues(
 
 function fingerprintPlan(input: Readonly<{
   plan: CapabilityAdditionPlanBody;
-  settings: CalendlyBookingSettings;
+  settings: CalendlyBookingSettings | null;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
 }>): `sha256:${string}` {
   const digest = createHash("sha256")
@@ -193,7 +195,7 @@ function hasMaterialDrift(inspection: ValidInspection): boolean {
   const materialCapabilities = discrepancies.capabilities.filter(
     ({ desired, identifier, installed }) =>
       !(
-        identifier === "booking-calendly" &&
+        (identifier === "booking-calendly" || identifier === "multilingual") &&
         !desired &&
         !installed
       ),
@@ -204,7 +206,9 @@ function hasMaterialDrift(inspection: ValidInspection): boolean {
     discrepancies.surfaces.length > 0 ||
     inspection.inference.capabilities.some(
       ({ category, identifier }) =>
-        identifier !== "booking-calendly" && category !== "confirmed",
+        identifier !== "booking-calendly" &&
+        identifier !== "multilingual" &&
+        category !== "confirmed",
     ) ||
     inspection.inference.surfaces.some(
       ({ status }) =>
@@ -460,18 +464,25 @@ async function deriveActions(input: Readonly<{
 async function planCapabilityAdditionUnchecked(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "booking-calendly";
-  settings: CalendlyBookingSettings;
+  capability: "booking-calendly" | "multilingual";
+  settings?: CalendlyBookingSettings;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
 
-  if (capabilityValue !== "booking-calendly") {
+  if (
+    capabilityValue !== "booking-calendly" &&
+    capabilityValue !== "multilingual"
+  ) {
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
 
-  const settingsResult = calendlyBookingSettingsSchema.safeParse(input.settings);
-
-  if (!settingsResult.success) {
+  const settingsResult = capabilityValue === "booking-calendly"
+    ? calendlyBookingSettingsSchema.safeParse(input.settings)
+    : undefined;
+  if (
+    (settingsResult !== undefined && !settingsResult.success) ||
+    (capabilityValue === "multilingual" && input.settings !== undefined)
+  ) {
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
 
@@ -503,13 +514,13 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 
   const project = inspection.project.value;
   const state = inspection.inference.state.value;
-  const bookingInstalled =
-    project.selectedCapabilities.includes("booking-calendly") ||
+  const capabilityInstalled =
+    project.selectedCapabilities.includes(capabilityValue) ||
     state.installedCapabilities.some(
-      ({ identifier }) => identifier === "booking-calendly",
+      ({ identifier }) => identifier === capabilityValue,
     );
 
-  if (bookingInstalled) {
+  if (capabilityInstalled) {
     return planningFailure("CAPABILITY_ALREADY_INSTALLED");
   }
 
@@ -517,6 +528,12 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     profile: project.originProfile,
     projectName: project.project.name,
     displayName: project.project.displayName,
+    ...(project.capabilitySettings["booking-calendly"] === undefined
+      ? {}
+      : { bookingCalendly: project.capabilitySettings["booking-calendly"] }),
+    ...(project.selectedCapabilities.includes("multilingual")
+      ? { multilingual: true as const }
+      : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
   const currentResult = await renderSkeleton(renderRequest);
@@ -541,17 +558,19 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("PROJECT_DRIFT_DETECTED");
   }
 
-  const bookingDescriptor = catalogResult.value.find(
-    ({ identifier }) => identifier === "booking-calendly",
+  const descriptor = catalogResult.value.find(
+    ({ identifier }) => identifier === capabilityValue,
   );
 
-  if (bookingDescriptor?.version !== "0.1.0") {
+  if (descriptor?.version !== "0.1.0") {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
   const desiredResult = await renderSkeleton({
     ...renderRequest,
-    bookingCalendly: settingsResult.data,
+    ...(capabilityValue === "booking-calendly" && settingsResult?.success === true
+      ? { bookingCalendly: settingsResult.data }
+      : { multilingual: true as const }),
   });
 
   if (!desiredResult.ok) {
@@ -592,13 +611,16 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       baseRevision: input.git.identity.revision,
       profile: project.originProfile,
       capability: {
-        identifier: "booking-calendly",
-        version: bookingDescriptor.version,
+        identifier: capabilityValue,
+        version: descriptor.version,
       },
-      settings: {
-        mode: settingsResult.data.mode,
-        destination: "redacted",
-      },
+      settings:
+        settingsResult?.success === true
+          ? {
+              mode: settingsResult.data.mode,
+              destination: "redacted",
+            }
+          : null,
       currentCapabilities,
       desiredCapabilities,
       actions: actionResult.value,
@@ -619,7 +641,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       ...plan,
       planFingerprint: fingerprintPlan({
         plan,
-        settings: settingsResult.data,
+        settings: settingsResult?.success === true ? settingsResult.data : null,
         git: input.git,
       }),
     },
@@ -629,8 +651,8 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 export async function planCapabilityAddition(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "booking-calendly";
-  settings: CalendlyBookingSettings;
+  capability: "booking-calendly" | "multilingual";
+  settings?: CalendlyBookingSettings;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   return planCapabilityAdditionUnchecked(input);
 }

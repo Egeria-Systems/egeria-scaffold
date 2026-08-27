@@ -220,6 +220,7 @@ async function runCreate(
       ...(command.bookingCalendly === undefined
         ? {}
         : { bookingCalendly: command.bookingCalendly }),
+      ...(command.multilingual === true ? { multilingual: true } : {}),
     },
     destination: resolve(command.directory),
     verifier: dependencies.createVerifier(),
@@ -392,7 +393,7 @@ async function runPlanAdd(
       reader,
       git: initialGit,
       capability: command.capability,
-      settings: command.settings,
+      ...(command.settings === undefined ? {} : { settings: command.settings }),
     });
   } catch {
     return writePlanAddRefusal(output, "REPOSITORY_OPEN_FAILED");
@@ -693,7 +694,7 @@ async function runApplyAdd(
     )({
       root: resolve(command.directory),
       capability: command.capability,
-      settings: command.settings,
+      ...(command.settings === undefined ? {} : { settings: command.settings }),
       approvedPlanFingerprint: command.approvedPlanFingerprint,
       verifier: dependencies.createVerifier(),
     });

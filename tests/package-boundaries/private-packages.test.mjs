@@ -362,6 +362,31 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/wrangler.jsonc.template",
       "common/package.json.template",
       "common/pnpm-workspace.yaml",
+      "multilingual/apps/web/app/[locale]/[[...segments]]/page.tsx",
+      "multilingual/apps/web/app/[locale]/layout.tsx",
+      "multilingual/apps/web/app/[locale]/not-found.tsx",
+      "multilingual/apps/web/app/error.tsx",
+      "multilingual/apps/web/app/layout.tsx",
+      "multilingual/apps/web/middleware.ts",
+      "multilingual/apps/web/src/i18n/locale.ts",
+      "multilingual/apps/web/src/i18n/localized-content.ts",
+      "multilingual/apps/web/src/i18n/read-localized-content.ts",
+      "multilingual/apps/web/src/integrations/booking/localized-booking.calendly.tsx",
+      "multilingual/apps/web/src/integrations/booking/localized-booking.stub.tsx",
+      "multilingual/apps/web/src/presentation/localized-page.tsx",
+      "multilingual/apps/web/tests/component/multilingual-page.test.tsx",
+      "multilingual/apps/web/tests/e2e/multilingual-routing.spec.ts",
+      "multilingual/apps/web/tests/unit/locale.test.ts",
+      "multilingual/apps/web/tests/unit/localized-content.test.ts",
+      "multilingual/apps/web/tests/visual/home-visual.spec.ts",
+      "multilingual/portfolio/apps/web/content/en-CA/localized-content.yaml.template",
+      "multilingual/portfolio/apps/web/content/fr-CA/localized-content.yaml.template",
+      "multilingual/portfolio/apps/web/src/i18n/localized-profile.ts",
+      "multilingual/site/apps/web/app/sitemap.ts",
+      "multilingual/site/apps/web/content/en-CA/localized-content.yaml.template",
+      "multilingual/site/apps/web/content/fr-CA/localized-content.yaml.template",
+      "multilingual/site/apps/web/src/i18n/localized-profile.ts",
+      "multilingual/site/apps/web/tests/e2e/site-routing.spec.ts.template",
       "portfolio/apps/web/content/en-CA/long-form/introduction.md.template",
       "portfolio/apps/web/content/en-CA/site.yaml.template",
       "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
@@ -637,7 +662,11 @@ test("builder-core direct consumers describe the private generation boundary", a
 
   assert.match(
     packageOwnership,
-    /standards@0\.3\.0[^\n]+site-routing@0\.3\.0[^\n]+exact Calendly transactions/,
+    /standards@0\.3\.0[^\n]+site-routing@0\.3\.0/,
+  );
+  assert.match(
+    packageOwnership,
+    /exact `booking-calendly@0\.1\.0` and `multilingual@0\.1\.0` addition\/removal planning and fingerprint-gated application/,
   );
   assert.match(packageOwnership, /canonical private owner/i);
   assert.match(packageOwnership, /deterministic in-memory rendering/);

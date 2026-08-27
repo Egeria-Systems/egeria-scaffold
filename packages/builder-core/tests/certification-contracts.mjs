@@ -12,6 +12,10 @@ export const requiredEvidence = Object.freeze({
     "deployed-application",
     "fresh-scaffold",
   ]),
+  multilingual: Object.freeze([
+    "existing-repository-lifecycle",
+    "fresh-scaffold",
+  ]),
   observability: Object.freeze([
     "cleanup-recovery",
     "deployed-application",

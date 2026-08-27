@@ -1690,36 +1690,50 @@ async function runCheck(
   }
 }
 
-test("the repository registry admits current subjects and passes both closure policies", async () => {
+test("the repository registry admits current subjects and refuses pending closure", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
     stdout: `${JSON.stringify({
       ok: true,
       gate: "admission",
-      records: 7,
+      records: 8,
     })}\n`,
     stderr: "",
   });
 
   const closure = await runCheck(["--closure", "legacy-backfill-exempt"]);
   assert.deepEqual(closure, {
-    exitCode: 0,
+    exitCode: 1,
     stdout: `${JSON.stringify({
-      ok: true,
+      ok: false,
       gate: "closure",
       policy: "legacy-backfill-exempt",
+      issues: [
+        {
+          code: "CAPABILITY_CERTIFICATION_PENDING",
+          path: ["records", "multilingual", "status"],
+          context: { reason: "pending" },
+        },
+      ],
     })}\n`,
     stderr: "",
   });
 
   const fullClosure = await runCheck(["--closure", "all-certified"]);
   assert.deepEqual(fullClosure, {
-    exitCode: 0,
+    exitCode: 1,
     stdout: `${JSON.stringify({
-      ok: true,
+      ok: false,
       gate: "closure",
       policy: "all-certified",
+      issues: [
+        {
+          code: "CAPABILITY_CERTIFICATION_PENDING",
+          path: ["records", "multilingual", "status"],
+          context: { reason: "pending" },
+        },
+      ],
     })}\n`,
     stderr: "",
   });
@@ -1747,7 +1761,7 @@ test("the ordinary certification gate does not require private workflow artifact
       stdout: `${JSON.stringify({
         ok: true,
         gate: "admission",
-        records: 7,
+        records: 8,
       })}\n`,
       stderr: "",
     });

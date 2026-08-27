@@ -63,13 +63,16 @@ async function loadTextEntries(directory) {
   return entries;
 }
 
-async function installedEntries(profile) {
+async function installedEntries(profile, options = {}) {
+  const includeBooking = options.booking ?? true;
+  const includeMultilingual = options.multilingual ?? false;
   const rendered = await core.renderSkeleton({
     profile,
     projectName: `${profile}-removal-test`,
     displayName: `${profile} removal test`,
     packageVersions: core.verifiedCapabilityPackageVersions,
-    bookingCalendly: settings,
+    ...(includeBooking ? { bookingCalendly: settings } : {}),
+    ...(includeMultilingual ? { multilingual: true } : {}),
   });
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
 
@@ -88,24 +91,31 @@ async function installedEntries(profile) {
     ".egeria/project.yaml",
     encoder.encode(core.serializeProjectYaml(rendered.value.project)),
   );
-  const additionMigration = {
+  const defaultMigrations = [
+    ...(includeBooking ? ["add-booking-calendly-0-1-0"] : []),
+    ...(includeMultilingual ? ["add-multilingual-0-1-0"] : []),
+  ];
+  const appliedMigrations = options.appliedMigrations ?? defaultMigrations;
+  const additionMigrations = appliedMigrations.map((identifier, index) => ({
     schemaVersion: "1.0.0",
-    identifier: "add-booking-calendly-0-1-0",
+    identifier,
     kind: "migration",
     outcome: "succeeded",
-    completedAt: "2026-08-21T15:00:00.000Z",
+    completedAt: `2026-08-21T15:00:0${index}.000Z`,
     fromBuilderVersion: "0.0.0",
     toBuilderVersion: "0.0.0",
     capabilities: rendered.value.resolved.capabilities
-      .map(({ identifier }) => identifier)
+      .map(({ identifier: capabilityIdentifier }) => capabilityIdentifier)
       .sort(compareText),
     persistentDataAuthorizations: [],
     remainingKnownDrift: [],
     verificationChecks: persistedVerificationChecks,
-  };
+  }));
   byteFiles.set(
     ".egeria/migrations.jsonl",
-    encoder.encode(core.serializeMigrationRecord(additionMigration)),
+    encoder.encode(
+      additionMigrations.map(core.serializeMigrationRecord).join(""),
+    ),
   );
 
   const surfaces = core.materializeInstalledSurfaces({
@@ -122,7 +132,7 @@ async function installedEntries(profile) {
     projectSchemaVersion: "1.0.0",
     origin: { profile, recipeVersion: rendered.value.project.recipeVersion },
     installedCapabilities: core.createInstalledManifest(rendered.value.resolved),
-    appliedMigrations: ["add-booking-calendly-0-1-0"],
+    appliedMigrations,
     managedSurfaces: surfaces.value,
     ejections: [],
     compatibility: {
@@ -201,11 +211,11 @@ function createRepository(entries, options = {}) {
   };
 }
 
-async function approvedPlan(reader) {
+async function approvedPlan(reader, capability = "booking-calendly") {
   const result = await core.planCapabilityRemoval({
     reader,
     git,
-    capability: "booking-calendly",
+    capability,
   });
   assert.equal(result.ok, true, JSON.stringify(result.issues));
   return result.value;
@@ -227,13 +237,14 @@ function successfulVerifier(calls) {
 }
 
 async function runApply(repository, overrides = {}) {
-  const plan = await approvedPlan(repository.reader);
+  const capability = overrides.capability ?? "booking-calendly";
+  const plan = await approvedPlan(repository.reader, capability);
   const worktreeInspections = [];
   const expectedInspections = [];
   const verifierCalls = [];
   const result = await core.applyCapabilityRemoval({
     root: overrides.root ?? root,
-    capability: overrides.capability ?? "booking-calendly",
+    capability,
     approvedPlanFingerprint:
       overrides.approvedPlanFingerprint ?? plan.planFingerprint,
     reader: repository.reader,
@@ -459,6 +470,128 @@ test("capability removal executes the approved plan once and persists migration 
     ]);
     assert.doesNotMatch(JSON.stringify(result), /private|calendly\.com|refs\/heads/u);
   }
+});
+
+test("multilingual and Calendly removal preserve the other capability in both install orders", async () => {
+  const installOrders = [
+    ["add-booking-calendly-0-1-0", "add-multilingual-0-1-0"],
+    ["add-multilingual-0-1-0", "add-booking-calendly-0-1-0"],
+  ];
+
+  for (const appliedMigrations of installOrders) {
+    for (const capability of ["booking-calendly", "multilingual"]) {
+      const repository = createRepository(
+        await installedEntries("site", {
+          booking: true,
+          multilingual: true,
+          appliedMigrations,
+        }),
+      );
+      const { result } = await runApply(repository, { capability });
+      const catalog = core.createVerifiedCapabilityCatalog();
+      const failedInference = result.ok || !catalog.ok
+        ? undefined
+        : await core.inferRepository({
+            reader: repository.reader,
+            catalog: catalog.value,
+          });
+      assert.equal(
+        result.ok,
+        true,
+        JSON.stringify({
+          result,
+          capability,
+          appliedMigrations,
+          capabilities: failedInference?.capabilities.map(
+            ({ identifier, category }) => ({ identifier, category }),
+          ),
+          exceptionalSurfaces: failedInference?.surfaces.filter(
+            ({ status }) =>
+              !["confirmed", "application-owned", "missing", "drifted"].includes(
+                status,
+              ),
+          ),
+        }),
+      );
+      assert.equal(
+        result.value.migration,
+        capability === "booking-calendly"
+          ? "remove-booking-calendly-0-1-0"
+          : "remove-multilingual-0-1-0",
+      );
+      const project = core.parseProjectYaml(
+        repository.files.get(".egeria/project.yaml"),
+      );
+      const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
+      assert.equal(project.ok, true);
+      assert.equal(state.ok, true);
+      assert.equal(project.value.selectedCapabilities.includes(capability), false);
+      const survivor = capability === "booking-calendly"
+        ? "multilingual"
+        : "booking-calendly";
+      assert.equal(project.value.selectedCapabilities.includes(survivor), true);
+      assert.equal(
+        state.value.installedCapabilities.some(
+          ({ identifier }) => identifier === survivor,
+        ),
+        true,
+      );
+      if (capability === "booking-calendly") {
+        assert.match(
+          repository.files.get(
+            "apps/web/src/integrations/booking/localized-booking.tsx",
+          ),
+          /return null/u,
+        );
+      } else {
+        assert.equal(
+          repository.files.has("apps/web/content/fr-CA/localized-content.yaml"),
+          false,
+        );
+        assert.equal(
+          repository.files.has(
+            "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+          ),
+          true,
+        );
+      }
+    }
+  }
+});
+
+test("multilingual removal preserves a modified locale catalog as an explicit ejection", async () => {
+  const entries = await installedEntries("portfolio", {
+    booking: false,
+    multilingual: true,
+  });
+  const preservedPath = "apps/web/content/fr-CA/localized-content.yaml";
+  const customized = `${entries.get(preservedPath)}# reviewed application translation\n`;
+  entries.set(preservedPath, customized);
+  const repository = createRepository(entries);
+  const { plan, result } = await runApply(repository, {
+    capability: "multilingual",
+  });
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.value.preservedPaths, [preservedPath]);
+  assert.equal(
+    plan.actions.some(
+      ({ kind, path }) =>
+        kind === "preserve-file-and-eject" && path === preservedPath,
+    ),
+    true,
+  );
+  assert.equal(repository.files.get(preservedPath), customized);
+  const project = core.parseProjectYaml(repository.files.get(".egeria/project.yaml"));
+  const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
+  assert.equal(project.ok, true);
+  assert.equal(state.ok, true);
+  assert.deepEqual(project.value.ejectedAreas, [preservedPath]);
+  assert.equal(
+    state.value.managedSurfaces.find(({ path }) => path === preservedPath)
+      ?.ownership,
+    "ejected",
+  );
 });
 
 function snapshot(entries) {

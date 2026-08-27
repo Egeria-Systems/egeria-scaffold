@@ -17,6 +17,7 @@ export type CliCommand =
       displayName: string;
       directory: string;
       bookingCalendly?: CalendlyBookingSettings;
+      multilingual?: true;
     }>
   | Readonly<{
       kind: "infer" | "doctor" | "diff";
@@ -25,13 +26,13 @@ export type CliCommand =
   | Readonly<{
       kind: "plan-add";
       directory: string;
-      capability: "booking-calendly";
-      settings: CalendlyBookingSettings;
+      capability: "booking-calendly" | "multilingual";
+      settings?: CalendlyBookingSettings;
     }>
   | Readonly<{
       kind: "plan-remove";
       directory: string;
-      capability: "booking-calendly";
+      capability: "booking-calendly" | "multilingual";
     }>
   | Readonly<{
       kind: "plan-upgrade";
@@ -47,14 +48,14 @@ export type CliCommand =
   | Readonly<{
       kind: "apply-add";
       directory: string;
-      capability: "booking-calendly";
-      settings: CalendlyBookingSettings;
+      capability: "booking-calendly" | "multilingual";
+      settings?: CalendlyBookingSettings;
       approvedPlanFingerprint: string;
     }>
   | Readonly<{
       kind: "apply-remove";
       directory: string;
-      capability: "booking-calendly";
+      capability: "booking-calendly" | "multilingual";
       approvedPlanFingerprint: string;
     }>
   | Readonly<{
@@ -124,6 +125,7 @@ function parseCreate(
         directory: { type: "string" },
         "calendly-url": { type: "string" },
         "calendly-mode": { type: "string" },
+        multilingual: { type: "boolean" },
       },
       strict: true,
       allowPositionals: false,
@@ -135,6 +137,7 @@ function parseCreate(
     const directory = values.directory;
     const calendlyUrl = values["calendly-url"];
     const calendlyMode = values["calendly-mode"];
+    const multilingual = values.multilingual;
     const parsedProfile = profileIdentifierSchema.safeParse(profile);
     const parsedProjectName = projectFields.name.safeParse(projectName);
     const parsedDisplayName = projectFields.displayName.safeParse(displayName);
@@ -147,16 +150,19 @@ function parseCreate(
           mode: calendlyMode,
         })
       : undefined;
-    const expectedOptions = hasCalendlySelection
-      ? [
-          "profile",
-          "name",
-          "display-name",
-          "directory",
-          "calendly-url",
-          "calendly-mode",
-        ]
-      : ["profile", "name", "display-name", "directory"];
+    const expectedOptions = [
+      "profile",
+      "name",
+      "display-name",
+      "directory",
+      ...(hasCalendlySelection
+        ? [
+            "calendly-url",
+            "calendly-mode",
+          ]
+        : []),
+      ...(multilingual === true ? ["multilingual"] : []),
+    ];
 
     if (
       !hasExactOptions(tokens, expectedOptions) ||
@@ -181,6 +187,7 @@ function parseCreate(
         ...(parsedCalendly?.success === true
           ? { bookingCalendly: parsedCalendly.data }
           : {}),
+        ...(multilingual === true ? { multilingual: true } : {}),
       },
     };
   } catch {
@@ -234,17 +241,17 @@ function parsePlanAdd(
       destination: values["calendly-url"],
       mode: values["calendly-mode"],
     });
+    const calendlySelection = capability === "booking-calendly";
+    const multilingualSelection = capability === "multilingual";
+    const expectedOptions = calendlySelection
+      ? ["directory", "capability", "calendly-url", "calendly-mode"]
+      : ["directory", "capability"];
 
     if (
-      !hasExactOptions(tokens, [
-        "directory",
-        "capability",
-        "calendly-url",
-        "calendly-mode",
-      ]) ||
+      !hasExactOptions(tokens, expectedOptions) ||
       !validDirectory(directory) ||
-      capability !== "booking-calendly" ||
-      !settings.success
+      (!calendlySelection && !multilingualSelection) ||
+      (calendlySelection && !settings.success)
     ) {
       return invalidArguments();
     }
@@ -255,7 +262,9 @@ function parsePlanAdd(
         kind: "plan-add",
         directory,
         capability,
-        settings: settings.data,
+        ...(calendlySelection && settings.success
+          ? { settings: settings.data }
+          : {}),
       },
     };
   } catch {
@@ -283,7 +292,7 @@ function parsePlanRemove(
     if (
       !hasExactOptions(tokens, ["directory", "capability"]) ||
       !validDirectory(directory) ||
-      capability !== "booking-calendly"
+      capability !== "booking-calendly" && capability !== "multilingual"
     ) {
       return invalidArguments();
     }
@@ -401,18 +410,23 @@ function parseApplyAdd(
       destination: values["calendly-url"],
       mode: values["calendly-mode"],
     });
+    const calendlySelection = capability === "booking-calendly";
+    const multilingualSelection = capability === "multilingual";
+    const expectedOptions = calendlySelection
+      ? [
+          "directory",
+          "capability",
+          "calendly-url",
+          "calendly-mode",
+          "approved-plan",
+        ]
+      : ["directory", "capability", "approved-plan"];
 
     if (
-      !hasExactOptions(tokens, [
-        "directory",
-        "capability",
-        "calendly-url",
-        "calendly-mode",
-        "approved-plan",
-      ]) ||
+      !hasExactOptions(tokens, expectedOptions) ||
       !validDirectory(directory) ||
-      capability !== "booking-calendly" ||
-      !settings.success ||
+      (!calendlySelection && !multilingualSelection) ||
+      (calendlySelection && !settings.success) ||
       approvedPlanFingerprint === undefined ||
       !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
     ) {
@@ -425,7 +439,9 @@ function parseApplyAdd(
         kind: "apply-add",
         directory,
         capability,
-        settings: settings.data,
+        ...(calendlySelection && settings.success
+          ? { settings: settings.data }
+          : {}),
         approvedPlanFingerprint,
       },
     };
@@ -460,7 +476,7 @@ function parseApplyRemove(
         "approved-plan",
       ]) ||
       !validDirectory(directory) ||
-      capability !== "booking-calendly" ||
+      (capability !== "booking-calendly" && capability !== "multilingual") ||
       approvedPlanFingerprint === undefined ||
       !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
     ) {

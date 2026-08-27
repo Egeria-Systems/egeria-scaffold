@@ -1,0 +1,73 @@
+metadata:
+  title: {{displayNameJson}}
+  description: A focused portfolio.
+accessibility:
+  skipToContent: Skip to content
+  navigationLabel: Primary navigation
+navigation:
+  - href: /en-CA
+    label: Home
+localeSwitch:
+  label: Français
+pages:
+  home:
+    metadata:
+      title: {{displayNameJson}}
+      description: A focused portfolio.
+    sections:
+      - id: introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: {{displayNameJson}}
+          summary: A concise introduction to selected work.
+      - id: approach
+        type: text
+        variant: default
+        enabled: true
+        content:
+          heading: Approach
+          body: Thoughtful work begins with clear goals and practical decisions.
+      - id: selected-work
+        type: project-list
+        variant: default
+        enabled: true
+        content:
+          heading: Selected work
+          projects:
+            - title: Example project
+              summary: A representative project demonstrating focused delivery.
+              href: https://example.com/work/example-project
+      - id: contact
+        type: call-to-action
+        variant: default
+        enabled: true
+        content:
+          heading: Start a conversation
+          summary: Share the goals and constraints shaping your next project.
+          label: Send an email
+          href: mailto:hello@example.com
+notFound:
+  metadata:
+    title: Page not found
+    description: The requested page could not be found.
+  sections:
+    - id: missing-page
+      type: hero
+      variant: default
+      enabled: true
+      content:
+        heading: Page not found
+        summary: Check the address or return to the home page.
+booking:
+  heading: Book a conversation
+  summary: Choose a time that works for you.
+  linkLabel: Schedule with Calendly
+  frameTitle: Calendly scheduling page
+  popupHeading: Choose a time
+  closeLabel: Close scheduling
+error:
+  heading: Something went wrong
+  summary: We could not complete this page. Please try again.
+  retryLabel: Try again

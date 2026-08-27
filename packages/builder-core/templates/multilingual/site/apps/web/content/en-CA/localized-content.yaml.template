@@ -1,0 +1,108 @@
+metadata:
+  title: {{displayNameJson}}
+  description: A multi-page public website.
+accessibility:
+  skipToContent: Skip to content
+  navigationLabel: Primary navigation
+navigation:
+  - href: /en-CA
+    label: Home
+  - href: /en-CA/about
+    label: About
+  - href: /en-CA/work/featured
+    label: Work
+localeSwitch:
+  label: Français
+pages:
+  home:
+    metadata:
+      title: {{displayNameJson}}
+      description: A multi-page public website.
+    sections:
+      - id: introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: {{displayNameJson}}
+          summary: A clear starting point for this website.
+      - id: welcome
+        type: text
+        variant: default
+        enabled: true
+        content:
+          heading: Welcome
+          body: Explore the work, background, and ways to connect.
+      - id: contact
+        type: call-to-action
+        variant: default
+        enabled: true
+        content:
+          heading: Get in touch
+          summary: Start a conversation about your next project.
+          label: Send an email
+          href: mailto:hello@example.com
+  about:
+    metadata:
+      title: About
+      description: Learn about the practice behind the work.
+    sections:
+      - id: about-introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: About
+          summary: A practical approach to thoughtful digital work.
+      - id: about-practice
+        type: text
+        variant: default
+        enabled: true
+        content:
+          heading: The practice
+          body: Clear goals, accessible delivery, and maintainable systems shape every engagement.
+  workFeatured:
+    metadata:
+      title: Featured work
+      description: A selection of representative work.
+    sections:
+      - id: featured-work-introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: Featured work
+          summary: A selection of representative work.
+      - id: featured-work
+        type: project-list
+        variant: default
+        enabled: true
+        content:
+          heading: Featured work
+          projects:
+            - title: Example project
+              summary: A representative project demonstrating focused delivery.
+              href: https://example.com/work/example-project
+notFound:
+  metadata:
+    title: Page not found
+    description: The requested page could not be found.
+  sections:
+    - id: missing-page
+      type: hero
+      variant: default
+      enabled: true
+      content:
+        heading: Page not found
+        summary: Check the address or use the navigation to continue.
+booking:
+  heading: Book a conversation
+  summary: Choose a time that works for you.
+  linkLabel: Schedule with Calendly
+  frameTitle: Calendly scheduling page
+  popupHeading: Choose a time
+  closeLabel: Close scheduling
+error:
+  heading: Something went wrong
+  summary: We could not complete this page. Please try again.
+  retryLabel: Try again

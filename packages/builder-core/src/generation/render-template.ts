@@ -7,6 +7,7 @@ import type {
 const templateLayers = new Set([
   "booking-calendly",
   "common",
+  "multilingual",
   "portfolio",
   "site",
 ]);

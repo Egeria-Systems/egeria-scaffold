@@ -159,6 +159,25 @@ const bookingCalendlyPaths = [
   "apps/web/tests/e2e/calendly-booking.spec.ts",
 ];
 
+const multilingualPaths = [
+  "apps/web/app/[locale]/[[...segments]]/page.tsx",
+  "apps/web/app/[locale]/layout.tsx",
+  "apps/web/app/[locale]/not-found.tsx",
+  "apps/web/content/en-CA/localized-content.yaml",
+  "apps/web/content/fr-CA/localized-content.yaml",
+  "apps/web/middleware.ts",
+  "apps/web/src/i18n/locale.ts",
+  "apps/web/src/i18n/localized-content.ts",
+  "apps/web/src/i18n/localized-profile.ts",
+  "apps/web/src/i18n/read-localized-content.ts",
+  "apps/web/src/integrations/booking/localized-booking.tsx",
+  "apps/web/src/presentation/localized-page.tsx",
+  "apps/web/tests/component/multilingual-page.test.tsx",
+  "apps/web/tests/e2e/multilingual-routing.spec.ts",
+  "apps/web/tests/unit/locale.test.ts",
+  "apps/web/tests/unit/localized-content.test.ts",
+];
+
 const bookingCalendlyCopy = {
   heading: "Book a conversation",
   summary: "Choose a time that works for you.",
@@ -1291,6 +1310,124 @@ test("portfolio and site render exact sorted deterministic file sets", async () 
       }
     }
   }
+});
+
+test("multilingual selection renders deterministic locale-prefixed portfolio and site contracts", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+
+  for (const profile of ["portfolio", "site"]) {
+    const request = {
+      profile,
+      projectName: `acme-${profile}`,
+      displayName: `Acme ${profile}`,
+      multilingual: true,
+      packageVersions,
+    };
+    const first = assertSuccess(await renderSkeleton(request));
+    const second = assertSuccess(await renderSkeleton(request));
+    const files = indexFiles(first.files);
+    const baselinePaths = profile === "portfolio" ? portfolioPaths : sitePaths;
+
+    assert.deepEqual(
+      first.files.map(({ path }) => path),
+      [
+        ...baselinePaths,
+        ...multilingualPaths,
+      ].toSorted(),
+    );
+    assert.deepEqual(snapshotBytes(first.files), snapshotBytes(second.files));
+    assert.equal(first.project.selectedCapabilities.includes("multilingual"), true);
+    assert.deepEqual(first.project.capabilitySettings, {});
+    assert.match(files.get("apps/web/middleware.ts"), /accept-language/iu);
+    assert.match(files.get("apps/web/middleware.ts"), /x-egeria-locale/u);
+    assert.match(files.get("apps/web/app/[locale]/layout.tsx"), /generateStaticParams/u);
+    assert.match(files.get("apps/web/app/[locale]/layout.tsx"), /alternates/u);
+    assert.match(
+      files.get("apps/web/app/[locale]/[[...segments]]/page.tsx"),
+      /generateMetadata/u,
+    );
+    assert.match(files.get("apps/web/src/i18n/localized-content.ts"), /CONTENT_INVALID/u);
+    assert.match(files.get("apps/web/src/i18n/localized-content.ts"), /parity/iu);
+    assert.match(files.get("apps/web/app/error.tsx"), /readLocalizedCatalog/u);
+    assert.match(
+      files.get("apps/web/tests/visual/home-visual.spec.ts"),
+      /outside the established generated visual matrix/u,
+    );
+    assert.doesNotMatch(
+      files.get("apps/web/src/i18n/localized-content.ts"),
+      /Accueil|Passer au contenu|Travaux en vedette/u,
+    );
+    const englishCatalog = parseGeneratedYaml(
+      first.files,
+      "apps/web/content/en-CA/localized-content.yaml",
+    );
+    const frenchCatalog = parseGeneratedYaml(
+      first.files,
+      "apps/web/content/fr-CA/localized-content.yaml",
+    );
+    assert.equal(frenchCatalog.navigation[0].href, "/fr-CA");
+    assert.match(frenchCatalog.localeSwitch.label, /\S/u);
+    assert.notEqual(
+      frenchCatalog.localeSwitch.label,
+      englishCatalog.localeSwitch.label,
+    );
+    assert.match(frenchCatalog.error.retryLabel, /\S/u);
+    assert.notEqual(
+      frenchCatalog.error.retryLabel,
+      englishCatalog.error.retryLabel,
+    );
+    if (profile === "site") {
+      assert.match(
+        files.get("apps/web/tests/e2e/site-routing.spec.ts"),
+        /\/fr-CA\/about/u,
+      );
+    }
+  }
+});
+
+test("multilingual and Calendly compose without changing either capability setting", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const bookingCalendly = {
+    destination: "https://calendly.com/acme/intro",
+    mode: "popup",
+  };
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "site",
+      projectName: "acme-site",
+      displayName: "Acme Site",
+      multilingual: true,
+      bookingCalendly,
+      packageVersions,
+    }),
+  );
+  const files = indexFiles(rendered.files);
+
+  assert.equal(rendered.project.selectedCapabilities.includes("multilingual"), true);
+  assert.equal(
+    rendered.project.selectedCapabilities.includes("booking-calendly"),
+    true,
+  );
+  assert.deepEqual(rendered.project.capabilitySettings, {
+    "booking-calendly": bookingCalendly,
+  });
+  assert.match(
+    files.get("apps/web/src/integrations/booking/localized-booking.tsx"),
+    /CalendlyBooking/u,
+  );
+  const englishCatalog = parseGeneratedYaml(
+    rendered.files,
+    "apps/web/content/en-CA/localized-content.yaml",
+  );
+  const frenchCatalog = parseGeneratedYaml(
+    rendered.files,
+    "apps/web/content/fr-CA/localized-content.yaml",
+  );
+  assert.match(frenchCatalog.booking.linkLabel, /\S/u);
+  assert.notEqual(
+    frenchCatalog.booking.linkLabel,
+    englishCatalog.booking.linkLabel,
+  );
 });
 
 test("current site rendering uses the patched framework while historical rendering stays frozen", async () => {

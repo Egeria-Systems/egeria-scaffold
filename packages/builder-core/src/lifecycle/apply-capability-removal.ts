@@ -70,7 +70,15 @@ import {
 } from "./plan-capability-removal.js";
 
 const encoder = new TextEncoder();
-const migrationIdentifier = "remove-booking-calendly-0-1-0";
+type RemovableCapability = "booking-calendly" | "multilingual";
+
+function removalMigrationIdentifier(
+  capability: RemovableCapability,
+): "remove-booking-calendly-0-1-0" | "remove-multilingual-0-1-0" {
+  return capability === "booking-calendly"
+    ? "remove-booking-calendly-0-1-0"
+    : "remove-multilingual-0-1-0";
+}
 
 export type CapabilityRemovalPhase =
   | "precondition"
@@ -109,10 +117,10 @@ export type CapabilityRemovalExecutionResult =
         status: "verified-final-diff-approval-required";
         baseRevision: string;
         capability: Readonly<{
-          identifier: "booking-calendly";
+          identifier: RemovableCapability;
           version: "0.1.0";
         }>;
-        migration: typeof migrationIdentifier;
+        migration: ReturnType<typeof removalMigrationIdentifier>;
         changedPaths: readonly string[];
         preservedPaths: readonly string[];
         verificationChecks: typeof capabilityRemovalVerificationChecks;
@@ -267,8 +275,13 @@ function expectedPendingSurfaceStatus(
   if (action?.kind === "replace-project-configuration") {
     return "drifted";
   }
-  if (action?.kind === "delete-file" && surface.ownership === "managed") {
-    return "missing";
+  if (surface.ownership === "managed") {
+    if (action?.kind === "delete-file") {
+      return "missing";
+    }
+    if (action?.kind === "replace-file") {
+      return "drifted";
+    }
   }
   if (surface.ownership === "application-owned") {
     return "application-owned";
@@ -284,6 +297,7 @@ function requirePendingInference(input: Readonly<{
   currentState: InstalledState;
   desiredCapabilities: readonly string[];
   actions: readonly CapabilityRemovalAction[];
+  removedCapability: RemovableCapability;
 }>): boolean {
   if (
     input.inference.state.kind !== "valid" ||
@@ -303,7 +317,7 @@ function requirePendingInference(input: Readonly<{
   if (
     !sameValues(currentIdentifiers, inferredIdentifiers) ||
     input.inference.capabilities.some(({ identifier, category }) =>
-      identifier === "booking-calendly"
+      identifier === input.removedCapability
         ? category !== "contradictory"
         : !desired.has(identifier) || category !== "confirmed",
     )
@@ -346,6 +360,7 @@ function requireFinalInference(input: Readonly<{
   expectedState: InstalledState;
   desiredCapabilities: readonly string[];
   preservedPaths: readonly string[];
+  removedCapability: RemovableCapability;
 }>): boolean {
   if (
     input.inference.state.kind !== "valid" ||
@@ -369,7 +384,7 @@ function requireFinalInference(input: Readonly<{
         return evidence.category !== "confirmed";
       }
       return (
-        evidence.identifier !== "booking-calendly" ||
+        evidence.identifier !== input.removedCapability ||
         evidence.probes.some(
           (probe) =>
             probe.status !== "missing" &&
@@ -412,13 +427,16 @@ function requireFinalInference(input: Readonly<{
 function createNextProject(
   current: ProjectConfiguration,
   preservedPaths: readonly string[],
+  capability: RemovableCapability,
 ): ProjectConfiguration | undefined {
   const remainingCapabilitySettings = { ...current.capabilitySettings };
-  delete remainingCapabilitySettings["booking-calendly"];
+  if (capability === "booking-calendly") {
+    delete remainingCapabilitySettings["booking-calendly"];
+  }
   const parsed = projectConfigurationSchema.safeParse({
     ...current,
     selectedCapabilities: current.selectedCapabilities.filter(
-      (identifier) => identifier !== "booking-calendly",
+      (identifier) => identifier !== capability,
     ),
     capabilitySettings: remainingCapabilitySettings,
     ejectedAreas: [
@@ -436,6 +454,7 @@ function createNextState(input: Readonly<{
   files: ReadonlyMap<string, Uint8Array>;
   migration: MigrationRecord;
   ejections: readonly string[];
+  removedCapability: RemovableCapability;
 }>): InstalledState | undefined {
   const descriptors = [
     ...input.desired.value.surfaces,
@@ -483,7 +502,7 @@ function createNextState(input: Readonly<{
       (surface) =>
         surface.path === path &&
         surface.owner.kind === "capability" &&
-        surface.owner.identifier === "booking-calendly",
+        surface.owner.identifier === input.removedCapability,
     );
     const preserved = candidates[0];
     if (candidates.length !== 1 || preserved === undefined) {
@@ -514,7 +533,7 @@ function createNextState(input: Readonly<{
 
 export async function applyCapabilityRemoval(input: Readonly<{
   root: string;
-  capability: "booking-calendly";
+  capability: RemovableCapability;
   approvedPlanFingerprint: string;
   verifier: GeneratedProjectVerifier;
   reader?: RepositoryReader;
@@ -593,7 +612,11 @@ export async function applyCapabilityRemoval(input: Readonly<{
       action.kind === "preserve-file-and-eject" ? [action.path] : [],
     )
     .sort(compareText);
-  const nextProject = createNextProject(controls.project.value, preservedPaths);
+  const nextProject = createNextProject(
+    controls.project.value,
+    preservedPaths,
+    input.capability,
+  );
   if (nextProject === undefined) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
@@ -602,6 +625,18 @@ export async function applyCapabilityRemoval(input: Readonly<{
     profile: controls.project.value.originProfile,
     projectName: controls.project.value.project.name,
     displayName: controls.project.value.project.displayName,
+    ...(input.capability === "booking-calendly" ||
+    controls.project.value.capabilitySettings["booking-calendly"] === undefined
+      ? {}
+      : {
+          bookingCalendly:
+            controls.project.value.capabilitySettings["booking-calendly"],
+        }),
+    ...(input.capability === "multilingual"
+      ? {}
+      : controls.project.value.selectedCapabilities.includes("multilingual")
+        ? { multilingual: true as const }
+        : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   });
   if (!desired.ok) {
@@ -732,6 +767,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       currentState: controls.state.value,
       desiredCapabilities: plan.desiredCapabilities,
       actions: plan.actions,
+      removedCapability: input.capability,
     }) ||
     !(await readExpectedFileStates(
       reader,
@@ -758,7 +794,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
   }
   const migration = migrationRecordSchema.safeParse({
     schemaVersion: "1.0.0",
-    identifier: migrationIdentifier,
+    identifier: removalMigrationIdentifier(input.capability),
     kind: "migration",
     outcome: "succeeded",
     completedAt,
@@ -800,6 +836,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
     files: actualFiles,
     migration: migration.data,
     ejections: nextProject.ejectedAreas,
+    removedCapability: input.capability,
   });
   if (nextState === undefined) {
     return failure(
@@ -896,6 +933,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       expectedState: nextState,
       desiredCapabilities: plan.desiredCapabilities,
       preservedPaths,
+      removedCapability: input.capability,
     })
   ) {
     return failure(
@@ -946,8 +984,8 @@ export async function applyCapabilityRemoval(input: Readonly<{
     value: {
       status: "verified-final-diff-approval-required",
       baseRevision: initialGit.identity.revision,
-      capability: { identifier: "booking-calendly", version: "0.1.0" },
-      migration: migrationIdentifier,
+      capability: { identifier: input.capability, version: "0.1.0" },
+      migration: removalMigrationIdentifier(input.capability),
       changedPaths,
       preservedPaths,
       verificationChecks: capabilityRemovalVerificationChecks,

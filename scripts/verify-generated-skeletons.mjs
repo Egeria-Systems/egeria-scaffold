@@ -116,11 +116,93 @@ const bookingCalendlyFiles = Object.freeze([
   "apps/web/tests/e2e/calendly-booking.spec.ts",
 ].sort(codePointCompare));
 
+const multilingualFiles = Object.freeze([
+  "apps/web/app/[locale]/[[...segments]]/page.tsx",
+  "apps/web/app/[locale]/layout.tsx",
+  "apps/web/app/[locale]/not-found.tsx",
+  "apps/web/content/en-CA/localized-content.yaml",
+  "apps/web/content/fr-CA/localized-content.yaml",
+  "apps/web/middleware.ts",
+  "apps/web/src/i18n/locale.ts",
+  "apps/web/src/i18n/localized-content.ts",
+  "apps/web/src/i18n/localized-profile.ts",
+  "apps/web/src/i18n/read-localized-content.ts",
+  "apps/web/src/integrations/booking/localized-booking.tsx",
+  "apps/web/src/presentation/localized-page.tsx",
+  "apps/web/tests/component/multilingual-page.test.tsx",
+  "apps/web/tests/e2e/multilingual-routing.spec.ts",
+  "apps/web/tests/unit/locale.test.ts",
+  "apps/web/tests/unit/localized-content.test.ts",
+].sort(codePointCompare));
+
+const multilingualErrorProofRoute = `"use client";
+
+export default function ErrorBoundaryProof() {
+  const recoveryKey = "egeria-verifier-error-boundary-recovery";
+  if (
+    typeof window !== "undefined" &&
+    window.sessionStorage.getItem(recoveryKey) !== "ready"
+  ) {
+    throw new Error("Intentional verifier-only error boundary proof");
+  }
+  return <main data-testid="verifier-recovery" />;
+}
+`;
+
+const multilingualErrorProofSpecification = `import { expect, test } from "@playwright/test";
+
+test("renders and retries ordinary failures in the active locale", async ({ page }) => {
+  const recoveryKey = "egeria-verifier-error-boundary-recovery";
+  await page.addInitScript((key) => {
+    window.sessionStorage.setItem(key, "fail");
+  }, recoveryKey);
+  await page.goto("/fr-CA/error-boundary-proof");
+
+  await expect(page.locator("html")).toHaveAttribute("lang", "fr-CA");
+  const fallback = page.locator(
+    'main[aria-labelledby="error-fallback-heading"]',
+  );
+  const heading = fallback.getByRole("heading", { level: 1 });
+  const retry = fallback.getByRole("button");
+  await expect(heading).toBeVisible();
+  await expect(retry).toBeVisible();
+
+  await page.evaluate((key) => {
+    window.sessionStorage.setItem(key, "ready");
+  }, recoveryKey);
+  await retry.click();
+  await expect(page.getByTestId("verifier-recovery")).toBeAttached();
+});
+`;
+
+async function prepareVerifierOnlyBrowserProof(validationRoot, contract) {
+  if (contract.expectedMultilingualVersion === null) return;
+
+  const routeDirectory = join(
+    validationRoot,
+    "apps/web/app/[locale]/error-boundary-proof",
+  );
+  await mkdir(routeDirectory, { recursive: true, mode: 0o700 });
+  await writeFile(join(routeDirectory, "page.tsx"), multilingualErrorProofRoute, {
+    flag: "wx",
+    mode: 0o600,
+  });
+  await writeFile(
+    join(
+      validationRoot,
+      "apps/web/tests/e2e/multilingual-error-boundary.spec.ts",
+    ),
+    multilingualErrorProofSpecification,
+    { flag: "wx", mode: 0o600 },
+  );
+}
+
 const createArguments = ({
   profile,
   projectName,
   displayName,
   bookingCalendly,
+  multilingual,
 }) =>
   Object.freeze([
     "--profile",
@@ -137,6 +219,7 @@ const createArguments = ({
           "--calendly-mode",
           bookingCalendly.mode,
         ]),
+    ...(multilingual === true ? ["--multilingual"] : []),
   ]);
 
 const noCapabilitySettings = Object.freeze({});
@@ -176,7 +259,9 @@ export const generatedFixtureContracts = Object.freeze([
     expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: null,
+    expectedMultilingualVersion: null,
     expectedSurfaces: 106,
+    visualRegression: true,
   }),
   Object.freeze({
     identifier: "portfolio-calendly",
@@ -213,7 +298,9 @@ export const generatedFixtureContracts = Object.freeze([
     expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: "0.1.0",
+    expectedMultilingualVersion: null,
     expectedSurfaces: 111,
+    visualRegression: true,
   }),
   Object.freeze({
     identifier: "site",
@@ -263,7 +350,64 @@ export const generatedFixtureContracts = Object.freeze([
     expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: "0.4.0",
     expectedBookingCalendlyVersion: null,
+    expectedMultilingualVersion: null,
     expectedSurfaces: 123,
+    visualRegression: true,
+  }),
+  Object.freeze({
+    identifier: "site-multilingual",
+    profile: "site",
+    projectName: "acme-site-multilingual",
+    displayName: "Acme Site Multilingual",
+    createArguments: createArguments({
+      profile: "site",
+      projectName: "acme-site-multilingual",
+      displayName: "Acme Site Multilingual",
+      multilingual: true,
+    }),
+    expectedCapabilitySettings: noCapabilitySettings,
+    relativeRoot: "fixtures/generated/site-multilingual",
+    expectedFiles: Object.freeze([
+      ...portfolioFiles,
+      "apps/web/app/about/page.tsx",
+      "apps/web/app/not-found.tsx",
+      "apps/web/app/robots.ts",
+      "apps/web/app/sitemap.ts",
+      "apps/web/app/work/error.tsx",
+      "apps/web/app/work/featured/page.tsx",
+      "apps/web/app/work/page.tsx",
+      "apps/web/content/en-CA/about.yaml",
+      "apps/web/content/en-CA/not-found.yaml",
+      "apps/web/content/en-CA/routing.yaml",
+      "apps/web/content/en-CA/work-featured.yaml",
+      "apps/web/src/routing/read-routing-content.ts",
+      "apps/web/src/routing/routing-content-schema.ts",
+      "apps/web/src/routing/site-page.tsx",
+      "apps/web/tests/component/site-page.test.tsx",
+      "apps/web/tests/e2e/site-routing.spec.ts",
+      "apps/web/tests/unit/routing-content.test.ts",
+      ...multilingualFiles,
+    ].sort(codePointCompare)),
+    expectedCapabilities: Object.freeze([
+      "standards",
+      "content-files",
+      "section-composition",
+      "deployment-cloudflare",
+      "observability",
+      "site-routing",
+      "multilingual",
+    ]),
+    expectedRecipeVersion: "0.11.0",
+    expectedStandardsVersion: "0.4.0",
+    expectedObservabilityVersion: "0.3.0",
+    expectedContentFilesVersion: "0.4.0",
+    expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.3.0",
+    expectedSiteRoutingVersion: "0.4.0",
+    expectedBookingCalendlyVersion: null,
+    expectedMultilingualVersion: "0.1.0",
+    expectedSurfaces: 139,
+    visualRegression: false,
   }),
 ]);
 
@@ -646,7 +790,7 @@ async function inspectFixture(root, contract) {
       webManifest,
       expectedWebManifest(
         contract.projectName,
-        contract.identifier === "site" ? "16.3.3" : "16.3.0",
+        contract.profile === "site" ? "16.3.3" : "16.3.0",
       ),
     )
   ) {
@@ -897,6 +1041,11 @@ async function verifySourcesWithAdapters(
       });
       await mkdir(supportRoot, { mode: 0o700 });
       const support = await createSupportPaths(supportRoot);
+      try {
+        await prepareVerifierOnlyBrowserProof(validationRoot, source.contract);
+      } catch {
+        fail("VERIFICATION_SETUP_FAILED");
+      }
       const environment = createChildEnvironment(support);
       const commandInput = (arguments_, timeout = commandTimeoutMilliseconds) => ({
         executable: "pnpm",
@@ -978,7 +1127,7 @@ async function verifySourcesWithAdapters(
           arguments: ["--dir", "apps/web", "run", "test:e2e:preview"],
           failureCode: "BROWSER_PREVIEW_FAILED",
         },
-        ...(options.includeVisual
+        ...(options.includeVisual && source.contract.visualRegression
           ? [
               {
                 arguments: ["--dir", "apps/web", "run", "test:visual"],
@@ -1054,13 +1203,17 @@ async function verifySourcesWithAdapters(
     throw pendingError;
   }
 
+  const visualVerificationExecuted =
+    options.includeVisual &&
+    sourcesBefore.some(({ contract }) => contract.visualRegression);
+
   return {
     ok: true,
     fixtures: sourcesBefore.map(({ contract }) => contract.identifier),
     profiles: [
       ...new Set(sourcesBefore.map(({ contract }) => contract.profile)),
     ],
-    checks: options.includeVisual
+    checks: visualVerificationExecuted
       ? [...verificationChecks, visualVerificationCheck]
       : verificationChecks,
   };

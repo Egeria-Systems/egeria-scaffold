@@ -161,6 +161,70 @@ const bookingCalendlyTemplateSources = textTemplateSources([
   "booking-calendly/apps/web/tests/e2e/calendly-booking.spec.ts",
 ] as const);
 
+const multilingualCommonTemplateSources = textTemplateSources([
+  "multilingual/apps/web/app/error.tsx",
+  "multilingual/apps/web/middleware.ts",
+  "multilingual/apps/web/app/layout.tsx",
+  "multilingual/apps/web/app/[locale]/layout.tsx",
+  "multilingual/apps/web/app/[locale]/[[...segments]]/page.tsx",
+  "multilingual/apps/web/app/[locale]/not-found.tsx",
+  "multilingual/apps/web/src/i18n/locale.ts",
+  "multilingual/apps/web/src/i18n/localized-content.ts",
+  "multilingual/apps/web/src/i18n/read-localized-content.ts",
+  "multilingual/apps/web/src/presentation/localized-page.tsx",
+  "multilingual/apps/web/tests/component/multilingual-page.test.tsx",
+  "multilingual/apps/web/tests/e2e/multilingual-routing.spec.ts",
+  "multilingual/apps/web/tests/unit/locale.test.ts",
+  "multilingual/apps/web/tests/unit/localized-content.test.ts",
+  "multilingual/apps/web/tests/visual/home-visual.spec.ts",
+] as const);
+
+function multilingualProfileSources(
+  profile: "portfolio" | "site",
+): readonly TemplateSource[] {
+  return [
+    {
+      source: `multilingual/${profile}/apps/web/src/i18n/localized-profile.ts`,
+      destinationSource: "common/apps/web/src/i18n/localized-profile.ts",
+      contentKind: "text",
+    },
+    ...["en-CA", "fr-CA"].map((locale) => ({
+      source: `multilingual/${profile}/apps/web/content/${locale}/localized-content.yaml.template`,
+      destinationSource: `common/apps/web/content/${locale}/localized-content.yaml.template`,
+      contentKind: "text" as const,
+    })),
+    ...(profile === "site"
+      ? [
+          {
+            source: "multilingual/site/apps/web/app/sitemap.ts",
+            destinationSource: "site/apps/web/app/sitemap.ts",
+            contentKind: "text" as const,
+          },
+          {
+            source:
+              "multilingual/site/apps/web/tests/e2e/site-routing.spec.ts.template",
+            destinationSource:
+              "site/apps/web/tests/e2e/site-routing.spec.ts.template",
+            contentKind: "text" as const,
+          },
+        ]
+      : []),
+  ];
+}
+
+function multilingualBookingSource(
+  includeBookingCalendly: boolean,
+): TemplateSource {
+  return {
+    source: includeBookingCalendly
+      ? "multilingual/apps/web/src/integrations/booking/localized-booking.calendly.tsx"
+      : "multilingual/apps/web/src/integrations/booking/localized-booking.stub.tsx",
+    destinationSource:
+      "common/apps/web/src/integrations/booking/localized-booking.tsx",
+    contentKind: "text",
+  };
+}
+
 const productionSiteBookingHome: TemplateSource = {
   source: "site/apps/web/app/page-with-booking.tsx",
   destinationSource: "site/apps/web/app/page.tsx",
@@ -187,6 +251,7 @@ export function createTemplateCatalog(
   profile: "portfolio" | "site",
   includeBookingCalendly = false,
   recipeVersion = profile === "site" ? "0.11.0" : "0.10.0",
+  includeMultilingual = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   const productionSite = profile === "site" && recipeVersion === "0.11.0";
   const sources = [
@@ -195,6 +260,12 @@ export function createTemplateCatalog(
         !(
           (includeBookingCalendly || productionSite) &&
           source === commonHomeRouteSource
+        ) &&
+        !(includeMultilingual && source === "common/apps/web/app/layout.tsx") &&
+        !(includeMultilingual && source === "common/apps/web/app/error.tsx") &&
+        !(
+          includeMultilingual &&
+          source === "common/apps/web/tests/visual/home-visual.spec.ts"
         ),
     ),
     ...(profile === "portfolio"
@@ -202,7 +273,11 @@ export function createTemplateCatalog(
       : productionSite
         ? productionSiteTemplateSources.filter(
             ({ source }) =>
-              !includeBookingCalendly || source !== "site/apps/web/app/page.tsx",
+              (!includeBookingCalendly || source !== "site/apps/web/app/page.tsx") &&
+              (!includeMultilingual ||
+                (source !== "site/apps/web/app/sitemap.ts" &&
+                  source !==
+                    "site/apps/web/tests/e2e/site-routing.spec.ts.template")),
           )
         : legacySiteTemplateSources),
     ...(includeBookingCalendly
@@ -213,6 +288,13 @@ export function createTemplateCatalog(
       : []),
     ...(includeBookingCalendly && productionSite
       ? [productionSiteBookingHome]
+      : []),
+    ...(includeMultilingual
+      ? [
+          ...multilingualCommonTemplateSources,
+          ...multilingualProfileSources(profile),
+          multilingualBookingSource(includeBookingCalendly),
+        ]
       : []),
   ];
   const destinations = new Set<string>();

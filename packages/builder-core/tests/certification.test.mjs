@@ -54,6 +54,8 @@ const historicalSiteRoutingEvidenceRevision =
   "77cea944513e521939bf4de088048f67acdfbc3c";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
+const multilingualPlanPath =
+  "docs/superpowers/plans/2026-08-26-multilingual-capability-implementation.md";
 const deploymentEvidencePath =
   "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md";
 const deploymentEvidenceRevision =
@@ -72,6 +74,8 @@ const descriptorDigests = Object.freeze({
     "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05",
   "deployment-cloudflare":
     "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41",
+  multilingual:
+    "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41",
   observability:
     "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99",
   "section-composition":
@@ -129,6 +133,8 @@ function createRecord(identifier) {
       ? planPath
       : identifier === "deployment-cloudflare"
         ? deploymentPlanPath
+        : identifier === "multilingual"
+          ? multilingualPlanPath
         : identifier === "observability"
           ? observabilityPlanPath
           : identifier === "site-routing"
@@ -152,6 +158,7 @@ function createRecord(identifier) {
     status:
       identifier === "booking-calendly" ||
       identifier === "deployment-cloudflare" ||
+      identifier === "multilingual" ||
       identifier === "observability" ||
       identifier === "site-routing" ||
       identifier === "standards"
@@ -469,6 +476,23 @@ test("current production site routing subject has exact reviewed lifecycle and f
     }),
     { ok: true, value: undefined },
   );
+});
+
+test("current multilingual subject is admitted only as pending certification", () => {
+  const descriptor = descriptorsByIdentifier.get("multilingual");
+  assert.notEqual(descriptor, undefined);
+  const subject = core.createCertificationSubject(
+    descriptor,
+    requiredEvidence.multilingual,
+  );
+
+  assert.deepEqual(committedRegistry.records.multilingual, {
+    subject,
+    requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
+    status: "pending",
+    taskPlan: multilingualPlanPath,
+    evidence: [],
+  });
 });
 
 test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", () => {
@@ -826,6 +850,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
+        [multilingualPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
       },
@@ -841,6 +866,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
         [deploymentPlanPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
+        [multilingualPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
       },
@@ -868,6 +894,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
+        [multilingualPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: evidenceDocumentSource,
       },
@@ -909,6 +936,7 @@ test("repository artifacts reject revisions outside the checked Git history", ()
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
+        [multilingualPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: nonexistentRevisionDocument,
       },
@@ -943,6 +971,7 @@ test("repository artifacts reject incomplete or unresolved reviewer receipts", (
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
+        [multilingualPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: incompleteReceipt,
       },
@@ -984,6 +1013,7 @@ test("repository artifacts require affirmative review of every claimed outcome",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
+        [multilingualPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
         [evidencePath]: mismatchedReview,
       },
@@ -1018,6 +1048,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       },
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "multilingual", "status"],
+        context: { reason: "pending" },
+      },
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "observability", "status"],
         context: { reason: "pending" },
       },
@@ -1036,7 +1071,7 @@ test("closure distinguishes the bounded legacy transition from full certificatio
   assert.equal(
     core.validateCertificationClosure({ registry, policy: "all-certified" })
       .issues.length,
-    7,
+    8,
   );
 
   const currentCertified = cloneRegistry();
@@ -1061,6 +1096,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       },
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "multilingual", "status"],
+        context: { reason: "pending" },
+      },
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "site-routing", "status"],
         context: { reason: "pending" },
       },
@@ -1076,7 +1116,7 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       registry: currentCertified,
       policy: "all-certified",
     }).issues.length,
-    5,
+    6,
   );
 
   const allCertified = cloneRegistry();

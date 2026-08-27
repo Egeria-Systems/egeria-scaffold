@@ -826,6 +826,105 @@ function createDescriptors(
     ),
   ] as const;
 
+  const multilingualEvidencePoints = [
+    createFileEvidencePoint(
+      "multilingual-locale-middleware",
+      "multilingual",
+      "apps/web/middleware.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-locale-layout",
+      "multilingual",
+      "apps/web/app/[locale]/layout.tsx",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-localized-route",
+      "multilingual",
+      "apps/web/app/[locale]/[[...segments]]/page.tsx",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-localized-not-found",
+      "multilingual",
+      "apps/web/app/[locale]/not-found.tsx",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-default-locale-content",
+      "multilingual",
+      "apps/web/content/en-CA/localized-content.yaml",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "multilingual-french-locale-content",
+      "multilingual",
+      "apps/web/content/fr-CA/localized-content.yaml",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "multilingual-locale-contract",
+      "multilingual",
+      "apps/web/src/i18n/locale.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-profile-routes",
+      "multilingual",
+      "apps/web/src/i18n/localized-profile.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-content-contract",
+      "multilingual",
+      "apps/web/src/i18n/localized-content.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-content-reader",
+      "multilingual",
+      "apps/web/src/i18n/read-localized-content.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-page-presentation",
+      "multilingual",
+      "apps/web/src/presentation/localized-page.tsx",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-booking-composition",
+      "multilingual",
+      "apps/web/src/integrations/booking/localized-booking.tsx",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-component-specification",
+      "multilingual",
+      "apps/web/tests/component/multilingual-page.test.tsx",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-browser-specification",
+      "multilingual",
+      "apps/web/tests/e2e/multilingual-routing.spec.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-locale-unit-specification",
+      "multilingual",
+      "apps/web/tests/unit/locale.test.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "multilingual-content-unit-specification",
+      "multilingual",
+      "apps/web/tests/unit/localized-content.test.ts",
+      "managed",
+    ),
+  ] as const;
+
   return [
     {
       identifier: "standards",
@@ -1190,6 +1289,46 @@ function createDescriptors(
       removalAndRecoveryRequirements: [
         "remove-generated-booking-surfaces",
         "exclude-calendly-account-and-provider-data",
+      ],
+    },
+    {
+      identifier: "multilingual",
+      version: "0.1.0",
+      deliveryMode: "source-generated",
+      stateClassifications: ["repository-stateful"],
+      removalPolicy: "reviewed",
+      dependencies: ["content-files", "observability", "section-composition"],
+      ...sharedCapabilityMetadata,
+      optionalIntegrations: ["booking-calendly", "site-routing"],
+      supportedProfiles: ["portfolio", "site"],
+      requiredPackages: [],
+      platformResources: [],
+      adapterSemanticRequirements: [],
+      ...projectEvidencePoints(multilingualEvidencePoints),
+      migrationPlanners: [
+        "add-multilingual-0-1-0",
+        "remove-multilingual-0-1-0",
+      ],
+      verificationPlan: [
+        "locale-contracts",
+        "content-contracts",
+        "component-tests",
+        "typecheck",
+        "next-build",
+        "opennext-build",
+        "browser-development",
+        "browser-preview",
+      ],
+      documentationEvidenceRequirements: [
+        "locale-prefixed-routing-and-negotiation-contract",
+        "translation-parity-and-exact-key-contract",
+        "localized-navigation-metadata-and-discovery-contract",
+        "human-translation-review-boundary",
+      ],
+      removalAndRecoveryRequirements: [
+        "review-application-owned-locale-catalog-preservation",
+        "restore-single-locale-routing-and-discovery-surfaces",
+        "verify-closed-booking-and-multilingual-lifecycle",
       ],
     },
   ];
