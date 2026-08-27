@@ -41,6 +41,7 @@ export async function generateMetadata({
   if (route.kind === "not-found") {
     return {
       ...catalog.notFound.metadata,
+      alternates: {},
       robots: { index: false, follow: false },
     };
   }

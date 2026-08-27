@@ -12,9 +12,9 @@ vi.mock("../../src/i18n/read-localized-content", () => ({
     if (locale !== "fr-CA") throw new Error("unexpected locale");
     return {
       error: {
-        heading: "Une erreur s’est produite",
-        summary: "Veuillez réessayer.",
-        retryLabel: "Réessayer",
+        heading: "Localized error heading",
+        summary: "Localized error summary",
+        retryLabel: "Localized retry action",
       },
     };
   },
@@ -25,8 +25,8 @@ vi.mock("../../src/infrastructure/observability/browser-reporter", () => ({
 
 describe("localized page", () => {
   it("renders localized navigation, current-page state, and the locale switch", () => {
-    const navigation = [{ href: "/fr-CA", label: "Accueil" }];
-    const localeSwitch = { href: "/en-CA", label: "English" };
+    const navigation = [{ href: "/fr-CA", label: "Current route" }];
+    const localeSwitch = { href: "/en-CA", label: "Switch locale" };
     render(
       <LocalizedPage
         locale="fr-CA"
@@ -37,20 +37,23 @@ describe("localized page", () => {
             type: "hero",
             variant: "default",
             enabled: true,
-            content: { heading: "Bonjour", summary: "Bienvenue." },
+            content: {
+              heading: "Localized heading",
+              summary: "Localized summary",
+            },
           },
         ]}
         navigation={navigation}
         localeSwitch={localeSwitch}
-        skipToContent="Passer au contenu"
-        navigationLabel="Navigation principale"
+        skipToContent="Skip test content"
+        navigationLabel="Test navigation"
       />,
     );
-    expect(screen.getByRole("link", { name: "Accueil" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Current route" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    expect(screen.getByRole("link", { name: "English" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Switch locale" })).toHaveAttribute(
       "href",
       "/en-CA",
     );
@@ -60,8 +63,10 @@ describe("localized page", () => {
     const reset = () => {};
     render(<ErrorBoundary error={new Error("test")} reset={reset} />);
     expect(
-      screen.getByRole("heading", { level: 1, name: "Une erreur s’est produite" }),
+      screen.getByRole("heading", { level: 1, name: "Localized error heading" }),
     ).toBeVisible();
-    expect(screen.getByRole("button", { name: "Réessayer" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Localized retry action" }),
+    ).toBeVisible();
   });
 });

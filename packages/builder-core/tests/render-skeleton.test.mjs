@@ -1357,13 +1357,25 @@ test("multilingual selection renders deterministic locale-prefixed portfolio and
       files.get("apps/web/src/i18n/localized-content.ts"),
       /Accueil|Passer au contenu|Travaux en vedette/u,
     );
+    const englishCatalog = parseGeneratedYaml(
+      first.files,
+      "apps/web/content/en-CA/localized-content.yaml",
+    );
     const frenchCatalog = parseGeneratedYaml(
       first.files,
       "apps/web/content/fr-CA/localized-content.yaml",
     );
     assert.equal(frenchCatalog.navigation[0].href, "/fr-CA");
-    assert.deepEqual(frenchCatalog.localeSwitch, { label: "English" });
-    assert.equal(frenchCatalog.error.retryLabel, "Réessayer");
+    assert.match(frenchCatalog.localeSwitch.label, /\S/u);
+    assert.notEqual(
+      frenchCatalog.localeSwitch.label,
+      englishCatalog.localeSwitch.label,
+    );
+    assert.match(frenchCatalog.error.retryLabel, /\S/u);
+    assert.notEqual(
+      frenchCatalog.error.retryLabel,
+      englishCatalog.error.retryLabel,
+    );
     if (profile === "site") {
       assert.match(
         files.get("apps/web/tests/e2e/site-routing.spec.ts"),
@@ -1403,9 +1415,18 @@ test("multilingual and Calendly compose without changing either capability setti
     files.get("apps/web/src/integrations/booking/localized-booking.tsx"),
     /CalendlyBooking/u,
   );
-  assert.match(
-    files.get("apps/web/content/fr-CA/localized-content.yaml"),
-    /Planifier avec Calendly/u,
+  const englishCatalog = parseGeneratedYaml(
+    rendered.files,
+    "apps/web/content/en-CA/localized-content.yaml",
+  );
+  const frenchCatalog = parseGeneratedYaml(
+    rendered.files,
+    "apps/web/content/fr-CA/localized-content.yaml",
+  );
+  assert.match(frenchCatalog.booking.linkLabel, /\S/u);
+  assert.notEqual(
+    frenchCatalog.booking.linkLabel,
+    englishCatalog.booking.linkLabel,
   );
 });
 

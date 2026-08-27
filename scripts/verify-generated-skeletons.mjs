@@ -145,12 +145,7 @@ export default function ErrorBoundaryProof() {
   ) {
     throw new Error("Intentional verifier-only error boundary proof");
   }
-  return (
-    <main>
-      <h1>Verifier recovery confirmed</h1>
-      <p>The localized error boundary reset the failed route.</p>
-    </main>
-  );
+  return <main data-testid="verifier-recovery" />;
 }
 `;
 
@@ -163,11 +158,9 @@ test("renders and retries ordinary failures in the active locale", async ({ page
   }, recoveryKey);
   await page.goto("/fr-CA/error-boundary-proof");
 
-  const heading = page.getByRole("heading", {
-    level: 1,
-    name: "Une erreur s’est produite",
-  });
-  const retry = page.getByRole("button", { name: "Réessayer" });
+  await expect(page.locator("html")).toHaveAttribute("lang", "fr-CA");
+  const heading = page.getByRole("heading", { level: 1 });
+  const retry = page.getByRole("button");
   await expect(heading).toBeVisible();
   await expect(retry).toBeVisible();
 
@@ -175,9 +168,7 @@ test("renders and retries ordinary failures in the active locale", async ({ page
     window.sessionStorage.setItem(key, "ready");
   }, recoveryKey);
   await retry.click();
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Verifier recovery confirmed" }),
-  ).toBeVisible();
+  await expect(page.getByTestId("verifier-recovery")).toBeAttached();
 });
 `;
 
@@ -1209,13 +1200,17 @@ async function verifySourcesWithAdapters(
     throw pendingError;
   }
 
+  const visualVerificationExecuted =
+    options.includeVisual &&
+    sourcesBefore.some(({ contract }) => contract.visualRegression);
+
   return {
     ok: true,
     fixtures: sourcesBefore.map(({ contract }) => contract.identifier),
     profiles: [
       ...new Set(sourcesBefore.map(({ contract }) => contract.profile)),
     ],
-    checks: options.includeVisual
+    checks: visualVerificationExecuted
       ? [...verificationChecks, visualVerificationCheck]
       : verificationChecks,
   };

@@ -2,7 +2,7 @@
 
 Private ownership boundary for Egeria Systems builder internals.
 
-For the production-site increment, exact descriptor admission and both closure policies pass because current `site-routing@0.4.0` has accepted evidence for both required outcomes at revision `6034d7330af912d1a1b9bcff3323ed360ebee2d0`. The historical `site-routing@0.3.0` receipt remains limited to that prior subject. The multilingual implementation is current, and its separate certification is next; analytics and real-client work remain separately gated.
+For the production-site increment, exact descriptor admission passes because current `site-routing@0.4.0` has accepted evidence for both required outcomes at revision `6034d7330af912d1a1b9bcff3323ed360ebee2d0`. Both repository-wide closure policies correctly remain blocked pending separately certified `multilingual@0.1.0` evidence. The historical `site-routing@0.3.0` receipt remains limited to that prior subject. The multilingual implementation is current, and its separate certification is next; analytics and real-client work remain separately gated.
 
 Builder-core owns executable runtime contracts for capability descriptors, profile recipes, desired project configuration, installed state, and successful migration records. Zod schemas are canonical; checked Draft 2020-12 artifacts live in `schemas/`. After building builder-core, regenerate them with `pnpm run schema:generate` or verify them without writes using `pnpm run schema:check`; `pnpm run verify` runs the required build first.
 

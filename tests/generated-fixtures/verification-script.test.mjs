@@ -612,9 +612,10 @@ test("multilingual browser verification injects its error-boundary proof only in
             );
             assert.match(routeSource, /throw new Error/u);
             assert.match(routeSource, /sessionStorage/u);
+            assert.match(routeSource, /data-testid="verifier-recovery"/u);
             assert.match(
               await readFile(join(input.cwd, specificationPath), "utf8"),
-              /Une erreur s’est produite[\s\S]+sessionStorage[\s\S]+retry\.click\(\)[\s\S]+Verifier recovery confirmed/u,
+              /toHaveAttribute\("lang", "fr-CA"\)[\s\S]+getByRole\("heading", \{ level: 1 \}\)[\s\S]+sessionStorage[\s\S]+retry\.click\(\)[\s\S]+getByTestId\("verifier-recovery"\)/u,
             );
           }
           return input.arguments[0] === "--version" ? "11.20.0\n" : "";
@@ -740,6 +741,37 @@ test("visual opt-in leaves the multilingual fixture outside the established matr
           arguments_.includes("test:visual") &&
           cwd.endsWith("/site-multilingual-project"),
       ),
+      false,
+    );
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
+});
+
+test("single-project visual opt-in reports only checks that actually run", async () => {
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-visual-receipt-"));
+  const commands = [];
+
+  try {
+    const result = await verifyGeneratedProjectForTesting(
+      resolve(repositoryRoot, "fixtures/generated/site-multilingual"),
+      "site-multilingual",
+      {
+        async createOwner() {
+          return createKnownOwner(ownerParent);
+        },
+        async runCommand(input) {
+          commands.push(input.arguments);
+          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+        },
+      },
+      undefined,
+      { includeVisual: true },
+    );
+
+    assert.equal(result.checks.includes("visual-regression"), false);
+    assert.equal(
+      commands.some((arguments_) => arguments_.includes("test:visual")),
       false,
     );
   } finally {

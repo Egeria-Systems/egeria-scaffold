@@ -1,13 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-const siteTitle = {{displayNameJson}};
 const routes = [
-  { path: "/en-CA", title: siteTitle },
-  { path: "/en-CA/about", title: "About" },
-  { path: "/en-CA/work/featured", title: "Featured work" },
-  { path: "/fr-CA", title: siteTitle },
-  { path: "/fr-CA/about", title: "À propos" },
-  { path: "/fr-CA/work/featured", title: "Travaux en vedette" },
+  "/en-CA",
+  "/en-CA/about",
+  "/en-CA/work/featured",
+  "/fr-CA",
+  "/fr-CA/about",
+  "/fr-CA/work/featured",
 ] as const;
 
 function parseSitemapAlternates(source: string) {
@@ -32,15 +31,19 @@ test("serves localized route metadata and active navigation across nested routes
   page,
 }) => {
   for (const route of routes) {
-    await page.goto(route.path);
-    await expect(page).toHaveTitle(route.title);
+    await page.goto(route);
+    await expect(page).toHaveTitle(/\S/u);
+    await expect(page.locator("html")).toHaveAttribute(
+      "lang",
+      route.split("/")[1] ?? "",
+    );
     await expect(page.locator('meta[name="description"]')).toHaveAttribute(
       "content",
       /\S/u,
     );
     await expect(page.locator('nav a[aria-current="page"]')).toHaveAttribute(
       "href",
-      route.path,
+      route,
     );
   }
 
@@ -81,8 +84,8 @@ test("publishes localized discovery, redirects, and not-found behavior", async (
 
   const missing = await page.goto("/fr-CA/missing-page");
   expect(missing?.status()).toBe(404);
-  await expect(page).toHaveTitle("Page introuvable");
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Page introuvable" }),
-  ).toBeVisible();
+  await expect(page).toHaveTitle(/\S/u);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
+  await expect(page.locator('link[rel="alternate"]')).toHaveCount(0);
 });

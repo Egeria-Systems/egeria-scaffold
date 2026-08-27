@@ -17,12 +17,15 @@ describe("locale contract", () => {
     expect(isLocale("en-US")).toBe(false);
     expect(() => requireLocale("es-ES")).toThrowError("LOCALE_INVALID");
     expect(looksLikeLocaleSegment("es-ES")).toBe(true);
+    expect(looksLikeLocaleSegment("fr-ca")).toBe(true);
+    expect(looksLikeLocaleSegment("FR-CA")).toBe(true);
     expect(looksLikeLocaleSegment("about")).toBe(false);
   });
 
   it("negotiates once by quality and falls back to the default locale", () => {
     expect(negotiateLocale("en-CA;q=0.4, fr-CA;q=0.9")).toBe("fr-CA");
-    expect(negotiateLocale("fr-FR, en;q=0.8")).toBe("en-CA");
+    expect(negotiateLocale("fr-FR, en;q=0.8")).toBe("fr-CA");
+    expect(negotiateLocale("en-GB, fr;q=0.8")).toBe("en-CA");
     expect(negotiateLocale("de-DE, *;q=0.2")).toBe("en-CA");
     expect(negotiateLocale(null)).toBe("en-CA");
   });

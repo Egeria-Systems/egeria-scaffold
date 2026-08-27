@@ -756,7 +756,7 @@
       "path": "apps/web/src/integrations/booking/localized-booking.tsx"
     },
     {
-      "fingerprint": "sha256:c906404ab6921c6dd7e44ccb237e299d7292db69db1350106a59840a41d63557",
+      "fingerprint": "sha256:3c2b1e030b81830a14d70f09d23e9aac29ad08bf245a8e557a76361e2d369715",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -770,7 +770,7 @@
       "path": "apps/web/tests/e2e/multilingual-routing.spec.ts"
     },
     {
-      "fingerprint": "sha256:6dec99a3bc424f39a7e38e59d26fbcd3fe09a3be474889a580b2fe7125574868",
+      "fingerprint": "sha256:393aa73277ba56817276f71c78131ea2bd0f54cf21860dd0319df8371fbe6ff7",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -854,7 +854,7 @@
       "path": "apps/web/content/fr-CA/localized-content.yaml"
     },
     {
-      "fingerprint": "sha256:49e604ef4c12c1ce01e7d302f9474af072a62607cb0d46349e0701b6e62d093d",
+      "fingerprint": "sha256:db3e47d4d623bca9394784aeebc969b727b2b09932fd1ced1313df03914f8f05",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -896,7 +896,7 @@
       "path": "apps/web/middleware.ts"
     },
     {
-      "fingerprint": "sha256:9d4fa293ba6789ad279d6c395bf0de00d33b6558d66dc349e61329f007997672",
+      "fingerprint": "sha256:691936526a59b7671a127aafecf9fdabbd10ce41cf236d32aa7731e7f547212b",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -924,7 +924,7 @@
       "path": "apps/web/app/[locale]/not-found.tsx"
     },
     {
-      "fingerprint": "sha256:1e56470e5f41051cac23d23516e7e2881f2a9f0c2b9945d78a1ead59429612ab",
+      "fingerprint": "sha256:1c61c9532dec151912086eb40d37d39b3a17044e06ece7557c332b6670668933",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1292,7 +1292,7 @@
       "path": "apps/web/app/about/page.tsx"
     },
     {
-      "fingerprint": "sha256:07b6187ec4810522b4be9ac177b15bf4d9c4767104b6dce2aaa00a529ab555f5",
+      "fingerprint": "sha256:8c5bac002c3842dc67e16b4ea05b1a1904057dee4f56761c98bace667ea3f69e",
       "fingerprintTarget": {
         "kind": "file"
       },

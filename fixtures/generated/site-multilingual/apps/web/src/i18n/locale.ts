@@ -16,7 +16,7 @@ export function requireLocale(value: string): Locale {
 }
 
 export function looksLikeLocaleSegment(value: string): boolean {
-  return /^[a-z]{2}(?:-[A-Z]{2})?$/u.test(value);
+  return /^[a-z]{2}(?:-[a-z]{2})?$/iu.test(value);
 }
 
 export function localizePath(locale: Locale, path: string): string {
@@ -59,10 +59,11 @@ export function negotiateLocale(header: string | null): Locale {
     );
 
   for (const { tag } of preferences) {
-    if (tag === "fr-ca" || tag === "fr") {
+    const [language] = tag.split("-");
+    if (language === "fr") {
       return "fr-CA";
     }
-    if (tag === "en-ca" || tag === "en") {
+    if (language === "en") {
       return "en-CA";
     }
   }
