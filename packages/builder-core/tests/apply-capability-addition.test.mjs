@@ -272,6 +272,8 @@ test("Calendly addition accepts the planned multilingual booking-composition rep
 test("multilingual addition applies the locale overlay and persists fresh discovery", async () => {
   for (const profile of ["portfolio", "site"]) {
     const repository = createRepository(await fixtureEntries(profile));
+    const initialState = repository.files.get(".egeria/state.json");
+    const initialMigrations = repository.files.get(".egeria/migrations.jsonl");
     const { plan, result, verifierCalls } = await runApply(repository, {
       capability: "multilingual",
       settings: undefined,
@@ -284,6 +286,15 @@ test("multilingual addition applies the locale overlay and persists fresh discov
     });
     assert.equal(result.value.migration, "add-multilingual-0-1-0");
     assert.deepEqual(verifierCalls, [root]);
+    assert.equal(repository.writes.length, 3);
+    assert.deepEqual(repository.writes[0], plan.actions.map(({ path }) => path));
+    assert.deepEqual(repository.writes[1], [".egeria/migrations.jsonl"]);
+    assert.deepEqual(repository.writes[2], [".egeria/state.json"]);
+    assert.notEqual(repository.files.get(".egeria/state.json"), initialState);
+    assert.notEqual(
+      repository.files.get(".egeria/migrations.jsonl"),
+      initialMigrations,
+    );
     assert.equal(
       repository.files.has("apps/web/content/fr-CA/localized-content.yaml"),
       true,
@@ -314,6 +325,167 @@ test("multilingual addition applies the locale overlay and persists fresh discov
       ].sort(),
     );
   }
+});
+
+test("multilingual addition refuses installed, stale-plan, and drifted repositories without persistence", async () => {
+  const installedRepository = createRepository(await fixtureEntries());
+  const installed = await runApply(installedRepository, {
+    capability: "multilingual",
+    settings: undefined,
+  });
+  assert.equal(installed.result.ok, true, JSON.stringify(installed.result));
+  const installedBefore = JSON.stringify([...installedRepository.files]);
+  const installedWrites = installedRepository.writes.length;
+  const installedVerifierCalls = [];
+  const repeated = await core.applyCapabilityAddition({
+    root,
+    capability: "multilingual",
+    approvedPlanFingerprint: installed.plan.planFingerprint,
+    reader: installedRepository.reader,
+    writer: installedRepository.writer,
+    verifier: successfulVerifier(installedVerifierCalls),
+    inspectWorktree: () => Promise.resolve(git),
+    inspectCreateTargets: () => Promise.resolve({ ok: true }),
+    inspectExpectedChanges: () => Promise.resolve({ ok: true }),
+  });
+  assert.deepEqual(repeated, {
+    ok: false,
+    code: "CAPABILITY_ALREADY_INSTALLED",
+    phase: "precondition",
+    recovery: "not-required",
+  });
+  assert.equal(installedRepository.writes.length, installedWrites);
+  assert.deepEqual(installedVerifierCalls, []);
+  assert.equal(JSON.stringify([...installedRepository.files]), installedBefore);
+
+  const staleRepository = createRepository(await fixtureEntries());
+  const staleBefore = JSON.stringify([...staleRepository.files]);
+  const stale = await runApply(staleRepository, {
+    capability: "multilingual",
+    settings: undefined,
+    approvedPlanFingerprint: `sha256:${"0".repeat(64)}`,
+  });
+  assert.deepEqual(stale.result, {
+    ok: false,
+    code: "CAPABILITY_PLAN_APPROVAL_INVALID",
+    phase: "precondition",
+    recovery: "not-required",
+  });
+  assert.deepEqual(staleRepository.writes, []);
+  assert.equal(JSON.stringify([...staleRepository.files]), staleBefore);
+
+  const driftedEntries = await fixtureEntries();
+  driftedEntries.set("apps/web/next.config.ts", "private managed drift\n");
+  const driftedRepository = createRepository(driftedEntries);
+  const driftedBefore = JSON.stringify([...driftedRepository.files]);
+  const drifted = await core.applyCapabilityAddition({
+    root,
+    capability: "multilingual",
+    approvedPlanFingerprint: `sha256:${"0".repeat(64)}`,
+    reader: driftedRepository.reader,
+    writer: driftedRepository.writer,
+    verifier: successfulVerifier([]),
+    inspectWorktree: () => Promise.resolve(git),
+    inspectCreateTargets: () => Promise.resolve({ ok: true }),
+    inspectExpectedChanges: () => Promise.resolve({ ok: true }),
+  });
+  assert.deepEqual(drifted, {
+    ok: false,
+    code: "PROJECT_DRIFT_DETECTED",
+    phase: "precondition",
+    recovery: "not-required",
+  });
+  assert.deepEqual(driftedRepository.writes, []);
+  assert.equal(JSON.stringify([...driftedRepository.files]), driftedBefore);
+});
+
+test("multilingual addition retains inspectable transform and verification failure prefixes", async () => {
+  const partialRepository = createRepository(await fixtureEntries());
+  const partialBefore = new Map(partialRepository.files);
+  partialRepository.writer.write = async (changes) => {
+    const first = changes[0];
+    partialRepository.files.set(first.path, decoder.decode(first.content));
+    return { ok: false, sourceChanged: true };
+  };
+  const partial = await runApply(partialRepository, {
+    capability: "multilingual",
+    settings: undefined,
+  });
+  assert.deepEqual(partial.result, {
+    ok: false,
+    code: "CAPABILITY_TRANSFORM_FAILED",
+    phase: "transform",
+    recovery: "inspect-worktree",
+  });
+  assert.notEqual(
+    partialRepository.files.get(partial.plan.actions[0].path),
+    partialBefore.get(partial.plan.actions[0].path),
+  );
+  assert.equal(
+    partialRepository.files.get(".egeria/state.json"),
+    partialBefore.get(".egeria/state.json"),
+  );
+  assert.equal(
+    partialRepository.files.get(".egeria/migrations.jsonl"),
+    partialBefore.get(".egeria/migrations.jsonl"),
+  );
+
+  const verificationRepository = createRepository(await fixtureEntries());
+  const verificationState = verificationRepository.files.get(
+    ".egeria/state.json",
+  );
+  const verificationMigrations = verificationRepository.files.get(
+    ".egeria/migrations.jsonl",
+  );
+  const verification = await runApply(verificationRepository, {
+    capability: "multilingual",
+    settings: undefined,
+    verifier: {
+      prepareLockfile() {
+        throw new Error("not used");
+      },
+      verifyInIsolatedCopy() {
+        return Promise.resolve({ ok: false, issues: [] });
+      },
+    },
+  });
+  assert.deepEqual(verification.result, {
+    ok: false,
+    code: "CAPABILITY_VERIFICATION_FAILED",
+    phase: "verify",
+    recovery: "inspect-worktree",
+  });
+  assert.equal(verificationRepository.writes.length, 1);
+  assert.equal(
+    verificationRepository.files.get(".egeria/state.json"),
+    verificationState,
+  );
+  assert.equal(
+    verificationRepository.files.get(".egeria/migrations.jsonl"),
+    verificationMigrations,
+  );
+});
+
+test("multilingual addition refuses changed final bytes after persistence", async () => {
+  const repository = createRepository(await fixtureEntries());
+  const result = await runApply(repository, {
+    capability: "multilingual",
+    settings: undefined,
+    inspectExpectedChanges: () => {
+      repository.files.set(
+        "apps/web/src/i18n/locale.ts",
+        "concurrent final edit\n",
+      );
+      return Promise.resolve({ ok: true });
+    },
+  });
+  assert.deepEqual(result.result, {
+    ok: false,
+    code: "CAPABILITY_POST_STATE_FAILED",
+    phase: "post-state",
+    recovery: "inspect-worktree",
+  });
+  assert.equal(repository.writes.length, 3);
 });
 
 test("capability addition refuses an unapproved plan before writes or verification", async () => {

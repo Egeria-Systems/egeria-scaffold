@@ -519,6 +519,13 @@ test("multilingual and Calendly removal preserve the other capability in both in
           ? "remove-booking-calendly-0-1-0"
           : "remove-multilingual-0-1-0",
       );
+      assert.equal(repository.writes.length, 3);
+      assert.deepEqual(repository.writes[1], [
+        { kind: "replace-file", path: ".egeria/migrations.jsonl" },
+      ]);
+      assert.deepEqual(repository.writes[2], [
+        { kind: "replace-file", path: ".egeria/state.json" },
+      ]);
       const project = core.parseProjectYaml(
         repository.files.get(".egeria/project.yaml"),
       );
@@ -592,6 +599,178 @@ test("multilingual removal preserves a modified locale catalog as an explicit ej
       ?.ownership,
     "ejected",
   );
+});
+
+test("multilingual removal refuses absent, stale-plan, and drifted repositories without persistence", async () => {
+  const removedRepository = createRepository(
+    await installedEntries("portfolio", {
+      booking: false,
+      multilingual: true,
+    }),
+  );
+  const removed = await runApply(removedRepository, {
+    capability: "multilingual",
+  });
+  assert.equal(removed.result.ok, true, JSON.stringify(removed.result));
+  const removedBefore = snapshot(removedRepository.files);
+  const removedWrites = removedRepository.writes.length;
+  const repeatedVerifierCalls = [];
+  const repeated = await core.applyCapabilityRemoval({
+    root,
+    capability: "multilingual",
+    approvedPlanFingerprint: removed.plan.planFingerprint,
+    reader: removedRepository.reader,
+    writer: removedRepository.writer,
+    verifier: successfulVerifier(repeatedVerifierCalls),
+    inspectWorktree: () => Promise.resolve(git),
+    inspectExpectedChanges: () => Promise.resolve({ ok: true }),
+  });
+  assert.deepEqual(repeated, {
+    ok: false,
+    code: "CAPABILITY_NOT_INSTALLED",
+    phase: "precondition",
+    recovery: "not-required",
+  });
+  assert.equal(removedRepository.writes.length, removedWrites);
+  assert.deepEqual(repeatedVerifierCalls, []);
+  assert.equal(snapshot(removedRepository.files), removedBefore);
+
+  const staleRepository = createRepository(
+    await installedEntries("portfolio", {
+      booking: false,
+      multilingual: true,
+    }),
+  );
+  const staleBefore = snapshot(staleRepository.files);
+  const stale = await runApply(staleRepository, {
+    capability: "multilingual",
+    approvedPlanFingerprint: `sha256:${"0".repeat(64)}`,
+  });
+  assert.deepEqual(stale.result, {
+    ok: false,
+    code: "CAPABILITY_PLAN_APPROVAL_INVALID",
+    phase: "precondition",
+    recovery: "not-required",
+  });
+  assert.deepEqual(staleRepository.writes, []);
+  assert.equal(snapshot(staleRepository.files), staleBefore);
+
+  const driftedEntries = await installedEntries("portfolio", {
+    booking: false,
+    multilingual: true,
+  });
+  driftedEntries.set("apps/web/src/i18n/locale.ts", "private managed drift\n");
+  const driftedRepository = createRepository(driftedEntries);
+  const driftedBefore = snapshot(driftedRepository.files);
+  const drifted = await core.applyCapabilityRemoval({
+    root,
+    capability: "multilingual",
+    approvedPlanFingerprint: `sha256:${"0".repeat(64)}`,
+    reader: driftedRepository.reader,
+    writer: driftedRepository.writer,
+    verifier: successfulVerifier([]),
+    inspectWorktree: () => Promise.resolve(git),
+    inspectExpectedChanges: () => Promise.resolve({ ok: true }),
+  });
+  assert.deepEqual(drifted, {
+    ok: false,
+    code: "PROJECT_DRIFT_DETECTED",
+    phase: "precondition",
+    recovery: "not-required",
+  });
+  assert.deepEqual(driftedRepository.writes, []);
+  assert.equal(snapshot(driftedRepository.files), driftedBefore);
+});
+
+test("multilingual removal retains inspectable transform and verification failure prefixes", async () => {
+  const entries = await installedEntries("portfolio", {
+    booking: false,
+    multilingual: true,
+  });
+  const partialRepository = createRepository(entries);
+  const partialBefore = snapshot(partialRepository.files);
+  partialRepository.writer.write = async (changes) => {
+    const first = changes[0];
+    assert.ok(first);
+    if (first.kind === "delete-file") {
+      partialRepository.files.delete(first.path);
+    } else {
+      partialRepository.files.set(first.path, decoder.decode(first.content));
+    }
+    return { ok: false, sourceChanged: true };
+  };
+  const partial = await runApply(partialRepository, {
+    capability: "multilingual",
+  });
+  assert.deepEqual(partial.result, {
+    ok: false,
+    code: "CAPABILITY_TRANSFORM_FAILED",
+    phase: "transform",
+    recovery: "inspect-worktree",
+  });
+  assert.notEqual(snapshot(partialRepository.files), partialBefore);
+  assert.equal(
+    partialRepository.files.get(".egeria/state.json"),
+    entries.get(".egeria/state.json"),
+  );
+  assert.equal(
+    partialRepository.files.get(".egeria/migrations.jsonl"),
+    entries.get(".egeria/migrations.jsonl"),
+  );
+
+  const verificationRepository = createRepository(entries);
+  const verification = await runApply(verificationRepository, {
+    capability: "multilingual",
+    verifier: {
+      prepareLockfile() {
+        throw new Error("not used");
+      },
+      verifyInIsolatedCopy() {
+        return Promise.resolve({ ok: false, issues: [] });
+      },
+    },
+  });
+  assert.deepEqual(verification.result, {
+    ok: false,
+    code: "CAPABILITY_VERIFICATION_FAILED",
+    phase: "verify",
+    recovery: "inspect-worktree",
+  });
+  assert.equal(verificationRepository.writes.length, 1);
+  assert.equal(
+    verificationRepository.files.get(".egeria/state.json"),
+    entries.get(".egeria/state.json"),
+  );
+  assert.equal(
+    verificationRepository.files.get(".egeria/migrations.jsonl"),
+    entries.get(".egeria/migrations.jsonl"),
+  );
+});
+
+test("multilingual removal refuses changed final bytes after persistence", async () => {
+  const repository = createRepository(
+    await installedEntries("portfolio", {
+      booking: false,
+      multilingual: true,
+    }),
+  );
+  const result = await runApply(repository, {
+    capability: "multilingual",
+    inspectExpectedChanges: () => {
+      repository.files.set(
+        "apps/web/src/i18n/locale.ts",
+        "concurrent final file\n",
+      );
+      return Promise.resolve({ ok: true });
+    },
+  });
+  assert.deepEqual(result.result, {
+    ok: false,
+    code: "CAPABILITY_POST_STATE_FAILED",
+    phase: "post-state",
+    recovery: "inspect-worktree",
+  });
+  assert.equal(repository.writes.length, 3);
 });
 
 function snapshot(entries) {
