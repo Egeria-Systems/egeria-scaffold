@@ -425,7 +425,7 @@ test("the supported standards edge refuses every undeclared pair", () => {
   }
 });
 
-test("the production site recipe has one exact pending site-routing upgrade edge", async () => {
+test("the production site recipe has one exact certified site-routing upgrade edge", async () => {
   const edge = core.resolveSupportedCapabilityUpgrade({
     capability: "site-routing",
     fromVersion: "0.3.0",
@@ -436,7 +436,7 @@ test("the production site recipe has one exact pending site-routing upgrade edge
   assert.equal(edge.value.target.recipeVersion, "0.11.0");
   assert.equal(
     edge.value.target.evidenceRevision,
-    "pending-site-routing-certification",
+    "f2b80d9e5e6bb08237d7cc887ee42d2f106e9243",
   );
 
   const entries = await acceptedSiteEntries();

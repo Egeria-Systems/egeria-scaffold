@@ -3442,6 +3442,15 @@ test("canonical documentation accepts profile-transition execution and records t
     assert.match(semanticStatusConsumer, semanticMultilingualPattern);
   }
 
+  assert.doesNotMatch(
+    overview,
+    /isolated production-site (?:implementation )?candidate/iu,
+  );
+  assert.doesNotMatch(
+    builderCoreReadme,
+    /public-site expansion is the next eligible phase/iu,
+  );
+
   assert.match(
     roadmap,
     /main@392f2e27de1d4a24124d51daf059b1667207436e[^\n]+0f5b729262237aa6856be4d8e5aa4396584233a2/iu,

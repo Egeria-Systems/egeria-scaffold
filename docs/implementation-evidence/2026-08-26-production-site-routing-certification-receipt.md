@@ -24,7 +24,7 @@ This content-safe receipt records the causal local certification and approved re
 
 ## Direct predecessor and authority
 
-- Direct implementation predecessor: merged pull request 60 at `main@0a699d26198e94ddfaa596d812ad175284d05c49`, accepted tree `ac0e7ef181552568344c6302100975071634e44e`, and successful Repository quality run `33014687284`.
+- Direct implementation predecessor: merged pull request 60 at `main@0a699d26198e94ddfaa596d812ad175284d05c49`, accepted tree `ac0e7eba8fc2890daf338db0a2cdecb5f47f6223`, and successful Repository quality run `33014687284`.
 - Evidence branch base: refreshed descendant `main@a66890a6c30a275818e7b51f22ded987cc1d52ff`.
 - Human authority: the user approved the exact subject, both required outcomes, bounded repairs and file-scope amendments, local commits, pull-request delivery, material CodeRabbit repairs, merge, and accepted-main verification in advance. The user separately authorized the disposable generated project's dependency names and versions to be sent to the npm registry advisory service for this run.
 - Excluded authority: no deployment, provider action, publication, credential use, production mutation, or response to review comments was authorized or performed by this certification.

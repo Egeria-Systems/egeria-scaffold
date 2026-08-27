@@ -139,7 +139,7 @@ function createSiteRoutingUpgrade(): SupportedSiteRoutingUpgrade {
     },
     target: {
       recipeVersion: "0.11.0",
-      evidenceRevision: "pending-site-routing-certification",
+      evidenceRevision: "f2b80d9e5e6bb08237d7cc887ee42d2f106e9243",
       subject: createCertificationSubject(siteRoutingDescriptor("0.4.0"), [
         "existing-repository-lifecycle",
         "fresh-scaffold",
