@@ -135,6 +135,74 @@ const multilingualFiles = Object.freeze([
   "apps/web/tests/unit/localized-content.test.ts",
 ].sort(codePointCompare));
 
+const multilingualErrorProofRoute = `"use client";
+
+export default function ErrorBoundaryProof() {
+  const recoveryKey = "egeria-verifier-error-boundary-recovery";
+  if (
+    typeof window !== "undefined" &&
+    window.sessionStorage.getItem(recoveryKey) !== "ready"
+  ) {
+    throw new Error("Intentional verifier-only error boundary proof");
+  }
+  return (
+    <main>
+      <h1>Verifier recovery confirmed</h1>
+      <p>The localized error boundary reset the failed route.</p>
+    </main>
+  );
+}
+`;
+
+const multilingualErrorProofSpecification = `import { expect, test } from "@playwright/test";
+
+test("renders and retries ordinary failures in the active locale", async ({ page }) => {
+  const recoveryKey = "egeria-verifier-error-boundary-recovery";
+  await page.addInitScript((key) => {
+    window.sessionStorage.setItem(key, "fail");
+  }, recoveryKey);
+  await page.goto("/fr-CA/error-boundary-proof");
+
+  const heading = page.getByRole("heading", {
+    level: 1,
+    name: "Une erreur s’est produite",
+  });
+  const retry = page.getByRole("button", { name: "Réessayer" });
+  await expect(heading).toBeVisible();
+  await expect(retry).toBeVisible();
+
+  await page.evaluate((key) => {
+    window.sessionStorage.setItem(key, "ready");
+  }, recoveryKey);
+  await retry.click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Verifier recovery confirmed" }),
+  ).toBeVisible();
+});
+`;
+
+async function prepareVerifierOnlyBrowserProof(validationRoot, contract) {
+  if (contract.expectedMultilingualVersion === null) return;
+
+  const routeDirectory = join(
+    validationRoot,
+    "apps/web/app/[locale]/error-boundary-proof",
+  );
+  await mkdir(routeDirectory, { recursive: true, mode: 0o700 });
+  await writeFile(join(routeDirectory, "page.tsx"), multilingualErrorProofRoute, {
+    flag: "wx",
+    mode: 0o600,
+  });
+  await writeFile(
+    join(
+      validationRoot,
+      "apps/web/tests/e2e/multilingual-error-boundary.spec.ts",
+    ),
+    multilingualErrorProofSpecification,
+    { flag: "wx", mode: 0o600 },
+  );
+}
+
 const createArguments = ({
   profile,
   projectName,
@@ -979,6 +1047,11 @@ async function verifySourcesWithAdapters(
       });
       await mkdir(supportRoot, { mode: 0o700 });
       const support = await createSupportPaths(supportRoot);
+      try {
+        await prepareVerifierOnlyBrowserProof(validationRoot, source.contract);
+      } catch {
+        fail("VERIFICATION_SETUP_FAILED");
+      }
       const environment = createChildEnvironment(support);
       const commandInput = (arguments_, timeout = commandTimeoutMilliseconds) => ({
         executable: "pnpm",

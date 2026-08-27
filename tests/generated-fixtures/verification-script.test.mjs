@@ -570,6 +570,72 @@ test("single-root verification runs the exact fixed checks against caller output
   }
 });
 
+test("multilingual browser verification injects its error-boundary proof only into the isolated copy", async () => {
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-multilingual-error-proof-"));
+  const sourceRoot = await copyFixture(
+    ownerParent,
+    "site-multilingual",
+    "source",
+  );
+  const sourceBefore = await inspectGeneratedFixture(
+    sourceRoot,
+    "site-multilingual",
+  );
+  const routePath = join(
+    "apps/web/app/[locale]/error-boundary-proof/page.tsx",
+  );
+  const specificationPath = join(
+    "apps/web/tests/e2e/multilingual-error-boundary.spec.ts",
+  );
+  let inspectedCopy = false;
+  let ownedPath;
+
+  try {
+    assert.equal(await pathExists(join(sourceRoot, routePath)), false);
+    assert.equal(await pathExists(join(sourceRoot, specificationPath)), false);
+
+    const result = await verifyGeneratedProjectForTesting(
+      sourceRoot,
+      "site-multilingual",
+      {
+        async createOwner() {
+          const identity = await createKnownOwner(ownerParent);
+          ownedPath = identity.path;
+          return identity;
+        },
+        async runCommand(input) {
+          if (!inspectedCopy) {
+            inspectedCopy = true;
+            const routeSource = await readFile(
+              join(input.cwd, routePath),
+              "utf8",
+            );
+            assert.match(routeSource, /throw new Error/u);
+            assert.match(routeSource, /sessionStorage/u);
+            assert.match(
+              await readFile(join(input.cwd, specificationPath), "utf8"),
+              /Une erreur s’est produite[\s\S]+sessionStorage[\s\S]+retry\.click\(\)[\s\S]+Verifier recovery confirmed/u,
+            );
+          }
+          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+        },
+      },
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(inspectedCopy, true);
+    assert.equal(await pathExists(ownedPath), false);
+    assert.deepEqual(
+      await inspectGeneratedFixture(sourceRoot, "site-multilingual"),
+      sourceBefore,
+    );
+    assert.equal(await pathExists(join(sourceRoot, routePath)), false);
+    assert.equal(await pathExists(join(sourceRoot, specificationPath)), false);
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
+});
+
 test("visual verification accepts only the exact opt-in argument", () => {
   assert.deepEqual(parseVerificationArguments([]), { includeVisual: false });
   assert.deepEqual(parseVerificationArguments(["--visual"]), {

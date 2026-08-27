@@ -101,7 +101,10 @@ describe("localized content", () => {
 
     const changedNavigation = parseLocalizedCatalog({
       ...validCatalog,
-      navigation: [{ href: "/fr-CA/about", label: "À propos" }],
+      navigation: [
+        { href: "/fr-CA", label: "Accueil" },
+        { href: "/fr-CA", label: "Accueil en double" },
+      ],
       localeSwitch: { label: "English" },
     }, "fr-CA");
     expect(() => assertTranslationParity(english, changedNavigation)).toThrowError(

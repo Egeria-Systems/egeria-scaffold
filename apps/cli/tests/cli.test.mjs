@@ -528,6 +528,21 @@ async function withFailingPnpm(run) {
   }
 }
 
+async function withSuccessfulPnpm(run) {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-successful-pnpm-"));
+  const executable = join(owner, "pnpm");
+  try {
+    await writeFile(
+      executable,
+      '#!/bin/sh\nif [ "$1" = "--version" ]; then\n  printf "11.20.0\\n"\nfi\nexit 0\n',
+    );
+    await chmod(executable, 0o700);
+    await run(`${owner}${delimiter}${process.env.PATH}`);
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+}
+
 async function withGeneratedFixture(run) {
   const owner = await mkdtemp(join(tmpdir(), "egeria-cli-test-"));
   const destination = join(owner, "acme-portfolio");
@@ -3568,32 +3583,135 @@ async function executeBuiltPlanProfileTransition(directory) {
   ]);
 }
 
-async function executeBuiltApplyAdd(directory, approvedPlan) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...applyAddArguments(directory, approvedPlan),
-  ]);
+async function executeBuiltApplyAdd(directory, approvedPlan, environment = {}) {
+  return executeNode(
+    [
+      resolve(packageRoot, "dist/index.js"),
+      ...applyAddArguments(directory, approvedPlan),
+    ],
+    environment,
+  );
 }
 
-async function executeBuiltApplyRemove(directory, approvedPlan) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...applyRemoveArguments(directory, approvedPlan),
-  ]);
+async function executeBuiltApplyRemove(directory, approvedPlan, environment = {}) {
+  return executeNode(
+    [
+      resolve(packageRoot, "dist/index.js"),
+      ...applyRemoveArguments(directory, approvedPlan),
+    ],
+    environment,
+  );
 }
 
-async function executeBuiltApplyMultilingualAdd(directory, approvedPlan) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...applyMultilingualAddArguments(directory, approvedPlan),
-  ]);
+async function executeBuiltApplyMultilingualAdd(
+  directory,
+  approvedPlan,
+  environment = {},
+) {
+  return executeNode(
+    [
+      resolve(packageRoot, "dist/index.js"),
+      ...applyMultilingualAddArguments(directory, approvedPlan),
+    ],
+    environment,
+  );
 }
 
-async function executeBuiltApplyMultilingualRemove(directory, approvedPlan) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...applyMultilingualRemoveArguments(directory, approvedPlan),
-  ]);
+async function executeBuiltApplyMultilingualRemove(
+  directory,
+  approvedPlan,
+  environment = {},
+) {
+  return executeNode(
+    [
+      resolve(packageRoot, "dist/index.js"),
+      ...applyMultilingualRemoveArguments(directory, approvedPlan),
+    ],
+    environment,
+  );
+}
+
+async function applyCompiledCapabilityAddition(root, identifier, environment = {}) {
+  const commands =
+    identifier === "multilingual"
+      ? {
+          plan: executeBuiltPlanMultilingualAdd,
+          apply: executeBuiltApplyMultilingualAdd,
+        }
+      : { plan: executeBuiltPlanAdd, apply: executeBuiltApplyAdd };
+  const cleanBefore = await gitRepositorySnapshot(root);
+  const planExecution = await commands.plan(root);
+  assert.equal(planExecution.exitCode, 0, planExecution.stderr);
+  assert.equal(planExecution.stderr, "");
+  const plan = JSON.parse(planExecution.stdout).result;
+  assert.deepEqual(plan.capability, { identifier, version: "0.1.0" });
+  assert.match(plan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
+  assert.deepEqual(await gitRepositorySnapshot(root), cleanBefore);
+
+  const execution = await commands.apply(
+    root,
+    plan.planFingerprint,
+    environment,
+  );
+  assert.equal(execution.exitCode, 0, `${identifier}: ${execution.stderr}`);
+  assert.equal(execution.stderr, "");
+  assert.deepEqual(JSON.parse(execution.stdout), {
+    ok: true,
+    command: "apply-add",
+    result: {
+      status: "verified-final-diff-approval-required",
+      baseRevision: Buffer.from(cleanBefore.head).toString("utf8").trim(),
+      capability: { identifier, version: "0.1.0" },
+      migration: `add-${identifier}-0-1-0`,
+      changedPaths: [
+        ...plan.actions.map(({ path }) => path),
+        ".egeria/migrations.jsonl",
+        ".egeria/state.json",
+      ].sort(),
+      verificationChecks: core.capabilityAdditionVerificationChecks,
+    },
+  });
+  return { execution, plan };
+}
+
+async function assertCapabilityLifecycleState(
+  root,
+  expectedMigrations,
+  expectedOptionalCapabilities,
+) {
+  const projectSource = await readFile(
+    join(root, ".egeria/project.yaml"),
+    "utf8",
+  );
+  const stateSource = await readFile(join(root, ".egeria/state.json"), "utf8");
+  const migrationSource = await readFile(
+    join(root, ".egeria/migrations.jsonl"),
+    "utf8",
+  );
+  const project = core.parseProjectYaml(projectSource);
+  const state = core.parseStateJson(stateSource);
+  const migrations = core.parseMigrationLog(migrationSource);
+  assert.equal(project.ok, true);
+  assert.equal(state.ok, true);
+  assert.equal(migrations.ok, true);
+  assert.deepEqual(state.value.appliedMigrations, expectedMigrations);
+  assert.deepEqual(
+    migrations.value.map(({ identifier }) => identifier),
+    expectedMigrations,
+  );
+  assert.deepEqual(
+    ["booking-calendly", "multilingual"].filter((identifier) =>
+      project.value.selectedCapabilities.includes(identifier),
+    ),
+    expectedOptionalCapabilities.toSorted(),
+  );
+  assert.equal(projectSource, core.serializeProjectYaml(project.value));
+  assert.equal(stateSource, core.serializeStateJson(state.value));
+  assert.equal(
+    migrationSource,
+    migrations.value.map(core.serializeMigrationRecord).join(""),
+  );
+  await assertExactInstalledAgreement(root);
 }
 
 async function executeBuiltApplyUpgrade(
@@ -5475,87 +5593,59 @@ test("the compiled plan-remove command refuses unsafe states without writes", as
   }
 });
 
-test("the compiled CLI adds and removes multilingual for both profiles with Calendly composition", async () => {
-  const cases = [
+test("the compiled CLI preserves multilingual through both capability install orders and re-addition", async () => {
+  const cases = ["portfolio", "site"].flatMap((profile) => [
     {
-      profile: "portfolio",
-      bookingCalendly: undefined,
-      branch: "multilingual-portfolio-lifecycle-test",
+      profile,
+      installationOrder: ["booking-calendly", "multilingual"],
     },
     {
-      profile: "site",
-      bookingCalendly: planSettings,
-      branch: "multilingual-site-booking-lifecycle-test",
+      profile,
+      installationOrder: ["multilingual", "booking-calendly"],
     },
-  ];
+  ]);
+  const finalApplicationTrees = new Map();
 
-  for (const fixture of cases) {
-    await withGitFixture(
-      fixture.profile,
-      async ({ linked, primary }) => {
+  await withSuccessfulPnpm(async (path) => {
+    const environment = { PATH: path };
+    for (const fixture of cases) {
+      await withGitFixture(
+        fixture.profile,
+        async ({ linked, primary }) => {
         const primaryBefore = await gitRepositorySnapshot(primary);
-        const cleanBefore = await gitRepositorySnapshot(linked);
-        const planExecution = await executeBuiltPlanMultilingualAdd(linked);
-        assert.equal(planExecution.exitCode, 0, planExecution.stderr);
-        assert.equal(planExecution.stderr, "");
-        const additionPlan = JSON.parse(planExecution.stdout).result;
-        assert.deepEqual(additionPlan.capability, {
-          identifier: "multilingual",
-          version: "0.1.0",
-        });
-        assert.equal(additionPlan.settings, null);
-        assert.match(additionPlan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
-        assert.deepEqual(await gitRepositorySnapshot(linked), cleanBefore);
+        const expectedMigrations = [];
+        const installedOptionalCapabilities = [];
+        const lifecycleOutput = [];
 
-        const addition = await executeBuiltApplyMultilingualAdd(
-          linked,
-          additionPlan.planFingerprint,
-        );
-        assert.equal(addition.exitCode, 0, addition.stderr);
-        assert.equal(addition.stderr, "");
-        const additionEnvelope = JSON.parse(addition.stdout);
-        assert.deepEqual(additionEnvelope, {
-          ok: true,
-          command: "apply-add",
-          result: {
-            status: "verified-final-diff-approval-required",
-            baseRevision: Buffer.from(cleanBefore.head).toString("utf8").trim(),
-            capability: { identifier: "multilingual", version: "0.1.0" },
-            migration: "add-multilingual-0-1-0",
-            changedPaths: [
-              ...additionPlan.actions.map(({ path }) => path),
-              ".egeria/migrations.jsonl",
-              ".egeria/state.json",
-            ].sort(),
-            verificationChecks: core.capabilityAdditionVerificationChecks,
-          },
-        });
-        const addedProject = core.parseProjectYaml(
-          await readFile(join(linked, ".egeria/project.yaml"), "utf8"),
-        );
-        const addedState = core.parseStateJson(
-          await readFile(join(linked, ".egeria/state.json"), "utf8"),
-        );
-        assert.equal(addedProject.ok, true);
-        assert.equal(addedState.ok, true);
-        assert.equal(
-          addedProject.value.selectedCapabilities.includes("multilingual"),
-          true,
-        );
-        assert.equal(
-          addedState.value.installedCapabilities.some(
-            ({ identifier }) => identifier === "multilingual",
-          ),
-          true,
-        );
-        assert.equal(
-          addedProject.value.selectedCapabilities.includes("booking-calendly"),
-          fixture.bookingCalendly !== undefined,
-        );
-        await assertExactInstalledAgreement(linked);
+        for (const identifier of fixture.installationOrder) {
+          const addition = await applyCompiledCapabilityAddition(
+            linked,
+            identifier,
+            environment,
+          );
+          lifecycleOutput.push(addition.execution.stdout);
+          expectedMigrations.push(`add-${identifier}-0-1-0`);
+          installedOptionalCapabilities.push(identifier);
+          await assertCapabilityLifecycleState(
+            linked,
+            expectedMigrations,
+            installedOptionalCapabilities,
+          );
+          await commitAll(linked, `add ${identifier} capability`);
+          await assertCapabilityLifecycleState(
+            linked,
+            expectedMigrations,
+            installedOptionalCapabilities,
+          );
+        }
 
-        await commitAll(linked, "add multilingual capability");
-        const cleanAdded = await gitRepositorySnapshot(linked);
+        const cleanComposed = await gitRepositorySnapshot(linked);
+        const composedApplicationTree = (await listTree(linked)).filter(
+          ({ path }) =>
+            path !== ".git" &&
+            path !== ".egeria/migrations.jsonl" &&
+            path !== ".egeria/state.json",
+        );
         const removalPlanExecution =
           await executeBuiltPlanMultilingualRemove(linked);
         assert.equal(
@@ -5570,11 +5660,12 @@ test("the compiled CLI adds and removes multilingual for both profiles with Cale
           version: "0.1.0",
         });
         assert.match(removalPlan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
-        assert.deepEqual(await gitRepositorySnapshot(linked), cleanAdded);
+        assert.deepEqual(await gitRepositorySnapshot(linked), cleanComposed);
 
         const removal = await executeBuiltApplyMultilingualRemove(
           linked,
           removalPlan.planFingerprint,
+          environment,
         );
         assert.equal(removal.exitCode, 0, removal.stderr);
         assert.equal(removal.stderr, "");
@@ -5584,7 +5675,7 @@ test("the compiled CLI adds and removes multilingual for both profiles with Cale
           command: "apply-remove",
           result: {
             status: "verified-final-diff-approval-required",
-            baseRevision: Buffer.from(cleanAdded.head).toString("utf8").trim(),
+            baseRevision: Buffer.from(cleanComposed.head).toString("utf8").trim(),
             capability: { identifier: "multilingual", version: "0.1.0" },
             migration: "remove-multilingual-0-1-0",
             changedPaths: [
@@ -5600,50 +5691,75 @@ test("the compiled CLI adds and removes multilingual for both profiles with Cale
             verificationChecks: core.capabilityRemovalVerificationChecks,
           },
         });
-        const removedProject = core.parseProjectYaml(
-          await readFile(join(linked, ".egeria/project.yaml"), "utf8"),
+        lifecycleOutput.push(removal.stdout);
+        expectedMigrations.push("remove-multilingual-0-1-0");
+        await assertCapabilityLifecycleState(
+          linked,
+          expectedMigrations,
+          ["booking-calendly"],
         );
-        const removedState = core.parseStateJson(
-          await readFile(join(linked, ".egeria/state.json"), "utf8"),
+        await commitAll(linked, "remove multilingual capability");
+        await assertCapabilityLifecycleState(
+          linked,
+          expectedMigrations,
+          ["booking-calendly"],
         );
-        const migrations = core.parseMigrationLog(
-          await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8"),
+
+        const usesRealFinalVerification =
+          (fixture.profile === "portfolio" &&
+            fixture.installationOrder[0] === "booking-calendly") ||
+          (fixture.profile === "site" &&
+            fixture.installationOrder[0] === "multilingual");
+        const readdition = await applyCompiledCapabilityAddition(
+          linked,
+          "multilingual",
+          usesRealFinalVerification ? {} : environment,
         );
-        assert.equal(removedProject.ok, true);
-        assert.equal(removedState.ok, true);
-        assert.equal(migrations.ok, true);
-        assert.equal(
-          removedProject.value.selectedCapabilities.includes("multilingual"),
-          false,
+        lifecycleOutput.push(readdition.execution.stdout);
+        expectedMigrations.push("add-multilingual-0-1-0");
+        await assertCapabilityLifecycleState(
+          linked,
+          expectedMigrations,
+          ["booking-calendly", "multilingual"],
         );
-        assert.equal(
-          removedProject.value.selectedCapabilities.includes("booking-calendly"),
-          fixture.bookingCalendly !== undefined,
+        const finalApplicationTree = (await listTree(linked)).filter(
+          ({ path }) =>
+            path !== ".git" &&
+            path !== ".egeria/migrations.jsonl" &&
+            path !== ".egeria/state.json",
         );
-        assert.deepEqual(
-          migrations.value.map(({ identifier }) => identifier),
-          ["add-multilingual-0-1-0", "remove-multilingual-0-1-0"],
+        assert.deepEqual(finalApplicationTree, composedApplicationTree);
+        finalApplicationTrees.set(
+          `${fixture.profile}:${fixture.installationOrder.join(",")}`,
+          finalApplicationTree,
         );
-        await assertExactInstalledAgreement(linked);
+        await commitAll(linked, "re-add multilingual capability");
+        await assertCapabilityLifecycleState(
+          linked,
+          expectedMigrations,
+          ["booking-calendly", "multilingual"],
+        );
         assert.deepEqual(
           withoutSharedRefs(await gitRepositorySnapshot(primary)),
           withoutSharedRefs(primaryBefore),
         );
         assert.doesNotMatch(
-          `${addition.stdout}${removal.stdout}`,
+          lifecycleOutput.join(""),
           /private-planning-destination|calendly\.com|refs\/heads|\.git\/worktrees/u,
         );
-      },
-      {
-        bookingCalendly: fixture.bookingCalendly,
-        branch: fixture.branch,
-        ...(fixture.bookingCalendly === undefined
-          ? {}
-          : {
-              preparePrimary: (root) =>
-                replaceFakeLockfileWithFixture(root, fixture.profile),
-            }),
-      },
+        },
+        {
+          branch: `${fixture.profile}-${fixture.installationOrder.join("-")}-lifecycle-test`,
+        },
+      );
+    }
+  });
+
+  for (const profile of ["portfolio", "site"]) {
+    assert.deepEqual(
+      finalApplicationTrees.get(`${profile}:booking-calendly,multilingual`),
+      finalApplicationTrees.get(`${profile}:multilingual,booking-calendly`),
+      `${profile} final application trees must converge across install orders`,
     );
   }
 });

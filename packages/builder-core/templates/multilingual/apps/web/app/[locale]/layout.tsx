@@ -14,8 +14,6 @@ type LocaleLayoutProperties = Readonly<{
   params: Promise<{ locale: string }>;
 }>;
 
-export const dynamicParams = false;
-
 export function generateStaticParams() {
   return supportedLocales.map((locale) => ({ locale }));
 }

@@ -756,7 +756,7 @@
       "path": "apps/web/src/integrations/booking/localized-booking.tsx"
     },
     {
-      "fingerprint": "sha256:7540ecdc7f6f2965432c4bece8637115de4e6c580d23e3d63b4aaa455528a8e3",
+      "fingerprint": "sha256:c906404ab6921c6dd7e44ccb237e299d7292db69db1350106a59840a41d63557",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -812,7 +812,7 @@
       "path": "apps/web/src/i18n/read-localized-content.ts"
     },
     {
-      "fingerprint": "sha256:3cc16d03472c7657c076d9fd9d35eb3f4f3b2200e585d43a3ea5f22179a46b8d",
+      "fingerprint": "sha256:ae3998b44858e6190eb9babedbbccdbe339a4cce753f8c8b403a3ec3c8f7f3a0",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -868,7 +868,7 @@
       "path": "apps/web/src/i18n/locale.ts"
     },
     {
-      "fingerprint": "sha256:464960605b316fca60734f18bb3c29970f5f986f697bec4d6cd35e8fbe9da69c",
+      "fingerprint": "sha256:3c208425b9e26de76c8ad7947365148d21fc9be9e244f3e7272b8b28e9bc1474",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1292,7 +1292,7 @@
       "path": "apps/web/app/about/page.tsx"
     },
     {
-      "fingerprint": "sha256:858c3e424bfca91ea44588e03f55e46ac4c2115210776eabf329b01a78428562",
+      "fingerprint": "sha256:07b6187ec4810522b4be9ac177b15bf4d9c4767104b6dce2aaa00a529ab555f5",
       "fingerprintTarget": {
         "kind": "file"
       },

@@ -261,6 +261,7 @@ function requirePendingInference(
   currentState: InstalledState,
   desiredCapabilities: readonly string[],
   addedCapability: AddableCapability,
+  plannedReplacementPaths: readonly string[],
 ): boolean {
   if (
     inference.state.kind !== "valid" ||
@@ -282,12 +283,13 @@ function requirePendingInference(
     return false;
   }
 
+  const plannedReplacements = new Set(plannedReplacementPaths);
   return (
     inference.surfaces.length === currentState.managedSurfaces.length &&
-    inference.surfaces.every(({ identifier, status }) =>
-      identifier === "builder-project-configuration"
-        ? status === "drifted"
-        : status === "confirmed" || status === "application-owned",
+    inference.surfaces.every(({ path, status }) =>
+      status === "confirmed" ||
+      status === "application-owned" ||
+      (status === "drifted" && plannedReplacements.has(path)),
     )
   );
 }
@@ -591,6 +593,9 @@ export async function applyCapabilityAddition(input: Readonly<{
       controls.state.value,
       plan.desiredCapabilities,
       input.capability,
+      plan.actions.flatMap((action) =>
+        action.kind === "create-file" ? [] : [action.path],
+      ),
     )
   ) {
     return failure(

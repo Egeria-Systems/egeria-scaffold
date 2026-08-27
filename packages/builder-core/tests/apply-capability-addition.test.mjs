@@ -234,6 +234,41 @@ test("capability addition applies, verifies, re-infers, and persists migration t
   }
 });
 
+test("Calendly addition accepts the planned multilingual booking-composition replacement", async () => {
+  const repository = createRepository(await fixtureEntries("portfolio"));
+  const multilingual = await runApply(repository, {
+    capability: "multilingual",
+    settings: undefined,
+  });
+  assert.equal(multilingual.result.ok, true, JSON.stringify(multilingual.result));
+
+  const calendly = await runApply(repository);
+  assert.equal(calendly.result.ok, true, JSON.stringify(calendly.result));
+  const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
+  const migrations = core.parseMigrationLog(
+    repository.files.get(".egeria/migrations.jsonl"),
+  );
+  assert.equal(state.ok, true, JSON.stringify(state.issues));
+  assert.equal(migrations.ok, true, JSON.stringify(migrations.issues));
+  assert.deepEqual(state.value.appliedMigrations, [
+    "add-multilingual-0-1-0",
+    "add-booking-calendly-0-1-0",
+  ]);
+  assert.deepEqual(
+    migrations.value.map(({ identifier }) => identifier),
+    state.value.appliedMigrations,
+  );
+  assert.deepEqual(
+    state.value.installedCapabilities
+      .filter(({ identifier }) =>
+        ["booking-calendly", "multilingual"].includes(identifier),
+      )
+      .map(({ identifier }) => identifier)
+      .sort(),
+    ["booking-calendly", "multilingual"],
+  );
+});
+
 test("multilingual addition applies the locale overlay and persists fresh discovery", async () => {
   for (const profile of ["portfolio", "site"]) {
     const repository = createRepository(await fixtureEntries(profile));
