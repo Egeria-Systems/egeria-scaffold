@@ -159,8 +159,11 @@ test("renders and retries ordinary failures in the active locale", async ({ page
   await page.goto("/fr-CA/error-boundary-proof");
 
   await expect(page.locator("html")).toHaveAttribute("lang", "fr-CA");
-  const heading = page.getByRole("heading", { level: 1 });
-  const retry = page.getByRole("button");
+  const fallback = page.locator(
+    'main[aria-labelledby="error-fallback-heading"]',
+  );
+  const heading = fallback.getByRole("heading", { level: 1 });
+  const retry = fallback.getByRole("button");
   await expect(heading).toBeVisible();
   await expect(retry).toBeVisible();
 

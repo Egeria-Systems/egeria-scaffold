@@ -615,7 +615,7 @@ test("multilingual browser verification injects its error-boundary proof only in
             assert.match(routeSource, /data-testid="verifier-recovery"/u);
             assert.match(
               await readFile(join(input.cwd, specificationPath), "utf8"),
-              /toHaveAttribute\("lang", "fr-CA"\)[\s\S]+getByRole\("heading", \{ level: 1 \}\)[\s\S]+sessionStorage[\s\S]+retry\.click\(\)[\s\S]+getByTestId\("verifier-recovery"\)/u,
+              /toHaveAttribute\("lang", "fr-CA"\)[\s\S]+main\[aria-labelledby="error-fallback-heading"\][\s\S]+fallback\.getByRole\("heading", \{ level: 1 \}\)[\s\S]+fallback\.getByRole\("button"\)[\s\S]+sessionStorage[\s\S]+retry\.click\(\)[\s\S]+getByTestId\("verifier-recovery"\)/u,
             );
           }
           return input.arguments[0] === "--version" ? "11.20.0\n" : "";
