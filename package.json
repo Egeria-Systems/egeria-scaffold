@@ -43,7 +43,7 @@
     "version-packages": "changeset version"
   },
   "devDependencies": {
-    "@changesets/cli": "3.0.0",
+    "@changesets/cli": "3.0.1",
     "@egeria-systems/standards": "workspace:*",
     "@eslint/js": "10.0.1",
     "eslint": "10.8.0",
