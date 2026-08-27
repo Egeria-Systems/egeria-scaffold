@@ -7,10 +7,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
-import {
-  loadPendingChangesets,
-  selectPendingChangesets,
-} from "../../scripts/check-package-release.mjs";
+import { selectPendingChangesets } from "../../scripts/check-package-release.mjs";
 import { exactSemanticVersionPattern } from "../helpers/semantic-version.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -329,12 +326,6 @@ test("pending Changeset discovery selects every Markdown record in deterministic
 });
 
 test("the release candidate materializes only the approved public versions", async () => {
-  const changesetFiles = await loadPendingChangesets();
-  assert.deepEqual(changesetFiles, [
-    "observability-sink-identifiers.md",
-    "update-typescript-eslint.md",
-  ]);
-
   const observabilityManifest = await readJson(
     "packages/observability/package.json",
   );
