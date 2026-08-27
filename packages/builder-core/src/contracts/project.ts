@@ -79,7 +79,7 @@ export type CalendlyBookingSettings = z.infer<
 
 const cloudflareWebAnalyticsTokenSchema = z
   .string()
-  .regex(/^[a-f0-9]{32}$/iu);
+  .regex(/^[A-Fa-f0-9]{32}$/u);
 const googleAnalyticsMeasurementIdSchema = z
   .string()
   .regex(/^G-[A-Z0-9]{6,20}$/u);

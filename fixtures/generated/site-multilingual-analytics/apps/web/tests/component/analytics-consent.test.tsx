@@ -37,13 +37,17 @@ describe("analytics consent", () => {
 
     expect(await screen.findByRole("dialog", { name: content.heading })).toBeVisible();
     expect(screen.getByText(content.summary)).toBeVisible();
+    expect(screen.getByRole("button", { name: content.allowLabel })).toHaveFocus();
     await user.click(screen.getByRole("button", { name: content.declineLabel }));
     expect(runtime.decline).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: content.manageLabel })).toBeVisible();
+    expect(screen.getByRole("button", { name: content.manageLabel })).toHaveFocus();
 
     await user.click(screen.getByRole("button", { name: content.manageLabel }));
+    expect(screen.getByRole("button", { name: content.allowLabel })).toHaveFocus();
     await user.click(screen.getByRole("button", { name: content.allowLabel }));
     expect(runtime.grant).toHaveBeenCalledWith(analyticsSettings);
+    expect(screen.getByRole("button", { name: content.manageLabel })).toHaveFocus();
 
     await user.click(screen.getByRole("button", { name: content.manageLabel }));
     expect(
@@ -52,6 +56,10 @@ describe("analytics consent", () => {
     expect(
       screen.queryByRole("button", { name: content.declineLabel }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: content.withdrawLabel })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: content.closeLabel }));
+    expect(screen.getByRole("button", { name: content.manageLabel })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: content.manageLabel }));
     await user.click(screen.getByRole("button", { name: content.withdrawLabel }));
     expect(runtime.withdraw).toHaveBeenCalledWith(analyticsSettings);
   });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { AnalyticsContent } from "./analytics-content";
 import type { AnalyticsSettings } from "./analytics-provider-contract";
@@ -50,6 +50,9 @@ function AnalyticsConsentControl({
     AnalyticsConsentChoice | null | undefined
   >(undefined);
   const [managing, setManaging] = useState(false);
+  const dialogReference = useRef<HTMLDivElement>(null);
+  const manageButtonReference = useRef<HTMLButtonElement>(null);
+  const hasOpenedDialogReference = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -67,11 +70,26 @@ function AnalyticsConsentControl({
     };
   }, [runtime, settings]);
 
+  const showChoices = choice === null || managing;
+
+  useEffect(() => {
+    if (choice === undefined) {
+      return;
+    }
+
+    if (showChoices) {
+      hasOpenedDialogReference.current = true;
+      dialogReference.current
+        ?.querySelector<HTMLButtonElement>("button")
+        ?.focus();
+    } else if (hasOpenedDialogReference.current) {
+      manageButtonReference.current?.focus();
+    }
+  }, [choice, showChoices]);
+
   if (choice === undefined) {
     return null;
   }
-
-  const showChoices = choice === null || managing;
 
   function grant() {
     runtime.grant(settings);
@@ -92,7 +110,12 @@ function AnalyticsConsentControl({
   return (
     <aside aria-label={content.heading} className="analytics-consent">
       {showChoices ? (
-        <div role="dialog" aria-modal="false" aria-labelledby="analytics-heading">
+        <div
+          ref={dialogReference}
+          role="dialog"
+          aria-modal="false"
+          aria-labelledby="analytics-heading"
+        >
           <h2 id="analytics-heading">{content.heading}</h2>
           <p>{content.summary}</p>
           {purposes.length > 0 ? (
@@ -127,7 +150,11 @@ function AnalyticsConsentControl({
         </div>
       ) : null}
       {!showChoices ? (
-        <button type="button" onClick={() => setManaging(true)}>
+        <button
+          ref={manageButtonReference}
+          type="button"
+          onClick={() => setManaging(true)}
+        >
           {content.manageLabel}
         </button>
       ) : null}

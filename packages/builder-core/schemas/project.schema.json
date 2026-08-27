@@ -82,7 +82,7 @@
                   "additionalProperties": false,
                   "properties": {
                     "siteToken": {
-                      "pattern": "^[a-f0-9]{32}$",
+                      "pattern": "^[A-Fa-f0-9]{32}$",
                       "type": "string"
                     }
                   },

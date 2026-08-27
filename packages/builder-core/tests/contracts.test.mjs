@@ -1222,6 +1222,10 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
     generated["project.schema.json"].properties.capabilitySettings.properties[
       "booking-calendly"
     ].properties.destination;
+  const cloudflareWebAnalyticsTokenContract =
+    generated["project.schema.json"].properties.capabilitySettings.properties
+      .analytics.properties.providers.properties.cloudflareWebAnalytics
+      .properties.siteToken;
 
   assert.deepEqual(
     Object.keys(
@@ -1237,6 +1241,10 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
   );
   assert.equal(calendlyDestinationContract.maxLength, 2_048);
   assert.equal(typeof calendlyDestinationContract.pattern, "string");
+  assert.match(
+    "0123456789ABCDEF0123456789ABCDEF",
+    new RegExp(cloudflareWebAnalyticsTokenContract.pattern, "u"),
+  );
   const calendlyDestinationPattern = new RegExp(
     calendlyDestinationContract.pattern,
     "u",

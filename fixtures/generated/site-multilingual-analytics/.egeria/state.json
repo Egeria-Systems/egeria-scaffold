@@ -116,7 +116,7 @@
       "path": "apps/web/tests/e2e/analytics-consent.spec.ts"
     },
     {
-      "fingerprint": "sha256:2431b72cc9a858e3ed32a34f8a1951f63c28c795ecb58250cb2903c1ac224363",
+      "fingerprint": "sha256:b1db2912a75531514d5d9efca293521e42035ac0f528149d847d72951971aa5c",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -130,7 +130,7 @@
       "path": "apps/web/tests/component/analytics-consent.test.tsx"
     },
     {
-      "fingerprint": "sha256:d241f2f1ca415e7d3ea234c8167d4006d06ed67e4c5dd8c58e9d256751437808",
+      "fingerprint": "sha256:e70e47ce3415b98772351bab4095d5570538535f8447705e499dcdb67cadca0e",
       "fingerprintTarget": {
         "kind": "file"
       },

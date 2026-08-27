@@ -645,7 +645,9 @@ test("analytics removal restores the multilingual layout and persists fresh disc
   );
   assert.equal(state.value.appliedMigrations.at(-1), "remove-analytics-0-1-0");
   assert.equal(
-    repository.files.has("apps/web/src/integrations/analytics/runtime.ts"),
+    repository.files.has(
+      "apps/web/src/integrations/analytics/analytics-runtime.ts",
+    ),
     false,
   );
   assert.doesNotMatch(
