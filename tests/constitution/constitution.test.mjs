@@ -3482,11 +3482,11 @@ test("canonical documentation accepts profile-transition execution and records t
     "iu",
   );
   const multilingualEligibilityPattern =
-    /multilingual[^\n]+implementation[^\n]+certification[^\n]+next/iu;
+    /multilingual[^\n]+implementation[^\n]+current[^\n]+certification[^\n]+next/iu;
   const semanticLifecycleClosurePattern =
     /transactional-lifecycle closure[^\n]+approved[^\n]+closed/iu;
   const semanticMultilingualPattern =
-    /multilingual[^\n]+implementation[^\n]+certification[^\n]+next/iu;
+    /multilingual[^\n]+implementation[^\n]+current[^\n]+certification[^\n]+next/iu;
 
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.doesNotMatch(sequencingOwner, /minimum one remaining increment/iu);
@@ -3860,7 +3860,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   assert.match(readme, /retained `portfolio-calendly` and `site-multilingual` fixtures/iu);
   assert.match(
     capabilityModel,
-    /seven `portfolio`\/`site` descriptors.*accepted base.*eighth executable descriptor/isu,
+    /eight `portfolio`\/`site` descriptors.*executable.*multilingual@0\.1\.0.*eighth executable descriptor/isu,
   );
   assert.match(
     packageOwnership,
