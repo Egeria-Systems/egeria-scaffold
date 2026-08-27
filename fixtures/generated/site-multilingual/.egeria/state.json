@@ -784,7 +784,7 @@
       "path": "apps/web/tests/component/multilingual-page.test.tsx"
     },
     {
-      "fingerprint": "sha256:3987ff96c3e139a49004b4ff99b46ddcc47e8ddcf7e455815bc2a19df444c627",
+      "fingerprint": "sha256:9ceb6daf5309268a17b95ad2e36a935db2219610021abacef15a7ea294fa2665",
       "fingerprintTarget": {
         "kind": "file"
       },

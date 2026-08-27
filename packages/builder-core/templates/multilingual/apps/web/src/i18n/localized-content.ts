@@ -7,7 +7,13 @@ import {
   type PageSection,
 } from "../content/content-schema";
 import { localizedRedirects, localizedRoutes } from "./localized-profile";
-import { isLocale, localizePath, supportedLocales, type Locale } from "./locale";
+import {
+  defaultLocale,
+  isLocale,
+  localizePath,
+  supportedLocales,
+  type Locale,
+} from "./locale";
 
 export type LocalizedPageContent = Readonly<{
   metadata: Readonly<{ title: string; description: string }>;
@@ -294,7 +300,7 @@ export function resolveLocalizedRoute(
 }
 
 export function localeFromMiddlewareHeader(value: string | null): Locale {
-  return value !== null && isLocale(value) ? value : "en-CA";
+  return value !== null && isLocale(value) ? value : defaultLocale;
 }
 
 export { localizedRoutes };
