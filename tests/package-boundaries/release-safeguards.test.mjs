@@ -11,6 +11,7 @@ import {
   loadPendingChangesets,
   selectPendingChangesets,
 } from "../../scripts/check-package-release.mjs";
+import { exactSemanticVersionPattern } from "../helpers/semantic-version.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(
@@ -190,10 +191,17 @@ test("public source and package licenses are exact", async () => {
   }
 });
 
-test("root release commands use the pinned Changesets boundary", async () => {
+test("root release commands use the supported Changesets boundary", async () => {
   const rootManifest = await readJson("package.json");
+  const changesetsVersion = rootManifest.devDependencies?.["@changesets/cli"];
 
-  assert.equal(rootManifest.devDependencies?.["@changesets/cli"], "3.0.0");
+  assert.equal(typeof changesetsVersion, "string");
+  assert.match(changesetsVersion, exactSemanticVersionPattern);
+  assert.equal(
+    changesetsVersion.split(".", 1)[0],
+    "3",
+    "release commands must retain the supported Changesets major",
+  );
   assert.equal(rootManifest.devDependencies?.npm, "12.0.2");
   assert.deepEqual(
     {

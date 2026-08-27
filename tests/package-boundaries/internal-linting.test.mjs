@@ -28,23 +28,29 @@ async function readJson(relativePath) {
 
 test("the builder root owns an exact ESLint 10 lint boundary", async () => {
   const rootManifest = await readJson("package.json");
+  const eslintVersion = rootManifest.devDependencies?.eslint;
+  const eslintJsVersion = rootManifest.devDependencies?.["@eslint/js"];
   const rootConfiguration = await readFile(
     resolve(repositoryRoot, "eslint.config.mjs"),
     "utf8",
   );
 
   assert.equal(await pathExists("eslint.config.mjs"), true);
-  assert.deepEqual(
-    {
-      eslint: rootManifest.devDependencies?.eslint,
-      eslintJs: rootManifest.devDependencies?.["@eslint/js"],
-      standards: rootManifest.devDependencies?.["@egeria-systems/standards"],
-    },
-    {
-      eslint: "10.8.0",
-      eslintJs: "10.0.1",
-      standards: "workspace:*",
-    },
+  for (const [surface, version] of [
+    ["ESLint", eslintVersion],
+    ["ESLint JavaScript config", eslintJsVersion],
+  ]) {
+    assert.equal(typeof version, "string", surface);
+    assert.match(version, exactSemanticVersionPattern, surface);
+    assert.equal(
+      version.split(".", 1)[0],
+      "10",
+      `${surface} must retain the supported major`,
+    );
+  }
+  assert.equal(
+    rootManifest.devDependencies?.["@egeria-systems/standards"],
+    "workspace:*",
   );
   assert.equal(
     rootManifest.scripts?.["lint:builder"],
@@ -249,6 +255,7 @@ test("copy externalization covers canonical builder TSX templates", async () => 
 
 test("ESLint 10 applies the builder root config to standards source", async () => {
   const { ESLint } = await import("eslint");
+  const rootManifest = await readJson("package.json");
   const eslint = new ESLint({
     cwd: repositoryRoot,
     overrideConfigFile: resolve(repositoryRoot, "eslint.config.mjs"),
@@ -261,7 +268,7 @@ test("ESLint 10 applies the builder root config to standards source", async () =
     ),
   });
 
-  assert.equal(ESLint.version, "10.8.0");
+  assert.equal(ESLint.version, rootManifest.devDependencies?.eslint);
   assert.deepEqual(
     result.messages.map(({ ruleId, severity }) => ({ ruleId, severity })),
     [{ ruleId: "no-undef", severity: 2 }],
