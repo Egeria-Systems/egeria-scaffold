@@ -45,8 +45,12 @@ const sectionCompositionEvidenceRevision =
 const siteRoutingPlanPath =
   "docs/superpowers/plans/2026-08-26-production-site-routing-certification.md";
 const siteRoutingEvidencePath =
-  "docs/implementation-evidence/2026-08-26-site-routing-certification-receipt.md";
+  "docs/implementation-evidence/2026-08-26-production-site-routing-certification-receipt.md";
 const siteRoutingEvidenceRevision =
+  "f2b80d9e5e6bb08237d7cc887ee42d2f106e9243";
+const historicalSiteRoutingEvidencePath =
+  "docs/implementation-evidence/2026-08-26-site-routing-certification-receipt.md";
+const historicalSiteRoutingEvidenceRevision =
   "77cea944513e521939bf4de088048f67acdfbc3c";
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
@@ -421,7 +425,7 @@ test("accepted section composition receipt binds the reviewed fresh-scaffold out
   );
 });
 
-test("current production site routing subject is admitted only as pending certification", () => {
+test("current production site routing subject has exact reviewed lifecycle and fresh-scaffold evidence", () => {
   const descriptor = descriptorsByIdentifier.get("site-routing");
   assert.notEqual(descriptor, undefined);
   const subject = core.createCertificationSubject(
@@ -429,13 +433,42 @@ test("current production site routing subject is admitted only as pending certif
     requiredEvidence["site-routing"],
   );
 
-  assert.deepEqual(committedRegistry.records["site-routing"], {
+  const acceptedRecord = {
     subject,
     requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
-    status: "pending",
+    status: "certified",
     taskPlan: siteRoutingPlanPath,
-    evidence: [],
-  });
+    evidence: ["existing-repository-lifecycle", "fresh-scaffold"].map(
+      (kind) => ({
+        kind,
+        path: siteRoutingEvidencePath,
+        outcome: "passed",
+        revision: siteRoutingEvidenceRevision,
+        subject,
+      }),
+    ),
+  };
+  const acceptedReceiptUrl = new URL(
+    `../../../${siteRoutingEvidencePath}`,
+    import.meta.url,
+  );
+
+  assert.deepEqual(committedRegistry.records["site-routing"], acceptedRecord);
+  assert.equal(existsSync(acceptedReceiptUrl), true, siteRoutingEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { "site-routing": acceptedRecord },
+      },
+      artifacts: {
+        [siteRoutingPlanPath]: "# approved plan",
+        [siteRoutingEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [siteRoutingEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
 });
 
 test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", () => {
@@ -452,19 +485,23 @@ test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", 
     evidence: [
       {
         kind: "fresh-scaffold",
-        path: siteRoutingEvidencePath,
+        path: historicalSiteRoutingEvidencePath,
         outcome: "passed",
-        revision: siteRoutingEvidenceRevision,
+        revision: historicalSiteRoutingEvidenceRevision,
         subject: historicalSubject,
       },
     ],
   };
   const acceptedReceiptUrl = new URL(
-    `../../../${siteRoutingEvidencePath}`,
+    `../../../${historicalSiteRoutingEvidencePath}`,
     import.meta.url,
   );
 
-  assert.equal(existsSync(acceptedReceiptUrl), true, siteRoutingEvidencePath);
+  assert.equal(
+    existsSync(acceptedReceiptUrl),
+    true,
+    historicalSiteRoutingEvidencePath,
+  );
   assert.deepEqual(
     core.validateCertificationArtifacts({
       registry: {
@@ -473,9 +510,12 @@ test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", 
       },
       artifacts: {
         [acceptedRecord.taskPlan]: "# approved plan",
-        [siteRoutingEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+        [historicalSiteRoutingEvidencePath]: readFileSync(
+          acceptedReceiptUrl,
+          "utf8",
+        ),
       },
-      validRevisions: [siteRoutingEvidenceRevision],
+      validRevisions: [historicalSiteRoutingEvidenceRevision],
     }),
     { ok: true, value: undefined },
   );
