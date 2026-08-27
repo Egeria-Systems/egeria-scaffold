@@ -58,6 +58,12 @@ const privatePlanPath =
   "docs/superpowers/plans/private-certification-validation.md";
 const privateEvidencePath =
   "docs/implementation-evidence/private-certification-validation.md";
+const temporaryRootRemovalOptions = Object.freeze({
+  force: true,
+  maxRetries: 5,
+  recursive: true,
+  retryDelay: 100,
+});
 const privateSubject = Object.freeze({
   descriptorVersion: "0.1.0",
   behaviorContractDigest:
@@ -1766,7 +1772,7 @@ test("the ordinary certification gate does not require private workflow artifact
       stderr: "",
     });
   } finally {
-    await rm(cleanRoot, { recursive: true, force: true });
+    await rm(cleanRoot, temporaryRootRemovalOptions);
   }
 });
 
@@ -1844,7 +1850,7 @@ test("private certification validation rejects missing, rejected, and non-ancest
       "CERTIFICATION_EVIDENCE_REVISION_UNKNOWN",
     );
   } finally {
-    await rm(cleanRoot, { recursive: true, force: true });
+    await rm(cleanRoot, temporaryRootRemovalOptions);
   }
 });
 
@@ -1962,7 +1968,7 @@ test("private certification validation checks only records changed from accepted
       },
     );
   } finally {
-    await rm(cleanRoot, { recursive: true, force: true });
+    await rm(cleanRoot, temporaryRootRemovalOptions);
   }
 });
 
@@ -2037,7 +2043,7 @@ test("private certification validation rejects deletion of an accepted evidence 
       "CERTIFICATION_EVIDENCE_MISSING",
     );
   } finally {
-    await rm(cleanRoot, { recursive: true, force: true });
+    await rm(cleanRoot, temporaryRootRemovalOptions);
   }
 });
 
@@ -2173,7 +2179,7 @@ test("Cloudflare deployment certification requires a clean checkout", async () =
       await rm(join(cleanRoot, path));
     }
   } finally {
-    await rm(cleanRoot, { recursive: true, force: true });
+    await rm(cleanRoot, temporaryRootRemovalOptions);
   }
 });
 
