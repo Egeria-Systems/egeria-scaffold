@@ -47,7 +47,7 @@ const siteRoutingPlanPath =
 const siteRoutingEvidencePath =
   "docs/implementation-evidence/2026-08-26-production-site-routing-certification-receipt.md";
 const siteRoutingEvidenceRevision =
-  "f2b80d9e5e6bb08237d7cc887ee42d2f106e9243";
+  "e69c28ec4228622fd34517a72858e2ac55401a5a";
 const historicalSiteRoutingEvidencePath =
   "docs/implementation-evidence/2026-08-26-site-routing-certification-receipt.md";
 const historicalSiteRoutingEvidenceRevision =

@@ -14,7 +14,7 @@
 
 **Certification behavior-contract digest:** `sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3`
 
-**Certification evidence revision:** `f2b80d9e5e6bb08237d7cc887ee42d2f106e9243`
+**Certification evidence revision:** `e69c28ec4228622fd34517a72858e2ac55401a5a`
 
 **Passed certification outcomes:** `existing-repository-lifecycle, fresh-scaffold`
 
@@ -34,7 +34,7 @@ This content-safe receipt records the causal local certification and approved re
 The exact clean revision ran:
 
 ```text
-pnpm run verify:site-routing-certification -- --revision f2b80d9e5e6bb08237d7cc887ee42d2f106e9243
+pnpm run verify:site-routing-certification -- --revision e69c28ec4228622fd34517a72858e2ac55401a5a
 ```
 
 The successful run used the repository-pinned `linux/amd64` Playwright `v1.62.1-noble` image at digest `sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e`, 1 GiB shared memory, Node `22.23.2`, pnpm `11.20.0`, and disposable Git `2.55.0`. The derived disposable toolchain image had manifest-list digest `sha256:29eae8956e818c3d38ec08bb05e5757914cb1e7e8ec7d02f61c15bccbe1fdb16`.
@@ -42,6 +42,8 @@ The successful run used the repository-pinned `linux/amd64` Playwright `v1.62.1-
 The official image's exact Playwright `1.62.1` Chromium `1234`, Chromium headless shell `1234`, and FFmpeg `1011` artifacts were copied into each verifier-created empty browser cache before the unchanged real pnpm and Playwright commands executed. This bounded environment repair preserved the verifier's per-run cache isolation while avoiding a redundant browser download that exceeded the command timeout. The real browser installer validated the exact artifacts, and the development, OpenNext/workerd preview, fixture, and visual browser journeys executed against them.
 
 No failed or interrupted attempt is accepted evidence. A host-sandbox attempt failed closed when package-network access was unavailable. Docker Desktop was cleanly restarted after its local engine returned an unhealthy response. A first authorized container run timed out while redownloading Chromium into the verifier's intentionally empty cache. A second run was deliberately interrupted after process evidence proved that an initial wrapper did not reach Volta's nested pnpm launcher. The final repair targeted that exact launcher, passed a stripped-environment diagnostic matching the verifier's child process, and the complete unchanged certificate then passed.
+
+The initial complete run at `f2b80d9e5e6bb08237d7cc887ee42d2f106e9243` was superseded after independent review found a pending target-evidence marker, stale current-status wording, and an incorrect predecessor tree claim. The reviewed repairs were rebased onto refreshed `origin/main`, and the complete certificate passed again at `e69c28ec4228622fd34517a72858e2ac55401a5a`. Only the renewed revision is admitted as current evidence.
 
 ## Fresh-scaffold outcome
 
@@ -82,5 +84,5 @@ It does not establish another capability version, recipe, profile, edge, removal
 - Planning, application, verification-failure prefix, migration-before-state, exact final state, and final-byte reread accepted: `yes`
 - Environment amendments, superseded-attempt dispositions, cleanup, privacy exclusions, and claim boundary accepted: `yes`
 - Registry transition approved: `yes`
-- Review revision: `f2b80d9e5e6bb08237d7cc887ee42d2f106e9243`
+- Review revision: `e69c28ec4228622fd34517a72858e2ac55401a5a`
 - Rerun trigger: any material descriptor, required-evidence contract, edge, runner, fixture, lifecycle implementation, verifier, generated output, visual baseline, registry, or evidence defect requires a new clean evidence revision and complete affected rerun

@@ -216,7 +216,7 @@
           "kind": "existing-repository-lifecycle",
           "path": "docs/implementation-evidence/2026-08-26-production-site-routing-certification-receipt.md",
           "outcome": "passed",
-          "revision": "f2b80d9e5e6bb08237d7cc887ee42d2f106e9243",
+          "revision": "e69c28ec4228622fd34517a72858e2ac55401a5a",
           "subject": {
             "descriptorVersion": "0.4.0",
             "behaviorContractDigest": "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3"
@@ -226,7 +226,7 @@
           "kind": "fresh-scaffold",
           "path": "docs/implementation-evidence/2026-08-26-production-site-routing-certification-receipt.md",
           "outcome": "passed",
-          "revision": "f2b80d9e5e6bb08237d7cc887ee42d2f106e9243",
+          "revision": "e69c28ec4228622fd34517a72858e2ac55401a5a",
           "subject": {
             "descriptorVersion": "0.4.0",
             "behaviorContractDigest": "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3"
