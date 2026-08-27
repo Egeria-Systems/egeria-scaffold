@@ -34,7 +34,8 @@ test("standards exposes only its approved public configuration APIs", async () =
   );
 
   const standardsManifest = await readJson("packages/standards/package.json");
-  const { dependencies, ...stableManifest } = standardsManifest;
+  const { dependencies, devDependencies, ...stableManifest } =
+    standardsManifest;
 
   assert.deepEqual(stableManifest, {
     name: "@egeria-systems/standards",
@@ -64,11 +65,6 @@ test("standards exposes only its approved public configuration APIs", async () =
     peerDependencies: {
       eslint: "^9.39.5 || ^10.8.0",
     },
-    devDependencies: {
-      eslint: "9.39.5",
-      "eslint-10": "npm:eslint@10.8.0",
-      typescript: "6.0.3",
-    },
     publishConfig: {
       access: "public",
       provenance: true,
@@ -83,6 +79,40 @@ test("standards exposes only its approved public configuration APIs", async () =
     typescriptEslintVersion.split(".", 1)[0],
     "8",
     "the strict preset provider must remain on its supported major",
+  );
+  assert.deepEqual(Object.keys(devDependencies ?? {}).sort(), [
+    "eslint",
+    "eslint-10",
+    "typescript",
+  ]);
+  for (const [surface, version, expectedMajor] of [
+    ["ESLint 9 test dependency", devDependencies?.eslint, "9"],
+    ["TypeScript", devDependencies?.typescript, "6"],
+  ]) {
+    assert.equal(typeof version, "string", surface);
+    assert.match(version, exactSemanticVersionPattern, surface);
+    assert.equal(
+      version.split(".", 1)[0],
+      expectedMajor,
+      `${surface} must retain the supported major`,
+    );
+  }
+  const eslint10Alias = devDependencies?.["eslint-10"];
+  assert.equal(typeof eslint10Alias, "string", "ESLint 10 test dependency");
+  const eslint10AliasMatch = /^npm:eslint@(?<version>.+)$/u.exec(
+    eslint10Alias,
+  );
+  assert.ok(
+    eslint10AliasMatch,
+    "ESLint 10 must remain an npm alias",
+  );
+  const eslint10Version = eslint10AliasMatch.groups?.version;
+  assert.equal(typeof eslint10Version, "string");
+  assert.match(eslint10Version, exactSemanticVersionPattern);
+  assert.equal(
+    eslint10Version.split(".", 1)[0],
+    "10",
+    "the ESLint 10 test dependency must retain the supported major",
   );
 
   assert.equal(await pathExists("packages/standards/AGENTS.md"), true);
