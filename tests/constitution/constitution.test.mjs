@@ -2394,7 +2394,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+refuse[^\n]+pending/i,
+    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/i,
   );
 });
 
@@ -2631,10 +2631,22 @@ test("executable capability certification ownership is current", async () => {
         "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3",
     },
     requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
-    status: "pending",
+    status: "certified",
     taskPlan:
       "docs/superpowers/plans/2026-08-26-production-site-routing-certification.md",
-    evidence: [],
+    evidence: ["existing-repository-lifecycle", "fresh-scaffold"].map(
+      (kind) => ({
+        kind,
+        path: "docs/implementation-evidence/2026-08-26-production-site-routing-certification-receipt.md",
+        outcome: "passed",
+        revision: "6034d7330af912d1a1b9bcff3323ed360ebee2d0",
+        subject: {
+          descriptorVersion: "0.4.0",
+          behaviorContractDigest:
+            "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3",
+        },
+      }),
+    ),
   });
   assert.equal(standardsRecord.status, "certified");
   assert.deepEqual(standardsRecord.requiredEvidence, [
@@ -2742,7 +2754,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+passes[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+refuse[^\n]+pending/iu,
+    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/iu,
   );
   assert.match(
     enforcementMap,
@@ -2959,7 +2971,6 @@ test("canonical documentation records visual regression and the client-ready clo
 
 test("canonical documentation accepts profile-transition execution and records transactional-lifecycle closure", async () => {
   const lifecyclePhase = compactLabel("P", "3");
-  const clientExpansionPhase = compactLabel("P", "3B");
   const [
     rootReadme,
     sourcePlan,
@@ -3360,14 +3371,12 @@ test("canonical documentation accepts profile-transition execution and records t
     `${escapeRegularExpression(lifecycleClosureLabel)}[^\\n]+approved[^\\n]+closed`,
     "iu",
   );
-  const clientExpansionEligibilityPattern = new RegExp(
-    `${escapeRegularExpression(clientExpansionPhase)}[^\\n]+next eligible[^\\n]+(?:does not authorize|not authorized|separate approval)`,
-    "iu",
-  );
+  const multilingualEligibilityPattern =
+    /multilingual[^\n]+implementation[^\n]+certification[^\n]+next/iu;
   const semanticLifecycleClosurePattern =
     /transactional-lifecycle closure[^\n]+approved[^\n]+closed/iu;
-  const semanticClientExpansionPattern =
-    /client-required public-site expansion[^\n]+next eligible[^\n]+does not authorize[^\n]+automated removal-reference hardening/iu;
+  const semanticMultilingualPattern =
+    /multilingual[^\n]+implementation[^\n]+certification[^\n]+next/iu;
 
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.doesNotMatch(sequencingOwner, /minimum one remaining increment/iu);
@@ -3397,6 +3406,10 @@ test("canonical documentation accepts profile-transition execution and records t
     );
     assert.match(
       sequencingOwner,
+      /site-routing@0\.4\.0[^\n]+certif(?:ied|ication)[^\n]+6034d7330af912d1a1b9bcff3323ed360ebee2d0/iu,
+    );
+    assert.match(
+      sequencingOwner,
       finalLifecycleClosurePattern,
     );
     assert.doesNotMatch(sequencingOwner, /minimum two remaining increments/iu);
@@ -3421,13 +3434,22 @@ test("canonical documentation accepts profile-transition execution and records t
     builderCoreInstructions,
   ]) {
     assert.match(closureStatusConsumer, finalLifecycleClosurePattern);
-    assert.match(closureStatusConsumer, clientExpansionEligibilityPattern);
+    assert.match(closureStatusConsumer, multilingualEligibilityPattern);
   }
 
   for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
     assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);
-    assert.match(semanticStatusConsumer, semanticClientExpansionPattern);
+    assert.match(semanticStatusConsumer, semanticMultilingualPattern);
   }
+
+  assert.doesNotMatch(
+    overview,
+    /isolated production-site (?:implementation )?candidate/iu,
+  );
+  assert.doesNotMatch(
+    builderCoreReadme,
+    /public-site expansion is the next eligible phase/iu,
+  );
 
   assert.match(
     roadmap,

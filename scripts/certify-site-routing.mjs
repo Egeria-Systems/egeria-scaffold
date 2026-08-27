@@ -19,10 +19,11 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
 const publicRegistry = "https://registry.npmjs.org/";
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
+const lifecycleCommandTimeoutMilliseconds = 30 * 60 * 1000;
 const subject = Object.freeze({
-  descriptorVersion: "0.3.0",
+  descriptorVersion: "0.4.0",
   behaviorContractDigest:
-    "sha256:d716a1c93f8f40db33e54612c85d521fbd6ba13cd142d35ab0c39fa9c4b9647e",
+    "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3",
 });
 const expectedCapabilities = Object.freeze([
   "standards",
@@ -48,6 +49,7 @@ const expectedVerificationChecks = Object.freeze([
   "browser-install",
   "browser-development",
   "browser-preview",
+  "visual-regression",
 ]);
 const expectedFixtureChecks = Object.freeze([
   "site-routing-fixture-overlay",
@@ -74,6 +76,30 @@ const fixtureMappings = Object.freeze([
     destination: "apps/web/tests/e2e/site-routing-certification.spec.ts",
   }),
 ]);
+const compiledLifecyclePattern =
+  "^the compiled (?:plan-upgrade command plans the exact production site edge without writes|site-routing upgrade converges on the exact current site|site-routing upgrade verification failure retains transformed source and old state and migration controls|site-routing planner refuses already-current and managed-drift repositories without writes)$";
+const compiledLifecycleTests = Object.freeze([
+  "the compiled plan-upgrade command plans the exact production site edge without writes",
+  "the compiled site-routing upgrade converges on the exact current site",
+  "the compiled site-routing upgrade verification failure retains transformed source and old state and migration controls",
+  "the compiled site-routing planner refuses already-current and managed-drift repositories without writes",
+]);
+const builderLifecyclePattern =
+  "^site-routing upgrade (?:replaces the exact production recipe and persists state last|retains transformed source and old state and migration controls when verification fails|rejects changed final bytes after state persistence)$";
+const builderLifecycleTests = Object.freeze([
+  "site-routing upgrade replaces the exact production recipe and persists state last",
+  "site-routing upgrade retains transformed source and old state and migration controls when verification fails",
+  "site-routing upgrade rejects changed final bytes after state persistence",
+]);
+const lifecycleChecks = Object.freeze([
+  "compiled-plan-site-routing-upgrade",
+  "compiled-apply-site-routing-upgrade",
+  "already-current-and-drift-refusal",
+  "verification-failure-prefix",
+  "migration-before-state",
+  "exact-final-state",
+  "final-byte-reread",
+]);
 
 export class SiteRoutingCertificationError extends Error {
   constructor(code) {
@@ -99,14 +125,15 @@ function configurationFor(revision) {
     createArguments: Object.freeze([]),
     expectedCapabilities,
     capabilityIdentifier: "site-routing",
-    capabilityVersion: "0.3.0",
-    expectedRecipeVersion: "0.10.0",
+    capabilityVersion: "0.4.0",
+    expectedRecipeVersion: "0.11.0",
     verifierIdentifier: "site",
     expectedVerificationChecks,
     expectedFixtureChecks,
+    verificationOptions: Object.freeze({ includeVisual: true }),
     receipt: Object.freeze({
       subject,
-      recipeVersion: "0.10.0",
+      recipeVersion: "0.11.0",
       locale: "en-CA",
       evidenceRevision: revision,
     }),
@@ -175,6 +202,13 @@ function authorityAdapters() {
     readCurrentRevision,
     readRepositoryStatus,
     readRepositoryIndexEntries,
+    runLifecycleCommand: (input) =>
+      execFileAsync(input.executable, input.arguments, {
+        cwd: input.cwd,
+        env: input.environment,
+        timeout: lifecycleCommandTimeoutMilliseconds,
+        ...isolatedProcessOptions,
+      }),
   };
 }
 
@@ -184,7 +218,8 @@ function requireAuthorityAdapters(adapters) {
     typeof adapters !== "object" ||
     typeof adapters.readCurrentRevision !== "function" ||
     typeof adapters.readRepositoryStatus !== "function" ||
-    typeof adapters.readRepositoryIndexEntries !== "function"
+    typeof adapters.readRepositoryIndexEntries !== "function" ||
+    typeof adapters.runLifecycleCommand !== "function"
   ) {
     throw createError("CERTIFICATION_ADAPTER_INVALID");
   }
@@ -365,10 +400,85 @@ export function verifySiteRoutingFixtureForTesting(input) {
   return verifySiteRoutingFixture(input);
 }
 
-function withSourceCheck(result) {
+function hasExactPassedTests(stdout, expectedTests) {
+  if (typeof stdout !== "string") return false;
+  const observedTests = stdout
+    .split("\n")
+    .flatMap((line) =>
+      line.startsWith("# Subtest: ") ? [line.slice("# Subtest: ".length)] : [],
+    );
+  const summaryCounts = new Map(
+    stdout.split("\n").flatMap((line) => {
+      const match = /^# (tests|pass|fail) ([0-9]+)$/u.exec(line);
+      return match === null ? [] : [[match[1], Number(match[2])]];
+    }),
+  );
+  const totalTests = summaryCounts.get("tests");
+  return (
+    observedTests.length === expectedTests.length &&
+    observedTests.every((name, index) => name === expectedTests[index]) &&
+    stdout.includes(`\n1..${expectedTests.length}\n`) &&
+    totalTests !== undefined &&
+    totalTests >= expectedTests.length &&
+    summaryCounts.get("pass") === totalTests &&
+    summaryCounts.get("fail") === 0
+  );
+}
+
+async function runLifecycleEvidence(adapters, arguments_, expectedTests) {
+  try {
+    const result = await adapters.runLifecycleCommand({
+      executable: process.execPath,
+      arguments: [...arguments_],
+      cwd: repositoryRoot,
+      environment: createIsolatedProcessEnvironment(),
+    });
+    if (!hasExactPassedTests(result?.stdout, expectedTests)) {
+      throw new Error("invalid lifecycle evidence");
+    }
+  } catch {
+    throw createError("CERTIFICATION_LIFECYCLE_EVIDENCE_FAILED");
+  }
+}
+
+async function certifyLifecycle(adapters) {
+  await runLifecycleEvidence(
+    adapters,
+    [
+      "--test",
+      "--test-reporter=tap",
+      "--test-name-pattern",
+      compiledLifecyclePattern,
+      "apps/cli/tests/cli.test.mjs",
+    ],
+    compiledLifecycleTests,
+  );
+  await runLifecycleEvidence(
+    adapters,
+    [
+      "--test",
+      "--test-reporter=tap",
+      "--test-name-pattern",
+      builderLifecyclePattern,
+      "packages/builder-core/tests/apply-capability-upgrade.test.mjs",
+    ],
+    builderLifecycleTests,
+  );
+  return lifecycleChecks;
+}
+
+function withSourceCheck(result, existingRepositoryChecks) {
   return Object.freeze({
     ...result,
-    checks: Object.freeze([...result.checks, "repository-sources-unchanged"]),
+    outcomes: Object.freeze([
+      "existing-repository-lifecycle",
+      "fresh-scaffold",
+    ]),
+    checks: Object.freeze([
+      ...result.checks,
+      ...existingRepositoryChecks,
+      "repository-sources-unchanged",
+    ]),
   });
 }
 
@@ -378,9 +488,10 @@ async function certifyWithAuthority(input, adapters, certify) {
   await requireCleanRepository(adapters);
   await requireRevision(input.revision, adapters);
   const result = await certify(configuration);
+  const existingRepositoryChecks = await certifyLifecycle(adapters);
   await requireRevision(input.revision, adapters);
   await requireCleanRepository(adapters);
-  return withSourceCheck(result);
+  return withSourceCheck(result, existingRepositoryChecks);
 }
 
 export function certifySiteRouting(input = {}) {

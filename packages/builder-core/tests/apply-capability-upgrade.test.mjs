@@ -749,6 +749,68 @@ test("site-routing upgrade replaces the exact production recipe and persists sta
   );
 });
 
+test("site-routing upgrade retains transformed source and old state and migration controls when verification fails", async () => {
+  const target = await currentEntries("site");
+  const repository = createRepository(await acceptedSiteEntries());
+  const controls = new Map(
+    [".egeria/state.json", ".egeria/migrations.jsonl"].map((path) => [
+      path,
+      new Uint8Array(repository.files.get(path)),
+    ]),
+  );
+  const execution = await runApply(repository, {
+    capability: "site-routing",
+    verifier: {
+      prepareLockfile() {
+        throw new Error("not used");
+      },
+      verifyInIsolatedCopy() {
+        return Promise.resolve({
+          ok: false,
+          issues: [{ code: "PRIVATE_FAILURE", path: [], context: {} }],
+        });
+      },
+    },
+  });
+
+  assertFailure(execution.result, {
+    code: "CAPABILITY_VERIFICATION_FAILED",
+    phase: "verify",
+    recovery: "inspect-worktree",
+  });
+  assertSourceActionsMatchTarget(repository, execution.plan, target);
+  for (const [path, content] of controls) {
+    assert.deepEqual(repository.files.get(path), content, path);
+  }
+  assert.equal(repository.writes.length, 1);
+});
+
+test("site-routing upgrade rejects changed final bytes after state persistence", async () => {
+  const repository = createRepository(await acceptedSiteEntries());
+  const corruptedPath = "apps/web/app/about/page.tsx";
+  const execution = await runApply(repository, {
+    capability: "site-routing",
+    inspectExpectedChanges: () => {
+      repository.files.set(
+        corruptedPath,
+        encoder.encode("concurrent final edit\n"),
+      );
+      return Promise.resolve({ ok: true });
+    },
+  });
+
+  assertFailure(execution.result, {
+    code: "CAPABILITY_FINAL_DIFF_FAILED",
+    phase: "final-diff",
+    recovery: "inspect-worktree",
+  });
+  assert.equal(repository.writes.length, 3);
+  assert.equal(
+    decode(repository.files.get(corruptedPath)),
+    "concurrent final edit\n",
+  );
+});
+
 test("standards capability upgrade refuses malformed, wrong, and stale plan authority without mutation", async () => {
   for (const approvedPlanFingerprint of [
     "not-a-fingerprint",

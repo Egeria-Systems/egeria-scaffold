@@ -4438,6 +4438,146 @@ test("the compiled site-routing upgrade converges on the exact current site", as
   );
 });
 
+test("the compiled site-routing upgrade verification failure retains transformed source and old state and migration controls", async () => {
+  await withGitFixture(
+    "site",
+    async ({ linked, primary }) => {
+      const primaryBefore = await gitRepositorySnapshot(primary);
+      const initialInspection = await core.inspectGitWorktree({ root: linked });
+      assert.equal(initialInspection.ok, true);
+      const retainedControlPaths = [
+        ".egeria/state.json",
+        ".egeria/migrations.jsonl",
+      ];
+      const controlsBefore = await Promise.all(
+        retainedControlPaths.map((path) => readFile(join(linked, path))),
+      );
+      const planExecution = await executeBuiltPlanUpgrade(
+        linked,
+        "site-routing",
+      );
+      assert.equal(planExecution.exitCode, 0, planExecution.stderr);
+      const plan = JSON.parse(planExecution.stdout).plan;
+
+      let execution;
+      await withFailingPnpm(async (path) => {
+        execution = await executeBuiltApplyUpgrade(
+          linked,
+          plan.planFingerprint,
+          { PATH: path },
+          "site-routing",
+        );
+      });
+
+      assert.equal(execution.exitCode, 1);
+      assert.equal(execution.stdout, "");
+      assert.deepEqual(JSON.parse(execution.stderr), {
+        ok: false,
+        command: "apply-upgrade",
+        code: "CAPABILITY_VERIFICATION_FAILED",
+        phase: "verify",
+        recovery: "inspect-worktree",
+      });
+      assert.deepEqual(
+        await Promise.all(
+          retainedControlPaths.map((path) => readFile(join(linked, path))),
+        ),
+        controlsBefore,
+      );
+      for (const { path } of plan.actions) {
+        assert.deepEqual(
+          await readFile(join(linked, path)),
+          await readFile(
+            resolve(repositoryRoot, "fixtures/generated/site", path),
+          ),
+          path,
+        );
+      }
+      assert.deepEqual(
+        await core.inspectGitExpectedChanges({
+          root: linked,
+          identity: initialInspection.identity,
+          expectedPaths: plan.actions.map(({ path }) => path).sort(),
+        }),
+        { ok: true },
+      );
+      assert.deepEqual(
+        withoutSharedRefs(await gitRepositorySnapshot(primary)),
+        withoutSharedRefs(primaryBefore),
+      );
+      assert.doesNotMatch(
+        execution.stderr,
+        /private|refs\/heads|\.git\/worktrees|egeria-failing-pnpm/u,
+      );
+    },
+    {
+      branch: "site-routing-upgrade-verification-failure-test",
+      preparePrimary: (root) =>
+        prepareHistoricalUpgradeFixture(root, { downgradeStandards: false }),
+    },
+  );
+});
+
+test("the compiled site-routing planner refuses already-current and managed-drift repositories without writes", async () => {
+  const cases = [
+    {
+      name: "already current",
+      code: "CAPABILITY_ALREADY_CURRENT",
+      preparePrimary: undefined,
+      prepareLinked: async () => {},
+    },
+    {
+      name: "managed drift",
+      code: "PROJECT_DRIFT_DETECTED",
+      preparePrimary: (root) =>
+        prepareHistoricalUpgradeFixture(root, { downgradeStandards: false }),
+      prepareLinked: async (root) => {
+        await writeFile(
+          join(root, "apps/web/app/about/page.tsx"),
+          "private managed route drift\n",
+        );
+        await commitAll(root, "drift managed route module");
+      },
+    },
+  ];
+
+  for (const [index, fixture] of cases.entries()) {
+    await withGitFixture(
+      "site",
+      async ({ linked }) => {
+        await fixture.prepareLinked(linked);
+        const before = await gitRepositorySnapshot(linked);
+        const execution = await executeBuiltPlanUpgrade(linked, "site-routing");
+        const after = await gitRepositorySnapshot(linked);
+
+        assert.equal(execution.exitCode, 1, fixture.name);
+        assert.equal(execution.stdout, "", fixture.name);
+        assert.deepEqual(
+          JSON.parse(execution.stderr),
+          {
+            ok: false,
+            command: "plan-upgrade",
+            code: fixture.code,
+          },
+          fixture.name,
+        );
+        assert.deepEqual(after, before, fixture.name);
+        assert.doesNotMatch(
+          execution.stderr,
+          /private|refs\/heads|\.git\/worktrees/u,
+          fixture.name,
+        );
+      },
+      {
+        branch: `site-routing-plan-refusal-${index}`,
+        ...(fixture.preparePrimary === undefined
+          ? {}
+          : { preparePrimary: fixture.preparePrimary }),
+      },
+    );
+  }
+});
+
 test("the compiled standards upgrade verification failure retains transformed source and old controls", async () => {
   await withGitFixture(
     "portfolio",

@@ -27,8 +27,8 @@ async function expectAboutRoute(page: Page) {
     "/",
   );
   await expect(page.getByRole("link", { name: "About" })).toHaveAttribute(
-    "href",
-    "/about",
+    "aria-current",
+    "page",
   );
 }
 
@@ -48,5 +48,49 @@ test("navigates between the generated home and about routes", async ({
   await expect(page).toHaveURL((url) => url.pathname === "/");
   await expect(
     page.getByRole("heading", { level: 1, name: "Acme Site" }),
+  ).toBeVisible();
+});
+
+test("serves and navigates to the generated nested work route", async ({
+  page,
+}) => {
+  await openRoute(page, "/work/featured");
+  await expect(page).toHaveTitle("Featured work");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Featured work" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Work" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  await openRoute(page, "/");
+  await page.getByRole("link", { name: "Work" }).click();
+  await expect(page).toHaveURL((url) => url.pathname === "/work/featured");
+  await expect(page).toHaveTitle("Featured work");
+});
+
+test("publishes crawl routes, redirects the work index, and serves not found content", async ({
+  page,
+  request,
+}) => {
+  const sitemap = await request.get("/sitemap.xml");
+  expect(sitemap.ok()).toBe(true);
+  expect(await sitemap.text()).toContain("https://example.com/work/featured");
+
+  const robots = await request.get("/robots.txt");
+  expect(robots.ok()).toBe(true);
+  expect(await robots.text()).toContain("https://example.com/sitemap.xml");
+
+  await openRoute(page, "/work");
+  await expect(page).toHaveURL((url) => url.pathname === "/work/featured");
+
+  const missing = await page.goto("/missing-page", {
+    waitUntil: "networkidle",
+  });
+  expect(missing?.status()).toBe(404);
+  await expect(page).toHaveTitle("Page not found");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Page not found" }),
   ).toBeVisible();
 });
