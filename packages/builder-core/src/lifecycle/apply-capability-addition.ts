@@ -10,9 +10,11 @@ import {
   migrationRecordSchema,
   type MigrationRecord,
 } from "../contracts/migration.js";
-import type {
-  AnalyticsSettings,
-  CalendlyBookingSettings,
+import {
+  analyticsSettingsSchema,
+  calendlyBookingSettingsSchema,
+  type AnalyticsSettings,
+  type CalendlyBookingSettings,
 } from "../contracts/project.js";
 import {
   capabilityAdditionPersistedVerificationChecks,
@@ -435,13 +437,30 @@ export async function applyCapabilityAddition(input: Readonly<{
     return failure(initialGit.code, "precondition", "not-required");
   }
 
+  const settingsSnapshotResult =
+    input.capability === "analytics"
+      ? analyticsSettingsSchema.safeParse(input.settings)
+      : input.capability === "booking-calendly"
+        ? calendlyBookingSettingsSchema.safeParse(input.settings)
+        : input.capability === "multilingual" && input.settings === undefined
+          ? { success: true as const, data: undefined }
+          : { success: false as const };
+  if (!settingsSnapshotResult.success) {
+    return failure(
+      "CAPABILITY_ADDITION_UNSUPPORTED",
+      "precondition",
+      "not-required",
+    );
+  }
+  const settingsSnapshot = settingsSnapshotResult.data;
+
   let planResult;
   try {
     planResult = await planCapabilityAddition({
       reader,
       git: initialGit,
       capability: input.capability,
-      ...(input.settings === undefined ? {} : { settings: input.settings }),
+      ...(settingsSnapshot === undefined ? {} : { settings: settingsSnapshot }),
     });
   } catch {
     return failure(
@@ -480,12 +499,12 @@ export async function applyCapabilityAddition(input: Readonly<{
     projectName: controls.project.value.project.name,
     displayName: controls.project.value.project.displayName,
     ...(input.capability === "analytics"
-      ? { analytics: input.settings as AnalyticsSettings }
+      ? { analytics: settingsSnapshot as AnalyticsSettings }
       : controls.project.value.capabilitySettings.analytics === undefined
         ? {}
         : { analytics: controls.project.value.capabilitySettings.analytics }),
     ...(input.capability === "booking-calendly"
-      ? { bookingCalendly: input.settings as CalendlyBookingSettings }
+      ? { bookingCalendly: settingsSnapshot as CalendlyBookingSettings }
       : controls.project.value.capabilitySettings["booking-calendly"] === undefined
         ? {}
         : {

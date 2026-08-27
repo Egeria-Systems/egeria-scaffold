@@ -62,6 +62,9 @@ describe("analytics consent", () => {
     await user.click(screen.getByRole("button", { name: content.manageLabel }));
     await user.click(screen.getByRole("button", { name: content.withdrawLabel }));
     expect(runtime.withdraw).toHaveBeenCalledWith(analyticsSettings);
+    expect(screen.getByRole("button", { name: content.allowLabel })).toBeVisible();
+    expect(screen.getByRole("button", { name: content.declineLabel })).toBeVisible();
+    expect(screen.getByRole("button", { name: content.allowLabel })).toHaveFocus();
   });
 
   it("omits consent controls when no runtime provider is selected", () => {

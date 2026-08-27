@@ -184,7 +184,7 @@ async function runApply(repository, overrides = {}) {
     ...(selectedSettings === undefined ? {} : { settings: selectedSettings }),
     approvedPlanFingerprint:
       overrides.approvedPlanFingerprint ?? plan.planFingerprint,
-    reader: repository.reader,
+    reader: overrides.reader ?? repository.reader,
     writer: repository.writer,
     verifier:
       overrides.verifier ?? successfulVerifier(verifierCalls),
@@ -554,6 +554,37 @@ test("analytics addition composes with multilingual and persists only public set
   assert.match(
     repository.files.get("apps/web/app/layout.tsx"),
     /AnalyticsConsent/u,
+  );
+});
+
+test("analytics addition binds transformation to the approved settings snapshot", async () => {
+  const repository = createRepository(await fixtureEntries("site-multilingual"));
+  const mutableSettings = structuredClone(analyticsSettings);
+  let projectReads = 0;
+  const reader = {
+    async readText(path) {
+      if (path === ".egeria/project.yaml" && ++projectReads === 2) {
+        mutableSettings.providers.googleAnalytics4.measurementId =
+          "G-MUTATED1234";
+      }
+      return repository.reader.readText(path);
+    },
+  };
+  const { result } = await runApply(repository, {
+    capability: "analytics",
+    settings: mutableSettings,
+    reader,
+  });
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(projectReads >= 2, true);
+  const project = core.parseProjectYaml(
+    repository.files.get(".egeria/project.yaml"),
+  );
+  assert.equal(project.ok, true);
+  assert.deepEqual(
+    project.value.capabilitySettings.analytics,
+    analyticsSettings,
   );
 });
 

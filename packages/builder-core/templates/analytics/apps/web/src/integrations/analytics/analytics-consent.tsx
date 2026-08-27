@@ -105,6 +105,7 @@ function AnalyticsConsentControl({
 
   function withdraw() {
     runtime.withdraw(settings);
+    setChoice(null);
   }
 
   return (
@@ -134,15 +135,37 @@ function AnalyticsConsentControl({
           <div>
             {choice === "granted" ? null : (
               <>
-                <button type="button" onClick={grant}>{content.allowLabel}</button>
-                <button type="button" onClick={decline}>{content.declineLabel}</button>
+                <button
+                  type="button"
+                  data-analytics-consent-action="allow"
+                  onClick={grant}
+                >
+                  {content.allowLabel}
+                </button>
+                <button
+                  type="button"
+                  data-analytics-consent-action="decline"
+                  onClick={decline}
+                >
+                  {content.declineLabel}
+                </button>
               </>
             )}
             {choice === "granted" ? (
-              <button type="button" onClick={withdraw}>{content.withdrawLabel}</button>
+              <button
+                type="button"
+                data-analytics-consent-action="withdraw"
+                onClick={withdraw}
+              >
+                {content.withdrawLabel}
+              </button>
             ) : null}
             {choice !== null ? (
-              <button type="button" onClick={() => setManaging(false)}>
+              <button
+                type="button"
+                data-analytics-consent-action="close"
+                onClick={() => setManaging(false)}
+              >
                 {content.closeLabel}
               </button>
             ) : null}
@@ -153,6 +176,7 @@ function AnalyticsConsentControl({
         <button
           ref={manageButtonReference}
           type="button"
+          data-analytics-consent-action="manage"
           onClick={() => setManaging(true)}
         >
           {content.manageLabel}

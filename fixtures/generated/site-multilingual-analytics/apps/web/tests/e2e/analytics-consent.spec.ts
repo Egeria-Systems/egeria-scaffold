@@ -25,16 +25,18 @@ test("optional providers stay blocked until grant and withdrawal persists denial
   }
 
   await page.goto("/");
-  await expect(page.getByRole("dialog", { name: "Analytics choices" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toBeVisible();
   expect(providerRequests).toEqual([]);
 
-  await page.getByRole("button", { name: "Decline analytics" }).click();
+  await page.locator('[data-analytics-consent-action="decline"]').click();
   await page.reload();
-  await expect(page.getByRole("button", { name: "Manage analytics" })).toBeVisible();
+  await expect(
+    page.locator('[data-analytics-consent-action="manage"]'),
+  ).toBeVisible();
   expect(providerRequests).toEqual([]);
 
-  await page.getByRole("button", { name: "Manage analytics" }).click();
-  await page.getByRole("button", { name: "Allow analytics" }).click();
+  await page.locator('[data-analytics-consent-action="manage"]').click();
+  await page.locator('[data-analytics-consent-action="allow"]').click();
   const expectedProviderCount = providerDeclarations.length;
   await expect.poll(() => providerRequests.length).toBe(expectedProviderCount);
   for (const declaration of providerDeclarations) {
@@ -62,12 +64,14 @@ test("optional providers stay blocked until grant and withdrawal persists denial
   expect(await page.evaluate(() => document.cookie)).toContain("_ga=");
   expect(await page.evaluate(() => document.cookie)).toContain("_clck=");
 
-  await page.getByRole("button", { name: "Manage analytics" }).click();
+  await page.locator('[data-analytics-consent-action="manage"]').click();
   await Promise.all([
     page.waitForEvent("framenavigated"),
-    page.getByRole("button", { name: "Withdraw analytics consent" }).click(),
+    page.locator('[data-analytics-consent-action="withdraw"]').click(),
   ]);
-  await expect(page.getByRole("button", { name: "Manage analytics" })).toBeVisible();
+  await expect(
+    page.locator('[data-analytics-consent-action="manage"]'),
+  ).toBeVisible();
   expect(
     await page.evaluate(() =>
       window.localStorage.getItem("egeria.analytics.consent.v1"),
