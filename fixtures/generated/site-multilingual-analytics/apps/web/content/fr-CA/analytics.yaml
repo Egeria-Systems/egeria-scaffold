@@ -1,0 +1,14 @@
+heading: Choix de mesure d’audience
+summary: Choisissez si ce site peut charger des services facultatifs de mesure d’audience.
+providersHeading: Finalités sélectionnées
+allowLabel: Autoriser la mesure d’audience
+declineLabel: Refuser la mesure d’audience
+manageLabel: Gérer la mesure d’audience
+withdrawLabel: Retirer le consentement
+closeLabel: Fermer les choix de mesure d’audience
+grantedStatus: La mesure d’audience facultative est autorisée.
+deniedStatus: La mesure d’audience facultative est bloquée.
+purposes:
+  cloudflareWebAnalytics: Mesure globale du trafic et de la performance
+  googleAnalytics4: Mesure de l’audience
+  microsoftClarity: Analyse consentie de l’expérience

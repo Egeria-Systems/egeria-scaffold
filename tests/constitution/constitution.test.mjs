@@ -2394,7 +2394,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/i,
+    /descriptor admission[^\n]+pass[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending multilingual and analytics subjects/i,
   );
 });
 
@@ -2895,7 +2895,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/iu,
+    /descriptor admission[^\n]+pass[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending multilingual and analytics subjects/iu,
   );
   assert.match(
     enforcementMap,
@@ -3227,7 +3227,7 @@ test("canonical documentation accepts profile-transition execution and records t
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+exact Calendly and multilingual addition\/removal[^\n]+standards and site-routing upgrades[^\n]+portfolio-to-site transaction[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+Exact Calendly certification[^\n]+protected-staging\/provider journey[^\n]+Exact standards certification[^\n]+compiled upgrade\/refusal\/recovery[^\n]+renewed fresh-scaffold evidence[^\n]+generic lifecycle executor[^\n]+(?:another|any further) upgrade or profile-transition edge[^\n]+automated recovery/iu,
+    /Existing-repository mutation[^\n]+Calendly and multilingual addition\/removal[^\n]+standards and site-routing upgrades[^\n]+portfolio-to-site transition[^\n]+analytics addition\/removal[^\n]+current isolated candidate[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+Exact Calendly certification[^\n]+protected-staging\/provider journey[^\n]+Exact standards certification[^\n]+compiled upgrade\/refusal\/recovery[^\n]+renewed fresh-scaffold evidence[^\n]+generic lifecycle executor[^\n]+any further upgrade or profile-transition edge[^\n]+automated recovery/iu,
   );
   assert.match(
     overview,
@@ -3256,7 +3256,7 @@ test("canonical documentation accepts profile-transition execution and records t
   );
   assert.match(
     enforcementMap,
-    /INV-STATE-UPDATE-ORDER[^\n]+exact Calendly addition\/removal[^\n]+migration-before-state persistence[^\n]+final manifest\/state\/inference agreement/iu,
+    /INV-STATE-UPDATE-ORDER[^\n]+exact Calendly, multilingual, and analytics addition\/removal[^\n]+migration-before-state persistence[^\n]+final manifest\/state\/inference agreement/iu,
   );
   assert.match(
     capabilityModel,
@@ -3264,7 +3264,7 @@ test("canonical documentation accepts profile-transition execution and records t
   );
   assert.match(
     capabilityModel,
-    /Exact `apply-remove`[^\n]+accepted-main integrated/iu,
+    /Exact Calendly removal[^\n]+accepted-main integrated/iu,
   );
   assert.match(
     capabilityModel,
@@ -3272,7 +3272,7 @@ test("canonical documentation accepts profile-transition execution and records t
   );
   assert.match(
     enforcementMap,
-    /INV-STATE-UPDATE-ORDER[^\n]+actual[^\n]+exact Calendly addition\/removal/iu,
+    /INV-STATE-UPDATE-ORDER[^\n]+actual[^\n]+exact Calendly, multilingual, and analytics addition\/removal/iu,
   );
 
   assert.match(
@@ -3960,6 +3960,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
       "fixtures/generated/portfolio-calendly",
       "fixtures/generated/site",
       "fixtures/generated/site-multilingual",
+      "fixtures/generated/site-multilingual-analytics",
     ].map((path) => access(resolve(repositoryRoot, path))),
   );
 
@@ -3971,22 +3972,25 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     readme,
     /builder kernel has received verified-final-diff approval.*committed golden fixtures.*client-ready portfolio stage is completed through an unnumbered closure amendment/iu,
   );
-  assert.match(readme, /retained `portfolio-calendly` and `site-multilingual` fixtures/iu);
+  assert.match(
+    readme,
+    /retained `portfolio-calendly`, `site-multilingual`, and `site-multilingual-analytics` fixtures/iu,
+  );
   assert.match(
     capabilityModel,
-    /eight `portfolio`\/`site` descriptors.*executable.*multilingual@0\.1\.0.*eighth executable descriptor/isu,
+    /nine `portfolio`\/`site` descriptors.*executable.*analytics@0\.1\.0.*ninth executable descriptor/isu,
   );
   assert.match(
     packageOwnership,
-    /eight capability descriptors/iu,
+    /nine capability descriptors/iu,
   );
   assert.match(
     builderCoreReadme,
-    /exact eight executable capability descriptors/iu,
+    /exact nine executable capability descriptors/iu,
   );
   assert.match(
     cliReadme,
-    /paired `--calendly-url` and `--calendly-mode`/iu,
+    /paired `--calendly-url` and `--calendly-mode`.*strict analytics options/isu,
   );
   assert.match(
     roadmap,

@@ -4,7 +4,7 @@ import { mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
 import { generatedFixtureContracts } from "../../scripts/verify-generated-skeletons.mjs";
@@ -15,6 +15,9 @@ const repositoryRoot = resolve(
   "../..",
 );
 const cliEntry = resolve(repositoryRoot, "apps/cli/dist/index.js");
+const core = await import(
+  pathToFileURL(resolve(repositoryRoot, "packages/builder-core/dist/index.js"))
+);
 const maximumOutputBytes = 1024 * 1024;
 const commandTimeoutMilliseconds = 45 * 60 * 1000;
 const codePointCompare = (left, right) =>
@@ -240,6 +243,12 @@ test("compiled project generation matches every committed fixture identifier", a
         );
         assert.equal(
           state.installedCapabilities.find(
+            ({ identifier }) => identifier === "analytics",
+          )?.version ?? null,
+          fixtureCase.expectedAnalyticsVersion,
+        );
+        assert.equal(
+          state.installedCapabilities.find(
             ({ identifier }) => identifier === "multilingual",
           )?.version ?? null,
           fixtureCase.expectedMultilingualVersion,
@@ -252,25 +261,12 @@ test("compiled project generation matches every committed fixture identifier", a
           join(destination, ".egeria/project.yaml"),
           "utf8",
         );
-        const expectedSettings = fixtureCase.expectedCapabilitySettings[
-          "booking-calendly"
-        ];
-        if (expectedSettings === undefined) {
-          assert.match(projectConfiguration, /^capabilitySettings: \{\}$/mu);
-        } else {
-          assert.match(
-            projectConfiguration,
-            new RegExp(
-              [
-                "^capabilitySettings:$",
-                "^  booking-calendly:$",
-                `^    destination: ${expectedSettings.destination}$`,
-                `^    mode: ${expectedSettings.mode}$`,
-              ].join("\\n"),
-              "mu",
-            ),
-          );
-        }
+        const parsedProject = core.parseProjectYaml(projectConfiguration);
+        assert.equal(parsedProject.ok, true, JSON.stringify(parsedProject.issues));
+        assert.deepEqual(
+          parsedProject.value.capabilitySettings,
+          fixtureCase.expectedCapabilitySettings,
+        );
         assert.deepEqual(state.lastSuccessfulVerification.checks, [
           "contracts",
           "pre-state-inference",
