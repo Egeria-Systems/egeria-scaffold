@@ -2506,7 +2506,7 @@ test("client-required public-site work is relocated after lifecycle without requ
   );
 });
 
-test("multilingual implementation is exact and serialized behind routing certification", async () => {
+test("multilingual implementation and certification remain exact and claim-limited", async () => {
   const [
     sourcePlan,
     programRoadmap,
@@ -2587,12 +2587,12 @@ test("multilingual implementation is exact and serialized behind routing certifi
   );
   assert.match(
     multilingualBoundary,
-    /certification[\s\S]+separate[\s\S]+pending[\s\S]+linguistic quality[\s\S]+WCAG conformance/iu,
+    /multilingual@0\.1\.0[\s\S]+certified[\s\S]+372761ac1e96eb6cbc5591c0825b124c5493244b[\s\S]+linguistic quality[\s\S]+WCAG conformance/iu,
   );
 
   assert.match(
     overview,
-    /multilingual@0\.1\.0[\s\S]+exact addition and removal[\s\S]+certification remains separate/iu,
+    /multilingual@0\.1\.0[\s\S]+exact addition and removal[\s\S]+certified[\s\S]+372761ac1e96eb6cbc5591c0825b124c5493244b/iu,
   );
   assert.match(
     enforcementMap,
@@ -2612,7 +2612,10 @@ test("multilingual implementation is exact and serialized behind routing certifi
       instructions,
       /booking-calendly@0\.1\.0[\s\S]+multilingual@0\.1\.0/iu,
     );
-    assert.match(instructions, /multilingual certification remains separate/iu);
+    assert.match(
+      instructions,
+      /multilingual@0\.1\.0[\s\S]+certified[\s\S]+372761ac1e96eb6cbc5591c0825b124c5493244b/iu,
+    );
   }
 });
 
@@ -2660,6 +2663,7 @@ test("executable capability certification ownership is current", async () => {
   const bookingRecord = registry.records["booking-calendly"];
   const deploymentRecord = registry.records["deployment-cloudflare"];
   const observabilityRecord = registry.records.observability;
+  const multilingualRecord = registry.records.multilingual;
   const siteRoutingRecord = registry.records["site-routing"];
   const standardsRecord = registry.records.standards;
   assert.equal(bookingRecord.status, "certified");
@@ -2734,6 +2738,29 @@ test("executable capability certification ownership is current", async () => {
     ),
   );
   assert.equal(observabilityRecord.status, "certified");
+  assert.deepEqual(multilingualRecord, {
+    subject: {
+      descriptorVersion: "0.1.0",
+      behaviorContractDigest:
+        "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41",
+    },
+    requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
+    status: "certified",
+    taskPlan: "docs/superpowers/plans/2026-08-27-multilingual-certification.md",
+    evidence: ["existing-repository-lifecycle", "fresh-scaffold"].map(
+      (kind) => ({
+        kind,
+        path: "docs/implementation-evidence/2026-08-27-multilingual-certification-receipt.md",
+        outcome: "passed",
+        revision: "372761ac1e96eb6cbc5591c0825b124c5493244b",
+        subject: {
+          descriptorVersion: "0.1.0",
+          behaviorContractDigest:
+            "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41",
+        },
+      }),
+    ),
+  });
   assert.deepEqual(siteRoutingRecord, {
     subject: {
       descriptorVersion: "0.4.0",
@@ -2834,6 +2861,10 @@ test("executable capability certification ownership is current", async () => {
     assert.match(
       document,
       /observability@0\.2\.0[^\n]+historical evidence[^\n]+(?:prior|exact historical) subject/iu,
+    );
+    assert.match(
+      document,
+      /multilingual@0\.1\.0[^\n]+certified[^\n]+372761ac1e96eb6cbc5591c0825b124c5493244b/iu,
     );
   }
   for (const document of [
@@ -3482,11 +3513,11 @@ test("canonical documentation accepts profile-transition execution and records t
     "iu",
   );
   const multilingualEligibilityPattern =
-    /multilingual[^\n]+implementation[^\n]+current[^\n]+certification[^\n]+next/iu;
+    /multilingual@0\.1\.0[^\n]+certified[^\n]+372761ac1e96eb6cbc5591c0825b124c5493244b/iu;
   const semanticLifecycleClosurePattern =
     /transactional-lifecycle closure[^\n]+approved[^\n]+closed/iu;
   const semanticMultilingualPattern =
-    /multilingual[^\n]+implementation[^\n]+current[^\n]+certification[^\n]+next/iu;
+    /multilingual@0\.1\.0[^\n]+certified[^\n]+372761ac1e96eb6cbc5591c0825b124c5493244b/iu;
 
   for (const sequencingOwner of [sourcePlan, roadmap]) {
     assert.doesNotMatch(sequencingOwner, /minimum one remaining increment/iu);

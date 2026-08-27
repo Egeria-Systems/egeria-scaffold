@@ -55,7 +55,11 @@ const historicalSiteRoutingEvidenceRevision =
 const deploymentPlanPath =
   "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md";
 const multilingualPlanPath =
-  "docs/superpowers/plans/2026-08-26-multilingual-capability-implementation.md";
+  "docs/superpowers/plans/2026-08-27-multilingual-certification.md";
+const multilingualEvidencePath =
+  "docs/implementation-evidence/2026-08-27-multilingual-certification-receipt.md";
+const multilingualEvidenceRevision =
+  "372761ac1e96eb6cbc5591c0825b124c5493244b";
 const deploymentEvidencePath =
   "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md";
 const deploymentEvidenceRevision =
@@ -478,21 +482,49 @@ test("current production site routing subject has exact reviewed lifecycle and f
   );
 });
 
-test("current multilingual subject is admitted only as pending certification", () => {
+test("current multilingual subject has exact reviewed lifecycle and fresh-scaffold evidence", () => {
   const descriptor = descriptorsByIdentifier.get("multilingual");
   assert.notEqual(descriptor, undefined);
   const subject = core.createCertificationSubject(
     descriptor,
     requiredEvidence.multilingual,
   );
-
-  assert.deepEqual(committedRegistry.records.multilingual, {
+  const acceptedRecord = {
     subject,
     requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
-    status: "pending",
+    status: "certified",
     taskPlan: multilingualPlanPath,
-    evidence: [],
-  });
+    evidence: ["existing-repository-lifecycle", "fresh-scaffold"].map(
+      (kind) => ({
+        kind,
+        path: multilingualEvidencePath,
+        outcome: "passed",
+        revision: multilingualEvidenceRevision,
+        subject,
+      }),
+    ),
+  };
+  const acceptedReceiptUrl = new URL(
+    `../../../${multilingualEvidencePath}`,
+    import.meta.url,
+  );
+
+  assert.deepEqual(committedRegistry.records.multilingual, acceptedRecord);
+  assert.equal(existsSync(acceptedReceiptUrl), true, multilingualEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { multilingual: acceptedRecord },
+      },
+      artifacts: {
+        [multilingualPlanPath]: "# approved plan",
+        [multilingualEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [multilingualEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
 });
 
 test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", () => {
