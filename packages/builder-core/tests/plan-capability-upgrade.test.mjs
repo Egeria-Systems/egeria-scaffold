@@ -436,7 +436,7 @@ test("the production site recipe has one exact certified site-routing upgrade ed
   assert.equal(edge.value.target.recipeVersion, "0.11.0");
   assert.equal(
     edge.value.target.evidenceRevision,
-    "f2b80d9e5e6bb08237d7cc887ee42d2f106e9243",
+    "e69c28ec4228622fd34517a72858e2ac55401a5a",
   );
 
   const entries = await acceptedSiteEntries();
