@@ -70,14 +70,22 @@ import {
 } from "./plan-capability-removal.js";
 
 const encoder = new TextEncoder();
-type RemovableCapability = "booking-calendly" | "multilingual";
+type RemovableCapability = "analytics" | "booking-calendly" | "multilingual";
 
 function removalMigrationIdentifier(
   capability: RemovableCapability,
-): "remove-booking-calendly-0-1-0" | "remove-multilingual-0-1-0" {
-  return capability === "booking-calendly"
-    ? "remove-booking-calendly-0-1-0"
-    : "remove-multilingual-0-1-0";
+):
+  | "remove-analytics-0-1-0"
+  | "remove-booking-calendly-0-1-0"
+  | "remove-multilingual-0-1-0" {
+  switch (capability) {
+    case "analytics":
+      return "remove-analytics-0-1-0";
+    case "booking-calendly":
+      return "remove-booking-calendly-0-1-0";
+    case "multilingual":
+      return "remove-multilingual-0-1-0";
+  }
 }
 
 export type CapabilityRemovalPhase =
@@ -430,6 +438,9 @@ function createNextProject(
   capability: RemovableCapability,
 ): ProjectConfiguration | undefined {
   const remainingCapabilitySettings = { ...current.capabilitySettings };
+  if (capability === "analytics") {
+    delete remainingCapabilitySettings.analytics;
+  }
   if (capability === "booking-calendly") {
     delete remainingCapabilitySettings["booking-calendly"];
   }
@@ -625,6 +636,10 @@ export async function applyCapabilityRemoval(input: Readonly<{
     profile: controls.project.value.originProfile,
     projectName: controls.project.value.project.name,
     displayName: controls.project.value.project.displayName,
+    ...(input.capability === "analytics" ||
+    controls.project.value.capabilitySettings.analytics === undefined
+      ? {}
+      : { analytics: controls.project.value.capabilitySettings.analytics }),
     ...(input.capability === "booking-calendly" ||
     controls.project.value.capabilitySettings["booking-calendly"] === undefined
       ? {}

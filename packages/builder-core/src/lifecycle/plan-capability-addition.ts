@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import { createVerifiedCapabilityCatalog, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
+  analyticsSettingsSchema,
+  type AnalyticsSettings,
   calendlyBookingSettingsSchema,
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
@@ -39,10 +41,23 @@ export type CapabilityAdditionPlan = Readonly<{
   baseRevision: string;
   profile: "portfolio" | "site";
   capability: Readonly<{
-    identifier: "booking-calendly" | "multilingual";
+    identifier: "analytics" | "booking-calendly" | "multilingual";
     version: "0.1.0";
   }>;
   settings:
+    | Readonly<{
+        consentPolicy: "explicit-opt-in";
+        providers: readonly (
+          | "cloudflare-web-analytics"
+          | "google-analytics-4"
+          | "microsoft-clarity"
+        )[];
+        operationalIntegrations: readonly (
+          | "google-search-console"
+          | "looker-studio"
+        )[];
+        providerIdentifiers: "redacted";
+      }>
     | Readonly<{
         mode: "link" | "inline" | "popup";
         destination: "redacted";
@@ -139,7 +154,7 @@ function sameOrderedValues(
 
 function fingerprintPlan(input: Readonly<{
   plan: CapabilityAdditionPlanBody;
-  settings: CalendlyBookingSettings | null;
+  settings: AnalyticsSettings | CalendlyBookingSettings | null;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
 }>): `sha256:${string}` {
   const digest = createHash("sha256")
@@ -195,7 +210,11 @@ function hasMaterialDrift(inspection: ValidInspection): boolean {
   const materialCapabilities = discrepancies.capabilities.filter(
     ({ desired, identifier, installed }) =>
       !(
-        (identifier === "booking-calendly" || identifier === "multilingual") &&
+        (
+          identifier === "analytics" ||
+          identifier === "booking-calendly" ||
+          identifier === "multilingual"
+        ) &&
         !desired &&
         !installed
       ),
@@ -207,6 +226,7 @@ function hasMaterialDrift(inspection: ValidInspection): boolean {
     inspection.inference.capabilities.some(
       ({ category, identifier }) =>
         identifier !== "booking-calendly" &&
+        identifier !== "analytics" &&
         identifier !== "multilingual" &&
         category !== "confirmed",
     ) ||
@@ -464,12 +484,13 @@ async function deriveActions(input: Readonly<{
 async function planCapabilityAdditionUnchecked(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "booking-calendly" | "multilingual";
-  settings?: CalendlyBookingSettings;
+  capability: "analytics" | "booking-calendly" | "multilingual";
+  settings?: AnalyticsSettings | CalendlyBookingSettings;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
 
   if (
+    capabilityValue !== "analytics" &&
     capabilityValue !== "booking-calendly" &&
     capabilityValue !== "multilingual"
   ) {
@@ -479,8 +500,12 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   const settingsResult = capabilityValue === "booking-calendly"
     ? calendlyBookingSettingsSchema.safeParse(input.settings)
     : undefined;
+  const analyticsSettingsResult = capabilityValue === "analytics"
+    ? analyticsSettingsSchema.safeParse(input.settings)
+    : undefined;
   if (
     (settingsResult !== undefined && !settingsResult.success) ||
+    (analyticsSettingsResult !== undefined && !analyticsSettingsResult.success) ||
     (capabilityValue === "multilingual" && input.settings !== undefined)
   ) {
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
@@ -534,6 +559,9 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     ...(project.selectedCapabilities.includes("multilingual")
       ? { multilingual: true as const }
       : {}),
+    ...(project.capabilitySettings.analytics === undefined
+      ? {}
+      : { analytics: project.capabilitySettings.analytics }),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
   const currentResult = await renderSkeleton(renderRequest);
@@ -568,9 +596,11 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 
   const desiredResult = await renderSkeleton({
     ...renderRequest,
-    ...(capabilityValue === "booking-calendly" && settingsResult?.success === true
-      ? { bookingCalendly: settingsResult.data }
-      : { multilingual: true as const }),
+    ...(capabilityValue === "analytics" && analyticsSettingsResult?.success === true
+      ? { analytics: analyticsSettingsResult.data }
+      : capabilityValue === "booking-calendly" && settingsResult?.success === true
+        ? { bookingCalendly: settingsResult.data }
+        : { multilingual: true as const }),
   });
 
   if (!desiredResult.ok) {
@@ -615,7 +645,31 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
         version: descriptor.version,
       },
       settings:
-        settingsResult?.success === true
+        analyticsSettingsResult?.success === true
+          ? {
+              consentPolicy: analyticsSettingsResult.data.consent.policy,
+              providers: [
+                ...(analyticsSettingsResult.data.providers.cloudflareWebAnalytics === undefined
+                  ? []
+                  : ["cloudflare-web-analytics" as const]),
+                ...(analyticsSettingsResult.data.providers.googleAnalytics4 === undefined
+                  ? []
+                  : ["google-analytics-4" as const]),
+                ...(analyticsSettingsResult.data.providers.microsoftClarity === undefined
+                  ? []
+                  : ["microsoft-clarity" as const]),
+              ],
+              operationalIntegrations: [
+                ...(analyticsSettingsResult.data.operationalIntegrations.googleSearchConsole === undefined
+                  ? []
+                  : ["google-search-console" as const]),
+                ...(analyticsSettingsResult.data.operationalIntegrations.lookerStudio === undefined
+                  ? []
+                  : ["looker-studio" as const]),
+              ],
+              providerIdentifiers: "redacted",
+            }
+          : settingsResult?.success === true
           ? {
               mode: settingsResult.data.mode,
               destination: "redacted",
@@ -641,7 +695,12 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       ...plan,
       planFingerprint: fingerprintPlan({
         plan,
-        settings: settingsResult?.success === true ? settingsResult.data : null,
+        settings:
+          analyticsSettingsResult?.success === true
+            ? analyticsSettingsResult.data
+            : settingsResult?.success === true
+              ? settingsResult.data
+              : null,
         git: input.git,
       }),
     },
@@ -651,8 +710,8 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 export async function planCapabilityAddition(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "booking-calendly" | "multilingual";
-  settings?: CalendlyBookingSettings;
+  capability: "analytics" | "booking-calendly" | "multilingual";
+  settings?: AnalyticsSettings | CalendlyBookingSettings;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   return planCapabilityAdditionUnchecked(input);
 }

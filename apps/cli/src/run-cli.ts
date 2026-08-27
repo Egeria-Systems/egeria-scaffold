@@ -220,6 +220,9 @@ async function runCreate(
       ...(command.bookingCalendly === undefined
         ? {}
         : { bookingCalendly: command.bookingCalendly }),
+      ...(command.analytics === undefined
+        ? {}
+        : { analytics: command.analytics }),
       ...(command.multilingual === true ? { multilingual: true } : {}),
     },
     destination: resolve(command.directory),
@@ -299,13 +302,17 @@ function writePlanAddRefusal(output: CliOutput, code: string): 1 {
   return 1;
 }
 
-function writePlanRemoveRefusal(output: CliOutput, code: string): 1 {
+function writePlanRemoveRefusal(
+  output: CliOutput,
+  code: string,
+  capability: Extract<CliCommand, Readonly<{ kind: "plan-remove" }>>["capability"],
+): 1 {
   writeJson(output.writeError, {
     ok: false,
     command: "plan-remove",
     code,
     ...(code === "CAPABILITY_NOT_INSTALLED"
-      ? { capability: "booking-calendly" }
+      ? { capability }
       : {}),
   });
   return 1;
@@ -450,7 +457,7 @@ async function runPlanRemove(
   const initialGit = await inspectForPlan(root, dependencies);
 
   if (!initialGit.ok) {
-    return writePlanRemoveRefusal(output, initialGit.code);
+    return writePlanRemoveRefusal(output, initialGit.code, command.capability);
   }
 
   let outcome:
@@ -477,15 +484,19 @@ async function runPlanRemove(
   const finalGit = await inspectForPlan(root, dependencies);
 
   if (!finalGit.ok) {
-    return writePlanRemoveRefusal(output, finalGit.code);
+    return writePlanRemoveRefusal(output, finalGit.code, command.capability);
   }
 
   if (!sameGitIdentity(initialGit, finalGit)) {
-    return writePlanRemoveRefusal(output, "GIT_WORKTREE_CHANGED");
+    return writePlanRemoveRefusal(
+      output,
+      "GIT_WORKTREE_CHANGED",
+      command.capability,
+    );
   }
 
   if (outcome.kind === "failure") {
-    return writePlanRemoveRefusal(output, outcome.code);
+    return writePlanRemoveRefusal(output, outcome.code, command.capability);
   }
 
   if (!outcome.result.ok) {
@@ -495,6 +506,7 @@ async function runPlanRemove(
       code !== undefined && isRemovalPlannerRefusalCode(code)
         ? code
         : "REPOSITORY_OPEN_FAILED",
+      command.capability,
     );
   }
 
@@ -760,7 +772,7 @@ async function runApplyRemove(
       command: "apply-remove",
       code: result.code,
       ...(result.code === "CAPABILITY_NOT_INSTALLED"
-        ? { capability: "booking-calendly" }
+        ? { capability: command.capability }
         : { phase: result.phase, recovery: result.recovery }),
     });
     return 1;

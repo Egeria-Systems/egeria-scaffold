@@ -5,6 +5,7 @@ import type {
 } from "../contracts/result.js";
 
 const templateLayers = new Set([
+  "analytics",
   "booking-calendly",
   "common",
   "multilingual",
@@ -24,9 +25,10 @@ const templateTokenNames = new Set([
   "githubCloudflareApiTokenExpression",
   "calendlyDestinationJson",
   "calendlyModeJson",
+  "analyticsSettingsJson",
 ]);
 const templateTokenPattern =
-  /{{(projectName|displayNameJson|workerName|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|calendlyDestinationJson|calendlyModeJson)}}/g;
+  /{{(projectName|displayNameJson|workerName|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson)}}/g;
 const completeTokenPattern = /{{([^{}]*)}}/g;
 const bookingCalendlySettingsSource =
   "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template";
@@ -34,6 +36,9 @@ const bookingCalendlyTokenNames = new Set([
   "calendlyDestinationJson",
   "calendlyModeJson",
 ]);
+const analyticsSettingsSource =
+  "analytics/apps/web/src/integrations/analytics/analytics-settings.ts.template";
+const analyticsTokenNames = new Set(["analyticsSettingsJson"]);
 const fixedTemplateTokens = {
   githubWorkflowExpression: "${{ github.workflow }}",
   githubRefExpression: "${{ github.ref }}",
@@ -52,6 +57,7 @@ export type TemplateTokens = Readonly<{
   workerName: string;
   calendlyDestinationJson?: string;
   calendlyModeJson?: string;
+  analyticsSettingsJson?: string;
 }>;
 
 type TemplateTokenName = keyof TemplateTokens | keyof typeof fixedTemplateTokens;
@@ -118,7 +124,8 @@ function validateTemplateSyntax(
       if (
         templateTokenNames.has(token) &&
         (!bookingCalendlyTokenNames.has(token) ||
-          source === bookingCalendlySettingsSource)
+          source === bookingCalendlySettingsSource) &&
+        (!analyticsTokenNames.has(token) || source === analyticsSettingsSource)
       ) {
         if (
           !(token in fixedTemplateTokens) &&
@@ -133,6 +140,8 @@ function validateTemplateSyntax(
         bookingCalendlyTokenNames.has(token) &&
         source !== bookingCalendlySettingsSource
           ? "unavailable-token"
+          : analyticsTokenNames.has(token) && source !== analyticsSettingsSource
+            ? "unavailable-token"
           : /^[A-Za-z][A-Za-z0-9]*$/.test(token)
             ? "unknown-token"
             : "malformed-token";

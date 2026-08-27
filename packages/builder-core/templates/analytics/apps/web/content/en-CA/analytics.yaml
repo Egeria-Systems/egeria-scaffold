@@ -1,0 +1,14 @@
+heading: Analytics choices
+summary: Choose whether this site may load optional analytics providers.
+providersHeading: Selected purposes
+allowLabel: Allow analytics
+declineLabel: Decline analytics
+manageLabel: Manage analytics
+withdrawLabel: Withdraw analytics consent
+closeLabel: Close analytics choices
+grantedStatus: Optional analytics are allowed.
+deniedStatus: Optional analytics are blocked.
+purposes:
+  cloudflareWebAnalytics: Aggregate traffic and performance measurement
+  googleAnalytics4: Audience measurement
+  microsoftClarity: Consented experience analysis

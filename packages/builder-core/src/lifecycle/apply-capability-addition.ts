@@ -10,7 +10,10 @@ import {
   migrationRecordSchema,
   type MigrationRecord,
 } from "../contracts/migration.js";
-import type { CalendlyBookingSettings } from "../contracts/project.js";
+import type {
+  AnalyticsSettings,
+  CalendlyBookingSettings,
+} from "../contracts/project.js";
 import {
   capabilityAdditionPersistedVerificationChecks,
   capabilityAdditionVerificationChecks,
@@ -65,14 +68,22 @@ import {
 } from "./plan-capability-addition.js";
 
 const encoder = new TextEncoder();
-type AddableCapability = "booking-calendly" | "multilingual";
+type AddableCapability = "analytics" | "booking-calendly" | "multilingual";
 
 function additionMigrationIdentifier(
   capability: AddableCapability,
-): "add-booking-calendly-0-1-0" | "add-multilingual-0-1-0" {
-  return capability === "booking-calendly"
-    ? "add-booking-calendly-0-1-0"
-    : "add-multilingual-0-1-0";
+):
+  | "add-analytics-0-1-0"
+  | "add-booking-calendly-0-1-0"
+  | "add-multilingual-0-1-0" {
+  switch (capability) {
+    case "analytics":
+      return "add-analytics-0-1-0";
+    case "booking-calendly":
+      return "add-booking-calendly-0-1-0";
+    case "multilingual":
+      return "add-multilingual-0-1-0";
+  }
 }
 
 export type CapabilityAdditionPhase =
@@ -383,7 +394,7 @@ function createNextState(input: Readonly<{
 export async function applyCapabilityAddition(input: Readonly<{
   root: string;
   capability: AddableCapability;
-  settings?: CalendlyBookingSettings;
+  settings?: AnalyticsSettings | CalendlyBookingSettings;
   approvedPlanFingerprint: string;
   verifier: GeneratedProjectVerifier;
   reader?: RepositoryReader;
@@ -468,8 +479,13 @@ export async function applyCapabilityAddition(input: Readonly<{
     profile: controls.project.value.originProfile,
     projectName: controls.project.value.project.name,
     displayName: controls.project.value.project.displayName,
+    ...(input.capability === "analytics"
+      ? { analytics: input.settings as AnalyticsSettings }
+      : controls.project.value.capabilitySettings.analytics === undefined
+        ? {}
+        : { analytics: controls.project.value.capabilitySettings.analytics }),
     ...(input.capability === "booking-calendly"
-      ? { bookingCalendly: input.settings }
+      ? { bookingCalendly: input.settings as CalendlyBookingSettings }
       : controls.project.value.capabilitySettings["booking-calendly"] === undefined
         ? {}
         : {

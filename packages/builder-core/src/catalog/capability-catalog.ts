@@ -945,6 +945,12 @@ function createDescriptors(
       "managed",
     ),
     createFileEvidencePoint(
+      "analytics-content-source-contract",
+      "analytics",
+      "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
       "analytics-content-reader",
       "analytics",
       "apps/web/src/integrations/analytics/analytics-content.ts",

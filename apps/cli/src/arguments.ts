@@ -1,7 +1,9 @@
 import {
+  analyticsSettingsSchema,
   calendlyBookingSettingsSchema,
   profileIdentifierSchema,
   projectConfigurationSchema,
+  type AnalyticsSettings,
   type CalendlyBookingSettings,
   type ProfileIdentifier,
   type ValidationResult,
@@ -17,6 +19,7 @@ export type CliCommand =
       displayName: string;
       directory: string;
       bookingCalendly?: CalendlyBookingSettings;
+      analytics?: AnalyticsSettings;
       multilingual?: true;
     }>
   | Readonly<{
@@ -26,13 +29,13 @@ export type CliCommand =
   | Readonly<{
       kind: "plan-add";
       directory: string;
-      capability: "booking-calendly" | "multilingual";
-      settings?: CalendlyBookingSettings;
+      capability: "analytics" | "booking-calendly" | "multilingual";
+      settings?: AnalyticsSettings | CalendlyBookingSettings;
     }>
   | Readonly<{
       kind: "plan-remove";
       directory: string;
-      capability: "booking-calendly" | "multilingual";
+      capability: "analytics" | "booking-calendly" | "multilingual";
     }>
   | Readonly<{
       kind: "plan-upgrade";
@@ -48,14 +51,14 @@ export type CliCommand =
   | Readonly<{
       kind: "apply-add";
       directory: string;
-      capability: "booking-calendly" | "multilingual";
-      settings?: CalendlyBookingSettings;
+      capability: "analytics" | "booking-calendly" | "multilingual";
+      settings?: AnalyticsSettings | CalendlyBookingSettings;
       approvedPlanFingerprint: string;
     }>
   | Readonly<{
       kind: "apply-remove";
       directory: string;
-      capability: "booking-calendly" | "multilingual";
+      capability: "analytics" | "booking-calendly" | "multilingual";
       approvedPlanFingerprint: string;
     }>
   | Readonly<{
@@ -75,6 +78,91 @@ export type CliCommand =
 const projectFields = projectConfigurationSchema
   .unwrap()
   .shape.project.unwrap().shape;
+
+const analyticsOptionDefinitions = {
+  "cloudflare-web-analytics-token": { type: "string" },
+  "google-analytics-id": { type: "string" },
+  "microsoft-clarity-id": { type: "string" },
+  "microsoft-clarity-audience": { type: "string" },
+  "search-console-verification": { type: "string" },
+  "looker-studio": { type: "boolean" },
+} as const;
+
+type AnalyticsOptionValues = Readonly<{
+  "cloudflare-web-analytics-token"?: string;
+  "google-analytics-id"?: string;
+  "microsoft-clarity-id"?: string;
+  "microsoft-clarity-audience"?: string;
+  "search-console-verification"?: string;
+  "looker-studio"?: boolean;
+}>;
+
+function selectedAnalyticsOptions(values: AnalyticsOptionValues): string[] {
+  return [
+    ...(values["cloudflare-web-analytics-token"] === undefined
+      ? []
+      : ["cloudflare-web-analytics-token"]),
+    ...(values["google-analytics-id"] === undefined
+      ? []
+      : ["google-analytics-id"]),
+    ...(values["microsoft-clarity-id"] === undefined
+      ? []
+      : ["microsoft-clarity-id"]),
+    ...(values["microsoft-clarity-audience"] === undefined
+      ? []
+      : ["microsoft-clarity-audience"]),
+    ...(values["search-console-verification"] === undefined
+      ? []
+      : ["search-console-verification"]),
+    ...(values["looker-studio"] === true ? ["looker-studio"] : []),
+  ];
+}
+
+function parseAnalyticsSettings(values: AnalyticsOptionValues) {
+  if (selectedAnalyticsOptions(values).length === 0) {
+    return undefined;
+  }
+
+  return analyticsSettingsSchema.safeParse({
+    consent: { policy: "explicit-opt-in" },
+    providers: {
+      ...(values["cloudflare-web-analytics-token"] === undefined
+        ? {}
+        : {
+            cloudflareWebAnalytics: {
+              siteToken: values["cloudflare-web-analytics-token"],
+            },
+          }),
+      ...(values["google-analytics-id"] === undefined
+        ? {}
+        : {
+            googleAnalytics4: {
+              measurementId: values["google-analytics-id"],
+            },
+          }),
+      ...(values["microsoft-clarity-id"] === undefined
+        ? {}
+        : {
+            microsoftClarity: {
+              projectId: values["microsoft-clarity-id"],
+              audience: values["microsoft-clarity-audience"],
+            },
+          }),
+    },
+    operationalIntegrations: {
+      ...(values["search-console-verification"] === undefined
+        ? {}
+        : {
+            googleSearchConsole: {
+              verificationToken: values["search-console-verification"],
+            },
+          }),
+      ...(values["looker-studio"] === true
+        ? { lookerStudio: { connector: "google-analytics-4" } }
+        : {}),
+    },
+  });
+}
 
 function invalidArguments(): ValidationResult<never> {
   return {
@@ -126,6 +214,7 @@ function parseCreate(
         "calendly-url": { type: "string" },
         "calendly-mode": { type: "string" },
         multilingual: { type: "boolean" },
+        ...analyticsOptionDefinitions,
       },
       strict: true,
       allowPositionals: false,
@@ -138,6 +227,7 @@ function parseCreate(
     const calendlyUrl = values["calendly-url"];
     const calendlyMode = values["calendly-mode"];
     const multilingual = values.multilingual;
+    const parsedAnalytics = parseAnalyticsSettings(values);
     const parsedProfile = profileIdentifierSchema.safeParse(profile);
     const parsedProjectName = projectFields.name.safeParse(projectName);
     const parsedDisplayName = projectFields.displayName.safeParse(displayName);
@@ -162,6 +252,7 @@ function parseCreate(
           ]
         : []),
       ...(multilingual === true ? ["multilingual"] : []),
+      ...selectedAnalyticsOptions(values),
     ];
 
     if (
@@ -171,6 +262,7 @@ function parseCreate(
       !parsedDisplayName.success ||
       hasCalendlyUrl !== hasCalendlyMode ||
       (parsedCalendly !== undefined && !parsedCalendly.success) ||
+      (parsedAnalytics !== undefined && !parsedAnalytics.success) ||
       !validDirectory(directory)
     ) {
       return invalidArguments();
@@ -186,6 +278,9 @@ function parseCreate(
         directory,
         ...(parsedCalendly?.success === true
           ? { bookingCalendly: parsedCalendly.data }
+          : {}),
+        ...(parsedAnalytics?.success === true
+          ? { analytics: parsedAnalytics.data }
           : {}),
         ...(multilingual === true ? { multilingual: true } : {}),
       },
@@ -230,6 +325,7 @@ function parsePlanAdd(
         capability: { type: "string" },
         "calendly-url": { type: "string" },
         "calendly-mode": { type: "string" },
+        ...analyticsOptionDefinitions,
       },
       strict: true,
       allowPositionals: false,
@@ -241,17 +337,22 @@ function parsePlanAdd(
       destination: values["calendly-url"],
       mode: values["calendly-mode"],
     });
+    const analyticsSettings = parseAnalyticsSettings(values);
     const calendlySelection = capability === "booking-calendly";
+    const analyticsSelection = capability === "analytics";
     const multilingualSelection = capability === "multilingual";
     const expectedOptions = calendlySelection
       ? ["directory", "capability", "calendly-url", "calendly-mode"]
-      : ["directory", "capability"];
+      : analyticsSelection
+        ? ["directory", "capability", ...selectedAnalyticsOptions(values)]
+        : ["directory", "capability"];
 
     if (
       !hasExactOptions(tokens, expectedOptions) ||
       !validDirectory(directory) ||
-      (!calendlySelection && !multilingualSelection) ||
-      (calendlySelection && !settings.success)
+      (!analyticsSelection && !calendlySelection && !multilingualSelection) ||
+      (calendlySelection && !settings.success) ||
+      (analyticsSelection && analyticsSettings?.success !== true)
     ) {
       return invalidArguments();
     }
@@ -264,7 +365,9 @@ function parsePlanAdd(
         capability,
         ...(calendlySelection && settings.success
           ? { settings: settings.data }
-          : {}),
+          : analyticsSelection && analyticsSettings?.success === true
+            ? { settings: analyticsSettings.data }
+            : {}),
       },
     };
   } catch {
@@ -292,7 +395,9 @@ function parsePlanRemove(
     if (
       !hasExactOptions(tokens, ["directory", "capability"]) ||
       !validDirectory(directory) ||
-      capability !== "booking-calendly" && capability !== "multilingual"
+      capability !== "analytics" &&
+      capability !== "booking-calendly" &&
+      capability !== "multilingual"
     ) {
       return invalidArguments();
     }
@@ -398,6 +503,7 @@ function parseApplyAdd(
         "calendly-url": { type: "string" },
         "calendly-mode": { type: "string" },
         "approved-plan": { type: "string" },
+        ...analyticsOptionDefinitions,
       },
       strict: true,
       allowPositionals: false,
@@ -410,7 +516,9 @@ function parseApplyAdd(
       destination: values["calendly-url"],
       mode: values["calendly-mode"],
     });
+    const analyticsSettings = parseAnalyticsSettings(values);
     const calendlySelection = capability === "booking-calendly";
+    const analyticsSelection = capability === "analytics";
     const multilingualSelection = capability === "multilingual";
     const expectedOptions = calendlySelection
       ? [
@@ -420,13 +528,21 @@ function parseApplyAdd(
           "calendly-mode",
           "approved-plan",
         ]
-      : ["directory", "capability", "approved-plan"];
+      : analyticsSelection
+        ? [
+            "directory",
+            "capability",
+            ...selectedAnalyticsOptions(values),
+            "approved-plan",
+          ]
+        : ["directory", "capability", "approved-plan"];
 
     if (
       !hasExactOptions(tokens, expectedOptions) ||
       !validDirectory(directory) ||
-      (!calendlySelection && !multilingualSelection) ||
+      (!analyticsSelection && !calendlySelection && !multilingualSelection) ||
       (calendlySelection && !settings.success) ||
+      (analyticsSelection && analyticsSettings?.success !== true) ||
       approvedPlanFingerprint === undefined ||
       !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
     ) {
@@ -441,7 +557,9 @@ function parseApplyAdd(
         capability,
         ...(calendlySelection && settings.success
           ? { settings: settings.data }
-          : {}),
+          : analyticsSelection && analyticsSettings?.success === true
+            ? { settings: analyticsSettings.data }
+            : {}),
         approvedPlanFingerprint,
       },
     };
@@ -476,7 +594,9 @@ function parseApplyRemove(
         "approved-plan",
       ]) ||
       !validDirectory(directory) ||
-      (capability !== "booking-calendly" && capability !== "multilingual") ||
+      (capability !== "analytics" &&
+        capability !== "booking-calendly" &&
+        capability !== "multilingual") ||
       approvedPlanFingerprint === undefined ||
       !/^sha256:[a-f0-9]{64}$/u.test(approvedPlanFingerprint)
     ) {

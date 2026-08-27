@@ -156,6 +156,39 @@ const multilingualRenderedPaths = [
   "apps/web/tests/unit/locale.test.ts",
   "apps/web/tests/unit/localized-content.test.ts",
 ];
+const analyticsRenderedPaths = [
+  "apps/web/content/en-CA/analytics.yaml",
+  "apps/web/content/fr-CA/analytics.yaml",
+  "apps/web/src/integrations/analytics/analytics-consent.tsx",
+  "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
+  "apps/web/src/integrations/analytics/analytics-content.ts",
+  "apps/web/src/integrations/analytics/analytics-provider-contract.ts",
+  "apps/web/src/integrations/analytics/analytics-runtime.ts",
+  "apps/web/src/integrations/analytics/analytics-settings.ts",
+  "apps/web/tests/component/analytics-consent.test.tsx",
+  "apps/web/tests/e2e/analytics-consent.spec.ts",
+  "apps/web/tests/unit/analytics-provider-contract.test.ts",
+  "docs/analytics.md",
+];
+const analyticsSettings = {
+  consent: { policy: "explicit-opt-in" },
+  providers: {
+    cloudflareWebAnalytics: {
+      siteToken: "0123456789abcdef0123456789abcdef",
+    },
+    googleAnalytics4: { measurementId: "G-TEST123456" },
+    microsoftClarity: {
+      projectId: "clarity123",
+      audience: "not-directed-to-minors",
+    },
+  },
+  operationalIntegrations: {
+    googleSearchConsole: {
+      verificationToken: "search-console-verification-token",
+    },
+    lookerStudio: { connector: "google-analytics-4" },
+  },
+};
 const controlPaths = [
   ".egeria/migrations.jsonl",
   ".egeria/project.yaml",
@@ -1407,6 +1440,73 @@ test("generation accepts only the exact multilingual selection value", async () 
       assertFailure(result, "PROJECT_GENERATION_REQUEST_INVALID");
       assert.deepEqual(invalidVerifier.calls, []);
       assert.equal(await exists(invalidDestination), false);
+    }
+  });
+});
+
+test("generation accepts only strict analytics settings and preserves public identifiers", async () => {
+  await withTestRoot(async (owner) => {
+    const destination = join(owner, "analytics-selection");
+    const fake = createFakeVerifier();
+    const generated = assertSuccess(
+      await core.generateProject({
+        request: { ...request("site"), analytics: analyticsSettings },
+        destination,
+        verifier: fake.verifier,
+      }),
+    );
+    const project = assertSuccess(
+      core.parseProjectYaml(
+        await readFile(join(destination, ".egeria/project.yaml"), "utf8"),
+      ),
+    );
+
+    assert.equal(project.selectedCapabilities.includes("analytics"), true);
+    assert.deepEqual(project.capabilitySettings.analytics, analyticsSettings);
+    assert.deepEqual(
+      await listFiles(destination),
+      [
+        ...siteRenderedPaths,
+        ...analyticsRenderedPaths,
+        ...controlPaths,
+      ].sort(),
+    );
+    assert.equal(
+      generated.state.installedCapabilities.some(
+        ({ identifier }) => identifier === "analytics",
+      ),
+      true,
+    );
+
+    for (const [index, analytics] of [
+      undefined,
+      {
+        ...analyticsSettings,
+        providers: {},
+        operationalIntegrations: {},
+      },
+      {
+        ...analyticsSettings,
+        providers: {
+          ...analyticsSettings.providers,
+          googleAnalytics4: { measurementId: "private-invalid-value" },
+        },
+      },
+    ].entries()) {
+      const invalidDestination = join(owner, `invalid-analytics-${index}`);
+      const invalidVerifier = createFakeVerifier();
+      const result = await core.generateProject({
+        request: { ...request(), analytics },
+        destination: invalidDestination,
+        verifier: invalidVerifier.verifier,
+      });
+      assertFailure(result, "PROJECT_GENERATION_REQUEST_INVALID");
+      assert.deepEqual(invalidVerifier.calls, []);
+      assert.equal(await exists(invalidDestination), false);
+      assert.doesNotMatch(
+        JSON.stringify(result.issues),
+        /private-invalid-value/u,
+      );
     }
   });
 });

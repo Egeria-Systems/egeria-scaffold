@@ -4,7 +4,7 @@
     "analytics": {
       "subject": {
         "descriptorVersion": "0.1.0",
-        "behaviorContractDigest": "sha256:1162afbf5f56a51033b66c4ee6d3758b71558b8004cf49f84d7b8414719aaa42"
+        "behaviorContractDigest": "sha256:c71477bfc9c5d1d1c111ad128f0d82b52a0b014bdeec44a879e0d76a2ff66fe0"
       },
       "requiredEvidence": [
         "cleanup-recovery",

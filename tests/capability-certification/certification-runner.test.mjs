@@ -1734,7 +1734,7 @@ test("the repository registry admits current subjects and passes both closure po
     stdout: `${JSON.stringify({
       ok: true,
       gate: "admission",
-      records: 8,
+      records: 9,
     })}\n`,
     stderr: "",
   });
@@ -1746,6 +1746,13 @@ test("the repository registry admits current subjects and passes both closure po
       ok: true,
       gate: "closure",
       policy: "legacy-backfill-exempt",
+      issues: [
+        {
+          code: "CAPABILITY_CERTIFICATION_PENDING",
+          path: ["records", "analytics", "status"],
+          context: { reason: "pending" },
+        },
+      ],
     })}\n`,
     stderr: "",
   });
@@ -1757,6 +1764,13 @@ test("the repository registry admits current subjects and passes both closure po
       ok: true,
       gate: "closure",
       policy: "all-certified",
+      issues: [
+        {
+          code: "CAPABILITY_CERTIFICATION_PENDING",
+          path: ["records", "analytics", "status"],
+          context: { reason: "pending" },
+        },
+      ],
     })}\n`,
     stderr: "",
   });
@@ -1784,7 +1798,7 @@ test("the ordinary certification gate does not require private workflow artifact
       stdout: `${JSON.stringify({
         ok: true,
         gate: "admission",
-        records: 8,
+        records: 9,
       })}\n`,
       stderr: "",
     });

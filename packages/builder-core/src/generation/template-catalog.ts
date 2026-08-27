@@ -161,6 +161,31 @@ const bookingCalendlyTemplateSources = textTemplateSources([
   "booking-calendly/apps/web/tests/e2e/calendly-booking.spec.ts",
 ] as const);
 
+const analyticsTemplateSources = textTemplateSources([
+  "analytics/apps/web/content/en-CA/analytics.yaml",
+  "analytics/apps/web/content/fr-CA/analytics.yaml",
+  "analytics/apps/web/src/integrations/analytics/analytics-settings.ts.template",
+  "analytics/apps/web/src/integrations/analytics/analytics-provider-contract.ts",
+  "analytics/apps/web/src/integrations/analytics/analytics-runtime.ts",
+  "analytics/apps/web/src/integrations/analytics/analytics-content-source.d.ts",
+  "analytics/apps/web/src/integrations/analytics/analytics-content.ts",
+  "analytics/apps/web/src/integrations/analytics/analytics-consent.tsx",
+  "analytics/apps/web/tests/unit/analytics-provider-contract.test.ts",
+  "analytics/apps/web/tests/component/analytics-consent.test.tsx",
+  "analytics/apps/web/tests/e2e/analytics-consent.spec.ts",
+  "analytics/docs/analytics.md",
+] as const);
+
+function analyticsLayoutSource(includeMultilingual: boolean): TemplateSource {
+  return {
+    source: includeMultilingual
+      ? "analytics/multilingual/apps/web/app/layout.tsx"
+      : "analytics/apps/web/app/layout.tsx",
+    destinationSource: "common/apps/web/app/layout.tsx",
+    contentKind: "text",
+  };
+}
+
 const multilingualCommonTemplateSources = textTemplateSources([
   "multilingual/apps/web/app/error.tsx",
   "multilingual/apps/web/middleware.ts",
@@ -252,6 +277,7 @@ export function createTemplateCatalog(
   includeBookingCalendly = false,
   recipeVersion = profile === "site" ? "0.11.0" : "0.10.0",
   includeMultilingual = false,
+  includeAnalytics = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   const productionSite = profile === "site" && recipeVersion === "0.11.0";
   const sources = [
@@ -261,7 +287,10 @@ export function createTemplateCatalog(
           (includeBookingCalendly || productionSite) &&
           source === commonHomeRouteSource
         ) &&
-        !(includeMultilingual && source === "common/apps/web/app/layout.tsx") &&
+        !(
+          (includeMultilingual || includeAnalytics) &&
+          source === "common/apps/web/app/layout.tsx"
+        ) &&
         !(includeMultilingual && source === "common/apps/web/app/error.tsx") &&
         !(
           includeMultilingual &&
@@ -291,10 +320,19 @@ export function createTemplateCatalog(
       : []),
     ...(includeMultilingual
       ? [
-          ...multilingualCommonTemplateSources,
+          ...multilingualCommonTemplateSources.filter(
+            ({ source }) =>
+              !(
+                includeAnalytics &&
+                source === "multilingual/apps/web/app/layout.tsx"
+              ),
+          ),
           ...multilingualProfileSources(profile),
           multilingualBookingSource(includeBookingCalendly),
         ]
+      : []),
+    ...(includeAnalytics
+      ? [...analyticsTemplateSources, analyticsLayoutSource(includeMultilingual)]
       : []),
   ];
   const destinations = new Set<string>();

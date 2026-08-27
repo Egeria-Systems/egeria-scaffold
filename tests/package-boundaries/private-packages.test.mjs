@@ -307,6 +307,20 @@ process.exitCode = await runCli(process.argv.slice(2), {
   assert.deepEqual(
     await listFiles(resolve(repositoryRoot, "packages/builder-core/templates")),
     [
+      "analytics/apps/web/app/layout.tsx",
+      "analytics/apps/web/content/en-CA/analytics.yaml",
+      "analytics/apps/web/content/fr-CA/analytics.yaml",
+      "analytics/apps/web/src/integrations/analytics/analytics-consent.tsx",
+      "analytics/apps/web/src/integrations/analytics/analytics-content-source.d.ts",
+      "analytics/apps/web/src/integrations/analytics/analytics-content.ts",
+      "analytics/apps/web/src/integrations/analytics/analytics-provider-contract.ts",
+      "analytics/apps/web/src/integrations/analytics/analytics-runtime.ts",
+      "analytics/apps/web/src/integrations/analytics/analytics-settings.ts.template",
+      "analytics/apps/web/tests/component/analytics-consent.test.tsx",
+      "analytics/apps/web/tests/e2e/analytics-consent.spec.ts",
+      "analytics/apps/web/tests/unit/analytics-provider-contract.test.ts",
+      "analytics/docs/analytics.md",
+      "analytics/multilingual/apps/web/app/layout.tsx",
       "booking-calendly/apps/web/app/page.tsx",
       "booking-calendly/apps/web/content/en-CA/booking-calendly.yaml",
       "booking-calendly/apps/web/src/integrations/booking-calendly/booking-content.ts",
@@ -666,7 +680,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   );
   assert.match(
     packageOwnership,
-    /exact `booking-calendly@0\.1\.0` and `multilingual@0\.1\.0` addition\/removal planning and fingerprint-gated application/,
+    /read-only exact `booking-calendly@0\.1\.0`, `multilingual@0\.1\.0`, and `analytics@0\.1\.0` addition\/removal planning and fingerprint-gated application/,
   );
   assert.match(packageOwnership, /canonical private owner/i);
   assert.match(packageOwnership, /deterministic in-memory rendering/);

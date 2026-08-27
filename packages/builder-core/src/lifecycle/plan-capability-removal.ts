@@ -37,6 +37,7 @@ export type CapabilityRemovalAction = Readonly<{
   path: string;
   ownership: "application-owned" | "ejected" | "managed";
   owner:
+    | "analytics"
     | "booking-calendly"
     | "builder-kernel"
     | "multilingual"
@@ -53,6 +54,10 @@ export type CapabilityRemovalReviewRequirement =
   | Readonly<{
       code: "reconcile-preserved-capability-surfaces";
       paths: readonly string[];
+    }>
+  | Readonly<{
+      code: "review-analytics-provider-and-client-storage-disposition";
+      scope: "provider-accounts-retained-data-browser-storage-and-cookies";
     }>;
 
 export type CapabilityRemovalPlan = Readonly<{
@@ -62,7 +67,7 @@ export type CapabilityRemovalPlan = Readonly<{
   baseRevision: string;
   profile: "portfolio" | "site";
   capability: Readonly<{
-    identifier: "booking-calendly" | "multilingual";
+    identifier: "analytics" | "booking-calendly" | "multilingual";
     version: "0.1.0";
   }>;
   currentCapabilities: readonly string[];
@@ -288,7 +293,7 @@ function isValidRemovedCapabilityState(input: Readonly<{
   descriptor: CapabilityDescriptor;
   inferred: ValidInspection["inference"]["capabilities"][number] | undefined;
   ejections: ReadonlySet<string>;
-  capability: "booking-calendly" | "multilingual";
+  capability: "analytics" | "booking-calendly" | "multilingual";
 }>): boolean {
   const expectedByIdentifier = new Map(
     input.descriptor.managedSurfaces.map((surface) => [
@@ -386,6 +391,7 @@ function actionOwner(
   }
 
   return [
+    "analytics",
     "booking-calendly",
     "multilingual",
     "observability",
@@ -471,7 +477,7 @@ async function deriveActions(input: Readonly<{
   current: RenderedSkeleton;
   desired: RenderedSkeleton;
   state: InstalledState;
-  capability: "booking-calendly" | "multilingual";
+  capability: "analytics" | "booking-calendly" | "multilingual";
 }>): Promise<PlanningResult<readonly CapabilityRemovalAction[]>> {
   const differences = changedFiles(input.current, input.desired);
 
@@ -605,6 +611,7 @@ async function deriveActions(input: Readonly<{
 
 function removalReviewRequirements(
   actions: readonly CapabilityRemovalAction[],
+  capability: "analytics" | "booking-calendly" | "multilingual",
 ): readonly CapabilityRemovalReviewRequirement[] {
   const preservedPaths = actions
     .flatMap((action) =>
@@ -617,6 +624,14 @@ function removalReviewRequirements(
       code: "review-surviving-references-to-removed-surfaces",
       scope: "repository",
     },
+    ...(capability === "analytics"
+      ? [
+          {
+            code: "review-analytics-provider-and-client-storage-disposition" as const,
+            scope: "provider-accounts-retained-data-browser-storage-and-cookies" as const,
+          },
+        ]
+      : []),
     ...(preservedPaths.length === 0
       ? []
       : [
@@ -652,11 +667,12 @@ function fingerprintPlan(input: Readonly<{
 export async function planCapabilityRemoval(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "booking-calendly" | "multilingual";
+  capability: "analytics" | "booking-calendly" | "multilingual";
 }>): Promise<PlanningResult<CapabilityRemovalPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
 
   if (
+    capabilityValue !== "analytics" &&
     capabilityValue !== "booking-calendly" &&
     capabilityValue !== "multilingual"
   ) {
@@ -727,7 +743,11 @@ export async function planCapabilityRemoval(input: Readonly<{
   }
 
   const bookingSettings = project.capabilitySettings["booking-calendly"];
+  const analyticsSettings = project.capabilitySettings.analytics;
   if (capabilityValue === "booking-calendly" && bookingSettings === undefined) {
+    return planningFailure("PROJECT_INSPECTION_INVALID");
+  }
+  if (capabilityValue === "analytics" && analyticsSettings === undefined) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
@@ -739,6 +759,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     ...(project.selectedCapabilities.includes("multilingual")
       ? { multilingual: true as const }
       : {}),
+    ...(analyticsSettings === undefined ? {} : { analytics: analyticsSettings }),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
   const [current, desiredRender] = await Promise.all([
@@ -747,13 +768,17 @@ export async function planCapabilityRemoval(input: Readonly<{
       profile: renderRequest.profile,
       projectName: renderRequest.projectName,
       displayName: renderRequest.displayName,
-      ...(capabilityValue === "booking-calendly"
-        ? project.selectedCapabilities.includes("multilingual")
+      ...(capabilityValue === "booking-calendly" || bookingSettings === undefined
+        ? {}
+        : { bookingCalendly: bookingSettings }),
+      ...(capabilityValue === "multilingual"
+        ? {}
+        : project.selectedCapabilities.includes("multilingual")
           ? { multilingual: true as const }
-          : {}
-        : bookingSettings === undefined
-          ? {}
-          : { bookingCalendly: bookingSettings }),
+          : {}),
+      ...(capabilityValue === "analytics" || analyticsSettings === undefined
+        ? {}
+        : { analytics: analyticsSettings }),
       packageVersions: verifiedCapabilityPackageVersions,
     }),
   ]);
@@ -821,7 +846,10 @@ export async function planCapabilityRemoval(input: Readonly<{
     currentCapabilities,
     desiredCapabilities,
     actions: actions.value,
-    reviewRequirements: removalReviewRequirements(actions.value),
+    reviewRequirements: removalReviewRequirements(
+      actions.value,
+      capabilityValue,
+    ),
     requiredApprovals: ["transform", "verified-final-diff"],
     persistenceOrder: [
       "transform",

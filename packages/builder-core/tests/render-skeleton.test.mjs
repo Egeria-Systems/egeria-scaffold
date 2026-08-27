@@ -19,6 +19,26 @@ const tokens = {
   workerName: "acme-studio-web",
 };
 
+const analyticsSettings = {
+  consent: { policy: "explicit-opt-in" },
+  providers: {
+    cloudflareWebAnalytics: {
+      siteToken: "0123456789abcdef0123456789abcdef",
+    },
+    googleAnalytics4: { measurementId: "G-TEST123456" },
+    microsoftClarity: {
+      projectId: "clarity123",
+      audience: "not-directed-to-minors",
+    },
+  },
+  operationalIntegrations: {
+    googleSearchConsole: {
+      verificationToken: "search-console-verification-token",
+    },
+    lookerStudio: { connector: "google-analytics-4" },
+  },
+};
+
 const visualBaselinePaths = [
   "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
   "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
@@ -176,6 +196,21 @@ const multilingualPaths = [
   "apps/web/tests/e2e/multilingual-routing.spec.ts",
   "apps/web/tests/unit/locale.test.ts",
   "apps/web/tests/unit/localized-content.test.ts",
+];
+
+const analyticsPaths = [
+  "apps/web/content/en-CA/analytics.yaml",
+  "apps/web/content/fr-CA/analytics.yaml",
+  "apps/web/src/integrations/analytics/analytics-consent.tsx",
+  "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
+  "apps/web/src/integrations/analytics/analytics-content.ts",
+  "apps/web/src/integrations/analytics/analytics-provider-contract.ts",
+  "apps/web/src/integrations/analytics/analytics-runtime.ts",
+  "apps/web/src/integrations/analytics/analytics-settings.ts",
+  "apps/web/tests/component/analytics-consent.test.tsx",
+  "apps/web/tests/e2e/analytics-consent.spec.ts",
+  "apps/web/tests/unit/analytics-provider-contract.test.ts",
+  "docs/analytics.md",
 ];
 
 const bookingCalendlyCopy = {
@@ -1135,6 +1170,31 @@ test("Calendly settings tokens are JSON data scoped to the managed settings temp
   assertFailureReason(recursive, "recursive-token");
 });
 
+test("analytics settings are one JSON token scoped to the managed settings template", () => {
+  const settingsSource =
+    "analytics/apps/web/src/integrations/analytics/analytics-settings.ts.template";
+  const settingsTokens = {
+    ...tokens,
+    analyticsSettingsJson: JSON.stringify(analyticsSettings, null, 2),
+  };
+  const rendered = assertSuccess(
+    renderTemplateSource({
+      source: settingsSource,
+      text: "export const settings = {{analyticsSettingsJson}} as const;",
+      tokens: settingsTokens,
+    }),
+  );
+
+  assert.match(rendered, /"measurementId": "G-TEST123456"/u);
+  const unavailable = renderTemplateSource({
+    source: "common/README.md.template",
+    text: "{{analyticsSettingsJson}}",
+    tokens: settingsTokens,
+  });
+  assertFailure(unavailable, "TEMPLATE_TOKEN_INVALID", "analyticsSettingsJson");
+  assertFailureReason(unavailable, "unavailable-token");
+});
+
 test("rendering normalizes newlines and leaves static sources otherwise unchanged", () => {
   assert.equal(
     assertSuccess(
@@ -1428,6 +1488,79 @@ test("multilingual and Calendly compose without changing either capability setti
     frenchCatalog.booking.linkLabel,
     englishCatalog.booking.linkLabel,
   );
+});
+
+test("analytics renders deterministic provider-neutral contracts and composes with multilingual", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+
+  for (const multilingual of [false, true]) {
+    const first = assertSuccess(
+      await renderSkeleton({
+        profile: "site",
+        projectName: "acme-site",
+        displayName: "Acme Site",
+        analytics: analyticsSettings,
+        ...(multilingual ? { multilingual: true } : {}),
+        packageVersions,
+      }),
+    );
+    const second = assertSuccess(
+      await renderSkeleton({
+        profile: "site",
+        projectName: "acme-site",
+        displayName: "Acme Site",
+        analytics: analyticsSettings,
+        ...(multilingual ? { multilingual: true } : {}),
+        packageVersions,
+      }),
+    );
+    const files = indexFiles(first.files);
+    const expectedPaths = [
+      ...sitePaths,
+      ...analyticsPaths,
+      ...(multilingual ? multilingualPaths : []),
+    ].toSorted();
+
+    assert.deepEqual(first.files.map(({ path }) => path), expectedPaths);
+    assert.deepEqual(snapshotBytes(first.files), snapshotBytes(second.files));
+    assert.equal(first.project.selectedCapabilities.includes("analytics"), true);
+    assert.deepEqual(first.project.capabilitySettings.analytics, analyticsSettings);
+    assert.match(
+      files.get("apps/web/src/integrations/analytics/analytics-settings.ts"),
+      /G-TEST123456/u,
+    );
+    assert.match(
+      files.get("apps/web/src/integrations/analytics/analytics-provider-contract.ts"),
+      /aggregate-traffic-and-performance|audience-measurement|consented-experience-analysis/u,
+    );
+    assert.match(
+      files.get("apps/web/src/integrations/analytics/analytics-runtime.ts"),
+      /explicit-opt-in|analytics_Storage|analytics_storage/u,
+    );
+    assert.match(files.get("apps/web/app/layout.tsx"), /AnalyticsConsent/u);
+    assert.match(files.get("apps/web/app/layout.tsx"), /verification/u);
+    assert.equal(
+      parseGeneratedYaml(first.files, "apps/web/content/en-CA/analytics.yaml")
+        .allowLabel,
+      "Allow analytics",
+    );
+    assert.match(
+      parseGeneratedYaml(first.files, "apps/web/content/fr-CA/analytics.yaml")
+        .allowLabel,
+      /\S/u,
+    );
+
+    for (const path of analyticsPaths) {
+      assert.doesNotMatch(files.get(path), /observability/iu, path);
+    }
+
+    if (multilingual) {
+      assert.match(files.get("apps/web/app/layout.tsx"), /x-egeria-locale/u);
+      assert.match(files.get("apps/web/app/layout.tsx"), /readAnalyticsContent\(locale\)/u);
+    } else {
+      assert.match(files.get("apps/web/app/layout.tsx"), /readAnalyticsContent\("en-CA"\)/u);
+    }
+  }
 });
 
 test("current site rendering uses the patched framework while historical rendering stays frozen", async () => {

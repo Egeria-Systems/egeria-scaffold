@@ -75,7 +75,7 @@ const committedRegistry = JSON.parse(
 
 const descriptorDigests = Object.freeze({
   analytics:
-    "sha256:1162afbf5f56a51033b66c4ee6d3758b71558b8004cf49f84d7b8414719aaa42",
+    "sha256:c71477bfc9c5d1d1c111ad128f0d82b52a0b014bdeec44a879e0d76a2ff66fe0",
   "booking-calendly":
     "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2",
   "content-files":

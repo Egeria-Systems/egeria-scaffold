@@ -50,6 +50,42 @@ const planSettings = {
   destination: "https://calendly.com/acme/private-planning-destination",
   mode: "popup",
 };
+const analyticsSettings = {
+  consent: { policy: "explicit-opt-in" },
+  providers: {
+    cloudflareWebAnalytics: {
+      siteToken: "0123456789abcdef0123456789abcdef",
+    },
+    googleAnalytics4: { measurementId: "G-ABCDEF1234" },
+    microsoftClarity: {
+      projectId: "clarity123",
+      audience: "not-directed-to-minors",
+    },
+  },
+  operationalIntegrations: {
+    googleSearchConsole: {
+      verificationToken: "search-console-verification-token",
+    },
+    lookerStudio: { connector: "google-analytics-4" },
+  },
+};
+
+function analyticsSelectionArguments() {
+  return [
+    "--cloudflare-web-analytics-token",
+    analyticsSettings.providers.cloudflareWebAnalytics.siteToken,
+    "--google-analytics-id",
+    analyticsSettings.providers.googleAnalytics4.measurementId,
+    "--microsoft-clarity-id",
+    analyticsSettings.providers.microsoftClarity.projectId,
+    "--microsoft-clarity-audience",
+    analyticsSettings.providers.microsoftClarity.audience,
+    "--search-console-verification",
+    analyticsSettings.operationalIntegrations.googleSearchConsole
+      .verificationToken,
+    "--looker-studio",
+  ];
+}
 
 function cleanGitInspection(overrides = {}) {
   return {
@@ -315,6 +351,27 @@ function planMultilingualRemoveArguments(directory) {
   ];
 }
 
+function planAnalyticsAddArguments(directory) {
+  return [
+    "plan-add",
+    "--directory",
+    directory,
+    "--capability",
+    "analytics",
+    ...analyticsSelectionArguments(),
+  ];
+}
+
+function planAnalyticsRemoveArguments(directory) {
+  return [
+    "plan-remove",
+    "--directory",
+    directory,
+    "--capability",
+    "analytics",
+  ];
+}
+
 function planUpgradeArguments(directory, capability = "standards") {
   return [
     "plan-upgrade",
@@ -382,6 +439,37 @@ function applyMultilingualAddArguments(
     directory,
     "--capability",
     "multilingual",
+    "--approved-plan",
+    approvedPlan,
+  ];
+}
+
+function applyAnalyticsAddArguments(
+  directory,
+  approvedPlan = `sha256:${"a".repeat(64)}`,
+) {
+  return [
+    "apply-add",
+    "--directory",
+    directory,
+    "--capability",
+    "analytics",
+    ...analyticsSelectionArguments(),
+    "--approved-plan",
+    approvedPlan,
+  ];
+}
+
+function applyAnalyticsRemoveArguments(
+  directory,
+  approvedPlan = `sha256:${"a".repeat(64)}`,
+) {
+  return [
+    "apply-remove",
+    "--directory",
+    directory,
+    "--capability",
+    "analytics",
     "--approved-plan",
     approvedPlan,
   ];
@@ -918,6 +1006,31 @@ test("the parser accepts only the exact command-specific arguments", () => {
     );
   }
 
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "create",
+        "--profile",
+        "site",
+        "--name",
+        "acme-site",
+        "--display-name",
+        "Acme Site",
+        "--directory",
+        "/private/tmp/acme-site",
+        ...analyticsSelectionArguments(),
+      ]),
+    ),
+    {
+      kind: "create",
+      profile: "site",
+      projectName: "acme-site",
+      displayName: "Acme Site",
+      directory: "/private/tmp/acme-site",
+      analytics: analyticsSettings,
+    },
+  );
+
   for (const kind of ["infer", "doctor", "diff"]) {
     assert.deepEqual(
       assertSuccess(
@@ -986,6 +1099,24 @@ test("the plan-add parser accepts exact options in any order", () => {
       capability: "multilingual",
     },
   );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "plan-add",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+        "--capability",
+        "analytics",
+        ...analyticsSelectionArguments(),
+      ]),
+    ),
+    {
+      kind: "plan-add",
+      directory: "/private/tmp/acme-portfolio",
+      capability: "analytics",
+      settings: analyticsSettings,
+    },
+  );
 });
 
 test("the plan-add parser rejects incomplete, duplicate, unknown, and unsafe values", () => {
@@ -1035,6 +1166,58 @@ test("the plan-add parser rejects incomplete, duplicate, unknown, and unsafe val
   }
 });
 
+test("analytics arguments reject partial or mismatched selections without disclosure", () => {
+  const privateIdentifier = "private-analytics-identifier";
+  const invalidCases = [
+    [
+      "plan-add",
+      "--directory",
+      "/private/tmp/acme-site",
+      "--capability",
+      "analytics",
+    ],
+    [
+      "plan-add",
+      "--directory",
+      "/private/tmp/acme-site",
+      "--capability",
+      "analytics",
+      "--microsoft-clarity-id",
+      privateIdentifier,
+    ],
+    [
+      "plan-add",
+      "--directory",
+      "/private/tmp/acme-site",
+      "--capability",
+      "analytics",
+      "--looker-studio",
+    ],
+    [
+      "plan-add",
+      "--directory",
+      "/private/tmp/acme-site",
+      "--capability",
+      "multilingual",
+      "--google-analytics-id",
+      "G-ABCDEF1234",
+    ],
+  ];
+
+  for (const arguments_ of invalidCases) {
+    const result = cliArguments.parseCliArguments(arguments_);
+    assert.equal(result.ok, false, JSON.stringify(arguments_));
+    assert.deepEqual(result.issues, [
+      {
+        code: "CLI_ARGUMENT_INVALID",
+        path: [],
+        context: { reason: "invalid-arguments" },
+      },
+    ]);
+    assert.doesNotMatch(JSON.stringify(result), /private-analytics-identifier/u);
+  }
+});
+
 test("the plan-remove parser accepts only its exact options in any order", () => {
   const expected = {
     kind: "plan-remove",
@@ -1063,6 +1246,22 @@ test("the plan-remove parser accepts only its exact options in any order", () =>
       kind: "plan-remove",
       directory: "/private/tmp/acme-portfolio",
       capability: "multilingual",
+    },
+  );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "plan-remove",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+        "--capability",
+        "analytics",
+      ]),
+    ),
+    {
+      kind: "plan-remove",
+      directory: "/private/tmp/acme-portfolio",
+      capability: "analytics",
     },
   );
   assert.deepEqual(
@@ -1285,6 +1484,27 @@ test("the apply-add parser accepts only the exact approved transaction arguments
       approvedPlanFingerprint: fingerprint,
     },
   );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "apply-add",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+        "--capability",
+        "analytics",
+        ...analyticsSelectionArguments(),
+        "--approved-plan",
+        fingerprint,
+      ]),
+    ),
+    {
+      kind: "apply-add",
+      directory: "/private/tmp/acme-portfolio",
+      capability: "analytics",
+      settings: analyticsSettings,
+      approvedPlanFingerprint: fingerprint,
+    },
+  );
 
   for (const arguments_ of [
     applyAddArguments("/private/tmp/acme-portfolio").slice(0, -2),
@@ -1340,6 +1560,25 @@ test("the apply-remove parser accepts only the exact approved removal arguments"
       kind: "apply-remove",
       directory: "/private/tmp/acme-portfolio",
       capability: "multilingual",
+      approvedPlanFingerprint: fingerprint,
+    },
+  );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "apply-remove",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+        "--capability",
+        "analytics",
+        "--approved-plan",
+        fingerprint,
+      ]),
+    ),
+    {
+      kind: "apply-remove",
+      directory: "/private/tmp/acme-portfolio",
+      capability: "analytics",
       approvedPlanFingerprint: fingerprint,
     },
   );
@@ -1785,6 +2024,50 @@ test("the runner creates multilingual portfolio and site projects with optional 
         /private-planning-destination|calendly\.com/u,
       );
     }
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+});
+
+test("the runner creates analytics without disclosing provider identifiers", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-cli-analytics-"));
+  const destination = join(owner, "acme-site");
+  const runCli = cli.createCliRunner({ createVerifier: createFakeVerifier });
+  const captured = captureOutput();
+
+  try {
+    assert.equal(
+      await runCli(
+        [
+          "create",
+          "--profile",
+          "site",
+          "--name",
+          "acme-site",
+          "--display-name",
+          "Acme Site",
+          "--directory",
+          destination,
+          "--multilingual",
+          ...analyticsSelectionArguments(),
+        ],
+        captured.output,
+      ),
+      0,
+    );
+    assert.deepEqual(captured.error, []);
+    const emitted = JSON.parse(captured.standard[0]);
+    assert.equal(emitted.capabilities.includes("analytics"), true);
+    assert.equal(emitted.capabilities.includes("multilingual"), true);
+    const project = core.parseProjectYaml(
+      await readFile(join(destination, ".egeria/project.yaml"), "utf8"),
+    );
+    assert.equal(project.ok, true);
+    assert.deepEqual(project.value.capabilitySettings.analytics, analyticsSettings);
+    assert.doesNotMatch(
+      captured.standard[0],
+      /0123456789abcdef|G-ABCDEF1234|clarity123|search-console-verification/u,
+    );
   } finally {
     await rm(owner, { recursive: true, force: true });
   }
@@ -3331,6 +3614,7 @@ async function withGitFixture(name, run, options = {}) {
 
   try {
     if (
+      options.analytics === undefined &&
       options.bookingCalendly === undefined &&
       options.multilingual !== true
     ) {
@@ -3347,6 +3631,9 @@ async function withGitFixture(name, run, options = {}) {
             ...(options.bookingCalendly === undefined
               ? {}
               : { bookingCalendly: options.bookingCalendly }),
+            ...(options.analytics === undefined
+              ? {}
+              : { analytics: options.analytics }),
             ...(options.multilingual === true ? { multilingual: true } : {}),
           },
           destination: primary,
@@ -3569,6 +3856,20 @@ async function executeBuiltPlanMultilingualRemove(directory) {
   ]);
 }
 
+async function executeBuiltPlanAnalyticsAdd(directory) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...planAnalyticsAddArguments(directory),
+  ]);
+}
+
+async function executeBuiltPlanAnalyticsRemove(directory) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...planAnalyticsRemoveArguments(directory),
+  ]);
+}
+
 async function executeBuiltPlanUpgrade(directory, capability = "standards") {
   return executeNode([
     resolve(packageRoot, "dist/index.js"),
@@ -3631,6 +3932,34 @@ async function executeBuiltApplyMultilingualRemove(
   );
 }
 
+async function executeBuiltApplyAnalyticsAdd(
+  directory,
+  approvedPlan,
+  environment = {},
+) {
+  return executeNode(
+    [
+      resolve(packageRoot, "dist/index.js"),
+      ...applyAnalyticsAddArguments(directory, approvedPlan),
+    ],
+    environment,
+  );
+}
+
+async function executeBuiltApplyAnalyticsRemove(
+  directory,
+  approvedPlan,
+  environment = {},
+) {
+  return executeNode(
+    [
+      resolve(packageRoot, "dist/index.js"),
+      ...applyAnalyticsRemoveArguments(directory, approvedPlan),
+    ],
+    environment,
+  );
+}
+
 async function applyCompiledCapabilityAddition(root, identifier, environment = {}) {
   const commands =
     identifier === "multilingual"
@@ -3638,7 +3967,12 @@ async function applyCompiledCapabilityAddition(root, identifier, environment = {
           plan: executeBuiltPlanMultilingualAdd,
           apply: executeBuiltApplyMultilingualAdd,
         }
-      : { plan: executeBuiltPlanAdd, apply: executeBuiltApplyAdd };
+      : identifier === "analytics"
+        ? {
+            plan: executeBuiltPlanAnalyticsAdd,
+            apply: executeBuiltApplyAnalyticsAdd,
+          }
+        : { plan: executeBuiltPlanAdd, apply: executeBuiltApplyAdd };
   const cleanBefore = await gitRepositorySnapshot(root);
   const planExecution = await commands.plan(root);
   assert.equal(planExecution.exitCode, 0, planExecution.stderr);
@@ -3700,7 +4034,7 @@ async function assertCapabilityLifecycleState(
     expectedMigrations,
   );
   assert.deepEqual(
-    ["booking-calendly", "multilingual"].filter((identifier) =>
+    ["analytics", "booking-calendly", "multilingual"].filter((identifier) =>
       project.value.selectedCapabilities.includes(identifier),
     ),
     expectedOptionalCapabilities.toSorted(),
@@ -5759,6 +6093,131 @@ test("the compiled CLI preserves multilingual through both capability install or
     assert.deepEqual(
       finalApplicationTrees.get(`${profile}:booking-calendly,multilingual`),
       finalApplicationTrees.get(`${profile}:multilingual,booking-calendly`),
+      `${profile} final application trees must converge across install orders`,
+    );
+  }
+});
+
+test("the compiled CLI preserves analytics and multilingual across both install orders and analytics re-addition", async () => {
+  const cases = ["portfolio", "site"].flatMap((profile) => [
+    { profile, installationOrder: ["analytics", "multilingual"] },
+    { profile, installationOrder: ["multilingual", "analytics"] },
+  ]);
+  const finalApplicationTrees = new Map();
+
+  await withSuccessfulPnpm(async (path) => {
+    const environment = { PATH: path };
+    for (const fixture of cases) {
+      await withGitFixture(
+        fixture.profile,
+        async ({ linked, primary }) => {
+          const primaryBefore = await gitRepositorySnapshot(primary);
+          const expectedMigrations = [];
+          const installedOptionalCapabilities = [];
+          const lifecycleOutput = [];
+
+          for (const identifier of fixture.installationOrder) {
+            const addition = await applyCompiledCapabilityAddition(
+              linked,
+              identifier,
+              environment,
+            );
+            lifecycleOutput.push(addition.execution.stdout);
+            expectedMigrations.push(`add-${identifier}-0-1-0`);
+            installedOptionalCapabilities.push(identifier);
+            await assertCapabilityLifecycleState(
+              linked,
+              expectedMigrations,
+              installedOptionalCapabilities,
+            );
+            await commitAll(linked, `add ${identifier} capability`);
+          }
+
+          const cleanComposed = await gitRepositorySnapshot(linked);
+          const composedApplicationTree = (await listTree(linked)).filter(
+            ({ path }) =>
+              path !== ".git" &&
+              path !== ".egeria/migrations.jsonl" &&
+              path !== ".egeria/state.json",
+          );
+          const removalPlanExecution =
+            await executeBuiltPlanAnalyticsRemove(linked);
+          assert.equal(
+            removalPlanExecution.exitCode,
+            0,
+            removalPlanExecution.stderr,
+          );
+          assert.equal(removalPlanExecution.stderr, "");
+          const removalPlan = JSON.parse(removalPlanExecution.stdout).plan;
+          assert.deepEqual(removalPlan.capability, {
+            identifier: "analytics",
+            version: "0.1.0",
+          });
+          assert.deepEqual(
+            removalPlan.settings,
+            undefined,
+          );
+          assert.deepEqual(await gitRepositorySnapshot(linked), cleanComposed);
+
+          const removal = await executeBuiltApplyAnalyticsRemove(
+            linked,
+            removalPlan.planFingerprint,
+            environment,
+          );
+          assert.equal(removal.exitCode, 0, removal.stderr);
+          assert.equal(removal.stderr, "");
+          lifecycleOutput.push(removal.stdout);
+          expectedMigrations.push("remove-analytics-0-1-0");
+          await assertCapabilityLifecycleState(
+            linked,
+            expectedMigrations,
+            ["multilingual"],
+          );
+          await commitAll(linked, "remove analytics capability");
+
+          const readdition = await applyCompiledCapabilityAddition(
+            linked,
+            "analytics",
+            environment,
+          );
+          lifecycleOutput.push(readdition.execution.stdout);
+          expectedMigrations.push("add-analytics-0-1-0");
+          await assertCapabilityLifecycleState(
+            linked,
+            expectedMigrations,
+            ["analytics", "multilingual"],
+          );
+          const finalApplicationTree = (await listTree(linked)).filter(
+            ({ path }) =>
+              path !== ".git" &&
+              path !== ".egeria/migrations.jsonl" &&
+              path !== ".egeria/state.json",
+          );
+          assert.deepEqual(finalApplicationTree, composedApplicationTree);
+          finalApplicationTrees.set(
+            `${fixture.profile}:${fixture.installationOrder.join(",")}`,
+            finalApplicationTree,
+          );
+          assert.deepEqual(
+            withoutSharedRefs(await gitRepositorySnapshot(primary)),
+            withoutSharedRefs(primaryBefore),
+          );
+          assert.doesNotMatch(
+            lifecycleOutput.join(""),
+            /0123456789abcdef|G-ABCDEF1234|clarity123|search-console-verification|refs\/heads|\.git\/worktrees/u,
+          );
+        },
+        {
+          branch: `${fixture.profile}-${fixture.installationOrder.join("-")}-analytics-lifecycle-test`,
+        },
+      );
+    }
+  });
+
+  for (const profile of ["portfolio", "site"]) {
+    assert.deepEqual(
+      finalApplicationTrees.get(`${profile}:analytics,multilingual`),
+      finalApplicationTrees.get(`${profile}:multilingual,analytics`),
       `${profile} final application trees must converge across install orders`,
     );
   }
