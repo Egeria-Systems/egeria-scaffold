@@ -64,31 +64,34 @@ const lifecycleGroups = Object.freeze([
   Object.freeze({
     file: "packages/builder-core/tests/apply-capability-addition.test.mjs",
     tests: Object.freeze([
-      "capability addition applies, verifies, re-infers, and persists migration then state",
+      "Calendly addition accepts the planned multilingual booking-composition replacement",
       "multilingual addition applies the locale overlay and persists fresh discovery",
-      "capability addition preserves prior control state when verification fails",
-      "capability addition refuses changed final bytes after diff inspection",
+      "multilingual addition refuses installed, stale-plan, and drifted repositories without persistence",
+      "multilingual addition retains inspectable transform and verification failure prefixes",
+      "multilingual addition refuses changed final bytes after persistence",
     ]),
   }),
   Object.freeze({
     file: "packages/builder-core/tests/apply-capability-removal.test.mjs",
     tests: Object.freeze([
-      "capability removal executes the approved plan once and persists migration before state",
       "multilingual and Calendly removal preserve the other capability in both install orders",
       "multilingual removal preserves a modified locale catalog as an explicit ejection",
-      "capability removal reports no-mutation and retained-prefix transformation failures",
+      "multilingual removal refuses absent, stale-plan, and drifted repositories without persistence",
+      "multilingual removal retains inspectable transform and verification failure prefixes",
+      "multilingual removal refuses changed final bytes after persistence",
     ]),
   }),
   Object.freeze({
     file: "packages/builder-core/tests/plan-capability-addition.test.mjs",
     tests: Object.freeze([
-      "capability addition plan refuses inference drift and replacement drift",
+      "multilingual addition plans the exact locale overlay with or without Calendly",
+      "multilingual addition plan refuses managed drift without writes",
     ]),
   }),
   Object.freeze({
     file: "packages/builder-core/tests/plan-capability-removal.test.mjs",
     tests: Object.freeze([
-      "capability removal plan refuses invalid controls, inventory, ejections, and owned drift",
+      "multilingual removal plan refuses absent state and managed drift without writes",
     ]),
   }),
 ]);

@@ -65,13 +65,17 @@ async function baseFixtureEntries(profile) {
   return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
 }
 
-async function installedEntries(profile, bookingSettings = settings) {
+async function installedEntries(profile, options = {}) {
+  const bookingSettings = Object.hasOwn(options, "bookingSettings")
+    ? options.bookingSettings
+    : settings;
   const rendered = await core.renderSkeleton({
     profile,
     projectName: `${profile}-removal-test`,
     displayName: `${profile} removal test`,
     packageVersions: core.verifiedCapabilityPackageVersions,
-    bookingCalendly: bookingSettings,
+    ...(bookingSettings === undefined ? {} : { bookingCalendly: bookingSettings }),
+    ...(options.multilingual === true ? { multilingual: true } : {}),
   });
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
 
@@ -543,6 +547,34 @@ test("capability removal plan distinguishes not-installed state from removal dri
   );
 });
 
+test("multilingual removal plan refuses absent state and managed drift without writes", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    assertFailure(
+      await planFromEntries(await baseFixtureEntries(profile), {
+        capability: "multilingual",
+      }),
+      "CAPABILITY_NOT_INSTALLED",
+    );
+  }
+
+  const drifted = await installedEntries("portfolio", {
+    bookingSettings: undefined,
+    multilingual: true,
+  });
+  assertFailure(
+    await planFromEntries(drifted, {
+      capability: "multilingual",
+      overrides: new Map([
+        [
+          "apps/web/src/i18n/locale.ts",
+          { kind: "file", content: "private managed drift\n" },
+        ],
+      ]),
+    }),
+    "PROJECT_DRIFT_DETECTED",
+  );
+});
+
 test("capability removal plan refuses unsupported recipe, provenance, migration, and version state", async () => {
   const base = await installedEntries("portfolio");
   const project = core.parseProjectYaml(base.get(".egeria/project.yaml"));
@@ -740,8 +772,10 @@ test("capability removal plan binds private controls and Git identity without di
   assert.equal(repeated.value.planFingerprint, first.value.planFingerprint);
 
   const changedSettings = await installedEntries("portfolio", {
-    ...settings,
-    destination: "https://calendly.com/private/changed",
+    bookingSettings: {
+      ...settings,
+      destination: "https://calendly.com/private/changed",
+    },
   });
   const second = await planFromEntries(changedSettings);
   assert.equal(second.ok, true, JSON.stringify(second.issues));
