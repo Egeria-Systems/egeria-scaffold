@@ -3227,7 +3227,7 @@ test("canonical documentation accepts profile-transition execution and records t
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+exact Calendly addition\/removal[^\n]+standards upgrade[^\n]+portfolio-to-site transactions[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+Exact Calendly certification[^\n]+protected-staging\/provider journey[^\n]+Exact standards certification[^\n]+compiled upgrade\/refusal\/recovery[^\n]+renewed fresh-scaffold evidence[^\n]+generic lifecycle executor[^\n]+(?:another|any further) upgrade or profile-transition edge[^\n]+automated recovery/iu,
+    /Existing-repository mutation[^\n]+exact Calendly and multilingual addition\/removal[^\n]+standards and site-routing upgrades[^\n]+portfolio-to-site transaction[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+Exact Calendly certification[^\n]+protected-staging\/provider journey[^\n]+Exact standards certification[^\n]+compiled upgrade\/refusal\/recovery[^\n]+renewed fresh-scaffold evidence[^\n]+generic lifecycle executor[^\n]+(?:another|any further) upgrade or profile-transition edge[^\n]+automated recovery/iu,
   );
   assert.match(
     overview,
