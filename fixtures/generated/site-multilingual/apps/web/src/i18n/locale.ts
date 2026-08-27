@@ -75,3 +75,11 @@ export function createLanguageAlternates(path: string): Record<Locale, string> {
     supportedLocales.map((locale) => [locale, localizePath(locale, path)]),
   ) as Record<Locale, string>;
 }
+
+export function createLocaleSwitchHref(
+  locale: Locale,
+  unlocalizedPath: string,
+): string {
+  const destinationLocale: Locale = locale === "en-CA" ? "fr-CA" : "en-CA";
+  return localizePath(destinationLocale, unlocalizedPath);
+}

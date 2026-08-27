@@ -8,7 +8,6 @@ navigation:
   - href: /fr-CA
     label: Accueil
 localeSwitch:
-  href: /en-CA
   label: English
 pages:
   home:
@@ -68,3 +67,7 @@ booking:
   frameTitle: Page de planification Calendly
   popupHeading: Choisir un moment
   closeLabel: Fermer la planification
+error:
+  heading: Une erreur s’est produite
+  summary: Nous n’avons pas pu terminer cette page. Veuillez réessayer.
+  retryLabel: Réessayer

@@ -8,7 +8,6 @@ navigation:
   - href: /en-CA
     label: Home
 localeSwitch:
-  href: /fr-CA
   label: Français
 pages:
   home:
@@ -68,3 +67,7 @@ booking:
   frameTitle: Calendly scheduling page
   popupHeading: Choose a time
   closeLabel: Close scheduling
+error:
+  heading: Something went wrong
+  summary: We could not complete this page. Please try again.
+  retryLabel: Try again

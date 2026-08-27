@@ -14,12 +14,12 @@ const rawCatalogs = {
   "fr-CA": parseYamlContent(frenchCatalogSource),
 } as const;
 
-assertTranslationParity(rawCatalogs["en-CA"], rawCatalogs["fr-CA"]);
-
 const catalogs: Record<Locale, LocalizedCatalog> = {
-  "en-CA": parseLocalizedCatalog(rawCatalogs["en-CA"]),
-  "fr-CA": parseLocalizedCatalog(rawCatalogs["fr-CA"]),
+  "en-CA": parseLocalizedCatalog(rawCatalogs["en-CA"], "en-CA"),
+  "fr-CA": parseLocalizedCatalog(rawCatalogs["fr-CA"], "fr-CA"),
 };
+
+assertTranslationParity(catalogs["en-CA"], catalogs["fr-CA"]);
 
 export function readLocalizedCatalog(locale: Locale): LocalizedCatalog {
   return catalogs[locale];

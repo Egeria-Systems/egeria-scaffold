@@ -40,6 +40,8 @@ export type CapabilityRemovalAction = Readonly<{
     | "booking-calendly"
     | "builder-kernel"
     | "multilingual"
+    | "observability"
+    | "standards"
     | "site-routing";
 }>;
 
@@ -383,7 +385,13 @@ function actionOwner(
     return "builder-kernel";
   }
 
-  return ["booking-calendly", "multilingual", "site-routing"].includes(
+  return [
+    "booking-calendly",
+    "multilingual",
+    "observability",
+    "site-routing",
+    "standards",
+  ].includes(
     surface.owner.identifier,
   )
     ? surface.owner.identifier as CapabilityRemovalAction["owner"]

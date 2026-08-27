@@ -7,7 +7,7 @@ import {
   type PageSection,
 } from "../content/content-schema";
 import { localizedRedirects, localizedRoutes } from "./localized-profile";
-import { isLocale, localizePath, type Locale } from "./locale";
+import { isLocale, localizePath, supportedLocales, type Locale } from "./locale";
 
 export type LocalizedPageContent = Readonly<{
   metadata: Readonly<{ title: string; description: string }>;
@@ -23,6 +23,12 @@ export type LocalizedBookingContent = Readonly<{
   closeLabel: string;
 }>;
 
+export type LocalizedErrorContent = Readonly<{
+  heading: string;
+  summary: string;
+  retryLabel: string;
+}>;
+
 export type LocalizedCatalog = Readonly<{
   metadata: Readonly<{ title: string; description: string }>;
   accessibility: Readonly<{
@@ -30,10 +36,11 @@ export type LocalizedCatalog = Readonly<{
     navigationLabel: string;
   }>;
   navigation: readonly NavigationItem[];
-  localeSwitch: Readonly<{ href: string; label: string }>;
+  localeSwitch: Readonly<{ label: string }>;
   pages: Readonly<Record<string, LocalizedPageContent>>;
   notFound: LocalizedPageContent;
   booking: LocalizedBookingContent;
+  error: LocalizedErrorContent;
 }>;
 
 export type LocalizedRoute =
@@ -49,6 +56,8 @@ const bookingKeys = [
   "popupHeading",
   "closeLabel",
 ] as const;
+
+const errorKeys = ["heading", "summary", "retryLabel"] as const;
 
 function contentInvalid(): never {
   throw new TypeError("CONTENT_INVALID");
@@ -76,10 +85,22 @@ function parseLocalizedPage(value: unknown): LocalizedPageContent {
   };
 }
 
-function parseNavigation(value: unknown): readonly NavigationItem[] {
+function routePath(locale: Locale, segments: readonly string[]): string {
+  const suffix = segments.length === 0 ? "/" : `/${segments.join("/")}`;
+  return localizePath(locale, suffix);
+}
+
+function parseNavigation(
+  value: unknown,
+  locale: Locale,
+): readonly NavigationItem[] {
   if (!Array.isArray(value)) {
     return contentInvalid();
   }
+
+  const declaredPaths = new Set(
+    localizedRoutes.map(({ segments }) => routePath(locale, segments)),
+  );
 
   return value.map((item) => {
     if (
@@ -88,7 +109,8 @@ function parseNavigation(value: unknown): readonly NavigationItem[] {
       !isNonEmptyString(item.href) ||
       !isNonEmptyString(item.label) ||
       !item.href.startsWith("/") ||
-      item.href.startsWith("//")
+      item.href.startsWith("//") ||
+      !declaredPaths.has(item.href)
     ) {
       return contentInvalid();
     }
@@ -99,15 +121,12 @@ function parseNavigation(value: unknown): readonly NavigationItem[] {
 function parseLocaleSwitch(value: unknown): LocalizedCatalog["localeSwitch"] {
   if (
     !isUnknownRecord(value) ||
-    !hasExactKeys(value, ["href", "label"]) ||
-    !isNonEmptyString(value.href) ||
-    !isNonEmptyString(value.label) ||
-    !value.href.startsWith("/") ||
-    value.href.startsWith("//")
+    !hasExactKeys(value, ["label"]) ||
+    !isNonEmptyString(value.label)
   ) {
     return contentInvalid();
   }
-  return { href: value.href, label: value.label };
+  return { label: value.label };
 }
 
 function parseBooking(value: unknown): LocalizedBookingContent {
@@ -124,33 +143,82 @@ function parseBooking(value: unknown): LocalizedBookingContent {
   ) as LocalizedBookingContent;
 }
 
-function collectShape(value: unknown, path = ""): string[] {
-  if (Array.isArray(value)) {
-    return value.flatMap((item, index) => collectShape(item, `${path}[${index}]`));
+function parseError(value: unknown): LocalizedErrorContent {
+  if (!isUnknownRecord(value) || !hasExactKeys(value, errorKeys)) {
+    return contentInvalid();
   }
-  if (isUnknownRecord(value)) {
-    return Object.keys(value)
-      .sort()
-      .flatMap((key) => collectShape(value[key], path.length === 0 ? key : `${path}.${key}`));
+  for (const key of errorKeys) {
+    if (!isNonEmptyString(value[key])) {
+      return contentInvalid();
+    }
   }
-  return [`${path}:${typeof value}`];
+  return Object.fromEntries(
+    errorKeys.map((key) => [key, value[key]]),
+  ) as LocalizedErrorContent;
+}
+
+function unlocalizePath(path: string): string {
+  for (const locale of supportedLocales) {
+    const prefix = `/${locale}`;
+    if (path === prefix) return "/";
+    if (path.startsWith(`${prefix}/`)) return path.slice(prefix.length);
+  }
+  return path;
+}
+
+function sectionStructure(section: PageSection): unknown {
+  const base = {
+    id: section.id,
+    type: section.type,
+    variant: section.variant,
+    enabled: section.enabled,
+  };
+  if (section.type === "project-list") {
+    return {
+      ...base,
+      destinations: section.content.projects.map(({ href }) => href),
+    };
+  }
+  if (section.type === "call-to-action") {
+    return { ...base, destination: section.content.href };
+  }
+  return base;
+}
+
+function pageStructure(page: LocalizedPageContent): unknown {
+  return page.sections.map(sectionStructure);
+}
+
+function translationStructure(catalog: LocalizedCatalog): unknown {
+  return {
+    navigation: catalog.navigation.map(({ href }) => unlocalizePath(href)),
+    pages: Object.fromEntries(
+      localizedRoutes.map(({ identifier }) => {
+        const page = catalog.pages[identifier];
+        if (page === undefined) return contentInvalid();
+        return [identifier, pageStructure(page)];
+      }),
+    ),
+    notFound: pageStructure(catalog.notFound),
+  };
 }
 
 export function assertTranslationParity(
-  reference: unknown,
-  candidate: unknown,
+  reference: LocalizedCatalog,
+  candidate: LocalizedCatalog,
 ): void {
-  const referenceShape = collectShape(reference);
-  const candidateShape = collectShape(candidate);
   if (
-    referenceShape.length !== candidateShape.length ||
-    referenceShape.some((key, index) => key !== candidateShape[index])
+    JSON.stringify(translationStructure(reference)) !==
+    JSON.stringify(translationStructure(candidate))
   ) {
     contentInvalid();
   }
 }
 
-export function parseLocalizedCatalog(value: unknown): LocalizedCatalog {
+export function parseLocalizedCatalog(
+  value: unknown,
+  locale: Locale,
+): LocalizedCatalog {
   if (
     !isUnknownRecord(value) ||
     !hasExactKeys(value, [
@@ -161,6 +229,7 @@ export function parseLocalizedCatalog(value: unknown): LocalizedCatalog {
       "pages",
       "notFound",
       "booking",
+      "error",
     ]) ||
     !isUnknownRecord(value.accessibility) ||
     !hasExactKeys(value.accessibility, ["skipToContent", "navigationLabel"]) ||
@@ -182,7 +251,7 @@ export function parseLocalizedCatalog(value: unknown): LocalizedCatalog {
       skipToContent: value.accessibility.skipToContent,
       navigationLabel: value.accessibility.navigationLabel,
     },
-    navigation: parseNavigation(value.navigation),
+    navigation: parseNavigation(value.navigation, locale),
     localeSwitch: parseLocaleSwitch(value.localeSwitch),
     pages: Object.fromEntries(
       localizedRoutes.map(({ identifier }) => [
@@ -192,6 +261,7 @@ export function parseLocalizedCatalog(value: unknown): LocalizedCatalog {
     ),
     notFound: parseLocalizedPage(value.notFound),
     booking: parseBooking(value.booking),
+    error: parseError(value.error),
   };
 }
 
@@ -207,8 +277,7 @@ export function resolveLocalizedRoute(
     sameSegments(candidate.segments, segments),
   );
   if (route !== undefined) {
-    const suffix = route.segments.length === 0 ? "/" : `/${route.segments.join("/")}`;
-    return { kind: "page", identifier: route.identifier, path: localizePath(locale, suffix) };
+    return { kind: "page", identifier: route.identifier, path: routePath(locale, route.segments) };
   }
 
   const redirect = localizedRedirects.find((candidate) =>

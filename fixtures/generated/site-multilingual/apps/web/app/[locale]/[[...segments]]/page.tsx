@@ -8,6 +8,7 @@ import {
 import { readLocalizedCatalog } from "../../../src/i18n/read-localized-content";
 import {
   createLanguageAlternates,
+  createLocaleSwitchHref,
   isLocale,
   localizePath,
   supportedLocales,
@@ -33,11 +34,17 @@ export async function generateMetadata({
     notFound();
   }
   const route = resolveLocalizedRoute(locale, segments);
-  if (route.kind !== "page") {
+  if (route.kind === "redirect") {
     return {};
   }
-  const { pages } = readLocalizedCatalog(locale);
-  const page = pages[route.identifier];
+  const catalog = readLocalizedCatalog(locale);
+  if (route.kind === "not-found") {
+    return {
+      ...catalog.notFound.metadata,
+      robots: { index: false, follow: false },
+    };
+  }
+  const page = catalog.pages[route.identifier];
   if (page === undefined) {
     notFound();
   }
@@ -69,13 +76,18 @@ export default async function LocalizedRoute({ params }: LocalizedRoutePropertie
   if (page === undefined) {
     notFound();
   }
+  const unlocalizedPath = segments.length === 0 ? "/" : `/${segments.join("/")}`;
+  const localeSwitch = {
+    ...catalog.localeSwitch,
+    href: createLocaleSwitchHref(locale, unlocalizedPath),
+  };
   return (
     <LocalizedPage
       locale={locale}
       currentPath={route.path}
       sections={page.sections}
       navigation={catalog.navigation}
-      localeSwitch={catalog.localeSwitch}
+      localeSwitch={localeSwitch}
       skipToContent={catalog.accessibility.skipToContent}
       navigationLabel={catalog.accessibility.navigationLabel}
     >

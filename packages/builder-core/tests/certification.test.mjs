@@ -75,7 +75,7 @@ const descriptorDigests = Object.freeze({
   "deployment-cloudflare":
     "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41",
   multilingual:
-    "sha256:b363b1a989ef1136caa87dc5068456087e8ff05a6bf59207dc920b3aaf2d367d",
+    "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41",
   observability:
     "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99",
   "section-composition":

@@ -137,7 +137,7 @@
     "multilingual": {
       "subject": {
         "descriptorVersion": "0.1.0",
-        "behaviorContractDigest": "sha256:b363b1a989ef1136caa87dc5068456087e8ff05a6bf59207dc920b3aaf2d367d"
+        "behaviorContractDigest": "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41"
       },
       "requiredEvidence": [
         "existing-repository-lifecycle",

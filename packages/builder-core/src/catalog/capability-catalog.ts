@@ -1296,7 +1296,7 @@ function createDescriptors(
       version: "0.1.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
-      removalPolicy: "automatic",
+      removalPolicy: "reviewed",
       dependencies: ["content-files", "observability", "section-composition"],
       ...sharedCapabilityMetadata,
       optionalIntegrations: ["booking-calendly", "site-routing"],

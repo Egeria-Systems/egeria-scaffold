@@ -27,7 +27,7 @@ const validCatalog = {
     navigationLabel: "Primary navigation",
   },
   navigation: [{ href: "/en-CA", label: "Home" }],
-  localeSwitch: { href: "/fr-CA", label: "Français" },
+  localeSwitch: { label: "Français" },
   pages: Object.fromEntries(
     localizedRoutes.map(({ identifier }) => [identifier, page]),
   ),
@@ -40,24 +40,73 @@ const validCatalog = {
     popupHeading: "Choose a time",
     closeLabel: "Close scheduling",
   },
+  error: {
+    heading: "Something went wrong",
+    summary: "Please try again.",
+    retryLabel: "Try again",
+  },
 };
 
 describe("localized content", () => {
   it("loads strict locale catalogs with matching translation shapes", () => {
-    const english = parseLocalizedCatalog(validCatalog);
+    const english = parseLocalizedCatalog(validCatalog, "en-CA");
     const french = parseLocalizedCatalog({
       ...validCatalog,
-      localeSwitch: { href: "/en-CA", label: "English" },
-    });
+      navigation: [{ href: "/fr-CA", label: "Accueil" }],
+      localeSwitch: { label: "English" },
+    }, "fr-CA");
     expect(english.pages.home).toBeDefined();
     expect(french.pages.home).toBeDefined();
     expect(() => assertTranslationParity(english, french)).not.toThrow();
-    expect(() => parseLocalizedCatalog({ ...english, unused: true })).toThrowError(
+    expect(() => parseLocalizedCatalog({ ...english, unused: true }, "en-CA")).toThrowError(
       "CONTENT_INVALID",
     );
     expect(() =>
-      assertTranslationParity(english, { ...french, booking: undefined }),
+      parseLocalizedCatalog({ ...validCatalog, booking: undefined }, "en-CA"),
     ).toThrowError("CONTENT_INVALID");
+  });
+
+  it("rejects cross-locale section and navigation drift", () => {
+    const english = parseLocalizedCatalog(validCatalog, "en-CA");
+    const changedSection = parseLocalizedCatalog({
+      ...validCatalog,
+      navigation: [{ href: "/fr-CA", label: "Accueil" }],
+      localeSwitch: { label: "English" },
+      pages: Object.fromEntries(
+        localizedRoutes.map(({ identifier }) => [
+          identifier,
+          identifier === "home"
+            ? {
+                ...page,
+                sections: [
+                  {
+                    id: "changed",
+                    type: "hero",
+                    variant: "default",
+                    enabled: true,
+                    content: {
+                      heading: "Exemple",
+                      summary: "Résumé d’exemple.",
+                    },
+                  },
+                ],
+              }
+            : page,
+        ]),
+      ),
+    }, "fr-CA");
+    expect(() => assertTranslationParity(english, changedSection)).toThrowError(
+      "CONTENT_INVALID",
+    );
+
+    const changedNavigation = parseLocalizedCatalog({
+      ...validCatalog,
+      navigation: [{ href: "/fr-CA/about", label: "À propos" }],
+      localeSwitch: { label: "English" },
+    }, "fr-CA");
+    expect(() => assertTranslationParity(english, changedNavigation)).toThrowError(
+      "CONTENT_INVALID",
+    );
   });
 
   it("resolves only declared localized routes", () => {

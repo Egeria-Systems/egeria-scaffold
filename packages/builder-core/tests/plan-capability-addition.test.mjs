@@ -285,7 +285,11 @@ test("multilingual addition plans the exact locale overlay with or without Calen
       result.value.actions
         .filter(({ kind }) => kind === "replace-file")
         .map(({ path }) => path),
-      ["apps/web/app/layout.tsx"],
+      [
+        "apps/web/app/error.tsx",
+        "apps/web/app/layout.tsx",
+        "apps/web/tests/visual/home-visual.spec.ts",
+      ],
     );
   }
 });

@@ -19,4 +19,9 @@ test("unsupported explicit locales and unknown localized paths return not found"
   expect(unsupported?.status()).toBe(404);
   const missing = await page.goto("/fr-CA/missing");
   expect(missing?.status()).toBe(404);
+  await expect(page).toHaveTitle("Page introuvable");
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    "content",
+    "La page demandée est introuvable.",
+  );
 });

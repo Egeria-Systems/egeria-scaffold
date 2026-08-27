@@ -1348,17 +1348,28 @@ test("multilingual selection renders deterministic locale-prefixed portfolio and
     );
     assert.match(files.get("apps/web/src/i18n/localized-content.ts"), /CONTENT_INVALID/u);
     assert.match(files.get("apps/web/src/i18n/localized-content.ts"), /parity/iu);
+    assert.match(files.get("apps/web/app/error.tsx"), /readLocalizedCatalog/u);
+    assert.match(
+      files.get("apps/web/tests/visual/home-visual.spec.ts"),
+      /outside the established generated visual matrix/u,
+    );
     assert.doesNotMatch(
       files.get("apps/web/src/i18n/localized-content.ts"),
       /Accueil|Passer au contenu|Travaux en vedette/u,
     );
-    assert.equal(
-      parseGeneratedYaml(
-        first.files,
-        "apps/web/content/fr-CA/localized-content.yaml",
-      ).navigation[0].href,
-      "/fr-CA",
+    const frenchCatalog = parseGeneratedYaml(
+      first.files,
+      "apps/web/content/fr-CA/localized-content.yaml",
     );
+    assert.equal(frenchCatalog.navigation[0].href, "/fr-CA");
+    assert.deepEqual(frenchCatalog.localeSwitch, { label: "English" });
+    assert.equal(frenchCatalog.error.retryLabel, "Réessayer");
+    if (profile === "site") {
+      assert.match(
+        files.get("apps/web/tests/e2e/site-routing.spec.ts"),
+        /\/fr-CA\/about/u,
+      );
+    }
   }
 });
 

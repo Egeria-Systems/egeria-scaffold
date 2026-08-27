@@ -1154,7 +1154,7 @@ test("the catalog declares the exact multilingual capability contract", () => {
     version: "0.1.0",
     deliveryMode: "source-generated",
     stateClassifications: ["repository-stateful"],
-    removalPolicy: "automatic",
+    removalPolicy: "reviewed",
     dependencies: ["content-files", "observability", "section-composition"],
     optionalIntegrations: ["booking-calendly", "site-routing"],
     conflicts: [],
@@ -1523,7 +1523,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
       version: "0.1.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
-      removalPolicy: "automatic",
+      removalPolicy: "reviewed",
     });
   }
 

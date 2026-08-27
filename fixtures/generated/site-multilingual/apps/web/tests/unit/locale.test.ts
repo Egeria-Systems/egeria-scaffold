@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createLanguageAlternates,
+  createLocaleSwitchHref,
   isLocale,
   localizePath,
   looksLikeLocaleSegment,
@@ -33,5 +34,6 @@ describe("locale contract", () => {
       "en-CA": "/en-CA/about",
       "fr-CA": "/fr-CA/about",
     });
+    expect(createLocaleSwitchHref("fr-CA", "/about")).toBe("/en-CA/about");
   });
 });
