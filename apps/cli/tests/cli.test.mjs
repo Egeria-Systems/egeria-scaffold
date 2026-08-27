@@ -295,6 +295,26 @@ function planRemoveArguments(directory) {
   ];
 }
 
+function planMultilingualAddArguments(directory) {
+  return [
+    "plan-add",
+    "--directory",
+    directory,
+    "--capability",
+    "multilingual",
+  ];
+}
+
+function planMultilingualRemoveArguments(directory) {
+  return [
+    "plan-remove",
+    "--directory",
+    directory,
+    "--capability",
+    "multilingual",
+  ];
+}
+
 function planUpgradeArguments(directory, capability = "standards") {
   return [
     "plan-upgrade",
@@ -347,6 +367,36 @@ function applyRemoveArguments(
     directory,
     "--capability",
     "booking-calendly",
+    "--approved-plan",
+    approvedPlan,
+  ];
+}
+
+function applyMultilingualAddArguments(
+  directory,
+  approvedPlan = `sha256:${"a".repeat(64)}`,
+) {
+  return [
+    "apply-add",
+    "--directory",
+    directory,
+    "--capability",
+    "multilingual",
+    "--approved-plan",
+    approvedPlan,
+  ];
+}
+
+function applyMultilingualRemoveArguments(
+  directory,
+  approvedPlan = `sha256:${"a".repeat(64)}`,
+) {
+  return [
+    "apply-remove",
+    "--directory",
+    directory,
+    "--capability",
+    "multilingual",
     "--approved-plan",
     approvedPlan,
   ];
@@ -795,6 +845,31 @@ test("the parser accepts only the exact command-specific arguments", () => {
     },
   );
 
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "create",
+        "--profile",
+        "site",
+        "--name",
+        "acme-site",
+        "--display-name",
+        "Acme Site",
+        "--directory",
+        "/private/tmp/acme-site",
+        "--multilingual",
+      ]),
+    ),
+    {
+      kind: "create",
+      profile: "site",
+      projectName: "acme-site",
+      displayName: "Acme Site",
+      directory: "/private/tmp/acme-site",
+      multilingual: true,
+    },
+  );
+
   for (const mode of ["link", "inline", "popup"]) {
     assert.deepEqual(
       assertSuccess(
@@ -880,6 +955,22 @@ test("the plan-add parser accepts exact options in any order", () => {
     assertSuccess(cliArguments.parseCliArguments(reordered)),
     expected,
   );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "plan-add",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+        "--capability",
+        "multilingual",
+      ]),
+    ),
+    {
+      kind: "plan-add",
+      directory: "/private/tmp/acme-portfolio",
+      capability: "multilingual",
+    },
+  );
 });
 
 test("the plan-add parser rejects incomplete, duplicate, unknown, and unsafe values", () => {
@@ -942,6 +1033,22 @@ test("the plan-remove parser accepts only its exact options in any order", () =>
       ),
     ),
     expected,
+  );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "plan-remove",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+        "--capability",
+        "multilingual",
+      ]),
+    ),
+    {
+      kind: "plan-remove",
+      directory: "/private/tmp/acme-portfolio",
+      capability: "multilingual",
+    },
   );
   assert.deepEqual(
     assertSuccess(
@@ -1144,6 +1251,25 @@ test("the apply-add parser accepts only the exact approved transaction arguments
       approvedPlanFingerprint: fingerprint,
     },
   );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "apply-add",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+        "--capability",
+        "multilingual",
+        "--approved-plan",
+        fingerprint,
+      ]),
+    ),
+    {
+      kind: "apply-add",
+      directory: "/private/tmp/acme-portfolio",
+      capability: "multilingual",
+      approvedPlanFingerprint: fingerprint,
+    },
+  );
 
   for (const arguments_ of [
     applyAddArguments("/private/tmp/acme-portfolio").slice(0, -2),
@@ -1180,6 +1306,25 @@ test("the apply-remove parser accepts only the exact approved removal arguments"
       kind: "apply-remove",
       directory: "/private/tmp/acme-portfolio",
       capability: "booking-calendly",
+      approvedPlanFingerprint: fingerprint,
+    },
+  );
+  assert.deepEqual(
+    assertSuccess(
+      cliArguments.parseCliArguments([
+        "apply-remove",
+        "--directory",
+        "/private/tmp/acme-portfolio",
+        "--capability",
+        "multilingual",
+        "--approved-plan",
+        fingerprint,
+      ]),
+    ),
+    {
+      kind: "apply-remove",
+      directory: "/private/tmp/acme-portfolio",
+      capability: "multilingual",
       approvedPlanFingerprint: fingerprint,
     },
   );
@@ -1549,6 +1694,82 @@ test("the runner forwards paired Calendly selection without exposing its URL", a
       }),
     ]);
     assert.doesNotMatch(captured.standard[0], /private-intro|calendly\.com/u);
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+});
+
+test("the runner creates multilingual portfolio and site projects with optional Calendly composition", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-cli-multilingual-"));
+  const cases = [
+    { profile: "portfolio", bookingCalendly: undefined },
+    { profile: "site", bookingCalendly: planSettings },
+  ];
+
+  try {
+    for (const fixture of cases) {
+      const destination = join(
+        owner,
+        `${fixture.profile}-${fixture.bookingCalendly === undefined ? "base" : "booking"}`,
+      );
+      const runCli = cli.createCliRunner({
+        createVerifier: createFakeVerifier,
+      });
+      const captured = captureOutput();
+      const arguments_ = [
+        "create",
+        "--profile",
+        fixture.profile,
+        "--name",
+        `acme-${fixture.profile}`,
+        "--display-name",
+        `Acme ${fixture.profile}`,
+        "--directory",
+        destination,
+        "--multilingual",
+        ...(fixture.bookingCalendly === undefined
+          ? []
+          : [
+              "--calendly-url",
+              fixture.bookingCalendly.destination,
+              "--calendly-mode",
+              fixture.bookingCalendly.mode,
+            ]),
+      ];
+
+      assert.equal(await runCli(arguments_, captured.output), 0);
+      assert.deepEqual(captured.error, []);
+      const emitted = JSON.parse(captured.standard[0]);
+      assert.equal(emitted.ok, true);
+      assert.equal(emitted.command, "create");
+      assert.equal(emitted.destination, await realpath(destination));
+      assert.equal(emitted.profile, fixture.profile);
+      assert.equal(emitted.capabilities.includes("multilingual"), true);
+      assert.equal(
+        emitted.capabilities.includes("booking-calendly"),
+        fixture.bookingCalendly !== undefined,
+      );
+      assert.equal(
+        await readFile(
+          join(destination, "apps/web/content/fr-CA/localized-content.yaml"),
+          "utf8",
+        ).then((source) => source.length > 0),
+        true,
+      );
+      const project = core.parseProjectYaml(
+        await readFile(join(destination, ".egeria/project.yaml"), "utf8"),
+      );
+      assert.equal(project.ok, true);
+      assert.equal(project.value.selectedCapabilities.includes("multilingual"), true);
+      assert.deepEqual(
+        project.value.capabilitySettings["booking-calendly"],
+        fixture.bookingCalendly,
+      );
+      assert.doesNotMatch(
+        captured.standard[0],
+        /private-planning-destination|calendly\.com/u,
+      );
+    }
   } finally {
     await rm(owner, { recursive: true, force: true });
   }
@@ -3094,7 +3315,10 @@ async function withGitFixture(name, run, options = {}) {
   const linked = join(owner, "linked");
 
   try {
-    if (options.bookingCalendly === undefined) {
+    if (
+      options.bookingCalendly === undefined &&
+      options.multilingual !== true
+    ) {
       await cp(resolve(repositoryRoot, `fixtures/generated/${name}`), primary, {
         recursive: true,
       });
@@ -3105,7 +3329,10 @@ async function withGitFixture(name, run, options = {}) {
             profile: name,
             projectName: `acme-${name}`,
             displayName: `Acme ${name}`,
-            bookingCalendly: options.bookingCalendly,
+            ...(options.bookingCalendly === undefined
+              ? {}
+              : { bookingCalendly: options.bookingCalendly }),
+            ...(options.multilingual === true ? { multilingual: true } : {}),
           },
           destination: primary,
           verifier: createFakeVerifier(),
@@ -3252,6 +3479,9 @@ async function assertExactInstalledAgreement(root, options = {}) {
   for (const evidence of inference.capabilities.filter(
     ({ identifier }) => !desired.includes(identifier),
   )) {
+    if (evidence.probes.every(({ status }) => status === "missing")) {
+      continue;
+    }
     assert.equal(evidence.identifier, "booking-calendly");
     assert.equal(options.allowPreservedCalendly, true);
     assert.equal(
@@ -3310,6 +3540,20 @@ async function executeBuiltPlanRemove(directory) {
   ]);
 }
 
+async function executeBuiltPlanMultilingualAdd(directory) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...planMultilingualAddArguments(directory),
+  ]);
+}
+
+async function executeBuiltPlanMultilingualRemove(directory) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...planMultilingualRemoveArguments(directory),
+  ]);
+}
+
 async function executeBuiltPlanUpgrade(directory, capability = "standards") {
   return executeNode([
     resolve(packageRoot, "dist/index.js"),
@@ -3335,6 +3579,20 @@ async function executeBuiltApplyRemove(directory, approvedPlan) {
   return executeNode([
     resolve(packageRoot, "dist/index.js"),
     ...applyRemoveArguments(directory, approvedPlan),
+  ]);
+}
+
+async function executeBuiltApplyMultilingualAdd(directory, approvedPlan) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...applyMultilingualAddArguments(directory, approvedPlan),
+  ]);
+}
+
+async function executeBuiltApplyMultilingualRemove(directory, approvedPlan) {
+  return executeNode([
+    resolve(packageRoot, "dist/index.js"),
+    ...applyMultilingualRemoveArguments(directory, approvedPlan),
   ]);
 }
 
@@ -5212,6 +5470,179 @@ test("the compiled plan-remove command refuses unsafe states without writes", as
       {
         bookingCalendly: planSettings,
         branch: `plan-remove-${fixture.code.toLowerCase()}-test`,
+      },
+    );
+  }
+});
+
+test("the compiled CLI adds and removes multilingual for both profiles with Calendly composition", async () => {
+  const cases = [
+    {
+      profile: "portfolio",
+      bookingCalendly: undefined,
+      branch: "multilingual-portfolio-lifecycle-test",
+    },
+    {
+      profile: "site",
+      bookingCalendly: planSettings,
+      branch: "multilingual-site-booking-lifecycle-test",
+    },
+  ];
+
+  for (const fixture of cases) {
+    await withGitFixture(
+      fixture.profile,
+      async ({ linked, primary }) => {
+        const primaryBefore = await gitRepositorySnapshot(primary);
+        const cleanBefore = await gitRepositorySnapshot(linked);
+        const planExecution = await executeBuiltPlanMultilingualAdd(linked);
+        assert.equal(planExecution.exitCode, 0, planExecution.stderr);
+        assert.equal(planExecution.stderr, "");
+        const additionPlan = JSON.parse(planExecution.stdout).result;
+        assert.deepEqual(additionPlan.capability, {
+          identifier: "multilingual",
+          version: "0.1.0",
+        });
+        assert.equal(additionPlan.settings, null);
+        assert.match(additionPlan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
+        assert.deepEqual(await gitRepositorySnapshot(linked), cleanBefore);
+
+        const addition = await executeBuiltApplyMultilingualAdd(
+          linked,
+          additionPlan.planFingerprint,
+        );
+        assert.equal(addition.exitCode, 0, addition.stderr);
+        assert.equal(addition.stderr, "");
+        const additionEnvelope = JSON.parse(addition.stdout);
+        assert.deepEqual(additionEnvelope, {
+          ok: true,
+          command: "apply-add",
+          result: {
+            status: "verified-final-diff-approval-required",
+            baseRevision: Buffer.from(cleanBefore.head).toString("utf8").trim(),
+            capability: { identifier: "multilingual", version: "0.1.0" },
+            migration: "add-multilingual-0-1-0",
+            changedPaths: [
+              ...additionPlan.actions.map(({ path }) => path),
+              ".egeria/migrations.jsonl",
+              ".egeria/state.json",
+            ].sort(),
+            verificationChecks: core.capabilityAdditionVerificationChecks,
+          },
+        });
+        const addedProject = core.parseProjectYaml(
+          await readFile(join(linked, ".egeria/project.yaml"), "utf8"),
+        );
+        const addedState = core.parseStateJson(
+          await readFile(join(linked, ".egeria/state.json"), "utf8"),
+        );
+        assert.equal(addedProject.ok, true);
+        assert.equal(addedState.ok, true);
+        assert.equal(
+          addedProject.value.selectedCapabilities.includes("multilingual"),
+          true,
+        );
+        assert.equal(
+          addedState.value.installedCapabilities.some(
+            ({ identifier }) => identifier === "multilingual",
+          ),
+          true,
+        );
+        assert.equal(
+          addedProject.value.selectedCapabilities.includes("booking-calendly"),
+          fixture.bookingCalendly !== undefined,
+        );
+        await assertExactInstalledAgreement(linked);
+
+        await commitAll(linked, "add multilingual capability");
+        const cleanAdded = await gitRepositorySnapshot(linked);
+        const removalPlanExecution =
+          await executeBuiltPlanMultilingualRemove(linked);
+        assert.equal(
+          removalPlanExecution.exitCode,
+          0,
+          removalPlanExecution.stderr,
+        );
+        assert.equal(removalPlanExecution.stderr, "");
+        const removalPlan = JSON.parse(removalPlanExecution.stdout).plan;
+        assert.deepEqual(removalPlan.capability, {
+          identifier: "multilingual",
+          version: "0.1.0",
+        });
+        assert.match(removalPlan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
+        assert.deepEqual(await gitRepositorySnapshot(linked), cleanAdded);
+
+        const removal = await executeBuiltApplyMultilingualRemove(
+          linked,
+          removalPlan.planFingerprint,
+        );
+        assert.equal(removal.exitCode, 0, removal.stderr);
+        assert.equal(removal.stderr, "");
+        const removalEnvelope = JSON.parse(removal.stdout);
+        assert.deepEqual(removalEnvelope, {
+          ok: true,
+          command: "apply-remove",
+          result: {
+            status: "verified-final-diff-approval-required",
+            baseRevision: Buffer.from(cleanAdded.head).toString("utf8").trim(),
+            capability: { identifier: "multilingual", version: "0.1.0" },
+            migration: "remove-multilingual-0-1-0",
+            changedPaths: [
+              ...removalPlan.actions.flatMap((action) =>
+                action.kind === "preserve-file-and-eject"
+                  ? []
+                  : [action.path],
+              ),
+              ".egeria/migrations.jsonl",
+              ".egeria/state.json",
+            ].sort(),
+            preservedPaths: [],
+            verificationChecks: core.capabilityRemovalVerificationChecks,
+          },
+        });
+        const removedProject = core.parseProjectYaml(
+          await readFile(join(linked, ".egeria/project.yaml"), "utf8"),
+        );
+        const removedState = core.parseStateJson(
+          await readFile(join(linked, ".egeria/state.json"), "utf8"),
+        );
+        const migrations = core.parseMigrationLog(
+          await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8"),
+        );
+        assert.equal(removedProject.ok, true);
+        assert.equal(removedState.ok, true);
+        assert.equal(migrations.ok, true);
+        assert.equal(
+          removedProject.value.selectedCapabilities.includes("multilingual"),
+          false,
+        );
+        assert.equal(
+          removedProject.value.selectedCapabilities.includes("booking-calendly"),
+          fixture.bookingCalendly !== undefined,
+        );
+        assert.deepEqual(
+          migrations.value.map(({ identifier }) => identifier),
+          ["add-multilingual-0-1-0", "remove-multilingual-0-1-0"],
+        );
+        await assertExactInstalledAgreement(linked);
+        assert.deepEqual(
+          withoutSharedRefs(await gitRepositorySnapshot(primary)),
+          withoutSharedRefs(primaryBefore),
+        );
+        assert.doesNotMatch(
+          `${addition.stdout}${removal.stdout}`,
+          /private-planning-destination|calendly\.com|refs\/heads|\.git\/worktrees/u,
+        );
+      },
+      {
+        bookingCalendly: fixture.bookingCalendly,
+        branch: fixture.branch,
+        ...(fixture.bookingCalendly === undefined
+          ? {}
+          : {
+              preparePrimary: (root) =>
+                replaceFakeLockfileWithFixture(root, fixture.profile),
+            }),
       },
     );
   }

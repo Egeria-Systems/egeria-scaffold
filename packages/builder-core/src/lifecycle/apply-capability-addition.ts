@@ -65,7 +65,15 @@ import {
 } from "./plan-capability-addition.js";
 
 const encoder = new TextEncoder();
-const migrationIdentifier = "add-booking-calendly-0-1-0";
+type AddableCapability = "booking-calendly" | "multilingual";
+
+function additionMigrationIdentifier(
+  capability: AddableCapability,
+): "add-booking-calendly-0-1-0" | "add-multilingual-0-1-0" {
+  return capability === "booking-calendly"
+    ? "add-booking-calendly-0-1-0"
+    : "add-multilingual-0-1-0";
+}
 
 export type CapabilityAdditionPhase =
   | "precondition"
@@ -103,10 +111,10 @@ export type CapabilityAdditionExecutionResult =
         status: "verified-final-diff-approval-required";
         baseRevision: string;
         capability: Readonly<{
-          identifier: "booking-calendly";
+          identifier: AddableCapability;
           version: "0.1.0";
         }>;
-        migration: typeof migrationIdentifier;
+        migration: ReturnType<typeof additionMigrationIdentifier>;
         changedPaths: readonly string[];
         verificationChecks: typeof capabilityAdditionVerificationChecks;
       }>;
@@ -252,6 +260,7 @@ function requirePendingInference(
   inference: Awaited<ReturnType<typeof inferRepository>>,
   currentState: InstalledState,
   desiredCapabilities: readonly string[],
+  addedCapability: AddableCapability,
 ): boolean {
   if (
     inference.state.kind !== "valid" ||
@@ -267,7 +276,7 @@ function requirePendingInference(
     evidenceByIdentifier.size !== desiredCapabilities.length ||
     desiredCapabilities.some((identifier) =>
       evidenceByIdentifier.get(identifier)?.category !==
-      (identifier === "booking-calendly" ? "probable" : "confirmed"),
+      (identifier === addedCapability ? "probable" : "confirmed"),
     )
   ) {
     return false;
@@ -371,8 +380,8 @@ function createNextState(input: Readonly<{
 
 export async function applyCapabilityAddition(input: Readonly<{
   root: string;
-  capability: "booking-calendly";
-  settings: CalendlyBookingSettings;
+  capability: AddableCapability;
+  settings?: CalendlyBookingSettings;
   approvedPlanFingerprint: string;
   verifier: GeneratedProjectVerifier;
   reader?: RepositoryReader;
@@ -419,7 +428,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       reader,
       git: initialGit,
       capability: input.capability,
-      settings: input.settings,
+      ...(input.settings === undefined ? {} : { settings: input.settings }),
     });
   } catch {
     return failure(
@@ -457,7 +466,18 @@ export async function applyCapabilityAddition(input: Readonly<{
     profile: controls.project.value.originProfile,
     projectName: controls.project.value.project.name,
     displayName: controls.project.value.project.displayName,
-    bookingCalendly: input.settings,
+    ...(input.capability === "booking-calendly"
+      ? { bookingCalendly: input.settings }
+      : controls.project.value.capabilitySettings["booking-calendly"] === undefined
+        ? {}
+        : {
+            bookingCalendly:
+              controls.project.value.capabilitySettings["booking-calendly"],
+          }),
+    ...(input.capability === "multilingual" ||
+    controls.project.value.selectedCapabilities.includes("multilingual")
+      ? { multilingual: true as const }
+      : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   });
   if (!desired.ok) {
@@ -570,6 +590,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       pendingInference,
       controls.state.value,
       plan.desiredCapabilities,
+      input.capability,
     )
   ) {
     return failure(
@@ -605,7 +626,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   }
   const migration = migrationRecordSchema.safeParse({
     schemaVersion: "1.0.0",
-    identifier: migrationIdentifier,
+    identifier: additionMigrationIdentifier(input.capability),
     kind: "migration",
     outcome: "succeeded",
     completedAt,
@@ -745,8 +766,8 @@ export async function applyCapabilityAddition(input: Readonly<{
     value: {
       status: "verified-final-diff-approval-required",
       baseRevision: initialGit.identity.revision,
-      capability: { identifier: "booking-calendly", version: "0.1.0" },
-      migration: migrationIdentifier,
+      capability: { identifier: input.capability, version: "0.1.0" },
+      migration: additionMigrationIdentifier(input.capability),
       changedPaths,
       verificationChecks: capabilityAdditionVerificationChecks,
     },

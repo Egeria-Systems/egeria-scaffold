@@ -125,12 +125,18 @@ function assertFailure(result, code) {
 async function planFromEntries(entries, options = {}) {
   const snapshotReader = createSnapshotReader(entries, options.overrides);
   const before = snapshotReader.snapshot();
+  const capability = options.capability ?? "booking-calendly";
+  const selectedSettings = Object.hasOwn(options, "settings")
+    ? options.settings
+    : capability === "booking-calendly"
+      ? settings
+      : undefined;
   try {
     return await core.planCapabilityAddition({
       reader: snapshotReader.reader,
       git: options.git ?? git,
-      capability: options.capability ?? "booking-calendly",
-      settings: options.settings ?? settings,
+      capability,
+      ...(selectedSettings === undefined ? {} : { settings: selectedSettings }),
     });
   } finally {
     assert.equal(snapshotReader.snapshot(), before);
@@ -235,6 +241,52 @@ test("capability addition plan is exact and read-only for portfolio and site", a
       expectedPlan(profile, result.value.planFingerprint),
     );
     assert.doesNotMatch(JSON.stringify(result.value), /calendly\.com|refs\/heads|\/generated\//u);
+  }
+});
+
+test("multilingual addition plans the exact locale overlay with or without Calendly", async () => {
+  const expectedCreatedPaths = [
+    "apps/web/app/[locale]/[[...segments]]/page.tsx",
+    "apps/web/app/[locale]/layout.tsx",
+    "apps/web/app/[locale]/not-found.tsx",
+    "apps/web/content/en-CA/localized-content.yaml",
+    "apps/web/content/fr-CA/localized-content.yaml",
+    "apps/web/middleware.ts",
+    "apps/web/src/i18n/locale.ts",
+    "apps/web/src/i18n/localized-content.ts",
+    "apps/web/src/i18n/localized-profile.ts",
+    "apps/web/src/i18n/read-localized-content.ts",
+    "apps/web/src/integrations/booking/localized-booking.tsx",
+    "apps/web/src/presentation/localized-page.tsx",
+    "apps/web/tests/component/multilingual-page.test.tsx",
+    "apps/web/tests/e2e/multilingual-routing.spec.ts",
+    "apps/web/tests/unit/locale.test.ts",
+    "apps/web/tests/unit/localized-content.test.ts",
+  ];
+
+  for (const fixture of ["portfolio", "portfolio-calendly"]) {
+    const result = await planFromEntries(await fixtureEntries(fixture), {
+      capability: "multilingual",
+    });
+    assert.equal(result.ok, true, JSON.stringify(result.issues));
+    assert.deepEqual(result.value.capability, {
+      identifier: "multilingual",
+      version: "0.1.0",
+    });
+    assert.equal(result.value.settings, null);
+    assert.equal(result.value.desiredCapabilities.includes("multilingual"), true);
+    assert.deepEqual(
+      result.value.actions
+        .filter(({ kind }) => kind === "create-file")
+        .map(({ path }) => path),
+      expectedCreatedPaths,
+    );
+    assert.deepEqual(
+      result.value.actions
+        .filter(({ kind }) => kind === "replace-file")
+        .map(({ path }) => path),
+      ["apps/web/app/layout.tsx"],
+    );
   }
 });
 

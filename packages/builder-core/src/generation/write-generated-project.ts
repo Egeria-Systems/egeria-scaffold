@@ -82,6 +82,16 @@ const exactCalendlyRequestKeys = [
   "bookingCalendly",
   ...exactRequestKeys,
 ] as const;
+const exactMultilingualRequestKeys = [
+  "displayName",
+  "multilingual",
+  "profile",
+  "projectName",
+] as const;
+const exactCalendlyMultilingualRequestKeys = [
+  "bookingCalendly",
+  ...exactMultilingualRequestKeys,
+] as const;
 function issue(
   code: string,
   path: readonly (string | number)[] = [],
@@ -123,9 +133,14 @@ function validateRequest(
 
   const keys = Object.keys(value).sort();
   const includesCalendly = Object.hasOwn(value, "bookingCalendly");
+  const includesMultilingual = Object.hasOwn(value, "multilingual");
   const expectedKeys = includesCalendly
-    ? exactCalendlyRequestKeys
-    : exactRequestKeys;
+    ? includesMultilingual
+      ? exactCalendlyMultilingualRequestKeys
+      : exactCalendlyRequestKeys
+    : includesMultilingual
+      ? exactMultilingualRequestKeys
+      : exactRequestKeys;
   if (
     keys.length !== expectedKeys.length ||
     keys.some((key, index) => key !== expectedKeys[index])
@@ -152,6 +167,13 @@ function validateRequest(
     }
     bookingCalendly = parsed.data;
   }
+  if (includesMultilingual && value.multilingual !== true) {
+    return issue(
+      "PROJECT_GENERATION_REQUEST_INVALID",
+      ["request", "multilingual"],
+      "invalid-selection",
+    );
+  }
 
   return {
     ok: true,
@@ -160,6 +182,7 @@ function validateRequest(
       projectName: value.projectName as string,
       displayName: value.displayName as string,
       ...(bookingCalendly === undefined ? {} : { bookingCalendly }),
+      ...(includesMultilingual ? { multilingual: true } : {}),
     },
   };
 }

@@ -107,12 +107,18 @@ function createRepository(entries, failBatch, afterWrite) {
   };
 }
 
-async function approvedPlan(reader) {
+async function approvedPlan(
+  reader,
+  capability = "booking-calendly",
+  selectedSettings,
+) {
+  const resolvedSettings = selectedSettings ??
+    (capability === "booking-calendly" ? settings : undefined);
   const result = await core.planCapabilityAddition({
     reader,
     git,
-    capability: "booking-calendly",
-    settings,
+    capability,
+    ...(resolvedSettings === undefined ? {} : { settings: resolvedSettings }),
   });
   assert.equal(result.ok, true, JSON.stringify(result.issues));
   return result.value;
@@ -134,13 +140,23 @@ function successfulVerifier(calls) {
 }
 
 async function runApply(repository, overrides = {}) {
-  const plan = await approvedPlan(repository.reader);
+  const capability = overrides.capability ?? "booking-calendly";
+  const selectedSettings = Object.hasOwn(overrides, "settings")
+    ? overrides.settings
+    : capability === "booking-calendly"
+      ? settings
+      : undefined;
+  const plan = await approvedPlan(
+    repository.reader,
+    capability,
+    selectedSettings,
+  );
   const expectedInspections = [];
   const verifierCalls = [];
   const result = await core.applyCapabilityAddition({
     root,
-    capability: "booking-calendly",
-    settings,
+    capability,
+    ...(selectedSettings === undefined ? {} : { settings: selectedSettings }),
     approvedPlanFingerprint:
       overrides.approvedPlanFingerprint ?? plan.planFingerprint,
     reader: repository.reader,
@@ -215,6 +231,53 @@ test("capability addition applies, verifies, re-infers, and persists migration t
       },
     ]);
     assert.doesNotMatch(JSON.stringify(result), /private|calendly\.com|refs\/heads/u);
+  }
+});
+
+test("multilingual addition applies the locale overlay and persists fresh discovery", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    const repository = createRepository(await fixtureEntries(profile));
+    const { plan, result, verifierCalls } = await runApply(repository, {
+      capability: "multilingual",
+      settings: undefined,
+    });
+
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.deepEqual(result.value.capability, {
+      identifier: "multilingual",
+      version: "0.1.0",
+    });
+    assert.equal(result.value.migration, "add-multilingual-0-1-0");
+    assert.deepEqual(verifierCalls, [root]);
+    assert.equal(
+      repository.files.has("apps/web/content/fr-CA/localized-content.yaml"),
+      true,
+    );
+    const project = core.parseProjectYaml(
+      repository.files.get(".egeria/project.yaml"),
+    );
+    const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
+    assert.equal(project.ok, true);
+    assert.equal(state.ok, true);
+    assert.equal(project.value.selectedCapabilities.includes("multilingual"), true);
+    assert.equal(
+      state.value.installedCapabilities.some(
+        ({ identifier }) => identifier === "multilingual",
+      ),
+      true,
+    );
+    assert.equal(
+      state.value.appliedMigrations.at(-1),
+      "add-multilingual-0-1-0",
+    );
+    assert.deepEqual(
+      result.value.changedPaths,
+      [
+        ...plan.actions.map(({ path }) => path),
+        ".egeria/migrations.jsonl",
+        ".egeria/state.json",
+      ].sort(),
+    );
   }
 });
 

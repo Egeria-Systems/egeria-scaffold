@@ -239,6 +239,12 @@ test("compiled project generation matches every committed fixture identifier", a
           fixtureCase.expectedBookingCalendlyVersion,
         );
         assert.equal(
+          state.installedCapabilities.find(
+            ({ identifier }) => identifier === "multilingual",
+          )?.version ?? null,
+          fixtureCase.expectedMultilingualVersion,
+        );
+        assert.equal(
           state.managedSurfaces.length,
           fixtureCase.expectedSurfaces,
         );

@@ -200,7 +200,7 @@ test("standards hybrid ownership declares generated unit, component, browser, an
   ]);
 });
 
-test("the portfolio and site catalog declares the exact seven executable capability contracts", async () => {
+test("the portfolio and site catalog preserves the existing seven executable capability contracts", async () => {
   const catalogEntry = builtDeclaration.match(
     /export \* from "(\.\/catalog\/[^\"]+)\.js";/,
   )?.[1];
@@ -228,7 +228,7 @@ test("the portfolio and site catalog declares the exact seven executable capabil
     "frame-src https://calendly.com https://www.calendly.com",
   ]);
 
-  assert.deepEqual(catalog.slice(1), [
+  assert.deepEqual(catalog.slice(1, 7), [
     {
       identifier: "content-files",
       version: "0.4.0",
@@ -1144,6 +1144,164 @@ test("the portfolio and site catalog declares the exact seven executable capabil
   );
 });
 
+test("the catalog declares the exact multilingual capability contract", () => {
+  const multilingual = createCatalog().find(
+    ({ identifier }) => identifier === "multilingual",
+  );
+
+  assert.deepEqual(multilingual, {
+    identifier: "multilingual",
+    version: "0.1.0",
+    deliveryMode: "source-generated",
+    stateClassifications: ["repository-stateful"],
+    removalPolicy: "automatic",
+    dependencies: ["content-files", "observability", "section-composition"],
+    optionalIntegrations: ["booking-calendly", "site-routing"],
+    conflicts: [],
+    supportedProfiles: ["portfolio", "site"],
+    requiredPackages: [],
+    environmentVariables: [],
+    secrets: [],
+    platformResources: [],
+    externalDomains: [],
+    contentSecurityPolicyContributions: [],
+    browserStorage: [],
+    dataClassifications: [],
+    retentionAssumptions: [],
+    privilegedOperations: [],
+    threatReviewLevel: "standard",
+    adapterSemanticRequirements: [],
+    managedSurfaces: [
+      ...[
+        ["multilingual-locale-middleware", "apps/web/middleware.ts", "managed"],
+        [
+          "multilingual-locale-layout",
+          "apps/web/app/[locale]/layout.tsx",
+          "managed",
+        ],
+        [
+          "multilingual-localized-route",
+          "apps/web/app/[locale]/[[...segments]]/page.tsx",
+          "managed",
+        ],
+        [
+          "multilingual-localized-not-found",
+          "apps/web/app/[locale]/not-found.tsx",
+          "managed",
+        ],
+        [
+          "multilingual-default-locale-content",
+          "apps/web/content/en-CA/localized-content.yaml",
+          "application-owned",
+        ],
+        [
+          "multilingual-french-locale-content",
+          "apps/web/content/fr-CA/localized-content.yaml",
+          "application-owned",
+        ],
+        ["multilingual-locale-contract", "apps/web/src/i18n/locale.ts", "managed"],
+        [
+          "multilingual-profile-routes",
+          "apps/web/src/i18n/localized-profile.ts",
+          "managed",
+        ],
+        [
+          "multilingual-content-contract",
+          "apps/web/src/i18n/localized-content.ts",
+          "managed",
+        ],
+        [
+          "multilingual-content-reader",
+          "apps/web/src/i18n/read-localized-content.ts",
+          "managed",
+        ],
+        [
+          "multilingual-page-presentation",
+          "apps/web/src/presentation/localized-page.tsx",
+          "managed",
+        ],
+        [
+          "multilingual-booking-composition",
+          "apps/web/src/integrations/booking/localized-booking.tsx",
+          "managed",
+        ],
+        [
+          "multilingual-component-specification",
+          "apps/web/tests/component/multilingual-page.test.tsx",
+          "managed",
+        ],
+        [
+          "multilingual-browser-specification",
+          "apps/web/tests/e2e/multilingual-routing.spec.ts",
+          "managed",
+        ],
+        [
+          "multilingual-locale-unit-specification",
+          "apps/web/tests/unit/locale.test.ts",
+          "managed",
+        ],
+        [
+          "multilingual-content-unit-specification",
+          "apps/web/tests/unit/localized-content.test.ts",
+          "managed",
+        ],
+      ].map(([identifier, path, ownership]) => ({
+        identifier,
+        owner: { kind: "capability", identifier: "multilingual" },
+        path,
+        ownership,
+        fingerprintTarget: { kind: "file" },
+        mergeStrategy: "replace-file",
+      })),
+    ],
+    inferenceProbes: [
+      ...[
+        "apps/web/middleware.ts",
+        "apps/web/app/[locale]/layout.tsx",
+        "apps/web/app/[locale]/[[...segments]]/page.tsx",
+        "apps/web/app/[locale]/not-found.tsx",
+        "apps/web/content/en-CA/localized-content.yaml",
+        "apps/web/content/fr-CA/localized-content.yaml",
+        "apps/web/src/i18n/locale.ts",
+        "apps/web/src/i18n/localized-profile.ts",
+        "apps/web/src/i18n/localized-content.ts",
+        "apps/web/src/i18n/read-localized-content.ts",
+        "apps/web/src/presentation/localized-page.tsx",
+        "apps/web/src/integrations/booking/localized-booking.tsx",
+        "apps/web/tests/component/multilingual-page.test.tsx",
+        "apps/web/tests/e2e/multilingual-routing.spec.ts",
+        "apps/web/tests/unit/locale.test.ts",
+        "apps/web/tests/unit/localized-content.test.ts",
+      ].map((path) => ({ kind: "file", path })),
+    ],
+    migrationPlanners: [
+      "add-multilingual-0-1-0",
+      "remove-multilingual-0-1-0",
+    ],
+    verificationPlan: [
+      "locale-contracts",
+      "content-contracts",
+      "component-tests",
+      "typecheck",
+      "next-build",
+      "opennext-build",
+      "browser-development",
+      "browser-preview",
+    ],
+    documentationEvidenceRequirements: [
+      "locale-prefixed-routing-and-negotiation-contract",
+      "translation-parity-and-exact-key-contract",
+      "localized-navigation-metadata-and-discovery-contract",
+      "human-translation-review-boundary",
+    ],
+    removalAndRecoveryRequirements: [
+      "review-application-owned-locale-catalog-preservation",
+      "restore-single-locale-routing-and-discovery-surfaces",
+      "verify-closed-booking-and-multilingual-lifecycle",
+    ],
+  });
+});
+
 test("capability package versions must be exact stable releases and issues do not echo inputs", () => {
   for (const invalidVersion of [
     "workspace:*",
@@ -1194,7 +1352,7 @@ test("the verified generation catalog pins exact public package releases", () =>
   assert.equal(core.verifiedCapabilityPackageVersions.standards, "0.1.0");
 
   const catalog = assertOk(core.createVerifiedCapabilityCatalog());
-  assert.equal(catalog.length, 7);
+  assert.equal(catalog.length, 8);
   assert.deepEqual(
     catalog.map(({ identifier }) => identifier),
     [
@@ -1205,6 +1363,7 @@ test("the verified generation catalog pins exact public package releases", () =>
       "observability",
       "site-routing",
       "booking-calendly",
+      "multilingual",
     ],
   );
 
@@ -1342,6 +1501,32 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
     });
   }
 
+  for (const profile of ["portfolio", "site"]) {
+    const selected = assertOk(
+      resolveRequest({ profile, requestedCapabilities: ["multilingual"] }),
+    );
+    const identifiers = selected.capabilities.map(({ identifier }) => identifier);
+
+    assert.equal(identifiers.includes("multilingual"), true);
+    for (const dependency of [
+      "content-files",
+      "observability",
+      "section-composition",
+    ]) {
+      assert.equal(
+        identifiers.indexOf(dependency) < identifiers.indexOf("multilingual"),
+        true,
+      );
+    }
+    assert.deepEqual(core.createInstalledManifest(selected).at(-1), {
+      identifier: "multilingual",
+      version: "0.1.0",
+      deliveryMode: "source-generated",
+      stateClassifications: ["repository-stateful"],
+      removalPolicy: "automatic",
+    });
+  }
+
   assert.deepEqual(core.createInstalledManifest(site), [
     {
       identifier: "standards",
@@ -1455,7 +1640,7 @@ test("resolution traverses dependency identifiers lexically rather than trusting
   );
 });
 
-test("resolution rejects unknown profiles and later-stage capability identifiers", () => {
+test("resolution rejects unknown profiles and capability identifiers without implementations", () => {
   for (const identifier of ["app", "authenticated-app"]) {
     assertIssues(resolveRequest({ profile: identifier }), [
       {
@@ -1472,7 +1657,6 @@ test("resolution rejects unknown profiles and later-stage capability identifiers
     "transactional-email-resend",
     "background-job-delivery",
     "durable-contact-submissions",
-    "multilingual",
     "analytics",
     "cms-payload",
     "identity-core",

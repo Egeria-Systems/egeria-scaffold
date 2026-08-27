@@ -43,6 +43,7 @@ export type GenerationRequest = Readonly<{
   projectName: string;
   displayName: string;
   bookingCalendly?: CalendlyBookingSettings;
+  multilingual?: true;
   packageVersions: CapabilityPackageVersions;
 }>;
 
@@ -406,9 +407,18 @@ export async function renderSkeleton(
   const resolutionResult = resolveCapabilities(
     {
       profile: request.profile,
-      ...(request.bookingCalendly === undefined
-        ? {}
-        : { requestedCapabilities: ["booking-calendly"] }),
+      ...(
+        request.bookingCalendly === undefined && request.multilingual !== true
+          ? {}
+          : {
+              requestedCapabilities: [
+                ...(request.bookingCalendly === undefined
+                  ? []
+                  : ["booking-calendly"]),
+                ...(request.multilingual === true ? ["multilingual"] : []),
+              ],
+            }
+      ),
     },
     catalogResult.value,
     context?.profiles ?? profileRecipes,
@@ -426,6 +436,7 @@ export async function renderSkeleton(
     request.profile,
     request.bookingCalendly !== undefined,
     resolutionResult.value.recipeVersion,
+    request.multilingual === true,
   );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;

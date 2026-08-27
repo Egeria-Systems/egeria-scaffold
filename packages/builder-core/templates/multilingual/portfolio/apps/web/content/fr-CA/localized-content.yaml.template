@@ -1,0 +1,70 @@
+metadata:
+  title: {{displayNameJson}}
+  description: Un portfolio ciblé.
+accessibility:
+  skipToContent: Passer au contenu
+  navigationLabel: Navigation principale
+navigation:
+  - href: /fr-CA
+    label: Accueil
+localeSwitch:
+  href: /en-CA
+  label: English
+pages:
+  home:
+    metadata:
+      title: {{displayNameJson}}
+      description: Un portfolio ciblé.
+    sections:
+      - id: introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: {{displayNameJson}}
+          summary: Une brève présentation de travaux sélectionnés.
+      - id: approach
+        type: text
+        variant: default
+        enabled: true
+        content:
+          heading: Approche
+          body: Un travail réfléchi commence par des objectifs clairs et des décisions pratiques.
+      - id: selected-work
+        type: project-list
+        variant: default
+        enabled: true
+        content:
+          heading: Travaux sélectionnés
+          projects:
+            - title: Projet exemple
+              summary: Un projet représentatif qui démontre une réalisation ciblée.
+              href: https://example.com/work/example-project
+      - id: contact
+        type: call-to-action
+        variant: default
+        enabled: true
+        content:
+          heading: Commençons une conversation
+          summary: Présentez les objectifs et les contraintes de votre prochain projet.
+          label: Envoyer un courriel
+          href: mailto:hello@example.com
+notFound:
+  metadata:
+    title: Page introuvable
+    description: La page demandée est introuvable.
+  sections:
+    - id: missing-page
+      type: hero
+      variant: default
+      enabled: true
+      content:
+        heading: Page introuvable
+        summary: Vérifiez l’adresse ou retournez à la page d’accueil.
+booking:
+  heading: Réserver une conversation
+  summary: Choisissez un moment qui vous convient.
+  linkLabel: Planifier avec Calendly
+  frameTitle: Page de planification Calendly
+  popupHeading: Choisir un moment
+  closeLabel: Fermer la planification

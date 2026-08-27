@@ -3845,6 +3845,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
       "fixtures/generated/portfolio",
       "fixtures/generated/portfolio-calendly",
       "fixtures/generated/site",
+      "fixtures/generated/site-multilingual",
     ].map((path) => access(resolve(repositoryRoot, path))),
   );
 
@@ -3856,18 +3857,18 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     readme,
     /builder kernel has received verified-final-diff approval.*committed golden fixtures.*client-ready portfolio stage is completed through an unnumbered closure amendment/iu,
   );
-  assert.match(readme, /retained `portfolio-calendly` fixture/iu);
+  assert.match(readme, /retained `portfolio-calendly` and `site-multilingual` fixtures/iu);
   assert.match(
     capabilityModel,
-    /seven `portfolio`\/`site` descriptors.*are executable/iu,
+    /seven `portfolio`\/`site` descriptors.*accepted base.*eighth executable descriptor/isu,
   );
   assert.match(
     packageOwnership,
-    /exact seven-capability catalog/iu,
+    /eight capability descriptors/iu,
   );
   assert.match(
     builderCoreReadme,
-    /exact seven executable capability descriptors/iu,
+    /exact eight executable capability descriptors/iu,
   );
   assert.match(
     cliReadme,

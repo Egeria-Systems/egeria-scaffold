@@ -138,6 +138,24 @@ const bookingCalendlyRenderedPaths = [
   "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
   "apps/web/tests/e2e/calendly-booking.spec.ts",
 ];
+const multilingualRenderedPaths = [
+  "apps/web/app/[locale]/[[...segments]]/page.tsx",
+  "apps/web/app/[locale]/layout.tsx",
+  "apps/web/app/[locale]/not-found.tsx",
+  "apps/web/content/en-CA/localized-content.yaml",
+  "apps/web/content/fr-CA/localized-content.yaml",
+  "apps/web/middleware.ts",
+  "apps/web/src/i18n/locale.ts",
+  "apps/web/src/i18n/localized-content.ts",
+  "apps/web/src/i18n/localized-profile.ts",
+  "apps/web/src/i18n/read-localized-content.ts",
+  "apps/web/src/integrations/booking/localized-booking.tsx",
+  "apps/web/src/presentation/localized-page.tsx",
+  "apps/web/tests/component/multilingual-page.test.tsx",
+  "apps/web/tests/e2e/multilingual-routing.spec.ts",
+  "apps/web/tests/unit/locale.test.ts",
+  "apps/web/tests/unit/localized-content.test.ts",
+];
 const controlPaths = [
   ".egeria/migrations.jsonl",
   ".egeria/project.yaml",
@@ -1340,6 +1358,55 @@ test("generation accepts only the exact optional Calendly request key", async ()
         JSON.stringify(result.issues),
         /calendar\.example|private|unexpected/u,
       );
+    }
+  });
+});
+
+test("generation accepts only the exact multilingual selection value", async () => {
+  await withTestRoot(async (owner) => {
+    const destination = join(owner, "multilingual-selection");
+    const fake = createFakeVerifier();
+    const generated = assertSuccess(
+      await core.generateProject({
+        request: { ...request(), multilingual: true },
+        destination,
+        verifier: fake.verifier,
+      }),
+    );
+    const project = assertSuccess(
+      core.parseProjectYaml(
+        await readFile(join(destination, ".egeria/project.yaml"), "utf8"),
+      ),
+    );
+
+    assert.equal(project.selectedCapabilities.includes("multilingual"), true);
+    assert.deepEqual(project.capabilitySettings, {});
+    assert.deepEqual(
+      await listFiles(destination),
+      [
+        ...portfolioRenderedPaths,
+        ...multilingualRenderedPaths,
+        ...controlPaths,
+      ].sort(),
+    );
+    assert.equal(
+      generated.state.installedCapabilities.some(
+        ({ identifier }) => identifier === "multilingual",
+      ),
+      true,
+    );
+
+    for (const [index, multilingual] of [false, undefined, "true"].entries()) {
+      const invalidDestination = join(owner, `invalid-multilingual-${index}`);
+      const invalidVerifier = createFakeVerifier();
+      const result = await core.generateProject({
+        request: { ...request(), multilingual },
+        destination: invalidDestination,
+        verifier: invalidVerifier.verifier,
+      });
+      assertFailure(result, "PROJECT_GENERATION_REQUEST_INVALID");
+      assert.deepEqual(invalidVerifier.calls, []);
+      assert.equal(await exists(invalidDestination), false);
     }
   });
 });

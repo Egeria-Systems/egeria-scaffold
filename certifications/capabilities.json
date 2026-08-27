@@ -134,6 +134,19 @@
         }
       ]
     },
+    "multilingual": {
+      "subject": {
+        "descriptorVersion": "0.1.0",
+        "behaviorContractDigest": "sha256:b363b1a989ef1136caa87dc5068456087e8ff05a6bf59207dc920b3aaf2d367d"
+      },
+      "requiredEvidence": [
+        "existing-repository-lifecycle",
+        "fresh-scaffold"
+      ],
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-08-26-multilingual-capability-implementation.md",
+      "evidence": []
+    },
     "observability": {
       "subject": {
         "descriptorVersion": "0.3.0",
