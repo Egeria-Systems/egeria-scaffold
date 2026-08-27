@@ -1,19 +1,24 @@
 import { expect, test } from "@playwright/test";
 
+import { createAnalyticsProviderDeclarations } from "../../src/integrations/analytics/analytics-provider-contract";
 import { analyticsSettings } from "../../src/integrations/analytics/analytics-settings";
 
-const providerHosts = [
-  "static.cloudflareinsights.com",
-  "www.googletagmanager.com",
-  "www.clarity.ms",
-] as const;
+const providerDeclarations = createAnalyticsProviderDeclarations(analyticsSettings);
+const providerOrigins = [
+  ...new Set(
+    providerDeclarations.flatMap((declaration) => [
+      new URL(declaration.scriptSource).origin,
+      ...declaration.connectSources,
+    ]),
+  ),
+];
 
 test("optional providers stay blocked until grant and withdrawal persists denial", async ({
   page,
 }) => {
   const providerRequests: string[] = [];
-  for (const host of providerHosts) {
-    await page.route(`https://${host}/**`, async (route) => {
+  for (const origin of providerOrigins) {
+    await page.route(`${origin}/**`, async (route) => {
       providerRequests.push(route.request().url());
       await route.fulfill({ status: 204, body: "" });
     });
@@ -23,11 +28,22 @@ test("optional providers stay blocked until grant and withdrawal persists denial
   await expect(page.getByRole("dialog", { name: "Analytics choices" })).toBeVisible();
   expect(providerRequests).toEqual([]);
 
+  await page.getByRole("button", { name: "Decline analytics" }).click();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Manage analytics" })).toBeVisible();
+  expect(providerRequests).toEqual([]);
+
+  await page.getByRole("button", { name: "Manage analytics" }).click();
   await page.getByRole("button", { name: "Allow analytics" }).click();
-  const expectedProviderCount = Object.values(analyticsSettings.providers).filter(
-    (provider) => provider !== undefined,
-  ).length;
+  const expectedProviderCount = providerDeclarations.length;
   await expect.poll(() => providerRequests.length).toBe(expectedProviderCount);
+  for (const declaration of providerDeclarations) {
+    expect(
+      providerRequests.some((request) =>
+        request.startsWith(declaration.scriptSource),
+      ),
+    ).toBe(true);
+  }
 
   const verificationToken =
     analyticsSettings.operationalIntegrations.googleSearchConsole
@@ -38,6 +54,13 @@ test("optional providers stay blocked until grant and withdrawal persists denial
       verificationToken,
     );
   }
+
+  await page.evaluate(() => {
+    document.cookie = "_ga=browser-test; Path=/; SameSite=Lax";
+    document.cookie = "_clck=browser-test; Path=/; SameSite=Lax";
+  });
+  expect(await page.evaluate(() => document.cookie)).toContain("_ga=");
+  expect(await page.evaluate(() => document.cookie)).toContain("_clck=");
 
   await page.getByRole("button", { name: "Manage analytics" }).click();
   await Promise.all([
@@ -50,4 +73,7 @@ test("optional providers stay blocked until grant and withdrawal persists denial
       window.localStorage.getItem("egeria.analytics.consent.v1"),
     ),
   ).toBe("denied");
+  expect(await page.evaluate(() => document.cookie)).not.toContain("_ga=");
+  expect(await page.evaluate(() => document.cookie)).not.toContain("_clck=");
+  expect(providerRequests).toHaveLength(expectedProviderCount);
 });

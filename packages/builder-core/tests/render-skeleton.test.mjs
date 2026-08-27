@@ -1493,72 +1493,88 @@ test("multilingual and Calendly compose without changing either capability setti
 test("analytics renders deterministic provider-neutral contracts and composes with multilingual", async () => {
   const renderSkeleton = await loadRenderSkeleton();
 
-  for (const multilingual of [false, true]) {
-    const first = assertSuccess(
-      await renderSkeleton({
-        profile: "site",
-        projectName: "acme-site",
-        displayName: "Acme Site",
-        analytics: analyticsSettings,
-        ...(multilingual ? { multilingual: true } : {}),
-        packageVersions,
-      }),
-    );
-    const second = assertSuccess(
-      await renderSkeleton({
-        profile: "site",
-        projectName: "acme-site",
-        displayName: "Acme Site",
-        analytics: analyticsSettings,
-        ...(multilingual ? { multilingual: true } : {}),
-        packageVersions,
-      }),
-    );
-    const files = indexFiles(first.files);
-    const expectedPaths = [
-      ...sitePaths,
-      ...analyticsPaths,
-      ...(multilingual ? multilingualPaths : []),
-    ].toSorted();
+  for (const profile of ["portfolio", "site"]) {
+    for (const multilingual of [false, true]) {
+      const first = assertSuccess(
+        await renderSkeleton({
+          profile,
+          projectName: `acme-${profile}`,
+          displayName: `Acme ${profile}`,
+          analytics: analyticsSettings,
+          ...(multilingual ? { multilingual: true } : {}),
+          packageVersions,
+        }),
+      );
+      const second = assertSuccess(
+        await renderSkeleton({
+          profile,
+          projectName: `acme-${profile}`,
+          displayName: `Acme ${profile}`,
+          analytics: analyticsSettings,
+          ...(multilingual ? { multilingual: true } : {}),
+          packageVersions,
+        }),
+      );
+      const files = indexFiles(first.files);
+      const expectedPaths = [
+        ...(profile === "site" ? sitePaths : portfolioPaths),
+        ...analyticsPaths,
+        ...(multilingual ? multilingualPaths : []),
+      ].toSorted();
 
-    assert.deepEqual(first.files.map(({ path }) => path), expectedPaths);
-    assert.deepEqual(snapshotBytes(first.files), snapshotBytes(second.files));
-    assert.equal(first.project.selectedCapabilities.includes("analytics"), true);
-    assert.deepEqual(first.project.capabilitySettings.analytics, analyticsSettings);
-    assert.match(
-      files.get("apps/web/src/integrations/analytics/analytics-settings.ts"),
-      /G-TEST123456/u,
-    );
-    assert.match(
-      files.get("apps/web/src/integrations/analytics/analytics-provider-contract.ts"),
-      /aggregate-traffic-and-performance|audience-measurement|consented-experience-analysis/u,
-    );
-    assert.match(
-      files.get("apps/web/src/integrations/analytics/analytics-runtime.ts"),
-      /explicit-opt-in|analytics_Storage|analytics_storage/u,
-    );
-    assert.match(files.get("apps/web/app/layout.tsx"), /AnalyticsConsent/u);
-    assert.match(files.get("apps/web/app/layout.tsx"), /verification/u);
-    assert.equal(
-      parseGeneratedYaml(first.files, "apps/web/content/en-CA/analytics.yaml")
-        .allowLabel,
-      "Allow analytics",
-    );
-    assert.match(
-      parseGeneratedYaml(first.files, "apps/web/content/fr-CA/analytics.yaml")
-        .allowLabel,
-      /\S/u,
-    );
+      assert.deepEqual(first.files.map(({ path }) => path), expectedPaths);
+      assert.deepEqual(snapshotBytes(first.files), snapshotBytes(second.files));
+      assert.equal(
+        first.project.selectedCapabilities.includes("analytics"),
+        true,
+      );
+      assert.deepEqual(
+        first.project.capabilitySettings.analytics,
+        analyticsSettings,
+      );
+      assert.match(
+        files.get("apps/web/src/integrations/analytics/analytics-settings.ts"),
+        /G-TEST123456/u,
+      );
+      assert.match(
+        files.get(
+          "apps/web/src/integrations/analytics/analytics-provider-contract.ts",
+        ),
+        /aggregate-traffic-and-performance|audience-measurement|consented-experience-analysis/u,
+      );
+      assert.match(
+        files.get("apps/web/src/integrations/analytics/analytics-runtime.ts"),
+        /explicit-opt-in|analytics_Storage|analytics_storage/u,
+      );
+      assert.match(files.get("apps/web/app/layout.tsx"), /AnalyticsConsent/u);
+      assert.match(files.get("apps/web/app/layout.tsx"), /verification/u);
+      assert.equal(
+        parseGeneratedYaml(first.files, "apps/web/content/en-CA/analytics.yaml")
+          .allowLabel,
+        "Allow analytics",
+      );
+      assert.match(
+        parseGeneratedYaml(first.files, "apps/web/content/fr-CA/analytics.yaml")
+          .allowLabel,
+        /\S/u,
+      );
 
-    for (const path of analyticsPaths) {
-      assert.doesNotMatch(files.get(path), /observability/iu, path);
-    }
+      for (const path of analyticsPaths) {
+        assert.doesNotMatch(files.get(path), /observability/iu, path);
+      }
 
-    if (multilingual) {
-      assert.match(files.get("apps/web/app/layout.tsx"), /x-egeria-locale/u);
-      assert.match(files.get("apps/web/app/layout.tsx"), /readAnalyticsContent\(locale\)/u);
-    } else {
-      assert.match(files.get("apps/web/app/layout.tsx"), /readAnalyticsContent\("en-CA"\)/u);
+      if (multilingual) {
+        assert.match(files.get("apps/web/app/layout.tsx"), /x-egeria-locale/u);
+        assert.match(
+          files.get("apps/web/app/layout.tsx"),
+          /readAnalyticsContent\(locale\)/u,
+        );
+      } else {
+        assert.match(
+          files.get("apps/web/app/layout.tsx"),
+          /readAnalyticsContent\("en-CA"\)/u,
+        );
+      }
     }
   }
 });

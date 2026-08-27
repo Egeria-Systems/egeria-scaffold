@@ -16,6 +16,13 @@ type AnalyticsConsentProperties = Readonly<{
   runtime?: AnalyticsConsentRuntime;
 }>;
 
+type AnalyticsConsentControlProperties = Readonly<{
+  settings: AnalyticsSettings;
+  content: AnalyticsContent;
+  runtime: AnalyticsConsentRuntime;
+  purposes: readonly string[];
+}>;
+
 function selectedPurposes(
   settings: AnalyticsSettings,
   content: AnalyticsContent,
@@ -33,11 +40,12 @@ function selectedPurposes(
   ];
 }
 
-export function AnalyticsConsent({
+function AnalyticsConsentControl({
   settings,
   content,
-  runtime = browserAnalyticsConsentRuntime,
-}: AnalyticsConsentProperties) {
+  runtime,
+  purposes,
+}: AnalyticsConsentControlProperties) {
   const [choice, setChoice] = useState<
     AnalyticsConsentChoice | null | undefined
   >(undefined);
@@ -63,7 +71,6 @@ export function AnalyticsConsent({
     return null;
   }
 
-  const purposes = selectedPurposes(settings, content);
   const showChoices = choice === null || managing;
 
   function grant() {
@@ -102,8 +109,12 @@ export function AnalyticsConsent({
                 : null}
           </p>
           <div>
-            <button type="button" onClick={grant}>{content.allowLabel}</button>
-            <button type="button" onClick={decline}>{content.declineLabel}</button>
+            {choice === "granted" ? null : (
+              <>
+                <button type="button" onClick={grant}>{content.allowLabel}</button>
+                <button type="button" onClick={decline}>{content.declineLabel}</button>
+              </>
+            )}
             {choice === "granted" ? (
               <button type="button" onClick={withdraw}>{content.withdrawLabel}</button>
             ) : null}
@@ -121,5 +132,25 @@ export function AnalyticsConsent({
         </button>
       ) : null}
     </aside>
+  );
+}
+
+export function AnalyticsConsent({
+  settings,
+  content,
+  runtime = browserAnalyticsConsentRuntime,
+}: AnalyticsConsentProperties) {
+  const purposes = selectedPurposes(settings, content);
+  if (purposes.length === 0) {
+    return null;
+  }
+
+  return (
+    <AnalyticsConsentControl
+      settings={settings}
+      content={content}
+      runtime={runtime}
+      purposes={purposes}
+    />
   );
 }

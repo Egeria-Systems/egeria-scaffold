@@ -664,16 +664,50 @@ test("Calendly settings accept only the default explicit HTTPS port", () => {
 });
 
 test("analytics settings enforce explicit selection, provider dependencies, and redacted rejection", () => {
-  assertAccepts(contracts.analyticsSettingsSchema, validAnalyticsSettings);
-  assertAccepts(contracts.analyticsSettingsSchema, {
-    consent: { policy: "explicit-opt-in" },
-    providers: {},
-    operationalIntegrations: {
-      googleSearchConsole: {
-        verificationToken: "search-console-verification-token",
+  for (const settings of [
+    validAnalyticsSettings,
+    {
+      consent: { policy: "explicit-opt-in" },
+      providers: {
+        cloudflareWebAnalytics:
+          validAnalyticsSettings.providers.cloudflareWebAnalytics,
+      },
+      operationalIntegrations: {},
+    },
+    {
+      consent: { policy: "explicit-opt-in" },
+      providers: {
+        googleAnalytics4: validAnalyticsSettings.providers.googleAnalytics4,
+      },
+      operationalIntegrations: {},
+    },
+    {
+      consent: { policy: "explicit-opt-in" },
+      providers: {
+        microsoftClarity: validAnalyticsSettings.providers.microsoftClarity,
+      },
+      operationalIntegrations: {},
+    },
+    {
+      consent: { policy: "explicit-opt-in" },
+      providers: {},
+      operationalIntegrations: {
+        googleSearchConsole:
+          validAnalyticsSettings.operationalIntegrations.googleSearchConsole,
       },
     },
-  });
+    {
+      consent: { policy: "explicit-opt-in" },
+      providers: {
+        googleAnalytics4: validAnalyticsSettings.providers.googleAnalytics4,
+      },
+      operationalIntegrations: {
+        lookerStudio: validAnalyticsSettings.operationalIntegrations.lookerStudio,
+      },
+    },
+  ]) {
+    assertAccepts(contracts.analyticsSettingsSchema, settings);
+  }
   assertAccepts(contracts.projectConfigurationSchema, {
     ...validProject,
     selectedCapabilities: ["standards", "analytics"],

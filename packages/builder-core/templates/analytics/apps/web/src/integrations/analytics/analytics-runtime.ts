@@ -52,7 +52,10 @@ function loadCloudflareWebAnalytics(
   browser: AnalyticsBrowser,
 ): void {
   const provider = settings.providers.cloudflareWebAnalytics;
-  if (provider === undefined) {
+  if (
+    provider === undefined ||
+    browser.document.getElementById(declaration.scriptId) !== null
+  ) {
     return;
   }
 
@@ -84,7 +87,10 @@ function loadGoogleAnalytics4(
   browser: AnalyticsBrowser,
 ): void {
   const provider = settings.providers.googleAnalytics4;
-  if (provider === undefined) {
+  if (
+    provider === undefined ||
+    browser.document.getElementById(declaration.scriptId) !== null
+  ) {
     return;
   }
 
@@ -129,7 +135,10 @@ function loadMicrosoftClarity(
   browser: AnalyticsBrowser,
 ): void {
   const provider = settings.providers.microsoftClarity;
-  if (provider === undefined) {
+  if (
+    provider === undefined ||
+    browser.document.getElementById(declaration.scriptId) !== null
+  ) {
     return;
   }
 
@@ -186,8 +195,26 @@ export function loadSelectedAnalytics(
   }
 }
 
-function clearAccessibleAnalyticsCookies(document: Document): void {
-  for (const cookie of document.cookie.split(";")) {
+function cookieDomainVariants(hostname: string): readonly string[] {
+  const labels = hostname.toLowerCase().replace(/\.$/u, "").split(".");
+  const isIpAddress =
+    labels.length === 4 && labels.every((label) => /^\d{1,3}$/u.test(label));
+  if (
+    labels.length < 2 ||
+    hostname.includes(":") ||
+    isIpAddress
+  ) {
+    return [];
+  }
+
+  return labels
+    .slice(0, -1)
+    .map((_, index) => labels.slice(index).join("."));
+}
+
+function clearAccessibleAnalyticsCookies(browser: AnalyticsBrowser): void {
+  const domainVariants = cookieDomainVariants(browser.window.location.hostname);
+  for (const cookie of browser.document.cookie.split(";")) {
     const name = cookie.split("=", 1)[0]?.trim();
     if (
       name === "_ga" ||
@@ -195,7 +222,11 @@ function clearAccessibleAnalyticsCookies(document: Document): void {
       name === "_clck" ||
       name === "_clsk"
     ) {
-      document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+      browser.document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+      for (const domain of domainVariants) {
+        browser.document.cookie =
+          `${name}=; Max-Age=0; Path=/; Domain=${domain}; SameSite=Lax`;
+      }
     }
   }
 }
@@ -226,7 +257,7 @@ export function withdrawAnalyticsConsent(
     configureClarityConsent(browser, "denied");
     clarityCommand(browser)("consent", false);
   }
-  clearAccessibleAnalyticsCookies(browser.document);
+  clearAccessibleAnalyticsCookies(browser);
   writeAnalyticsConsent("denied", browser);
   reload();
 }

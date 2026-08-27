@@ -1191,6 +1191,17 @@ test("analytics arguments reject partial or mismatched selections without disclo
       "/private/tmp/acme-site",
       "--capability",
       "analytics",
+      "--cloudflare-web-analytics-token",
+      "0123456789abcdef0123456789abcdef",
+      "--microsoft-clarity-audience",
+      privateIdentifier,
+    ],
+    [
+      "plan-add",
+      "--directory",
+      "/private/tmp/acme-site",
+      "--capability",
+      "analytics",
       "--looker-studio",
     ],
     [
@@ -1215,6 +1226,94 @@ test("analytics arguments reject partial or mismatched selections without disclo
       },
     ]);
     assert.doesNotMatch(JSON.stringify(result), /private-analytics-identifier/u);
+  }
+});
+
+test("analytics arguments accept each independent provider and operational selection", () => {
+  const cases = [
+    {
+      arguments: [
+        "--cloudflare-web-analytics-token",
+        analyticsSettings.providers.cloudflareWebAnalytics.siteToken,
+      ],
+      providers: {
+        cloudflareWebAnalytics:
+          analyticsSettings.providers.cloudflareWebAnalytics,
+      },
+      operationalIntegrations: {},
+    },
+    {
+      arguments: [
+        "--google-analytics-id",
+        analyticsSettings.providers.googleAnalytics4.measurementId,
+      ],
+      providers: {
+        googleAnalytics4: analyticsSettings.providers.googleAnalytics4,
+      },
+      operationalIntegrations: {},
+    },
+    {
+      arguments: [
+        "--microsoft-clarity-id",
+        analyticsSettings.providers.microsoftClarity.projectId,
+        "--microsoft-clarity-audience",
+        analyticsSettings.providers.microsoftClarity.audience,
+      ],
+      providers: {
+        microsoftClarity: analyticsSettings.providers.microsoftClarity,
+      },
+      operationalIntegrations: {},
+    },
+    {
+      arguments: [
+        "--search-console-verification",
+        analyticsSettings.operationalIntegrations.googleSearchConsole
+          .verificationToken,
+      ],
+      providers: {},
+      operationalIntegrations: {
+        googleSearchConsole:
+          analyticsSettings.operationalIntegrations.googleSearchConsole,
+      },
+    },
+    {
+      arguments: [
+        "--google-analytics-id",
+        analyticsSettings.providers.googleAnalytics4.measurementId,
+        "--looker-studio",
+      ],
+      providers: {
+        googleAnalytics4: analyticsSettings.providers.googleAnalytics4,
+      },
+      operationalIntegrations: {
+        lookerStudio: analyticsSettings.operationalIntegrations.lookerStudio,
+      },
+    },
+  ];
+
+  for (const fixture of cases) {
+    assert.deepEqual(
+      assertSuccess(
+        cliArguments.parseCliArguments([
+          "plan-add",
+          "--directory",
+          "/private/tmp/acme-site",
+          "--capability",
+          "analytics",
+          ...fixture.arguments,
+        ]),
+      ),
+      {
+        kind: "plan-add",
+        directory: "/private/tmp/acme-site",
+        capability: "analytics",
+        settings: {
+          consent: { policy: "explicit-opt-in" },
+          providers: fixture.providers,
+          operationalIntegrations: fixture.operationalIntegrations,
+        },
+      },
+    );
   }
 });
 

@@ -140,7 +140,8 @@ function parseAnalyticsSettings(values: AnalyticsOptionValues) {
               measurementId: values["google-analytics-id"],
             },
           }),
-      ...(values["microsoft-clarity-id"] === undefined
+      ...(values["microsoft-clarity-id"] === undefined &&
+        values["microsoft-clarity-audience"] === undefined
         ? {}
         : {
             microsoftClarity: {

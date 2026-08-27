@@ -102,7 +102,7 @@
   },
   "managedSurfaces": [
     {
-      "fingerprint": "sha256:57ce3795b4a4ef6891641c9637ba34b83547815ad4687833dcbbc52543bb7358",
+      "fingerprint": "sha256:113b119ca6c9bae8a5796dfd46cad07501abd7fa2d3278c7b7f52e2359734a39",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -116,7 +116,7 @@
       "path": "apps/web/tests/e2e/analytics-consent.spec.ts"
     },
     {
-      "fingerprint": "sha256:fdcb3bb339cdd2dbe80e4051c9280a2e33cb2b5109102018a6497e3d2053189a",
+      "fingerprint": "sha256:2431b72cc9a858e3ed32a34f8a1951f63c28c795ecb58250cb2903c1ac224363",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -130,7 +130,7 @@
       "path": "apps/web/tests/component/analytics-consent.test.tsx"
     },
     {
-      "fingerprint": "sha256:9541a5ef0e3e585e5afdbfabd63a2d84969a116bf2a370bcaa90ccfb5b7c4a33",
+      "fingerprint": "sha256:d241f2f1ca415e7d3ea234c8167d4006d06ed67e4c5dd8c58e9d256751437808",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -228,7 +228,7 @@
       "path": "apps/web/src/integrations/analytics/analytics-provider-contract.ts"
     },
     {
-      "fingerprint": "sha256:b6204774804693c3d596e4b3a0207c1b8ea3eee4e780594a743766474f92819b",
+      "fingerprint": "sha256:263f3625c1fd827d88b9248badb1981bb020fe9ea1b5f718fc6fa5b46c85c02e",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -242,7 +242,7 @@
       "path": "apps/web/tests/unit/analytics-provider-contract.test.ts"
     },
     {
-      "fingerprint": "sha256:204e9159c365e5b923c291d585897a6e5872d98e125209c024b0e5eaf8acd25c",
+      "fingerprint": "sha256:9daff59421ce2dd783a45298c1e0159afc7228dba6efcaea8368cc4c968ede86",
       "fingerprintTarget": {
         "kind": "file"
       },
