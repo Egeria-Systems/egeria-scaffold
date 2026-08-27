@@ -9,6 +9,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # The accepted Next proof remains on ESLint 9 until its plugin graph supports ESLint 10.
+      - dependency-name: "eslint"
+        update-types:
+          - "version-update:semver-major"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

@@ -77,7 +77,7 @@ Public packages remain ordinary dependencies. Public availability does not remov
 
 Generated repositories are lightweight pnpm workspaces with `apps/web`. Application behavior stays in cohesive modules under `apps/web` until a separate runtime, release boundary, or proven reuse justifies extraction. Local `packages/` may remain absent.
 
-Generated Next.js projects retain ESLint `9.39.5` while the selected Next plugin dependency graph does not support ESLint 10. This is a compatibility boundary, not a permanent version policy: revalidate the selected Next and plugin graph before changing majors. The builder repository's independent ESLint 10 use and standards' dual-major support do not migrate the accepted P0.2 proof.
+Generated Next.js projects retain ESLint `9.39.5` while the selected Next plugin dependency graph does not support ESLint 10. This is a compatibility boundary, not a permanent version policy: revalidate the selected Next and plugin graph before changing majors. Dependabot ignores automated ESLint major updates while that incompatibility remains, but continues to propose compatible updates. The builder repository's independent ESLint 10 use and standards' dual-major support do not migrate the accepted P0.2 proof.
 
 `apps/jobs is generated only` when a concrete OpenNext limitation, independent deployment, permission isolation, failure isolation, materially different scaling, bundle boundary, or operational owner justifies another Worker. Selecting a queue does not automatically create it.
 
