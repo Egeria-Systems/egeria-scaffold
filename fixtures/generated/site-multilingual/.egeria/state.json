@@ -784,7 +784,7 @@
       "path": "apps/web/tests/component/multilingual-page.test.tsx"
     },
     {
-      "fingerprint": "sha256:c021555ee8edac7bd51a6316517eaa164035792dd2676021f316ac57d3e883f1",
+      "fingerprint": "sha256:3987ff96c3e139a49004b4ff99b46ddcc47e8ddcf7e455815bc2a19df444c627",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -812,7 +812,7 @@
       "path": "apps/web/src/i18n/read-localized-content.ts"
     },
     {
-      "fingerprint": "sha256:ae3998b44858e6190eb9babedbbccdbe339a4cce753f8c8b403a3ec3c8f7f3a0",
+      "fingerprint": "sha256:8b5bfa2f92ea194e18bf33c1297af6df097c8f705e7e727a15c2cd94842b74f5",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -910,7 +910,7 @@
       "path": "apps/web/tests/unit/locale.test.ts"
     },
     {
-      "fingerprint": "sha256:0d2b992fb1c376d9fe01bb669ff21d95b874de5af11d17f7eed54580cad9a2bc",
+      "fingerprint": "sha256:bb541e12aa225c11eb339ee03aa253df647152e694e0273e20a1195767454548",
       "fingerprintTarget": {
         "kind": "file"
       },

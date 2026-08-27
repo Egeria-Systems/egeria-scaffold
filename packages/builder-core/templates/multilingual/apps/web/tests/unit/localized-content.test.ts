@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   assertTranslationParity,
+  localeFromMiddlewareHeader,
   localizedRoutes,
   parseLocalizedCatalog,
   resolveLocalizedRoute,
@@ -121,5 +122,11 @@ describe("localized content", () => {
     expect(resolveLocalizedRoute("en-CA", ["missing"])).toEqual({
       kind: "not-found",
     });
+  });
+
+  it("accepts only an exact locale from the middleware-owned header", () => {
+    expect(localeFromMiddlewareHeader("fr-CA")).toBe("fr-CA");
+    expect(localeFromMiddlewareHeader("fr-CA, en-CA;q=0.8")).toBe("en-CA");
+    expect(localeFromMiddlewareHeader(null)).toBe("en-CA");
   });
 });

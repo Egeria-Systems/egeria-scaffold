@@ -293,7 +293,7 @@ export function resolveLocalizedRoute(
   return { kind: "not-found" };
 }
 
-export function localeFromHeader(value: string | null): Locale {
+export function localeFromMiddlewareHeader(value: string | null): Locale {
   return value !== null && isLocale(value) ? value : "en-CA";
 }
 

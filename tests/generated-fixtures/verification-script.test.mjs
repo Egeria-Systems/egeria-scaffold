@@ -14,7 +14,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
@@ -731,7 +731,7 @@ test("visual opt-in leaves the multilingual fixture outside the established matr
         .filter(({ arguments: arguments_ }) =>
           arguments_.includes("test:visual"),
         )
-        .map(({ cwd }) => cwd.split("/").at(-1))
+        .map(({ cwd }) => basename(cwd))
         .sort(),
       ["portfolio-calendly-project", "portfolio-project", "site-project"],
     );
@@ -739,7 +739,7 @@ test("visual opt-in leaves the multilingual fixture outside the established matr
       commands.some(
         ({ arguments: arguments_, cwd }) =>
           arguments_.includes("test:visual") &&
-          cwd.endsWith("/site-multilingual-project"),
+          basename(cwd) === "site-multilingual-project",
       ),
       false,
     );

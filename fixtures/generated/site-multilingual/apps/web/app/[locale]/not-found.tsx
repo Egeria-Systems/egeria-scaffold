@@ -1,13 +1,15 @@
 import { headers } from "next/headers";
 
-import { localeFromHeader } from "../../src/i18n/localized-content";
+import { localeFromMiddlewareHeader } from "../../src/i18n/localized-content";
 import { readLocalizedCatalog } from "../../src/i18n/read-localized-content";
 import { createLocaleSwitchHref } from "../../src/i18n/locale";
 import { LocalizedPage } from "../../src/presentation/localized-page";
 
 export default async function LocalizedNotFound() {
   const requestHeaders = await headers();
-  const locale = localeFromHeader(requestHeaders.get("x-egeria-locale"));
+  const locale = localeFromMiddlewareHeader(
+    requestHeaders.get("x-egeria-locale"),
+  );
   const catalog = readLocalizedCatalog(locale);
   const localeSwitch = {
     ...catalog.localeSwitch,
