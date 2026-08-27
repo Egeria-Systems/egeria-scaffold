@@ -728,7 +728,7 @@ async function inspectFixture(root, contract) {
       webManifest,
       expectedWebManifest(
         contract.projectName,
-        contract.identifier === "site" ? "16.3.3" : "16.3.0",
+        contract.profile === "site" ? "16.3.3" : "16.3.0",
       ),
     )
   ) {
