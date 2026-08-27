@@ -60,6 +60,8 @@ const multilingualEvidencePath =
   "docs/implementation-evidence/2026-08-27-multilingual-certification-receipt.md";
 const multilingualEvidenceRevision =
   "96b587a254cf6fc859867d6fc66c7e0c900c4cfd";
+const analyticsPlanPath =
+  "docs/superpowers/plans/2026-08-27-analytics-capability-certification.md";
 const deploymentEvidencePath =
   "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md";
 const deploymentEvidenceRevision =
@@ -72,6 +74,8 @@ const committedRegistry = JSON.parse(
 );
 
 const descriptorDigests = Object.freeze({
+  analytics:
+    "sha256:1162afbf5f56a51033b66c4ee6d3758b71558b8004cf49f84d7b8414719aaa42",
   "booking-calendly":
     "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2",
   "content-files":
@@ -133,7 +137,9 @@ function createRecord(identifier) {
   assert.notEqual(descriptor, undefined);
 
   const taskPlan =
-    identifier === "booking-calendly"
+    identifier === "analytics"
+      ? analyticsPlanPath
+      : identifier === "booking-calendly"
       ? planPath
       : identifier === "deployment-cloudflare"
         ? deploymentPlanPath
@@ -160,6 +166,7 @@ function createRecord(identifier) {
     },
     requiredEvidence: requiredEvidence[identifier],
     status:
+      identifier === "analytics" ||
       identifier === "booking-calendly" ||
       identifier === "deployment-cloudflare" ||
       identifier === "multilingual" ||
@@ -527,6 +534,29 @@ test("current multilingual subject has exact reviewed lifecycle and fresh-scaffo
   );
 });
 
+test("current analytics subject is admitted only as pending certification", () => {
+  const descriptor = descriptorsByIdentifier.get("analytics");
+  assert.notEqual(descriptor, undefined);
+  const subject = core.createCertificationSubject(
+    descriptor,
+    requiredEvidence.analytics,
+  );
+
+  assert.deepEqual(committedRegistry.records.analytics, {
+    subject,
+    requiredEvidence: [
+      "cleanup-recovery",
+      "deployed-application",
+      "existing-repository-lifecycle",
+      "fresh-scaffold",
+      "provider-confirmed",
+    ],
+    status: "pending",
+    taskPlan: analyticsPlanPath,
+    evidence: [],
+  });
+});
+
 test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", () => {
   const historicalSubject = {
     descriptorVersion: "0.3.0",
@@ -878,6 +908,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [analyticsPlanPath]: "# approved plan",
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
@@ -895,6 +926,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [analyticsPlanPath]: "# approved plan",
         [deploymentPlanPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
@@ -922,6 +954,7 @@ test("repository artifacts bind successful evidence to capability, subject, revi
     core.validateCertificationArtifacts({
       registry: relabeled,
       artifacts: {
+        [analyticsPlanPath]: "# approved plan",
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
@@ -964,6 +997,7 @@ test("repository artifacts reject revisions outside the checked Git history", ()
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [analyticsPlanPath]: "# approved plan",
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
@@ -999,6 +1033,7 @@ test("repository artifacts reject incomplete or unresolved reviewer receipts", (
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [analyticsPlanPath]: "# approved plan",
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
@@ -1041,6 +1076,7 @@ test("repository artifacts require affirmative review of every claimed outcome",
     core.validateCertificationArtifacts({
       registry: recorded,
       artifacts: {
+        [analyticsPlanPath]: "# approved plan",
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
@@ -1068,6 +1104,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       policy: "legacy-backfill-exempt",
     }).issues,
     [
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "analytics", "status"],
+        context: { reason: "pending" },
+      },
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "booking-calendly", "status"],
@@ -1103,7 +1144,7 @@ test("closure distinguishes the bounded legacy transition from full certificatio
   assert.equal(
     core.validateCertificationClosure({ registry, policy: "all-certified" })
       .issues.length,
-    8,
+    9,
   );
 
   const currentCertified = cloneRegistry();
@@ -1121,6 +1162,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       policy: "legacy-backfill-exempt",
     }).issues,
     [
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "analytics", "status"],
+        context: { reason: "pending" },
+      },
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "deployment-cloudflare", "status"],
@@ -1148,7 +1194,7 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       registry: currentCertified,
       policy: "all-certified",
     }).issues.length,
-    6,
+    7,
   );
 
   const allCertified = cloneRegistry();

@@ -1,4 +1,11 @@
 export const requiredEvidence = Object.freeze({
+  analytics: Object.freeze([
+    "cleanup-recovery",
+    "deployed-application",
+    "existing-repository-lifecycle",
+    "fresh-scaffold",
+    "provider-confirmed",
+  ]),
   "booking-calendly": Object.freeze([
     "cleanup-recovery",
     "deployed-application",

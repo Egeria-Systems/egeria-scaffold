@@ -90,6 +90,26 @@ const validCalendlyBookingSettings = {
   mode: "popup",
 };
 
+const validAnalyticsSettings = {
+  consent: { policy: "explicit-opt-in" },
+  providers: {
+    cloudflareWebAnalytics: {
+      siteToken: "0123456789abcdef0123456789abcdef",
+    },
+    googleAnalytics4: { measurementId: "G-TEST123456" },
+    microsoftClarity: {
+      projectId: "clarity123",
+      audience: "not-directed-to-minors",
+    },
+  },
+  operationalIntegrations: {
+    googleSearchConsole: {
+      verificationToken: "search-console-verification-token",
+    },
+    lookerStudio: { connector: "google-analytics-4" },
+  },
+};
+
 const validInstalledSurface = {
   identifier: "standards-typescript",
   owner: { kind: "capability", identifier: "standards" },
@@ -309,6 +329,7 @@ test("builder-core exports the executable contract boundary", () => {
     "capabilityDescriptorSchema",
     "capabilityRemovalPolicySchema",
     "capabilityStateClassificationSchema",
+    "analyticsSettingsSchema",
     "calendlyBookingSettingsSchema",
     "certificationRegistrySchema",
     "createJsonSchemaArtifacts",
@@ -640,6 +661,118 @@ test("Calendly settings accept only the default explicit HTTPS port", () => {
     destination: "https://calendly.com:444/acme/intro",
     mode: "popup",
   });
+});
+
+test("analytics settings enforce explicit selection, provider dependencies, and redacted rejection", () => {
+  assertAccepts(contracts.analyticsSettingsSchema, validAnalyticsSettings);
+  assertAccepts(contracts.analyticsSettingsSchema, {
+    consent: { policy: "explicit-opt-in" },
+    providers: {},
+    operationalIntegrations: {
+      googleSearchConsole: {
+        verificationToken: "search-console-verification-token",
+      },
+    },
+  });
+  assertAccepts(contracts.projectConfigurationSchema, {
+    ...validProject,
+    selectedCapabilities: ["standards", "analytics"],
+    capabilitySettings: { analytics: validAnalyticsSettings },
+  });
+
+  for (const invalidSettings of [
+    {
+      ...validAnalyticsSettings,
+      consent: { policy: "advanced-consent-mode" },
+    },
+    {
+      ...validAnalyticsSettings,
+      providers: {},
+      operationalIntegrations: {},
+    },
+    {
+      ...validAnalyticsSettings,
+      providers: {
+        microsoftClarity: {
+          projectId: "clarity123",
+          audience: "general-audience",
+        },
+      },
+      operationalIntegrations: {},
+    },
+    {
+      ...validAnalyticsSettings,
+      providers: {},
+      operationalIntegrations: {
+        lookerStudio: { connector: "google-analytics-4" },
+      },
+    },
+  ]) {
+    assertRejects(contracts.analyticsSettingsSchema, invalidSettings);
+  }
+
+  assertRejects(contracts.projectConfigurationSchema, {
+    ...validProject,
+    selectedCapabilities: ["standards", "analytics"],
+  });
+  assertRejects(contracts.projectConfigurationSchema, {
+    ...validProject,
+    capabilitySettings: { analytics: validAnalyticsSettings },
+  });
+
+  for (const [field, invalidSettings, sensitiveValue] of [
+    [
+      "cloudflare",
+      {
+        ...validAnalyticsSettings,
+        providers: {
+          ...validAnalyticsSettings.providers,
+          cloudflareWebAnalytics: { siteToken: "private-cloudflare-token" },
+        },
+      },
+      "private-cloudflare-token",
+    ],
+    [
+      "google",
+      {
+        ...validAnalyticsSettings,
+        providers: {
+          ...validAnalyticsSettings.providers,
+          googleAnalytics4: { measurementId: "private-google-id" },
+        },
+      },
+      "private-google-id",
+    ],
+    [
+      "clarity",
+      {
+        ...validAnalyticsSettings,
+        providers: {
+          ...validAnalyticsSettings.providers,
+          microsoftClarity: { projectId: "private!clarity", audience: "not-directed-to-minors" },
+        },
+      },
+      "private!clarity",
+    ],
+    [
+      "search-console",
+      {
+        ...validAnalyticsSettings,
+        operationalIntegrations: {
+          ...validAnalyticsSettings.operationalIntegrations,
+          googleSearchConsole: { verificationToken: "private token" },
+        },
+      },
+      "private token",
+    ],
+  ]) {
+    const result = contracts.validateContract(
+      contracts.analyticsSettingsSchema,
+      invalidSettings,
+    );
+    assert.equal(result.ok, false, field);
+    assert.equal(JSON.stringify(result.issues).includes(sensitiveValue), false);
+  }
 });
 
 test("project display names preserve Unicode while rejecting controls and whitespace-only input", () => {
@@ -1061,7 +1194,7 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
       generated["project.schema.json"].properties.capabilitySettings
         .properties,
     ),
-    ["booking-calendly"],
+    ["analytics", "booking-calendly"],
   );
   assert.equal(
     generated["project.schema.json"].properties.capabilitySettings

@@ -1,6 +1,22 @@
 {
   "schemaVersion": "1.0.0",
   "records": {
+    "analytics": {
+      "subject": {
+        "descriptorVersion": "0.1.0",
+        "behaviorContractDigest": "sha256:1162afbf5f56a51033b66c4ee6d3758b71558b8004cf49f84d7b8414719aaa42"
+      },
+      "requiredEvidence": [
+        "cleanup-recovery",
+        "deployed-application",
+        "existing-repository-lifecycle",
+        "fresh-scaffold",
+        "provider-confirmed"
+      ],
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-08-27-analytics-capability-certification.md",
+      "evidence": []
+    },
     "booking-calendly": {
       "subject": {
         "descriptorVersion": "0.1.0",
