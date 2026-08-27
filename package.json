@@ -32,6 +32,7 @@
     "verify:cloudflare-deployment-certification": "pnpm run build:builder && node scripts/certify-cloudflare-deployment.mjs",
     "verify:content-files-certification": "pnpm run build:builder && node scripts/certify-content-files.mjs",
     "verify:generated-testing-certification": "pnpm run build:builder && node scripts/certify-generated-testing.mjs",
+    "verify:multilingual-certification": "pnpm run build:builder && node scripts/certify-multilingual.mjs",
     "verify:observability-error-diagnostics-certification": "pnpm run build:builder && node scripts/certify-observability-error-diagnostics.mjs",
     "verify:profile-transition-lifecycle-certification": "pnpm run build:builder && node scripts/certify-profile-transition-lifecycle.mjs",
     "verify:section-composition-certification": "pnpm run build:builder && node scripts/certify-section-composition.mjs",

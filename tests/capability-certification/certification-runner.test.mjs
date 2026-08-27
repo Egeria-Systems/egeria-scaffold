@@ -134,6 +134,34 @@ const builderSiteRoutingLifecycleTests = [
   "site-routing upgrade retains transformed source and old state and migration controls when verification fails",
   "site-routing upgrade rejects changed final bytes after state persistence",
 ];
+const compiledMultilingualLifecycleTests = [
+  "the compiled CLI preserves multilingual through both capability install orders and re-addition",
+];
+const builderMultilingualAdditionLifecycleTests = [
+  "capability addition applies, verifies, re-infers, and persists migration then state",
+  "multilingual addition applies the locale overlay and persists fresh discovery",
+  "capability addition preserves prior control state when verification fails",
+  "capability addition refuses changed final bytes after diff inspection",
+];
+const builderMultilingualRemovalLifecycleTests = [
+  "capability removal executes the approved plan once and persists migration before state",
+  "multilingual and Calendly removal preserve the other capability in both install orders",
+  "multilingual removal preserves a modified locale catalog as an explicit ejection",
+  "capability removal reports no-mutation and retained-prefix transformation failures",
+];
+const builderMultilingualAdditionPlanTests = [
+  "capability addition plan refuses inference drift and replacement drift",
+];
+const builderMultilingualRemovalPlanTests = [
+  "capability removal plan refuses invalid controls, inventory, ejections, and owned drift",
+];
+const multilingualCommonCapabilities = [
+  "standards",
+  "content-files",
+  "section-composition",
+  "deployment-cloudflare",
+  "observability",
+];
 const compiledProfileTransitionCertificationTests = [
   "the compiled profile-transition planner is repeatable and leaves portfolio controls and Git unchanged",
   "the compiled profile-transition planner refuses an already-site project without mutation",
@@ -3457,6 +3485,488 @@ test("the site routing certification command requires one exact revision without
     const execution = await execFileAsync(
       process.execPath,
       [siteRoutingCertificationScript, ...arguments_],
+      {
+        cwd: repositoryRoot,
+        encoding: "utf8",
+        env: { PATH: process.env.PATH },
+      },
+    ).catch((error) => error);
+
+    assert.equal(execution.code, expectedExitCode);
+    assert.equal(execution.stdout, "");
+    assert.deepEqual(JSON.parse(execution.stderr), {
+      ok: false,
+      code: expectedCode,
+    });
+    assert.doesNotMatch(execution.stderr, /private-value/u);
+  }
+});
+
+test("multilingual certification binds both profiles and the exact lifecycle to one clean accepted subject", async () => {
+  const { certifyMultilingualForTesting } = await import(
+    "../../scripts/certify-multilingual.mjs"
+  );
+  const revision = "a".repeat(40);
+  const subject = {
+    descriptorVersion: "0.1.0",
+    behaviorContractDigest:
+      "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41",
+  };
+  let revisionReads = 0;
+  let statusReads = 0;
+  let indexReads = 0;
+  const authority = {
+    readCurrentRevision: async () => {
+      revisionReads += 1;
+      return revision;
+    },
+    readRepositoryStatus: async () => {
+      statusReads += 1;
+      return "";
+    },
+    readRepositoryIndexEntries: async () => {
+      indexReads += 1;
+      return "H selected-evidence.test.mjs\0";
+    },
+  };
+  const portfolio = createSuccessfulScaffoldAdapters({
+    expectedCapabilities: Object.freeze([
+      ...multilingualCommonCapabilities,
+      "booking-calendly",
+      "multilingual",
+    ]),
+    inferredCapability: { identifier: "multilingual", version: "0.1.0" },
+    profile: "portfolio",
+    readCurrentRevision: authority.readCurrentRevision,
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+    verifierIdentifier: "portfolio-multilingual-calendly",
+  });
+  const site = createSuccessfulScaffoldAdapters({
+    expectedCapabilities: Object.freeze([
+      ...multilingualCommonCapabilities,
+      "site-routing",
+      "multilingual",
+    ]),
+    inferredCapability: { identifier: "multilingual", version: "0.1.0" },
+    profile: "site",
+    readCurrentRevision: authority.readCurrentRevision,
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.0"),
+    verifierIdentifier: "site-multilingual",
+  });
+  const lifecycleCommands = [];
+  const lifecycleByFile = new Map([
+    ["apps/cli/tests/cli.test.mjs", compiledMultilingualLifecycleTests],
+    [
+      "packages/builder-core/tests/apply-capability-addition.test.mjs",
+      builderMultilingualAdditionLifecycleTests,
+    ],
+    [
+      "packages/builder-core/tests/apply-capability-removal.test.mjs",
+      builderMultilingualRemovalLifecycleTests,
+    ],
+    [
+      "packages/builder-core/tests/plan-capability-addition.test.mjs",
+      builderMultilingualAdditionPlanTests,
+    ],
+    [
+      "packages/builder-core/tests/plan-capability-removal.test.mjs",
+      builderMultilingualRemovalPlanTests,
+    ],
+  ]);
+
+  const result = await certifyMultilingualForTesting(
+    { revision },
+    {
+      ...authority,
+      journeys: { portfolio: portfolio.adapters, site: site.adapters },
+      async runLifecycleCommand(input) {
+        lifecycleCommands.push(input);
+        const selected = lifecycleByFile.get(input.arguments.at(-1));
+        assert.notEqual(selected, undefined);
+        return { stdout: successfulTap(selected) };
+      },
+    },
+  );
+
+  assert.deepEqual(result, {
+    ok: true,
+    capability: "multilingual",
+    version: "0.1.0",
+    profiles: ["portfolio", "site"],
+    subject,
+    evidenceRevision: revision,
+    outcomes: ["existing-repository-lifecycle", "fresh-scaffold"],
+    checks: [
+      "portfolio:compiled-cli-create",
+      "portfolio:state-inference",
+      "portfolio:healthy-diagnostics",
+      "portfolio:exact-diff",
+      ...fixedChecks.map((check) => `portfolio:${check}`),
+      "site:compiled-cli-create",
+      "site:state-inference",
+      "site:healthy-diagnostics",
+      "site:exact-diff",
+      ...fixedChecks.map((check) => `site:${check}`),
+      "compiled-add-remove-re-add-both-profiles",
+      "addition-fresh-inference-and-state-last",
+      "removal-composition-ejection-and-state-last",
+      "addition-drift-refusal",
+      "removal-drift-refusal",
+      "retained-failure-prefixes",
+      "exact-final-byte-validation",
+      "repository-sources-unchanged",
+    ],
+  });
+  assert.deepEqual(
+    portfolio.state.commands.map(({ arguments: arguments_ }) =>
+      arguments_.slice(1),
+    ),
+    [
+      [
+        "create",
+        "--profile",
+        "portfolio",
+        "--name",
+        "acme-portfolio-multilingual",
+        "--display-name",
+        "Acme Portfolio Multilingual",
+        "--directory",
+        portfolio.state.projectRoot,
+        "--multilingual",
+        "--calendly-url",
+        "https://calendly.com/example/intro",
+        "--calendly-mode",
+        "popup",
+      ],
+      ["infer", "--directory", portfolio.state.projectRoot],
+      ["doctor", "--directory", portfolio.state.projectRoot],
+      ["diff", "--directory", portfolio.state.projectRoot],
+    ],
+  );
+  assert.deepEqual(
+    site.state.commands.map(({ arguments: arguments_ }) => arguments_.slice(1)),
+    [
+      [
+        "create",
+        "--profile",
+        "site",
+        "--name",
+        "acme-site-multilingual",
+        "--display-name",
+        "Acme Site Multilingual",
+        "--directory",
+        site.state.projectRoot,
+        "--multilingual",
+      ],
+      ["infer", "--directory", site.state.projectRoot],
+      ["doctor", "--directory", site.state.projectRoot],
+      ["diff", "--directory", site.state.projectRoot],
+    ],
+  );
+  assert.deepEqual(
+    lifecycleCommands.map(({ arguments: arguments_ }) => arguments_.at(-1)),
+    [...lifecycleByFile.keys()],
+  );
+  assert.equal(revisionReads, 2);
+  assert.equal(statusReads, 2);
+  assert.equal(indexReads, 2);
+  assert.equal(await pathExists(portfolio.state.ownedPath), false);
+  assert.equal(await pathExists(site.state.ownedPath), false);
+});
+
+test("multilingual portfolio verification runs the full isolated project and browser sequence", async () => {
+  const { verifyMultilingualPortfolioForTesting } = await import(
+    "../../scripts/certify-multilingual.mjs"
+  );
+  const ownedRoot = await mkdtemp(
+    join(tmpdir(), "multilingual-portfolio-verifier-"),
+  );
+  const projectRoot = join(ownedRoot, "project");
+  const supportRoot = join(ownedRoot, "multilingual-portfolio-support");
+  const commands = [];
+
+  try {
+    await mkdir(projectRoot);
+    const result = await verifyMultilingualPortfolioForTesting({
+      projectRoot,
+      environment: { PATH: "/verified/bin" },
+      async runCommand(command) {
+        commands.push(command);
+        return command.arguments[0] === "--version" ? "11.20.0\n" : "";
+      },
+    });
+
+    assert.deepEqual(result, {
+      ok: true,
+      fixtures: ["portfolio-multilingual-calendly"],
+      profiles: ["portfolio"],
+      checks: fixedChecks,
+    });
+    assert.deepEqual(
+      commands.map(({ executable, arguments: arguments_, cwd }) => ({
+        executable,
+        arguments: arguments_,
+        cwd,
+      })),
+      [
+        { executable: "pnpm", arguments: ["--version"], cwd: projectRoot },
+        {
+          executable: "pnpm",
+          arguments: [
+            "install",
+            "--frozen-lockfile",
+            "--store-dir",
+            join(supportRoot, "store"),
+          ],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["peers", "check"],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["audit", "--audit-level", "moderate"],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["audit", "signatures"],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["run", "lint"],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["--dir", "apps/web", "run", "cf-typegen"],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["run", "typecheck"],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["run", "test:unit"],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["run", "test:component"],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["run", "build"],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: [
+            "--dir",
+            "apps/web",
+            "exec",
+            "opennextjs-cloudflare",
+            "build",
+            "--skipNextBuild",
+          ],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["--dir", "apps/web", "run", "browser:install"],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["--dir", "apps/web", "run", "test:e2e:dev"],
+          cwd: projectRoot,
+        },
+        {
+          executable: "pnpm",
+          arguments: ["--dir", "apps/web", "run", "test:e2e:preview"],
+          cwd: projectRoot,
+        },
+      ],
+    );
+    for (const command of commands) {
+      assert.equal(command.environment.PATH, "/verified/bin");
+      assert.equal(command.environment.HOME, join(supportRoot, "home"));
+      assert.equal(command.environment.USERPROFILE, join(supportRoot, "home"));
+      assert.equal(
+        command.environment.PLAYWRIGHT_BROWSERS_PATH,
+        join(supportRoot, "playwright-browsers"),
+      );
+      assert.equal(
+        command.environment.NPM_CONFIG_USERCONFIG,
+        join(supportRoot, ".npmrc"),
+      );
+      assert.equal(
+        command.environment.NPM_CONFIG_REGISTRY,
+        "https://registry.npmjs.org/",
+      );
+      assert.equal(command.environment.TMPDIR, join(supportRoot, "temporary"));
+      assert.equal(command.environment.TMP, join(supportRoot, "temporary"));
+      assert.equal(command.environment.TEMP, join(supportRoot, "temporary"));
+      assert.equal(command.environment.XDG_CACHE_HOME, join(supportRoot, "cache"));
+      assert.equal(command.environment.CLOUDFLARE_API_TOKEN, undefined);
+      assert.equal(command.environment.CLOUDFLARE_ACCOUNT_ID, undefined);
+      assert.equal(command.environment.NPM_TOKEN, undefined);
+      assert.equal(command.environment.NODE_OPTIONS, undefined);
+    }
+  } finally {
+    await rm(ownedRoot, { recursive: true, force: true });
+  }
+});
+
+test("multilingual certification fails closed on authority and selected-evidence drift", async (context) => {
+  const {
+    certifyMultilingualForTesting,
+    MultilingualCertificationError,
+  } = await import("../../scripts/certify-multilingual.mjs");
+  const revision = "a".repeat(40);
+  const testsByFile = new Map([
+    ["apps/cli/tests/cli.test.mjs", compiledMultilingualLifecycleTests],
+    [
+      "packages/builder-core/tests/apply-capability-addition.test.mjs",
+      builderMultilingualAdditionLifecycleTests,
+    ],
+    [
+      "packages/builder-core/tests/apply-capability-removal.test.mjs",
+      builderMultilingualRemovalLifecycleTests,
+    ],
+    [
+      "packages/builder-core/tests/plan-capability-addition.test.mjs",
+      builderMultilingualAdditionPlanTests,
+    ],
+    [
+      "packages/builder-core/tests/plan-capability-removal.test.mjs",
+      builderMultilingualRemovalPlanTests,
+    ],
+  ]);
+  const createAdapters = (overrides = {}) => {
+    const portfolio = createSuccessfulScaffoldAdapters({
+      expectedCapabilities: Object.freeze([
+        ...multilingualCommonCapabilities,
+        "booking-calendly",
+        "multilingual",
+      ]),
+      inferredCapability: { identifier: "multilingual", version: "0.1.0" },
+      profile: "portfolio",
+      readCurrentRevision: async () => revision,
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+      verifierIdentifier: "portfolio-multilingual-calendly",
+    });
+    const site = createSuccessfulScaffoldAdapters({
+      expectedCapabilities: Object.freeze([
+        ...multilingualCommonCapabilities,
+        "site-routing",
+        "multilingual",
+      ]),
+      inferredCapability: { identifier: "multilingual", version: "0.1.0" },
+      profile: "site",
+      readCurrentRevision: async () => revision,
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.0"),
+      verifierIdentifier: "site-multilingual",
+    });
+    return {
+      state: { portfolio: portfolio.state, site: site.state },
+      adapters: {
+        readCurrentRevision: async () => revision,
+        readRepositoryStatus: async () => "",
+        readRepositoryIndexEntries: async () =>
+          "H selected-evidence.test.mjs\0",
+        async runLifecycleCommand(input) {
+          return {
+            stdout: successfulTap(testsByFile.get(input.arguments.at(-1))),
+          };
+        },
+        journeys: { portfolio: portfolio.adapters, site: site.adapters },
+        ...overrides,
+      },
+    };
+  };
+
+  await context.test("rejects a dirty source before a journey starts", async () => {
+    const scaffold = createAdapters({
+      readRepositoryStatus: async () => "?? private-source.ts\0",
+    });
+    await assert.rejects(
+      certifyMultilingualForTesting({ revision }, scaffold.adapters),
+      (error) =>
+        error instanceof MultilingualCertificationError &&
+        error.code === "CERTIFICATION_WORKTREE_DIRTY",
+    );
+    assert.equal(scaffold.state.portfolio.commands.length, 0);
+    assert.equal(scaffold.state.site.commands.length, 0);
+  });
+
+  await context.test("rejects revision drift after contained evidence", async () => {
+    let reads = 0;
+    const scaffold = createAdapters({
+      readCurrentRevision: async () =>
+        (reads += 1) === 1 ? revision : "b".repeat(40),
+    });
+    await assert.rejects(
+      certifyMultilingualForTesting({ revision }, scaffold.adapters),
+      (error) => error?.code === "CERTIFICATION_REVISION_MISMATCH",
+    );
+    assert.equal(await pathExists(scaffold.state.portfolio.ownedPath), false);
+    assert.equal(await pathExists(scaffold.state.site.ownedPath), false);
+  });
+
+  for (const [name, stdout] of [
+    [
+      "rejects a zero-match lifecycle selection",
+      "TAP version 13\n1..0\n# tests 0\n# pass 0\n# fail 0\n",
+    ],
+    [
+      "rejects a skipped lifecycle selection",
+      [
+        "TAP version 13",
+        "# Subtest: the compiled CLI preserves multilingual through both capability install orders and re-addition",
+        "ok 1 - the compiled CLI preserves multilingual through both capability install orders and re-addition # SKIP private refusal",
+        "1..1",
+        "# tests 1",
+        "# pass 0",
+        "# fail 0",
+        "",
+      ].join("\n"),
+    ],
+  ]) {
+    await context.test(name, async () => {
+      const scaffold = createAdapters({
+        runLifecycleCommand: async () => ({ stdout }),
+      });
+      await assert.rejects(
+        certifyMultilingualForTesting({ revision }, scaffold.adapters),
+        (error) => error?.code === "CERTIFICATION_LIFECYCLE_EVIDENCE_FAILED",
+      );
+      assert.equal(await pathExists(scaffold.state.portfolio.ownedPath), false);
+      assert.equal(await pathExists(scaffold.state.site.ownedPath), false);
+    });
+  }
+});
+
+test("the multilingual certification command requires one exact revision without echoing rejected values", async () => {
+  const script = resolve(repositoryRoot, "scripts/certify-multilingual.mjs");
+  for (const [arguments_, expectedCode, expectedExitCode] of [
+    [["--revision", "private-value"], "CERTIFICATION_REVISION_INVALID", 1],
+    [
+      ["--", "--revision", "private-value"],
+      "CERTIFICATION_REVISION_INVALID",
+      1,
+    ],
+    [["--unknown", "private-value"], "CERTIFICATION_ARGUMENT_INVALID", 2],
+  ]) {
+    const execution = await execFileAsync(
+      process.execPath,
+      [script, ...arguments_],
       {
         cwd: repositoryRoot,
         encoding: "utf8",
