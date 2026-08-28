@@ -230,6 +230,7 @@ function AnalyticsConsentControl({
       result.persistence === "session-only" ? content.sessionOnlyStatus : "",
     );
     if (!result.reloading) {
+      focusRequestReference.current = "manage";
       setManaging(false);
     }
   }

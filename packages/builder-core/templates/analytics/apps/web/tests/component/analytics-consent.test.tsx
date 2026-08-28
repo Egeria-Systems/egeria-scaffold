@@ -288,6 +288,20 @@ describe("analytics consent", () => {
     expect(allow.className).toContain("min-h-11");
   });
 
+  it("moves focus to Manage after a first-time non-reloading save", async () => {
+    const user = userEvent.setup();
+    const runtime = createRuntime();
+    const { content } = await renderConsent("en-CA", runtime);
+
+    await user.click(
+      screen.getByRole("button", { name: content.allowAllLabel }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: content.manageChoicesLabel }),
+    ).toHaveFocus();
+  });
+
   it("opens first-time choices without saving and returns focus to Choose", async () => {
     const user = userEvent.setup();
     const runtime = createRuntime();
@@ -358,6 +372,28 @@ describe("analytics consent", () => {
     );
   });
 
+  it("moves focus to Manage when a non-reloading management save replaces its action", async () => {
+    const user = userEvent.setup();
+    const runtime = createRuntime(validSnapshot(analyticsSettings, allDenied));
+    const { content } = await renderConsent("en-CA", runtime);
+
+    await user.click(
+      screen.getByRole("button", { name: content.manageChoicesLabel }),
+    );
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: content.purposes["audience-measurement"].label,
+      }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: content.saveSelectionLabel }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: content.manageChoicesLabel }),
+    ).toHaveFocus();
+  });
+
   it("preserves verified decisions and the requested draft across a stale-grant retry", async () => {
     const user = userEvent.setup();
     const runtime = createRuntime(validSnapshot(analyticsSettings, allGranted));
@@ -386,9 +422,10 @@ describe("analytics consent", () => {
       name: content.purposes["consented-experience-analysis"].label,
     });
     await user.click(clarityChoice);
-    await user.click(
-      screen.getByRole("button", { name: content.saveSelectionLabel }),
-    );
+    const saveSelection = screen.getByRole("button", {
+      name: content.saveSelectionLabel,
+    });
+    await user.click(saveSelection);
 
     expect(screen.getByRole("status")).toHaveTextContent(
       content.staleGrantRetainedStatus,
@@ -400,10 +437,10 @@ describe("analytics consent", () => {
     expect(
       screen.queryByRole("button", { name: content.manageChoicesLabel }),
     ).not.toBeInTheDocument();
+    expect(saveSelection).toHaveFocus();
 
-    await user.click(
-      screen.getByRole("button", { name: content.saveSelectionLabel }),
-    );
+    await user.click(saveSelection);
+    expect(saveSelection).toHaveFocus();
     expect(runtime.save).toHaveBeenNthCalledWith(
       1,
       analyticsSettings,
