@@ -218,7 +218,7 @@ describe("analytics provider contract", () => {
     const english = readAnalyticsContent("en-CA");
     const french = readAnalyticsContent("fr-CA");
 
-    expect(english.allowLabel).not.toBe(french.allowLabel);
+    expect(english.allowAllLabel).not.toBe(french.allowAllLabel);
     expect(() => parseAnalyticsContent({ ...english, extra: true })).toThrow(
       "CONTENT_INVALID",
     );
