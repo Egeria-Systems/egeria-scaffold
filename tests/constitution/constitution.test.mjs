@@ -2394,7 +2394,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+pass[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending multilingual and analytics subjects/i,
+    /descriptor admission[^\n]+pass[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending analytics subject/i,
   );
 });
 
@@ -2895,7 +2895,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+pass[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending multilingual and analytics subjects/iu,
+    /descriptor admission[^\n]+pass[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending analytics subject/iu,
   );
   assert.match(
     enforcementMap,
