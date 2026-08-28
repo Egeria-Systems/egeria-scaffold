@@ -1330,20 +1330,27 @@ test("the catalog declares the exact analytics capability contract without obser
     "microsoft-clarity-project",
   ]);
   assert.deepEqual(analytics.externalDomains, [
+    "*.analytics.google.com",
     "*.clarity.ms",
-    "analytics.google.com",
+    "*.google-analytics.com",
     "c.bing.com",
     "cloudflareinsights.com",
-    "region1.google-analytics.com",
     "static.cloudflareinsights.com",
     "www.clarity.ms",
-    "www.google-analytics.com",
     "www.googletagmanager.com",
   ]);
   assert.deepEqual(analytics.contentSecurityPolicyContributions, [
     "script-src https://static.cloudflareinsights.com https://www.googletagmanager.com https://www.clarity.ms https://*.clarity.ms",
-    "connect-src https://cloudflareinsights.com https://www.google-analytics.com https://region1.google-analytics.com https://analytics.google.com https://www.clarity.ms https://*.clarity.ms https://c.bing.com",
+    "img-src https://*.google-analytics.com https://www.googletagmanager.com",
+    "connect-src https://cloudflareinsights.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://www.clarity.ms https://*.clarity.ms https://c.bing.com",
   ]);
+  assert.doesNotMatch(
+    [
+      ...analytics.externalDomains,
+      ...analytics.contentSecurityPolicyContributions,
+    ].join(" "),
+    /doubleclick\.net|googleadservices\.com|googlesyndication\.com|(?:^|\s)\*\.google\.com/u,
+  );
   assert.deepEqual(analytics.browserStorage, [
     "functional-consent-local-storage",
     "cloudflare-web-analytics-cookie-free",
@@ -1355,8 +1362,19 @@ test("the catalog declares the exact analytics capability contract without obser
     "aggregate-traffic-and-performance-data",
     "audience-measurement-data",
     "consented-experience-and-interaction-data",
+    "google-analytics-session-statistics",
+    "google-analytics-approximate-geolocation",
+    "google-analytics-pseudonymous-client-and-session-identifiers",
+    "microsoft-clarity-session-replay-dom-mutations-content-and-layout",
+    "microsoft-clarity-diagnostics-and-performance",
+    "microsoft-clarity-page-metadata-and-dimensions",
+    "microsoft-clarity-pseudonymous-envelope-user-and-session-identifiers",
     "public-provider-identifiers",
   ]);
+  assert.doesNotMatch(
+    analytics.dataClassifications.join(" "),
+    /advertis|ad-personalization/iu,
+  );
   assert.deepEqual(analytics.retentionAssumptions, [
     "cloudflare-provider-controlled-retention",
     "google-provider-controlled-retention",

@@ -52,6 +52,129 @@ function createTestBrowser(
 }
 
 describe("analytics provider contract", () => {
+  it("declares the exact non-advertising GA4 CSP sources only when selected", () => {
+    const googleAnalytics4Only = createAnalyticsProviderDeclarations({
+      consent: { policy: "explicit-opt-in" },
+      providers: { googleAnalytics4: { measurementId: "G-TEST123456" } },
+      operationalIntegrations: {},
+    });
+    const declaration = googleAnalytics4Only[0] as
+      | (typeof googleAnalytics4Only)[number] & {
+          imageSources?: readonly string[];
+        }
+      | undefined;
+
+    expect(googleAnalytics4Only.map(({ identifier }) => identifier)).toEqual([
+      "google-analytics-4",
+    ]);
+    expect(declaration?.scriptSource).toBe(
+      "https://www.googletagmanager.com/gtag/js",
+    );
+    expect(declaration?.imageSources).toEqual([
+      "https://*.google-analytics.com",
+      "https://www.googletagmanager.com",
+    ]);
+    expect(declaration?.connectSources).toEqual([
+      "https://*.google-analytics.com",
+      "https://*.analytics.google.com",
+      "https://www.googletagmanager.com",
+    ]);
+
+    const declaredSources = [
+      declaration?.scriptSource,
+      ...(declaration?.imageSources ?? []),
+      ...(declaration?.connectSources ?? []),
+    ].join(" ");
+    expect(declaredSources).not.toMatch(
+      /doubleclick\.net|googleadservices\.com|googlesyndication\.com|https:\/\/\*\.google\./u,
+    );
+
+    const cloudflareOnly = createAnalyticsProviderDeclarations({
+      consent: { policy: "explicit-opt-in" },
+      providers: { cloudflareWebAnalytics: { siteToken: "test-token" } },
+      operationalIntegrations: {},
+    });
+    expect(cloudflareOnly.map(({ identifier }) => identifier)).toEqual([
+      "cloudflare-web-analytics",
+    ]);
+    expect(JSON.stringify(cloudflareOnly)).not.toMatch(/google/iu);
+  });
+
+  it("declares bounded GA4 default data classes only when GA4 is selected", () => {
+    const googleAnalytics4Only = createAnalyticsProviderDeclarations({
+      consent: { policy: "explicit-opt-in" },
+      providers: { googleAnalytics4: { measurementId: "G-TEST123456" } },
+      operationalIntegrations: {},
+    });
+
+    expect(googleAnalytics4Only[0]?.dataClasses).toEqual([
+      "audience",
+      "device",
+      "navigation",
+      "session-statistics",
+      "approximate-geolocation",
+      "pseudonymous-client-and-session-identifiers",
+    ]);
+    expect(googleAnalytics4Only[0]?.dataClasses.join(" ")).not.toMatch(
+      /advertis|ad-personalization/iu,
+    );
+
+    const clarityOnly = createAnalyticsProviderDeclarations({
+      consent: { policy: "explicit-opt-in" },
+      providers: {
+        microsoftClarity: {
+          projectId: "clarity-test",
+          audience: "not-directed-to-minors",
+        },
+      },
+      operationalIntegrations: {},
+    });
+    expect(clarityOnly.map(({ identifier }) => identifier)).toEqual([
+      "microsoft-clarity",
+    ]);
+    expect(clarityOnly[0]?.dataClasses).not.toEqual(
+      googleAnalytics4Only[0]?.dataClasses,
+    );
+    expect(JSON.stringify(clarityOnly)).not.toMatch(
+      /session-statistics|approximate-geolocation|pseudonymous-client-and-session-identifiers/u,
+    );
+  });
+
+  it("declares bounded Clarity capture classes only when Clarity is selected", () => {
+    const clarityOnly = createAnalyticsProviderDeclarations({
+      consent: { policy: "explicit-opt-in" },
+      providers: {
+        microsoftClarity: {
+          projectId: "clarity-test",
+          audience: "not-directed-to-minors",
+        },
+      },
+      operationalIntegrations: {},
+    });
+
+    expect(clarityOnly[0]?.dataClasses).toEqual([
+      "interaction",
+      "navigation",
+      "session",
+      "session-replay-dom-mutations-content-and-layout",
+      "diagnostics-and-performance",
+      "page-metadata-and-dimensions",
+      "pseudonymous-envelope-user-and-session-identifiers",
+    ]);
+
+    const googleAnalytics4Only = createAnalyticsProviderDeclarations({
+      consent: { policy: "explicit-opt-in" },
+      providers: { googleAnalytics4: { measurementId: "G-TEST123456" } },
+      operationalIntegrations: {},
+    });
+    expect(googleAnalytics4Only.map(({ identifier }) => identifier)).toEqual([
+      "google-analytics-4",
+    ]);
+    expect(JSON.stringify(googleAnalytics4Only)).not.toMatch(
+      /session-replay-dom-mutations-content-and-layout|diagnostics-and-performance|page-metadata-and-dimensions|pseudonymous-envelope-user-and-session-identifiers/u,
+    );
+  });
+
   it("declares each selected runtime provider once with a unique purpose", () => {
     const declarations = createAnalyticsProviderDeclarations(analyticsSettings);
     const expectedPurposes = [

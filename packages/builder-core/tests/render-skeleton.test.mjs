@@ -1536,15 +1536,86 @@ test("analytics renders deterministic provider-neutral contracts and composes wi
         files.get("apps/web/src/integrations/analytics/analytics-settings.ts"),
         /G-TEST123456/u,
       );
+      const analyticsProviderContract = files.get(
+        "apps/web/src/integrations/analytics/analytics-provider-contract.ts",
+      );
       assert.match(
-        files.get(
-          "apps/web/src/integrations/analytics/analytics-provider-contract.ts",
-        ),
+        analyticsProviderContract,
         /aggregate-traffic-and-performance|audience-measurement|consented-experience-analysis/u,
+      );
+      assert.match(analyticsProviderContract, /imageSources/u);
+      assert.match(
+        analyticsProviderContract,
+        /https:\/\/\*\.google-analytics\.com/u,
+      );
+      assert.match(
+        analyticsProviderContract,
+        /https:\/\/\*\.analytics\.google\.com/u,
+      );
+      assert.match(
+        analyticsProviderContract,
+        /session-statistics/u,
+      );
+      assert.match(
+        analyticsProviderContract,
+        /approximate-geolocation/u,
+      );
+      assert.match(
+        analyticsProviderContract,
+        /pseudonymous-client-and-session-identifiers/u,
+      );
+      assert.match(
+        analyticsProviderContract,
+        /session-replay-dom-mutations-content-and-layout/u,
+      );
+      assert.match(
+        analyticsProviderContract,
+        /diagnostics-and-performance/u,
+      );
+      assert.match(
+        analyticsProviderContract,
+        /page-metadata-and-dimensions/u,
+      );
+      assert.match(
+        analyticsProviderContract,
+        /pseudonymous-envelope-user-and-session-identifiers/u,
+      );
+      assert.doesNotMatch(
+        analyticsProviderContract,
+        /doubleclick\.net|googleadservices\.com|googlesyndication\.com|https:\/\/\*\.google\.com/u,
       );
       assert.match(
         files.get("apps/web/src/integrations/analytics/analytics-runtime.ts"),
         /explicit-opt-in|analytics_Storage|analytics_storage/u,
+      );
+      const analyticsGuide = files.get("docs/analytics.md");
+      assert.match(
+        analyticsGuide,
+        /Enable with JS Snippet installation/u,
+      );
+      assert.match(
+        analyticsGuide,
+        /automatic.*Page.*one-click.*injection/iu,
+      );
+      assert.match(
+        analyticsGuide,
+        /Disable.*not.*repair/iu,
+      );
+      assert.match(
+        analyticsGuide,
+        /cookie-free.*manual/iu,
+      );
+      assert.match(
+        analyticsGuide,
+        /configured masking.*prevents masked content.*uploaded/iu,
+      );
+      assert.match(
+        analyticsGuide,
+        /structural.*layout.*unmasked content.*transmitted/iu,
+      );
+      assert.match(
+        analyticsGuide,
+        /masking.*provider-account controlled/iu,
       );
       assert.match(files.get("apps/web/app/layout.tsx"), /AnalyticsConsent/u);
       assert.match(files.get("apps/web/app/layout.tsx"), /verification/u);

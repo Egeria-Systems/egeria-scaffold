@@ -200,7 +200,7 @@
       "path": "apps/web/content/fr-CA/analytics.yaml"
     },
     {
-      "fingerprint": "sha256:b256a99aa95aa83c6ea419c1e4a1820a3b6b5eaeb2f8455f64ff2dd78111df17",
+      "fingerprint": "sha256:f34f2c3f4a9032b3c75a654105d8ff2e64cbad9a4c4e49398d5b1aa3a834f5a7",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -214,7 +214,7 @@
       "path": "docs/analytics.md"
     },
     {
-      "fingerprint": "sha256:aaa2614aa0f1b0c4a940c1823bd8c7cc3f0d8696a5eeb7b70438df42f6415750",
+      "fingerprint": "sha256:f4c78270abbdb361214d30b52729b4a2cc26018b2e89e4cdc3b17b27bd44eabc",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -228,7 +228,7 @@
       "path": "apps/web/src/integrations/analytics/analytics-provider-contract.ts"
     },
     {
-      "fingerprint": "sha256:263f3625c1fd827d88b9248badb1981bb020fe9ea1b5f718fc6fa5b46c85c02e",
+      "fingerprint": "sha256:a4e2be0effd7b643d23468b59759f6647f041b55ab0ed4b2994276899226099d",
       "fingerprintTarget": {
         "kind": "file"
       },

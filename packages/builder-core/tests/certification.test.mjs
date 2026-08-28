@@ -75,7 +75,7 @@ const committedRegistry = JSON.parse(
 
 const descriptorDigests = Object.freeze({
   analytics:
-    "sha256:c71477bfc9c5d1d1c111ad128f0d82b52a0b014bdeec44a879e0d76a2ff66fe0",
+    "sha256:e9386b318b0c42e3bc05ccb0f9077bacd833d3211e4d61371a12ed8fef473833",
   "booking-calendly":
     "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2",
   "content-files":
@@ -541,6 +541,10 @@ test("current analytics subject is admitted only as pending certification", () =
     descriptor,
     requiredEvidence.analytics,
   );
+  const analyticsPlan = readFileSync(
+    new URL(`../../../${analyticsPlanPath}`, import.meta.url),
+    "utf8",
+  );
 
   assert.deepEqual(committedRegistry.records.analytics, {
     subject,
@@ -555,6 +559,14 @@ test("current analytics subject is admitted only as pending certification", () =
     taskPlan: analyticsPlanPath,
     evidence: [],
   });
+  assert.match(analyticsPlan, /Enable with JS Snippet installation/u);
+  assert.match(analyticsPlan, /installation-mode.*readback/iu);
+  assert.match(
+    analyticsPlan,
+    /zero.*\/cdn-cgi\/rum.*fresh denial.*persisted denial.*withdrawal.*reload/iu,
+  );
+  assert.match(analyticsPlan, /positive grant.*provider.*receipt/iu);
+  assert.match(analyticsPlan, /Disable.*not.*repair/iu);
 });
 
 test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", () => {

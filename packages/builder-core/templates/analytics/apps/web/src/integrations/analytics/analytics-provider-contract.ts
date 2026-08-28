@@ -27,6 +27,7 @@ export type AnalyticsProviderDeclaration = Readonly<{
     | "audience-measurement"
     | "consented-experience-analysis";
   scriptSource: string;
+  imageSources: readonly string[];
   connectSources: readonly string[];
   browserStorage: readonly string[];
   cookies: readonly string[];
@@ -46,6 +47,7 @@ const providerDeclarations = {
     scriptId: "analytics-cloudflare-web-analytics",
     purpose: "aggregate-traffic-and-performance",
     scriptSource: "https://static.cloudflareinsights.com/beacon.min.js",
+    imageSources: [],
     connectSources: ["https://cloudflareinsights.com"],
     browserStorage: [],
     cookies: [],
@@ -57,14 +59,25 @@ const providerDeclarations = {
     scriptId: "analytics-google-analytics-4",
     purpose: "audience-measurement",
     scriptSource: "https://www.googletagmanager.com/gtag/js",
+    imageSources: [
+      "https://*.google-analytics.com",
+      "https://www.googletagmanager.com",
+    ],
     connectSources: [
-      "https://www.google-analytics.com",
-      "https://region1.google-analytics.com",
-      "https://analytics.google.com",
+      "https://*.google-analytics.com",
+      "https://*.analytics.google.com",
+      "https://www.googletagmanager.com",
     ],
     browserStorage: ["first-party-cookie"],
     cookies: ["_ga", "_ga_<container-id>"],
-    dataClasses: ["audience", "device", "navigation"],
+    dataClasses: [
+      "audience",
+      "device",
+      "navigation",
+      "session-statistics",
+      "approximate-geolocation",
+      "pseudonymous-client-and-session-identifiers",
+    ],
     retention: "provider-controlled",
   },
   microsoftClarity: {
@@ -72,6 +85,7 @@ const providerDeclarations = {
     scriptId: "analytics-microsoft-clarity",
     purpose: "consented-experience-analysis",
     scriptSource: "https://www.clarity.ms/tag/",
+    imageSources: [],
     connectSources: [
       "https://www.clarity.ms",
       "https://*.clarity.ms",
@@ -79,7 +93,15 @@ const providerDeclarations = {
     ],
     browserStorage: ["first-party-cookie", "provider-controlled-storage"],
     cookies: ["_clck", "_clsk"],
-    dataClasses: ["interaction", "navigation", "session"],
+    dataClasses: [
+      "interaction",
+      "navigation",
+      "session",
+      "session-replay-dom-mutations-content-and-layout",
+      "diagnostics-and-performance",
+      "page-metadata-and-dimensions",
+      "pseudonymous-envelope-user-and-session-identifiers",
+    ],
     retention: "provider-controlled",
   },
 } as const satisfies Readonly<
