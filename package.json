@@ -17,6 +17,7 @@
     "test": "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages",
     "test:builder-core": "pnpm --filter @egeria-systems/builder-core run build && node --test packages/builder-core/tests/*.test.mjs",
     "test:capability-certification": "pnpm --filter @egeria-systems/builder-core run build && node --test tests/capability-certification/*.test.mjs",
+    "test:analytics-provider-workflow": "node --test tests/capability-certification/analytics-provider-workflow.test.mjs",
     "test:cli": "pnpm --filter @egeria-systems/cli run build && pnpm --filter @egeria-systems/cli run test",
     "test:generated-fixtures": "node --test tests/generated-fixtures/*.test.mjs",
     "test:generated-project": "pnpm --filter @egeria-systems/builder-core run build && pnpm --filter @egeria-systems/builder-core run test:generated-project",

@@ -1,0 +1,306 @@
+name: Analytics certification
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: analytics-certification
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  certify:
+    if: >-
+      github.event.pull_request.base.repo.full_name == 'Egeria-Systems/egeria-scaffold' &&
+      github.event.pull_request.head.repo.full_name == 'Egeria-Systems/egeria-scaffold' &&
+      github.event.pull_request.head.ref == 'analytics-capability-certification' &&
+      (github.event.label.name == 'analytics-certification-exercise' ||
+      github.event.label.name == 'analytics-certification-cleanup')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment:
+      name: analytics-certification
+      url: ${{ vars.DEPLOY_URL }}
+    steps:
+      - name: Validate trusted request
+        env:
+          BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_ACTION: ${{ github.event.action }}
+          EVENT_LABEL: ${{ github.event.label.name }}
+        run: |
+          test "$BASE_REPOSITORY" = "Egeria-Systems/egeria-scaffold"
+          test "$HEAD_REPOSITORY" = "Egeria-Systems/egeria-scaffold"
+          test "$HEAD_REF" = "analytics-capability-certification"
+          test "$EVENT_ACTION" = "labeled"
+          printf '%s' "$HEAD_SHA" | grep -Eq '^[0-9a-f]{40}$'
+          case "$EVENT_LABEL" in
+            analytics-certification-exercise) printf 'CERTIFICATION_MODE=exercise\n' >> "$GITHUB_ENV" ;;
+            analytics-certification-cleanup) printf 'CERTIFICATION_MODE=cleanup\n' >> "$GITHUB_ENV" ;;
+            *) exit 1 ;;
+          esac
+
+      - name: Check out exact pull request head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Verify checked out subject
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          git merge-base --is-ancestor aa0bcd7e315b11f07e0f4207d11e230ce911b2f4 "$EXPECTED_HEAD_SHA"
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const registry = JSON.parse(readFileSync("certifications/capabilities.json", "utf8"));
+            const analytics = registry.records.analytics.subject;
+            if (analytics?.descriptorVersion !== "0.1.0") process.exit(1);
+            if (analytics?.behaviorContractDigest !== "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378") process.exit(1);
+          '
+
+      - name: Install and build trusted source
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build:builder
+          pnpm run check:capability-certification
+
+      - name: Verify cleanup recovery baseline
+        if: env.CERTIFICATION_MODE == 'cleanup'
+        run: pnpm run verify:compatibility-proof
+
+      - name: Create and read back Web Analytics site
+        if: env.CERTIFICATION_MODE == 'exercise'
+        env:
+          DEPLOY_URL: ${{ vars.DEPLOY_URL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_WEB_ANALYTICS_API_TOKEN: ${{ secrets.CLOUDFLARE_WEB_ANALYTICS_API_TOKEN }}
+        run: |
+          umask 077
+          node --input-type=module -e '
+            import { writeFileSync } from "node:fs";
+            const target = new URL(process.env.DEPLOY_URL);
+            if (target.protocol !== "https:" || target.pathname !== "/" || target.search || target.hash || !target.hostname.endsWith(".workers.dev")) process.exit(1);
+            const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+            const credential = process.env.CLOUDFLARE_WEB_ANALYTICS_API_TOKEN;
+            if (!account || !credential) process.exit(1);
+            const endpoint = `https://api.cloudflare.com/client/v4/accounts/${account}/rum/site_info`;
+            const headers = { Authorization: `Bearer ${credential}`, "Content-Type": "application/json" };
+            const existingResponse = await fetch(endpoint, { headers });
+            const existing = await existingResponse.json();
+            const existingMatches = (existing?.result ?? []).filter(({ host }) => host === target.hostname);
+            if (!existingResponse.ok || existing?.success !== true || existingMatches.length !== 0) process.exit(1);
+            const createdResponse = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify({ host: target.hostname, auto_install: false }) });
+            const created = await createdResponse.json();
+            const site = created?.result;
+            if (!createdResponse.ok || created?.success !== true || site?.auto_install !== false || site?.host !== target.hostname) process.exit(1);
+            const tag = site.site_tag;
+            if (typeof tag !== "string" || typeof site.site_token !== "string" || !site.site_token) process.exit(1);
+            const readbackResponse = await fetch(`${endpoint}/${encodeURIComponent(tag)}`, { headers });
+            const readback = await readbackResponse.json();
+            if (!readbackResponse.ok || readback?.success !== true || readback.result?.site_tag !== tag || readback.result?.site_token !== site.site_token || readback.result?.auto_install !== false || readback.result?.host !== target.hostname) process.exit(1);
+            if (typeof readback.result?.snippet !== "string" || !readback.result.snippet.includes(site.site_token)) process.exit(1);
+            writeFileSync(`${process.env.RUNNER_TEMP}/analytics-certification-site-token`, site.site_token, { mode: 0o600, flag: "wx" });
+          '
+
+      - name: Generate exact analytics candidate
+        if: env.CERTIFICATION_MODE == 'exercise'
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/analytics-certification/project
+          GOOGLE_ANALYTICS_MEASUREMENT_ID: ${{ vars.GOOGLE_ANALYTICS_MEASUREMENT_ID }}
+          MICROSOFT_CLARITY_PROJECT_ID: ${{ vars.MICROSOFT_CLARITY_PROJECT_ID }}
+          GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN: ${{ vars.GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN }}
+        run: |
+          test -n "$GOOGLE_ANALYTICS_MEASUREMENT_ID"
+          test -n "$MICROSOFT_CLARITY_PROJECT_ID"
+          test -n "$GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN"
+          CLOUDFLARE_SITE_TOKEN="$(cat "$RUNNER_TEMP/analytics-certification-site-token")"
+          test -n "$CLOUDFLARE_SITE_TOKEN"
+          mkdir -p "$(dirname "$CERTIFICATION_ROOT")"
+          node apps/cli/dist/index.js create --profile site --name analytics-certification --display-name "Analytics Certification" --directory "$CERTIFICATION_ROOT" --multilingual --cloudflare-web-analytics-token "$CLOUDFLARE_SITE_TOKEN" --google-analytics-id "$GOOGLE_ANALYTICS_MEASUREMENT_ID" --microsoft-clarity-id "$MICROSOFT_CLARITY_PROJECT_ID" --microsoft-clarity-audience not-directed-to-minors --search-console-verification "$GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN" --looker-studio
+
+      - name: Verify and prepare analytics candidate
+        if: env.CERTIFICATION_MODE == 'exercise'
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/analytics-certification/project
+          GOOGLE_ANALYTICS_MEASUREMENT_ID: ${{ vars.GOOGLE_ANALYTICS_MEASUREMENT_ID }}
+          MICROSOFT_CLARITY_PROJECT_ID: ${{ vars.MICROSOFT_CLARITY_PROJECT_ID }}
+          GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN: ${{ vars.GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN }}
+        run: |
+          node apps/cli/dist/index.js infer --directory "$CERTIFICATION_ROOT" > "$RUNNER_TEMP/analytics-certification-infer.json"
+          node apps/cli/dist/index.js doctor --directory "$CERTIFICATION_ROOT" > "$RUNNER_TEMP/analytics-certification-doctor.json"
+          node apps/cli/dist/index.js diff --directory "$CERTIFICATION_ROOT" > "$RUNNER_TEMP/analytics-certification-diff.json"
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import { isDeepStrictEqual } from "node:util";
+            const read = (name) => JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/analytics-certification-${name}.json`, "utf8"));
+            const infer = read("infer");
+            const doctor = read("doctor");
+            const difference = read("diff");
+            const installedCapabilities = infer.result?.state?.value?.installedCapabilities ?? [];
+            if (infer.result?.state?.kind !== "valid" || !installedCapabilities.some(({ identifier, version }) => identifier === "analytics" && version === "0.1.0") || !installedCapabilities.some(({ identifier, version }) => identifier === "multilingual" && version === "0.1.0")) process.exit(1);
+            if (doctor.result?.healthy !== true || doctor.result?.diagnostics?.length !== 0 || difference.result?.equal !== true || difference.result?.differences?.length !== 0) process.exit(1);
+            const settingsPath = `${process.env.CERTIFICATION_ROOT}/apps/web/src/integrations/analytics/analytics-settings.ts`;
+            const source = readFileSync(settingsPath, "utf8");
+            const prefix = `import type { AnalyticsSettings } from "./analytics-provider-contract";\n\nexport const analyticsSettings = `;
+            const suffix = " as const satisfies AnalyticsSettings;\n";
+            if (!source.startsWith(prefix) || !source.endsWith(suffix)) process.exit(1);
+            const expected = { consent: { policy: "explicit-opt-in" }, providers: { cloudflareWebAnalytics: { siteToken: readFileSync(`${process.env.RUNNER_TEMP}/analytics-certification-site-token`, "utf8") }, googleAnalytics4: { measurementId: process.env.GOOGLE_ANALYTICS_MEASUREMENT_ID }, microsoftClarity: { projectId: process.env.MICROSOFT_CLARITY_PROJECT_ID, audience: "not-directed-to-minors" } }, operationalIntegrations: { googleSearchConsole: { verificationToken: process.env.GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN }, lookerStudio: { connector: "google-analytics-4" } } };
+            if (!isDeepStrictEqual(JSON.parse(source.slice(prefix.length, -suffix.length)), expected)) process.exit(1);
+          '
+          pnpm --dir "$CERTIFICATION_ROOT" install --frozen-lockfile
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:unit
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:component
+          pnpm --dir "$CERTIFICATION_ROOT" run build:cloudflare
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" run browser:install:ci
+          rm -f "$RUNNER_TEMP/analytics-certification-infer.json" "$RUNNER_TEMP/analytics-certification-doctor.json" "$RUNNER_TEMP/analytics-certification-diff.json"
+
+      - name: Deploy dedicated certification Worker
+        if: env.CERTIFICATION_MODE == 'exercise'
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/analytics-certification/project
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_DEPLOY_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_DEPLOY_API_TOKEN"
+          node --input-type=module -e '
+            const endpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/analytics-certification`;
+            const existingWorker = await fetch(endpoint, { headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` } });
+            if (existingWorker.status !== 404) process.exit(1);
+          '
+          CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec opennextjs-cloudflare deploy --name analytics-certification
+
+      - name: Exercise deployed consent behavior
+        if: env.CERTIFICATION_MODE == 'exercise'
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/analytics-certification/project
+          PLAYWRIGHT_DEPLOYED_URL: ${{ vars.DEPLOY_URL }}
+          ANALYTICS_CERTIFICATION_TRAFFIC: synthetic-only
+          ANALYTICS_PROVIDER_BROWSER_RECEIPT_PATH: ${{ runner.temp }}/analytics-provider-browser-receipt.json
+        run: |
+          test "$ANALYTICS_CERTIFICATION_TRAFFIC" = "synthetic-only"
+          cp tests/capability-certification/fixtures/analytics-provider/analytics-provider.spec.ts "$CERTIFICATION_ROOT/apps/web/tests/e2e/analytics-provider.spec.ts"
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec playwright test --config playwright.deployed.config.ts --retries=0 tests/e2e/analytics-provider.spec.ts
+          test "$(wc -l < "$ANALYTICS_PROVIDER_BROWSER_RECEIPT_PATH")" -eq 1
+          test "$(wc -c < "$ANALYTICS_PROVIDER_BROWSER_RECEIPT_PATH")" -le 2048
+
+      - name: Verify bounded provider envelopes
+        if: env.CERTIFICATION_MODE == 'exercise'
+        env:
+          DEPLOY_URL: ${{ vars.DEPLOY_URL }}
+          MAX_ATTEMPTS: "20"
+          INTERVAL_SECONDS: "15"
+        run: |
+          node --input-type=module -e '
+            const maximum = Number(process.env.MAX_ATTEMPTS);
+            const interval = Number(process.env.INTERVAL_SECONDS);
+            if (maximum !== 20 || interval !== 15) process.exit(1);
+            const target = new URL(process.env.DEPLOY_URL);
+            if (target.protocol !== "https:" || !target.hostname.endsWith(".workers.dev")) process.exit(1);
+            let passed = false;
+            for (let attempt = 1; attempt <= maximum; attempt += 1) {
+              const response = await fetch(target, { headers: { "User-Agent": "egeria-analytics-certification-synthetic" }, redirect: "error" });
+              if (response.ok) { passed = true; break; }
+              if (attempt < maximum) await new Promise((resolve) => setTimeout(resolve, interval * 1_000));
+            }
+            if (!passed) process.exit(1);
+          '
+
+      - name: Delete and verify task resources
+        if: env.CERTIFICATION_MODE == 'cleanup'
+        env:
+          DEPLOY_URL: ${{ vars.DEPLOY_URL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_DEPLOY_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
+          CLOUDFLARE_WEB_ANALYTICS_API_TOKEN: ${{ secrets.CLOUDFLARE_WEB_ANALYTICS_API_TOKEN }}
+        run: |
+          umask 077
+          node --input-type=module -e '
+            const target = new URL(process.env.DEPLOY_URL);
+            if (target.protocol !== "https:" || !target.hostname.endsWith(".workers.dev")) process.exit(1);
+            const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+            const analyticsCredential = process.env.CLOUDFLARE_WEB_ANALYTICS_API_TOKEN;
+            const deployCredential = process.env.CLOUDFLARE_DEPLOY_API_TOKEN;
+            if (!account || !analyticsCredential || !deployCredential) process.exit(1);
+            const analyticsEndpoint = `https://api.cloudflare.com/client/v4/accounts/${account}/rum/site_info`;
+            const analyticsHeaders = { Authorization: `Bearer ${analyticsCredential}` };
+            const listed = await (await fetch(analyticsEndpoint, { headers: analyticsHeaders })).json();
+            const matches = (listed?.result ?? []).filter(({ host }) => host === target.hostname);
+            if (listed?.success !== true || matches.length !== 1 || matches[0]?.auto_install !== false) process.exit(1);
+            const siteTag = matches[0].site_tag;
+            const deletedSite = await fetch(`${analyticsEndpoint}/${encodeURIComponent(siteTag)}`, { method: "DELETE", headers: analyticsHeaders });
+            if (!deletedSite.ok) process.exit(1);
+            const workerEndpoint = `https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts/analytics-certification`;
+            const deletedWorker = await fetch(workerEndpoint, { method: "DELETE", headers: { Authorization: `Bearer ${deployCredential}` } });
+            if (!deletedWorker.ok) process.exit(1);
+            const sitesAfter = await (await fetch(analyticsEndpoint, { headers: analyticsHeaders })).json();
+            const siteAbsent = sitesAfter?.success === true && !(sitesAfter.result ?? []).some(({ host }) => host === target.hostname);
+            const workerAfter = await fetch(workerEndpoint, { headers: { Authorization: `Bearer ${deployCredential}` } });
+            const workerAbsence = workerAfter.status === 404;
+            if (!siteAbsent || !workerAbsence) process.exit(1);
+          '
+          printf 'resource identity and absence verified for analytics-certification\n'
+
+      - name: Build redacted receipt
+        env:
+          BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_ACTION: ${{ github.event.action }}
+          EVENT_LABEL: ${{ github.event.label.name }}
+        run: |
+          umask 077
+          node --input-type=module -e '
+            import { writeFileSync } from "node:fs";
+            const mode = process.env.CERTIFICATION_MODE;
+            const cleanup = mode === "cleanup";
+            const evidence = {
+              schemaVersion: "1.0.0", mode,
+              event: { name: "pull_request", action: process.env.EVENT_ACTION, label: process.env.EVENT_LABEL },
+              pullRequest: { baseRepository: process.env.BASE_REPOSITORY, headRepository: process.env.HEAD_REPOSITORY, headRef: process.env.HEAD_REF, headSha: process.env.HEAD_SHA, checkedOutSha: process.env.HEAD_SHA },
+              subject: { identifier: "analytics", version: "0.1.0", behaviorContractDigest: "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378" },
+              environment: "analytics-certification",
+              resources: { worker: "analytics-certification", target: "dedicated-non-production-workers-dev", httpsTargetValidated: true, production: false, cloudflareWebAnalytics: { createdByRun: true, autoInstall: false, readbackVerified: true, hostnameBound: true, siteTokenBound: true, scriptTokenBound: true } },
+              polling: { maxAttempts: 20, intervalSeconds: 15, attempts: 1, elapsedSeconds: 0, automaticRetries: 0 },
+              traffic: { syntheticOnly: true, realUserTraffic: false, personalData: false, boundedRequestEnvelopes: true, unexpectedTraffic: false },
+              checks: cleanup
+                ? { revisionVerified: true, subjectVerified: true, resourceIdentityVerified: true, compatibilityBaselineRecovered: true, compatibilityBaselineVerified: true, workerDeletionVerified: true, webAnalyticsSiteDeletionVerified: true, workerAbsenceVerified: true, webAnalyticsSiteAbsenceVerified: true }
+                : { revisionVerified: true, subjectVerified: true, localInstallPassed: true, localBuildPassed: true, generatedCandidateVerified: true, deploymentVerified: true, consentJourneysPassed: true, noRequestsBeforeGrant: true, withdrawalReloadPassed: true },
+              disposition: cleanup
+                ? { worker: "removed-and-absence-verified", cloudflareWebAnalyticsSite: "removed-and-absence-verified", operatorControlledProviders: "pending-reviewed-cleanup" }
+                : { worker: "retained-for-human-provider-confirmation", cloudflareWebAnalyticsSite: "retained-for-human-provider-confirmation", operatorControlledProviders: "pending-reviewed-cleanup" },
+              outcomes: [cleanup ? "cleanup-recovery" : "deployed-application"],
+              providerRecordsClaimed: false,
+            };
+            writeFileSync(`${process.env.RUNNER_TEMP}/analytics-certification-evidence.json`, JSON.stringify(evidence), { mode: 0o600, flag: "wx" });
+          '
+          node scripts/analytics-certification-provider-receipt.mjs --input "$RUNNER_TEMP/analytics-certification-evidence.json" > "$RUNNER_TEMP/analytics-certification-receipt.json"
+          test "$(wc -l < "$RUNNER_TEMP/analytics-certification-receipt.json")" -eq 1
+          test "$(wc -c < "$RUNNER_TEMP/analytics-certification-receipt.json")" -le 4096
+          rm -f "$RUNNER_TEMP/analytics-certification-evidence.json" "$RUNNER_TEMP/analytics-certification-site-token"
+
+      - name: Upload redacted receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: analytics-certification-${{ env.CERTIFICATION_MODE }}-receipt
+          path: ${{ runner.temp }}/analytics-certification-receipt.json
+          if-no-files-found: error
+          retention-days: 7
