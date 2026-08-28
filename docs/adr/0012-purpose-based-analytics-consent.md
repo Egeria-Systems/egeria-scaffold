@@ -22,12 +22,13 @@ Provider identifiers describe which providers implement and disclose a purpose a
 
 The first-party key `egeria.analytics.consent.v2` stores one strict version-2 local preference record containing only:
 
-- `version: 2`;
-- the exact generated `noticeRevision` shown with the choice;
+- `schemaVersion: 2`;
+- `noticeVersion: 1`, the exact current generated notice contract;
 - UTC `decidedAt` and `expiresAt` instants, with expiry exactly 180 days after the decision;
-- the exact configured purposes, each with its exact current provider-identifier context and one `granted` or `denied` decision.
+- `providerPurposeContext`, the exact configured provider identities paired with their fixed purposes;
+- `purposes`, the exact configured purposes with one `granted` or `denied` decision each.
 
-Purpose entries and provider identifiers use deterministic order and contain no duplicate, missing, extra, or unknown member. A record is current only when its version and shape are valid, its notice revision and complete provider-to-purpose context exactly match the generated configuration, its timestamps are valid, and it has not expired. A legacy, malformed, partial, expired, future-dated, notice-stale, or configuration-stale record grants nothing. A legacy grant is never promoted to version 2.
+Provider-purpose context entries and purpose decisions are separate and use deterministic order. The record stores no provider configuration values. Neither collection may contain a duplicate, missing, extra, or unknown member. A record is current only when its schema and shape are valid, its notice version is exactly 1, its complete provider-purpose context and purpose-decision set exactly match the generated configuration, its timestamps are valid, and it has not expired. A legacy, malformed, partial, expired, future-dated, notice-stale, or configuration-stale record grants nothing. A legacy grant is never promoted to version 2.
 
 The initial and management controls disclose the configured purposes, default each optional purpose to denied, give the allow-all and deny-all actions equal prominence, permit purpose-specific choices, remain persistently reopenable, and provide withdrawal. A choice is effective in memory only for the current document unless the exact version-2 record is persisted successfully.
 

@@ -3886,6 +3886,10 @@ test("purpose-based analytics consent is canonical and fail-closed", async () =>
 
   assert.match(adr, /Status:\*\* Accepted/u);
   assert.match(capabilityModel, /purpose[^\n]+canonical choice/iu);
+  assert.match(
+    capabilityModel,
+    /type AnalyticsConsentRecordV2 = Readonly<\{\n  schemaVersion: 2;\n  noticeVersion: 1;\n  decidedAt: string;\n  expiresAt: string;\n  providerPurposeContext: readonly AnalyticsConsentContextEntry\[\];\n  purposes: readonly AnalyticsPurposeDecision\[\];\n\}>;/u,
+  );
   assert.match(capabilityModel, /180 days/iu);
   assert.match(capabilityModel, /configured purposes/iu);
   assert.match(capabilityModel, /local technical preference/iu);

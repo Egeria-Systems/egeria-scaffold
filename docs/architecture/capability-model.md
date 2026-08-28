@@ -248,23 +248,32 @@ Purpose is the canonical choice key. The current provider mapping is fixed and o
 The first-party key `egeria.analytics.consent.v2` stores one strict record:
 
 ```ts
-type AnalyticsConsentPreferenceV2 = Readonly<{
-  version: 2;
-  noticeRevision: string;
+type AnalyticsPurposeIdentifier =
+  | "aggregate-traffic-and-performance"
+  | "audience-measurement"
+  | "consented-experience-analysis";
+
+type AnalyticsPurposeDecision = Readonly<{
+  purpose: AnalyticsPurposeIdentifier;
+  decision: "granted" | "denied";
+}>;
+
+type AnalyticsConsentContextEntry = Readonly<{
+  provider: AnalyticsProviderIdentifier;
+  purpose: AnalyticsPurposeIdentifier;
+}>;
+
+type AnalyticsConsentRecordV2 = Readonly<{
+  schemaVersion: 2;
+  noticeVersion: 1;
   decidedAt: string;
   expiresAt: string;
-  configuredPurposes: readonly Readonly<{
-    purpose:
-      | "aggregate-traffic-and-performance"
-      | "audience-measurement"
-      | "consented-experience-analysis";
-    providerIdentifiers: readonly AnalyticsProviderIdentifier[];
-    decision: "granted" | "denied";
-  }>[];
+  providerPurposeContext: readonly AnalyticsConsentContextEntry[];
+  purposes: readonly AnalyticsPurposeDecision[];
 }>;
 ```
 
-`decidedAt` and `expiresAt` are UTC instants, and expiry is exactly 180 days after the decision. Purpose entries and provider identifiers use deterministic lexical order. The record must contain exactly the configured purposes with one decision per purpose and the exact current provider-to-purpose context, with no duplicate, missing, extra, or unknown value. Its version, shape, notice revision, timestamps, configured purposes, and provider context are revalidated before any provider loads. A legacy, malformed, partial, expired, future-dated, notice-stale, or configuration-stale record grants nothing, and no legacy grant is promoted.
+`decidedAt` and `expiresAt` are UTC instants, and expiry is exactly 180 days after the decision. `providerPurposeContext` and `purposes` are separate, use deterministic code-point order, and store no provider configuration values. The context contains exactly one entry for every configured provider and its one current purpose. The decisions contain exactly one entry for every unique configured purpose. Neither collection permits a duplicate, missing, extra, or unknown value. The record's schema, exact `noticeVersion: 1`, shape, timestamps, purpose decisions, and complete provider-purpose context are revalidated before any provider loads. A legacy, malformed, partial, expired, future-dated, notice-stale, or configuration-stale record grants nothing, and no legacy grant is promoted.
 
 The localized control defaults every purpose to denied, discloses the configured purposes, gives allow-all and deny-all equal prominence, supports purpose-specific decisions, stays persistently reopenable, and provides withdrawal. A current in-memory choice does not become durable unless the complete record persists successfully. A reduction is any formerly granted purpose becoming denied, absent, expired, or invalid; reductions take effect fail-closed in memory before bounded provider effects. A successful persisted reduction reloads: complete withdrawal or invalidation yields a provider-free document, while partial reduction can reload only the providers for purposes that remain granted. More-permissive persisted changes may load only newly granted current providers and retain the one-loader invariant.
 
