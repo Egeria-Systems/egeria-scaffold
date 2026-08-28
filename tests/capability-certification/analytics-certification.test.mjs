@@ -35,6 +35,25 @@ const providerArguments = Object.freeze([
   "search-console-verification-token",
   "--looker-studio",
 ]);
+const analyticsSettings = Object.freeze({
+  consent: Object.freeze({ policy: "explicit-opt-in" }),
+  providers: Object.freeze({
+    cloudflareWebAnalytics: Object.freeze({
+      siteToken: "0123456789abcdef0123456789abcdef",
+    }),
+    googleAnalytics4: Object.freeze({ measurementId: "G-ABCDEF1234" }),
+    microsoftClarity: Object.freeze({
+      projectId: "clarity123",
+      audience: "not-directed-to-minors",
+    }),
+  }),
+  operationalIntegrations: Object.freeze({
+    googleSearchConsole: Object.freeze({
+      verificationToken: "search-console-verification-token",
+    }),
+    lookerStudio: Object.freeze({ connector: "google-analytics-4" }),
+  }),
+});
 const commonCapabilities = Object.freeze([
   "standards",
   "content-files",
@@ -65,12 +84,14 @@ const freshScaffoldChecks = Object.freeze([
   "healthy-diagnostics",
   "exact-diff",
   ...generatedChecks,
+  "exact-generated-analytics-settings",
 ]);
 const lifecycleTestsByFile = new Map([
   [
     "apps/cli/tests/cli.test.mjs",
     Object.freeze([
       "the compiled CLI preserves analytics and multilingual across both install orders and analytics re-addition",
+      "the compiled CLI refuses duplicate analytics addition without repository mutation",
     ]),
   ],
   [
@@ -133,6 +154,15 @@ function successfulTap(testNames) {
   ].join("\n");
 }
 
+function renderAnalyticsSettingsArtifact(settings) {
+  return [
+    'import type { AnalyticsSettings } from "./analytics-provider-contract";',
+    "",
+    `export const analyticsSettings = ${JSON.stringify(settings, null, 2)} as const satisfies AnalyticsSettings;`,
+    "",
+  ].join("\n");
+}
+
 function createJourney({
   profile,
   projectName,
@@ -141,6 +171,7 @@ function createJourney({
   recipeVersion,
   verifierIdentifier,
   createArguments,
+  settingsArtifactSource = renderAnalyticsSettingsArtifact(analyticsSettings),
   replaceOwner = false,
 }) {
   const state = { commands: [], ownedPath: undefined, projectRoot: undefined };
@@ -162,6 +193,12 @@ function createJourney({
           join(projectRoot, ".egeria/project.yaml"),
           `recipeVersion: ${recipeVersion}\n`,
         );
+        const settingsPath = join(
+          projectRoot,
+          "apps/web/src/integrations/analytics/analytics-settings.ts",
+        );
+        await mkdir(dirname(settingsPath), { recursive: true });
+        await writeFile(settingsPath, settingsArtifactSource);
         return `${JSON.stringify({
           ok: true,
           command,
@@ -242,6 +279,7 @@ function createCertificationAdapters(overrides = {}) {
     recipeVersion: "0.10.0",
     verifierIdentifier: "portfolio-analytics",
     createArguments: providerArguments,
+    settingsArtifactSource: overrides.portfolioSettingsArtifactSource,
     replaceOwner: overrides.replacePortfolioOwner === true,
   });
   const site = createJourney({
@@ -257,6 +295,7 @@ function createCertificationAdapters(overrides = {}) {
     recipeVersion: "0.11.0",
     verifierIdentifier: "site-multilingual-analytics",
     createArguments: [...providerArguments, "--multilingual"],
+    settingsArtifactSource: overrides.siteSettingsArtifactSource,
   });
   const lifecycleCommands = [];
   const adapters = {
@@ -273,6 +312,8 @@ function createCertificationAdapters(overrides = {}) {
     ...overrides,
   };
   delete adapters.replacePortfolioOwner;
+  delete adapters.portfolioSettingsArtifactSource;
+  delete adapters.siteSettingsArtifactSource;
 
   return { adapters, lifecycleCommands, portfolio, site };
 }
@@ -315,6 +356,7 @@ test("analytics certification binds both full-matrix profiles and lifecycle evid
       ...freshScaffoldChecks.map((check) => `portfolio:${check}`),
       ...freshScaffoldChecks.map((check) => `site:${check}`),
       "compiled-add-remove-re-add-both-profiles",
+      "duplicate-analytics-add-refusal",
       "settings-bound-addition",
       "addition-state-last-and-failure-prefixes",
       "removal-state-last-provider-disposition-and-failure-prefixes",
@@ -341,6 +383,73 @@ test("analytics certification binds both full-matrix profiles and lifecycle evid
   assert.equal(revisionReads, 2);
   assert.equal(statusReads, 2);
   assert.equal(indexReads, 2);
+});
+
+test("analytics certification rejects missing or changed generated settings fields for both profiles without disclosure", async (context) => {
+  const { certifyAnalyticsForTesting, AnalyticsCertificationError } =
+    await import(certificationScript);
+  const cases = [
+    {
+      name: "portfolio missing provider field",
+      profile: "portfolio",
+      mutate(settings) {
+        delete settings.providers.googleAnalytics4;
+      },
+    },
+    {
+      name: "portfolio changed provider field",
+      profile: "portfolio",
+      mutate(settings) {
+        settings.providers.cloudflareWebAnalytics.siteToken =
+          "changed-private-site-token";
+      },
+    },
+    {
+      name: "site missing operational field",
+      profile: "site",
+      mutate(settings) {
+        delete settings.operationalIntegrations.googleSearchConsole;
+      },
+    },
+    {
+      name: "site changed operational field",
+      profile: "site",
+      mutate(settings) {
+        settings.operationalIntegrations.lookerStudio.connector =
+          "changed-private-connector";
+      },
+    },
+  ];
+
+  for (const fixture of cases) {
+    await context.test(fixture.name, async () => {
+      const changedSettings = structuredClone(analyticsSettings);
+      fixture.mutate(changedSettings);
+      const sourceOverride = {
+        [`${fixture.profile}SettingsArtifactSource`]:
+          renderAnalyticsSettingsArtifact(changedSettings),
+      };
+      const scaffold = createCertificationAdapters(sourceOverride);
+      let observedError;
+
+      await assert.rejects(
+        certifyAnalyticsForTesting({ revision }, scaffold.adapters),
+        (error) => {
+          observedError = error;
+          return (
+            error instanceof AnalyticsCertificationError &&
+            error.code === "GENERATED_ANALYTICS_SETTINGS_INVALID"
+          );
+        },
+      );
+      assert.doesNotMatch(
+        observedError.message,
+        /0123456789abcdef|G-ABCDEF1234|clarity123|search-console-verification-token|changed-private/u,
+      );
+      assert.equal(await fileExists(scaffold.portfolio.state.ownedPath), false);
+      assert.equal(await fileExists(scaffold.site.state.ownedPath), false);
+    });
+  }
 });
 
 test("analytics portfolio verification executes isolated unit, component, build, and browser behavior without provider authority", async () => {

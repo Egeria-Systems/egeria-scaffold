@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, parse, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { isDeepStrictEqual, promisify } from "node:util";
 
 import { certifyFreshScaffoldForTesting } from "./lib/certify-fresh-scaffold.mjs";
 import { runCertificationCli } from "./lib/certification-cli.mjs";
@@ -26,19 +26,45 @@ const subject = Object.freeze({
   behaviorContractDigest:
     "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378",
 });
+const expectedAnalyticsSettings = Object.freeze({
+  consent: Object.freeze({ policy: "explicit-opt-in" }),
+  providers: Object.freeze({
+    cloudflareWebAnalytics: Object.freeze({
+      siteToken: "0123456789abcdef0123456789abcdef",
+    }),
+    googleAnalytics4: Object.freeze({ measurementId: "G-ABCDEF1234" }),
+    microsoftClarity: Object.freeze({
+      projectId: "clarity123",
+      audience: "not-directed-to-minors",
+    }),
+  }),
+  operationalIntegrations: Object.freeze({
+    googleSearchConsole: Object.freeze({
+      verificationToken: "search-console-verification-token",
+    }),
+    lookerStudio: Object.freeze({ connector: "google-analytics-4" }),
+  }),
+});
 const providerArguments = Object.freeze([
   "--cloudflare-web-analytics-token",
-  "0123456789abcdef0123456789abcdef",
+  expectedAnalyticsSettings.providers.cloudflareWebAnalytics.siteToken,
   "--google-analytics-id",
-  "G-ABCDEF1234",
+  expectedAnalyticsSettings.providers.googleAnalytics4.measurementId,
   "--microsoft-clarity-id",
-  "clarity123",
+  expectedAnalyticsSettings.providers.microsoftClarity.projectId,
   "--microsoft-clarity-audience",
-  "not-directed-to-minors",
+  expectedAnalyticsSettings.providers.microsoftClarity.audience,
   "--search-console-verification",
-  "search-console-verification-token",
+  expectedAnalyticsSettings.operationalIntegrations.googleSearchConsole
+    .verificationToken,
   "--looker-studio",
 ]);
+const analyticsSettingsPath =
+  "apps/web/src/integrations/analytics/analytics-settings.ts";
+const analyticsSettingsPrefix =
+  'import type { AnalyticsSettings } from "./analytics-provider-contract";\n\nexport const analyticsSettings = ';
+const analyticsSettingsSuffix =
+  " as const satisfies AnalyticsSettings;\n";
 const commonCapabilities = Object.freeze([
   "standards",
   "content-files",
@@ -74,6 +100,7 @@ const lifecycleGroups = Object.freeze([
     file: "apps/cli/tests/cli.test.mjs",
     tests: Object.freeze([
       "the compiled CLI preserves analytics and multilingual across both install orders and analytics re-addition",
+      "the compiled CLI refuses duplicate analytics addition without repository mutation",
     ]),
   }),
   Object.freeze({
@@ -122,6 +149,7 @@ const lifecycleGroups = Object.freeze([
 ]);
 const lifecycleChecks = Object.freeze([
   "compiled-add-remove-re-add-both-profiles",
+  "duplicate-analytics-add-refusal",
   "settings-bound-addition",
   "addition-state-last-and-failure-prefixes",
   "removal-state-last-provider-disposition-and-failure-prefixes",
@@ -178,6 +206,9 @@ function configurationFor(profile, revision) {
       ? "portfolio-analytics"
       : "site-multilingual-analytics",
     expectedVerificationChecks: generatedChecks,
+    expectedFixtureChecks: Object.freeze([
+      "exact-generated-analytics-settings",
+    ]),
     receipt: Object.freeze({ subject, evidenceRevision: revision }),
     createError,
     isCertificationError: (error) =>
@@ -348,8 +379,48 @@ export async function verifyAnalyticsPortfolioForTesting({
   });
 }
 
+async function verifyGeneratedAnalyticsSettings({ projectRoot }) {
+  let source;
+  try {
+    source = await readFile(join(projectRoot, analyticsSettingsPath), "utf8");
+  } catch {
+    throw createError("GENERATED_ANALYTICS_SETTINGS_INVALID");
+  }
+
+  if (
+    !source.startsWith(analyticsSettingsPrefix) ||
+    !source.endsWith(analyticsSettingsSuffix)
+  ) {
+    throw createError("GENERATED_ANALYTICS_SETTINGS_INVALID");
+  }
+
+  let settings;
+  try {
+    settings = JSON.parse(
+      source.slice(
+        analyticsSettingsPrefix.length,
+        -analyticsSettingsSuffix.length,
+      ),
+    );
+  } catch {
+    throw createError("GENERATED_ANALYTICS_SETTINGS_INVALID");
+  }
+  if (!isDeepStrictEqual(settings, expectedAnalyticsSettings)) {
+    throw createError("GENERATED_ANALYTICS_SETTINGS_INVALID");
+  }
+
+  return Object.freeze({
+    ok: true,
+    checks: Object.freeze(["exact-generated-analytics-settings"]),
+  });
+}
+
 function expectedJourneyChecks() {
-  return [...baseFreshScaffoldChecks, ...generatedChecks];
+  return [
+    ...baseFreshScaffoldChecks,
+    ...generatedChecks,
+    "exact-generated-analytics-settings",
+  ];
 }
 
 function requireJourneyResult(configuration, result) {
@@ -499,7 +570,10 @@ async function certifyWithAuthority(input, adapters) {
   for (const configuration of configurations) {
     const result = await certifyFreshScaffoldForTesting(
       configuration,
-      adapters.journeys[configuration.profile],
+      {
+        ...adapters.journeys[configuration.profile],
+        verifyFixture: verifyGeneratedAnalyticsSettings,
+      },
     );
     requireJourneyResult(configuration, result);
     results.push(result);
