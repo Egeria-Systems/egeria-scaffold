@@ -24,6 +24,10 @@ export type AnalyticsPurposeIdentifier =
   | "audience-measurement"
   | "consented-experience-analysis";
 
+export type AnalyticsCookieCleanupRule =
+  | Readonly<{ match: "exact"; value: string }>
+  | Readonly<{ match: "prefix"; value: string }>;
+
 export type AnalyticsProviderDeclaration = Readonly<{
   identifier: AnalyticsProviderIdentifier;
   scriptId: string;
@@ -33,6 +37,7 @@ export type AnalyticsProviderDeclaration = Readonly<{
   connectSources: readonly string[];
   browserStorage: readonly string[];
   cookies: readonly string[];
+  cookieCleanupRules: readonly AnalyticsCookieCleanupRule[];
   dataClasses: readonly string[];
   retention: "provider-controlled";
 }>;
@@ -53,6 +58,7 @@ const providerDeclarations = {
     connectSources: ["https://cloudflareinsights.com"],
     browserStorage: [],
     cookies: [],
+    cookieCleanupRules: [],
     dataClasses: ["aggregate-traffic", "web-performance"],
     retention: "provider-controlled",
   },
@@ -72,6 +78,10 @@ const providerDeclarations = {
     ],
     browserStorage: ["first-party-cookie"],
     cookies: ["_ga", "_ga_<container-id>"],
+    cookieCleanupRules: [
+      { match: "exact", value: "_ga" },
+      { match: "prefix", value: "_ga_" },
+    ],
     dataClasses: [
       "audience",
       "device",
@@ -95,6 +105,10 @@ const providerDeclarations = {
     ],
     browserStorage: ["first-party-cookie", "provider-controlled-storage"],
     cookies: ["_clck", "_clsk"],
+    cookieCleanupRules: [
+      { match: "exact", value: "_clck" },
+      { match: "exact", value: "_clsk" },
+    ],
     dataClasses: [
       "interaction",
       "navigation",
