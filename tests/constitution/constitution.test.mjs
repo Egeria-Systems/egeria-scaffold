@@ -1912,6 +1912,7 @@ const acceptedAdrs = [
   ["0009-accessibility-evidence-and-claims.md", "ADR-0009"],
   ["0010-analytics-and-observability.md", "ADR-0010"],
   ["0011-github-actions-deployment-authority.md", "ADR-0011"],
+  ["0012-purpose-based-analytics-consent.md", "ADR-0012"],
 ];
 
 function escapeRegularExpression(value) {
@@ -3874,6 +3875,29 @@ test("analytics implementation is independently selectable and serialized behind
       /no provider (?:provisioning|mutation)[^.]+no deployment[^.]+no legal-compliance claim/iu,
     );
   }
+});
+
+test("purpose-based analytics consent is canonical and fail-closed", async () => {
+  const [adr, capabilityModel, enforcementMap] = await Promise.all([
+    readRepositoryFile("docs/adr/0012-purpose-based-analytics-consent.md"),
+    readRepositoryFile("docs/architecture/capability-model.md"),
+    readRepositoryFile("docs/architecture/enforcement-map.md"),
+  ]);
+
+  assert.match(adr, /Status:\*\* Accepted/u);
+  assert.match(capabilityModel, /purpose[^\n]+canonical choice/iu);
+  assert.match(capabilityModel, /180 days/iu);
+  assert.match(capabilityModel, /configured purposes/iu);
+  assert.match(capabilityModel, /local technical preference/iu);
+  assert.match(
+    capabilityModel,
+    /stale grant[^\n]+revocation[^\n]+incomplete/iu,
+  );
+  assert.match(capabilityModel, /storage event[^\n]+open tabs/iu);
+  assert.match(
+    enforcementMap,
+    /INV-ANALYTICS-CONSENT[^\n]+versioned[^\n]+purpose/iu,
+  );
 });
 
 test("accepted ADRs use the repository decision contract", async () => {

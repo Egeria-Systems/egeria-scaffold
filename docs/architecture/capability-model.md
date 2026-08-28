@@ -239,9 +239,42 @@ Exact `analytics@0.1.0` is hybrid, repository-stateful and external-stateful, wi
 
 The runtime provider settings are independently optional strict objects for Cloudflare Web Analytics, Google Analytics 4, and Microsoft Clarity. Search Console and Looker Studio are independently represented operational integration settings. A request must select at least one runtime provider or Search Console; Looker Studio requires GA4, and Clarity requires the exact `not-directed-to-minors` audience declaration. Site tokens, measurement identifiers, project identifiers, and verification tokens are provider identifiers that are public in generated browser source, not secrets. Builder contracts still validate bounded safe identifier syntax, fingerprint the exact values, and redact them from plans and failures.
 
-The only supported consent policy is `explicit-opt-in`. It is deny-by-default for every selected runtime provider: no provider script or request starts before grant. One functional first-party `localStorage` value records only `granted` or `denied`. The localized provider-neutral control supports initial grant or decline, reopening management, later grant, and withdrawal. Withdrawal sends GA4 consent denial, Clarity consent-v2 denial and its documented cookie-erasure signal, expires accessible `_ga`, `_ga_*`, `_clck`, and `_clsk` first-party cookies, records denial, and reloads so the prior scripts cannot continue. This is a conservative technical policy, not an assertion that consent is legally required or sufficient in a jurisdiction.
+The only supported consent policy is `explicit-opt-in`. It is deny-by-default for every selected runtime provider, supports withdrawal, and starts no provider script or request before a current grant. The [purpose-based consent decision](../adr/0012-purpose-based-analytics-consent.md) owns the architecture, and the exact executable contract follows.
 
-Provider contracts have stable unique loader identifiers and fixed non-advertising purposes: Cloudflare Web Analytics provides aggregate performance and traffic measurement; GA4 provides audience measurement; Clarity provides consented experience analysis. Repeated grant and navigation insert each selected script at most once. GA4 `ad_storage`, `ad_user_data`, and `ad_personalization` remain denied, and the integration emits no custom events or manual page-view stream. Clarity `ad_Storage` remains denied. Provider-native page and navigation measurement supplies the selected analytics behavior. Search Console emits only Google verification metadata. Looker Studio emits no runtime code and records only the operator contract for a GA4 connector.
+#### Purpose-based consent contract
+
+Purpose is the canonical choice key. The current provider mapping is fixed and one-to-one: `cloudflare-web-analytics` implements `aggregate-traffic-and-performance`, `google-analytics-4` implements `audience-measurement`, and `microsoft-clarity` implements `consented-experience-analysis`. Provider identifiers are disclosure and invalidation context, not visitor switches; project settings remain the provider-selection authority.
+
+The first-party key `egeria.analytics.consent.v2` stores one strict record:
+
+```ts
+type AnalyticsConsentPreferenceV2 = Readonly<{
+  version: 2;
+  noticeRevision: string;
+  decidedAt: string;
+  expiresAt: string;
+  configuredPurposes: readonly Readonly<{
+    purpose:
+      | "aggregate-traffic-and-performance"
+      | "audience-measurement"
+      | "consented-experience-analysis";
+    providerIdentifiers: readonly AnalyticsProviderIdentifier[];
+    decision: "granted" | "denied";
+  }>[];
+}>;
+```
+
+`decidedAt` and `expiresAt` are UTC instants, and expiry is exactly 180 days after the decision. Purpose entries and provider identifiers use deterministic lexical order. The record must contain exactly the configured purposes with one decision per purpose and the exact current provider-to-purpose context, with no duplicate, missing, extra, or unknown value. Its version, shape, notice revision, timestamps, configured purposes, and provider context are revalidated before any provider loads. A legacy, malformed, partial, expired, future-dated, notice-stale, or configuration-stale record grants nothing, and no legacy grant is promoted.
+
+The localized control defaults every purpose to denied, discloses the configured purposes, gives allow-all and deny-all equal prominence, supports purpose-specific decisions, stays persistently reopenable, and provides withdrawal. A current in-memory choice does not become durable unless the complete record persists successfully. A reduction is any formerly granted purpose becoming denied, absent, expired, or invalid; reductions take effect fail-closed in memory before bounded provider effects. A successful persisted reduction reloads: complete withdrawal or invalidation yields a provider-free document, while partial reduction can reload only the providers for purposes that remain granted. More-permissive persisted changes may load only newly granted current providers and retain the one-loader invariant.
+
+The browser storage event synchronizes a persisted change across other open tabs, which revalidate the whole record and apply the same expansion or reduction path. A storage failure leaves only a tab-local in-memory result and is not broadcast. If a stale grant cannot be removed or replaced, revocation remains `incomplete`: the tab stays fail-closed, does not report successful withdrawal, and does not automatically reload into that stale grant.
+
+Google denial updates `analytics_storage`, `ad_storage`, `ad_user_data`, and `ad_personalization` to `denied`. Clarity receives consent-v2 denial plus its documented cookie-erasure call. The runtime may expire known accessible `_ga`, `_ga_*`, `_clck`, and `_clsk` first-party cookies. Cloudflare Web Analytics documents no client revocation operation for its manual beacon. These bounded effects do not unload executed code, cancel every in-flight request, erase provider-held data, or replace the safe reload that omits denied providers.
+
+The stored record is a local technical preference, not an audit receipt, identity record, provider-erasure receipt, proof of informed consent, or legal-compliance artifact. It adds no dependency, backend, provider mutation, deployment, certification, compliance claim, or observability coupling.
+
+Provider contracts retain stable unique loader identifiers and the fixed non-advertising purposes above. Repeated grant and navigation insert each selected script at most once. GA4 advertising storage, user data, and personalization remain denied, and the integration emits no custom events or manual page-view stream. Clarity advertising storage remains denied. Provider-native page and navigation measurement supplies the selected analytics behavior. Search Console emits only Google verification metadata. Looker Studio emits no runtime code and records only the operator contract for a GA4 connector.
 
 The descriptor and generated provider declaration enumerate potential or selected external domains, Content Security Policy contributions, browser storage, cookies, data purposes and classes, provider-controlled retention, account/property/project resources, and privileged operator configuration. Cloudflare Web Analytics uses its manual beacon host and collection endpoint; GA4 uses only non-advertising Google tag and analytics endpoints; Clarity uses its documented tag, collection, and Bing support endpoints. Operator guidance states that provider accounts, verification state, reports, dashboards, retained provider data, and third-party cookies are outside repository lifecycle authority.
 
