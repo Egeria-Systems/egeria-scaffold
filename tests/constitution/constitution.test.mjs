@@ -1912,6 +1912,7 @@ const acceptedAdrs = [
   ["0009-accessibility-evidence-and-claims.md", "ADR-0009"],
   ["0010-analytics-and-observability.md", "ADR-0010"],
   ["0011-github-actions-deployment-authority.md", "ADR-0011"],
+  ["0012-purpose-based-analytics-consent.md", "ADR-0012"],
 ];
 
 function escapeRegularExpression(value) {
@@ -2394,7 +2395,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/i,
+    /descriptor admission[^\n]+pass[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending analytics subject/i,
   );
 });
 
@@ -2895,7 +2896,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/iu,
+    /descriptor admission[^\n]+pass[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending analytics subject/iu,
   );
   assert.match(
     enforcementMap,
@@ -3227,7 +3228,7 @@ test("canonical documentation accepts profile-transition execution and records t
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+exact Calendly and multilingual addition\/removal[^\n]+standards and site-routing upgrades[^\n]+portfolio-to-site transaction[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+Exact Calendly certification[^\n]+protected-staging\/provider journey[^\n]+Exact standards certification[^\n]+compiled upgrade\/refusal\/recovery[^\n]+renewed fresh-scaffold evidence[^\n]+generic lifecycle executor[^\n]+(?:another|any further) upgrade or profile-transition edge[^\n]+automated recovery/iu,
+    /Existing-repository mutation[^\n]+Calendly and multilingual addition\/removal[^\n]+standards and site-routing upgrades[^\n]+portfolio-to-site transition[^\n]+analytics addition\/removal[^\n]+current isolated candidate[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+Exact Calendly certification[^\n]+protected-staging\/provider journey[^\n]+Exact standards certification[^\n]+compiled upgrade\/refusal\/recovery[^\n]+renewed fresh-scaffold evidence[^\n]+generic lifecycle executor[^\n]+any further upgrade or profile-transition edge[^\n]+automated recovery/iu,
   );
   assert.match(
     overview,
@@ -3256,7 +3257,7 @@ test("canonical documentation accepts profile-transition execution and records t
   );
   assert.match(
     enforcementMap,
-    /INV-STATE-UPDATE-ORDER[^\n]+exact Calendly addition\/removal[^\n]+migration-before-state persistence[^\n]+final manifest\/state\/inference agreement/iu,
+    /INV-STATE-UPDATE-ORDER[^\n]+exact Calendly, multilingual, and analytics addition\/removal[^\n]+migration-before-state persistence[^\n]+final manifest\/state\/inference agreement/iu,
   );
   assert.match(
     capabilityModel,
@@ -3264,7 +3265,7 @@ test("canonical documentation accepts profile-transition execution and records t
   );
   assert.match(
     capabilityModel,
-    /Exact `apply-remove`[^\n]+accepted-main integrated/iu,
+    /Exact Calendly removal[^\n]+accepted-main integrated/iu,
   );
   assert.match(
     capabilityModel,
@@ -3272,7 +3273,7 @@ test("canonical documentation accepts profile-transition execution and records t
   );
   assert.match(
     enforcementMap,
-    /INV-STATE-UPDATE-ORDER[^\n]+actual[^\n]+exact Calendly addition\/removal/iu,
+    /INV-STATE-UPDATE-ORDER[^\n]+actual[^\n]+exact Calendly, multilingual, and analytics addition\/removal/iu,
   );
 
   assert.match(
@@ -3793,6 +3794,135 @@ test("execution plans enforce direct predecessors and bounded independent-work e
 
 });
 
+test("analytics implementation is independently selectable and serialized behind multilingual certification", async () => {
+  const [sourcePlan, roadmap, overview, capabilityModel, enforcementMap, packageOwnership] =
+    await Promise.all([
+      readRepositoryFile(
+        "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+      ),
+      readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+      readRepositoryFile("docs/architecture/overview.md"),
+      readRepositoryFile("docs/architecture/capability-model.md"),
+      readRepositoryFile("docs/architecture/enforcement-map.md"),
+      readRepositoryFile("docs/architecture/package-ownership.md"),
+    ]);
+  const owners = [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+    enforcementMap,
+    packageOwnership,
+  ];
+
+  for (const owner of owners) {
+    assert.match(owner, /analytics@0\.1\.0/iu);
+    assert.match(
+      owner,
+      /Cloudflare Web Analytics[^\n]+Google Analytics 4[^\n]+Microsoft Clarity|Cloudflare Web Analytics[^\n]+GA4[^\n]+Microsoft Clarity/iu,
+    );
+    assert.match(owner, /Search Console[^\n]+Looker Studio/iu);
+    assert.match(owner, /observability[^\n]+(?:independent|separate|no coupling)/iu);
+  }
+
+  for (const sequencingOwner of [sourcePlan, roadmap]) {
+    assert.match(
+      sequencingOwner,
+      /one-time 2026-08-27 analytics implementation-lane exception/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /multilingual certification[^.]+merge(?:s|d)? first[^.]+analytics[^.]+rebase/iu,
+    );
+    assert.match(
+      sequencingOwner,
+      /not precedent[^.]+no concurrent merge/iu,
+    );
+  }
+
+  assert.match(
+    capabilityModel,
+    /explicit-opt-in[\s\S]{0,800}deny-by-default[\s\S]{0,800}withdrawal/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /provider identifiers[^.]+public[^.]+not secrets/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /provider accounts[^.]+retained provider data[^.]+outside repository lifecycle authority/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-ANALYTICS-CONSENT[^\n]+actual/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /INV-ANALYTICS-PROVIDER-BOUNDARY[^\n]+actual/iu,
+  );
+  assert.match(
+    packageOwnership,
+    /no public package[^.]+no generic lifecycle executor/iu,
+  );
+  assert.match(
+    overview,
+    /pending[^.]+analytics certification[^.]+separate successor/iu,
+  );
+
+  for (const boundaryOwner of [sourcePlan, roadmap, overview, capabilityModel]) {
+    assert.match(
+      boundaryOwner,
+      /no provider (?:provisioning|mutation)[^.]+no deployment[^.]+no legal-compliance claim/iu,
+    );
+  }
+});
+
+test("purpose-based analytics consent is canonical and fail-closed", async () => {
+  const [adr, capabilityModel, enforcementMap] = await Promise.all([
+    readRepositoryFile("docs/adr/0012-purpose-based-analytics-consent.md"),
+    readRepositoryFile("docs/architecture/capability-model.md"),
+    readRepositoryFile("docs/architecture/enforcement-map.md"),
+  ]);
+
+  assert.match(adr, /Status:\*\* Accepted/u);
+  assert.match(capabilityModel, /purpose[^\n]+canonical choice/iu);
+  assert.match(
+    capabilityModel,
+    /type AnalyticsConsentRecordV2 = Readonly<\{\n  schemaVersion: 2;\n  noticeVersion: 1;\n  decidedAt: string;\n  expiresAt: string;\n  providerPurposeContext: readonly AnalyticsConsentContextEntry\[\];\n  purposes: readonly AnalyticsPurposeDecision\[\];\n\}>;/u,
+  );
+  assert.match(capabilityModel, /180 days/iu);
+  assert.match(capabilityModel, /configured purposes/iu);
+  assert.match(capabilityModel, /local technical preference/iu);
+  assert.match(
+    capabilityModel,
+    /stale grant[^\n]+revocation[^\n]+incomplete/iu,
+  );
+  assert.match(capabilityModel, /storage event[^\n]+open tabs/iu);
+  const consentEnforcementRow = enforcementMap
+    .split("\n")
+    .find((row) => row.startsWith("| `INV-ANALYTICS-CONSENT` |"));
+  assert.ok(consentEnforcementRow);
+  const consentEnforcementColumns = consentEnforcementRow
+    .split("|")
+    .slice(1, -1)
+    .map((column) => column.trim());
+  assert.match(consentEnforcementColumns[1], /versioned[^\n]+purpose/iu);
+  assert.match(
+    consentEnforcementColumns[2],
+    /^actual for the version-2 consent record/iu,
+  );
+  assert.doesNotMatch(consentEnforcementColumns[2], /\bplanned\b/iu);
+  for (const evidenceOwner of [
+    /builder contract[^;]+rendering[^;]+lifecycle tests/iu,
+    /generated Vitest unit[^;]+component specifications/iu,
+    /site-multilingual-analytics[^;]+Playwright specification/iu,
+    /fixture determinism/iu,
+    /verify:generated-skeletons/iu,
+  ]) {
+    assert.match(consentEnforcementColumns[3], evidenceOwner);
+  }
+});
+
 test("accepted ADRs use the repository decision contract", async () => {
   const index = await readRepositoryFile("docs/adr/README.md");
   const rowPositions = [];
@@ -3877,6 +4007,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
       "fixtures/generated/portfolio-calendly",
       "fixtures/generated/site",
       "fixtures/generated/site-multilingual",
+      "fixtures/generated/site-multilingual-analytics",
     ].map((path) => access(resolve(repositoryRoot, path))),
   );
 
@@ -3888,22 +4019,25 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     readme,
     /builder kernel has received verified-final-diff approval.*committed golden fixtures.*client-ready portfolio stage is completed through an unnumbered closure amendment/iu,
   );
-  assert.match(readme, /retained `portfolio-calendly` and `site-multilingual` fixtures/iu);
+  assert.match(
+    readme,
+    /retained `portfolio-calendly`, `site-multilingual`, and `site-multilingual-analytics` fixtures/iu,
+  );
   assert.match(
     capabilityModel,
-    /eight `portfolio`\/`site` descriptors.*executable.*multilingual@0\.1\.0.*eighth executable descriptor/isu,
+    /nine `portfolio`\/`site` descriptors.*executable.*analytics@0\.1\.0.*ninth executable descriptor/isu,
   );
   assert.match(
     packageOwnership,
-    /eight capability descriptors/iu,
+    /nine capability descriptors/iu,
   );
   assert.match(
     builderCoreReadme,
-    /exact eight executable capability descriptors/iu,
+    /exact nine executable capability descriptors/iu,
   );
   assert.match(
     cliReadme,
-    /paired `--calendly-url` and `--calendly-mode`/iu,
+    /paired `--calendly-url` and `--calendly-mode`.*strict analytics options/isu,
   );
   assert.match(
     roadmap,

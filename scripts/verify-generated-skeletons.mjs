@@ -135,6 +135,24 @@ const multilingualFiles = Object.freeze([
   "apps/web/tests/unit/localized-content.test.ts",
 ].sort(codePointCompare));
 
+const analyticsFiles = Object.freeze([
+  "apps/web/content/en-CA/analytics.yaml",
+  "apps/web/content/fr-CA/analytics.yaml",
+  "apps/web/src/integrations/analytics/analytics-consent-state.ts",
+  "apps/web/src/integrations/analytics/analytics-consent.tsx",
+  "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
+  "apps/web/src/integrations/analytics/analytics-content.ts",
+  "apps/web/src/integrations/analytics/analytics-provider-contract.ts",
+  "apps/web/src/integrations/analytics/analytics-runtime.ts",
+  "apps/web/src/integrations/analytics/analytics-settings.ts",
+  "apps/web/tests/component/analytics-consent.test.tsx",
+  "apps/web/tests/e2e/analytics-consent.spec.ts",
+  "apps/web/tests/unit/analytics-consent-state.test.ts",
+  "apps/web/tests/unit/analytics-provider-contract.test.ts",
+  "apps/web/tests/unit/analytics-runtime.test.ts",
+  "docs/analytics.md",
+].sort(codePointCompare));
+
 const multilingualErrorProofRoute = `"use client";
 
 export default function ErrorBoundaryProof() {
@@ -201,6 +219,7 @@ const createArguments = ({
   profile,
   projectName,
   displayName,
+  analytics,
   bookingCalendly,
   multilingual,
 }) =>
@@ -220,6 +239,22 @@ const createArguments = ({
           bookingCalendly.mode,
         ]),
     ...(multilingual === true ? ["--multilingual"] : []),
+    ...(analytics === undefined
+      ? []
+      : [
+          "--cloudflare-web-analytics-token",
+          analytics.providers.cloudflareWebAnalytics.siteToken,
+          "--google-analytics-id",
+          analytics.providers.googleAnalytics4.measurementId,
+          "--microsoft-clarity-id",
+          analytics.providers.microsoftClarity.projectId,
+          "--microsoft-clarity-audience",
+          analytics.providers.microsoftClarity.audience,
+          "--search-console-verification",
+          analytics.operationalIntegrations.googleSearchConsole
+            .verificationToken,
+          "--looker-studio",
+        ]),
   ]);
 
 const noCapabilitySettings = Object.freeze({});
@@ -227,6 +262,27 @@ const portfolioCalendlySettings = Object.freeze({
   "booking-calendly": Object.freeze({
     destination: "https://calendly.com/example/intro",
     mode: "popup",
+  }),
+});
+const siteAnalyticsSettings = Object.freeze({
+  analytics: Object.freeze({
+    consent: Object.freeze({ policy: "explicit-opt-in" }),
+    providers: Object.freeze({
+      cloudflareWebAnalytics: Object.freeze({
+        siteToken: "0123456789abcdef0123456789abcdef",
+      }),
+      googleAnalytics4: Object.freeze({ measurementId: "G-ABCDEF1234" }),
+      microsoftClarity: Object.freeze({
+        projectId: "clarity123",
+        audience: "not-directed-to-minors",
+      }),
+    }),
+    operationalIntegrations: Object.freeze({
+      googleSearchConsole: Object.freeze({
+        verificationToken: "search-console-verification-token",
+      }),
+      lookerStudio: Object.freeze({ connector: "google-analytics-4" }),
+    }),
   }),
 });
 
@@ -259,6 +315,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: null,
+    expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
     expectedSurfaces: 106,
     visualRegression: true,
@@ -298,6 +355,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: "0.1.0",
+    expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
     expectedSurfaces: 111,
     visualRegression: true,
@@ -350,6 +408,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: "0.4.0",
     expectedBookingCalendlyVersion: null,
+    expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
     expectedSurfaces: 123,
     visualRegression: true,
@@ -405,8 +464,68 @@ export const generatedFixtureContracts = Object.freeze([
     expectedDeploymentCloudflareVersion: "0.3.0",
     expectedSiteRoutingVersion: "0.4.0",
     expectedBookingCalendlyVersion: null,
+    expectedAnalyticsVersion: null,
     expectedMultilingualVersion: "0.1.0",
     expectedSurfaces: 139,
+    visualRegression: false,
+  }),
+  Object.freeze({
+    identifier: "site-multilingual-analytics",
+    profile: "site",
+    projectName: "acme-site-multilingual-analytics",
+    displayName: "Acme Site Multilingual Analytics",
+    createArguments: createArguments({
+      profile: "site",
+      projectName: "acme-site-multilingual-analytics",
+      displayName: "Acme Site Multilingual Analytics",
+      analytics: siteAnalyticsSettings.analytics,
+      multilingual: true,
+    }),
+    expectedCapabilitySettings: siteAnalyticsSettings,
+    relativeRoot: "fixtures/generated/site-multilingual-analytics",
+    expectedFiles: Object.freeze([
+      ...portfolioFiles,
+      "apps/web/app/about/page.tsx",
+      "apps/web/app/not-found.tsx",
+      "apps/web/app/robots.ts",
+      "apps/web/app/sitemap.ts",
+      "apps/web/app/work/error.tsx",
+      "apps/web/app/work/featured/page.tsx",
+      "apps/web/app/work/page.tsx",
+      "apps/web/content/en-CA/about.yaml",
+      "apps/web/content/en-CA/not-found.yaml",
+      "apps/web/content/en-CA/routing.yaml",
+      "apps/web/content/en-CA/work-featured.yaml",
+      "apps/web/src/routing/read-routing-content.ts",
+      "apps/web/src/routing/routing-content-schema.ts",
+      "apps/web/src/routing/site-page.tsx",
+      "apps/web/tests/component/site-page.test.tsx",
+      "apps/web/tests/e2e/site-routing.spec.ts",
+      "apps/web/tests/unit/routing-content.test.ts",
+      ...multilingualFiles,
+      ...analyticsFiles,
+    ].sort(codePointCompare)),
+    expectedCapabilities: Object.freeze([
+      "standards",
+      "content-files",
+      "section-composition",
+      "deployment-cloudflare",
+      "observability",
+      "site-routing",
+      "analytics",
+      "multilingual",
+    ]),
+    expectedRecipeVersion: "0.11.0",
+    expectedStandardsVersion: "0.4.0",
+    expectedObservabilityVersion: "0.3.0",
+    expectedContentFilesVersion: "0.4.0",
+    expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.3.0",
+    expectedSiteRoutingVersion: "0.4.0",
+    expectedBookingCalendlyVersion: null,
+    expectedAnalyticsVersion: "0.1.0",
+    expectedMultilingualVersion: "0.1.0",
+    expectedSurfaces: 154,
     visualRegression: false,
   }),
 ]);

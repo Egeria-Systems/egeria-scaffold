@@ -1,0 +1,36 @@
+builderCompatibility: 0.0.0
+capabilitySettings:
+  analytics:
+    consent:
+      policy: explicit-opt-in
+    operationalIntegrations:
+      googleSearchConsole:
+        verificationToken: search-console-verification-token
+      lookerStudio:
+        connector: google-analytics-4
+    providers:
+      cloudflareWebAnalytics:
+        siteToken: 0123456789abcdef0123456789abcdef
+      googleAnalytics4:
+        measurementId: G-ABCDEF1234
+      microsoftClarity:
+        audience: not-directed-to-minors
+        projectId: clarity123
+ejectedAreas: []
+originProfile: site
+platformAdapter: cloudflare-workers
+project:
+  defaultLocale: en-CA
+  displayName: Acme Site Multilingual Analytics
+  name: acme-site-multilingual-analytics
+recipeVersion: 0.11.0
+schemaVersion: 1.0.0
+selectedCapabilities:
+  - standards
+  - content-files
+  - section-composition
+  - deployment-cloudflare
+  - observability
+  - site-routing
+  - analytics
+  - multilingual

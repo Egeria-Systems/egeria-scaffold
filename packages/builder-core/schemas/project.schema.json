@@ -23,6 +23,121 @@
     "capabilitySettings": {
       "additionalProperties": false,
       "properties": {
+        "analytics": {
+          "additionalProperties": false,
+          "properties": {
+            "consent": {
+              "additionalProperties": false,
+              "properties": {
+                "policy": {
+                  "const": "explicit-opt-in",
+                  "type": "string"
+                }
+              },
+              "readOnly": true,
+              "required": [
+                "policy"
+              ],
+              "type": "object"
+            },
+            "operationalIntegrations": {
+              "additionalProperties": false,
+              "properties": {
+                "googleSearchConsole": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "verificationToken": {
+                      "pattern": "^[A-Za-z0-9_-]{16,128}$",
+                      "type": "string"
+                    }
+                  },
+                  "readOnly": true,
+                  "required": [
+                    "verificationToken"
+                  ],
+                  "type": "object"
+                },
+                "lookerStudio": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "connector": {
+                      "const": "google-analytics-4",
+                      "type": "string"
+                    }
+                  },
+                  "readOnly": true,
+                  "required": [
+                    "connector"
+                  ],
+                  "type": "object"
+                }
+              },
+              "readOnly": true,
+              "type": "object"
+            },
+            "providers": {
+              "additionalProperties": false,
+              "properties": {
+                "cloudflareWebAnalytics": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "siteToken": {
+                      "pattern": "^[A-Fa-f0-9]{32}$",
+                      "type": "string"
+                    }
+                  },
+                  "readOnly": true,
+                  "required": [
+                    "siteToken"
+                  ],
+                  "type": "object"
+                },
+                "googleAnalytics4": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "measurementId": {
+                      "pattern": "^G-[A-Z0-9]{6,20}$",
+                      "type": "string"
+                    }
+                  },
+                  "readOnly": true,
+                  "required": [
+                    "measurementId"
+                  ],
+                  "type": "object"
+                },
+                "microsoftClarity": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "audience": {
+                      "const": "not-directed-to-minors",
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "pattern": "^[a-z0-9]{8,32}$",
+                      "type": "string"
+                    }
+                  },
+                  "readOnly": true,
+                  "required": [
+                    "projectId",
+                    "audience"
+                  ],
+                  "type": "object"
+                }
+              },
+              "readOnly": true,
+              "type": "object"
+            }
+          },
+          "readOnly": true,
+          "required": [
+            "consent",
+            "providers",
+            "operationalIntegrations"
+          ],
+          "type": "object"
+        },
         "booking-calendly": {
           "additionalProperties": false,
           "properties": {

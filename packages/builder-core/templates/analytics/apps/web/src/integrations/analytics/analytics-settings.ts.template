@@ -1,0 +1,3 @@
+import type { AnalyticsSettings } from "./analytics-provider-contract";
+
+export const analyticsSettings = {{analyticsSettingsJson}} as const satisfies AnalyticsSettings;

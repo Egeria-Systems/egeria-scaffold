@@ -21,6 +21,8 @@ import type {
   ValidationResult,
 } from "../contracts/result.js";
 import {
+  analyticsSettingsSchema,
+  type AnalyticsSettings,
   calendlyBookingSettingsSchema,
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
@@ -73,25 +75,15 @@ type Destination = Readonly<{
 }>;
 
 const encoder = new TextEncoder();
-const exactRequestKeys = [
-  "displayName",
-  "profile",
-  "projectName",
-] as const;
-const exactCalendlyRequestKeys = [
+const requiredRequestKeys = ["displayName", "profile", "projectName"] as const;
+const allowedRequestKeys = new Set([
+  "analytics",
   "bookingCalendly",
-  ...exactRequestKeys,
-] as const;
-const exactMultilingualRequestKeys = [
   "displayName",
   "multilingual",
   "profile",
   "projectName",
-] as const;
-const exactCalendlyMultilingualRequestKeys = [
-  "bookingCalendly",
-  ...exactMultilingualRequestKeys,
-] as const;
+]);
 function issue(
   code: string,
   path: readonly (string | number)[] = [],
@@ -132,24 +124,31 @@ function validateRequest(
   }
 
   const keys = Object.keys(value).sort();
+  const includesAnalytics = Object.hasOwn(value, "analytics");
   const includesCalendly = Object.hasOwn(value, "bookingCalendly");
   const includesMultilingual = Object.hasOwn(value, "multilingual");
-  const expectedKeys = includesCalendly
-    ? includesMultilingual
-      ? exactCalendlyMultilingualRequestKeys
-      : exactCalendlyRequestKeys
-    : includesMultilingual
-      ? exactMultilingualRequestKeys
-      : exactRequestKeys;
   if (
-    keys.length !== expectedKeys.length ||
-    keys.some((key, index) => key !== expectedKeys[index])
+    requiredRequestKeys.some((key) => !Object.hasOwn(value, key)) ||
+    keys.some((key) => !allowedRequestKeys.has(key))
   ) {
     return issue(
       "PROJECT_GENERATION_REQUEST_INVALID",
       ["request"],
       "invalid-keys",
     );
+  }
+
+  let analytics: AnalyticsSettings | undefined;
+  if (includesAnalytics) {
+    const parsed = analyticsSettingsSchema.safeParse(value.analytics);
+    if (!parsed.success) {
+      return issue(
+        "PROJECT_GENERATION_REQUEST_INVALID",
+        ["request", "analytics"],
+        "invalid-settings",
+      );
+    }
+    analytics = parsed.data;
   }
 
   let bookingCalendly: CalendlyBookingSettings | undefined;
@@ -181,6 +180,7 @@ function validateRequest(
       profile: value.profile as ProjectGenerationRequest["profile"],
       projectName: value.projectName as string,
       displayName: value.displayName as string,
+      ...(analytics === undefined ? {} : { analytics }),
       ...(bookingCalendly === undefined ? {} : { bookingCalendly }),
       ...(includesMultilingual ? { multilingual: true } : {}),
     },

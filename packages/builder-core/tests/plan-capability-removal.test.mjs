@@ -18,6 +18,25 @@ const settings = Object.freeze({
   destination: "https://calendly.com/private/discovery",
   mode: "popup",
 });
+const analyticsSettings = Object.freeze({
+  consent: { policy: "explicit-opt-in" },
+  providers: {
+    cloudflareWebAnalytics: {
+      siteToken: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    googleAnalytics4: { measurementId: "G-TEST123456" },
+    microsoftClarity: {
+      projectId: "clarity123",
+      audience: "not-directed-to-minors",
+    },
+  },
+  operationalIntegrations: {
+    googleSearchConsole: {
+      verificationToken: "search-console-verification-token",
+    },
+    lookerStudio: { connector: "google-analytics-4" },
+  },
+});
 const git = Object.freeze({
   ok: true,
   identity: Object.freeze({
@@ -76,6 +95,7 @@ async function installedEntries(profile, options = {}) {
     packageVersions: core.verifiedCapabilityPackageVersions,
     ...(bookingSettings === undefined ? {} : { bookingCalendly: bookingSettings }),
     ...(options.multilingual === true ? { multilingual: true } : {}),
+    ...(options.analytics === undefined ? {} : { analytics: options.analytics }),
   });
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
 
@@ -300,6 +320,69 @@ const expectedCurrentCapabilities = Object.freeze({
     "site-routing",
     "standards",
   ]),
+});
+
+test("analytics removal restores the composed layout and requires provider disposition review", async () => {
+  for (const multilingual of [false, true]) {
+    const entries = await installedEntries("site", {
+      bookingSettings: undefined,
+      analytics: analyticsSettings,
+      ...(multilingual ? { multilingual: true } : {}),
+    });
+    const result = await planFromEntries(entries, { capability: "analytics" });
+    assert.equal(result.ok, true, JSON.stringify(result.issues));
+    assert.deepEqual(result.value.capability, {
+      identifier: "analytics",
+      version: "0.1.0",
+    });
+    assert.equal(result.value.desiredCapabilities.includes("analytics"), false);
+    assert.equal(
+      result.value.desiredCapabilities.includes("multilingual"),
+      multilingual,
+    );
+    assert.deepEqual(
+      result.value.actions
+        .filter(({ kind }) => kind === "delete-file")
+        .map(({ path }) => path),
+      [
+        "apps/web/content/en-CA/analytics.yaml",
+        "apps/web/content/fr-CA/analytics.yaml",
+        "apps/web/src/integrations/analytics/analytics-consent-state.ts",
+        "apps/web/src/integrations/analytics/analytics-consent.tsx",
+        "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
+        "apps/web/src/integrations/analytics/analytics-content.ts",
+        "apps/web/src/integrations/analytics/analytics-provider-contract.ts",
+        "apps/web/src/integrations/analytics/analytics-runtime.ts",
+        "apps/web/src/integrations/analytics/analytics-settings.ts",
+        "apps/web/tests/component/analytics-consent.test.tsx",
+        "apps/web/tests/e2e/analytics-consent.spec.ts",
+        "apps/web/tests/unit/analytics-consent-state.test.ts",
+        "apps/web/tests/unit/analytics-provider-contract.test.ts",
+        "apps/web/tests/unit/analytics-runtime.test.ts",
+        "docs/analytics.md",
+      ],
+    );
+    assert.deepEqual(
+      result.value.actions
+        .filter(({ kind }) => kind === "replace-file")
+        .map(({ path }) => path),
+      ["apps/web/app/layout.tsx"],
+    );
+    assert.deepEqual(result.value.reviewRequirements, [
+      {
+        code: "review-surviving-references-to-removed-surfaces",
+        scope: "repository",
+      },
+      {
+        code: "review-analytics-provider-and-client-storage-disposition",
+        scope: "provider-accounts-retained-data-browser-storage-and-cookies",
+      },
+    ]);
+    assert.doesNotMatch(
+      JSON.stringify(result.value),
+      /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|G-TEST123456|clarity123|search-console-verification-token/u,
+    );
+  }
 });
 
 function updateEjections(entries, paths) {

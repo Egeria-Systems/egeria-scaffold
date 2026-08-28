@@ -1302,6 +1302,158 @@ test("the catalog declares the exact multilingual capability contract", () => {
   });
 });
 
+test("the catalog declares the exact analytics capability contract without observability coupling", () => {
+  const analytics = createCatalog().find(
+    ({ identifier }) => identifier === "analytics",
+  );
+
+  assert.notEqual(analytics, undefined);
+  assert.equal(analytics.version, "0.1.0");
+  assert.equal(analytics.deliveryMode, "hybrid");
+  assert.deepEqual(analytics.stateClassifications, [
+    "repository-stateful",
+    "external-stateful",
+  ]);
+  assert.equal(analytics.removalPolicy, "reviewed");
+  assert.deepEqual(analytics.dependencies, ["content-files", "section-composition"]);
+  assert.deepEqual(analytics.optionalIntegrations, ["multilingual", "site-routing"]);
+  assert.equal(analytics.dependencies.includes("observability"), false);
+  assert.deepEqual(analytics.supportedProfiles, ["portfolio", "site"]);
+  assert.deepEqual(analytics.requiredPackages, []);
+  assert.deepEqual(analytics.environmentVariables, []);
+  assert.deepEqual(analytics.secrets, []);
+  assert.deepEqual(analytics.platformResources, [
+    "cloudflare-web-analytics-site",
+    "google-analytics-4-property-and-web-stream",
+    "google-search-console-property",
+    "looker-studio-report",
+    "microsoft-clarity-project",
+  ]);
+  assert.deepEqual(analytics.externalDomains, [
+    "*.analytics.google.com",
+    "*.clarity.ms",
+    "*.google-analytics.com",
+    "c.bing.com",
+    "cloudflareinsights.com",
+    "static.cloudflareinsights.com",
+    "www.clarity.ms",
+    "www.googletagmanager.com",
+  ]);
+  assert.deepEqual(analytics.contentSecurityPolicyContributions, [
+    "script-src https://static.cloudflareinsights.com https://www.googletagmanager.com https://www.clarity.ms https://*.clarity.ms",
+    "img-src https://*.google-analytics.com https://www.googletagmanager.com",
+    "connect-src https://cloudflareinsights.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://www.clarity.ms https://*.clarity.ms https://c.bing.com",
+  ]);
+  assert.doesNotMatch(
+    [
+      ...analytics.externalDomains,
+      ...analytics.contentSecurityPolicyContributions,
+    ].join(" "),
+    /doubleclick\.net|googleadservices\.com|googlesyndication\.com|(?:^|\s|\/\/)\*\.google\.com/u,
+  );
+  assert.deepEqual(analytics.browserStorage, [
+    "functional-consent-local-storage",
+    "cloudflare-web-analytics-cookie-free",
+    "google-analytics-first-party-cookies-_ga-and-_ga_<container-id>",
+    "microsoft-clarity-first-party-cookies-_clck-and-_clsk",
+    "provider-controlled-third-party-storage",
+  ]);
+  assert.deepEqual(analytics.dataClassifications, [
+    "aggregate-traffic-and-performance-data",
+    "audience-measurement-data",
+    "consented-experience-and-interaction-data",
+    "google-analytics-session-statistics",
+    "google-analytics-approximate-geolocation",
+    "google-analytics-pseudonymous-client-and-session-identifiers",
+    "microsoft-clarity-session-replay-dom-mutations-content-and-layout",
+    "microsoft-clarity-diagnostics-and-performance",
+    "microsoft-clarity-page-metadata-and-dimensions",
+    "microsoft-clarity-pseudonymous-envelope-user-and-session-identifiers",
+    "public-provider-identifiers",
+  ]);
+  assert.doesNotMatch(
+    analytics.dataClassifications.join(" "),
+    /advertis|ad-personalization/iu,
+  );
+  assert.deepEqual(analytics.retentionAssumptions, [
+    "cloudflare-provider-controlled-retention",
+    "google-provider-controlled-retention",
+    "microsoft-provider-controlled-retention",
+  ]);
+  assert.deepEqual(analytics.privilegedOperations, [
+    "provider-account-and-property-configuration",
+    "provider-data-access-and-deletion",
+    "provider-resource-removal",
+  ]);
+  assert.equal(analytics.threatReviewLevel, "elevated");
+  assert.deepEqual(analytics.adapterSemanticRequirements, [
+    "deny-provider-load-before-explicit-grant",
+    "deduplicate-provider-loaders-and-navigation-measurement",
+    "emit-search-console-verification-metadata-only",
+    "keep-advertising-signals-denied",
+    "withdraw-consent-clear-accessible-cookies-and-reload",
+  ]);
+  assert.deepEqual(
+    analytics.managedSurfaces.map(({ identifier, path, ownership }) => [
+      identifier,
+      path,
+      ownership,
+    ]),
+    [
+      ["analytics-settings", "apps/web/src/integrations/analytics/analytics-settings.ts", "managed"],
+      ["analytics-provider-contract", "apps/web/src/integrations/analytics/analytics-provider-contract.ts", "managed"],
+      ["analytics-consent-state", "apps/web/src/integrations/analytics/analytics-consent-state.ts", "managed"],
+      ["analytics-runtime", "apps/web/src/integrations/analytics/analytics-runtime.ts", "managed"],
+      [
+        "analytics-content-source-contract",
+        "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
+        "managed",
+      ],
+      ["analytics-content-reader", "apps/web/src/integrations/analytics/analytics-content.ts", "managed"],
+      ["analytics-consent-control", "apps/web/src/integrations/analytics/analytics-consent.tsx", "managed"],
+      ["analytics-default-locale-content", "apps/web/content/en-CA/analytics.yaml", "application-owned"],
+      ["analytics-french-locale-content", "apps/web/content/fr-CA/analytics.yaml", "application-owned"],
+      ["analytics-operator-guide", "docs/analytics.md", "application-owned"],
+      ["analytics-provider-contract-specification", "apps/web/tests/unit/analytics-provider-contract.test.ts", "managed"],
+      ["analytics-consent-state-specification", "apps/web/tests/unit/analytics-consent-state.test.ts", "managed"],
+      ["analytics-runtime-specification", "apps/web/tests/unit/analytics-runtime.test.ts", "managed"],
+      ["analytics-consent-component-specification", "apps/web/tests/component/analytics-consent.test.tsx", "managed"],
+      ["analytics-browser-specification", "apps/web/tests/e2e/analytics-consent.spec.ts", "managed"],
+    ],
+  );
+  assert.deepEqual(
+    analytics.inferenceProbes,
+    analytics.managedSurfaces.map(({ path }) => ({ kind: "file", path })),
+  );
+  assert.deepEqual(analytics.migrationPlanners, [
+    "add-analytics-0-1-0",
+    "remove-analytics-0-1-0",
+  ]);
+  assert.deepEqual(analytics.verificationPlan, [
+    "settings-contracts",
+    "provider-contracts",
+    "content-contracts",
+    "component-tests",
+    "typecheck",
+    "next-build",
+    "opennext-build",
+    "browser-development",
+    "browser-preview",
+  ]);
+  assert.deepEqual(analytics.documentationEvidenceRequirements, [
+    "consent-purpose-and-withdrawal-contract",
+    "provider-domain-csp-storage-cookie-data-and-retention-boundary",
+    "provider-account-and-retained-data-lifecycle-boundary",
+    "provider-identifiers-are-public-not-secrets",
+  ]);
+  assert.deepEqual(analytics.removalAndRecoveryRequirements, [
+    "review-application-owned-copy-and-operator-guide-preservation",
+    "review-provider-account-retained-data-storage-and-cookie-disposition",
+    "restore-non-analytics-layout-and-remove-unchanged-owned-surfaces",
+    "verify-closed-analytics-and-multilingual-lifecycle",
+  ]);
+});
+
 test("capability package versions must be exact stable releases and issues do not echo inputs", () => {
   for (const invalidVersion of [
     "workspace:*",
@@ -1352,7 +1504,7 @@ test("the verified generation catalog pins exact public package releases", () =>
   assert.equal(core.verifiedCapabilityPackageVersions.standards, "0.1.0");
 
   const catalog = assertOk(core.createVerifiedCapabilityCatalog());
-  assert.equal(catalog.length, 8);
+  assert.equal(catalog.length, 9);
   assert.deepEqual(
     catalog.map(({ identifier }) => identifier),
     [
@@ -1364,6 +1516,7 @@ test("the verified generation catalog pins exact public package releases", () =>
       "site-routing",
       "booking-calendly",
       "multilingual",
+      "analytics",
     ],
   );
 
@@ -1657,7 +1810,6 @@ test("resolution rejects unknown profiles and capability identifiers without imp
     "transactional-email-resend",
     "background-job-delivery",
     "durable-contact-submissions",
-    "analytics",
     "cms-payload",
     "identity-core",
     "identity-google",

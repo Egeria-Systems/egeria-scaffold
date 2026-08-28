@@ -115,6 +115,11 @@ test("fixture inspection accepts only the exact portable generated trees", async
         profile: "site",
         relativeRoot: "fixtures/generated/site-multilingual",
       },
+      {
+        identifier: "site-multilingual-analytics",
+        profile: "site",
+        relativeRoot: "fixtures/generated/site-multilingual-analytics",
+      },
     ],
   );
 
@@ -137,7 +142,14 @@ test("fixture inspection accepts only the exact portable generated trees", async
     );
     assert.equal(
       contract.expectedMultilingualVersion,
-      contract.identifier === "site-multilingual" ? "0.1.0" : null,
+      contract.identifier === "site-multilingual" ||
+        contract.identifier === "site-multilingual-analytics"
+        ? "0.1.0"
+        : null,
+    );
+    assert.equal(
+      contract.expectedAnalyticsVersion,
+      contract.identifier === "site-multilingual-analytics" ? "0.1.0" : null,
     );
     assert.equal(
       contract.expectedSurfaces,
@@ -147,11 +159,16 @@ test("fixture inspection accepts only the exact portable generated trees", async
           ? 106
           : contract.identifier === "site"
             ? 123
-            : 139,
+            : contract.identifier === "site-multilingual"
+              ? 139
+              : 154,
     );
     assert.equal(
       contract.visualRegression,
-      contract.identifier !== "site-multilingual",
+      ![
+        "site-multilingual",
+        "site-multilingual-analytics",
+      ].includes(contract.identifier),
     );
     const snapshot = await inspectGeneratedFixture(
       resolve(repositoryRoot, contract.relativeRoot),
@@ -176,9 +193,13 @@ test("fixture inspection accepts only the exact portable generated trees", async
   const multilingualSite = generatedFixtureContracts.find(
     ({ identifier }) => identifier === "site-multilingual",
   );
+  const analyticsSite = generatedFixtureContracts.find(
+    ({ identifier }) => identifier === "site-multilingual-analytics",
+  );
   assert.equal(basePortfolio.expectedFiles.length, 57);
   assert.equal(site.expectedFiles.length, 74);
   assert.equal(multilingualSite.expectedFiles.length, 90);
+  assert.equal(analyticsSite.expectedFiles.length, 105);
   assert.equal(
     calendlyPortfolio.expectedFiles.length,
     57 - 1 + 6,
@@ -229,6 +250,40 @@ test("fixture inspection accepts only the exact portable generated trees", async
     "site-routing",
     "multilingual",
   ]);
+  assert.deepEqual(analyticsSite.createArguments, [
+    "--profile",
+    "site",
+    "--name",
+    "acme-site-multilingual-analytics",
+    "--display-name",
+    "Acme Site Multilingual Analytics",
+    "--multilingual",
+    "--cloudflare-web-analytics-token",
+    "0123456789abcdef0123456789abcdef",
+    "--google-analytics-id",
+    "G-ABCDEF1234",
+    "--microsoft-clarity-id",
+    "clarity123",
+    "--microsoft-clarity-audience",
+    "not-directed-to-minors",
+    "--search-console-verification",
+    "search-console-verification-token",
+    "--looker-studio",
+  ]);
+  assert.equal(
+    analyticsSite.expectedCapabilitySettings.analytics.consent.policy,
+    "explicit-opt-in",
+  );
+  assert.deepEqual(analyticsSite.expectedCapabilities, [
+    "standards",
+    "content-files",
+    "section-composition",
+    "deployment-cloudflare",
+    "observability",
+    "site-routing",
+    "analytics",
+    "multilingual",
+  ]);
   assert.deepEqual(
     multilingualSite.expectedFiles.filter(
       (path) => !site.expectedFiles.includes(path),
@@ -250,6 +305,28 @@ test("fixture inspection accepts only the exact portable generated trees", async
       "apps/web/tests/e2e/multilingual-routing.spec.ts",
       "apps/web/tests/unit/locale.test.ts",
       "apps/web/tests/unit/localized-content.test.ts",
+    ],
+  );
+  assert.deepEqual(
+    analyticsSite.expectedFiles.filter(
+      (path) => !multilingualSite.expectedFiles.includes(path),
+    ),
+    [
+      "apps/web/content/en-CA/analytics.yaml",
+      "apps/web/content/fr-CA/analytics.yaml",
+      "apps/web/src/integrations/analytics/analytics-consent-state.ts",
+      "apps/web/src/integrations/analytics/analytics-consent.tsx",
+      "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
+      "apps/web/src/integrations/analytics/analytics-content.ts",
+      "apps/web/src/integrations/analytics/analytics-provider-contract.ts",
+      "apps/web/src/integrations/analytics/analytics-runtime.ts",
+      "apps/web/src/integrations/analytics/analytics-settings.ts",
+      "apps/web/tests/component/analytics-consent.test.tsx",
+      "apps/web/tests/e2e/analytics-consent.spec.ts",
+      "apps/web/tests/unit/analytics-consent-state.test.ts",
+      "apps/web/tests/unit/analytics-provider-contract.test.ts",
+      "apps/web/tests/unit/analytics-runtime.test.ts",
+      "docs/analytics.md",
     ],
   );
   assert.deepEqual(
@@ -292,6 +369,8 @@ test("generated fixture text and visual baseline attributes are explicit", async
     "fixtures/generated/site/package.json: eol: lf",
     "fixtures/generated/site-multilingual/package.json: text: set",
     "fixtures/generated/site-multilingual/package.json: eol: lf",
+    "fixtures/generated/site-multilingual-analytics/package.json: text: set",
+    "fixtures/generated/site-multilingual-analytics/package.json: eol: lf",
   ]);
 
   const baselineDirectory =
@@ -321,7 +400,7 @@ test("generated fixture text and visual baseline attributes are explicit", async
     { cwd: repositoryRoot, encoding: "utf8" },
   );
 
-  assert.equal(baselinePaths.length, 12);
+  assert.equal(baselinePaths.length, 14);
   assert.deepEqual(
     binaryAttributes.trimEnd().split("\n"),
     baselinePaths.flatMap((path) => [
@@ -1090,6 +1169,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         "portfolio-calendly",
         "site",
         "site-multilingual",
+        "site-multilingual-analytics",
       ],
       profiles: ["portfolio", "site"],
       checks: [
@@ -1131,7 +1211,10 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   const firstCommands = fixtureCommands.map(
     ([command]) => command,
   );
-  assert.equal(new Set(firstCommands.map(({ cwd }) => cwd)).size, 4);
+  assert.equal(
+    new Set(firstCommands.map(({ cwd }) => cwd)).size,
+    generatedFixtureContracts.length,
+  );
   for (const key of [
     "HOME",
     "USERPROFILE",
@@ -1144,13 +1227,13 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   ]) {
     assert.equal(
       new Set(firstCommands.map(({ environment }) => environment[key])).size,
-      4,
+      generatedFixtureContracts.length,
       `${key} must be isolated per fixture identifier`,
     );
   }
   assert.equal(
     new Set(fixtureCommands.map((entries) => entries[1].arguments.at(-1))).size,
-    4,
+    generatedFixtureContracts.length,
     "pnpm stores must be isolated per fixture identifier",
   );
 

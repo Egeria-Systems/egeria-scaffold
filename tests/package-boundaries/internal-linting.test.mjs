@@ -101,6 +101,21 @@ test("copy externalization covers canonical builder TSX templates", async () => 
     [
       {
         filePath:
+          "packages/builder-core/templates/analytics/apps/web/app/layout.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/analytics/apps/web/src/integrations/analytics/analytics-consent.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/analytics/multilingual/apps/web/app/layout.tsx",
+        messages: [],
+      },
+      {
+        filePath:
           "packages/builder-core/templates/booking-calendly/apps/web/app/page.tsx",
         messages: [],
       },

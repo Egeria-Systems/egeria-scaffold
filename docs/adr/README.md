@@ -19,3 +19,4 @@ If an ADR conflicts with implementation or another canonical document, identify 
 | [ADR-0009](0009-accessibility-evidence-and-claims.md) | Accessibility evidence and claims | Accepted | 2026-08-04 |
 | [ADR-0010](0010-analytics-and-observability.md) | Analytics and observability separation | Accepted | 2026-08-04 |
 | [ADR-0011](0011-github-actions-deployment-authority.md) | GitHub Actions deployment authority | Accepted | 2026-08-04 |
+| [ADR-0012](0012-purpose-based-analytics-consent.md) | Purpose-based analytics consent | Accepted | 2026-08-04 |

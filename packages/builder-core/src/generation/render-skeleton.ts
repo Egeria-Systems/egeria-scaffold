@@ -8,6 +8,7 @@ import {
 } from "../catalog/capability-catalog.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
+  type AnalyticsSettings,
   type CalendlyBookingSettings,
   projectConfigurationSchema,
   type ProjectConfiguration,
@@ -42,6 +43,7 @@ export type GenerationRequest = Readonly<{
   profile: "portfolio" | "site";
   projectName: string;
   displayName: string;
+  analytics?: AnalyticsSettings;
   bookingCalendly?: CalendlyBookingSettings;
   multilingual?: true;
   packageVersions: CapabilityPackageVersions;
@@ -100,10 +102,14 @@ function createProject(
     selectedCapabilities: resolved.capabilities.map(
       ({ identifier }) => identifier,
     ),
-    capabilitySettings:
-      request.bookingCalendly === undefined
+    capabilitySettings: {
+      ...(request.analytics === undefined
         ? {}
-        : { "booking-calendly": request.bookingCalendly },
+        : { analytics: request.analytics }),
+      ...(request.bookingCalendly === undefined
+        ? {}
+        : { "booking-calendly": request.bookingCalendly }),
+    },
     ejectedAreas: [],
   });
 }
@@ -408,10 +414,13 @@ export async function renderSkeleton(
     {
       profile: request.profile,
       ...(
-        request.bookingCalendly === undefined && request.multilingual !== true
+        request.analytics === undefined &&
+        request.bookingCalendly === undefined &&
+        request.multilingual !== true
           ? {}
           : {
               requestedCapabilities: [
+                ...(request.analytics === undefined ? [] : ["analytics"]),
                 ...(request.bookingCalendly === undefined
                   ? []
                   : ["booking-calendly"]),
@@ -437,6 +446,7 @@ export async function renderSkeleton(
     request.bookingCalendly !== undefined,
     resolutionResult.value.recipeVersion,
     request.multilingual === true,
+    request.analytics !== undefined,
   );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;
@@ -446,6 +456,11 @@ export async function renderSkeleton(
     projectName: projectResult.value.project.name,
     displayNameJson: JSON.stringify(projectResult.value.project.displayName),
     workerName: projectResult.value.project.name,
+    ...(request.analytics === undefined
+      ? {}
+      : {
+          analyticsSettingsJson: JSON.stringify(request.analytics, null, 2),
+        }),
     ...(request.bookingCalendly === undefined
       ? {}
       : {

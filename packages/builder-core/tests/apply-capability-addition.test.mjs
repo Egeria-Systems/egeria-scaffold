@@ -30,6 +30,25 @@ const settings = Object.freeze({
   destination: "https://calendly.com/private/discovery",
   mode: "popup",
 });
+const analyticsSettings = Object.freeze({
+  consent: Object.freeze({ policy: "explicit-opt-in" }),
+  providers: Object.freeze({
+    cloudflareWebAnalytics: Object.freeze({
+      siteToken: "0123456789abcdef0123456789abcdef",
+    }),
+    googleAnalytics4: Object.freeze({ measurementId: "G-ABCDEF1234" }),
+    microsoftClarity: Object.freeze({
+      projectId: "clarity123",
+      audience: "not-directed-to-minors",
+    }),
+  }),
+  operationalIntegrations: Object.freeze({
+    googleSearchConsole: Object.freeze({
+      verificationToken: "search-console-verification-token",
+    }),
+    lookerStudio: Object.freeze({ connector: "google-analytics-4" }),
+  }),
+});
 const git = Object.freeze({
   ok: true,
   identity: Object.freeze({
@@ -113,7 +132,11 @@ async function approvedPlan(
   selectedSettings,
 ) {
   const resolvedSettings = selectedSettings ??
-    (capability === "booking-calendly" ? settings : undefined);
+    (capability === "booking-calendly"
+      ? settings
+      : capability === "analytics"
+        ? analyticsSettings
+        : undefined);
   const result = await core.planCapabilityAddition({
     reader,
     git,
@@ -145,7 +168,9 @@ async function runApply(repository, overrides = {}) {
     ? overrides.settings
     : capability === "booking-calendly"
       ? settings
-      : undefined;
+      : capability === "analytics"
+        ? analyticsSettings
+        : undefined;
   const plan = await approvedPlan(
     repository.reader,
     capability,
@@ -159,7 +184,7 @@ async function runApply(repository, overrides = {}) {
     ...(selectedSettings === undefined ? {} : { settings: selectedSettings }),
     approvedPlanFingerprint:
       overrides.approvedPlanFingerprint ?? plan.planFingerprint,
-    reader: repository.reader,
+    reader: overrides.reader ?? repository.reader,
     writer: repository.writer,
     verifier:
       overrides.verifier ?? successfulVerifier(verifierCalls),
@@ -486,6 +511,81 @@ test("multilingual addition refuses changed final bytes after persistence", asyn
     recovery: "inspect-worktree",
   });
   assert.equal(repository.writes.length, 3);
+});
+
+test("analytics addition composes with multilingual and persists only public settings", async () => {
+  const repository = createRepository(await fixtureEntries("site-multilingual"));
+  const { plan, result, verifierCalls } = await runApply(repository, {
+    capability: "analytics",
+  });
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.value.capability, {
+    identifier: "analytics",
+    version: "0.1.0",
+  });
+  assert.equal(result.value.migration, "add-analytics-0-1-0");
+  assert.deepEqual(verifierCalls, [root]);
+  assert.deepEqual(
+    result.value.changedPaths,
+    [
+      ...plan.actions.map(({ path }) => path),
+      ".egeria/migrations.jsonl",
+      ".egeria/state.json",
+    ].sort(),
+  );
+
+  const project = core.parseProjectYaml(
+    repository.files.get(".egeria/project.yaml"),
+  );
+  const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
+  assert.equal(project.ok, true);
+  assert.equal(state.ok, true);
+  assert.deepEqual(project.value.capabilitySettings.analytics, analyticsSettings);
+  assert.equal(project.value.selectedCapabilities.includes("multilingual"), true);
+  assert.equal(project.value.selectedCapabilities.includes("analytics"), true);
+  assert.equal(
+    state.value.installedCapabilities.some(
+      ({ identifier }) => identifier === "analytics",
+    ),
+    true,
+  );
+  assert.equal(state.value.appliedMigrations.at(-1), "add-analytics-0-1-0");
+  assert.match(
+    repository.files.get("apps/web/app/layout.tsx"),
+    /AnalyticsConsent/u,
+  );
+});
+
+test("analytics addition binds transformation to the approved settings snapshot", async () => {
+  const repository = createRepository(await fixtureEntries("site-multilingual"));
+  const mutableSettings = structuredClone(analyticsSettings);
+  let projectReads = 0;
+  const reader = {
+    async readText(path) {
+      if (path === ".egeria/project.yaml" && ++projectReads === 2) {
+        mutableSettings.providers.googleAnalytics4.measurementId =
+          "G-MUTATED1234";
+      }
+      return repository.reader.readText(path);
+    },
+  };
+  const { result } = await runApply(repository, {
+    capability: "analytics",
+    settings: mutableSettings,
+    reader,
+  });
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(projectReads >= 2, true);
+  const project = core.parseProjectYaml(
+    repository.files.get(".egeria/project.yaml"),
+  );
+  assert.equal(project.ok, true);
+  assert.deepEqual(
+    project.value.capabilitySettings.analytics,
+    analyticsSettings,
+  );
 });
 
 test("capability addition refuses an unapproved plan before writes or verification", async () => {

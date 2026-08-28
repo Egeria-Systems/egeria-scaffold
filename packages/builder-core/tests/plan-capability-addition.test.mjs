@@ -15,6 +15,25 @@ const settings = Object.freeze({
   destination: "https://calendly.com/example/discovery",
   mode: "popup",
 });
+const analyticsSettings = Object.freeze({
+  consent: { policy: "explicit-opt-in" },
+  providers: {
+    cloudflareWebAnalytics: {
+      siteToken: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    },
+    googleAnalytics4: { measurementId: "G-TEST123456" },
+    microsoftClarity: {
+      projectId: "clarity123",
+      audience: "not-directed-to-minors",
+    },
+  },
+  operationalIntegrations: {
+    googleSearchConsole: {
+      verificationToken: "search-console-verification-token",
+    },
+    lookerStudio: { connector: "google-analytics-4" },
+  },
+});
 const git = Object.freeze({
   ok: true,
   identity: Object.freeze({
@@ -313,6 +332,64 @@ test("multilingual addition plan refuses managed drift without writes", async ()
         overrides,
       }),
       "PROJECT_DRIFT_DETECTED",
+    );
+  }
+});
+
+test("analytics addition redacts public identifiers and composes after multilingual", async () => {
+  const expectedCreatedPaths = [
+    "apps/web/content/en-CA/analytics.yaml",
+    "apps/web/content/fr-CA/analytics.yaml",
+    "apps/web/src/integrations/analytics/analytics-consent-state.ts",
+    "apps/web/src/integrations/analytics/analytics-consent.tsx",
+    "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
+    "apps/web/src/integrations/analytics/analytics-content.ts",
+    "apps/web/src/integrations/analytics/analytics-provider-contract.ts",
+    "apps/web/src/integrations/analytics/analytics-runtime.ts",
+    "apps/web/src/integrations/analytics/analytics-settings.ts",
+    "apps/web/tests/component/analytics-consent.test.tsx",
+    "apps/web/tests/e2e/analytics-consent.spec.ts",
+    "apps/web/tests/unit/analytics-consent-state.test.ts",
+    "apps/web/tests/unit/analytics-provider-contract.test.ts",
+    "apps/web/tests/unit/analytics-runtime.test.ts",
+    "docs/analytics.md",
+  ];
+
+  for (const fixture of ["site", "site-multilingual"]) {
+    const result = await planFromEntries(await fixtureEntries(fixture), {
+      capability: "analytics",
+      settings: analyticsSettings,
+    });
+    assert.equal(result.ok, true, JSON.stringify(result.issues));
+    assert.deepEqual(result.value.capability, {
+      identifier: "analytics",
+      version: "0.1.0",
+    });
+    assert.deepEqual(result.value.settings, {
+      consentPolicy: "explicit-opt-in",
+      providers: [
+        "cloudflare-web-analytics",
+        "google-analytics-4",
+        "microsoft-clarity",
+      ],
+      operationalIntegrations: ["google-search-console", "looker-studio"],
+      providerIdentifiers: "redacted",
+    });
+    assert.deepEqual(
+      result.value.actions
+        .filter(({ kind }) => kind === "create-file")
+        .map(({ path }) => path),
+      expectedCreatedPaths,
+    );
+    assert.deepEqual(
+      result.value.actions
+        .filter(({ kind }) => kind === "replace-file")
+        .map(({ path }) => path),
+      ["apps/web/app/layout.tsx"],
+    );
+    assert.doesNotMatch(
+      JSON.stringify(result.value),
+      /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|G-TEST123456|clarity123|search-console-verification-token/u,
     );
   }
 });
