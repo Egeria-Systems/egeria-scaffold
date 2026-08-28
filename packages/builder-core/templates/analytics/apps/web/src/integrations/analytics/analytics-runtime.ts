@@ -364,7 +364,7 @@ function persistDecisions(
   settings: AnalyticsSettings,
   decisions: readonly AnalyticsPurposeDecision[],
   browser: AnalyticsBrowser,
-): boolean {
+): Readonly<{ persisted: boolean; stored: StoredConsentRead }> {
   const record = createAnalyticsConsentRecord(
     decisions,
     createAnalyticsConsentContext(settings),
@@ -390,7 +390,7 @@ function persistDecisions(
       // The verified v2 record is authoritative; v1 removal is best effort.
     }
   }
-  return persisted;
+  return { persisted, stored };
 }
 
 function removeUnverifiedRecord(
@@ -426,18 +426,37 @@ function save(
   browser: AnalyticsBrowser,
 ): AnalyticsConsentSaveResult {
   const transition = compareAnalyticsPurposeDecisions(previous, next);
-  const persisted = persistDecisions(settings, next, browser);
+  const persistence = persistDecisions(settings, next, browser);
+
+  if (
+    !persistence.persisted &&
+    transition.removed.length === 0 &&
+    persistence.stored.resolution.status === "valid"
+  ) {
+    const retainedTransition = compareAnalyticsPurposeDecisions(
+      persistence.stored.resolution.record.purposes,
+      next,
+    );
+    if (retainedTransition.removed.length > 0) {
+      applyReductionEffects(settings, retainedTransition.removed, browser);
+      return {
+        decisions: persistence.stored.resolution.record.purposes,
+        persistence: "stale-grant-retained",
+        reloading: false,
+      };
+    }
+  }
 
   if (transition.removed.length === 0) {
     loadPurposes(settings, transition.added, browser);
     return {
       decisions: next,
-      persistence: persisted ? "persisted" : "session-only",
+      persistence: persistence.persisted ? "persisted" : "session-only",
       reloading: false,
     };
   }
 
-  if (persisted) {
+  if (persistence.persisted) {
     applyReductionEffects(settings, transition.removed, browser);
     browser.window.location.reload();
     return { decisions: next, persistence: "persisted", reloading: true };

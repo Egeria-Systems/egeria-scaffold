@@ -244,23 +244,25 @@ describe("analytics consent runtime", () => {
       "google:consent:default",
       "google:consent:update",
     ]);
-    expect(
-      effectIndex(
-        browser.effects,
-        'clarity:consentv2:{"ad_Storage":"denied","analytics_Storage":"denied"}',
-      ),
-    ).toBeLessThan(
-      effectIndex(
-        browser.effects,
-        'clarity:consentv2:{"ad_Storage":"denied","analytics_Storage":"granted"}',
-      ),
+    const clarityDenied =
+      'clarity:consentv2:{"ad_Storage":"denied","analytics_Storage":"denied"}';
+    const clarityGranted =
+      'clarity:consentv2:{"ad_Storage":"denied","analytics_Storage":"granted"}';
+    const clarityConsentCommands = browser.effects.filter((effect) =>
+      effect.startsWith("clarity:consentv2:"),
     );
-    expect(
-      effectIndex(
-        browser.effects,
-        'clarity:consentv2:{"ad_Storage":"denied","analytics_Storage":"denied"}',
-      ),
-    ).toBeLessThan(
+    expect(clarityConsentCommands).toEqual([
+      clarityDenied,
+      clarityGranted,
+      clarityDenied,
+      clarityGranted,
+    ]);
+    const clarityDefault = effectIndex(browser.effects, clarityDenied);
+    expect(clarityDefault).toBeGreaterThanOrEqual(0);
+    expect(clarityDefault).toBeLessThan(
+      effectIndex(browser.effects, clarityGranted),
+    );
+    expect(clarityDefault).toBeLessThan(
       effectIndex(browser.effects, "append:analytics-microsoft-clarity"),
     );
   });
@@ -331,6 +333,82 @@ describe("analytics consent runtime", () => {
 
     expect(result.persistence).toBe("session-only");
     expect(result.reloading).toBe(false);
+    expect(browser.scripts.map(({ id }) => id)).toEqual([
+      "analytics-google-analytics-4",
+    ]);
+  });
+
+  it("classifies a concurrent retained grant before an addition-only return", () => {
+    const browser = createTestBrowser();
+    const previous = purposeDecisions(analyticsSettings, []);
+    const next = purposeDecisions(analyticsSettings, [
+      "audience-measurement",
+    ]);
+    const retained = purposeDecisions(analyticsSettings, [
+      "consented-experience-analysis",
+    ]);
+    const retainedSource = JSON.stringify(
+      createAnalyticsConsentRecord(
+        retained,
+        createAnalyticsConsentContext(analyticsSettings),
+        now,
+      ),
+    );
+    browser.localStorage.setItem.mockImplementation((key: string) => {
+      browser.effects.push(`storage:set:${key}`);
+      browser.storedValues.set(key, retainedSource);
+    });
+    browser.localStorage.removeItem.mockImplementation(() => {
+      throw new Error("concurrent grant retained");
+    });
+
+    const result = browserAnalyticsConsentRuntime.save(
+      analyticsSettings,
+      previous,
+      next,
+    );
+
+    expect(result).toEqual({
+      decisions: retained,
+      persistence: "stale-grant-retained",
+      reloading: false,
+    });
+    expect(browser.scripts).toEqual([]);
+    expect(browser.reload).not.toHaveBeenCalled();
+    expect(browser.clarity).toHaveBeenCalledWith("consentv2", {
+      ad_Storage: "denied",
+      analytics_Storage: "denied",
+    });
+    expect(browser.clarity).toHaveBeenCalledWith("consent", false);
+    expect(browser.cookieWrites).toContain(
+      "_clck=; Max-Age=0; Path=/; SameSite=Lax",
+    );
+  });
+
+  it("keeps a storage-unavailable addition session-only", () => {
+    const browser = createTestBrowser();
+    const previous = purposeDecisions(analyticsSettings, []);
+    const next = purposeDecisions(analyticsSettings, [
+      "audience-measurement",
+    ]);
+    browser.localStorage.setItem.mockImplementation(() => {
+      throw new Error("write unavailable");
+    });
+    browser.localStorage.getItem.mockImplementation(() => {
+      throw new Error("read unavailable");
+    });
+
+    const result = browserAnalyticsConsentRuntime.save(
+      analyticsSettings,
+      previous,
+      next,
+    );
+
+    expect(result).toEqual({
+      decisions: next,
+      persistence: "session-only",
+      reloading: false,
+    });
     expect(browser.scripts.map(({ id }) => id)).toEqual([
       "analytics-google-analytics-4",
     ]);
