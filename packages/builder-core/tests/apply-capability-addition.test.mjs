@@ -813,6 +813,110 @@ test("capability addition requires inspection for a retained partial transform p
   }
 });
 
+test("analytics addition retains failure prefixes and final authority", async () => {
+  const fixture = await fixtureEntries("site-multilingual");
+  const initialState = fixture.get(".egeria/state.json");
+  const initialMigrations = fixture.get(".egeria/migrations.jsonl");
+
+  const verificationRepository = createRepository(fixture);
+  const verification = await runApply(verificationRepository, {
+    capability: "analytics",
+    verifier: {
+      prepareLockfile() {
+        throw new Error("not used");
+      },
+      verifyInIsolatedCopy() {
+        return Promise.resolve({ ok: false, issues: [] });
+      },
+    },
+  });
+  assert.deepEqual(verification.result, {
+    ok: false,
+    code: "CAPABILITY_VERIFICATION_FAILED",
+    phase: "verify",
+    recovery: "inspect-worktree",
+  }, "verification failure");
+  assert.equal(verificationRepository.files.get(".egeria/state.json"), initialState);
+  assert.equal(
+    verificationRepository.files.get(".egeria/migrations.jsonl"),
+    initialMigrations,
+  );
+  assert.equal(verificationRepository.writes.length, 1);
+
+  const stateRepository = createRepository(fixture, 3);
+  const stateFailure = await runApply(stateRepository, {
+    capability: "analytics",
+  });
+  assert.deepEqual(stateFailure.result, {
+    ok: false,
+    code: "CAPABILITY_STATE_WRITE_FAILED",
+    phase: "persist-state",
+    recovery: "inspect-worktree",
+  }, "state persistence failure");
+  const persistedMigrations = core.parseMigrationLog(
+    stateRepository.files.get(".egeria/migrations.jsonl"),
+  );
+  assert.equal(persistedMigrations.ok, true);
+  assert.equal(
+    persistedMigrations.value.at(-1).identifier,
+    "add-analytics-0-1-0",
+  );
+  assert.equal(stateRepository.files.get(".egeria/state.json"), initialState);
+
+  const finalDiffRepository = createRepository(fixture);
+  const finalDiffFailure = await runApply(finalDiffRepository, {
+    capability: "analytics",
+    inspectExpectedChanges: () =>
+      Promise.resolve({ ok: false, code: "GIT_WORKTREE_CHANGED" }),
+  });
+  assert.deepEqual(finalDiffFailure.result, {
+    ok: false,
+    code: "GIT_WORKTREE_CHANGED",
+    phase: "final-diff",
+    recovery: "inspect-worktree",
+  }, "final diff refusal");
+  assert.equal(finalDiffRepository.writes.length, 3);
+
+  const finalBytesRepository = createRepository(fixture);
+  const finalBytesFailure = await runApply(finalBytesRepository, {
+    capability: "analytics",
+    inspectExpectedChanges: () => {
+      finalBytesRepository.files.set(
+        "apps/web/src/integrations/analytics/analytics-settings.ts",
+        "concurrent final edit\n",
+      );
+      return Promise.resolve({ ok: true });
+    },
+  });
+  assert.deepEqual(finalBytesFailure.result, {
+    ok: false,
+    code: "CAPABILITY_POST_STATE_FAILED",
+    phase: "post-state",
+    recovery: "inspect-worktree",
+  }, "final byte refusal");
+
+  const partialRepository = createRepository(fixture);
+  const beforePartial = new Map(partialRepository.files);
+  partialRepository.writer.write = async (changes) => {
+    const first = changes[0];
+    partialRepository.files.set(first.path, decoder.decode(first.content));
+    return { ok: false, sourceChanged: true };
+  };
+  const partial = await runApply(partialRepository, {
+    capability: "analytics",
+  });
+  assert.deepEqual(partial.result, {
+    ok: false,
+    code: "CAPABILITY_TRANSFORM_FAILED",
+    phase: "transform",
+    recovery: "inspect-worktree",
+  }, "partial transform failure");
+  assert.notEqual(
+    partialRepository.files.get(partial.plan.actions[0].path),
+    beforePartial.get(partial.plan.actions[0].path),
+  );
+});
+
 test("filesystem addition writer replaces expected files and exclusively creates targets", async (context) => {
   const temporaryRoot = await mkdtemp(join(tmpdir(), "egeria-addition-writer-"));
   context.after(() => rm(temporaryRoot, { recursive: true, force: false }));

@@ -108,13 +108,7 @@ const lifecycleGroups = Object.freeze([
     tests: Object.freeze([
       "analytics addition composes with multilingual and persists only public settings",
       "analytics addition binds transformation to the approved settings snapshot",
-      "capability addition preserves prior control state when verification fails",
-      "capability addition preserves state when migration persistence fails",
-      "capability addition records only persisted checks when state persistence fails",
-      "capability addition retains persisted receipts when post-state inference disagrees",
-      "capability addition reports a final diff refusal after persistence",
-      "capability addition refuses changed final bytes after diff inspection",
-      "capability addition requires inspection for a retained partial transform prefix",
+      "analytics addition retains failure prefixes and final authority",
     ]),
   }),
   Object.freeze({
@@ -122,28 +116,21 @@ const lifecycleGroups = Object.freeze([
     tests: Object.freeze([
       "analytics removal restores the multilingual layout and persists fresh discovery",
       "analytics removal can be re-added with exact repaired surfaces and ordered history",
-      "capability removal refuses invalid roots, Git states, changed identity, and approval before writes",
-      "capability removal reports no-mutation and retained-prefix transformation failures",
-      "capability removal retains transformed source and old receipts on verification and re-inference failures",
-      "capability removal preserves exact persistence prefixes across migration and state failures",
-      "capability removal retains persisted receipts on post-state, final-diff, and final-byte failures",
+      "analytics removal retains failure prefixes and final authority",
     ]),
   }),
   Object.freeze({
     file: "packages/builder-core/tests/plan-capability-addition.test.mjs",
     tests: Object.freeze([
       "analytics addition redacts public identifiers and composes after multilingual",
-      "capability addition plan refuses inference drift and replacement drift",
-      "capability addition plan binds private settings and exact Git identity without disclosure",
+      "analytics addition planning refuses drift and binds private authority",
     ]),
   }),
   Object.freeze({
     file: "packages/builder-core/tests/plan-capability-removal.test.mjs",
     tests: Object.freeze([
       "analytics removal restores the composed layout and requires provider disposition review",
-      "capability removal plan distinguishes not-installed state from removal drift",
-      "capability removal plan refuses invalid controls, inventory, ejections, and owned drift",
-      "capability removal plan binds private controls and Git identity without disclosure",
+      "analytics removal planning refuses drift and binds private authority",
     ]),
   }),
 ]);

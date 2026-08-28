@@ -892,6 +892,128 @@ test("capability removal plan binds private controls and Git identity without di
   );
 });
 
+test("analytics removal planning refuses drift and binds private authority", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    assertFailure(
+      await planFromEntries(await baseFixtureEntries(profile), {
+        capability: "analytics",
+      }),
+      "CAPABILITY_NOT_INSTALLED",
+    );
+  }
+
+  const residual = await baseFixtureEntries("portfolio");
+  residual.set(
+    "apps/web/src/integrations/analytics/analytics-settings.ts",
+    "private residual source\n",
+  );
+  assertFailure(
+    await planFromEntries(residual, { capability: "analytics" }),
+    "PROJECT_DRIFT_DETECTED",
+  );
+
+  const base = await installedEntries("portfolio", {
+    bookingSettings: undefined,
+    analytics: analyticsSettings,
+  });
+  const state = core.parseStateJson(base.get(".egeria/state.json"));
+  assert.equal(state.ok, true);
+  const analyticsSurface = state.value.managedSurfaces.find(
+    ({ owner }) => owner.identifier === "analytics",
+  );
+  assert.notEqual(analyticsSurface, undefined);
+  const incomplete = new Map(base);
+  incomplete.set(
+    ".egeria/state.json",
+    core.serializeStateJson({
+      ...state.value,
+      managedSurfaces: state.value.managedSurfaces.filter(
+        ({ identifier }) => identifier !== analyticsSurface.identifier,
+      ),
+    }),
+  );
+  assertFailure(
+    await planFromEntries(incomplete, { capability: "analytics" }),
+    "PROJECT_DRIFT_DETECTED",
+  );
+
+  const inconsistentEjection = updateEjections(base, [
+    "apps/web/content/en-CA/analytics.yaml",
+  ]);
+  const inconsistentState = core.parseStateJson(
+    inconsistentEjection.get(".egeria/state.json"),
+  );
+  assert.equal(inconsistentState.ok, true);
+  inconsistentEjection.set(
+    ".egeria/state.json",
+    core.serializeStateJson({ ...inconsistentState.value, ejections: [] }),
+  );
+  assertFailure(
+    await planFromEntries(inconsistentEjection, { capability: "analytics" }),
+    "PROJECT_EJECTION_INVALID",
+  );
+
+  for (const overrides of [
+    new Map([
+      [
+        "apps/web/src/integrations/analytics/analytics-settings.ts",
+        { kind: "file", content: "private managed drift\n" },
+      ],
+    ]),
+    new Map([
+      [
+        "apps/web/app/layout.tsx",
+        { kind: "file", content: "private shared composition\n" },
+      ],
+    ]),
+    new Map([
+      ["apps/web/content/en-CA/analytics.yaml", { kind: "missing" }],
+    ]),
+  ]) {
+    assertFailure(
+      await planFromEntries(base, { capability: "analytics", overrides }),
+      "PROJECT_DRIFT_DETECTED",
+    );
+  }
+
+  const changedSettings = structuredClone(analyticsSettings);
+  changedSettings.providers.googleAnalytics4.measurementId = "G-PRIVATE654321";
+  const changedEntries = await installedEntries("portfolio", {
+    bookingSettings: undefined,
+    analytics: changedSettings,
+  });
+  const first = await planFromEntries(base, { capability: "analytics" });
+  const repeated = await planFromEntries(base, { capability: "analytics" });
+  const changed = await planFromEntries(changedEntries, {
+    capability: "analytics",
+  });
+  const changedGit = await planFromEntries(base, {
+    capability: "analytics",
+    git: {
+      ...git,
+      identity: {
+        ...git.identity,
+        gitDirectory: "/generated/common/.git/worktrees/other",
+      },
+    },
+  });
+  assert.equal(first.ok, true, JSON.stringify(first.issues));
+  assert.equal(repeated.ok, true, JSON.stringify(repeated.issues));
+  assert.equal(changed.ok, true, JSON.stringify(changed.issues));
+  assert.equal(changedGit.ok, true, JSON.stringify(changedGit.issues));
+  assert.equal(repeated.value.planFingerprint, first.value.planFingerprint);
+  assert.notEqual(changed.value.planFingerprint, first.value.planFingerprint);
+  assert.notEqual(changedGit.value.planFingerprint, first.value.planFingerprint);
+  assert.deepEqual(
+    { ...changed.value, planFingerprint: first.value.planFingerprint },
+    first.value,
+  );
+  assert.doesNotMatch(
+    JSON.stringify([first, repeated, changed, changedGit]),
+    /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|G-TEST123456|G-PRIVATE654321|clarity123|search-console-verification-token|refs\/heads|\/generated\//u,
+  );
+});
+
 test("capability removal plan fingerprint binds its review requirements", async () => {
   const entries = await installedEntries("portfolio");
   const result = await planFromEntries(entries);
