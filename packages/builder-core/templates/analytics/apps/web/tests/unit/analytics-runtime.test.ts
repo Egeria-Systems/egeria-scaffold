@@ -14,10 +14,23 @@ import {
   analyticsConsentStorageKey,
   browserAnalyticsConsentRuntime,
 } from "../../src/integrations/analytics/analytics-runtime";
-import { analyticsSettings } from "../../src/integrations/analytics/analytics-settings";
 
 const now = new Date("2026-08-27T12:00:00.000Z");
 const legacyStorageKey = "egeria.analytics.consent.v1";
+const analyticsSettings: AnalyticsSettings = {
+  consent: { policy: "explicit-opt-in" },
+  providers: {
+    cloudflareWebAnalytics: {
+      siteToken: "0123456789abcdef0123456789abcdef",
+    },
+    googleAnalytics4: { measurementId: "G-TEST123456" },
+    microsoftClarity: {
+      projectId: "clarity123",
+      audience: "not-directed-to-minors",
+    },
+  },
+  operationalIntegrations: {},
+};
 
 type StorageListener = (event: StorageEvent) => void;
 
@@ -596,7 +609,14 @@ describe("analytics consent runtime", () => {
       analytics_Storage: "denied",
     });
     expect(browser.clarity).toHaveBeenCalledWith("consent", false);
-    expect(browser.effects.some((effect) => effect.includes("cloudflare:stop"))).toBe(false);
+    expect(
+      browser.effects.some((effect) =>
+        effect.startsWith("remove-script:analytics-cloudflare-web-analytics"),
+      ),
+    ).toBe(false);
+    expect(browser.effects).not.toContain(
+      "append:analytics-cloudflare-web-analytics",
+    );
     expect(browser.cookieWrites).toEqual(
       expect.arrayContaining([
         "_ga=; Max-Age=0; Path=/; SameSite=Lax",
@@ -709,17 +729,19 @@ describe("analytics consent runtime", () => {
       JSON.stringify({
         ...storedRecord(analyticsSettings, []),
         providerPurposeContext: createAnalyticsConsentContext({
-          ...analyticsSettings,
+          consent: { policy: "explicit-opt-in" },
           providers: {
-            googleAnalytics4: analyticsSettings.providers.googleAnalytics4,
+            googleAnalytics4: { measurementId: "G-TEST123456" },
           },
+          operationalIntegrations: {},
         }),
         purposes: purposeDecisions(
           {
-            ...analyticsSettings,
+            consent: { policy: "explicit-opt-in" },
             providers: {
-              googleAnalytics4: analyticsSettings.providers.googleAnalytics4,
+              googleAnalytics4: { measurementId: "G-TEST123456" },
             },
+            operationalIntegrations: {},
           },
           [],
         ),

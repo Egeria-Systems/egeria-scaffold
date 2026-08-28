@@ -4,12 +4,29 @@ import {
   createAnalyticsOperationalDeclarations,
   createAnalyticsProviderDeclarations,
   type AnalyticsPurposeIdentifier,
+  type AnalyticsSettings,
 } from "../../src/integrations/analytics/analytics-provider-contract";
 import {
   parseAnalyticsContent,
   readAnalyticsContent,
 } from "../../src/integrations/analytics/analytics-content";
 import { analyticsSettings } from "../../src/integrations/analytics/analytics-settings";
+
+const configuredAnalyticsSettings: AnalyticsSettings = analyticsSettings;
+const allProviderSettings: AnalyticsSettings = {
+  consent: { policy: "explicit-opt-in" },
+  providers: {
+    cloudflareWebAnalytics: {
+      siteToken: "0123456789abcdef0123456789abcdef",
+    },
+    googleAnalytics4: { measurementId: "G-TEST123456" },
+    microsoftClarity: {
+      projectId: "clarity123",
+      audience: "not-directed-to-minors",
+    },
+  },
+  operationalIntegrations: {},
+};
 
 describe("analytics provider contract", () => {
   it("declares the exact non-advertising GA4 CSP sources only when selected", () => {
@@ -136,7 +153,7 @@ describe("analytics provider contract", () => {
   });
 
   it("declares each selected runtime provider once with its fixed purpose", () => {
-    const declarations = createAnalyticsProviderDeclarations(analyticsSettings);
+    const declarations = createAnalyticsProviderDeclarations(allProviderSettings);
     const expectedProviderPurposes = [
       {
         identifier: "cloudflare-web-analytics",
@@ -170,7 +187,7 @@ describe("analytics provider contract", () => {
   });
 
   it("declares executable cookie cleanup rules separately from disclosure copy", () => {
-    const declarations = createAnalyticsProviderDeclarations(analyticsSettings);
+    const declarations = createAnalyticsProviderDeclarations(allProviderSettings);
 
     expect(
       declarations.map(({ identifier, cookieCleanupRules }) => ({
@@ -205,10 +222,10 @@ describe("analytics provider contract", () => {
 
     expect(declarations.every(({ runtimeCode }) => runtimeCode === false)).toBe(true);
     expect(declarations.map(({ identifier }) => identifier)).toEqual([
-      ...(analyticsSettings.operationalIntegrations.googleSearchConsole === undefined
+      ...(configuredAnalyticsSettings.operationalIntegrations.googleSearchConsole === undefined
         ? []
         : ["google-search-console"]),
-      ...(analyticsSettings.operationalIntegrations.lookerStudio === undefined
+      ...(configuredAnalyticsSettings.operationalIntegrations.lookerStudio === undefined
         ? []
         : ["looker-studio"]),
     ]);

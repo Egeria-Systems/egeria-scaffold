@@ -62,6 +62,7 @@ const multilingualEvidenceRevision =
   "96b587a254cf6fc859867d6fc66c7e0c900c4cfd";
 const analyticsPlanPath =
   "docs/superpowers/plans/2026-08-27-analytics-capability-certification.md";
+const analyticsPlanUrl = new URL(`../../../${analyticsPlanPath}`, import.meta.url);
 const deploymentEvidencePath =
   "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md";
 const deploymentEvidenceRevision =
@@ -543,11 +544,6 @@ test("current analytics subject is admitted only as pending certification", () =
     descriptor,
     requiredEvidence.analytics,
   );
-  const analyticsPlan = readFileSync(
-    new URL(`../../../${analyticsPlanPath}`, import.meta.url),
-    "utf8",
-  );
-
   assert.equal(subject.descriptorVersion, "0.1.0");
   assert.notEqual(
     subject.behaviorContractDigest,
@@ -568,15 +564,24 @@ test("current analytics subject is admitted only as pending certification", () =
     taskPlan: analyticsPlanPath,
     evidence: [],
   });
-  assert.match(analyticsPlan, /Enable with JS Snippet installation/u);
-  assert.match(analyticsPlan, /installation-mode.*readback/iu);
-  assert.match(
-    analyticsPlan,
-    /zero.*\/cdn-cgi\/rum.*fresh denial.*persisted denial.*withdrawal.*reload/iu,
-  );
-  assert.match(analyticsPlan, /positive grant.*provider.*receipt/iu);
-  assert.match(analyticsPlan, /Disable.*not.*repair/iu);
 });
+
+test(
+  "private analytics certification plan retains the provider evidence boundary",
+  { skip: !existsSync(analyticsPlanUrl) },
+  () => {
+    const analyticsPlan = readFileSync(analyticsPlanUrl, "utf8");
+
+    assert.match(analyticsPlan, /Enable with JS Snippet installation/u);
+    assert.match(analyticsPlan, /installation-mode.*readback/iu);
+    assert.match(
+      analyticsPlan,
+      /zero.*\/cdn-cgi\/rum.*fresh denial.*persisted denial.*withdrawal.*reload/iu,
+    );
+    assert.match(analyticsPlan, /positive grant.*provider.*receipt/iu);
+    assert.match(analyticsPlan, /Disable.*not.*repair/iu);
+  },
+);
 
 test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", () => {
   const historicalSubject = {

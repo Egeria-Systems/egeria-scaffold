@@ -102,7 +102,7 @@
   },
   "managedSurfaces": [
     {
-      "fingerprint": "sha256:167ddfd77ead74176c77fc97dc75fab1113ec5e641685c9bda4d06e3b8d29808",
+      "fingerprint": "sha256:9b7b3d973de23d680cc456668ec1978158f9a22edb3bbcea763ccc5c842e2731",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -116,7 +116,7 @@
       "path": "apps/web/tests/e2e/analytics-consent.spec.ts"
     },
     {
-      "fingerprint": "sha256:ccff1993742cfb98caa9be8d89510184683b77090663b26710e68bb0ae46f142",
+      "fingerprint": "sha256:01b4a65000213d7d22b0c02eddbb34a0b56ecff1b2a98ea58ff8cdbe8281e535",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -256,7 +256,7 @@
       "path": "apps/web/src/integrations/analytics/analytics-provider-contract.ts"
     },
     {
-      "fingerprint": "sha256:17725d142242393edb633536591784d793dc4b4274aacc3c3e2c839dc18eef6b",
+      "fingerprint": "sha256:bcfd0f566590ce86c3776da653a1b221950bb340103a7650bbfb1c6521b28f6c",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -284,7 +284,7 @@
       "path": "apps/web/src/integrations/analytics/analytics-runtime.ts"
     },
     {
-      "fingerprint": "sha256:cc79fce26647c45e39f5cb11da6958d1f9c8b9e09cbae57f512f1be02d9e4529",
+      "fingerprint": "sha256:341b0642923c53e39f585f4474cabed6e0b98bdd477b2d5ba72e170052a1238a",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -416,7 +416,7 @@
       "path": "AGENTS.md"
     },
     {
-      "fingerprint": "sha256:536bb13db0e914ca1e524653cf44897b775660f701b25b73335d22c6977b7d44",
+      "fingerprint": "sha256:abdc51373ab53a68ef4f5aee4dfe077a68e37c9a8b34baf5016eb9b68f53b0fe",
       "fingerprintTarget": {
         "kind": "file"
       },

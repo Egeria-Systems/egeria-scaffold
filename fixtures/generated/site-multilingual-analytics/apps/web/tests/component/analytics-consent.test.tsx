@@ -20,9 +20,22 @@ import type {
   AnalyticsConsentSaveResult,
   AnalyticsConsentSnapshot,
 } from "../../src/integrations/analytics/analytics-runtime";
-import { analyticsSettings } from "../../src/integrations/analytics/analytics-settings";
 
 const now = new Date("2026-08-27T12:00:00.000Z");
+const analyticsSettings: AnalyticsSettings = {
+  consent: { policy: "explicit-opt-in" },
+  providers: {
+    cloudflareWebAnalytics: {
+      siteToken: "0123456789abcdef0123456789abcdef",
+    },
+    googleAnalytics4: { measurementId: "G-TEST123456" },
+    microsoftClarity: {
+      projectId: "clarity123",
+      audience: "not-directed-to-minors",
+    },
+  },
+  operationalIntegrations: {},
+};
 
 const allDenied = [
   { purpose: "aggregate-traffic-and-performance", decision: "denied" },
@@ -53,9 +66,9 @@ const searchConsoleOnlySettings = {
 } as const;
 
 const googleOnlySettings = {
-  ...analyticsSettings,
+  consent: { policy: "explicit-opt-in" },
   providers: {
-    googleAnalytics4: analyticsSettings.providers.googleAnalytics4,
+    googleAnalytics4: { measurementId: "G-TEST123456" },
   },
   operationalIntegrations: {},
 } as const;

@@ -129,7 +129,7 @@ The generated runtime supports exactly `en-CA` and `fr-CA`, defaults to `en-CA`,
 
 The bounded Next/OpenNext compatibility adapter intentionally uses Edge `middleware.ts`: the pinned OpenNext version rejects the Node-only Next 16 `proxy.ts` convention. The generated Next build therefore emits a known deprecation warning until a later adapter upgrade passes both Next and OpenNext verification with `proxy.ts`.
 
-The retained `site-multilingual` fixture proves deterministic generation plus the configured unit, component, build, development-browser, and workerd-browser boundaries. It does not expand the visual comparison matrix and is not itself certification evidence. Exact `multilingual@0.1.0` is separately certified at revision `96b587a254cf6fc859867d6fc66c7e0c900c4cfd`; that certificate does not establish linguistic quality, visual quality, deployed behavior, production readiness, human accessibility, or WCAG conformance. Analytics remains a separate successor task.
+The retained `site-multilingual` fixture proves deterministic generation plus the configured unit, component, build, development-browser, and workerd-browser boundaries. It does not expand the visual comparison matrix and is not itself certification evidence. Exact `multilingual@0.1.0` is separately certified at revision `96b587a254cf6fc859867d6fc66c7e0c900c4cfd`; that certificate does not establish linguistic quality, visual quality, deployed behavior, production readiness, human accessibility, or WCAG conformance. Analytics certification remains a separate successor task.
 
 ## Analytics scaffold boundary
 

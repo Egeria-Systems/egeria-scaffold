@@ -1349,7 +1349,7 @@ test("the catalog declares the exact analytics capability contract without obser
       ...analytics.externalDomains,
       ...analytics.contentSecurityPolicyContributions,
     ].join(" "),
-    /doubleclick\.net|googleadservices\.com|googlesyndication\.com|(?:^|\s)\*\.google\.com/u,
+    /doubleclick\.net|googleadservices\.com|googlesyndication\.com|(?:^|\s|\/\/)\*\.google\.com/u,
   );
   assert.deepEqual(analytics.browserStorage, [
     "functional-consent-local-storage",

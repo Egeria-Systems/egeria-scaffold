@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
@@ -14,17 +14,25 @@ import {
   createAnalyticsProviderDeclarations,
   type AnalyticsProviderIdentifier,
   type AnalyticsPurposeIdentifier,
+  type AnalyticsSettings,
 } from "../../src/integrations/analytics/analytics-provider-contract";
 import { analyticsConsentStorageKey } from "../../src/integrations/analytics/analytics-runtime";
 import { analyticsSettings } from "../../src/integrations/analytics/analytics-settings";
 
-const providerDeclarations = createAnalyticsProviderDeclarations(analyticsSettings);
+const configuredAnalyticsSettings: AnalyticsSettings = analyticsSettings;
+const providerDeclarations = createAnalyticsProviderDeclarations(
+  configuredAnalyticsSettings,
+);
 const configuredPurposes = [
   ...new Set(providerDeclarations.map(({ purpose }) => purpose)),
 ].sort();
-const localePaths = ["/en-CA", "/fr-CA"] as const;
 
-type LocalePath = (typeof localePaths)[number];
+type AnalyticsLocale = "en-CA" | "fr-CA";
+type LocaleRoute = Readonly<{
+  locale: AnalyticsLocale;
+  path: string;
+  staleGrantStatus: string;
+}>;
 
 type ProviderRequest = Readonly<{
   provider: AnalyticsProviderIdentifier;
@@ -37,22 +45,7 @@ type RuntimeCommand = Readonly<{
   parameters: readonly unknown[];
 }>;
 
-function requireProvider(identifier: AnalyticsProviderIdentifier) {
-  const declaration = providerDeclarations.find(
-    (candidate) => candidate.identifier === identifier,
-  );
-  if (declaration === undefined) {
-    throw new Error("expected the generated analytics provider declaration");
-  }
-  return declaration;
-}
-
-const cloudflareDeclaration = requireProvider("cloudflare-web-analytics");
-const googleDeclaration = requireProvider("google-analytics-4");
-const clarityDeclaration = requireProvider("microsoft-clarity");
-
-function readStaleGrantStatus(localePath: LocalePath): string {
-  const locale = localePath.slice(1);
+function readStaleGrantStatus(locale: AnalyticsLocale): string {
   const source = readFileSync(
     new URL(`../../content/${locale}/analytics.yaml`, import.meta.url),
     "utf8",
@@ -68,12 +61,34 @@ function readStaleGrantStatus(localePath: LocalePath): string {
   return status;
 }
 
-const staleGrantStatusByLocalePath = Object.fromEntries(
-  localePaths.map((localePath) => [
-    localePath,
-    readStaleGrantStatus(localePath),
-  ]),
-) as Readonly<Record<LocalePath, string>>;
+const localeRoutes: readonly LocaleRoute[] = (
+  existsSync(new URL("../../src/i18n/locale.ts", import.meta.url))
+    ? [
+        { locale: "en-CA", path: "/en-CA" },
+        { locale: "fr-CA", path: "/fr-CA" },
+      ] as const
+    : [{ locale: "en-CA", path: "/" }] as const
+).map((route) => ({
+  ...route,
+  staleGrantStatus: readStaleGrantStatus(route.locale),
+}));
+const primaryLocalePath = localeRoutes[0]?.path ?? "/";
+const cloudflareDeclaration = providerDeclarations.find(
+  ({ identifier }) => identifier === "cloudflare-web-analytics",
+);
+const googleDeclaration = providerDeclarations.find(
+  ({ identifier }) => identifier === "google-analytics-4",
+);
+const clarityDeclaration = providerDeclarations.find(
+  ({ identifier }) => identifier === "microsoft-clarity",
+);
+
+test.beforeEach(() => {
+  test.skip(
+    providerDeclarations.length === 0,
+    "consent browser behavior requires at least one runtime analytics provider",
+  );
+});
 
 function action(page: Page, identifier: string): Locator {
   return page.locator(`[data-analytics-consent-action="${identifier}"]`);
@@ -328,7 +343,7 @@ async function focusWithTab(page: Page, target: Locator): Promise<void> {
 test("first visit makes no provider request", async ({ page }) => {
   const providerRequests = await interceptProviderRequests(page);
 
-  await page.goto("/en-CA");
+  await page.goto(primaryLocalePath);
 
   await expect(page.getByRole("complementary")).toBeVisible();
   await expect(action(page, "allow")).toBeVisible();
@@ -337,7 +352,7 @@ test("first visit makes no provider request", async ({ page }) => {
   expect(providerRequests).toEqual([]);
 
   const verificationToken =
-    analyticsSettings.operationalIntegrations.googleSearchConsole
+    configuredAnalyticsSettings.operationalIntegrations.googleSearchConsole
       ?.verificationToken;
   if (verificationToken !== undefined) {
     await expect(
@@ -348,7 +363,7 @@ test("first visit makes no provider request", async ({ page }) => {
 
 test("reject all persists denial across reload", async ({ page }) => {
   const providerRequests = await interceptProviderRequests(page);
-  await page.goto("/en-CA");
+  await page.goto(primaryLocalePath);
 
   await action(page, "decline").click();
   await page.reload();
@@ -370,7 +385,7 @@ for (const declaration of providerDeclarations) {
     page,
   }) => {
     const providerRequests = await interceptProviderRequests(page);
-    await page.goto("/en-CA");
+    await page.goto(primaryLocalePath);
 
     await choosePurposes(page, [declaration.purpose]);
 
@@ -382,9 +397,13 @@ for (const declaration of providerDeclarations) {
 test("a representative partial selection loads only its two providers", async ({
   page,
 }) => {
+  test.skip(
+    providerDeclarations.length < 2,
+    "a two-provider selection requires at least two configured providers",
+  );
   const selected = providerDeclarations.slice(0, 2);
   const providerRequests = await interceptProviderRequests(page);
-  await page.goto("/en-CA");
+  await page.goto(primaryLocalePath);
 
   await choosePurposes(
     page,
@@ -403,7 +422,7 @@ test("a representative partial selection loads only its two providers", async ({
 
 test("allow all inserts every provider only once", async ({ page }) => {
   const providerRequests = await interceptProviderRequests(page);
-  await page.goto("/en-CA");
+  await page.goto(primaryLocalePath);
 
   await action(page, "allow").click();
   await expectRequestedProviders(
@@ -437,6 +456,10 @@ test("allow all inserts every provider only once", async ({ page }) => {
 test("a purpose addition loads only the new provider without navigation", async ({
   page,
 }) => {
+  test.skip(
+    providerDeclarations.length < 2,
+    "a purpose addition requires at least two configured providers",
+  );
   const [initial, added] = providerDeclarations;
   expect(initial).toBeDefined();
   expect(added).toBeDefined();
@@ -445,7 +468,7 @@ test("a purpose addition loads only the new provider without navigation", async 
   }
 
   const providerRequests = await interceptProviderRequests(page);
-  await page.goto("/en-CA");
+  await page.goto(primaryLocalePath);
   await choosePurposes(page, [initial.purpose]);
   await expectRequestedProviders(providerRequests, [initial.identifier]);
 
@@ -473,14 +496,14 @@ test("a persisted purpose reduction applies denial and reloads without the remov
   const google = providerDeclarations.find(
     ({ identifier }) => identifier === "google-analytics-4",
   );
-  expect(google).toBeDefined();
+  test.skip(google === undefined, "the reduction case requires configured GA4");
   if (google === undefined) {
     return;
   }
 
   const commands = await installRuntimeCommandRecorder(page);
   const providerRequests = await interceptProviderRequests(page);
-  await page.goto("/en-CA");
+  await page.goto(primaryLocalePath);
   await action(page, "allow").click();
   await expectRequestedProviders(
     providerRequests,
@@ -529,7 +552,7 @@ test("a notice revision mismatch re-prompts without provider requests", async ({
   await preloadRecord(page, { ...record, noticeVersion: 2 });
   const providerRequests = await interceptProviderRequests(page);
 
-  await page.goto("/en-CA");
+  await page.goto(primaryLocalePath);
 
   await expect(action(page, "choose")).toBeVisible();
   await expect(page.getByRole("status")).toContainText(/\S/u);
@@ -552,7 +575,7 @@ test("a provider context mismatch re-prompts without provider requests", async (
   });
   const providerRequests = await interceptProviderRequests(page);
 
-  await page.goto("/en-CA");
+  await page.goto(primaryLocalePath);
 
   await expect(action(page, "choose")).toBeVisible();
   await expect(page.getByRole("status")).toContainText(/\S/u);
@@ -571,7 +594,7 @@ test("an expired record re-prompts without provider requests", async ({ page }) 
   await preloadRecord(page, record);
   const providerRequests = await interceptProviderRequests(page);
 
-  await page.goto("/en-CA");
+  await page.goto(primaryLocalePath);
 
   await expect(action(page, "choose")).toBeVisible();
   await expect(page.getByRole("status")).toContainText(/\S/u);
@@ -580,10 +603,23 @@ test("an expired record re-prompts without provider requests", async ({ page }) 
   expect(providerRequests).toEqual([]);
 });
 
-for (const localePath of localePaths) {
+for (const { locale, path: localePath, staleGrantStatus } of localeRoutes) {
   test(`failed storage mixed transition stays on ${localePath} with localized incomplete feedback`, async ({
     page,
   }) => {
+    test.skip(
+      cloudflareDeclaration === undefined ||
+        googleDeclaration === undefined ||
+        clarityDeclaration === undefined,
+      "the mixed transition requires all three analytics providers",
+    );
+    if (
+      cloudflareDeclaration === undefined ||
+      googleDeclaration === undefined ||
+      clarityDeclaration === undefined
+    ) {
+      return;
+    }
     const commands = await installRuntimeCommandRecorder(page);
     const providerRequests = await interceptProviderRequests(page);
     await page.goto(localePath);
@@ -623,9 +659,7 @@ for (const localePath of localePaths) {
     await purposeChoice(page, cloudflareDeclaration.purpose).check();
     await action(page, "save").click();
 
-    await expect(page.getByRole("status")).toHaveText(
-      staleGrantStatusByLocalePath[localePath],
-    );
+    await expect(page.getByRole("status")).toHaveText(staleGrantStatus);
     await expect(action(page, "save")).toBeVisible();
     await expect(purposeChoice(page, cloudflareDeclaration.purpose)).toBeChecked();
     await expect(purposeChoice(page, googleDeclaration.purpose)).not.toBeChecked();
@@ -656,16 +690,17 @@ for (const localePath of localePaths) {
         clarityDeclaration.purpose,
       ]),
     );
-    await expect(page.locator("html")).toHaveAttribute(
-      "lang",
-      localePath.slice(1),
-    );
+    await expect(page.locator("html")).toHaveAttribute("lang", locale);
   });
 }
 
 test("two pages synchronize additions and reload reductions into a provider-free document", async ({
   context,
 }) => {
+  test.skip(
+    providerDeclarations.length < 2,
+    "cross-page addition and reduction requires at least two providers",
+  );
   const [initial, added] = providerDeclarations;
   expect(initial).toBeDefined();
   expect(added).toBeDefined();
@@ -677,7 +712,10 @@ test("two pages synchronize additions and reload reductions into a provider-free
   const secondPage = await context.newPage();
   const firstRequests = await interceptProviderRequests(firstPage);
   const secondRequests = await interceptProviderRequests(secondPage);
-  await Promise.all([firstPage.goto("/en-CA"), secondPage.goto("/en-CA")]);
+  await Promise.all([
+    firstPage.goto(primaryLocalePath),
+    secondPage.goto(primaryLocalePath),
+  ]);
   await Promise.all([
     expect(action(firstPage, "choose")).toBeVisible(),
     expect(action(secondPage, "choose")).toBeVisible(),
@@ -738,7 +776,7 @@ test("two pages synchronize additions and reload reductions into a provider-free
   );
 });
 
-for (const localePath of localePaths) {
+for (const { locale, path: localePath } of localeRoutes) {
   test(`keyboard-only consent management works on ${localePath}`, async ({
     page,
   }) => {
@@ -778,15 +816,12 @@ for (const localePath of localePaths) {
     await page.keyboard.press("Enter");
     await reloaded;
     await expect(action(page, "manage")).toBeVisible();
-    await expect(page.locator("html")).toHaveAttribute(
-      "lang",
-      localePath.slice(1),
-    );
-    expect(providerRequests.length).toBeGreaterThan(0);
+    await expect(page.locator("html")).toHaveAttribute("lang", locale);
+    await expect.poll(() => providerRequests.length).toBeGreaterThan(0);
   });
 }
 
-for (const localePath of localePaths) {
+for (const { path: localePath } of localeRoutes) {
   test(`the expanded consent control has no automated axe violations on ${localePath}`, async ({
     page,
   }) => {
@@ -805,7 +840,7 @@ for (const localePath of localePaths) {
   });
 }
 
-for (const localePath of localePaths) {
+for (const { path: localePath } of localeRoutes) {
   test(`the expanded consent control does not overflow at 320px on ${localePath}`, async ({
     page,
   }) => {

@@ -6,11 +6,13 @@ import { isLocale } from "../src/i18n/locale";
 import { WebVitalsReporter } from "../src/infrastructure/observability/web-vitals-reporter";
 import { AnalyticsConsent } from "../src/integrations/analytics/analytics-consent";
 import { readAnalyticsContent } from "../src/integrations/analytics/analytics-content";
+import type { AnalyticsSettings } from "../src/integrations/analytics/analytics-provider-contract";
 import { analyticsSettings } from "../src/integrations/analytics/analytics-settings";
 import "./globals.css";
 
+const configuredAnalyticsSettings: AnalyticsSettings = analyticsSettings;
 const searchVerification =
-  analyticsSettings.operationalIntegrations.googleSearchConsole
+  configuredAnalyticsSettings.operationalIntegrations.googleSearchConsole
     ?.verificationToken;
 
 export const metadata: Metadata = searchVerification === undefined
