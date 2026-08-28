@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
+
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { parse } from "yaml";
 
 import {
   createAnalyticsConsentContext,
@@ -21,6 +24,8 @@ const configuredPurposes = [
 ].sort();
 const localePaths = ["/en-CA", "/fr-CA"] as const;
 
+type LocalePath = (typeof localePaths)[number];
+
 type ProviderRequest = Readonly<{
   provider: AnalyticsProviderIdentifier;
   script: boolean;
@@ -31,6 +36,44 @@ type RuntimeCommand = Readonly<{
   provider: "google" | "clarity";
   parameters: readonly unknown[];
 }>;
+
+function requireProvider(identifier: AnalyticsProviderIdentifier) {
+  const declaration = providerDeclarations.find(
+    (candidate) => candidate.identifier === identifier,
+  );
+  if (declaration === undefined) {
+    throw new Error("expected the generated analytics provider declaration");
+  }
+  return declaration;
+}
+
+const cloudflareDeclaration = requireProvider("cloudflare-web-analytics");
+const googleDeclaration = requireProvider("google-analytics-4");
+const clarityDeclaration = requireProvider("microsoft-clarity");
+
+function readStaleGrantStatus(localePath: LocalePath): string {
+  const locale = localePath.slice(1);
+  const source = readFileSync(
+    new URL(`../../content/${locale}/analytics.yaml`, import.meta.url),
+    "utf8",
+  );
+  const content: unknown = parse(source);
+  if (typeof content !== "object" || content === null) {
+    throw new Error("expected the generated analytics locale content");
+  }
+  const status = Reflect.get(content, "staleGrantRetainedStatus");
+  if (typeof status !== "string") {
+    throw new Error("expected the localized stale-grant status");
+  }
+  return status;
+}
+
+const staleGrantStatusByLocalePath = Object.fromEntries(
+  localePaths.map((localePath) => [
+    localePath,
+    readStaleGrantStatus(localePath),
+  ]),
+) as Readonly<Record<LocalePath, string>>;
 
 function action(page: Page, identifier: string): Locator {
   return page.locator(`[data-analytics-consent-action="${identifier}"]`);
@@ -88,6 +131,10 @@ async function interceptProviderRequests(page: Page): Promise<ProviderRequest[]>
     });
   });
   return requests;
+}
+
+async function waitForNetworkReadiness(page: Page): Promise<void> {
+  await page.waitForLoadState("networkidle");
 }
 
 function requestedScriptProviders(
@@ -285,6 +332,8 @@ test("first visit makes no provider request", async ({ page }) => {
 
   await expect(page.getByRole("complementary")).toBeVisible();
   await expect(action(page, "allow")).toBeVisible();
+  await expectProviderScripts(page, []);
+  await waitForNetworkReadiness(page);
   expect(providerRequests).toEqual([]);
 
   const verificationToken =
@@ -305,6 +354,8 @@ test("reject all persists denial across reload", async ({ page }) => {
   await page.reload();
 
   await expect(action(page, "manage")).toBeVisible();
+  await expectProviderScripts(page, []);
+  await waitForNetworkReadiness(page);
   expect(providerRequests).toEqual([]);
   const record = await readStoredRecord(page);
   expect(record.schemaVersion).toBe(2);
@@ -367,6 +418,12 @@ test("allow all inserts every provider only once", async ({ page }) => {
   await action(page, "manage").click();
   await action(page, "allow").click();
 
+  await expect(action(page, "manage")).toBeVisible();
+  await expectProviderScripts(
+    page,
+    providerDeclarations.map(({ identifier }) => identifier),
+  );
+  await waitForNetworkReadiness(page);
   for (const declaration of providerDeclarations) {
     expect(
       providerRequests.filter(
@@ -476,6 +533,8 @@ test("a notice revision mismatch re-prompts without provider requests", async ({
 
   await expect(action(page, "choose")).toBeVisible();
   await expect(page.getByRole("status")).toContainText(/\S/u);
+  await expectProviderScripts(page, []);
+  await waitForNetworkReadiness(page);
   expect(providerRequests).toEqual([]);
 });
 
@@ -497,6 +556,8 @@ test("a provider context mismatch re-prompts without provider requests", async (
 
   await expect(action(page, "choose")).toBeVisible();
   await expect(page.getByRole("status")).toContainText(/\S/u);
+  await expectProviderScripts(page, []);
+  await waitForNetworkReadiness(page);
   expect(providerRequests).toEqual([]);
 });
 
@@ -514,26 +575,39 @@ test("an expired record re-prompts without provider requests", async ({ page }) 
 
   await expect(action(page, "choose")).toBeVisible();
   await expect(page.getByRole("status")).toContainText(/\S/u);
+  await expectProviderScripts(page, []);
+  await waitForNetworkReadiness(page);
   expect(providerRequests).toEqual([]);
 });
 
 for (const localePath of localePaths) {
-  test(`failed storage reduction stays on ${localePath} with localized incomplete feedback`, async ({
+  test(`failed storage mixed transition stays on ${localePath} with localized incomplete feedback`, async ({
     page,
   }) => {
     const commands = await installRuntimeCommandRecorder(page);
     const providerRequests = await interceptProviderRequests(page);
     await page.goto(localePath);
-    await action(page, "allow").click();
+    await choosePurposes(page, [
+      googleDeclaration.purpose,
+      clarityDeclaration.purpose,
+    ]);
     await expectRequestedProviders(
       providerRequests,
-      providerDeclarations.map(({ identifier }) => identifier),
+      [googleDeclaration.identifier, clarityDeclaration.identifier],
     );
+    await expectProviderScripts(page, [
+      googleDeclaration.identifier,
+      clarityDeclaration.identifier,
+    ]);
+    await waitForNetworkReadiness(page);
+    expect(
+      providerRequests.filter(
+        ({ provider, script }) =>
+          provider === cloudflareDeclaration.identifier && script,
+      ),
+    ).toEqual([]);
     await expect.poll(() => hasClarityGrant(commands)).toBe(true);
     const commandsBeforeReduction = commands.length;
-    const scriptRequestsBeforeReduction = providerRequests.filter(
-      ({ script }) => script,
-    ).length;
     const originalUrl = page.url();
     let mainFrameNavigations = 0;
     page.on("framenavigated", (frame) => {
@@ -543,16 +617,32 @@ for (const localePath of localePaths) {
     });
     await preventStorageWritesAndRemoval(page);
 
-    await action(page, "withdraw").click();
+    await action(page, "manage").click();
+    await purposeChoice(page, googleDeclaration.purpose).uncheck();
+    await purposeChoice(page, clarityDeclaration.purpose).uncheck();
+    await purposeChoice(page, cloudflareDeclaration.purpose).check();
+    await action(page, "save").click();
 
-    await expect(page.getByRole("status")).toContainText(/\S/u);
+    await expect(page.getByRole("status")).toHaveText(
+      staleGrantStatusByLocalePath[localePath],
+    );
     await expect(action(page, "save")).toBeVisible();
+    await expect(purposeChoice(page, cloudflareDeclaration.purpose)).toBeChecked();
+    await expect(purposeChoice(page, googleDeclaration.purpose)).not.toBeChecked();
+    await expect(purposeChoice(page, clarityDeclaration.purpose)).not.toBeChecked();
     expect(page.url()).toBe(originalUrl);
     expect(mainFrameNavigations).toBe(0);
-    expect(providerRequests.filter(({ script }) => script)).toHaveLength(
-      scriptRequestsBeforeReduction,
-    );
-    await expect.poll(() => hasGoogleDenial(commands)).toBe(true);
+    await expectProviderScripts(page, []);
+    await waitForNetworkReadiness(page);
+    expect(
+      providerRequests.filter(
+        ({ provider, script }) =>
+          provider === cloudflareDeclaration.identifier && script,
+      ),
+    ).toEqual([]);
+    await expect
+      .poll(() => hasGoogleDenial(commands.slice(commandsBeforeReduction)))
+      .toBe(true);
     await expect
       .poll(() => hasClarityDenial(commands.slice(commandsBeforeReduction)))
       .toBe(true);
@@ -560,8 +650,11 @@ for (const localePath of localePaths) {
       .poll(() => hasClarityErasure(commands.slice(commandsBeforeReduction)))
       .toBe(true);
     const retained = await readStoredRecord(page);
-    expect(retained.purposes.every(({ decision }) => decision === "granted")).toBe(
-      true,
+    expect(retained.purposes).toEqual(
+      decisionsWithGrants([
+        googleDeclaration.purpose,
+        clarityDeclaration.purpose,
+      ]),
     );
     await expect(page.locator("html")).toHaveAttribute(
       "lang",
@@ -629,6 +722,10 @@ test("two pages synchronize additions and reload reductions into a provider-free
 
   await expectProviderScripts(firstPage, []);
   await expectProviderScripts(secondPage, []);
+  await Promise.all([
+    waitForNetworkReadiness(firstPage),
+    waitForNetworkReadiness(secondPage),
+  ]);
   expect(
     requestedScriptProviders(firstRequests.slice(firstRequestsBeforeReduction)),
   ).toEqual([]);
@@ -702,6 +799,8 @@ for (const localePath of localePaths) {
       .analyze();
 
     expect(results.violations).toEqual([]);
+    await expectProviderScripts(page, []);
+    await waitForNetworkReadiness(page);
     expect(providerRequests).toEqual([]);
   });
 }
@@ -721,6 +820,8 @@ for (const localePath of localePaths) {
     }));
 
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+    await expectProviderScripts(page, []);
+    await waitForNetworkReadiness(page);
     expect(providerRequests).toEqual([]);
   });
 }
