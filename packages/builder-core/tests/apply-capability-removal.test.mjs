@@ -180,6 +180,19 @@ async function installedEntries(profile, options = {}) {
   return entries;
 }
 
+function sourceMatchesExpected(current, expected) {
+  if (expected instanceof Uint8Array) {
+    return typeof current === "string" && current === decoder.decode(expected);
+  }
+  if (expected.kind === "missing") {
+    return current === undefined;
+  }
+  return (
+    typeof current === "string" &&
+    current === decoder.decode(expected.content)
+  );
+}
+
 function createRepository(entries, options = {}) {
   const files = new Map(entries);
   const writes = [];
@@ -210,10 +223,7 @@ function createRepository(entries, options = {}) {
 
         for (const change of changes) {
           const current = files.get(change.path);
-          if (
-            current === undefined ||
-            current !== decoder.decode(change.expected)
-          ) {
+          if (!sourceMatchesExpected(current, change.expected)) {
             return { ok: false, sourceChanged: false };
           }
         }
@@ -231,6 +241,31 @@ function createRepository(entries, options = {}) {
       },
     },
   };
+}
+
+async function runAddition(repository) {
+  const planned = await core.planCapabilityAddition({
+    reader: repository.reader,
+    git,
+    capability: "analytics",
+    settings: analyticsSettings,
+  });
+  assert.equal(planned.ok, true, JSON.stringify(planned.issues));
+  const verifierCalls = [];
+  const result = await core.applyCapabilityAddition({
+    root,
+    capability: "analytics",
+    settings: analyticsSettings,
+    approvedPlanFingerprint: planned.value.planFingerprint,
+    reader: repository.reader,
+    writer: repository.writer,
+    verifier: successfulVerifier(verifierCalls),
+    inspectWorktree: () => Promise.resolve(git),
+    inspectCreateTargets: () => Promise.resolve({ ok: true }),
+    inspectExpectedChanges: () => Promise.resolve({ ok: true }),
+    now: () => "2026-08-23T15:00:00.000Z",
+  });
+  return { plan: planned.value, result, verifierCalls };
 }
 
 async function approvedPlan(reader, capability = "booking-calendly") {
@@ -653,6 +688,115 @@ test("analytics removal restores the multilingual layout and persists fresh disc
   assert.doesNotMatch(
     repository.files.get("apps/web/app/layout.tsx"),
     /AnalyticsConsent/u,
+  );
+});
+
+test("analytics removal can be re-added with exact repaired surfaces and ordered history", async () => {
+  const repairedPaths = [
+    "apps/web/src/integrations/analytics/analytics-consent-state.ts",
+    "apps/web/tests/unit/analytics-consent-state.test.ts",
+    "apps/web/tests/unit/analytics-runtime.test.ts",
+  ];
+  const initialEntries = await installedEntries("site", {
+    booking: false,
+    multilingual: true,
+    analytics: true,
+    appliedMigrations: [
+      "add-multilingual-0-1-0",
+      "add-analytics-0-1-0",
+    ],
+  });
+  const initialState = core.parseStateJson(initialEntries.get(".egeria/state.json"));
+  assert.equal(initialState.ok, true, JSON.stringify(initialState.issues));
+  const repository = createRepository(initialEntries);
+
+  const removal = await runApply(repository, { capability: "analytics" });
+  assert.equal(removal.result.ok, true, JSON.stringify(removal.result));
+  const removedState = core.parseStateJson(
+    repository.files.get(".egeria/state.json"),
+  );
+  assert.equal(removedState.ok, true, JSON.stringify(removedState.issues));
+  assert.deepEqual(removedState.value.appliedMigrations, [
+    "add-multilingual-0-1-0",
+    "add-analytics-0-1-0",
+    "remove-analytics-0-1-0",
+  ]);
+  assert.equal(
+    removedState.value.installedCapabilities.some(
+      ({ identifier }) => identifier === "analytics",
+    ),
+    false,
+  );
+
+  const readdition = await runAddition(repository);
+  assert.equal(readdition.result.ok, true, JSON.stringify(readdition.result));
+  assert.deepEqual(readdition.verifierCalls, [root]);
+  assert.deepEqual(
+    readdition.result.value.changedPaths,
+    [
+      ...readdition.plan.actions.map(({ path }) => path),
+      ".egeria/migrations.jsonl",
+      ".egeria/state.json",
+    ].sort(compareText),
+  );
+  assert.deepEqual(
+    repairedPaths.filter((path) => repository.files.has(path)),
+    repairedPaths,
+  );
+
+  const readdedProject = core.parseProjectYaml(
+    repository.files.get(".egeria/project.yaml"),
+  );
+  const readdedState = core.parseStateJson(
+    repository.files.get(".egeria/state.json"),
+  );
+  const readdedMigrations = core.parseMigrationLog(
+    repository.files.get(".egeria/migrations.jsonl"),
+  );
+  assert.equal(readdedProject.ok, true, JSON.stringify(readdedProject.issues));
+  assert.equal(readdedState.ok, true, JSON.stringify(readdedState.issues));
+  assert.equal(
+    readdedMigrations.ok,
+    true,
+    JSON.stringify(readdedMigrations.issues),
+  );
+  const expectedMigrationHistory = [
+    "add-multilingual-0-1-0",
+    "add-analytics-0-1-0",
+    "remove-analytics-0-1-0",
+    "add-analytics-0-1-0",
+  ];
+  assert.deepEqual(readdedState.value.appliedMigrations, expectedMigrationHistory);
+  assert.deepEqual(
+    readdedMigrations.value.map(({ identifier }) => identifier),
+    expectedMigrationHistory,
+  );
+  assert.deepEqual(readdedProject.value.capabilitySettings.analytics, analyticsSettings);
+  assert.equal(readdedProject.value.selectedCapabilities.includes("analytics"), true);
+  assert.deepEqual(
+    readdedState.value.installedCapabilities,
+    initialState.value.installedCapabilities,
+  );
+  assert.deepEqual(
+    readdedState.value.managedSurfaces.filter(
+      ({ owner }) => owner.identifier === "analytics",
+    ),
+    initialState.value.managedSurfaces.filter(
+      ({ owner }) => owner.identifier === "analytics",
+    ),
+  );
+
+  const catalog = core.createVerifiedCapabilityCatalog();
+  assert.equal(catalog.ok, true, JSON.stringify(catalog.issues));
+  const inference = await core.inferRepository({
+    reader: repository.reader,
+    catalog: catalog.value,
+  });
+  assert.equal(inference.state.kind, "valid");
+  assert.equal(
+    inference.capabilities.find(({ identifier }) => identifier === "analytics")
+      ?.category,
+    "confirmed",
   );
 });
 
