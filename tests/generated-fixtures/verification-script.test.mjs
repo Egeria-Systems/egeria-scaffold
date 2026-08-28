@@ -161,7 +161,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
             ? 123
             : contract.identifier === "site-multilingual"
               ? 139
-              : 151,
+              : 154,
     );
     assert.equal(
       contract.visualRegression,
@@ -199,7 +199,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
   assert.equal(basePortfolio.expectedFiles.length, 57);
   assert.equal(site.expectedFiles.length, 74);
   assert.equal(multilingualSite.expectedFiles.length, 90);
-  assert.equal(analyticsSite.expectedFiles.length, 102);
+  assert.equal(analyticsSite.expectedFiles.length, 105);
   assert.equal(
     calendlyPortfolio.expectedFiles.length,
     57 - 1 + 6,
@@ -314,6 +314,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
     [
       "apps/web/content/en-CA/analytics.yaml",
       "apps/web/content/fr-CA/analytics.yaml",
+      "apps/web/src/integrations/analytics/analytics-consent-state.ts",
       "apps/web/src/integrations/analytics/analytics-consent.tsx",
       "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
       "apps/web/src/integrations/analytics/analytics-content.ts",
@@ -322,7 +323,9 @@ test("fixture inspection accepts only the exact portable generated trees", async
       "apps/web/src/integrations/analytics/analytics-settings.ts",
       "apps/web/tests/component/analytics-consent.test.tsx",
       "apps/web/tests/e2e/analytics-consent.spec.ts",
+      "apps/web/tests/unit/analytics-consent-state.test.ts",
       "apps/web/tests/unit/analytics-provider-contract.test.ts",
+      "apps/web/tests/unit/analytics-runtime.test.ts",
       "docs/analytics.md",
     ],
   );

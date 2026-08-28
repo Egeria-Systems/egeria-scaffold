@@ -1,14 +1,40 @@
 heading: Choix de mesure d’audience
-summary: Choisissez si ce site peut charger des services facultatifs de mesure d’audience.
-providersHeading: Finalités sélectionnées
-allowLabel: Autoriser la mesure d’audience
-declineLabel: Refuser la mesure d’audience
-manageLabel: Gérer la mesure d’audience
-withdrawLabel: Retirer le consentement
-closeLabel: Fermer les choix de mesure d’audience
-grantedStatus: La mesure d’audience facultative est autorisée.
-deniedStatus: La mesure d’audience facultative est bloquée.
+summary: Choisissez les finalités facultatives de mesure d’audience que ce site peut utiliser. Vous pourrez modifier ou désactiver ces choix plus tard.
+allowAllLabel: Tout autoriser
+rejectAllLabel: Tout refuser
+choosePurposesLabel: Choisir les finalités
+saveSelectionLabel: Enregistrer la sélection
+manageChoicesLabel: Gérer les choix
+closeLabel: Fermer les choix
+turnOffLabel: Désactiver les mesures facultatives
+purposesLegend: Finalités facultatives de mesure d’audience
+updatedChoiceStatus: Les finalités ou l’avis de mesure d’audience ont changé. Examinez vos choix de nouveau.
+expiredChoiceStatus: Votre choix précédent a expiré. Examinez les finalités de nouveau.
+sessionOnlyStatus: Votre choix s’applique uniquement à cette page, car il n’a pas pu être enregistré.
+staleGrantRetainedStatus: Nous n’avons pas pu remplacer le choix enregistré précédent; cette modification est donc incomplète. La mesure d’audience déjà active sur cette page peut se poursuivre, et le choix enregistré précédent peut s’appliquer après la navigation. Réessayez d’enregistrer ou fermez cette page.
 purposes:
-  cloudflareWebAnalytics: Mesure globale du trafic et de la performance
-  googleAnalytics4: Mesure de l’audience
-  microsoftClarity: Analyse consentie de l’expérience
+  aggregate-traffic-and-performance:
+    label: Trafic global et performance
+    description: Comprendre les visites globales et la performance du site sans activer de fonctions publicitaires.
+  audience-measurement:
+    label: Mesure de l’audience
+    description: Comprendre comment les visiteurs trouvent et utilisent le site.
+  consented-experience-analysis:
+    label: Analyse de l’expérience
+    description: Comprendre les interactions et la facilité d’utilisation, y compris les données de relecture de session.
+providers:
+  cloudflare-web-analytics:
+    name: Cloudflare Web Analytics
+    dataSummary: Recueille des renseignements agrégés sur les visites, les pages vues et la performance Web.
+    storageSummary: Cette intégration ne déclare aucun stockage dans le navigateur ni aucun témoin.
+    retentionSummary: La conservation est contrôlée dans le compte fournisseur Cloudflare du site.
+  google-analytics-4:
+    name: Google Analytics 4
+    dataSummary: Recueille des renseignements sur l’audience, l’appareil, la navigation, les sessions, la localisation approximative et des identifiants pseudonymes.
+    storageSummary: Utilise des témoins de mesure d’audience propriétaires et le stockage du navigateur.
+    retentionSummary: La conservation est contrôlée dans le compte fournisseur Google du site.
+  microsoft-clarity:
+    name: Microsoft Clarity
+    dataSummary: Recueille des renseignements sur les interactions, la navigation, la relecture de session, les diagnostics, le contenu et la mise en page.
+    storageSummary: Utilise des témoins propriétaires et du stockage de navigateur contrôlé par le fournisseur.
+    retentionSummary: La conservation est contrôlée dans le compte fournisseur Microsoft du site.

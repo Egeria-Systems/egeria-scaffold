@@ -1,14 +1,40 @@
 heading: Analytics choices
-summary: Choose whether this site may load optional analytics providers.
-providersHeading: Selected purposes
-allowLabel: Allow analytics
-declineLabel: Decline analytics
-manageLabel: Manage analytics
-withdrawLabel: Withdraw analytics consent
-closeLabel: Close analytics choices
-grantedStatus: Optional analytics are allowed.
-deniedStatus: Optional analytics are blocked.
+summary: Choose which optional analytics purposes this site may use. You can change or turn off these choices later.
+allowAllLabel: Allow all
+rejectAllLabel: Reject all
+choosePurposesLabel: Choose purposes
+saveSelectionLabel: Save selection
+manageChoicesLabel: Manage choices
+closeLabel: Close choices
+turnOffLabel: Turn off optional analytics
+purposesLegend: Optional analytics purposes
+updatedChoiceStatus: The analytics purposes or notice changed. Review your choices again.
+expiredChoiceStatus: Your previous analytics choice expired. Review the purposes again.
+sessionOnlyStatus: Your choice applies only to this page because it could not be saved.
+staleGrantRetainedStatus: We could not replace the previous saved choice, so this change is incomplete. Analytics already running on this page may continue, and the previous saved choice may apply after navigation. Retry saving or close this page.
 purposes:
-  cloudflareWebAnalytics: Aggregate traffic and performance measurement
-  googleAnalytics4: Audience measurement
-  microsoftClarity: Consented experience analysis
+  aggregate-traffic-and-performance:
+    label: Aggregate traffic and performance
+    description: Understand overall visits and site performance without enabling advertising features.
+  audience-measurement:
+    label: Audience measurement
+    description: Understand how visitors find and use the site.
+  consented-experience-analysis:
+    label: Experience analysis
+    description: Understand page interactions and usability, including session replay data.
+providers:
+  cloudflare-web-analytics:
+    name: Cloudflare Web Analytics
+    dataSummary: Collects aggregate visits, page views, and web performance information.
+    storageSummary: This integration declares no browser storage or cookies.
+    retentionSummary: Retention is controlled through the site’s Cloudflare provider account.
+  google-analytics-4:
+    name: Google Analytics 4
+    dataSummary: Collects audience, device, navigation, session, approximate location, and pseudonymous identifier information.
+    storageSummary: Uses first-party analytics cookies and browser storage.
+    retentionSummary: Retention is controlled through the site’s Google provider account.
+  microsoft-clarity:
+    name: Microsoft Clarity
+    dataSummary: Collects interaction, navigation, session replay, diagnostics, page content, and layout information.
+    storageSummary: Uses first-party cookies and provider-controlled browser storage.
+    retentionSummary: Retention is controlled through the site’s Microsoft provider account.

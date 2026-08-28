@@ -340,6 +340,7 @@ test("analytics addition redacts public identifiers and composes after multiling
   const expectedCreatedPaths = [
     "apps/web/content/en-CA/analytics.yaml",
     "apps/web/content/fr-CA/analytics.yaml",
+    "apps/web/src/integrations/analytics/analytics-consent-state.ts",
     "apps/web/src/integrations/analytics/analytics-consent.tsx",
     "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
     "apps/web/src/integrations/analytics/analytics-content.ts",
@@ -348,7 +349,9 @@ test("analytics addition redacts public identifiers and composes after multiling
     "apps/web/src/integrations/analytics/analytics-settings.ts",
     "apps/web/tests/component/analytics-consent.test.tsx",
     "apps/web/tests/e2e/analytics-consent.spec.ts",
+    "apps/web/tests/unit/analytics-consent-state.test.ts",
     "apps/web/tests/unit/analytics-provider-contract.test.ts",
+    "apps/web/tests/unit/analytics-runtime.test.ts",
     "docs/analytics.md",
   ];
 

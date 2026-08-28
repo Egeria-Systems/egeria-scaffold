@@ -939,6 +939,12 @@ function createDescriptors(
       "managed",
     ),
     createFileEvidencePoint(
+      "analytics-consent-state",
+      "analytics",
+      "apps/web/src/integrations/analytics/analytics-consent-state.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
       "analytics-runtime",
       "analytics",
       "apps/web/src/integrations/analytics/analytics-runtime.ts",
@@ -984,6 +990,18 @@ function createDescriptors(
       "analytics-provider-contract-specification",
       "analytics",
       "apps/web/tests/unit/analytics-provider-contract.test.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "analytics-consent-state-specification",
+      "analytics",
+      "apps/web/tests/unit/analytics-consent-state.test.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "analytics-runtime-specification",
+      "analytics",
+      "apps/web/tests/unit/analytics-runtime.test.ts",
       "managed",
     ),
     createFileEvidencePoint(

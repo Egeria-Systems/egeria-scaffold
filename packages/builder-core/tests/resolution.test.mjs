@@ -1402,6 +1402,7 @@ test("the catalog declares the exact analytics capability contract without obser
     [
       ["analytics-settings", "apps/web/src/integrations/analytics/analytics-settings.ts", "managed"],
       ["analytics-provider-contract", "apps/web/src/integrations/analytics/analytics-provider-contract.ts", "managed"],
+      ["analytics-consent-state", "apps/web/src/integrations/analytics/analytics-consent-state.ts", "managed"],
       ["analytics-runtime", "apps/web/src/integrations/analytics/analytics-runtime.ts", "managed"],
       [
         "analytics-content-source-contract",
@@ -1414,6 +1415,8 @@ test("the catalog declares the exact analytics capability contract without obser
       ["analytics-french-locale-content", "apps/web/content/fr-CA/analytics.yaml", "application-owned"],
       ["analytics-operator-guide", "docs/analytics.md", "application-owned"],
       ["analytics-provider-contract-specification", "apps/web/tests/unit/analytics-provider-contract.test.ts", "managed"],
+      ["analytics-consent-state-specification", "apps/web/tests/unit/analytics-consent-state.test.ts", "managed"],
+      ["analytics-runtime-specification", "apps/web/tests/unit/analytics-runtime.test.ts", "managed"],
       ["analytics-consent-component-specification", "apps/web/tests/component/analytics-consent.test.tsx", "managed"],
       ["analytics-browser-specification", "apps/web/tests/e2e/analytics-consent.spec.ts", "managed"],
     ],

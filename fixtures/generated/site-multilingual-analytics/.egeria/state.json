@@ -102,7 +102,7 @@
   },
   "managedSurfaces": [
     {
-      "fingerprint": "sha256:46a4a47443717a46c21c9387152fd25690a572e6c5b232dbcc25c87baad17ba5",
+      "fingerprint": "sha256:167ddfd77ead74176c77fc97dc75fab1113ec5e641685c9bda4d06e3b8d29808",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -116,7 +116,7 @@
       "path": "apps/web/tests/e2e/analytics-consent.spec.ts"
     },
     {
-      "fingerprint": "sha256:88f6bb3636fdb1675f66a3869c54679d17dae53034ee15494080a2d41d94e3fb",
+      "fingerprint": "sha256:ccff1993742cfb98caa9be8d89510184683b77090663b26710e68bb0ae46f142",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -130,7 +130,7 @@
       "path": "apps/web/tests/component/analytics-consent.test.tsx"
     },
     {
-      "fingerprint": "sha256:599aa1d9ab8735b61952565bbc62199f097900f24398a21b55b2b50243fac60a",
+      "fingerprint": "sha256:da6eb35682a44881e8c7e6433f3a2b8bc3bf9843ed77e28da71fb6dcfe56d13c",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -144,7 +144,35 @@
       "path": "apps/web/src/integrations/analytics/analytics-consent.tsx"
     },
     {
-      "fingerprint": "sha256:5948836ebdcd9da0fe0c7e9092fa5b7e1f6066baf69507b111f4400ea65bd09e",
+      "fingerprint": "sha256:f15bc9dab85afb47dc54b25213ca2884ff207dd6455cc85e1e70a098c3185488",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "analytics-consent-state",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "analytics",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/src/integrations/analytics/analytics-consent-state.ts"
+    },
+    {
+      "fingerprint": "sha256:4680f4aab0bc16573dc3bc7e78e0c6ac3decd8baccbc44af80470c99f7f8cdd1",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "analytics-consent-state-specification",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "analytics",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/tests/unit/analytics-consent-state.test.ts"
+    },
+    {
+      "fingerprint": "sha256:ddd22b280ee18e5d16d21a9ae9aa0970a96f704ffd529e52ca67d3e453926a33",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -172,7 +200,7 @@
       "path": "apps/web/src/integrations/analytics/analytics-content-source.d.ts"
     },
     {
-      "fingerprint": "sha256:503858ba51ab5e33098c440078a5c11713996a12234d6b3b9c53fc0a5cc74cae",
+      "fingerprint": "sha256:f0a1be2a8b2ed776135dc2016efba22c46bb0c5f9db63b97164bf215d3927b70",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -186,7 +214,7 @@
       "path": "apps/web/content/en-CA/analytics.yaml"
     },
     {
-      "fingerprint": "sha256:e7f0727efe2acf572a9032beb6273e4ca36c3d36f8a4998a3a6943b39ee7a891",
+      "fingerprint": "sha256:62fcedcd77ab878cbe08d3f7eafa8ca0c3126b4f8a2e0d087c00abb7fe787bff",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -200,7 +228,7 @@
       "path": "apps/web/content/fr-CA/analytics.yaml"
     },
     {
-      "fingerprint": "sha256:f34f2c3f4a9032b3c75a654105d8ff2e64cbad9a4c4e49398d5b1aa3a834f5a7",
+      "fingerprint": "sha256:83a57a5d351483d9265d4248e7336fc8a4a37a14ff7f06811534e600e86b40e8",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -214,7 +242,7 @@
       "path": "docs/analytics.md"
     },
     {
-      "fingerprint": "sha256:f4c78270abbdb361214d30b52729b4a2cc26018b2e89e4cdc3b17b27bd44eabc",
+      "fingerprint": "sha256:13922c48207ef793d352afe7b33de27c9a08a8828539a03a99444a9791432cf2",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -228,7 +256,7 @@
       "path": "apps/web/src/integrations/analytics/analytics-provider-contract.ts"
     },
     {
-      "fingerprint": "sha256:a4e2be0effd7b643d23468b59759f6647f041b55ab0ed4b2994276899226099d",
+      "fingerprint": "sha256:17725d142242393edb633536591784d793dc4b4274aacc3c3e2c839dc18eef6b",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -242,7 +270,7 @@
       "path": "apps/web/tests/unit/analytics-provider-contract.test.ts"
     },
     {
-      "fingerprint": "sha256:9daff59421ce2dd783a45298c1e0159afc7228dba6efcaea8368cc4c968ede86",
+      "fingerprint": "sha256:fd83ae5fb8a7aa78d6433d611aa8badac2f254ac98cf634d2339c9f961bf57be",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -254,6 +282,20 @@
       },
       "ownership": "managed",
       "path": "apps/web/src/integrations/analytics/analytics-runtime.ts"
+    },
+    {
+      "fingerprint": "sha256:cc79fce26647c45e39f5cb11da6958d1f9c8b9e09cbae57f512f1be02d9e4529",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "analytics-runtime-specification",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "analytics",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/tests/unit/analytics-runtime.test.ts"
     },
     {
       "fingerprint": "sha256:611d690f523df5b3c69155421024f0407e2dc84d67740ad87caf3d9be63e8e17",

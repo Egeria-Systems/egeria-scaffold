@@ -72,10 +72,12 @@ const committedRegistry = JSON.parse(
     "utf8",
   ),
 );
+const previousAnalyticsDescriptorDigest =
+  "sha256:e9386b318b0c42e3bc05ccb0f9077bacd833d3211e4d61371a12ed8fef473833";
 
 const descriptorDigests = Object.freeze({
   analytics:
-    "sha256:e9386b318b0c42e3bc05ccb0f9077bacd833d3211e4d61371a12ed8fef473833",
+    "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378",
   "booking-calendly":
     "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2",
   "content-files":
@@ -546,6 +548,13 @@ test("current analytics subject is admitted only as pending certification", () =
     "utf8",
   );
 
+  assert.equal(subject.descriptorVersion, "0.1.0");
+  assert.notEqual(
+    subject.behaviorContractDigest,
+    previousAnalyticsDescriptorDigest,
+  );
+  assert.equal(committedRegistry.records.analytics.status, "pending");
+  assert.deepEqual(committedRegistry.records.analytics.evidence, []);
   assert.deepEqual(committedRegistry.records.analytics, {
     subject,
     requiredEvidence: [

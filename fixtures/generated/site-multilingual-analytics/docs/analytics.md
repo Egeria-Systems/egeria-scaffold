@@ -1,6 +1,8 @@
 # Analytics operations
 
-This project contains an explicit-opt-in analytics integration. No selected runtime provider loads before a visitor grants analytics consent. Consent can be declined, granted later, managed, and withdrawn. Withdrawal records denial, sends supported provider denial or erasure signals, expires accessible first-party analytics cookies, and reloads the page.
+This project contains an explicit-opt-in analytics integration. No selected runtime provider loads before a visitor grants its exact configured purpose. Visitors can allow all purposes, reject all purposes, make a partial selection, manage their choices later, or turn off optional analytics directly.
+
+The browser stores an exact version-2 local preference for the configured provider-purpose context and revisits grants, rejections, and partial choices after 180 days. A changed notice, changed provider-purpose context, expired choice, malformed value, or legacy value grants nothing and asks the visitor to choose again. This local preference is not an identity or audit receipt.
 
 ## Provider purposes
 
@@ -9,6 +11,14 @@ This project contains an explicit-opt-in analytics integration. No selected runt
 - Microsoft Clarity: consented experience analysis. This selection declares that the property is not directed to minors.
 
 Search Console contributes only site-verification metadata. Looker Studio contributes no runtime code and assumes the selected Google Analytics 4 connector.
+
+## Reduction and withdrawal limits
+
+A successfully persisted reduction sends the supported bounded provider denial or erasure signals, expires matching accessible first-party analytics cookies, removes matching script nodes as local cleanup, and reloads into a document that omits denied providers. Removing a script node does not undo code that already executed.
+
+If the reduced preference cannot be stored and an earlier valid grant cannot be removed, the control reports an incomplete change, loads no newly requested provider, and does not reload into that retained grant. The visitor can retry saving or close the page. Analytics already running in the current document may continue, and the previous stored choice may apply on a later navigation.
+
+Google Analytics consent denial can still permit cookieless measurements after its tag has loaded. Microsoft Clarity consent denial can use a limited no-consent mode; the integration also uses Clarity’s documented cookie-erasure call. Cloudflare Web Analytics exposes no documented current-document stop operation for the manually loaded beacon. These bounded browser effects do not prove that already-running requests ceased, cancel in-flight work, or erase provider-held data. Provider-account changes and retained-data review remain separate operator responsibilities.
 
 ## Cloudflare installation prerequisite
 

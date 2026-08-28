@@ -201,6 +201,7 @@ const multilingualPaths = [
 const analyticsPaths = [
   "apps/web/content/en-CA/analytics.yaml",
   "apps/web/content/fr-CA/analytics.yaml",
+  "apps/web/src/integrations/analytics/analytics-consent-state.ts",
   "apps/web/src/integrations/analytics/analytics-consent.tsx",
   "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
   "apps/web/src/integrations/analytics/analytics-content.ts",
@@ -209,7 +210,9 @@ const analyticsPaths = [
   "apps/web/src/integrations/analytics/analytics-settings.ts",
   "apps/web/tests/component/analytics-consent.test.tsx",
   "apps/web/tests/e2e/analytics-consent.spec.ts",
+  "apps/web/tests/unit/analytics-consent-state.test.ts",
   "apps/web/tests/unit/analytics-provider-contract.test.ts",
+  "apps/web/tests/unit/analytics-runtime.test.ts",
   "docs/analytics.md",
 ];
 
@@ -1621,12 +1624,12 @@ test("analytics renders deterministic provider-neutral contracts and composes wi
       assert.match(files.get("apps/web/app/layout.tsx"), /verification/u);
       assert.equal(
         parseGeneratedYaml(first.files, "apps/web/content/en-CA/analytics.yaml")
-          .allowLabel,
-        "Allow analytics",
+          .allowAllLabel,
+        "Allow all",
       );
       assert.match(
         parseGeneratedYaml(first.files, "apps/web/content/fr-CA/analytics.yaml")
-          .allowLabel,
+          .allowAllLabel,
         /\S/u,
       );
 
