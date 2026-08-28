@@ -19,13 +19,15 @@ export type AnalyticsProviderIdentifier =
   | "google-analytics-4"
   | "microsoft-clarity";
 
+export type AnalyticsPurposeIdentifier =
+  | "aggregate-traffic-and-performance"
+  | "audience-measurement"
+  | "consented-experience-analysis";
+
 export type AnalyticsProviderDeclaration = Readonly<{
   identifier: AnalyticsProviderIdentifier;
   scriptId: string;
-  purpose:
-    | "aggregate-traffic-and-performance"
-    | "audience-measurement"
-    | "consented-experience-analysis";
+  purpose: AnalyticsPurposeIdentifier;
   scriptSource: string;
   imageSources: readonly string[];
   connectSources: readonly string[];

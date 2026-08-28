@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createAnalyticsOperationalDeclarations,
   createAnalyticsProviderDeclarations,
+  type AnalyticsPurposeIdentifier,
 } from "../../src/integrations/analytics/analytics-provider-contract";
 import {
   parseAnalyticsContent,
@@ -175,15 +176,25 @@ describe("analytics provider contract", () => {
     );
   });
 
-  it("declares each selected runtime provider once with a unique purpose", () => {
+  it("declares each selected runtime provider once with its fixed purpose", () => {
     const declarations = createAnalyticsProviderDeclarations(analyticsSettings);
-    const expectedPurposes = [
-      "aggregate-traffic-and-performance",
-      "audience-measurement",
-      "consented-experience-analysis",
-    ].filter((purpose) =>
-      declarations.some((declaration) => declaration.purpose === purpose),
-    );
+    const expectedProviderPurposes = [
+      {
+        identifier: "cloudflare-web-analytics",
+        purpose: "aggregate-traffic-and-performance",
+      },
+      {
+        identifier: "google-analytics-4",
+        purpose: "audience-measurement",
+      },
+      {
+        identifier: "microsoft-clarity",
+        purpose: "consented-experience-analysis",
+      },
+    ] as const satisfies readonly Readonly<{
+      identifier: (typeof declarations)[number]["identifier"];
+      purpose: AnalyticsPurposeIdentifier;
+    }>[];
 
     expect(new Set(declarations.map(({ identifier }) => identifier)).size).toBe(
       declarations.length,
@@ -191,8 +202,10 @@ describe("analytics provider contract", () => {
     expect(new Set(declarations.map(({ scriptId }) => scriptId)).size).toBe(
       declarations.length,
     );
-    expect(new Set(declarations.map(({ purpose }) => purpose))).toEqual(
-      new Set(expectedPurposes),
+    expect(
+      declarations.map(({ identifier, purpose }) => ({ identifier, purpose })),
+    ).toEqual(
+      expectedProviderPurposes,
     );
     expect(declarations.every(({ retention }) => retention === "provider-controlled")).toBe(true);
   });
