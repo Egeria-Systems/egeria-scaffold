@@ -417,6 +417,55 @@ test("analytics portfolio verification executes isolated unit, component, build,
   }
 });
 
+test("analytics production commands give compiled create a finite aggregate timeout without widening child bounds", async () => {
+  const { runAnalyticsProductionCommandForTesting } = await import(
+    certificationScript
+  );
+  const calls = [];
+  const execute = async (executable, arguments_, options) => {
+    calls.push({ executable, arguments: arguments_, options });
+    return { stdout: "ok\n" };
+  };
+  const environment = { PATH: "/verified/bin" };
+
+  assert.equal(
+    await runAnalyticsProductionCommandForTesting(
+      {
+        executable: process.execPath,
+        arguments: [
+          resolve(repositoryRoot, "apps/cli/dist/index.js"),
+          "create",
+        ],
+        cwd: repositoryRoot,
+        environment,
+      },
+      execute,
+    ),
+    "ok\n",
+  );
+  assert.equal(
+    await runAnalyticsProductionCommandForTesting(
+      {
+        executable: "pnpm",
+        arguments: ["run", "build"],
+        cwd: "/private/generated-project",
+        environment,
+        timeout: 15 * 60 * 1000,
+      },
+      execute,
+    ),
+    "ok\n",
+  );
+
+  assert.equal(calls[0].options.timeout, 45 * 60 * 1000);
+  assert.equal(calls[1].options.timeout, 15 * 60 * 1000);
+  for (const call of calls) {
+    assert.equal(call.options.cwd, call === calls[0] ? repositoryRoot : "/private/generated-project");
+    assert.equal(call.options.env, environment);
+    assert.equal(call.options.shell, false);
+  }
+});
+
 test("analytics certification fails closed on dirty, hidden-index, revision, and lifecycle evidence drift", async (context) => {
   const { certifyAnalyticsForTesting, AnalyticsCertificationError } =
     await import(certificationScript);

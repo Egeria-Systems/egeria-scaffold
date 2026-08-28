@@ -14,9 +14,11 @@ import { verifyGeneratedProject } from "./verify-generated-skeletons.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const cliEntry = resolve(repositoryRoot, "apps/cli/dist/index.js");
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
 const publicRegistry = "https://registry.npmjs.org/";
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
+const aggregateCreateTimeoutMilliseconds = 45 * 60 * 1000;
 const lifecycleCommandTimeoutMilliseconds = 45 * 60 * 1000;
 const profiles = Object.freeze(["portfolio", "site"]);
 const subject = Object.freeze({
@@ -580,14 +582,30 @@ async function readRepositoryIndexEntries() {
   }
 }
 
-async function runProductionCommand(input) {
-  const { stdout } = await execFileAsync(input.executable, input.arguments, {
+async function runProductionCommandWith(input, execute) {
+  const isCompiledCreate =
+    input.executable === process.execPath &&
+    input.arguments[0] === cliEntry &&
+    input.arguments[1] === "create";
+  const { stdout } = await execute(input.executable, input.arguments, {
     cwd: input.cwd,
     env: input.environment,
-    timeout: input.timeout ?? commandTimeoutMilliseconds,
+    timeout:
+      input.timeout ??
+      (isCompiledCreate
+        ? aggregateCreateTimeoutMilliseconds
+        : commandTimeoutMilliseconds),
     ...isolatedProcessOptions,
   });
   return stdout;
+}
+
+async function runProductionCommand(input) {
+  return runProductionCommandWith(input, execFileAsync);
+}
+
+export function runAnalyticsProductionCommandForTesting(input, execute) {
+  return runProductionCommandWith(input, execute);
 }
 
 function productionJourneyAdapters() {
