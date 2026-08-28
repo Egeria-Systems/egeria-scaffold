@@ -89,6 +89,7 @@ function createTestBrowser(
       storedValues.set(key, value);
     }),
   };
+  const sessionStorage = {};
   const dataLayer = {
     entries: [] as unknown[][],
     push(parameters: unknown[]) {
@@ -157,6 +158,7 @@ function createTestBrowser(
       reload,
     },
     removeEventListener,
+    sessionStorage,
   };
 
   vi.stubGlobal("document", document);
@@ -172,10 +174,15 @@ function createTestBrowser(
     reload,
     removeEventListener,
     scripts,
+    sessionStorage,
     storedValues,
-    dispatchStorage(newValue: string | null, key = analyticsConsentStorageKey) {
+    dispatchStorage(
+      newValue: string | null,
+      key: string | null = analyticsConsentStorageKey,
+      storageArea: Storage | null = localStorage as unknown as Storage,
+    ) {
       for (const listener of storageListeners) {
-        listener({ key, newValue } as StorageEvent);
+        listener({ key, newValue, storageArea } as StorageEvent);
       }
     },
   };
@@ -520,7 +527,7 @@ describe("analytics consent runtime", () => {
     expect(browser.reload).toHaveBeenCalledOnce();
   });
 
-  it("keeps an unreadable reduction session-only without an unsafe reload", () => {
+  it("keeps an unreadable reduction in the incomplete-revocation state", () => {
     const previous = purposeDecisions(analyticsSettings, [
       "audience-measurement",
     ]);
@@ -543,8 +550,8 @@ describe("analytics consent runtime", () => {
     );
 
     expect(result).toEqual({
-      decisions: denied,
-      persistence: "session-only",
+      decisions: previous,
+      persistence: "stale-grant-retained",
       reloading: false,
     });
     expect(browser.dataLayer.entries).toContainEqual([
@@ -704,6 +711,63 @@ describe("analytics consent runtime", () => {
     );
     browser.dispatchStorage(JSON.stringify(storedRecord(analyticsSettings, [])));
     expect(synchronized).toHaveBeenCalledOnce();
+  });
+
+  it("ignores same-key events from non-authoritative storage", () => {
+    const browser = createTestBrowser();
+    const current = purposeDecisions(analyticsSettings, []);
+    const next = purposeDecisions(analyticsSettings, [
+      "consented-experience-analysis",
+    ]);
+    const synchronized = vi.fn();
+    browserAnalyticsConsentRuntime.subscribe(
+      analyticsSettings,
+      () => current,
+      synchronized,
+    );
+
+    browser.dispatchStorage(
+      JSON.stringify(
+        createAnalyticsConsentRecord(
+          next,
+          createAnalyticsConsentContext(analyticsSettings),
+          now,
+        ),
+      ),
+      analyticsConsentStorageKey,
+      browser.sessionStorage as Storage,
+    );
+
+    expect(synchronized).not.toHaveBeenCalled();
+    expect(browser.scripts).toEqual([]);
+    expect(browser.reload).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when authoritative local storage is cleared", () => {
+    const browser = createTestBrowser();
+    const current = purposeDecisions(analyticsSettings, [
+      "audience-measurement",
+      "consented-experience-analysis",
+    ]);
+    const synchronized = vi.fn();
+    browserAnalyticsConsentRuntime.subscribe(
+      analyticsSettings,
+      () => current,
+      synchronized,
+    );
+
+    browser.dispatchStorage(null, null);
+
+    expect(synchronized).toHaveBeenCalledWith(
+      purposeDecisions(analyticsSettings, []),
+    );
+    expect(browser.dataLayer.entries).toContainEqual([
+      "consent",
+      "update",
+      expect.objectContaining({ analytics_storage: "denied" }),
+    ]);
+    expect(browser.clarity).toHaveBeenCalledWith("consent", false);
+    expect(browser.reload).toHaveBeenCalledOnce();
   });
 
   it.each([

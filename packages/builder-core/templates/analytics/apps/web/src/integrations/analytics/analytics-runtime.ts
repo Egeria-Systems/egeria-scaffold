@@ -484,7 +484,11 @@ function save(
 
   applyReductionEffects(settings, transition.removed, browser);
   if (!remaining.readable) {
-    return { decisions: next, persistence: "session-only", reloading: false };
+    return {
+      decisions: previous,
+      persistence: "stale-grant-retained",
+      reloading: false,
+    };
   }
   browser.window.location.reload();
   return { decisions: next, persistence: "session-only", reloading: true };
@@ -498,7 +502,10 @@ function subscribe(
 ): () => void {
   const context = createAnalyticsConsentContext(settings);
   const listener = (event: StorageEvent): void => {
-    if (event.key !== analyticsConsentStorageKey) {
+    if (
+      event.storageArea !== browser.window.localStorage ||
+      (event.key !== analyticsConsentStorageKey && event.key !== null)
+    ) {
       return;
     }
 
