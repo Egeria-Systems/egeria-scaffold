@@ -206,6 +206,58 @@ function enumerateSecretReferences(value, path = "") {
   );
 }
 
+const controlPlaneStepNames = [
+  "Create and read back Web Analytics site",
+  "Deploy dedicated certification Worker",
+  "Read back dedicated Worker deployment",
+  "Resolve exact exercise identity artifacts",
+  "Download exact exercise identity artifacts",
+  "Delete and verify task resources",
+];
+
+function assertBoundedControlPlaneRequests(source) {
+  assert.match(
+    source,
+    /const controlPlaneFetch = \(input, init = \{\}\) =>\s*fetch\(input, \{ \.\.\.init, signal: AbortSignal\.timeout\(10_000\) \}\);/u,
+  );
+  assert.equal((source.match(/\bfetch\b/gu) ?? []).length, 1);
+  assert.ok((source.match(/\bcontrolPlaneFetch\(/gu) ?? []).length > 0);
+  assert.doesNotMatch(
+    source,
+    /\b(?:retry|retries|maximumAttempts|setTimeout)\b/iu,
+  );
+}
+
+test("control-plane requests use exact per-request deadlines without retries", async () => {
+  const workflow = parseYaml(await readFile(workflowPath, "utf8"));
+  const steps = Object.fromEntries(
+    workflow.jobs.certify.steps.map((step) => [step.name, step]),
+  );
+
+  for (const name of controlPlaneStepNames) {
+    const source = steps[name].run;
+    assertBoundedControlPlaneRequests(source);
+    assert.throws(() =>
+      assertBoundedControlPlaneRequests(
+        source.replace("AbortSignal.timeout(10_000)", "undefined"),
+      ),
+    );
+    assert.throws(() =>
+      assertBoundedControlPlaneRequests(
+        source.replace(/await controlPlaneFetch\(/u, "await fetch("),
+      ),
+    );
+    assert.throws(() =>
+      assertBoundedControlPlaneRequests(`${source}\nconst retries = 1;`),
+    );
+  }
+
+  assert.match(
+    steps["Wait for dedicated Worker readiness"].run,
+    /AbortSignal\.timeout\(Math\.max\(1, Math\.min\(requestTimeoutMilliseconds, Math\.floor\(remaining\)\)\)\)/u,
+  );
+});
+
 test("the label workflow is protected, pinned, non-cancelling, and step-secret-isolated", async () => {
   const [workflowSource, browserFixture] = await Promise.all([
     readFile(workflowPath, "utf8"),

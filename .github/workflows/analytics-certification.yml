@@ -150,11 +150,13 @@ jobs:
             if (!account || !credential) process.exit(1);
             const endpoint = `https://api.cloudflare.com/client/v4/accounts/${account}/rum/site_info`;
             const headers = { Authorization: `Bearer ${credential}`, "Content-Type": "application/json" };
-            const existingResponse = await fetch(endpoint, { headers });
+            const controlPlaneFetch = (input, init = {}) =>
+              fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
+            const existingResponse = await controlPlaneFetch(endpoint, { headers });
             const existing = await existingResponse.json();
             const existingMatches = (existing?.result ?? []).filter(({ host }) => host === target.hostname);
             if (!existingResponse.ok || existing?.success !== true || existingMatches.length !== 0) process.exit(1);
-            const createdResponse = await fetch(endpoint, { method: "POST", headers, body: JSON.stringify({ host: target.hostname, auto_install: false }) });
+            const createdResponse = await controlPlaneFetch(endpoint, { method: "POST", headers, body: JSON.stringify({ host: target.hostname, auto_install: false }) });
             const created = await createdResponse.json();
             const site = created?.result;
             if (!createdResponse.ok || created?.success !== true || site?.auto_install !== false || site?.host !== target.hostname) process.exit(1);
@@ -165,7 +167,7 @@ jobs:
             writeFileSync(`${identityPath}.next`, JSON.stringify(identity), { mode: 0o600, flag: "wx" });
             renameSync(`${identityPath}.next`, identityPath);
             writeFileSync(`${process.env.RUNNER_TEMP}/analytics-certification-site-token`, site.site_token, { mode: 0o600, flag: "wx" });
-            const readbackResponse = await fetch(`${endpoint}/${encodeURIComponent(site.site_tag)}`, { headers });
+            const readbackResponse = await controlPlaneFetch(`${endpoint}/${encodeURIComponent(site.site_tag)}`, { headers });
             const readback = await readbackResponse.json();
             const value = readback?.result;
             if (!readbackResponse.ok || readback?.success !== true || value?.site_tag !== site.site_tag || value?.site_token !== site.site_token || value?.auto_install !== false || value?.host !== target.hostname) process.exit(1);
@@ -246,7 +248,9 @@ jobs:
           test -n "$CLOUDFLARE_DEPLOY_API_TOKEN"
           node --input-type=module -e '
             const endpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/analytics-certification`;
-            const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` } });
+            const controlPlaneFetch = (input, init = {}) =>
+              fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
+            const response = await controlPlaneFetch(endpoint, { headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` } });
             if (response.status !== 404) process.exit(1);
           '
           CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec opennextjs-cloudflare deploy --name analytics-certification
@@ -267,9 +271,11 @@ jobs:
             if (!/^analytics-certification\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
             const headers = { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` };
             const endpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/analytics-certification`;
-            const scriptReadback = await fetch(endpoint, { headers });
+            const controlPlaneFetch = (input, init = {}) =>
+              fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
+            const scriptReadback = await controlPlaneFetch(endpoint, { headers });
             if (!scriptReadback.ok) process.exit(1);
-            const deploymentsResponse = await fetch(`${endpoint}/deployments`, { headers });
+            const deploymentsResponse = await controlPlaneFetch(`${endpoint}/deployments`, { headers });
             const payload = await deploymentsResponse.json();
             const deployments = Array.isArray(payload?.result) ? payload.result : payload?.result?.deployments;
             if (!deploymentsResponse.ok || payload?.success !== true || !Array.isArray(deployments) || deployments.length < 1 || deployments.length > 100) process.exit(1);
@@ -371,10 +377,12 @@ jobs:
           node --input-type=module -e '
             import { appendFileSync } from "node:fs";
             const headers = { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json" };
+            const controlPlaneFetch = (input, init = {}) =>
+              fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
             const resolveArtifact = async (kind) => {
               const name = `analytics-certification-${kind}-identity-${process.env.HEAD_SHA}`;
               const endpoint = `${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100`;
-              const response = await fetch(endpoint, { headers });
+              const response = await controlPlaneFetch(endpoint, { headers });
               const payload = await response.json();
               const matches = (payload?.artifacts ?? []).filter((artifact) => artifact.name === name && artifact.expired === false && artifact.workflow_run?.head_sha === process.env.HEAD_SHA && artifact.workflow_run?.head_branch === "analytics-capability-certification");
               if (!response.ok || matches.length !== 1 || !Number.isSafeInteger(matches[0].id)) process.exit(1);
@@ -401,9 +409,11 @@ jobs:
               ["worker", process.env.WORKER_IDENTITY_ARTIFACT_ID],
             ];
             const headers = { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json" };
+            const controlPlaneFetch = (input, init = {}) =>
+              fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
             for (const [kind, id] of artifact_ids) {
               if (!/^[1-9][0-9]*$/u.test(id ?? "")) process.exit(1);
-              const response = await fetch(`${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/actions/artifacts/${id}/zip`, { headers });
+              const response = await controlPlaneFetch(`${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/actions/artifacts/${id}/zip`, { headers });
               if (!response.ok) process.exit(1);
               const contentLength = Number(response.headers.get("content-length"));
               if (!Number.isInteger(contentLength) || contentLength < 22 || contentLength > 65_536) process.exit(1);
@@ -444,28 +454,30 @@ jobs:
             const deployHeaders = { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` };
             const analyticsEndpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/rum/site_info`;
             const workerEndpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/analytics-certification`;
+            const controlPlaneFetch = (input, init = {}) =>
+              fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
             let currentSite = null;
             if (siteIdentity.identityKnown === true) {
-              const response = await fetch(`${analyticsEndpoint}/${encodeURIComponent(siteIdentity.site.siteTag)}`, { headers: analyticsHeaders });
+              const response = await controlPlaneFetch(`${analyticsEndpoint}/${encodeURIComponent(siteIdentity.site.siteTag)}`, { headers: analyticsHeaders });
               if (response.status !== 404) {
                 const payload = await response.json();
                 if (!response.ok || payload?.success !== true || typeof payload.result?.site_token !== "string") process.exit(1);
                 currentSite = { hostname: payload.result.host, siteTag: payload.result.site_tag, siteTokenSha256: createHash("sha256").update(payload.result.site_token).digest("hex"), autoInstall: payload.result.auto_install };
               }
             } else {
-              const response = await fetch(analyticsEndpoint, { headers: analyticsHeaders });
+              const response = await controlPlaneFetch(analyticsEndpoint, { headers: analyticsHeaders });
               const payload = await response.json();
               if (!response.ok || payload?.success !== true) process.exit(1);
               const matches = (payload.result ?? []).filter(({ host }) => host === context.hostname);
               if (matches.length > 0) currentSite = { present: true };
             }
-            const workerResponse = await fetch(workerEndpoint, { headers: deployHeaders });
+            const workerResponse = await controlPlaneFetch(workerEndpoint, { headers: deployHeaders });
             let currentWorker = null;
             if (workerResponse.status !== 404) {
               if (!workerResponse.ok) process.exit(1);
               if (workerIdentity.identityKnown !== true) currentWorker = { present: true };
               else {
-                const deploymentsResponse = await fetch(`${workerEndpoint}/deployments`, { headers: deployHeaders });
+                const deploymentsResponse = await controlPlaneFetch(`${workerEndpoint}/deployments`, { headers: deployHeaders });
                 const payload = await deploymentsResponse.json();
                 const deployments = Array.isArray(payload?.result) ? payload.result : payload?.result?.deployments;
                 if (!deploymentsResponse.ok || payload?.success !== true || !Array.isArray(deployments) || deployments.length < 1 || deployments.length > 100) process.exit(1);
@@ -479,17 +491,17 @@ jobs:
             }
             const plan = planAnalyticsCertificationCleanup({ context, siteIdentity, workerIdentity, currentSite, currentWorker });
             if (plan.deleteSite) {
-              const response = await fetch(`${analyticsEndpoint}/${encodeURIComponent(siteIdentity.site.siteTag)}`, { method: "DELETE", headers: analyticsHeaders });
+              const response = await controlPlaneFetch(`${analyticsEndpoint}/${encodeURIComponent(siteIdentity.site.siteTag)}`, { method: "DELETE", headers: analyticsHeaders });
               if (!response.ok) process.exit(1);
             }
             if (plan.deleteWorker) {
-              const response = await fetch(workerEndpoint, { method: "DELETE", headers: deployHeaders });
+              const response = await controlPlaneFetch(workerEndpoint, { method: "DELETE", headers: deployHeaders });
               if (!response.ok) process.exit(1);
             }
-            const sitesAfterResponse = await fetch(analyticsEndpoint, { headers: analyticsHeaders });
+            const sitesAfterResponse = await controlPlaneFetch(analyticsEndpoint, { headers: analyticsHeaders });
             const sitesAfter = await sitesAfterResponse.json();
             const siteAbsent = sitesAfterResponse.ok && sitesAfter?.success === true && !(sitesAfter.result ?? []).some(({ host }) => host === context.hostname);
-            const workerAfter = await fetch(workerEndpoint, { headers: deployHeaders });
+            const workerAfter = await controlPlaneFetch(workerEndpoint, { headers: deployHeaders });
             const workerAbsent = workerAfter.status === 404;
             if (!siteAbsent || !workerAbsent) process.exit(1);
             const measurement = { schemaVersion: "1.0.0", headSha: context.headSha, environment: context.environment, hostname: context.hostname, worker: context.worker, site: { initialState: plan.siteInitialState, identityDisposition: plan.siteInitialState === "present" ? "matched" : "not-present", deletionAttempted: plan.deleteSite, absenceVerified: siteAbsent }, workerResource: { initialState: plan.workerInitialState, identityDisposition: plan.workerInitialState === "present" ? "matched" : "not-present", deletionAttempted: plan.deleteWorker, absenceVerified: workerAbsent }, dedicatedRecovery: "exact-deletion-and-absence", operatorCleanupPending: true };
