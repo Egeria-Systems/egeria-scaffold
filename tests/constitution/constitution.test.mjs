@@ -3898,10 +3898,29 @@ test("purpose-based analytics consent is canonical and fail-closed", async () =>
     /stale grant[^\n]+revocation[^\n]+incomplete/iu,
   );
   assert.match(capabilityModel, /storage event[^\n]+open tabs/iu);
+  const consentEnforcementRow = enforcementMap
+    .split("\n")
+    .find((row) => row.startsWith("| `INV-ANALYTICS-CONSENT` |"));
+  assert.ok(consentEnforcementRow);
+  const consentEnforcementColumns = consentEnforcementRow
+    .split("|")
+    .slice(1, -1)
+    .map((column) => column.trim());
+  assert.match(consentEnforcementColumns[1], /versioned[^\n]+purpose/iu);
   assert.match(
-    enforcementMap,
-    /INV-ANALYTICS-CONSENT[^\n]+versioned[^\n]+purpose/iu,
+    consentEnforcementColumns[2],
+    /^actual for the version-2 consent record/iu,
   );
+  assert.doesNotMatch(consentEnforcementColumns[2], /\bplanned\b/iu);
+  for (const evidenceOwner of [
+    /builder contract[^;]+rendering[^;]+lifecycle tests/iu,
+    /generated Vitest unit[^;]+component specifications/iu,
+    /site-multilingual-analytics[^;]+Playwright specification/iu,
+    /fixture determinism/iu,
+    /verify:generated-skeletons/iu,
+  ]) {
+    assert.match(consentEnforcementColumns[3], evidenceOwner);
+  }
 });
 
 test("accepted ADRs use the repository decision contract", async () => {
