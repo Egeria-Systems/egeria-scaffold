@@ -1,5 +1,5 @@
-import { lstat, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { lstat, readFile, readdir } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const exactRepository = "Egeria-Systems/egeria-scaffold";
@@ -9,6 +9,11 @@ const exactWorker = "analytics-certification";
 const exactDigest =
   "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378";
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
+const exactDedicatedHostnamePattern =
+  /^analytics-certification\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.workers\.dev$/u;
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const sha256HexPattern = /^[0-9a-f]{64}$/u;
 const maximumInputBytes = 32 * 1024;
 
 export class AnalyticsProviderReceiptError extends Error {
@@ -41,6 +46,140 @@ function arraysEqual(left, right) {
   );
 }
 
+function isBoundedIdentifier(value) {
+  return (
+    typeof value === "string" &&
+    value.length >= 8 &&
+    value.length <= 128 &&
+    /^[A-Za-z0-9_-]+$/u.test(value)
+  );
+}
+
+function requireCleanupContext(context) {
+  if (
+    !hasExactKeys(context, ["headSha", "environment", "hostname", "worker"]) ||
+    !exactRevisionPattern.test(context.headSha) ||
+    context.environment !== exactEnvironment ||
+    !exactDedicatedHostnamePattern.test(context.hostname) ||
+    context.worker !== exactWorker
+  ) {
+    reject();
+  }
+}
+
+function requireSiteIdentity(identity, context) {
+  if (
+    !hasExactKeys(identity, [
+      "headSha",
+      "environment",
+      "hostname",
+      "identityKnown",
+      "site",
+    ]) ||
+    identity.headSha !== context.headSha ||
+    identity.environment !== context.environment ||
+    identity.hostname !== context.hostname ||
+    typeof identity.identityKnown !== "boolean"
+  ) {
+    reject();
+  }
+  if (identity.identityKnown === false) {
+    if (identity.site !== null) reject();
+    return;
+  }
+  if (
+    !hasExactKeys(identity.site, [
+      "siteTag",
+      "siteTokenSha256",
+      "autoInstall",
+    ]) ||
+    !isBoundedIdentifier(identity.site.siteTag) ||
+    !sha256HexPattern.test(identity.site.siteTokenSha256) ||
+    identity.site.autoInstall !== false
+  ) {
+    reject();
+  }
+}
+
+function requireWorkerIdentity(identity, context) {
+  if (
+    !hasExactKeys(identity, [
+      "headSha",
+      "environment",
+      "hostname",
+      "identityKnown",
+      "worker",
+    ]) ||
+    identity.headSha !== context.headSha ||
+    identity.environment !== context.environment ||
+    identity.hostname !== context.hostname ||
+    typeof identity.identityKnown !== "boolean"
+  ) {
+    reject();
+  }
+  if (identity.identityKnown === false) {
+    if (identity.worker !== null) reject();
+    return;
+  }
+  if (
+    !hasExactKeys(identity.worker, ["name", "deploymentId", "versionId"]) ||
+    identity.worker.name !== exactWorker ||
+    !uuidPattern.test(identity.worker.deploymentId) ||
+    !uuidPattern.test(identity.worker.versionId)
+  ) {
+    reject();
+  }
+}
+
+export function planAnalyticsCertificationCleanup({
+  context,
+  siteIdentity,
+  workerIdentity,
+  currentSite,
+  currentWorker,
+} = {}) {
+  requireCleanupContext(context);
+  requireSiteIdentity(siteIdentity, context);
+  requireWorkerIdentity(workerIdentity, context);
+
+  if (currentSite !== null) {
+    if (
+      siteIdentity.identityKnown !== true ||
+      !hasExactKeys(currentSite, [
+        "hostname",
+        "siteTag",
+        "siteTokenSha256",
+        "autoInstall",
+      ]) ||
+      currentSite.hostname !== context.hostname ||
+      currentSite.siteTag !== siteIdentity.site.siteTag ||
+      currentSite.siteTokenSha256 !== siteIdentity.site.siteTokenSha256 ||
+      currentSite.autoInstall !== false
+    ) {
+      reject();
+    }
+  }
+
+  if (currentWorker !== null) {
+    if (
+      workerIdentity.identityKnown !== true ||
+      !hasExactKeys(currentWorker, ["name", "deploymentId", "versionId"]) ||
+      currentWorker.name !== exactWorker ||
+      currentWorker.deploymentId !== workerIdentity.worker.deploymentId ||
+      currentWorker.versionId !== workerIdentity.worker.versionId
+    ) {
+      reject();
+    }
+  }
+
+  return Object.freeze({
+    deleteSite: currentSite !== null,
+    deleteWorker: currentWorker !== null,
+    siteInitialState: currentSite === null ? "absent" : "present",
+    workerInitialState: currentWorker === null ? "absent" : "present",
+  });
+}
+
 function containsUnsafeContent(value) {
   if (typeof value === "string") {
     return /https?:\/\/|bearer\s|api[_-]?key|secret\s*=|token\s*=/iu.test(value);
@@ -50,9 +189,9 @@ function containsUnsafeContent(value) {
   return Object.values(value).some(containsUnsafeContent);
 }
 
-function requireSharedEvidence(input) {
+function requireMeasuredContext(context) {
   if (
-    !hasExactKeys(input, [
+    !hasExactKeys(context, [
       "schemaVersion",
       "mode",
       "event",
@@ -60,211 +199,396 @@ function requireSharedEvidence(input) {
       "subject",
       "environment",
       "resources",
-      "polling",
-      "traffic",
-      "checks",
-      "disposition",
-      "outcomes",
-      "providerRecordsClaimed",
     ]) ||
-    input.schemaVersion !== "1.0.0" ||
-    !["exercise", "cleanup"].includes(input.mode) ||
-    !hasExactKeys(input.event, ["name", "action", "label"]) ||
-    input.event.name !== "pull_request" ||
-    input.event.action !== "labeled" ||
-    input.event.label !== `analytics-certification-${input.mode}` ||
-    !hasExactKeys(input.pullRequest, [
+    context.schemaVersion !== "1.0.0" ||
+    !["exercise", "cleanup"].includes(context.mode) ||
+    !hasExactKeys(context.event, ["name", "action", "label"]) ||
+    context.event.name !== "pull_request" ||
+    context.event.action !== "labeled" ||
+    context.event.label !== `analytics-certification-${context.mode}` ||
+    !hasExactKeys(context.pullRequest, [
       "baseRepository",
       "headRepository",
       "headRef",
       "headSha",
       "checkedOutSha",
     ]) ||
-    input.pullRequest.baseRepository !== exactRepository ||
-    input.pullRequest.headRepository !== exactRepository ||
-    input.pullRequest.headRef !== exactHeadRef ||
-    !exactRevisionPattern.test(input.pullRequest.headSha) ||
-    input.pullRequest.checkedOutSha !== input.pullRequest.headSha ||
-    !hasExactKeys(input.subject, [
+    context.pullRequest.baseRepository !== exactRepository ||
+    context.pullRequest.headRepository !== exactRepository ||
+    context.pullRequest.headRef !== exactHeadRef ||
+    !exactRevisionPattern.test(context.pullRequest.headSha) ||
+    context.pullRequest.checkedOutSha !== context.pullRequest.headSha ||
+    !hasExactKeys(context.subject, [
       "identifier",
       "version",
       "behaviorContractDigest",
     ]) ||
-    input.subject.identifier !== "analytics" ||
-    input.subject.version !== "0.1.0" ||
-    input.subject.behaviorContractDigest !== exactDigest ||
-    input.environment !== exactEnvironment ||
-    !hasExactKeys(input.polling, [
-      "maxAttempts",
-      "intervalSeconds",
+    context.subject.identifier !== "analytics" ||
+    context.subject.version !== "0.1.0" ||
+    context.subject.behaviorContractDigest !== exactDigest ||
+    context.environment !== exactEnvironment ||
+    !hasExactKeys(context.resources, [
+      "worker",
+      "target",
+      "hostname",
+      "production",
+    ]) ||
+    context.resources.worker !== exactWorker ||
+    context.resources.target !== "dedicated-non-production-workers-dev" ||
+    !exactDedicatedHostnamePattern.test(context.resources.hostname) ||
+    context.resources.production !== false ||
+    containsUnsafeContent(context)
+  ) {
+    reject();
+  }
+}
+
+function cleanupContextFromMeasuredContext(context) {
+  return {
+    headSha: context.pullRequest.headSha,
+    environment: context.environment,
+    hostname: context.resources.hostname,
+    worker: context.resources.worker,
+  };
+}
+
+function requireSiteReadback(measurement, context, identity) {
+  if (
+    !hasExactKeys(measurement, [
+      "schemaVersion",
+      "headSha",
+      "environment",
+      "hostname",
+      "createdByRun",
+      "readbackVerified",
+      "siteTagMatchesIdentity",
+      "siteTokenMatchesIdentity",
+      "scriptTokenMatchesIdentity",
+      "autoInstall",
+    ]) ||
+    measurement.schemaVersion !== "1.0.0" ||
+    measurement.headSha !== context.pullRequest.headSha ||
+    measurement.environment !== context.environment ||
+    measurement.hostname !== context.resources.hostname ||
+    identity.identityKnown !== true ||
+    measurement.createdByRun !== true ||
+    measurement.readbackVerified !== true ||
+    measurement.siteTagMatchesIdentity !== true ||
+    measurement.siteTokenMatchesIdentity !== true ||
+    measurement.scriptTokenMatchesIdentity !== true ||
+    measurement.autoInstall !== false
+  ) {
+    reject();
+  }
+}
+
+function requireDeploymentReadback(measurement, context, identity) {
+  if (
+    !hasExactKeys(measurement, [
+      "schemaVersion",
+      "headSha",
+      "environment",
+      "hostname",
+      "worker",
+      "scriptReadbackVerified",
+      "deploymentReadbackVerified",
+      "deploymentId",
+      "versionId",
+      "singleVersionAt100Percent",
+    ]) ||
+    measurement.schemaVersion !== "1.0.0" ||
+    measurement.headSha !== context.pullRequest.headSha ||
+    measurement.environment !== context.environment ||
+    measurement.hostname !== context.resources.hostname ||
+    measurement.worker !== exactWorker ||
+    identity.identityKnown !== true ||
+    measurement.scriptReadbackVerified !== true ||
+    measurement.deploymentReadbackVerified !== true ||
+    measurement.deploymentId !== identity.worker.deploymentId ||
+    measurement.versionId !== identity.worker.versionId ||
+    measurement.singleVersionAt100Percent !== true
+  ) {
+    reject();
+  }
+}
+
+function requireReadiness(measurement, context) {
+  if (
+    !hasExactKeys(measurement, [
+      "schemaVersion",
+      "headSha",
+      "hostname",
+      "maximumAttempts",
+      "intervalMilliseconds",
+      "requestTimeoutMilliseconds",
+      "maximumElapsedMilliseconds",
       "attempts",
-      "elapsedSeconds",
-      "automaticRetries",
+      "elapsedMilliseconds",
+      "succeeded",
+      "status",
     ]) ||
-    input.polling.maxAttempts !== 20 ||
-    input.polling.intervalSeconds !== 15 ||
-    !Number.isInteger(input.polling.attempts) ||
-    input.polling.attempts < 1 ||
-    input.polling.attempts > input.polling.maxAttempts ||
-    !Number.isFinite(input.polling.elapsedSeconds) ||
-    input.polling.elapsedSeconds < 0 ||
-    input.polling.elapsedSeconds >
-      input.polling.maxAttempts * input.polling.intervalSeconds ||
-    input.polling.automaticRetries !== 0 ||
-    !hasExactKeys(input.traffic, [
-      "syntheticOnly",
-      "realUserTraffic",
-      "personalData",
-      "boundedRequestEnvelopes",
-      "unexpectedTraffic",
+    measurement.schemaVersion !== "1.0.0" ||
+    measurement.headSha !== context.pullRequest.headSha ||
+    measurement.hostname !== context.resources.hostname ||
+    measurement.maximumAttempts !== 20 ||
+    measurement.intervalMilliseconds !== 15_000 ||
+    measurement.requestTimeoutMilliseconds !== 5_000 ||
+    measurement.maximumElapsedMilliseconds !== 300_000 ||
+    !Number.isInteger(measurement.attempts) ||
+    measurement.attempts < 1 ||
+    measurement.attempts > measurement.maximumAttempts ||
+    !Number.isInteger(measurement.elapsedMilliseconds) ||
+    measurement.elapsedMilliseconds < 0 ||
+    measurement.elapsedMilliseconds > measurement.maximumElapsedMilliseconds ||
+    measurement.succeeded !== true ||
+    !Number.isInteger(measurement.status) ||
+    measurement.status < 200 ||
+    measurement.status > 399
+  ) {
+    reject();
+  }
+}
+
+function requireRequestPhase(phase) {
+  return (
+    hasExactKeys(phase, ["providerRequests", "unexpectedExternalRequests"]) &&
+    Number.isInteger(phase.providerRequests) &&
+    phase.providerRequests >= 0 &&
+    Number.isInteger(phase.unexpectedExternalRequests) &&
+    phase.unexpectedExternalRequests === 0
+  );
+}
+
+function requireBrowserJourney(measurement) {
+  if (
+    !hasExactKeys(measurement, [
+      "schemaVersion",
+      "traffic",
+      "requestEnvelopeLimit",
+      "totalExternalRequests",
+      "unexpectedExternalRequests",
+      "cases",
+      "providers",
+      "beforeGrant",
+      "afterGrant",
+      "withdrawalReload",
     ]) ||
-    input.traffic.syntheticOnly !== true ||
-    input.traffic.realUserTraffic !== false ||
-    input.traffic.personalData !== false ||
-    input.traffic.boundedRequestEnvelopes !== true ||
-    input.traffic.unexpectedTraffic !== false ||
-    input.providerRecordsClaimed !== false ||
+    measurement.schemaVersion !== "1.0.0" ||
+    measurement.traffic !== "synthetic-only" ||
+    measurement.requestEnvelopeLimit !== 64 ||
+    !Number.isInteger(measurement.totalExternalRequests) ||
+    measurement.totalExternalRequests < 1 ||
+    measurement.totalExternalRequests > measurement.requestEnvelopeLimit ||
+    measurement.unexpectedExternalRequests !== 0 ||
+    !arraysEqual(measurement.cases, [
+      "fresh-denial",
+      "positive-grant",
+      "complete-withdrawal-reload",
+    ]) ||
+    !hasExactKeys(measurement.providers, [
+      "cloudflareWebAnalytics",
+      "googleAnalytics4",
+      "microsoftClarity",
+    ]) ||
+    !requireRequestPhase(measurement.beforeGrant) ||
+    !requireRequestPhase(measurement.afterGrant) ||
+    !hasExactKeys(measurement.withdrawalReload, [
+      "providerRequests",
+      "unexpectedExternalRequests",
+      "captureStartedBeforeAction",
+      "networkIdleObserved",
+    ]) ||
+    !Number.isInteger(measurement.withdrawalReload.providerRequests) ||
+    measurement.withdrawalReload.providerRequests !== 0 ||
+    measurement.withdrawalReload.unexpectedExternalRequests !== 0 ||
+    measurement.withdrawalReload.captureStartedBeforeAction !== true ||
+    measurement.withdrawalReload.networkIdleObserved !== true
+  ) {
+    reject();
+  }
+
+  let providerRequestCount = 0;
+  for (const provider of Object.values(measurement.providers)) {
+    if (
+      !hasExactKeys(provider, ["scriptRequests", "collectionRequests"]) ||
+      !Number.isInteger(provider.scriptRequests) ||
+      provider.scriptRequests < 1 ||
+      !Number.isInteger(provider.collectionRequests) ||
+      provider.collectionRequests < 1
+    ) {
+      reject();
+    }
+    providerRequestCount += provider.scriptRequests + provider.collectionRequests;
+  }
+  if (
+    measurement.beforeGrant.providerRequests !== 0 ||
+    measurement.afterGrant.providerRequests !== providerRequestCount ||
+    measurement.totalExternalRequests !== providerRequestCount
+  ) {
+    reject();
+  }
+}
+
+function requireCleanupResourceMeasurement(measurement, identity) {
+  if (
+    !hasExactKeys(measurement, [
+      "initialState",
+      "identityDisposition",
+      "deletionAttempted",
+      "absenceVerified",
+    ]) ||
+    !["present", "absent"].includes(measurement.initialState) ||
+    measurement.absenceVerified !== true
+  ) {
+    reject();
+  }
+  if (measurement.initialState === "present") {
+    if (
+      identity.identityKnown !== true ||
+      measurement.identityDisposition !== "matched" ||
+      measurement.deletionAttempted !== true
+    ) {
+      reject();
+    }
+  } else if (
+    measurement.identityDisposition !== "not-present" ||
+    measurement.deletionAttempted !== false
+  ) {
+    reject();
+  }
+}
+
+function requireCleanupMeasurement(measurement, context, siteIdentity, workerIdentity) {
+  if (
+    !hasExactKeys(measurement, [
+      "schemaVersion",
+      "headSha",
+      "environment",
+      "hostname",
+      "worker",
+      "site",
+      "workerResource",
+      "dedicatedRecovery",
+      "operatorCleanupPending",
+    ]) ||
+    measurement.schemaVersion !== "1.0.0" ||
+    measurement.headSha !== context.pullRequest.headSha ||
+    measurement.environment !== context.environment ||
+    measurement.hostname !== context.resources.hostname ||
+    measurement.worker !== exactWorker ||
+    measurement.dedicatedRecovery !== "exact-deletion-and-absence" ||
+    measurement.operatorCleanupPending !== true
+  ) {
+    reject();
+  }
+  requireCleanupResourceMeasurement(measurement.site, siteIdentity);
+  requireCleanupResourceMeasurement(measurement.workerResource, workerIdentity);
+}
+
+function createMeasuredReceipt(input) {
+  if (
+    !hasExactKeys(input, [
+      "context",
+      "siteIdentity",
+      "workerIdentity",
+      "siteReadback",
+      "deploymentReadback",
+      "readiness",
+      "browserJourney",
+      "cleanup",
+    ]) ||
     containsUnsafeContent(input)
   ) {
     reject();
   }
-}
+  const { context } = input;
+  requireMeasuredContext(context);
+  const cleanupContext = cleanupContextFromMeasuredContext(context);
+  requireSiteIdentity(input.siteIdentity, cleanupContext);
+  requireWorkerIdentity(input.workerIdentity, cleanupContext);
 
-function requireResources(resources) {
-  if (
-    !hasExactKeys(resources, [
-      "worker",
-      "target",
-      "httpsTargetValidated",
-      "production",
-      "cloudflareWebAnalytics",
-    ]) ||
-    resources.worker !== exactWorker ||
-    resources.target !== "dedicated-non-production-workers-dev" ||
-    resources.httpsTargetValidated !== true ||
-    resources.production !== false ||
-    !hasExactKeys(resources.cloudflareWebAnalytics, [
-      "createdByRun",
-      "autoInstall",
-      "readbackVerified",
-      "hostnameBound",
-      "siteTokenBound",
-      "scriptTokenBound",
-    ]) ||
-    resources.cloudflareWebAnalytics.createdByRun !== true ||
-    resources.cloudflareWebAnalytics.autoInstall !== false ||
-    resources.cloudflareWebAnalytics.readbackVerified !== true ||
-    resources.cloudflareWebAnalytics.hostnameBound !== true ||
-    resources.cloudflareWebAnalytics.siteTokenBound !== true ||
-    resources.cloudflareWebAnalytics.scriptTokenBound !== true
-  ) {
-    reject();
+  let outcomes;
+  let resourceDisposition;
+  let measurements;
+  let checks;
+  if (context.mode === "exercise") {
+    if (input.cleanup !== null) reject();
+    requireSiteReadback(input.siteReadback, context, input.siteIdentity);
+    requireDeploymentReadback(
+      input.deploymentReadback,
+      context,
+      input.workerIdentity,
+    );
+    requireReadiness(input.readiness, context);
+    requireBrowserJourney(input.browserJourney);
+    outcomes = ["deployed-application"];
+    resourceDisposition = "retained-for-human-provider-confirmation";
+    measurements = {
+      readinessAttempts: input.readiness.attempts,
+      readinessElapsedMilliseconds: input.readiness.elapsedMilliseconds,
+      externalRequestEnvelopes: input.browserJourney.totalExternalRequests,
+    };
+    checks = [
+      "trusted-pull-request-head",
+      "exact-subject",
+      "dedicated-worker-identity",
+      "manual-web-analytics-readback",
+      "bounded-readiness",
+      "bounded-synthetic-provider-collections",
+      "deployed-consent-journeys",
+    ];
+  } else {
+    if (
+      input.siteReadback !== null ||
+      input.deploymentReadback !== null ||
+      input.readiness !== null ||
+      input.browserJourney !== null
+    ) {
+      reject();
+    }
+    requireCleanupMeasurement(
+      input.cleanup,
+      context,
+      input.siteIdentity,
+      input.workerIdentity,
+    );
+    outcomes = [];
+    resourceDisposition = "cloudflare-only-removed-and-absence-verified";
+    measurements = {
+      siteInitialState: input.cleanup.site.initialState,
+      workerInitialState: input.cleanup.workerResource.initialState,
+    };
+    checks = [
+      "trusted-pull-request-head",
+      "exact-subject",
+      "exercise-identity-reconciled",
+      "dedicated-worker-absence",
+      "web-analytics-site-absence",
+      "operator-cleanup-pending",
+    ];
   }
-}
-
-function requireExercise(input) {
-  if (
-    !hasExactKeys(input.checks, [
-      "revisionVerified",
-      "subjectVerified",
-      "localInstallPassed",
-      "localBuildPassed",
-      "generatedCandidateVerified",
-      "deploymentVerified",
-      "consentJourneysPassed",
-      "noRequestsBeforeGrant",
-      "withdrawalReloadPassed",
-    ]) ||
-    Object.values(input.checks).some((value) => value !== true) ||
-    !hasExactKeys(input.disposition, [
-      "worker",
-      "cloudflareWebAnalyticsSite",
-      "operatorControlledProviders",
-    ]) ||
-    input.disposition.worker !== "retained-for-human-provider-confirmation" ||
-    input.disposition.cloudflareWebAnalyticsSite !==
-      "retained-for-human-provider-confirmation" ||
-    input.disposition.operatorControlledProviders !==
-      "pending-reviewed-cleanup" ||
-    !arraysEqual(input.outcomes, ["deployed-application"])
-  ) {
-    reject();
-  }
-}
-
-function requireCleanup(input) {
-  if (
-    !hasExactKeys(input.checks, [
-      "revisionVerified",
-      "subjectVerified",
-      "resourceIdentityVerified",
-      "compatibilityBaselineRecovered",
-      "compatibilityBaselineVerified",
-      "workerDeletionVerified",
-      "webAnalyticsSiteDeletionVerified",
-      "workerAbsenceVerified",
-      "webAnalyticsSiteAbsenceVerified",
-    ]) ||
-    Object.values(input.checks).some((value) => value !== true) ||
-    !hasExactKeys(input.disposition, [
-      "worker",
-      "cloudflareWebAnalyticsSite",
-      "operatorControlledProviders",
-    ]) ||
-    input.disposition.worker !== "removed-and-absence-verified" ||
-    input.disposition.cloudflareWebAnalyticsSite !==
-      "removed-and-absence-verified" ||
-    input.disposition.operatorControlledProviders !==
-      "pending-reviewed-cleanup" ||
-    !arraysEqual(input.outcomes, ["cleanup-recovery"])
-  ) {
-    reject();
-  }
-}
-
-export function createAnalyticsCertificationProviderReceiptForTesting(input) {
-  requireSharedEvidence(input);
-  requireResources(input.resources);
-  if (input.mode === "exercise") requireExercise(input);
-  else requireCleanup(input);
 
   return Object.freeze({
     schemaVersion: "1.0.0",
     ok: true,
-    mode: input.mode,
-    subject: Object.freeze({ ...input.subject }),
+    mode: context.mode,
+    subject: Object.freeze({ ...context.subject }),
     repository: exactRepository,
     headRef: exactHeadRef,
-    headSha: input.pullRequest.headSha,
+    headSha: context.pullRequest.headSha,
     environment: exactEnvironment,
     worker: exactWorker,
-    outcomes: Object.freeze([...input.outcomes]),
+    outcomes: Object.freeze(outcomes),
     providerRecordsClaimed: false,
     providerConfirmation: "pending-human-evidence",
-    resourceDisposition:
-      input.mode === "exercise"
-        ? "retained-for-human-provider-confirmation"
-        : "removed-and-absence-verified",
-    checks: Object.freeze(
-      input.mode === "exercise"
-        ? [
-            "trusted-pull-request-head",
-            "exact-subject",
-            "dedicated-non-production-target",
-            "manual-web-analytics-readback",
-            "bounded-synthetic-traffic",
-            "deployed-consent-journeys",
-          ]
-        : [
-            "trusted-pull-request-head",
-            "exact-subject",
-            "task-resource-identity",
-            "compatibility-baseline-recovery",
-            "worker-absence",
-            "web-analytics-site-absence",
-          ],
-    ),
+    resourceDisposition,
+    measurements: Object.freeze(measurements),
+    checks: Object.freeze(checks),
   });
+}
+
+export function createAnalyticsCertificationProviderReceiptForTesting(input) {
+  return createMeasuredReceipt(input);
 }
 
 async function readEvidence(path) {
@@ -293,10 +617,87 @@ async function readEvidence(path) {
   return value;
 }
 
+async function readMeasuredEvidence(directoryPath) {
+  const directory = resolve(directoryPath);
+  let statistics;
+  try {
+    statistics = await lstat(directory);
+  } catch {
+    reject();
+  }
+  if (
+    !statistics.isDirectory() ||
+    statistics.isSymbolicLink() ||
+    (statistics.mode & 0o077) !== 0
+  ) {
+    reject();
+  }
+
+  const context = await readEvidence(join(directory, "context.json"));
+  requireMeasuredContext(context);
+  const exerciseFiles = [
+    "browser-journey.json",
+    "context.json",
+    "deployment-readback.json",
+    "readiness.json",
+    "site-identity.json",
+    "site-readback.json",
+    "worker-identity.json",
+  ];
+  const cleanupFiles = [
+    "cleanup.json",
+    "context.json",
+    "site-identity.json",
+    "worker-identity.json",
+  ];
+  const expectedFiles = context.mode === "exercise" ? exerciseFiles : cleanupFiles;
+  let actualFiles;
+  try {
+    actualFiles = (await readdir(directory)).sort();
+  } catch {
+    reject();
+  }
+  if (!arraysEqual(actualFiles, expectedFiles)) reject();
+
+  const [siteIdentity, workerIdentity] = await Promise.all([
+    readEvidence(join(directory, "site-identity.json")),
+    readEvidence(join(directory, "worker-identity.json")),
+  ]);
+  if (context.mode === "exercise") {
+    const [siteReadback, deploymentReadback, readiness, browserJourney] =
+      await Promise.all([
+        readEvidence(join(directory, "site-readback.json")),
+        readEvidence(join(directory, "deployment-readback.json")),
+        readEvidence(join(directory, "readiness.json")),
+        readEvidence(join(directory, "browser-journey.json")),
+      ]);
+    return {
+      context,
+      siteIdentity,
+      workerIdentity,
+      siteReadback,
+      deploymentReadback,
+      readiness,
+      browserJourney,
+      cleanup: null,
+    };
+  }
+  return {
+    context,
+    siteIdentity,
+    workerIdentity,
+    siteReadback: null,
+    deploymentReadback: null,
+    readiness: null,
+    browserJourney: null,
+    cleanup: await readEvidence(join(directory, "cleanup.json")),
+  };
+}
+
 async function main() {
   const arguments_ = process.argv.slice(2);
-  if (arguments_.length !== 2 || arguments_[0] !== "--input") reject();
-  const evidence = await readEvidence(arguments_[1]);
+  if (arguments_.length !== 2 || arguments_[0] !== "--input-directory") reject();
+  const evidence = await readMeasuredEvidence(arguments_[1]);
   const receipt = createAnalyticsCertificationProviderReceiptForTesting(evidence);
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
 }
