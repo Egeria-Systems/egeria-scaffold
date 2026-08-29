@@ -17,8 +17,8 @@ type ProviderRequest = {
 };
 type ExternalRequest = ProviderRequest | { provider: "unexpected"; kind: "external" };
 
-function classifyRequest(request: Request, applicationHostname: string): ExternalRequest | undefined {
-  const hostname = new URL(request.url()).hostname;
+function classifyUrl(url: string, applicationHostname: string): ExternalRequest | undefined {
+  const hostname = new URL(url).hostname;
   if (hostname === applicationHostname) return undefined;
   if (hostname === "static.cloudflareinsights.com") {
     return { provider: "cloudflareWebAnalytics", kind: "script" };
@@ -48,6 +48,10 @@ function classifyRequest(request: Request, applicationHostname: string): Externa
     return { provider: "microsoftClarity", kind: "collection" };
   }
   return { provider: "unexpected", kind: "external" };
+}
+
+function classifyRequest(request: Request, applicationHostname: string): ExternalRequest | undefined {
+  return classifyUrl(request.url(), applicationHostname);
 }
 
 function action(page: Page, identifier: "allow" | "decline" | "manage") {
@@ -92,17 +96,7 @@ test("bounded synthetic consent journey reaches each provider collection only af
   const applicationRoot = new URL(deployedUrl);
   expect(applicationRoot.pathname).toBe("/");
   const requests: ExternalRequest[] = [];
-  let awaitingWithdrawalReload = false;
-  let withdrawalReloadStartIndex: number | undefined;
   page.on("request", (request) => {
-    if (
-      awaitingWithdrawalReload &&
-      withdrawalReloadStartIndex === undefined &&
-      request.isNavigationRequest() &&
-      request.frame() === page.mainFrame()
-    ) {
-      withdrawalReloadStartIndex = requests.length;
-    }
     const captured = classifyRequest(request, applicationRoot.hostname);
     if (captured !== undefined) requests.push(captured);
   });
@@ -139,7 +133,6 @@ test("bounded synthetic consent journey reaches each provider collection only af
   expect(requests.length).toBeLessThanOrEqual(requestEnvelopeLimit);
 
   await action(page, "manage").click();
-  awaitingWithdrawalReload = true;
   const reloaded = page.waitForEvent("framenavigated", {
     predicate: (frame) => frame === page.mainFrame(),
   });
@@ -154,16 +147,19 @@ test("bounded synthetic consent journey reaches each provider collection only af
   ]) {
     await expect(page.locator(`#analytics-${identifier}`)).toHaveCount(0);
   }
-  expect(withdrawalReloadStartIndex).not.toBeUndefined();
-  if (withdrawalReloadStartIndex === undefined) return;
-  const withdrawalRequests = requests.slice(withdrawalReloadStartIndex);
+  const withdrawalRequests: ExternalRequest[] = [];
+  const reloadedDocumentResources = await page.evaluate(() =>
+    performance.getEntriesByType("resource").map(({ name }) => name),
+  );
+  for (const url of reloadedDocumentResources) {
+    const captured = classifyUrl(url, applicationRoot.hostname);
+    if (captured !== undefined) withdrawalRequests.push(captured);
+  }
   expect(providerRequests(withdrawalRequests)).toEqual([]);
   expect(unexpectedRequestCount(withdrawalRequests)).toBe(0);
   expect(requests.length).toBeLessThanOrEqual(requestEnvelopeLimit);
 
-  const grantRequests = providerRequests(
-    requests.slice(grantStartIndex, withdrawalReloadStartIndex),
-  );
+  const grantRequests = providerRequests(requests.slice(grantStartIndex));
   writeFileSync(
     receiptPath,
     `${JSON.stringify({
