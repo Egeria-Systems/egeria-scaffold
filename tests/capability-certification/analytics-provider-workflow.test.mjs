@@ -394,6 +394,14 @@ test("the label workflow is protected, pinned, non-cancelling, and step-secret-i
   );
   assert.match(
     steps["Wait for dedicated Worker readiness"].run,
+    /const readinessTarget = new URL\("\/en-CA", target\);[\s\S]+fetch\(readinessTarget,/u,
+  );
+  assert.doesNotMatch(
+    steps["Wait for dedicated Worker readiness"].run,
+    /fetch\(target,/u,
+  );
+  assert.match(
+    steps["Wait for dedicated Worker readiness"].run,
     /elapsedMilliseconds[\s\S]+attempts/u,
   );
   assert.ok(

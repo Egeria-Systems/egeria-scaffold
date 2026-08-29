@@ -323,6 +323,7 @@ jobs:
             import { performance } from "node:perf_hooks";
             const target = new URL(process.env.DEPLOY_URL);
             if (!/^analytics-certification\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
+            const readinessTarget = new URL("/en-CA", target);
             const maximumAttempts = Number(process.env.MAXIMUM_ATTEMPTS);
             const intervalMilliseconds = Number(process.env.INTERVAL_MILLISECONDS);
             const requestTimeoutMilliseconds = Number(process.env.REQUEST_TIMEOUT_MILLISECONDS);
@@ -336,7 +337,7 @@ jobs:
               attempts += 1;
               const remaining = maximumElapsedMilliseconds - (performance.now() - started);
               try {
-                const response = await fetch(target, { headers: { "User-Agent": "egeria-analytics-certification-synthetic" }, redirect: "error", signal: AbortSignal.timeout(Math.max(1, Math.min(requestTimeoutMilliseconds, Math.floor(remaining)))) });
+                const response = await fetch(readinessTarget, { headers: { "User-Agent": "egeria-analytics-certification-synthetic" }, redirect: "error", signal: AbortSignal.timeout(Math.max(1, Math.min(requestTimeoutMilliseconds, Math.floor(remaining)))) });
                 status = response.status;
                 if (response.ok) { succeeded = true; break; }
               } catch {
