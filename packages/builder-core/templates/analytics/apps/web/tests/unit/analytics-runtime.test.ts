@@ -92,9 +92,12 @@ function createTestBrowser(
   const sessionStorage = {};
   const dataLayer = {
     entries: [] as unknown[][],
-    push(parameters: unknown[]) {
-      this.entries.push(parameters);
-      effects.push(`google:${String(parameters[0])}:${String(parameters[1])}`);
+    rawEntries: [] as unknown[],
+    push(parameters: unknown) {
+      const normalized = Array.from(parameters as ArrayLike<unknown>);
+      this.rawEntries.push(parameters);
+      this.entries.push(normalized);
+      effects.push(`google:${String(normalized[0])}:${String(normalized[1])}`);
       return this.entries.length;
     },
   };
@@ -246,6 +249,14 @@ describe("analytics consent runtime", () => {
         ad_personalization: "denied",
       },
     ]);
+    expect(browser.dataLayer.rawEntries).not.toHaveLength(0);
+    expect(
+      browser.dataLayer.rawEntries.every(
+        (entry) =>
+          !Array.isArray(entry) &&
+          Object.prototype.toString.call(entry) === "[object Arguments]",
+      ),
+    ).toBe(true);
     const googleDefault = effectIndex(browser.effects, "google:consent:default");
     for (const laterEffect of [
       "google:consent:update",

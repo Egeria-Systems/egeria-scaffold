@@ -54,7 +54,7 @@ type ClarityCommand = ((...parameters: unknown[]) => void) & {
 };
 
 type AnalyticsWindow = Window & {
-  dataLayer?: unknown[][];
+  dataLayer?: unknown[];
   gtag?: (...parameters: unknown[]) => void;
   clarity?: ClarityCommand;
 };
@@ -99,8 +99,10 @@ function googleCommand(
   browser: AnalyticsBrowser,
 ): (...parameters: unknown[]) => void {
   browser.window.dataLayer ??= [];
-  browser.window.gtag ??= (...parameters: unknown[]) => {
-    browser.window.dataLayer?.push(parameters);
+  browser.window.gtag ??= function () {
+    // Google Tag consumes the native Arguments shape used by its documented snippet.
+    // eslint-disable-next-line prefer-rest-params
+    browser.window.dataLayer?.push(arguments);
   };
   return browser.window.gtag;
 }
