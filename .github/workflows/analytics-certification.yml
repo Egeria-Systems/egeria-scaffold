@@ -149,10 +149,11 @@ jobs:
             const credential = process.env.CLOUDFLARE_WEB_ANALYTICS_API_TOKEN;
             if (!account || !credential) process.exit(1);
             const endpoint = `https://api.cloudflare.com/client/v4/accounts/${account}/rum/site_info`;
+            const listEndpoint = `${endpoint}/list`;
             const headers = { Authorization: `Bearer ${credential}`, "Content-Type": "application/json" };
             const controlPlaneFetch = (input, init = {}) =>
               fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
-            const existingResponse = await controlPlaneFetch(endpoint, { headers });
+            const existingResponse = await controlPlaneFetch(listEndpoint, { headers });
             const existing = await existingResponse.json();
             const existingMatches = (existing?.result ?? []).filter(({ host }) => host === target.hostname);
             if (!existingResponse.ok || existing?.success !== true || existingMatches.length !== 0) process.exit(1);
@@ -453,6 +454,7 @@ jobs:
             const analyticsHeaders = { Authorization: `Bearer ${process.env.CLOUDFLARE_WEB_ANALYTICS_API_TOKEN}` };
             const deployHeaders = { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` };
             const analyticsEndpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/rum/site_info`;
+            const analyticsListEndpoint = `${analyticsEndpoint}/list`;
             const workerEndpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/analytics-certification`;
             const controlPlaneFetch = (input, init = {}) =>
               fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
@@ -465,7 +467,7 @@ jobs:
                 currentSite = { hostname: payload.result.host, siteTag: payload.result.site_tag, siteTokenSha256: createHash("sha256").update(payload.result.site_token).digest("hex"), autoInstall: payload.result.auto_install };
               }
             } else {
-              const response = await controlPlaneFetch(analyticsEndpoint, { headers: analyticsHeaders });
+              const response = await controlPlaneFetch(analyticsListEndpoint, { headers: analyticsHeaders });
               const payload = await response.json();
               if (!response.ok || payload?.success !== true) process.exit(1);
               const matches = (payload.result ?? []).filter(({ host }) => host === context.hostname);
@@ -498,7 +500,7 @@ jobs:
               const response = await controlPlaneFetch(workerEndpoint, { method: "DELETE", headers: deployHeaders });
               if (!response.ok) process.exit(1);
             }
-            const sitesAfterResponse = await controlPlaneFetch(analyticsEndpoint, { headers: analyticsHeaders });
+            const sitesAfterResponse = await controlPlaneFetch(analyticsListEndpoint, { headers: analyticsHeaders });
             const sitesAfter = await sitesAfterResponse.json();
             const siteAbsent = sitesAfterResponse.ok && sitesAfter?.success === true && !(sitesAfter.result ?? []).some(({ host }) => host === context.hostname);
             const workerAfter = await controlPlaneFetch(workerEndpoint, { headers: deployHeaders });

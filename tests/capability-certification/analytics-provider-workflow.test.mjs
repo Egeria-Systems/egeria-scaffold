@@ -314,6 +314,10 @@ test("the label workflow is protected, pinned, non-cancelling, and step-secret-i
   assert.match(steps["Create and read back Web Analytics site"].run, /false/u);
   assert.match(
     steps["Create and read back Web Analytics site"].run,
+    /const endpoint = `https:\/\/api\.cloudflare\.com\/client\/v4\/accounts\/\$\{account\}\/rum\/site_info`;\s*const listEndpoint = `\$\{endpoint\}\/list`;/u,
+  );
+  assert.match(
+    steps["Create and read back Web Analytics site"].run,
     /existing[\s\S]+length !== 0/u,
   );
   assert.match(
@@ -401,6 +405,10 @@ test("the label workflow is protected, pinned, non-cancelling, and step-secret-i
       job.steps.indexOf(steps["Exercise deployed consent behavior"]),
   );
   assert.match(steps["Delete and verify task resources"].run, /analytics-certification/u);
+  assert.match(
+    steps["Delete and verify task resources"].run,
+    /const analyticsEndpoint = `https:\/\/api\.cloudflare\.com\/client\/v4\/accounts\/\$\{process\.env\.CLOUDFLARE_ACCOUNT_ID\}\/rum\/site_info`;\s*const analyticsListEndpoint = `\$\{analyticsEndpoint\}\/list`;/u,
+  );
   assert.match(
     steps["Delete and verify task resources"].run,
     /planAnalyticsCertificationCleanup/u,
