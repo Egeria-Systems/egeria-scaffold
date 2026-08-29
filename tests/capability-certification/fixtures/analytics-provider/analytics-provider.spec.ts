@@ -92,7 +92,17 @@ test("bounded synthetic consent journey reaches each provider collection only af
   const applicationRoot = new URL(deployedUrl);
   expect(applicationRoot.pathname).toBe("/");
   const requests: ExternalRequest[] = [];
+  let awaitingWithdrawalReload = false;
+  let withdrawalReloadStartIndex: number | undefined;
   page.on("request", (request) => {
+    if (
+      awaitingWithdrawalReload &&
+      withdrawalReloadStartIndex === undefined &&
+      request.isNavigationRequest() &&
+      request.frame() === page.mainFrame()
+    ) {
+      withdrawalReloadStartIndex = requests.length;
+    }
     const captured = classifyRequest(request, applicationRoot.hostname);
     if (captured !== undefined) requests.push(captured);
   });
@@ -129,7 +139,7 @@ test("bounded synthetic consent journey reaches each provider collection only af
   expect(requests.length).toBeLessThanOrEqual(requestEnvelopeLimit);
 
   await action(page, "manage").click();
-  const withdrawalStartIndex = requests.length;
+  awaitingWithdrawalReload = true;
   const reloaded = page.waitForEvent("framenavigated", {
     predicate: (frame) => frame === page.mainFrame(),
   });
@@ -144,13 +154,15 @@ test("bounded synthetic consent journey reaches each provider collection only af
   ]) {
     await expect(page.locator(`#analytics-${identifier}`)).toHaveCount(0);
   }
-  const withdrawalRequests = requests.slice(withdrawalStartIndex);
+  expect(withdrawalReloadStartIndex).not.toBeUndefined();
+  if (withdrawalReloadStartIndex === undefined) return;
+  const withdrawalRequests = requests.slice(withdrawalReloadStartIndex);
   expect(providerRequests(withdrawalRequests)).toEqual([]);
   expect(unexpectedRequestCount(withdrawalRequests)).toBe(0);
   expect(requests.length).toBeLessThanOrEqual(requestEnvelopeLimit);
 
   const grantRequests = providerRequests(
-    requests.slice(grantStartIndex, withdrawalStartIndex),
+    requests.slice(grantStartIndex, withdrawalReloadStartIndex),
   );
   writeFileSync(
     receiptPath,

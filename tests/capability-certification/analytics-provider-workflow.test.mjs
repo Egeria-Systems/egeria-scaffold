@@ -476,8 +476,13 @@ test("the label workflow is protected, pinned, non-cancelling, and step-secret-i
   assert.match(browserFixture, /requestEnvelopeLimit\s*=\s*64/u);
   assert.match(
     browserFixture,
-    /withdrawalStartIndex\s*=\s*requests\.length[\s\S]+action\(page,\s*"decline"\)/u,
+    /awaitingWithdrawalReload[\s\S]+request\.isNavigationRequest\(\)[\s\S]+request\.frame\(\) === page\.mainFrame\(\)[\s\S]+withdrawalReloadStartIndex = requests\.length/u,
   );
+  assert.match(
+    browserFixture,
+    /action\(page,\s*"decline"\)[\s\S]+requests\.slice\(withdrawalReloadStartIndex\)/u,
+  );
+  assert.doesNotMatch(browserFixture, /withdrawalStartIndex/u);
   assert.doesNotMatch(browserFixture, /requests\s*=\s*\[\]/u);
   assert.doesNotMatch(browserFixture, /page\.route|route\.fulfill/u);
 
