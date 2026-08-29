@@ -201,6 +201,7 @@ async function createOwnedDirectory() {
     path: identity.path,
     device: identity.device,
     inode: identity.inode,
+    birthtimeNanoseconds: identity.birthtimeNanoseconds,
   };
 }
 

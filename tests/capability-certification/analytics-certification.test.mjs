@@ -684,6 +684,26 @@ test("analytics certification fails closed on dirty, hidden-index, revision, and
 });
 
 test("analytics certification rejects unsafe roots and preserves a replacement owner during identity-safe cleanup", async () => {
+  const { pathIdentityMatches, readPathIdentity } = await import(
+    "../../scripts/lib/isolated-process.mjs"
+  );
+  const identityRoot = await mkdtemp(
+    join(tmpdir(), "analytics-path-identity-test-"),
+  );
+  try {
+    const identity = await readPathIdentity(identityRoot);
+    assert.equal(typeof identity.birthtimeNanoseconds, "bigint");
+    assert.equal(
+      await pathIdentityMatches({
+        ...identity,
+        birthtimeNanoseconds: identity.birthtimeNanoseconds + 1n,
+      }),
+      false,
+    );
+  } finally {
+    await rm(identityRoot, { recursive: true, force: true });
+  }
+
   const {
     certifyAnalyticsForTesting,
     verifyAnalyticsPortfolioForTesting,

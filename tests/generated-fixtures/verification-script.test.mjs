@@ -74,7 +74,12 @@ async function expectFixtureError(callback, expectedCode) {
 async function createKnownOwner(parent) {
   const path = await mkdtemp(join(parent, "verification-owner-"));
   const stats = await lstat(path, { bigint: true });
-  return { path, device: stats.dev, inode: stats.ino };
+  return {
+    path,
+    device: stats.dev,
+    inode: stats.ino,
+    birthtimeNanoseconds: stats.birthtimeNs,
+  };
 }
 
 async function withPortfolioVisualFixture(callback) {
