@@ -349,14 +349,44 @@ function requireReadiness(measurement, context) {
   }
 }
 
-function requireRequestPhase(phase) {
+function requireRequestPhase(
+  phase,
+  keys = ["providerRequests", "unexpectedExternalRequests"],
+) {
   return (
-    hasExactKeys(phase, ["providerRequests", "unexpectedExternalRequests"]) &&
+    hasExactKeys(phase, keys) &&
     Number.isInteger(phase.providerRequests) &&
     phase.providerRequests >= 0 &&
     Number.isInteger(phase.unexpectedExternalRequests) &&
     phase.unexpectedExternalRequests === 0
   );
+}
+
+function requireProviderMeasurements(providers, minimumRequests) {
+  if (
+    !hasExactKeys(providers, [
+      "cloudflareWebAnalytics",
+      "googleAnalytics4",
+      "microsoftClarity",
+    ])
+  ) {
+    reject();
+  }
+
+  let requestCount = 0;
+  for (const provider of Object.values(providers)) {
+    if (
+      !hasExactKeys(provider, ["scriptRequests", "collectionRequests"]) ||
+      !Number.isInteger(provider.scriptRequests) ||
+      provider.scriptRequests < minimumRequests ||
+      !Number.isInteger(provider.collectionRequests) ||
+      provider.collectionRequests < minimumRequests
+    ) {
+      reject();
+    }
+    requestCount += provider.scriptRequests + provider.collectionRequests;
+  }
+  return requestCount;
 }
 
 function requireBrowserJourney(measurement) {
@@ -369,11 +399,14 @@ function requireBrowserJourney(measurement) {
       "unexpectedExternalRequests",
       "cases",
       "providers",
-      "beforeGrant",
-      "afterGrant",
+      "freshDenial",
+      "persistedDenialReload",
+      "partialGrant",
+      "fullGrant",
       "withdrawalReload",
+      "providerSourceBoundary",
     ]) ||
-    measurement.schemaVersion !== "1.0.0" ||
+    measurement.schemaVersion !== "1.1.0" ||
     measurement.traffic !== "synthetic-only" ||
     measurement.requestEnvelopeLimit !== 64 ||
     !Number.isInteger(measurement.totalExternalRequests) ||
@@ -382,48 +415,99 @@ function requireBrowserJourney(measurement) {
     measurement.unexpectedExternalRequests !== 0 ||
     !arraysEqual(measurement.cases, [
       "fresh-denial",
+      "persisted-denial-reload",
+      "purpose-specific-partial-grant",
       "positive-grant",
       "complete-withdrawal-reload",
     ]) ||
-    !hasExactKeys(measurement.providers, [
-      "cloudflareWebAnalytics",
-      "googleAnalytics4",
-      "microsoftClarity",
+    !requireRequestPhase(measurement.freshDenial, [
+      "providerRequests",
+      "unexpectedExternalRequests",
+      "consentRecordPersisted",
+      "providerCookieCount",
     ]) ||
-    !requireRequestPhase(measurement.beforeGrant) ||
-    !requireRequestPhase(measurement.afterGrant) ||
+    measurement.freshDenial.providerRequests !== 0 ||
+    measurement.freshDenial.consentRecordPersisted !== false ||
+    measurement.freshDenial.providerCookieCount !== 0 ||
+    !requireRequestPhase(measurement.persistedDenialReload, [
+      "providerRequests",
+      "unexpectedExternalRequests",
+      "consentRecordPersisted",
+      "consentRecordSchemaVersion",
+      "deniedPurposeCount",
+      "providerCookieCount",
+    ]) ||
+    measurement.persistedDenialReload.providerRequests !== 0 ||
+    measurement.persistedDenialReload.consentRecordPersisted !== true ||
+    measurement.persistedDenialReload.consentRecordSchemaVersion !== 2 ||
+    measurement.persistedDenialReload.deniedPurposeCount !== 3 ||
+    measurement.persistedDenialReload.providerCookieCount !== 0 ||
+    !requireRequestPhase(measurement.partialGrant, [
+      "providerRequests",
+      "unexpectedExternalRequests",
+      "grantedPurpose",
+      "grantedProvider",
+      "providers",
+    ]) ||
+    measurement.partialGrant.grantedPurpose !==
+      "aggregate-traffic-and-performance" ||
+    measurement.partialGrant.grantedProvider !== "cloudflareWebAnalytics" ||
+    !requireRequestPhase(measurement.fullGrant) ||
     !hasExactKeys(measurement.withdrawalReload, [
       "providerRequests",
       "unexpectedExternalRequests",
       "captureStartedBeforeAction",
       "networkIdleObserved",
+      "consentRecordPersisted",
+      "deniedPurposeCount",
+      "providerCookiesBeforeWithdrawal",
+      "providerCookiesAfterWithdrawal",
     ]) ||
     !Number.isInteger(measurement.withdrawalReload.providerRequests) ||
     measurement.withdrawalReload.providerRequests !== 0 ||
     measurement.withdrawalReload.unexpectedExternalRequests !== 0 ||
     measurement.withdrawalReload.captureStartedBeforeAction !== true ||
-    measurement.withdrawalReload.networkIdleObserved !== true
+    measurement.withdrawalReload.networkIdleObserved !== true ||
+    measurement.withdrawalReload.consentRecordPersisted !== true ||
+    measurement.withdrawalReload.deniedPurposeCount !== 3 ||
+    !Number.isInteger(
+      measurement.withdrawalReload.providerCookiesBeforeWithdrawal,
+    ) ||
+    measurement.withdrawalReload.providerCookiesBeforeWithdrawal < 2 ||
+    measurement.withdrawalReload.providerCookiesAfterWithdrawal !== 0 ||
+    !hasExactKeys(measurement.providerSourceBoundary, [
+      "classifiedProviderRequests",
+      "unexpectedExternalRequests",
+    ]) ||
+    !Number.isInteger(
+      measurement.providerSourceBoundary.classifiedProviderRequests,
+    ) ||
+    measurement.providerSourceBoundary.unexpectedExternalRequests !== 0
   ) {
     reject();
   }
 
-  let providerRequestCount = 0;
-  for (const provider of Object.values(measurement.providers)) {
-    if (
-      !hasExactKeys(provider, ["scriptRequests", "collectionRequests"]) ||
-      !Number.isInteger(provider.scriptRequests) ||
-      provider.scriptRequests < 1 ||
-      !Number.isInteger(provider.collectionRequests) ||
-      provider.collectionRequests < 1
-    ) {
-      reject();
-    }
-    providerRequestCount += provider.scriptRequests + provider.collectionRequests;
-  }
+  const providerRequestCount = requireProviderMeasurements(
+    measurement.providers,
+    1,
+  );
+  const partialProviderRequestCount = requireProviderMeasurements(
+    measurement.partialGrant.providers,
+    0,
+  );
+  const partialProviders = measurement.partialGrant.providers;
   if (
-    measurement.beforeGrant.providerRequests !== 0 ||
-    measurement.afterGrant.providerRequests !== providerRequestCount ||
-    measurement.totalExternalRequests !== providerRequestCount
+    partialProviders.cloudflareWebAnalytics.scriptRequests < 1 ||
+    partialProviders.cloudflareWebAnalytics.collectionRequests < 1 ||
+    partialProviders.googleAnalytics4.scriptRequests !== 0 ||
+    partialProviders.googleAnalytics4.collectionRequests !== 0 ||
+    partialProviders.microsoftClarity.scriptRequests !== 0 ||
+    partialProviders.microsoftClarity.collectionRequests !== 0 ||
+    measurement.partialGrant.providerRequests !== partialProviderRequestCount ||
+    measurement.fullGrant.providerRequests !== providerRequestCount ||
+    measurement.totalExternalRequests !== providerRequestCount ||
+    measurement.providerSourceBoundary.classifiedProviderRequests !==
+      providerRequestCount
   ) {
     reject();
   }
@@ -527,6 +611,15 @@ function createMeasuredReceipt(input) {
       readinessAttempts: input.readiness.attempts,
       readinessElapsedMilliseconds: input.readiness.elapsedMilliseconds,
       externalRequestEnvelopes: input.browserJourney.totalExternalRequests,
+      deployedConsentCases: input.browserJourney.cases.length,
+      persistedDenialProviderRequests:
+        input.browserJourney.persistedDenialReload.providerRequests,
+      partialGrantProviderRequests:
+        input.browserJourney.partialGrant.providerRequests,
+      providerCookiesAfterWithdrawal:
+        input.browserJourney.withdrawalReload.providerCookiesAfterWithdrawal,
+      sourceBoundaryUnexpectedExternalRequests:
+        input.browserJourney.providerSourceBoundary.unexpectedExternalRequests,
     };
     checks = [
       "trusted-pull-request-head",
@@ -535,6 +628,10 @@ function createMeasuredReceipt(input) {
       "manual-web-analytics-readback",
       "bounded-readiness",
       "bounded-synthetic-provider-collections",
+      "persisted-denial-reload",
+      "purpose-specific-partial-grant",
+      "accessible-provider-cookie-cleanup",
+      "configured-provider-source-boundary",
       "deployed-consent-journeys",
     ];
   } else {

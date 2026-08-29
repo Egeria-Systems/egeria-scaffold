@@ -5,6 +5,8 @@ import { expect, test, type Page, type Request } from "@playwright/test";
 const receiptPath = process.env.ANALYTICS_PROVIDER_BROWSER_RECEIPT_PATH;
 const deployedUrl = process.env.PLAYWRIGHT_DEPLOYED_URL;
 const requestEnvelopeLimit = 64;
+const analyticsConsentStorageKey = "egeria.analytics.consent.v2";
+const partialGrantPurpose = "aggregate-traffic-and-performance";
 const providerIdentifiers = [
   "cloudflareWebAnalytics",
   "googleAnalytics4",
@@ -58,6 +60,10 @@ function action(page: Page, identifier: "allow" | "decline" | "manage") {
   return page.locator(`[data-analytics-consent-action="${identifier}"]`);
 }
 
+function purposeChoice(page: Page, purpose: string) {
+  return page.locator(`[data-analytics-consent-purpose="${purpose}"]`);
+}
+
 function providerRequests(requests: ExternalRequest[]) {
   return requests.filter(
     (request): request is ProviderRequest => request.provider !== "unexpected",
@@ -84,6 +90,37 @@ function providerCounts(requests: ProviderRequest[]) {
   ) as Record<ProviderIdentifier, { scriptRequests: number; collectionRequests: number }>;
 }
 
+async function providerCookieCount(page: Page): Promise<number> {
+  return page.evaluate(() =>
+    document.cookie
+      .split(";")
+      .map((cookie) => cookie.split("=", 1)[0]?.trim())
+      .filter(
+        (name) =>
+          name === "_ga" ||
+          name?.startsWith("_ga_") === true ||
+          name === "_clck" ||
+          name === "_clsk",
+      ).length,
+  );
+}
+
+async function readConsentRecord(page: Page): Promise<{
+  schemaVersion: number;
+  purposes: readonly { purpose: string; decision: string }[];
+} | null> {
+  return page.evaluate((key) => {
+    const source = window.localStorage.getItem(key);
+    return source === null ? null : JSON.parse(source);
+  }, analyticsConsentStorageKey);
+}
+
+function deniedPurposeCount(
+  record: { purposes: readonly { decision: string }[] },
+): number {
+  return record.purposes.filter(({ decision }) => decision === "denied").length;
+}
+
 test("bounded synthetic consent journey reaches each provider collection only after grant", async ({
   page,
 }) => {
@@ -105,8 +142,75 @@ test("bounded synthetic consent journey reaches each provider collection only af
   await expect(page.getByRole("complementary")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(requests).toEqual([]);
+  expect(await readConsentRecord(page)).toBeNull();
+  const freshDenial = {
+    providerRequests: 0,
+    unexpectedExternalRequests: 0,
+    consentRecordPersisted: false,
+    providerCookieCount: await providerCookieCount(page),
+  };
+  expect(freshDenial.providerCookieCount).toBe(0);
+
+  const persistedDenialStartIndex = requests.length;
+  await action(page, "decline").click();
+  await page.reload();
+  await expect(action(page, "manage")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  const persistedDenialRequests = requests.slice(persistedDenialStartIndex);
+  expect(providerRequests(persistedDenialRequests)).toEqual([]);
+  expect(unexpectedRequestCount(persistedDenialRequests)).toBe(0);
+  const persistedDenialRecord = await readConsentRecord(page);
+  expect(persistedDenialRecord).not.toBeNull();
+  if (persistedDenialRecord === null) return;
+  expect(persistedDenialRecord.schemaVersion).toBe(2);
+  expect(deniedPurposeCount(persistedDenialRecord)).toBe(3);
+  const persistedDenialReload = {
+    providerRequests: 0,
+    unexpectedExternalRequests: 0,
+    consentRecordPersisted: true,
+    consentRecordSchemaVersion: persistedDenialRecord.schemaVersion,
+    deniedPurposeCount: deniedPurposeCount(persistedDenialRecord),
+    providerCookieCount: await providerCookieCount(page),
+  };
+  expect(persistedDenialReload.providerCookieCount).toBe(0);
 
   const grantStartIndex = requests.length;
+  await action(page, "manage").click();
+  await purposeChoice(page, partialGrantPurpose).check();
+  await page.locator('[data-analytics-consent-action="save"]').click();
+  await expect
+    .poll(() => {
+      const counts = providerCounts(
+        providerRequests(requests.slice(grantStartIndex)),
+      );
+      return (
+        counts.cloudflareWebAnalytics.scriptRequests > 0 &&
+        counts.cloudflareWebAnalytics.collectionRequests > 0
+      );
+    })
+    .toBe(true);
+  await page.waitForLoadState("networkidle");
+  const partialGrantRequests = requests.slice(grantStartIndex);
+  const partialGrantProviderRequests = providerRequests(partialGrantRequests);
+  const partialGrantProviders = providerCounts(partialGrantProviderRequests);
+  expect(partialGrantProviders.googleAnalytics4).toEqual({
+    scriptRequests: 0,
+    collectionRequests: 0,
+  });
+  expect(partialGrantProviders.microsoftClarity).toEqual({
+    scriptRequests: 0,
+    collectionRequests: 0,
+  });
+  expect(unexpectedRequestCount(partialGrantRequests)).toBe(0);
+  const partialGrant = {
+    providerRequests: partialGrantProviderRequests.length,
+    unexpectedExternalRequests: 0,
+    grantedPurpose: partialGrantPurpose,
+    grantedProvider: "cloudflareWebAnalytics" as const,
+    providers: partialGrantProviders,
+  };
+
+  await action(page, "manage").click();
   await action(page, "allow").click();
   await expect
     .poll(
@@ -131,6 +235,12 @@ test("bounded synthetic consent journey reaches each provider collection only af
   }
   expect(unexpectedRequestCount(requests)).toBe(0);
   expect(requests.length).toBeLessThanOrEqual(requestEnvelopeLimit);
+  await page.evaluate(() => {
+    document.cookie = "_ga=synthetic-certification; Path=/; SameSite=Lax";
+    document.cookie = "_clck=synthetic-certification; Path=/; SameSite=Lax";
+  });
+  const providerCookiesBeforeWithdrawal = await providerCookieCount(page);
+  expect(providerCookiesBeforeWithdrawal).toBeGreaterThanOrEqual(2);
 
   await action(page, "manage").click();
   const reloaded = page.waitForEvent("framenavigated", {
@@ -158,24 +268,34 @@ test("bounded synthetic consent journey reaches each provider collection only af
   expect(providerRequests(withdrawalRequests)).toEqual([]);
   expect(unexpectedRequestCount(withdrawalRequests)).toBe(0);
   expect(requests.length).toBeLessThanOrEqual(requestEnvelopeLimit);
+  const withdrawalRecord = await readConsentRecord(page);
+  expect(withdrawalRecord).not.toBeNull();
+  if (withdrawalRecord === null) return;
+  expect(deniedPurposeCount(withdrawalRecord)).toBe(3);
+  const providerCookiesAfterWithdrawal = await providerCookieCount(page);
+  expect(providerCookiesAfterWithdrawal).toBe(0);
 
   const grantRequests = providerRequests(requests.slice(grantStartIndex));
   writeFileSync(
     receiptPath,
     `${JSON.stringify({
-      schemaVersion: "1.0.0",
+      schemaVersion: "1.1.0",
       traffic: "synthetic-only",
       requestEnvelopeLimit,
       totalExternalRequests: requests.length,
       unexpectedExternalRequests: unexpectedRequestCount(requests),
       cases: [
         "fresh-denial",
+        "persisted-denial-reload",
+        "purpose-specific-partial-grant",
         "positive-grant",
         "complete-withdrawal-reload",
       ],
       providers: providerCounts(grantRequests),
-      beforeGrant: { providerRequests: 0, unexpectedExternalRequests: 0 },
-      afterGrant: {
+      freshDenial,
+      persistedDenialReload,
+      partialGrant,
+      fullGrant: {
         providerRequests: grantRequests.length,
         unexpectedExternalRequests: 0,
       },
@@ -184,6 +304,14 @@ test("bounded synthetic consent journey reaches each provider collection only af
         unexpectedExternalRequests: 0,
         captureStartedBeforeAction: true,
         networkIdleObserved: true,
+        consentRecordPersisted: true,
+        deniedPurposeCount: deniedPurposeCount(withdrawalRecord),
+        providerCookiesBeforeWithdrawal,
+        providerCookiesAfterWithdrawal,
+      },
+      providerSourceBoundary: {
+        classifiedProviderRequests: grantRequests.length,
+        unexpectedExternalRequests: unexpectedRequestCount(requests),
       },
     })}\n`,
     { encoding: "utf8", mode: 0o600, flag: "wx" },
