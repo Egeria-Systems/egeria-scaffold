@@ -685,6 +685,79 @@ test("capability addition plan binds private settings and exact Git identity wit
   );
 });
 
+test("analytics addition planning refuses drift and binds private authority", async () => {
+  const base = await fixtureEntries("portfolio");
+  for (const overrides of [
+    new Map([
+      [
+        "apps/web/next.config.ts",
+        { kind: "file", content: "private managed drift\n" },
+      ],
+    ]),
+    new Map([["apps/web/app/layout.tsx", { kind: "missing" }]]),
+    new Map([
+      [
+        "apps/web/app/layout.tsx",
+        { kind: "file", content: "private application customization\n" },
+      ],
+    ]),
+  ]) {
+    assertFailure(
+      await planFromEntries(base, {
+        capability: "analytics",
+        settings: analyticsSettings,
+        overrides,
+      }),
+      "PROJECT_DRIFT_DETECTED",
+    );
+  }
+
+  const changedSettings = structuredClone(analyticsSettings);
+  changedSettings.providers.googleAnalytics4.measurementId = "G-PRIVATE654321";
+  const first = await planFromEntries(base, {
+    capability: "analytics",
+    settings: analyticsSettings,
+  });
+  const repeated = await planFromEntries(base, {
+    capability: "analytics",
+    settings: analyticsSettings,
+  });
+  const changed = await planFromEntries(base, {
+    capability: "analytics",
+    settings: changedSettings,
+  });
+  const changedGit = await planFromEntries(base, {
+    capability: "analytics",
+    settings: analyticsSettings,
+    git: {
+      ...git,
+      identity: {
+        ...git.identity,
+        attachedRef: "refs/heads/another-transactional-change",
+      },
+    },
+  });
+  assert.equal(first.ok, true);
+  assert.equal(repeated.ok, true);
+  assert.equal(changed.ok, true);
+  assert.equal(changedGit.ok, true);
+  assert.deepEqual(repeated.value, first.value);
+  assert.notEqual(changed.value.planFingerprint, first.value.planFingerprint);
+  assert.notEqual(changedGit.value.planFingerprint, first.value.planFingerprint);
+  assert.deepEqual(
+    { ...changed.value, planFingerprint: first.value.planFingerprint },
+    first.value,
+  );
+  assert.deepEqual(
+    { ...changedGit.value, planFingerprint: first.value.planFingerprint },
+    first.value,
+  );
+  assert.doesNotMatch(
+    JSON.stringify([first, repeated, changed, changedGit]),
+    /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|G-TEST123456|G-PRIVATE654321|clarity123|search-console-verification-token|another-transactional-change/iu,
+  );
+});
+
 test("capability addition plan propagates unexpected reader failures for boundary containment", async () => {
   await assert.rejects(
     planFromEntries(await fixtureEntries("portfolio"), {

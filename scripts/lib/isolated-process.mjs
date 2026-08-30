@@ -51,6 +51,7 @@ export async function readPathIdentity(path) {
     path,
     device: stats.dev,
     inode: stats.ino,
+    birthtimeNanoseconds: stats.birthtimeNs,
     isDirectory: stats.isDirectory(),
     isSymbolicLink: stats.isSymbolicLink(),
   };
@@ -63,7 +64,8 @@ export async function pathIdentityMatches(identity) {
       !currentIdentity.isSymbolicLink &&
       currentIdentity.isDirectory &&
       currentIdentity.device === identity.device &&
-      currentIdentity.inode === identity.inode
+      currentIdentity.inode === identity.inode &&
+      currentIdentity.birthtimeNanoseconds === identity.birthtimeNanoseconds
     );
   } catch {
     return false;

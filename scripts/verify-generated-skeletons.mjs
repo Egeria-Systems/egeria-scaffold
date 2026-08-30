@@ -760,6 +760,7 @@ async function createGeneratedFixtureOwner() {
     path: identity.path,
     device: identity.device,
     inode: identity.inode,
+    birthtimeNanoseconds: identity.birthtimeNanoseconds,
   };
 }
 

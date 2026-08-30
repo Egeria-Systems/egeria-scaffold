@@ -2395,7 +2395,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+pass[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending analytics subject/i,
+    /analytics@0\.1\.0[^\n]+certified[^\n]+a97341ea628210b6fa713fb12461084f20c3f8da[^\n]+descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/i,
   );
 });
 
@@ -2896,7 +2896,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /descriptor admission[^\n]+pass[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+reject[^\n]+pending analytics subject/iu,
+    /analytics@0\.1\.0[^\n]+certified[^\n]+a97341ea628210b6fa713fb12461084f20c3f8da[^\n]+descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/iu,
   );
   assert.match(
     enforcementMap,
@@ -3228,7 +3228,7 @@ test("canonical documentation accepts profile-transition execution and records t
 
   assert.match(
     overview,
-    /Existing-repository mutation[^\n]+Calendly and multilingual addition\/removal[^\n]+standards and site-routing upgrades[^\n]+portfolio-to-site transition[^\n]+analytics addition\/removal[^\n]+current isolated candidate[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+Exact Calendly certification[^\n]+protected-staging\/provider journey[^\n]+Exact standards certification[^\n]+compiled upgrade\/refusal\/recovery[^\n]+renewed fresh-scaffold evidence[^\n]+generic lifecycle executor[^\n]+any further upgrade or profile-transition edge[^\n]+automated recovery/iu,
+    /Existing-repository mutation[^\n]+Calendly, multilingual, and analytics addition\/removal[^\n]+standards and site-routing upgrades[^\n]+portfolio-to-site transition[^\n]+analytics implementation[^\n]+aa0bcd7e315b11f07e0f4207d11e230ce911b2f4[^\n]+532a7cd6e874db13ac8c4b1d2f376abe83862772[^\n]+Exact Calendly certification[^\n]+protected-staging\/provider journey[^\n]+Exact standards certification[^\n]+compiled upgrade\/refusal\/recovery[^\n]+renewed fresh-scaffold evidence[^\n]+analytics@0\.1\.0[^\n]+a97341ea628210b6fa713fb12461084f20c3f8da[^\n]+generic lifecycle executor[^\n]+any further upgrade or profile-transition edge[^\n]+automated recovery/iu,
   );
   assert.match(
     overview,
@@ -3866,7 +3866,7 @@ test("analytics implementation is independently selectable and serialized behind
   );
   assert.match(
     overview,
-    /pending[^.]+analytics certification[^.]+separate successor/iu,
+    /separate analytics certification[^.]+accepted[^.]+exact five-outcome receipt/iu,
   );
 
   for (const boundaryOwner of [sourcePlan, roadmap, overview, capabilityModel]) {

@@ -330,7 +330,11 @@ async function runApply(repository, overrides = {}) {
   };
 }
 
-async function expectedSuccessfulArtifacts(entries, plan) {
+async function expectedSuccessfulArtifacts(
+  entries,
+  plan,
+  capability = "booking-calendly",
+) {
   const currentProject = core.parseProjectYaml(entries.get(".egeria/project.yaml"));
   const currentState = core.parseStateJson(entries.get(".egeria/state.json"));
   assert.equal(currentProject.ok, true);
@@ -343,7 +347,7 @@ async function expectedSuccessfulArtifacts(entries, plan) {
   const nextProject = {
     ...currentProject.value,
     selectedCapabilities: currentProject.value.selectedCapabilities.filter(
-      (identifier) => identifier !== "booking-calendly",
+      (identifier) => identifier !== capability,
     ),
     capabilitySettings: {},
     ejectedAreas: [...new Set([
@@ -379,7 +383,7 @@ async function expectedSuccessfulArtifacts(entries, plan) {
   expectedFiles.set(".egeria/project.yaml", projectSource);
   const removalMigration = {
     schemaVersion: "1.0.0",
-    identifier: "remove-booking-calendly-0-1-0",
+    identifier: `remove-${capability}-0-1-0`,
     kind: "migration",
     outcome: "succeeded",
     completedAt,
@@ -439,7 +443,7 @@ async function expectedSuccessfulArtifacts(entries, plan) {
     installedCapabilities: core.createInstalledManifest(desired.value.resolved),
     appliedMigrations: [
       ...currentState.value.appliedMigrations,
-      "remove-booking-calendly-0-1-0",
+      `remove-${capability}-0-1-0`,
     ],
     managedSurfaces: nextSurfaces,
     ejections: nextProject.ejectedAreas,
@@ -1632,4 +1636,162 @@ test("capability removal retains persisted receipts on post-state, final-diff, a
   assert.equal(raceRepository.files.get(".egeria/migrations.jsonl"), expected.migrationSource);
   assert.equal(raceRepository.files.get(".egeria/state.json"), expected.stateSource);
   assert.equal(raceRepository.files.get(deletedPath), "concurrent final file\n");
+});
+
+test("analytics removal retains failure prefixes and final authority", async () => {
+  const entries = await installedEntries("portfolio", {
+    booking: false,
+    analytics: true,
+  });
+  const oldState = entries.get(".egeria/state.json");
+  const oldMigrations = entries.get(".egeria/migrations.jsonl");
+
+  const unsafeRepository = createRepository(entries);
+  const unsafeBefore = snapshot(unsafeRepository.files);
+  const unsafe = await runApply(unsafeRepository, {
+    capability: "analytics",
+    root: "relative/project",
+  });
+  assert.deepEqual(unsafe.result, {
+    ok: false,
+    code: "GIT_WORKTREE_IDENTITY_INVALID",
+    phase: "precondition",
+    recovery: "not-required",
+  }, "unsafe root refusal");
+  assert.equal(snapshot(unsafeRepository.files), unsafeBefore);
+  assert.deepEqual(unsafeRepository.writes, []);
+
+  const partialRepository = createRepository(entries);
+  const partialPlan = await approvedPlan(partialRepository.reader, "analytics");
+  partialRepository.writer.write = async (changes) => {
+    const first = changes[0];
+    assert.ok(first);
+    if (first.kind === "delete-file") {
+      partialRepository.files.delete(first.path);
+    } else {
+      partialRepository.files.set(first.path, decoder.decode(first.content));
+    }
+    return { ok: false, sourceChanged: true };
+  };
+  const partial = await runApply(partialRepository, {
+    capability: "analytics",
+  });
+  assert.deepEqual(partial.result, {
+    ok: false,
+    code: "CAPABILITY_TRANSFORM_FAILED",
+    phase: "transform",
+    recovery: "inspect-worktree",
+  }, "partial transform failure");
+  assert.notEqual(
+    partialRepository.files.get(partialPlan.actions[0].path),
+    entries.get(partialPlan.actions[0].path),
+  );
+
+  const verificationRepository = createRepository(entries);
+  const verification = await runApply(verificationRepository, {
+    capability: "analytics",
+    verifier: {
+      prepareLockfile() {
+        throw new Error("not used");
+      },
+      verifyInIsolatedCopy() {
+        return Promise.resolve({ ok: false, issues: [] });
+      },
+    },
+  });
+  assert.deepEqual(verification.result, {
+    ok: false,
+    code: "CAPABILITY_VERIFICATION_FAILED",
+    phase: "verify",
+    recovery: "inspect-worktree",
+  }, "verification failure");
+  assert.equal(verificationRepository.files.get(".egeria/state.json"), oldState);
+  assert.equal(
+    verificationRepository.files.get(".egeria/migrations.jsonl"),
+    oldMigrations,
+  );
+  assert.equal(verificationRepository.writes.length, 1);
+
+  const planRepository = createRepository(entries);
+  const plan = await approvedPlan(planRepository.reader, "analytics");
+  const expected = await expectedSuccessfulArtifacts(entries, plan, "analytics");
+  const stateRepository = createRepository(entries, { failBatch: 3 });
+  const stateFailure = await runApply(stateRepository, {
+    capability: "analytics",
+  });
+  assert.deepEqual(stateFailure.result, {
+    ok: false,
+    code: "CAPABILITY_STATE_WRITE_FAILED",
+    phase: "persist-state",
+    recovery: "inspect-worktree",
+  }, "state persistence failure");
+  assert.equal(stateRepository.files.get(".egeria/state.json"), oldState);
+  assert.equal(
+    stateRepository.files.get(".egeria/migrations.jsonl"),
+    expected.migrationSource,
+  );
+
+  const postStateRepository = createRepository(entries, {
+    afterWrite({ batch, files }) {
+      if (batch === 3) {
+        files.set(
+          ".egeria/migrations.jsonl",
+          files
+            .get(".egeria/migrations.jsonl")
+            .replace(completedAt, "2026-08-22T15:00:00.001Z"),
+        );
+      }
+    },
+  });
+  const postState = await runApply(postStateRepository, {
+    capability: "analytics",
+  });
+  assert.deepEqual(postState.result, {
+    ok: false,
+    code: "CAPABILITY_POST_STATE_FAILED",
+    phase: "post-state",
+    recovery: "inspect-worktree",
+  }, "post-state failure");
+  assert.equal(
+    postStateRepository.files.get(".egeria/state.json"),
+    expected.stateSource,
+  );
+
+  const finalDiffRepository = createRepository(entries);
+  const finalDiff = await runApply(finalDiffRepository, {
+    capability: "analytics",
+    inspectExpectedChanges: () =>
+      Promise.resolve({ ok: false, code: "GIT_WORKTREE_CHANGED" }),
+  });
+  assert.deepEqual(finalDiff.result, {
+    ok: false,
+    code: "GIT_WORKTREE_CHANGED",
+    phase: "final-diff",
+    recovery: "inspect-worktree",
+  }, "final diff refusal");
+  assert.equal(
+    finalDiffRepository.files.get(".egeria/state.json"),
+    expected.stateSource,
+  );
+
+  const finalBytesRepository = createRepository(entries);
+  const deletedPath = plan.actions.find(({ kind }) => kind === "delete-file").path;
+  const finalBytes = await runApply(finalBytesRepository, {
+    capability: "analytics",
+    inspectExpectedChanges: () => {
+      finalBytesRepository.files.set(deletedPath, "concurrent final file\n");
+      return Promise.resolve({ ok: true });
+    },
+  });
+  assert.deepEqual(finalBytes.result, {
+    ok: false,
+    code: "CAPABILITY_POST_STATE_FAILED",
+    phase: "post-state",
+    recovery: "inspect-worktree",
+  }, "final byte refusal");
+  assert.equal(finalBytesRepository.files.get(".egeria/state.json"), expected.stateSource);
+  assert.equal(
+    finalBytesRepository.files.get(deletedPath),
+    "concurrent final file\n",
+  );
 });

@@ -63,6 +63,10 @@ const multilingualEvidenceRevision =
 const analyticsPlanPath =
   "docs/superpowers/plans/2026-08-27-analytics-capability-certification.md";
 const analyticsPlanUrl = new URL(`../../../${analyticsPlanPath}`, import.meta.url);
+const analyticsEvidencePath =
+  "docs/implementation-evidence/2026-08-28-analytics-capability-certification-receipt.md";
+const analyticsEvidenceRevision =
+  "a97341ea628210b6fa713fb12461084f20c3f8da";
 const deploymentEvidencePath =
   "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md";
 const deploymentEvidenceRevision =
@@ -537,7 +541,7 @@ test("current multilingual subject has exact reviewed lifecycle and fresh-scaffo
   );
 });
 
-test("current analytics subject is admitted only as pending certification", () => {
+test("current analytics subject has exact reviewed certification evidence", () => {
   const descriptor = descriptorsByIdentifier.get("analytics");
   assert.notEqual(descriptor, undefined);
   const subject = core.createCertificationSubject(
@@ -549,9 +553,7 @@ test("current analytics subject is admitted only as pending certification", () =
     subject.behaviorContractDigest,
     previousAnalyticsDescriptorDigest,
   );
-  assert.equal(committedRegistry.records.analytics.status, "pending");
-  assert.deepEqual(committedRegistry.records.analytics.evidence, []);
-  assert.deepEqual(committedRegistry.records.analytics, {
+  const acceptedRecord = {
     subject,
     requiredEvidence: [
       "cleanup-recovery",
@@ -560,10 +562,37 @@ test("current analytics subject is admitted only as pending certification", () =
       "fresh-scaffold",
       "provider-confirmed",
     ],
-    status: "pending",
+    status: "certified",
     taskPlan: analyticsPlanPath,
-    evidence: [],
-  });
+    evidence: requiredEvidence.analytics.map((kind) => ({
+      kind,
+      path: analyticsEvidencePath,
+      outcome: "passed",
+      revision: analyticsEvidenceRevision,
+      subject,
+    })),
+  };
+  const acceptedReceiptUrl = new URL(
+    `../../../${analyticsEvidencePath}`,
+    import.meta.url,
+  );
+
+  assert.deepEqual(committedRegistry.records.analytics, acceptedRecord);
+  assert.equal(existsSync(acceptedReceiptUrl), true, analyticsEvidencePath);
+  assert.deepEqual(
+    core.validateCertificationArtifacts({
+      registry: {
+        schemaVersion: "1.0.0",
+        records: { analytics: acceptedRecord },
+      },
+      artifacts: {
+        [analyticsPlanPath]: "# approved plan",
+        [analyticsEvidencePath]: readFileSync(acceptedReceiptUrl, "utf8"),
+      },
+      validRevisions: [analyticsEvidenceRevision],
+    }),
+    { ok: true, value: undefined },
+  );
 });
 
 test(

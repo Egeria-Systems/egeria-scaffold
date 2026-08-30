@@ -270,7 +270,7 @@
       "path": "apps/web/tests/unit/analytics-provider-contract.test.ts"
     },
     {
-      "fingerprint": "sha256:491440d4e83b491b8c643c1f3508a9cfa0af16e73ca5733c1ef65e2bd41331c3",
+      "fingerprint": "sha256:667874813d58f0dc00dd2f006d6283bd43daeeb00a1d257fd0ae3d05985f5a2d",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -284,7 +284,7 @@
       "path": "apps/web/src/integrations/analytics/analytics-runtime.ts"
     },
     {
-      "fingerprint": "sha256:d549a04d68c551cd27e603bb5fb7c18580fb11134ea72167cdebea67bda6011e",
+      "fingerprint": "sha256:b5501dcaa6c18b57fa92159292a120490ae5c813d00c9f9ceffe0632b4f5f6ef",
       "fingerprintTarget": {
         "kind": "file"
       },

@@ -6322,6 +6322,40 @@ test("the compiled CLI preserves analytics and multilingual across both install 
   }
 });
 
+test("the compiled CLI refuses duplicate analytics addition without repository mutation", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    await withGitFixture(
+      profile,
+      async ({ linked, primary }) => {
+        const linkedBefore = await gitRepositorySnapshot(linked);
+        const primaryBefore = await gitRepositorySnapshot(primary);
+
+        const execution = await executeBuiltPlanAnalyticsAdd(linked);
+
+        assert.equal(execution.exitCode, 1, execution.stderr);
+        assert.equal(execution.stdout, "");
+        assert.deepEqual(execution.stderr.trimEnd().split("\n"), [
+          JSON.stringify({
+            ok: false,
+            command: "plan-add",
+            code: "CAPABILITY_ALREADY_INSTALLED",
+          }),
+        ]);
+        assert.deepEqual(await gitRepositorySnapshot(linked), linkedBefore);
+        assert.deepEqual(await gitRepositorySnapshot(primary), primaryBefore);
+        assert.doesNotMatch(
+          execution.stderr,
+          /0123456789abcdef|G-ABCDEF1234|clarity123|search-console-verification-token|refs\/heads|\.git\/worktrees/u,
+        );
+      },
+      {
+        analytics: analyticsSettings,
+        branch: `${profile}-duplicate-analytics-refusal-test`,
+      },
+    );
+  }
+});
+
 test("the compiled CLI completes exact add-remove-re-add transactions", async () => {
   for (const profile of ["portfolio", "site"]) {
     await withGitFixture(profile, async ({ linked, primary }) => {
