@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "1.0.0",
+  "synthetic": true,
+  "identifier": "harbour-light-studio",
+  "displayName": "Harbour Light Studio",
+  "profile": "site",
+  "canonicalOrigin": "https://harbour-light.example",
+  "destinationRoot": "apps/web",
+  "defaultLocale": "en-CA",
+  "locales": [
+    "en-CA",
+    "fr-CA"
+  ],
+  "selectedCapabilities": [
+    {
+      "identifier": "site-routing",
+      "version": "0.4.0"
+    },
+    {
+      "identifier": "multilingual",
+      "version": "0.1.0"
+    },
+    {
+      "identifier": "analytics",
+      "version": "0.1.0"
+    }
+  ],
+  "analytics": {
+    "consentPolicy": "explicit-opt-in",
+    "cloudflareWebAnalytics": "selected-external-test-token",
+    "googleAnalytics4": "disabled",
+    "microsoftClarity": "disabled",
+    "searchConsole": "disabled",
+    "lookerStudio": "disabled"
+  },
+  "bookingCalendly": "disabled",
+  "supportedRoutes": [
+    "/en-CA",
+    "/en-CA/about",
+    "/en-CA/work/featured",
+    "/fr-CA",
+    "/fr-CA/about",
+    "/fr-CA/work/featured"
+  ],
+  "reviewOwnership": {
+    "content": "synthetic-fixture-maintainer",
+    "french": "human-review-required",
+    "provider": "operator-owned-test-account",
+    "deployment": "test-deploy-operator"
+  },
+  "payloadManifestSha256": "2948c53b36b367c17891d8166877f77b2ca4ef5610992169e2390a657ffcd667",
+  "contentCoupledExpectation": {
+    "path": "apps/web/tests/e2e/site-routing.spec.ts",
+    "sourceSha256": "8c5bac002c3842dc67e16b4ea05b1a1904057dee4f56761c98bace667ea3f69e",
+    "targetSha256": "2924a763aa465ae8abde4da00e5f9bc27c1fe3760ad0baec79552a9653f5c294",
+    "from": "https://example.com",
+    "to": "https://harbour-light.example",
+    "expectedOccurrences": 3
+  },
+  "contentFiles": [
+    "content/en-CA/localized-content.yaml",
+    "content/fr-CA/localized-content.yaml",
+    "content/en-CA/analytics.yaml",
+    "content/fr-CA/analytics.yaml",
+    "content/en-CA/routing.yaml",
+    "content/en-CA/site.yaml",
+    "content/en-CA/about.yaml",
+    "content/en-CA/work-featured.yaml",
+    "content/en-CA/not-found.yaml",
+    "content/en-CA/observability.yaml",
+    "content/en-CA/long-form/introduction.md"
+  ],
+  "prohibitedContentClasses": [
+    "non-example-email",
+    "non-reserved-domain",
+    "home-directory-path",
+    "provider-credential",
+    "starter-identity",
+    "starter-project-copy"
+  ],
+  "allowedExternalPrefix": "https://example.com/harbour-light/",
+  "deferred": [
+    "assets",
+    "standalone-legal",
+    "standalone-privacy",
+    "booking",
+    "payment",
+    "screening",
+    "production-domain"
+  ],
+  "claimLimits": [
+    "synthetic-client-journey-only",
+    "no-client-approval-claim",
+    "no-french-certification-claim",
+    "no-provider-certification-claim",
+    "no-wcag-conformance-claim",
+    "no-production-readiness-claim"
+  ]
+}

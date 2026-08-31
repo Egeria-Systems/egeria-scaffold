@@ -1,0 +1,20 @@
+metadata:
+  title: Page not found
+  description: The requested test page could not be found.
+sections:
+  - id: page-not-found
+    type: hero
+    variant: default
+    enabled: true
+    content:
+      heading: Page not found
+      summary: Check the address or use the navigation to continue through the test site.
+  - id: return-home
+    type: call-to-action
+    variant: default
+    enabled: true
+    content:
+      heading: Return to the homepage
+      summary: Continue from the main test page.
+      label: Go home
+      href: /

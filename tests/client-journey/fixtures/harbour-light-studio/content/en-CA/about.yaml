@@ -1,0 +1,18 @@
+metadata:
+  title: About Harbour Light Studio
+  description: Learn about this fictional studio and its synthetic service approach.
+sections:
+  - id: about-introduction
+    type: hero
+    variant: default
+    enabled: true
+    content:
+      heading: About Harbour Light Studio
+      summary: A fictional, client-shaped scenario for testing a bilingual public site.
+  - id: about-practice
+    type: text
+    variant: default
+    enabled: true
+    content:
+      heading: The test approach
+      body: The synthetic copy emphasizes clear choices, a gentle tone, and direct routes without making claims about a real person or business.

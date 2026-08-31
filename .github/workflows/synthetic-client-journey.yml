@@ -1,0 +1,239 @@
+name: Synthetic client journey
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_revision:
+        description: Exact accepted main revision approved for the synthetic journey
+        required: true
+        type: string
+      cloudflare_web_analytics_site_token:
+        description: Operator-owned test Web Analytics site token
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-deploy
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  verify-and-deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment:
+      name: test-deploy
+      url: ${{ vars.DEPLOY_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Verify approved revision
+        env:
+          EXPECTED_REVISION: ${{ inputs.expected_revision }}
+        run: node scripts/verify-approved-revision.mjs
+
+      - name: Verify approved predecessor
+        run: git merge-base --is-ancestor af3e927e542d322edd1b8200507de43276d02375 "$GITHUB_SHA"
+
+      - name: Install builder dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check capability admission
+        run: pnpm run check:capability-certification
+
+      - name: Check capability closure
+        run: node scripts/check-capability-certification.mjs --closure all-certified
+
+      - name: Build builder
+        run: pnpm run build:builder
+
+      - name: Validate and mask test site token
+        env:
+          CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN: ${{ inputs.cloudflare_web_analytics_site_token }}
+        run: |
+          echo "::add-mask::$CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN"
+          printf '%s' "$CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN" | grep -Eq '^[0-9a-f]{32}$'
+          printf 'CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN=%s\n' "$CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN" >> "$GITHUB_ENV"
+
+      - name: Generate synthetic client project
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+        run: |
+          mkdir -p "$(dirname "$JOURNEY_ROOT")"
+          node apps/cli/dist/index.js create \
+            --profile site \
+            --name harbour-light-studio \
+            --display-name "Harbour Light Studio" \
+            --directory "$JOURNEY_ROOT" \
+            --multilingual \
+            --cloudflare-web-analytics-token "$CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN"
+          printf 'CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN=\n' >> "$GITHUB_ENV"
+          unset CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN
+
+      - name: Record pristine generated baseline
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+        run: |
+          git init -b main "$JOURNEY_ROOT"
+          git -C "$JOURNEY_ROOT" config user.name "Synthetic Journey Workflow"
+          git -C "$JOURNEY_ROOT" config user.email "synthetic-journey@example.com"
+          git -C "$JOURNEY_ROOT" add .
+          git -C "$JOURNEY_ROOT" commit -m "Record pristine synthetic scaffold"
+
+      - name: Apply synthetic client packet
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+          RECEIPT_ROOT: ${{ runner.temp }}/synthetic-client-journey-receipts
+        run: |
+          mkdir -p "$RECEIPT_ROOT"
+          node scripts/apply-synthetic-client-packet.mjs --project-root "$JOURNEY_ROOT" > "$RECEIPT_ROOT/packet-application.json"
+
+      - name: Verify generated state and write summary
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+          RECEIPT_ROOT: ${{ runner.temp }}/synthetic-client-journey-receipts
+        run: |
+          node apps/cli/dist/index.js infer --directory "$JOURNEY_ROOT" > "$RUNNER_TEMP/synthetic-client-infer.json"
+          node apps/cli/dist/index.js doctor --directory "$JOURNEY_ROOT" > "$RUNNER_TEMP/synthetic-client-doctor.json"
+          node apps/cli/dist/index.js diff --directory "$JOURNEY_ROOT" > "$RUNNER_TEMP/synthetic-client-diff.json"
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            import { createRequire } from "node:module";
+            import { resolve } from "node:path";
+            import { isDeepStrictEqual } from "node:util";
+            const readResult = (name) => JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/synthetic-client-${name}.json`, "utf8"));
+            const infer = readResult("infer");
+            const doctor = readResult("doctor");
+            const diff = readResult("diff");
+            const fail = (code) => { process.stderr.write(`${code}\n`); process.exit(1); };
+            if (infer.ok !== true || infer.result?.state?.kind !== "valid") fail("INFER_STATE_INVALID");
+            if (doctor.ok !== true || doctor.result?.healthy !== true || doctor.result?.diagnostics?.length !== 0) fail("DOCTOR_HEALTH_INVALID");
+            if (diff.ok !== true || diff.result?.equal !== true || diff.result?.differences?.length !== 0) fail("DIFF_STATE_INVALID");
+            const state = infer.result.state.value;
+            const capabilities = state.installedCapabilities.map(({ identifier, version }) => ({ identifier, version }));
+            for (const expected of [{ identifier: "site-routing", version: "0.4.0" }, { identifier: "multilingual", version: "0.1.0" }, { identifier: "analytics", version: "0.1.0" }]) {
+              if (!capabilities.some((value) => isDeepStrictEqual(value, expected))) process.exit(1);
+            }
+            const requireFromBuilderCore = createRequire(resolve("packages/builder-core/package.json"));
+            const { parse } = requireFromBuilderCore("yaml");
+            const project = parse(readFileSync(`${process.env.JOURNEY_ROOT}/.egeria/project.yaml`, "utf8"));
+            const providers = project.capabilitySettings?.analytics?.providers;
+            if (!isDeepStrictEqual(Object.keys(providers ?? {}), ["cloudflareWebAnalytics"])) process.exit(1);
+            if (!/^[0-9a-f]{32}$/u.test(providers.cloudflareWebAnalytics.siteToken)) process.exit(1);
+            if (project.capabilitySettings.analytics.consent?.policy !== "explicit-opt-in") process.exit(1);
+            const summary = { schemaVersion: "1.0.0", synthetic: true, state: "valid", diagnostics: "healthy", diff: "equal", capabilities: capabilities.filter(({ identifier }) => ["site-routing", "multilingual", "analytics"].includes(identifier)) };
+            writeFileSync(`${process.env.RECEIPT_ROOT}/generated-verification.json`, `${JSON.stringify(summary)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
+          '
+
+      - name: Install generated dependencies
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+        run: pnpm --dir "$JOURNEY_ROOT" install --frozen-lockfile
+
+      - name: Check generated dependency integrity
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+        run: |
+          pnpm --dir "$JOURNEY_ROOT" peers check
+          pnpm --dir "$JOURNEY_ROOT" audit --audit-level moderate
+          pnpm --dir "$JOURNEY_ROOT" audit signatures
+
+      - name: Run generated static and unit checks
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+        run: |
+          pnpm --dir "$JOURNEY_ROOT" run lint
+          pnpm --dir "$JOURNEY_ROOT/apps/web" run cf-typegen
+          pnpm --dir "$JOURNEY_ROOT" run typecheck
+          pnpm --dir "$JOURNEY_ROOT" run test:unit
+          pnpm --dir "$JOURNEY_ROOT" run test:component
+
+      - name: Build and prepare generated project
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+        run: |
+          pnpm --dir "$JOURNEY_ROOT" run build
+          pnpm --dir "$JOURNEY_ROOT/apps/web" exec opennextjs-cloudflare build --skipNextBuild
+          pnpm --dir "$JOURNEY_ROOT/apps/web" run browser:install:ci
+
+      - name: Run generated local browser checks
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+        run: |
+          pnpm --dir "$JOURNEY_ROOT/apps/web" run test:e2e:dev
+          pnpm --dir "$JOURNEY_ROOT/apps/web" run test:e2e:preview
+
+      - name: Add deployed-only journey specification
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+        run: cp tests/client-journey/synthetic-client-deployed.spec.ts "$JOURNEY_ROOT/apps/web/tests/e2e/synthetic-client-deployed.spec.ts"
+
+      - name: Deploy synthetic client Worker
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          pnpm --dir "$JOURNEY_ROOT/apps/web" exec opennextjs-cloudflare deploy --name test-deploy
+
+      - name: Test deployed synthetic client journey
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+          PLAYWRIGHT_DEPLOYED_URL: ${{ vars.DEPLOY_URL }}
+          SYNTHETIC_CLIENT_BROWSER_RECEIPT_PATH: ${{ runner.temp }}/synthetic-client-journey-receipts/deployed-browser.json
+        run: |
+          test -n "$PLAYWRIGHT_DEPLOYED_URL"
+          pnpm --dir "$JOURNEY_ROOT/apps/web" run test:e2e:deployed -- tests/e2e/synthetic-client-deployed.spec.ts
+
+      - name: Validate content-safe receipts
+        env:
+          RECEIPT_ROOT: ${{ runner.temp }}/synthetic-client-journey-receipts
+        run: |
+          for receipt in packet-application.json generated-verification.json deployed-browser.json; do
+            test -f "$RECEIPT_ROOT/$receipt"
+            test "$(wc -l < "$RECEIPT_ROOT/$receipt")" -eq 1
+            test "$(wc -c < "$RECEIPT_ROOT/$receipt")" -le 4096
+          done
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const names = ["packet-application.json", "generated-verification.json", "deployed-browser.json"];
+            const values = names.map((name) => JSON.parse(readFileSync(`${process.env.RECEIPT_ROOT}/${name}`, "utf8")));
+            if (values.some((value) => value.synthetic !== true || value.schemaVersion !== "1.0.0")) process.exit(1);
+            const deployed = values[2];
+            if (deployed.cloudflareScriptRequestObserved !== true || deployed.noProviderRequestAfterWithdrawal !== true || deployed.automatedAxeViolations !== 0) {
+              process.stderr.write("DEPLOYED_BROWSER_RECEIPT_INVALID\n");
+              process.exit(1);
+            }
+            const serialized = JSON.stringify(values);
+            if (/\/(?:Users|home)\/|https?:\/\//u.test(serialized)) process.exit(1);
+          '
+
+      - name: Upload content-safe journey receipts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: synthetic-client-journey-receipts
+          path: |
+            ${{ runner.temp }}/synthetic-client-journey-receipts/packet-application.json
+            ${{ runner.temp }}/synthetic-client-journey-receipts/generated-verification.json
+            ${{ runner.temp }}/synthetic-client-journey-receipts/deployed-browser.json
+          if-no-files-found: error
+          retention-days: 7

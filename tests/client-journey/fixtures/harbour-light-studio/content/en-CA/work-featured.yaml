@@ -1,0 +1,24 @@
+metadata:
+  title: Offerings
+  description: Explore the fictional guided-reflection sessions and workshops.
+sections:
+  - id: featured-work-introduction
+    type: hero
+    variant: default
+    enabled: true
+    content:
+      heading: Ways to engage
+      summary: Compare two fictional offerings within the supported project-list layout.
+  - id: featured-work
+    type: project-list
+    variant: default
+    enabled: true
+    content:
+      heading: Synthetic offerings
+      projects:
+        - title: Guided reflection session
+          summary: A fictional one-to-one session for testing concise service descriptions and calls to action.
+          href: https://example.com/harbour-light/sessions
+        - title: Small-group intuition workshop
+          summary: A fictional workshop for testing a second offering with the same accessible content structure.
+          href: https://example.com/harbour-light/workshops

@@ -1,0 +1,111 @@
+metadata:
+  title: "Harbour Light Studio"
+  description: A fictional studio for guided reflection and small-group workshops.
+accessibility:
+  skipToContent: Skip to content
+  navigationLabel: Primary navigation
+navigation:
+  - href: /en-CA
+    label: Home
+  - href: /en-CA/about
+    label: About
+  - href: /en-CA/work/featured
+    label: Offerings
+localeSwitch:
+  label: Français
+pages:
+  home:
+    metadata:
+      title: "Harbour Light Studio"
+      description: A fictional studio for guided reflection and small-group workshops.
+    sections:
+      - id: introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: "Harbour Light Studio"
+          summary: A fictional service studio used to exercise a complete bilingual client journey.
+      - id: welcome
+        type: text
+        variant: default
+        enabled: true
+        content:
+          heading: A calm place to begin
+          body: Explore synthetic guided-reflection sessions and small-group workshops designed to test clear, accessible service content.
+      - id: contact
+        type: call-to-action
+        variant: default
+        enabled: true
+        content:
+          heading: Start a test conversation
+          summary: Continue to the fictional contact destination for this non-production journey.
+          label: Open the test contact page
+          href: https://example.com/harbour-light/contact
+  about:
+    metadata:
+      title: About Harbour Light Studio
+      description: Learn about this fictional studio and its synthetic service approach.
+    sections:
+      - id: about-introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: About Harbour Light Studio
+          summary: A fictional, client-shaped scenario for testing a bilingual public site.
+      - id: about-practice
+        type: text
+        variant: default
+        enabled: true
+        content:
+          heading: The test approach
+          body: The synthetic copy emphasizes clear choices, a gentle tone, and direct routes without making claims about a real person or business.
+  workFeatured:
+    metadata:
+      title: Offerings
+      description: Explore the fictional guided-reflection sessions and workshops.
+    sections:
+      - id: featured-work-introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: Ways to engage
+          summary: Compare two fictional offerings within the supported project-list layout.
+      - id: featured-work
+        type: project-list
+        variant: default
+        enabled: true
+        content:
+          heading: Synthetic offerings
+          projects:
+            - title: Guided reflection session
+              summary: A fictional one-to-one session for testing concise service descriptions and calls to action.
+              href: https://example.com/harbour-light/sessions
+            - title: Small-group intuition workshop
+              summary: A fictional workshop for testing a second offering with the same accessible content structure.
+              href: https://example.com/harbour-light/workshops
+notFound:
+  metadata:
+    title: Page not found
+    description: The requested test page could not be found.
+  sections:
+    - id: missing-page
+      type: hero
+      variant: default
+      enabled: true
+      content:
+        heading: Page not found
+        summary: Check the address or use the navigation to continue through the test site.
+booking:
+  heading: Arrange a test conversation
+  summary: Choose a fictional time for this interface example.
+  linkLabel: Open test scheduling
+  frameTitle: Fictional scheduling page
+  popupHeading: Choose a test time
+  closeLabel: Close scheduling
+error:
+  heading: Something went wrong
+  summary: We could not complete this test page. Please try again.
+  retryLabel: Try again

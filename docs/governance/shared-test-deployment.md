@@ -17,7 +17,10 @@ A workflow may reuse this boundary only when its deployment is stateless, non-pr
 
 - [compatibility proof](../../.github/workflows/compatibility-proof.yml);
 - [booking Calendly certification](../../.github/workflows/booking-calendly-certification.yml); and
-- [observability error-diagnostics certification](../../.github/workflows/observability-error-diagnostics-certification.yml).
+- [observability error-diagnostics certification](../../.github/workflows/observability-error-diagnostics-certification.yml); and
+- [synthetic client journey](../../.github/workflows/synthetic-client-journey.yml).
+
+The synthetic client journey uses a pre-existing operator-owned Cloudflare Web Analytics site token supplied only at dispatch. It creates no provider resource and performs no control-plane provider mutation. After explicit opt-in, the deployed browser check sends only bounded synthetic measurement traffic and accepts the provider-account retention already chosen for that test traffic; it does not establish provider receipt or deletion. The token is a public site identifier rather than a credential, and this reuse adds no GitHub environment secret or variable. Its exclusive lease cannot be released until the existing compatibility workflow restores and verifies the clean compatibility baseline under separate recovery approval.
 
 A workflow is not eligible when it targets production, uses persistent data, needs a different Cloudflare account, uses a client or private domain, requires different provider permissions, changes the shared protection or spend boundary, cannot restore the baseline, or can leave provider-specific state without an approved disposition. Database, identity, payments, CMS, durable queue, storage, destructive migration, and privileged integration journeys therefore require a separately reviewed environment and provider-resource design unless a later accepted plan proves equivalence against this gate.
 
@@ -40,7 +43,7 @@ The no-upgrade and no-incremental-spend boundary is mandatory. A missing protect
 
 ## Exclusive lease and deployment identity
 
-The shared Worker has one exclusive lease from the first run-specific preflight through its separately approved cleanup and recovery verification. The three workflows use the same concurrency group so their deployments cannot run concurrently. Operators must also confirm that no manual or external deployment is active; GitHub concurrency does not coordinate changes made outside these workflows.
+The shared Worker has one exclusive lease from the first run-specific preflight through its separately approved cleanup and recovery verification. The four workflows use the same concurrency group so their deployments cannot run concurrently. Operators must also confirm that no manual or external deployment is active; GitHub concurrency does not coordinate changes made outside these workflows.
 
 Generated candidate names remain capability-specific because they identify the generated application under test. Deployment commands override the generated Wrangler name and target the shared Worker explicitly. Receipts must distinguish the generated candidate identity from the exact deployed Worker, deployment, version, route envelope, and real-browser identity.
 
