@@ -193,7 +193,7 @@ test("the hosted synthetic client journey is bilingual, opt-in, and bounded", as
   expect(axeViolations).toEqual([]);
 
   const redirect = await request.get("/fr-CA/work", { maxRedirects: 0 });
-  expect(redirect.status()).toBe(307);
+  expect(redirect.status()).toBe(308);
   expect(redirect.headers().location).toBe("/fr-CA/work/featured");
   const missing = await page.goto("/en-CA/missing-page");
   expect(missing?.status()).toBe(404);
