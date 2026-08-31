@@ -122,9 +122,10 @@ jobs:
             const infer = readResult("infer");
             const doctor = readResult("doctor");
             const diff = readResult("diff");
-            if (infer.ok !== true || infer.result?.state?.kind !== "valid") process.exit(1);
-            if (doctor.ok !== true || doctor.result?.healthy !== true || doctor.result?.diagnostics?.length !== 0) process.exit(1);
-            if (diff.ok !== true || diff.result?.equal !== true || diff.result?.differences?.length !== 0) process.exit(1);
+            const fail = (code) => { process.stderr.write(`${code}\n`); process.exit(1); };
+            if (infer.ok !== true || infer.result?.state?.kind !== "valid") fail("INFER_STATE_INVALID");
+            if (doctor.ok !== true || doctor.result?.healthy !== true || doctor.result?.diagnostics?.length !== 0) fail("DOCTOR_HEALTH_INVALID");
+            if (diff.ok !== true || diff.result?.equal !== true || diff.result?.differences?.length !== 0) fail("DIFF_STATE_INVALID");
             const state = infer.result.state.value;
             const capabilities = state.installedCapabilities.map(({ identifier, version }) => ({ identifier, version }));
             for (const expected of [{ identifier: "site-routing", version: "0.4.0" }, { identifier: "multilingual", version: "0.1.0" }, { identifier: "analytics", version: "0.1.0" }]) {
@@ -217,6 +218,11 @@ jobs:
             const names = ["packet-application.json", "generated-verification.json", "deployed-browser.json"];
             const values = names.map((name) => JSON.parse(readFileSync(`${process.env.RECEIPT_ROOT}/${name}`, "utf8")));
             if (values.some((value) => value.synthetic !== true || value.schemaVersion !== "1.0.0")) process.exit(1);
+            const deployed = values[2];
+            if (deployed.cloudflareScriptRequestObserved !== true || deployed.noProviderRequestAfterWithdrawal !== true || deployed.automatedAxeViolations !== 0) {
+              process.stderr.write("DEPLOYED_BROWSER_RECEIPT_INVALID\n");
+              process.exit(1);
+            }
             const serialized = JSON.stringify(values);
             if (/\/(?:Users|home)\/|https?:\/\//u.test(serialized)) process.exit(1);
           '

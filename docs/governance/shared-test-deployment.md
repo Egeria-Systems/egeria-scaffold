@@ -43,7 +43,7 @@ The no-upgrade and no-incremental-spend boundary is mandatory. A missing protect
 
 ## Exclusive lease and deployment identity
 
-The shared Worker has one exclusive lease from the first run-specific preflight through its separately approved cleanup and recovery verification. The three workflows use the same concurrency group so their deployments cannot run concurrently. Operators must also confirm that no manual or external deployment is active; GitHub concurrency does not coordinate changes made outside these workflows.
+The shared Worker has one exclusive lease from the first run-specific preflight through its separately approved cleanup and recovery verification. The four workflows use the same concurrency group so their deployments cannot run concurrently. Operators must also confirm that no manual or external deployment is active; GitHub concurrency does not coordinate changes made outside these workflows.
 
 Generated candidate names remain capability-specific because they identify the generated application under test. Deployment commands override the generated Wrangler name and target the shared Worker explicitly. Receipts must distinguish the generated candidate identity from the exact deployed Worker, deployment, version, route envelope, and real-browser identity.
 

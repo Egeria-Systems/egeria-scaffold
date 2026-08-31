@@ -33,7 +33,19 @@ const compactLabel = (...parts) => parts.join("");
 const namedLabel = (prefix, ordinal, separator = " ") =>
   [prefix, separator, ordinal].join("");
 const credentialBoundPackageCommandPattern =
-  /\b(?:pnpm|npm|yarn)\b[^\n]*(?:\bbuild|\btest)(?=[:\s]|$)/iu;
+  /(?:\b(?:pnpm|npm|yarn)\b[^\n]*(?:\bbuild|\btest)(?=[:\s]|$)|\bopennextjs-cloudflare\b[^\n]*\bbuild\b)/iu;
+
+test("credential-bearing workflow steps forbid package and direct OpenNext builds", () => {
+  for (const command of [
+    "pnpm run build",
+    "npm test",
+    "yarn build:cloudflare",
+    "opennextjs-cloudflare build --skipNextBuild",
+  ]) {
+    assert.match(command, credentialBoundPackageCommandPattern);
+  }
+});
+
 async function runRepositoryQualityScopeClassifier(input) {
   const executionRoot = await mkdtemp(
     join(tmpdir(), "egeria-quality-scope-execution-"),
@@ -1690,6 +1702,13 @@ test("the synthetic client journey workflow is manual, protected, and content-sa
   assert.match(source, /apps\/cli\/dist\/index\.js infer/u);
   assert.match(source, /apps\/cli\/dist\/index\.js doctor/u);
   assert.match(source, /apps\/cli\/dist\/index\.js diff/u);
+  for (const code of [
+    "INFER_STATE_INVALID",
+    "DOCTOR_HEALTH_INVALID",
+    "DIFF_STATE_INVALID",
+  ]) {
+    assert.match(source, new RegExp(code, "u"));
+  }
   for (const command of [
     "pnpm --dir \"$JOURNEY_ROOT\" install --frozen-lockfile",
     "pnpm --dir \"$JOURNEY_ROOT\" peers check",
@@ -1743,6 +1762,18 @@ test("the synthetic client journey workflow is manual, protected, and content-sa
   );
   assert.match(source, /4096/u);
   assert.match(source, /wc -l/u);
+  assert.match(
+    stepsByName["Validate content-safe receipts"].run,
+    /cloudflareScriptRequestObserved !== true/u,
+  );
+  assert.match(
+    stepsByName["Validate content-safe receipts"].run,
+    /noProviderRequestAfterWithdrawal !== true/u,
+  );
+  assert.match(
+    stepsByName["Validate content-safe receipts"].run,
+    /automatedAxeViolations !== 0/u,
+  );
 
   assertWorkflowSecretBoundary(workflow, [
     {

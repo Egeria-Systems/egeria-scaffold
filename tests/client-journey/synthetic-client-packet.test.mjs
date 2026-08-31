@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  chmod,
   cp,
   mkdir,
   mkdtemp,
@@ -38,10 +39,6 @@ const generatedFixtureRoot = resolve(
 const adapterPath = resolve(
   repositoryRoot,
   "scripts/apply-synthetic-client-packet.mjs",
-);
-const deployedSpecPath = resolve(
-  repositoryRoot,
-  "tests/client-journey/synthetic-client-deployed.spec.ts",
 );
 const requireFromBuilderCore = createRequire(
   resolve(repositoryRoot, "packages/builder-core/package.json"),
@@ -258,6 +255,99 @@ async function readStatusPaths(projectRoot) {
     .sort();
 }
 
+async function runInjectedRollback(projectRoot, statusMode) {
+  const executionRoot = await mkdtemp(
+    join(tmpdir(), "egeria-synthetic-rollback-"),
+  );
+  const wrapperRoot = resolve(executionRoot, "bin");
+  const wrapperPath = resolve(wrapperRoot, "git");
+  const counterPath = resolve(executionRoot, "status-count");
+  const { stdout: gitPathOutput } = await execFileAsync("which", ["git"], {
+    encoding: "utf8",
+  });
+  await mkdir(wrapperRoot);
+  await writeFile(
+    wrapperPath,
+    `#!/bin/sh
+if [ "$1" = "status" ]; then
+  count="$(cat "$ROLLBACK_STATUS_COUNTER" 2>/dev/null || printf '0')"
+  count="$((count + 1))"
+  printf '%s\n' "$count" > "$ROLLBACK_STATUS_COUNTER"
+  if [ "$count" -eq 2 ]; then
+    case "$ROLLBACK_STATUS_MODE" in
+      dirty)
+        printf '?? rollback-residue\\000'
+        exit 0
+        ;;
+      fail)
+        exit 17
+        ;;
+    esac
+  fi
+fi
+exec ${JSON.stringify(gitPathOutput.trim())} "$@"
+`,
+    "utf8",
+  );
+  await chmod(wrapperPath, 0o755);
+
+  const childScript = `
+    import { pathToFileURL } from "node:url";
+    const { applySyntheticClientPacket } = await import(
+      pathToFileURL(process.env.ADAPTER_PATH).href
+    );
+    try {
+      await applySyntheticClientPacket({
+        projectRoot: process.argv[1],
+        injectWriteFailureAfter: Number(process.argv[2]),
+      });
+    } catch (error) {
+      const causes = error.cause instanceof AggregateError
+        ? error.cause.errors.map((cause) => cause.code)
+        : [error.cause?.code].filter(Boolean);
+      process.stderr.write(JSON.stringify({ code: error.code, causes }));
+      process.exit(1);
+    }
+  `;
+
+  try {
+    await execFileAsync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        childScript,
+        projectRoot,
+        String(expectedWritePaths.length),
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          ADAPTER_PATH: adapterPath,
+          PATH: `${wrapperRoot}:${process.env.PATH ?? ""}`,
+          ROLLBACK_STATUS_COUNTER: counterPath,
+          ROLLBACK_STATUS_MODE: statusMode,
+        },
+      },
+    );
+  } catch (cause) {
+    if (
+      cause !== null &&
+      typeof cause === "object" &&
+      "stderr" in cause &&
+      typeof cause.stderr === "string"
+    ) {
+      return JSON.parse(cause.stderr);
+    }
+    throw cause;
+  } finally {
+    await rm(executionRoot, { recursive: true, force: true });
+  }
+
+  assert.fail("injected application failure must reject");
+}
+
 async function assertRefusalWithoutAdditionalWrites({
   projectRoot,
   packetRoot: customPacketRoot = packetRoot,
@@ -459,20 +549,6 @@ test("the adapter applies exactly the declared writes and emits a bounded receip
   } finally {
     await cliFixture.cleanup();
   }
-});
-
-test("the deployed journey clears consent once and proves grant persistence", async () => {
-  const source = await readFile(deployedSpecPath, "utf8");
-
-  assert.match(source, /sessionStorage\.getItem\("synthetic-client-initialized"\)/u);
-  assert.match(source, /sessionStorage\.setItem\("synthetic-client-initialized", "true"\)/u);
-  assert.match(source, /const requestsBeforePersistedGrantReload = providerRequests\.length/u);
-  assert.match(source, /await page\.reload\(\{ waitUntil: "networkidle" \}\)/u);
-  assert.match(
-    source,
-    /providerRequests\.length[\s\S]+requestsBeforePersistedGrantReload/u,
-  );
-  assert.match(source, /await expect\(action\(page, "manage"\)\)\.toBeVisible\(\)/u);
 });
 
 test("the adapter refuses packet, manifest, content, and source drift before writing", async () => {
@@ -689,5 +765,64 @@ test("the adapter refuses unsafe repository boundaries and rolls back injected f
     assert.deepEqual(await readStatusPaths(rollbackProject.projectRoot), []);
   } finally {
     await rollbackProject.cleanup();
+  }
+});
+
+test("rollback reports reconciliation residue without disguising it as a restore failure", async () => {
+  const project = await createProjectFixture();
+  try {
+    assert.deepEqual(await runInjectedRollback(project.projectRoot, "dirty"), {
+      code: "ROLLBACK_RECONCILIATION_FAILED",
+      causes: ["INJECTED_WRITE_FAILURE"],
+    });
+  } finally {
+    await project.cleanup();
+  }
+});
+
+test("rollback failure preserves both the application and restore causes", async () => {
+  const project = await createProjectFixture();
+  try {
+    assert.deepEqual(await runInjectedRollback(project.projectRoot, "fail"), {
+      code: "ROLLBACK_FAILED",
+      causes: ["INJECTED_WRITE_FAILURE", "GIT_BOUNDARY_INVALID"],
+    });
+  } finally {
+    await project.cleanup();
+  }
+});
+
+test("the adapter treats project metadata object key order as nonsemantic", async () => {
+  const project = await createProjectFixture();
+  try {
+    const projectPath = resolve(project.projectRoot, ".egeria/project.yaml");
+    const projectMetadata = parse(await readFile(projectPath, "utf8"));
+    projectMetadata.project = {
+      name: projectMetadata.project.name,
+      displayName: projectMetadata.project.displayName,
+      defaultLocale: projectMetadata.project.defaultLocale,
+    };
+    await writeFile(projectPath, stringify(projectMetadata));
+
+    const statePath = resolve(project.projectRoot, ".egeria/state.json");
+    const state = JSON.parse(await readFile(statePath, "utf8"));
+    state.origin = {
+      recipeVersion: state.origin.recipeVersion,
+      profile: state.origin.profile,
+    };
+    await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    await runGit(project.projectRoot, ["add", ".egeria"]);
+    await runGit(project.projectRoot, [
+      "commit",
+      "-m",
+      "Reorder project metadata keys",
+    ]);
+
+    const receipt = await applySyntheticClientPacket({
+      projectRoot: project.projectRoot,
+    });
+    assert.equal(receipt.synthetic, true);
+  } finally {
+    await project.cleanup();
   }
 });

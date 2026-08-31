@@ -185,13 +185,12 @@ test("the hosted synthetic client journey is bilingual, opt-in, and bounded", as
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  expect(
-    (
-      await new AxeBuilder({ page })
-        .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-        .analyze()
-    ).violations,
-  ).toEqual([]);
+  const axeViolations = (
+    await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze()
+  ).violations;
+  expect(axeViolations).toEqual([]);
 
   const redirect = await request.get("/fr-CA/work", { maxRedirects: 0 });
   expect(redirect.status()).toBe(307);
@@ -199,6 +198,12 @@ test("the hosted synthetic client journey is bilingual, opt-in, and bounded", as
   const missing = await page.goto("/en-CA/missing-page");
   expect(missing?.status()).toBe(404);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+  const cloudflareScriptRequestObserved = providerRequests.length > 0;
+  const noProviderRequestAfterWithdrawal =
+    providerRequests.length === requestsAfterWithdrawal;
+  expect(cloudflareScriptRequestObserved).toBe(true);
+  expect(noProviderRequestAfterWithdrawal).toBe(true);
 
   const receiptPath = process.env.SYNTHETIC_CLIENT_BROWSER_RECEIPT_PATH;
   if (receiptPath !== undefined) {
@@ -208,9 +213,9 @@ test("the hosted synthetic client journey is bilingual, opt-in, and bounded", as
         schemaVersion: "1.0.0",
         synthetic: true,
         locales: ["en-CA", "fr-CA"],
-        cloudflareScriptRequestObserved: true,
-        noProviderRequestAfterWithdrawal: true,
-        automatedAxeViolations: 0,
+        cloudflareScriptRequestObserved,
+        noProviderRequestAfterWithdrawal,
+        automatedAxeViolations: axeViolations.length,
       })}\n`,
       { encoding: "utf8", flag: "wx", mode: 0o600 },
     );

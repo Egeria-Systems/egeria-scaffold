@@ -18,7 +18,7 @@ import {
   sep,
 } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { isDeepStrictEqual, promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -117,7 +117,7 @@ function sha256(bytes) {
 }
 
 function sameJson(left, right) {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return isDeepStrictEqual(left, right);
 }
 
 function isContainedPath(root, candidate) {
@@ -621,13 +621,20 @@ async function restoreOriginalWrites(stagedWrites) {
 }
 
 async function rollbackWrites(projectRoot, stagedWrites, cause) {
+  let status;
   try {
     await restoreOriginalWrites(stagedWrites);
-    if ((await readGitStatus(projectRoot)) !== "") {
-      refuse("ROLLBACK_RECONCILIATION_FAILED", { cause });
-    }
+    status = await readGitStatus(projectRoot);
   } catch (rollbackCause) {
-    refuse("ROLLBACK_FAILED", { cause: rollbackCause });
+    refuse("ROLLBACK_FAILED", {
+      cause: new AggregateError(
+        [cause, rollbackCause],
+        "Application and rollback both failed",
+      ),
+    });
+  }
+  if (status !== "") {
+    refuse("ROLLBACK_RECONCILIATION_FAILED", { cause });
   }
 }
 
