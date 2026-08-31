@@ -17,7 +17,10 @@ A workflow may reuse this boundary only when its deployment is stateless, non-pr
 
 - [compatibility proof](../../.github/workflows/compatibility-proof.yml);
 - [booking Calendly certification](../../.github/workflows/booking-calendly-certification.yml); and
-- [observability error-diagnostics certification](../../.github/workflows/observability-error-diagnostics-certification.yml).
+- [observability error-diagnostics certification](../../.github/workflows/observability-error-diagnostics-certification.yml); and
+- [synthetic client journey](../../.github/workflows/synthetic-client-journey.yml).
+
+The synthetic client journey uses a pre-existing operator-owned Cloudflare Web Analytics site token supplied only at dispatch. It creates no provider resource and performs no control-plane provider mutation. After explicit opt-in, the deployed browser check sends only bounded synthetic measurement traffic and accepts the provider-account retention already chosen for that test traffic; it does not establish provider receipt or deletion. The token is a public site identifier rather than a credential, and this reuse adds no GitHub environment secret or variable. Its exclusive lease cannot be released until the existing compatibility workflow restores and verifies the clean compatibility baseline under separate recovery approval.
 
 A workflow is not eligible when it targets production, uses persistent data, needs a different Cloudflare account, uses a client or private domain, requires different provider permissions, changes the shared protection or spend boundary, cannot restore the baseline, or can leave provider-specific state without an approved disposition. Database, identity, payments, CMS, durable queue, storage, destructive migration, and privileged integration journeys therefore require a separately reviewed environment and provider-resource design unless a later accepted plan proves equivalence against this gate.
 

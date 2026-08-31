@@ -191,6 +191,21 @@ test("the root workspace remains private and pins the compatibility-proof toolch
     "node --test tests/constitution/*.test.mjs",
   );
   assert.equal(
+    manifest.scripts["test:synthetic-client-journey"],
+    "node --test tests/client-journey/*.test.mjs",
+  );
+  for (const aggregate of ["test", "verify:builder-kernel"]) {
+    assert.equal(
+      manifest.scripts[aggregate]
+        .split(" && ")
+        .filter(
+          (command) => command === "pnpm run test:synthetic-client-journey",
+        ).length,
+      1,
+      `${aggregate} must invoke the synthetic client journey exactly once`,
+    );
+  }
+  assert.equal(
     manifest.scripts["check:semantic-naming"],
     "node scripts/check-semantic-naming.mjs",
   );
@@ -1549,11 +1564,211 @@ test("credential-bearing steps reject package build or test commands at the end 
   }
 });
 
+test("the synthetic client journey workflow is manual, protected, and content-safe", async () => {
+  const source = await readRepositoryFile(
+    ".github/workflows/synthetic-client-journey.yml",
+  );
+  const workflow = parse(source);
+
+  assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
+  assert.deepEqual(workflow.on.workflow_dispatch.inputs, {
+    expected_revision: {
+      description:
+        "Exact accepted main revision approved for the synthetic journey",
+      required: true,
+      type: "string",
+    },
+    cloudflare_web_analytics_site_token: {
+      description: "Operator-owned test Web Analytics site token",
+      required: true,
+      type: "string",
+    },
+  });
+  assert.deepEqual(workflow.permissions, { contents: "read" });
+  assert.deepEqual(workflow.concurrency, {
+    group: "test-deploy",
+    "cancel-in-progress": false,
+    queue: "max",
+  });
+
+  const job = workflow.jobs["verify-and-deploy"];
+  assert.equal(job.if, "github.ref == 'refs/heads/main'");
+  assert.equal(job["runs-on"], "ubuntu-24.04");
+  assert.equal(job["timeout-minutes"], 60);
+  assert.deepEqual(job.environment, {
+    name: "test-deploy",
+    url: "${{ vars.DEPLOY_URL }}",
+  });
+  const stepsByName = Object.fromEntries(
+    job.steps.map((step) => [step.name, step]),
+  );
+  const stepNames = job.steps.map(({ name }) => name);
+  assert.ok(
+    stepNames.indexOf("Record pristine generated baseline") >
+      stepNames.indexOf("Generate synthetic client project"),
+  );
+  assert.ok(
+    stepNames.indexOf("Record pristine generated baseline") <
+      stepNames.indexOf("Apply synthetic client packet"),
+  );
+  assert.equal(
+    stepsByName["Record pristine generated baseline"].run,
+    `${[
+      "git init -b main \"$JOURNEY_ROOT\"",
+      "git -C \"$JOURNEY_ROOT\" config user.name \"Synthetic Journey Workflow\"",
+      "git -C \"$JOURNEY_ROOT\" config user.email \"synthetic-journey@example.com\"",
+      "git -C \"$JOURNEY_ROOT\" add .",
+      "git -C \"$JOURNEY_ROOT\" commit -m \"Record pristine synthetic scaffold\"",
+    ].join("\n")}\n`,
+  );
+  assert.equal(
+    isPinnedGitHubActionReference(
+      stepsByName["Check out repository"].uses,
+      "actions/checkout",
+    ),
+    true,
+  );
+  assert.deepEqual(stepsByName["Check out repository"].with, {
+    "fetch-depth": 0,
+    ref: "${{ github.sha }}",
+    "persist-credentials": false,
+  });
+  assert.equal(
+    isPinnedGitHubActionReference(
+      stepsByName["Set up pnpm and Node.js"].uses,
+      "pnpm/setup",
+    ),
+    true,
+  );
+  assert.deepEqual(stepsByName["Set up pnpm and Node.js"].with, {
+    version: "11.20.0",
+    runtime: "node@22.23.2",
+    cache: false,
+    install: false,
+  });
+  assert.deepEqual(stepsByName["Verify approved revision"].env, {
+    EXPECTED_REVISION: "${{ inputs.expected_revision }}",
+  });
+  assert.equal(
+    stepsByName["Verify approved revision"].run,
+    "node scripts/verify-approved-revision.mjs",
+  );
+  assert.match(
+    stepsByName["Validate and mask test site token"].run,
+    /^echo "::add-mask::\$CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN"/u,
+  );
+  assert.match(
+    stepsByName["Validate and mask test site token"].run,
+    /\^\[0-9a-f\]\{32\}\$/u,
+  );
+  assert.match(
+    stepsByName["Verify approved predecessor"].run,
+    /git merge-base --is-ancestor af3e927e542d322edd1b8200507de43276d02375 "\$GITHUB_SHA"/u,
+  );
+  assert.equal(
+    stepsByName["Install builder dependencies"].run,
+    "pnpm install --frozen-lockfile",
+  );
+  assert.match(source, /pnpm run check:capability-certification/u);
+  assert.match(
+    source,
+    /node scripts\/check-capability-certification\.mjs --closure all-certified/u,
+  );
+  assert.match(source, /pnpm run build:builder/u);
+  const generationCommand = stepsByName["Generate synthetic client project"].run
+    .split("\n")
+    .map((line) => line.trim().replace(/ \\$/u, ""))
+    .join(" ");
+  assert.match(
+    generationCommand,
+    /node apps\/cli\/dist\/index\.js create --profile site --name harbour-light-studio --display-name "Harbour Light Studio" --directory "\$JOURNEY_ROOT" --multilingual --cloudflare-web-analytics-token "\$CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN"/u,
+  );
+  assert.match(
+    stepsByName["Apply synthetic client packet"].run,
+    /node scripts\/apply-synthetic-client-packet\.mjs --project-root "\$JOURNEY_ROOT"/u,
+  );
+  assert.match(source, /apps\/cli\/dist\/index\.js infer/u);
+  assert.match(source, /apps\/cli\/dist\/index\.js doctor/u);
+  assert.match(source, /apps\/cli\/dist\/index\.js diff/u);
+  for (const command of [
+    "pnpm --dir \"$JOURNEY_ROOT\" install --frozen-lockfile",
+    "pnpm --dir \"$JOURNEY_ROOT\" peers check",
+    "pnpm --dir \"$JOURNEY_ROOT\" audit --audit-level moderate",
+    "pnpm --dir \"$JOURNEY_ROOT\" audit signatures",
+    "pnpm --dir \"$JOURNEY_ROOT\" run lint",
+    "pnpm --dir \"$JOURNEY_ROOT/apps/web\" run cf-typegen",
+    "pnpm --dir \"$JOURNEY_ROOT\" run typecheck",
+    "pnpm --dir \"$JOURNEY_ROOT\" run test:unit",
+    "pnpm --dir \"$JOURNEY_ROOT\" run test:component",
+    "pnpm --dir \"$JOURNEY_ROOT\" run build",
+    "pnpm --dir \"$JOURNEY_ROOT/apps/web\" exec opennextjs-cloudflare build --skipNextBuild",
+    "pnpm --dir \"$JOURNEY_ROOT/apps/web\" run test:e2e:dev",
+    "pnpm --dir \"$JOURNEY_ROOT/apps/web\" run test:e2e:preview",
+  ]) {
+    assert.match(source, new RegExp(command.replaceAll("$", "\\$"), "u"));
+  }
+  assert.match(
+    stepsByName["Deploy synthetic client Worker"].run,
+    /opennextjs-cloudflare deploy --name test-deploy/u,
+  );
+  assert.doesNotMatch(
+    stepsByName["Deploy synthetic client Worker"].run,
+    credentialBoundPackageCommandPattern,
+  );
+  assert.deepEqual(stepsByName["Deploy synthetic client Worker"].env, {
+    CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
+    CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
+    JOURNEY_ROOT: "${{ runner.temp }}/synthetic-client-journey/project",
+  });
+  assert.match(
+    stepsByName["Test deployed synthetic client journey"].run,
+    /synthetic-client-deployed\.spec\.ts/u,
+  );
+  assert.match(
+    stepsByName["Test deployed synthetic client journey"].run,
+    /test:e2e:deployed/u,
+  );
+  assert.equal(
+    isPinnedGitHubActionReference(
+      stepsByName["Upload content-safe journey receipts"].uses,
+      "actions/upload-artifact",
+    ),
+    true,
+  );
+  assert.equal(
+    stepsByName["Upload content-safe journey receipts"].with[
+      "retention-days"
+    ],
+    7,
+  );
+  assert.match(source, /4096/u);
+  assert.match(source, /wc -l/u);
+
+  assertWorkflowSecretBoundary(workflow, [
+    {
+      path: 'jobs.verify-and-deploy.steps["Deploy synthetic client Worker"].env.CLOUDFLARE_ACCOUNT_ID',
+      reference: "secrets.CLOUDFLARE_ACCOUNT_ID",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Deploy synthetic client Worker"].env.CLOUDFLARE_API_TOKEN',
+      reference: "secrets.CLOUDFLARE_API_TOKEN",
+    },
+  ]);
+  assert.deepEqual(
+    [...source.matchAll(/vars\.([A-Z0-9_]+)/gu)].map(([, name]) => name),
+    ["DEPLOY_URL", "DEPLOY_URL"],
+  );
+  assert.doesNotMatch(source, /api\.cloudflare\.com/u);
+  assert.doesNotMatch(source, /CLOUDFLARE_WEB_ANALYTICS_API_TOKEN/u);
+  assert.doesNotMatch(source, /^  (?:pull_request|push|schedule):/mu);
+});
+
 test("stateless manual deployments share one serialized protected deployment boundary", async () => {
   const [
     compatibilitySource,
     calendlySource,
     observabilitySource,
+    syntheticClientSource,
     policy,
     compatibilityRecord,
   ] = await Promise.all([
@@ -1562,6 +1777,7 @@ test("stateless manual deployments share one serialized protected deployment bou
     readRepositoryFile(
       ".github/workflows/observability-error-diagnostics-certification.yml",
     ),
+    readRepositoryFile(".github/workflows/synthetic-client-journey.yml"),
     readRepositoryFile("docs/governance/shared-test-deployment.md"),
     readRepositoryFile("docs/compatibility/nextjs-cloudflare.md"),
   ]);
@@ -1570,6 +1786,7 @@ test("stateless manual deployments share one serialized protected deployment bou
     compatibilitySource,
     calendlySource,
     observabilitySource,
+    syntheticClientSource,
   ]) {
     const workflow = parse(source);
     assert.deepEqual(workflow.concurrency, {
@@ -1603,6 +1820,10 @@ test("stateless manual deployments share one serialized protected deployment bou
     observabilitySource,
     /wrangler secret bulk "\$SECRET_FILE" --name test-deploy/u,
   );
+  assert.match(
+    syntheticClientSource,
+    /opennextjs-cloudflare deploy --name test-deploy/u,
+  );
 
   assert.match(
     policy,
@@ -1624,6 +1845,19 @@ test("stateless manual deployments share one serialized protected deployment bou
   assert.match(
     policy,
     /clean compatibility baseline[\s\S]+certification-only route[\s\S]+unreachable/iu,
+  );
+  assert.match(
+    policy,
+    /synthetic client journey[\s\S]+pre-existing operator-owned[\s\S]+token/iu,
+  );
+  assert.match(
+    policy,
+    /bounded synthetic measurement traffic[\s\S]+provider-account retention/iu,
+  );
+  assert.match(policy, /no control-plane[\s\S]+mutation/iu);
+  assert.match(
+    policy,
+    /exclusive lease[\s\S]+compatibility[\s\S]+restore[\s\S]+baseline/iu,
   );
 
   assert.match(compatibilityRecord, /shared-test-deployment\.md/u);
@@ -2442,11 +2676,11 @@ test("client-required public-site work is relocated after lifecycle without requ
   assert.doesNotMatch(roadmapPortfolio, /urgent first-client milestone/iu);
   assert.match(
     roadmapExpansion,
-    /first client-ready milestone[\s\S]+real client/iu,
+    /first client-ready milestone[\s\S]+representative synthetic client journey/iu,
   );
   assert.match(
     roadmapExpansion,
-    /\*\*Stop gate:\*\*[\s\S]+production `site`[\s\S]+independent multilingual and analytics[\s\S]+combined client journey[\s\S]+retained migration fixture[\s\S]+before app-foundation/iu,
+    /\*\*Stop gate:\*\*[\s\S]+production `site`[\s\S]+independent multilingual and analytics[\s\S]+combined representative synthetic client journey[\s\S]+retained migration fixture[\s\S]+before app-foundation/iu,
   );
 
   for (const section of [sourceExpansion, roadmapExpansion]) {
@@ -2463,7 +2697,16 @@ test("client-required public-site work is relocated after lifecycle without requ
     );
     assert.match(
       section,
-      /real client project[\s\S]+generated[\s\S]+retained as migration evidence/iu,
+      /representative synthetic client journey[\s\S]+derived from real engagement needs[\s\S]+generated[\s\S]+retained as migration evidence/iu,
+    );
+    assert.match(section, /operator-owned non-production accounts/iu);
+    assert.match(
+      section,
+      /no actual client identity[\s\S]+content[\s\S]+approval[\s\S]+domain[\s\S]+account/iu,
+    );
+    assert.match(
+      section,
+      /does not establish[\s\S]+production deployment[\s\S]+provider certification[\s\S]+French certification[\s\S]+WCAG conformance[\s\S]+legal or privacy compliance[\s\S]+production readiness/iu,
     );
     assert.match(section, /no composite[\s\S]+profile[\s\S]+capability/iu);
     assert.match(section, /relocation ledger/iu);
@@ -3997,7 +4240,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     {
       fixtures: "node --test tests/generated-fixtures/*.test.mjs",
       kernel:
-        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages && pnpm run test:capability-certification && pnpm run check:capability-certification && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run changeset:status",
+        "pnpm run test:constitution && pnpm run test:synthetic-client-journey && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages && pnpm run test:capability-certification && pnpm run check:capability-certification && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run changeset:status",
       skeletons: "node scripts/verify-generated-skeletons.mjs",
     },
   );

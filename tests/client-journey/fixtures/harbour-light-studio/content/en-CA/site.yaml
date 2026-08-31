@@ -1,0 +1,37 @@
+metadata:
+  title: "Harbour Light Studio"
+  description: A fictional studio for guided reflection and small-group workshops.
+accessibility:
+  skipToContent: Skip to content
+home:
+  sections:
+    - id: introduction
+      type: hero
+      variant: default
+      enabled: true
+      content:
+        heading: "Harbour Light Studio"
+        summary: A fictional service studio used to exercise a complete bilingual client journey.
+    - id: welcome
+      type: text
+      variant: default
+      enabled: true
+      content:
+        heading: A calm place to begin
+        body: Explore synthetic guided-reflection sessions and small-group workshops designed to test clear, accessible service content.
+    - id: contact
+      type: call-to-action
+      variant: default
+      enabled: true
+      content:
+        heading: Start a test conversation
+        summary: Continue to the fictional contact destination for this non-production journey.
+        label: Open the test contact page
+        href: https://example.com/harbour-light/contact
+navigation:
+  - href: /
+    label: Home
+  - href: /about
+    label: About
+  - href: /work/featured
+    label: Offerings

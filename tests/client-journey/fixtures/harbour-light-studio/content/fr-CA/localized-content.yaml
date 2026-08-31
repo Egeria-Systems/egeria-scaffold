@@ -1,0 +1,111 @@
+metadata:
+  title: "Harbour Light Studio"
+  description: Un studio fictif de réflexion guidée et d'ateliers en petits groupes.
+accessibility:
+  skipToContent: Passer au contenu
+  navigationLabel: Navigation principale
+navigation:
+  - href: /fr-CA
+    label: Accueil
+  - href: /fr-CA/about
+    label: À propos
+  - href: /fr-CA/work/featured
+    label: Offres
+localeSwitch:
+  label: English
+pages:
+  home:
+    metadata:
+      title: "Harbour Light Studio"
+      description: Un studio fictif de réflexion guidée et d'ateliers en petits groupes.
+    sections:
+      - id: introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: "Harbour Light Studio"
+          summary: Un studio de services fictif utilisé pour exercer un parcours client bilingue complet.
+      - id: welcome
+        type: text
+        variant: default
+        enabled: true
+        content:
+          heading: Un point de départ calme
+          body: Découvrez des séances fictives de réflexion guidée et des ateliers en petits groupes conçus pour tester un contenu de services clair et accessible.
+      - id: contact
+        type: call-to-action
+        variant: default
+        enabled: true
+        content:
+          heading: Commencer une conversation d'essai
+          summary: Continuez vers la destination de contact fictive de ce parcours hors production.
+          label: Ouvrir la page de contact d'essai
+          href: https://example.com/harbour-light/contact
+  about:
+    metadata:
+      title: À propos de Harbour Light Studio
+      description: Découvrez ce studio fictif et son approche de services synthétique.
+    sections:
+      - id: about-introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: À propos de Harbour Light Studio
+          summary: Un scénario fictif inspiré d'un projet client pour tester un site public bilingue.
+      - id: about-practice
+        type: text
+        variant: default
+        enabled: true
+        content:
+          heading: L'approche d'essai
+          body: Le texte synthétique met l'accent sur des choix clairs, un ton doux et des parcours directs, sans faire d'affirmation au sujet d'une personne ou d'une entreprise réelle.
+  workFeatured:
+    metadata:
+      title: Offres
+      description: Découvrez les séances fictives de réflexion guidée et les ateliers.
+    sections:
+      - id: featured-work-introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: Façons de participer
+          summary: Comparez deux offres fictives dans la mise en page de liste de projets prise en charge.
+      - id: featured-work
+        type: project-list
+        variant: default
+        enabled: true
+        content:
+          heading: Offres synthétiques
+          projects:
+            - title: Séance de réflexion guidée
+              summary: Une séance individuelle fictive pour tester des descriptions de services et des appels à l'action concis.
+              href: https://example.com/harbour-light/sessions
+            - title: Atelier d'intuition en petit groupe
+              summary: Un atelier fictif pour tester une deuxième offre avec la même structure de contenu accessible.
+              href: https://example.com/harbour-light/workshops
+notFound:
+  metadata:
+    title: Page introuvable
+    description: La page d'essai demandée est introuvable.
+  sections:
+    - id: missing-page
+      type: hero
+      variant: default
+      enabled: true
+      content:
+        heading: Page introuvable
+        summary: Vérifiez l'adresse ou utilisez la navigation pour continuer dans le site d'essai.
+booking:
+  heading: Organiser une conversation d'essai
+  summary: Choisissez un moment fictif pour cet exemple d'interface.
+  linkLabel: Ouvrir la planification d'essai
+  frameTitle: Page de planification fictive
+  popupHeading: Choisir un moment d'essai
+  closeLabel: Fermer la planification
+error:
+  heading: Une erreur s'est produite
+  summary: Nous n'avons pas pu terminer cette page d'essai. Veuillez réessayer.
+  retryLabel: Réessayer

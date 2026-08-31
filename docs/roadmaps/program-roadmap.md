@@ -94,7 +94,7 @@ Each certification task begins with current planning under the [review and contr
 
 ## P3B — Client-required public-site expansion
 
-**Production-site increment:** The completed increment advances only `site` to recipe `0.11.0` and `site-routing@0.4.0`. It materializes content-backed home, about, featured-work, not-found, and nested error behavior; active navigation; route metadata; sitemap and robots output; redirects; development and OpenNext/workerd browser contracts; and the exact state-last `site-routing@0.3.0` to `0.4.0` upgrade. The current descriptor subject is certified from accepted local `fresh-scaffold` and `existing-repository-lifecycle` evidence at revision `6034d7330af912d1a1b9bcff3323ed360ebee2d0`; the historical 0.3 receipt remains exact-subject-only. P3 closure is accepted and reconciled. Exact `multilingual@0.1.0` is certified from the same two local evidence kinds at revision `96b587a254cf6fc859867d6fc66c7e0c900c4cfd`. Exact `analytics@0.1.0` implementation is accepted at `main@aa0bcd7e315b11f07e0f4207d11e230ce911b2f4` and its separate certification is accepted at evidence revision `a97341ea628210b6fa713fb12461084f20c3f8da`; real-client generation, production providers or deployment, publication, and production action remain separately gated.
+**Production-site increment:** The completed increment advances only `site` to recipe `0.11.0` and `site-routing@0.4.0`. It materializes content-backed home, about, featured-work, not-found, and nested error behavior; active navigation; route metadata; sitemap and robots output; redirects; development and OpenNext/workerd browser contracts; and the exact state-last `site-routing@0.3.0` to `0.4.0` upgrade. The current descriptor subject is certified from accepted local `fresh-scaffold` and `existing-repository-lifecycle` evidence at revision `6034d7330af912d1a1b9bcff3323ed360ebee2d0`; the historical 0.3 receipt remains exact-subject-only. P3 closure is accepted and reconciled. Exact `multilingual@0.1.0` is certified from the same two local evidence kinds at revision `96b587a254cf6fc859867d6fc66c7e0c900c4cfd`. Exact `analytics@0.1.0` implementation is accepted at `main@aa0bcd7e315b11f07e0f4207d11e230ce911b2f4` and its separate certification is accepted at evidence revision `a97341ea628210b6fa713fb12461084f20c3f8da`; the combined representative synthetic client journey, production providers or deployment, publication, and production action remain separately gated.
 
 **One-time 2026-08-26 multilingual implementation-lane exception:** Lane B may implement exact `multilingual@0.1.0` for the executable `portfolio` and `site` profiles from accepted production-site predecessor `0a699d26198e94ddfaa596d812ad175284d05c49` on selected base `a66890a6c30a275818e7b51f22ded987cc1d52ff` while Lane A completes separate `site-routing@0.4.0` certification. Lane B owns no Lane A evidence and may merge only after Lane A is accepted, accepted-main verification is green, Lane B is rebased onto that accepted main, and the routing evidence contract is revalidated. This exception does not authorize multilingual certification, analytics implementation, a real client project, provider or deployment action, publication, or a concurrent merge, and it is not precedent for another lane.
 
@@ -107,8 +107,10 @@ P3 remains unchanged and is the prerequisite for this boundary. This part reloca
 - deliver `analytics` as an independently selectable capability during initial scaffolding and addable later through the completed P3 lifecycle, preserving the analytics/observability boundary and provider-neutral consent with deny-by-default behavior where required, withdrawal handling, and no automatic legal-compliance claim;
 - keep Cloudflare Web Analytics, Google Analytics 4, and Microsoft Clarity as independent analytics providers, while Search Console and Looker Studio remain operational integrations rather than runtime analytics providers;
 - give each delivered capability a capability implementation task and a separate capability-certification task, including initial-scaffold and fresh-add evidence plus the applicable upgrade, removal, refusal, drift, state, and recovery cases;
-- compose the client from `site` plus explicitly selected `multilingual`, `analytics`, and the existing independent `booking-calendly` capability when required; and
-- ensure the real client project is generated through the public builder path and retained as migration evidence.
+- compose a representative synthetic client journey from `site` plus explicitly selected `multilingual` and `analytics`, with the existing independent `booking-calendly` capability selected only when the scenario requires it; and
+- ensure the representative synthetic client journey derived from real engagement needs is generated through the public builder path and retained as migration evidence.
+
+The combined journey uses tracked synthetic content and operator-owned non-production accounts under the [shared test deployment boundary](../governance/shared-test-deployment.md). It uses no actual client identity, content, approval, domain, or account and does not establish production deployment, provider certification, French certification, WCAG conformance, legal or privacy compliance, or production readiness.
 
 This boundary creates no composite client profile or capability, hidden defaults, client-specific branch, or duplicate migration path.
 
@@ -122,7 +124,7 @@ The implementation creates no public package and no generic lifecycle executor. 
 
 No approved task, requirement, gate, or identifier is removed:
 
-- P2 retains every approved portfolio task and stop gate; only the real-client generation and retention requirement moves here so it can exercise P3.
+- P2 retains every approved portfolio task and stop gate; only the representative synthetic client-journey generation and retention requirement moves here so it can exercise P3.
 - P3 retains every approved lifecycle, migration, removal, refusal, recovery, state, certification, and approval requirement unchanged.
 - P4 production-complete `site` work moves here as the `site` implementation and certification pair.
 - P5A multilingual work moves here intact; its capability identifier and requirements remain unchanged.
@@ -132,9 +134,9 @@ No approved task, requirement, gate, or identifier is removed:
 
 P5A and P5B are therefore not deleted and not renumbered.
 
-**First client-ready milestone:** The real client site is generated and retained only after the production `site` and each explicitly selected capability pass their P3B gates.
+**First client-ready milestone:** The representative synthetic client journey is generated and retained only after the production `site` and each explicitly selected capability pass their P3B gates.
 
-**Stop gate:** Approve the production `site`, independent multilingual and analytics capability evidence, the combined client journey, and the retained migration fixture before app-foundation work begins.
+**Stop gate:** Approve the production `site`, independent multilingual and analytics capability evidence, the combined representative synthetic client journey, and the retained migration fixture before app-foundation work begins.
 
 ## P3C — Automated removal-reference hardening
 
@@ -191,7 +193,7 @@ Implement verified/idempotent Calendly events, normalized booking events, option
 
 ## P10 — Fleet hardening
 
-After real client evidence, reassess package boundaries, measure inference and migration failures, simplify weak abstractions, verify supported upgrades, run data/provider recovery drills, and perform a bounded portability spike without claiming a second supported production platform.
+After representative synthetic client-journey evidence, reassess package boundaries, measure inference and migration failures, simplify weak abstractions, verify supported upgrades, run data/provider recovery drills, and perform a bounded portability spike without claiming a second supported production platform.
 
 At the end of the final fleet-hardening task, run permanent documentation hardening: inventory architecture, ADR, governance, and agent-instruction sequencing labels; replace implementation-routing references where provenance is no longer necessary; and narrow the scanner exemptions while preserving historical records and content whose subject is genuinely sequencing.
 

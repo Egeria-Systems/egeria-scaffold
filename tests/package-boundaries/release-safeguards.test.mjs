@@ -242,7 +242,7 @@ test("root release commands use the supported Changesets boundary", async () => 
       packageTests:
         "pnpm --filter @egeria-systems/standards --filter @egeria-systems/observability run test",
       test:
-        "pnpm run test:constitution && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages",
+        "pnpm run test:constitution && pnpm run test:synthetic-client-journey && pnpm --filter @egeria-systems/nextjs-cloudflare-proof test:unit && pnpm run test:package-boundaries && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages",
       typecheck:
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run typecheck",
       verify:
