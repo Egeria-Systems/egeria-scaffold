@@ -30,10 +30,9 @@ function parseArguments(arguments_) {
   if (
     arguments_.length === 2 &&
     arguments_[0] === "--closure" &&
-    (arguments_[1] === "legacy-backfill-exempt" ||
-      arguments_[1] === "all-certified")
+    arguments_[1] === "all-certified"
   ) {
-    return { kind: "closure", policy: arguments_[1] };
+    return { kind: "closure" };
   }
 
   return undefined;
@@ -138,7 +137,7 @@ async function readChangedPaths(baselineRevision) {
 
 function recordReferencesChangedArtifact(record, changedPaths) {
   return (
-    (record.taskPlan !== null && changedPaths.has(record.taskPlan)) ||
+    changedPaths.has(record.taskPlan) ||
     record.evidence.some((evidence) => changedPaths.has(evidence.path))
   );
 }
@@ -179,9 +178,7 @@ async function validatePrivateArtifacts(registry) {
   );
   const artifactPaths = new Set();
   for (const record of Object.values(selectedRegistry.records)) {
-    if (record.taskPlan !== null) {
-      artifactPaths.add(record.taskPlan);
-    }
+    artifactPaths.add(record.taskPlan);
     for (const evidence of record.evidence) {
       artifactPaths.add(evidence.path);
     }
@@ -298,20 +295,19 @@ async function runMain() {
 
   const closure = validateCertificationClosure({
     registry: registry.value,
-    policy: command.policy,
   });
   if (!closure.ok) {
     writeStandard({
       ok: false,
       gate: "closure",
-      policy: command.policy,
+      policy: "all-certified",
       issues: closure.issues,
     });
     process.exitCode = 1;
     return;
   }
 
-  writeStandard({ ok: true, gate: "closure", policy: command.policy });
+  writeStandard({ ok: true, gate: "closure", policy: "all-certified" });
 }
 
 await runMain();

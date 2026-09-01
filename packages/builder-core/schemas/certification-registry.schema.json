@@ -87,7 +87,6 @@
           },
           "status": {
             "enum": [
-              "backfill-pending",
               "pending",
               "certified"
             ],
@@ -111,14 +110,7 @@
             "type": "object"
           },
           "taskPlan": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/urn:egeria-systems:schema:safe-relative-path:1.0.0"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/$defs/urn:egeria-systems:schema:safe-relative-path:1.0.0"
           }
         },
         "readOnly": true,
