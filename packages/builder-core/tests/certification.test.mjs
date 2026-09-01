@@ -731,6 +731,17 @@ test("descriptor admission accepts pending subjects and rejects incomplete, stal
     ],
   );
 
+  const certifiedTransition = cloneRegistry();
+  certifiedTransition.records["booking-calendly"].status = "certified";
+  assert.deepEqual(
+    core.validateCertificationAdmission({
+      acceptedRegistry: cloneRegistry(),
+      catalog,
+      registry: certifiedTransition,
+    }),
+    { ok: true, value: undefined },
+  );
+
 });
 
 test("material observability diagnostics have exact reviewed certification evidence", () => {

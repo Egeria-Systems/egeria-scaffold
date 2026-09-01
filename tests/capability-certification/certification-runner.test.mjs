@@ -1765,6 +1765,108 @@ test("the repository registry admits current subjects and passes full closure", 
   });
 });
 
+test("ordinary admission requires a new pending task for a changed accepted subject", async () => {
+  const cleanRoot = await mkdtemp(
+    join(tmpdir(), "egeria-certification-subject-transition-"),
+  );
+
+  try {
+    const cleanCheckScript = await copyCertificationRuntime(cleanRoot);
+    const currentRegistry = JSON.parse(
+      await readFile(certificationRegistryPath, "utf8"),
+    );
+    const baselineRegistry = structuredClone(currentRegistry);
+    const baselineRecord = baselineRegistry.records["booking-calendly"];
+    baselineRecord.subject.descriptorVersion = "0.0.1";
+    baselineRecord.subject.behaviorContractDigest = `sha256:${"0".repeat(64)}`;
+    for (const evidence of baselineRecord.evidence) {
+      evidence.subject = structuredClone(baselineRecord.subject);
+    }
+    await writeFile(
+      join(cleanRoot, "certifications/capabilities.json"),
+      `${JSON.stringify(baselineRegistry, null, 2)}\n`,
+      "utf8",
+    );
+    await execFileAsync("git", ["init", "--quiet"], { cwd: cleanRoot });
+    await execFileAsync(
+      "git",
+      ["add", "certifications/capabilities.json"],
+      { cwd: cleanRoot },
+    );
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Certification Test",
+        "-c",
+        "user.email=certification@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "accept prior certification subject",
+      ],
+      { cwd: cleanRoot },
+    );
+    const { stdout: baselineRevisionOutput } = await execFileAsync(
+      "git",
+      ["rev-parse", "HEAD"],
+      { cwd: cleanRoot, encoding: "utf8" },
+    );
+    await execFileAsync(
+      "git",
+      [
+        "update-ref",
+        "refs/remotes/origin/main",
+        baselineRevisionOutput.trim(),
+      ],
+      { cwd: cleanRoot },
+    );
+
+    await writeFile(
+      join(cleanRoot, "certifications/capabilities.json"),
+      `${JSON.stringify(currentRegistry, null, 2)}\n`,
+      "utf8",
+    );
+    const changedCertified = await runCheck([], {
+      cwd: cleanRoot,
+      script: cleanCheckScript,
+    });
+    assert.equal(changedCertified.exitCode, 1);
+    assert.equal(changedCertified.stderr, "");
+    assert.deepEqual(
+      JSON.parse(changedCertified.stdout).issues.map(({ code }) => code),
+      [
+        "CERTIFICATION_SUBJECT_PENDING_REQUIRED",
+        "CERTIFICATION_TASK_PLAN_RENEWAL_REQUIRED",
+      ],
+    );
+
+    currentRegistry.records["booking-calendly"].status = "pending";
+    currentRegistry.records["booking-calendly"].taskPlan =
+      "docs/superpowers/plans/replacement-certification.md";
+    currentRegistry.records["booking-calendly"].evidence = [];
+    await writeFile(
+      join(cleanRoot, "certifications/capabilities.json"),
+      `${JSON.stringify(currentRegistry, null, 2)}\n`,
+      "utf8",
+    );
+    assert.deepEqual(
+      await runCheck([], { cwd: cleanRoot, script: cleanCheckScript }),
+      {
+        exitCode: 0,
+        stdout: `${JSON.stringify({
+          ok: true,
+          gate: "admission",
+          records: 9,
+        })}\n`,
+        stderr: "",
+      },
+    );
+  } finally {
+    await rm(cleanRoot, temporaryRootRemovalOptions);
+  }
+});
+
 test("the ordinary certification gate does not require private workflow artifacts", async () => {
   const cleanRoot = await mkdtemp(
     join(tmpdir(), "egeria-certification-clean-checkout-"),

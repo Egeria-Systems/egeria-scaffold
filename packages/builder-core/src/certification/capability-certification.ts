@@ -22,6 +22,16 @@ function issue(
   return { code, path, context: { reason } };
 }
 
+function certificationSubjectEquals(
+  left: CertificationSubject,
+  right: CertificationSubject,
+): boolean {
+  return (
+    left.descriptorVersion === right.descriptorVersion &&
+    left.behaviorContractDigest === right.behaviorContractDigest
+  );
+}
+
 function readMetadata(document: string, label: string): string | undefined {
   const prefix = `**${label}:** \``;
   const line = document
@@ -239,6 +249,7 @@ export function createCertificationSubject(
 }
 
 export function validateCertificationAdmission(input: Readonly<{
+  acceptedRegistry?: CertificationRegistry;
   catalog: readonly CapabilityDescriptor[];
   registry: CertificationRegistry;
 }>): ValidationResult<void> {
@@ -291,6 +302,32 @@ export function validateCertificationAdmission(input: Readonly<{
           "stale",
         ),
       );
+    }
+
+    const acceptedRecord = input.acceptedRegistry?.records[descriptor.identifier];
+    if (
+      input.acceptedRegistry !== undefined &&
+      (acceptedRecord === undefined ||
+        !certificationSubjectEquals(record.subject, acceptedRecord.subject))
+    ) {
+      if (record.status !== "pending") {
+        issues.push(
+          issue(
+            "CERTIFICATION_SUBJECT_PENDING_REQUIRED",
+            ["records", descriptor.identifier, "status"],
+            "changed-subject",
+          ),
+        );
+      }
+      if (acceptedRecord?.taskPlan === record.taskPlan) {
+        issues.push(
+          issue(
+            "CERTIFICATION_TASK_PLAN_RENEWAL_REQUIRED",
+            ["records", descriptor.identifier, "taskPlan"],
+            "changed-subject",
+          ),
+        );
+      }
     }
   }
 

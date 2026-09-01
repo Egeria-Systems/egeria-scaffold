@@ -274,7 +274,11 @@ async function runMain() {
     return;
   }
 
+  const acceptedBaseline = await readAcceptedBaselineRegistry();
   const admission = validateCertificationAdmission({
+    ...(acceptedBaseline === undefined
+      ? {}
+      : { acceptedRegistry: acceptedBaseline.registry }),
     catalog: catalog.value,
     registry: registry.value,
   });
