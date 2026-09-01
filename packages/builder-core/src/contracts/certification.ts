@@ -40,11 +40,7 @@ const certificationEvidencePathSchema = safeRelativePathSchema.refine(
   "certification evidence must use the implementation evidence directory",
 );
 
-export const certificationStatusSchema = z.enum([
-  "backfill-pending",
-  "pending",
-  "certified",
-]);
+export const certificationStatusSchema = z.enum(["pending", "certified"]);
 
 export const certificationSubjectSchema = z
   .strictObject({
@@ -92,26 +88,10 @@ export const capabilityCertificationRecordSchema = z
     subject: certificationSubjectSchema,
     requiredEvidence: requiredEvidenceSchema,
     status: certificationStatusSchema,
-    taskPlan: certificationPlanPathSchema.nullable(),
+    taskPlan: certificationPlanPathSchema,
     evidence: certificationEvidenceListSchema,
   })
   .superRefine((record, context) => {
-    if (record.status === "backfill-pending") {
-      if (record.taskPlan !== null) {
-        context.addIssue({
-          code: "custom",
-          message: "backfill records cannot claim a certification task",
-          path: ["taskPlan"],
-        });
-      }
-    } else if (record.taskPlan === null) {
-      context.addIssue({
-        code: "custom",
-        message: "pending and certified records require a task plan",
-        path: ["taskPlan"],
-      });
-    }
-
     const required = new Set(record.requiredEvidence);
     const evidenceKinds = record.evidence.map(({ kind }) => kind);
 

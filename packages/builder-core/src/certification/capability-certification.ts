@@ -12,51 +12,6 @@ import type {
 } from "../contracts/result.js";
 import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
 
-const legacyBackfillSubjects = Object.freeze({
-  "content-files": Object.freeze({
-    descriptorVersion: "0.4.0",
-    behaviorContractDigest:
-      "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05",
-  }),
-  "deployment-cloudflare": Object.freeze({
-    descriptorVersion: "0.2.0",
-    behaviorContractDigest:
-      "sha256:846ae45d15ba9d8f256a9b7a1d8a4f3cda1b871a3b3f79f7656fd621050e8273",
-  }),
-  observability: Object.freeze({
-    descriptorVersion: "0.1.0",
-    behaviorContractDigest:
-      "sha256:1f070bdb531d8bcec8a7ebf5b081cde8466dcd0d72d5f16b5a5a3ac2bd65af93",
-  }),
-  "section-composition": Object.freeze({
-    descriptorVersion: "0.3.0",
-    behaviorContractDigest:
-      "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
-  }),
-  "site-routing": Object.freeze({
-    descriptorVersion: "0.3.0",
-    behaviorContractDigest:
-      "sha256:d716a1c93f8f40db33e54612c85d521fbd6ba13cd142d35ab0c39fa9c4b9647e",
-  }),
-  standards: Object.freeze({
-    descriptorVersion: "0.2.0",
-    behaviorContractDigest:
-      "sha256:a3a020b778c1ccfa24e0bfc951fcdf5eb74b50728f69e960124c6bae6a757311",
-  }),
-} satisfies Readonly<Record<string, CertificationSubject>>);
-
-export const legacyBackfillCapabilityIdentifiers = Object.freeze(
-  Object.keys(legacyBackfillSubjects).sort(),
-);
-
-export type CertificationClosurePolicy =
-  | "legacy-backfill-exempt"
-  | "all-certified";
-
-const legacyBackfillCapabilitySet = new Set<string>(
-  legacyBackfillCapabilityIdentifiers,
-);
-
 type CertificationArtifacts = Readonly<Record<string, string | undefined>>;
 
 function issue(
@@ -67,7 +22,7 @@ function issue(
   return { code, path, context: { reason } };
 }
 
-function subjectEquals(
+function certificationSubjectEquals(
   left: CertificationSubject,
   right: CertificationSubject,
 ): boolean {
@@ -248,10 +203,7 @@ export function validateCertificationArtifacts(input: Readonly<{
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
     .flatMap(([identifier, record]) => {
       const recordIssues: ContractIssue[] = [];
-      if (
-        record.taskPlan !== null &&
-        input.artifacts[record.taskPlan] === undefined
-      ) {
+      if (input.artifacts[record.taskPlan] === undefined) {
         recordIssues.push(
           issue(
             "CERTIFICATION_TASK_PLAN_MISSING",
@@ -297,6 +249,7 @@ export function createCertificationSubject(
 }
 
 export function validateCertificationAdmission(input: Readonly<{
+  acceptedRegistry?: CertificationRegistry;
   catalog: readonly CapabilityDescriptor[];
   registry: CertificationRegistry;
 }>): ValidationResult<void> {
@@ -350,28 +303,28 @@ export function validateCertificationAdmission(input: Readonly<{
         ),
       );
     }
-    if (record.status === "backfill-pending") {
-      if (!legacyBackfillCapabilitySet.has(descriptor.identifier)) {
+
+    const acceptedRecord = input.acceptedRegistry?.records[descriptor.identifier];
+    if (
+      input.acceptedRegistry !== undefined &&
+      (acceptedRecord === undefined ||
+        !certificationSubjectEquals(record.subject, acceptedRecord.subject))
+    ) {
+      if (record.status !== "pending") {
         issues.push(
           issue(
-            "CERTIFICATION_BACKFILL_NOT_ALLOWED",
+            "CERTIFICATION_SUBJECT_PENDING_REQUIRED",
             ["records", descriptor.identifier, "status"],
-            "not-legacy",
+            "changed-subject",
           ),
         );
-      } else if (
-        !subjectEquals(
-          record.subject,
-          legacyBackfillSubjects[
-            descriptor.identifier as keyof typeof legacyBackfillSubjects
-          ],
-        )
-      ) {
+      }
+      if (acceptedRecord?.taskPlan === record.taskPlan) {
         issues.push(
           issue(
-            "CERTIFICATION_BACKFILL_SUBJECT_MISMATCH",
-            ["records", descriptor.identifier, "subject"],
-            "not-accepted-subject",
+            "CERTIFICATION_TASK_PLAN_RENEWAL_REQUIRED",
+            ["records", descriptor.identifier, "taskPlan"],
+            "changed-subject",
           ),
         );
       }
@@ -397,35 +350,21 @@ export function validateCertificationAdmission(input: Readonly<{
 
 export function validateCertificationClosure(input: Readonly<{
   registry: CertificationRegistry;
-  policy: CertificationClosurePolicy;
 }>): ValidationResult<void> {
   const issues = Object.entries(input.registry.records)
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
     .flatMap(([identifier, record]) => {
-    if (record.status === "certified") {
-      return [];
-    }
-    if (
-      input.policy === "legacy-backfill-exempt" &&
-      record.status === "backfill-pending" &&
-      legacyBackfillCapabilitySet.has(identifier) &&
-      subjectEquals(
-        record.subject,
-        legacyBackfillSubjects[
-          identifier as keyof typeof legacyBackfillSubjects
-        ],
-      )
-    ) {
-      return [];
-    }
+      if (record.status === "certified") {
+        return [];
+      }
 
-    return [
-      issue(
-        "CAPABILITY_CERTIFICATION_PENDING",
-        ["records", identifier, "status"],
-        record.status,
-      ),
-    ];
+      return [
+        issue(
+          "CAPABILITY_CERTIFICATION_PENDING",
+          ["records", identifier, "status"],
+          record.status,
+        ),
+      ];
     });
 
   return issues.length === 0

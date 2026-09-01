@@ -148,17 +148,21 @@ function createRecord(identifier) {
       ? analyticsPlanPath
       : identifier === "booking-calendly"
       ? planPath
+      : identifier === "content-files"
+        ? contentFilesPlanPath
       : identifier === "deployment-cloudflare"
         ? deploymentPlanPath
         : identifier === "multilingual"
           ? multilingualPlanPath
         : identifier === "observability"
           ? observabilityPlanPath
+          : identifier === "section-composition"
+            ? sectionCompositionPlanPath
           : identifier === "site-routing"
             ? siteRoutingPlanPath
           : identifier === "standards"
             ? standardsPlanPath
-            : null;
+            : planPath;
 
   return {
     subject: {
@@ -172,16 +176,7 @@ function createRecord(identifier) {
           : descriptorDigests[identifier],
     },
     requiredEvidence: requiredEvidence[identifier],
-    status:
-      identifier === "analytics" ||
-      identifier === "booking-calendly" ||
-      identifier === "deployment-cloudflare" ||
-      identifier === "multilingual" ||
-      identifier === "observability" ||
-      identifier === "site-routing" ||
-      identifier === "standards"
-        ? "pending"
-        : "backfill-pending",
+    status: "pending",
     taskPlan,
     evidence: [],
   };
@@ -246,6 +241,20 @@ test("the registry contract is strict, sorted, and status-aware", () => {
   assert.equal(
     core.certificationRegistrySchema.safeParse(unplannedPending).success,
     false,
+  );
+
+  const retiredBackfillStatus = cloneRegistry();
+  retiredBackfillStatus.records["booking-calendly"].status =
+    "backfill-pending";
+  retiredBackfillStatus.records["booking-calendly"].taskPlan = null;
+  const retiredBackfillResult =
+    core.certificationRegistrySchema.safeParse(retiredBackfillStatus);
+  assert.equal(retiredBackfillResult.success, false);
+  assert.equal(
+    retiredBackfillResult.error.issues.some(
+      ({ path }) => path.join(".") === "records.booking-calendly.status",
+    ),
+    true,
   );
 
   const unexpectedEvidence = cloneRegistry();
@@ -662,7 +671,7 @@ test("accepted site routing receipt binds the reviewed fresh-scaffold outcome", 
   );
 });
 
-test("descriptor admission rejects incomplete, stale, extra, and false-legacy coverage", () => {
+test("descriptor admission accepts pending subjects and rejects incomplete, stale, and extra coverage", () => {
   assert.deepEqual(
     core.validateCertificationAdmission({ catalog, registry }),
     { ok: true, value: undefined },
@@ -709,21 +718,6 @@ test("descriptor admission rejects incomplete, stale, extra, and false-legacy co
     ],
   );
 
-  const falseLegacy = cloneRegistry();
-  falseLegacy.records["booking-calendly"].status = "backfill-pending";
-  falseLegacy.records["booking-calendly"].taskPlan = null;
-  assert.deepEqual(
-    core.validateCertificationAdmission({ catalog, registry: falseLegacy })
-      .issues,
-    [
-      {
-        code: "CERTIFICATION_BACKFILL_NOT_ALLOWED",
-        path: ["records", "booking-calendly", "status"],
-        context: { reason: "not-legacy" },
-      },
-    ],
-  );
-
   const extra = cloneRegistry();
   extra.records["unknown-capability"] = createRecord("standards");
   assert.deepEqual(
@@ -737,51 +731,17 @@ test("descriptor admission rejects incomplete, stale, extra, and false-legacy co
     ],
   );
 
-  const changedLegacyCatalog = catalog.map((descriptor) =>
-    descriptor.identifier === "standards"
-      ? { ...descriptor, version: "0.2.1" }
-      : descriptor,
-  );
-  const changedLegacy = cloneRegistry();
-  const changedStandards = changedLegacyCatalog.find(
-    ({ identifier }) => identifier === "standards",
-  );
-  assert.notEqual(changedStandards, undefined);
-  changedLegacy.records.standards.subject = core.createCertificationSubject(
-    changedStandards,
-    changedLegacy.records.standards.requiredEvidence,
-  );
-  changedLegacy.records.standards.status = "backfill-pending";
-  changedLegacy.records.standards.taskPlan = null;
+  const certifiedTransition = cloneRegistry();
+  certifiedTransition.records["booking-calendly"].status = "certified";
   assert.deepEqual(
     core.validateCertificationAdmission({
-      catalog: changedLegacyCatalog,
-      registry: changedLegacy,
-    }).issues,
-    [
-      {
-        code: "CERTIFICATION_BACKFILL_SUBJECT_MISMATCH",
-        path: ["records", "standards", "subject"],
-        context: { reason: "not-accepted-subject" },
-      },
-    ],
+      acceptedRegistry: cloneRegistry(),
+      catalog,
+      registry: certifiedTransition,
+    }),
+    { ok: true, value: undefined },
   );
-  assert.deepEqual(
-    core.validateCertificationClosure({
-      registry: {
-        schemaVersion: "1.0.0",
-        records: { standards: changedLegacy.records.standards },
-      },
-      policy: "legacy-backfill-exempt",
-    }).issues,
-    [
-      {
-        code: "CAPABILITY_CERTIFICATION_PENDING",
-        path: ["records", "standards", "status"],
-        context: { reason: "backfill-pending" },
-      },
-    ],
-  );
+
 });
 
 test("material observability diagnostics have exact reviewed certification evidence", () => {
@@ -826,22 +786,6 @@ test("material observability diagnostics have exact reviewed certification evide
       validRevisions: [observabilityEvidenceRevision],
     }),
     { ok: true, value: undefined },
-  );
-  const falseLegacy = structuredClone(committedRegistry);
-  falseLegacy.records.observability.status = "backfill-pending";
-  falseLegacy.records.observability.taskPlan = null;
-  assert.deepEqual(
-    core.validateCertificationAdmission({
-      catalog,
-      registry: falseLegacy,
-    }).issues,
-    [
-      {
-        code: "CERTIFICATION_BACKFILL_SUBJECT_MISMATCH",
-        path: ["records", "observability", "subject"],
-        context: { reason: "not-accepted-subject" },
-      },
-    ],
   );
 });
 
@@ -966,6 +910,8 @@ test("repository artifacts bind successful evidence to capability, subject, revi
         [analyticsPlanPath]: "# approved plan",
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
+        [contentFilesPlanPath]: "# approved plan",
+        [sectionCompositionPlanPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
         [multilingualPlanPath]: "# approved plan",
@@ -982,8 +928,10 @@ test("repository artifacts bind successful evidence to capability, subject, revi
       registry: recorded,
       artifacts: {
         [analyticsPlanPath]: "# approved plan",
+        [contentFilesPlanPath]: "# approved plan",
         [deploymentPlanPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
+        [sectionCompositionPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
         [multilingualPlanPath]: "# approved plan",
         [standardsPlanPath]: "# approved plan",
@@ -1012,6 +960,8 @@ test("repository artifacts bind successful evidence to capability, subject, revi
         [analyticsPlanPath]: "# approved plan",
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
+        [contentFilesPlanPath]: "# approved plan",
+        [sectionCompositionPlanPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
         [multilingualPlanPath]: "# approved plan",
@@ -1055,6 +1005,8 @@ test("repository artifacts reject revisions outside the checked Git history", ()
         [analyticsPlanPath]: "# approved plan",
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
+        [contentFilesPlanPath]: "# approved plan",
+        [sectionCompositionPlanPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
         [multilingualPlanPath]: "# approved plan",
@@ -1091,6 +1043,8 @@ test("repository artifacts reject incomplete or unresolved reviewer receipts", (
         [analyticsPlanPath]: "# approved plan",
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
+        [contentFilesPlanPath]: "# approved plan",
+        [sectionCompositionPlanPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
         [multilingualPlanPath]: "# approved plan",
@@ -1134,6 +1088,8 @@ test("repository artifacts require affirmative review of every claimed outcome",
         [analyticsPlanPath]: "# approved plan",
         [deploymentPlanPath]: "# approved plan",
         [planPath]: "# approved plan",
+        [contentFilesPlanPath]: "# approved plan",
+        [sectionCompositionPlanPath]: "# approved plan",
         [observabilityPlanPath]: "# approved plan",
         [siteRoutingPlanPath]: "# approved plan",
         [multilingualPlanPath]: "# approved plan",
@@ -1152,12 +1108,9 @@ test("repository artifacts require affirmative review of every claimed outcome",
   );
 });
 
-test("closure distinguishes the bounded legacy transition from full certification", () => {
+test("closure rejects every pending record and accepts complete certification", () => {
   assert.deepEqual(
-    core.validateCertificationClosure({
-      registry,
-      policy: "legacy-backfill-exempt",
-    }).issues,
+    core.validateCertificationClosure({ registry }).issues,
     [
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
@@ -1167,6 +1120,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "booking-calendly", "status"],
+        context: { reason: "pending" },
+      },
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "content-files", "status"],
         context: { reason: "pending" },
       },
       {
@@ -1186,6 +1144,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       },
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "section-composition", "status"],
+        context: { reason: "pending" },
+      },
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "site-routing", "status"],
         context: { reason: "pending" },
       },
@@ -1195,11 +1158,6 @@ test("closure distinguishes the bounded legacy transition from full certificatio
         context: { reason: "pending" },
       },
     ],
-  );
-  assert.equal(
-    core.validateCertificationClosure({ registry, policy: "all-certified" })
-      .issues.length,
-    9,
   );
 
   const currentCertified = cloneRegistry();
@@ -1212,14 +1170,16 @@ test("closure distinguishes the bounded legacy transition from full certificatio
     currentCertified.records.observability,
   );
   assert.deepEqual(
-    core.validateCertificationClosure({
-      registry: currentCertified,
-      policy: "legacy-backfill-exempt",
-    }).issues,
+    core.validateCertificationClosure({ registry: currentCertified }).issues,
     [
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "analytics", "status"],
+        context: { reason: "pending" },
+      },
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "content-files", "status"],
         context: { reason: "pending" },
       },
       {
@@ -1234,6 +1194,11 @@ test("closure distinguishes the bounded legacy transition from full certificatio
       },
       {
         code: "CAPABILITY_CERTIFICATION_PENDING",
+        path: ["records", "section-composition", "status"],
+        context: { reason: "pending" },
+      },
+      {
+        code: "CAPABILITY_CERTIFICATION_PENDING",
         path: ["records", "site-routing", "status"],
         context: { reason: "pending" },
       },
@@ -1243,13 +1208,6 @@ test("closure distinguishes the bounded legacy transition from full certificatio
         context: { reason: "pending" },
       },
     ],
-  );
-  assert.equal(
-    core.validateCertificationClosure({
-      registry: currentCertified,
-      policy: "all-certified",
-    }).issues.length,
-    7,
   );
 
   const allCertified = cloneRegistry();
@@ -1263,10 +1221,7 @@ test("closure distinguishes the bounded legacy transition from full certificatio
     allCertified,
   );
   assert.deepEqual(
-    core.validateCertificationClosure({
-      registry: allCertified,
-      policy: "all-certified",
-    }),
+    core.validateCertificationClosure({ registry: allCertified }),
     { ok: true, value: undefined },
   );
 });

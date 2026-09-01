@@ -2660,8 +2660,9 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /analytics@0\.1\.0[^\n]+certified[^\n]+a97341ea628210b6fa713fb12461084f20c3f8da[^\n]+descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/i,
+    /analytics@0\.1\.0[^\n]+certified[^\n]+a97341ea628210b6fa713fb12461084f20c3f8da[^\n]+descriptor admission[^\n]+all-certified[^\n]+pass/i,
   );
+  assert.doesNotMatch(enforcementMap, /legacy-backfill-exempt/iu);
 });
 
 test("client-required public-site work is relocated after lifecycle without requirement loss", async () => {
@@ -3170,7 +3171,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /analytics@0\.1\.0[^\n]+certified[^\n]+a97341ea628210b6fa713fb12461084f20c3f8da[^\n]+descriptor admission[^\n]+legacy-backfill-exempt[^\n]+all-certified[^\n]+pass/iu,
+    /analytics@0\.1\.0[^\n]+certified[^\n]+a97341ea628210b6fa713fb12461084f20c3f8da[^\n]+descriptor admission[^\n]+all-certified[^\n]+pass/iu,
   );
   assert.match(
     enforcementMap,
@@ -3180,7 +3181,7 @@ test("executable capability certification ownership is current", async () => {
     reviewProtocol,
     /pnpm run check:capability-certification/iu,
   );
-  assert.match(
+  assert.doesNotMatch(
     reviewProtocol,
     /--closure legacy-backfill-exempt/iu,
   );
@@ -3378,10 +3379,11 @@ test("canonical documentation records visual regression and the client-ready clo
   );
   assert.match(
     roadmap,
-    new RegExp(
-      `backfill-pending[^\\n]+exempt from ${escapeRegularExpression(clientReadyPhase)} closure[^\\n]+${escapeRegularExpression(lifecyclePhase)} closure[^\\n]+rejects`,
-      "iu",
-    ),
+    /no capability-certification backfill increment remains/iu,
+  );
+  assert.doesNotMatch(
+    roadmap,
+    /Accepted pre-foundation capabilities remain explicitly `backfill-pending`/iu,
   );
 });
 
