@@ -1045,6 +1045,159 @@ test("the parser accepts only the exact command-specific arguments", () => {
   }
 });
 
+test("paired lifecycle parser contracts preserve shared validation and apply approval", () => {
+  const fingerprint = `sha256:${"a".repeat(64)}`;
+  const fixtures = [
+    {
+      planKind: "plan-add",
+      applyKind: "apply-add",
+      arguments: [
+        "--directory",
+        "/private/tmp/acme-site",
+        "--capability",
+        "analytics",
+        ...analyticsSelectionArguments(),
+      ],
+      invalidArguments: [
+        "--directory",
+        "/private/tmp/acme-site",
+        "--capability",
+        "analytics",
+        "--microsoft-clarity-id",
+        "private-analytics-identifier",
+      ],
+      expected: {
+        directory: "/private/tmp/acme-site",
+        capability: "analytics",
+        settings: analyticsSettings,
+      },
+    },
+    {
+      planKind: "plan-remove",
+      applyKind: "apply-remove",
+      arguments: [
+        "--directory",
+        "/private/tmp/acme-site",
+        "--capability",
+        "multilingual",
+      ],
+      invalidArguments: [
+        "--directory",
+        "/private/tmp/acme-site",
+        "--capability",
+        "invented-capability",
+      ],
+      expected: {
+        directory: "/private/tmp/acme-site",
+        capability: "multilingual",
+      },
+    },
+    {
+      planKind: "plan-upgrade",
+      applyKind: "apply-upgrade",
+      arguments: [
+        "--directory",
+        "/private/tmp/acme-site",
+        "--capability",
+        "site-routing",
+        "--to-version",
+        "0.4.0",
+      ],
+      invalidArguments: [
+        "--directory",
+        "relative/project",
+        "--capability",
+        "site-routing",
+        "--to-version",
+        "0.4.0",
+      ],
+      expected: {
+        directory: "/private/tmp/acme-site",
+        capability: "site-routing",
+        toVersion: "0.4.0",
+      },
+    },
+    {
+      planKind: "plan-profile-transition",
+      applyKind: "apply-profile-transition",
+      arguments: [
+        "--directory",
+        "/private/tmp/acme-portfolio",
+        "--to-profile",
+        "site",
+      ],
+      invalidArguments: [
+        "--directory",
+        "/private/tmp/acme-portfolio",
+        "--to-profile",
+        "portfolio",
+      ],
+      expected: {
+        directory: "/private/tmp/acme-portfolio",
+        toProfile: "site",
+      },
+    },
+  ];
+
+  for (const fixture of fixtures) {
+    assert.deepEqual(
+      assertSuccess(
+        cliArguments.parseCliArguments([
+          fixture.planKind,
+          ...fixture.arguments,
+        ]),
+      ),
+      { kind: fixture.planKind, ...fixture.expected },
+    );
+    assert.deepEqual(
+      assertSuccess(
+        cliArguments.parseCliArguments([
+          fixture.applyKind,
+          ...fixture.arguments,
+          "--approved-plan",
+          fingerprint,
+        ]),
+      ),
+      {
+        kind: fixture.applyKind,
+        ...fixture.expected,
+        approvedPlanFingerprint: fingerprint,
+      },
+    );
+
+    for (const arguments_ of [
+      [fixture.applyKind, ...fixture.arguments],
+      [
+        fixture.planKind,
+        ...fixture.arguments,
+        "--approved-plan",
+        fingerprint,
+      ],
+      [fixture.planKind, ...fixture.invalidArguments],
+      [
+        fixture.applyKind,
+        ...fixture.invalidArguments,
+        "--approved-plan",
+        fingerprint,
+      ],
+    ]) {
+      const result = cliArguments.parseCliArguments(arguments_);
+      assert.equal(result.ok, false, JSON.stringify(arguments_));
+      assert.deepEqual(result.issues, [
+        {
+          code: "CLI_ARGUMENT_INVALID",
+          path: [],
+          context: { reason: "invalid-arguments" },
+        },
+      ]);
+      assert.doesNotMatch(
+        JSON.stringify(result),
+        /private-analytics-identifier/u,
+      );
+    }
+  }
+});
+
 test("the plan-add parser accepts exact options in any order", () => {
   const expected = {
     kind: "plan-add",
