@@ -5,6 +5,10 @@ import { fileURLToPath } from "node:url";
 
 import { runCertificationCli } from "./lib/certification-cli.mjs";
 import {
+  createCertificationPreflight,
+  createCertificationRepositoryReaders,
+} from "./lib/certification-preflight.mjs";
+import {
   createIsolatedProcessEnvironment,
   isolatedProcessOptions,
 } from "./lib/isolated-process.mjs";
@@ -67,43 +71,39 @@ function fail(code) {
   throw new StandardsLifecycleCertificationError(code);
 }
 
-async function readCurrentRevision() {
-  try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["rev-parse", "HEAD"],
-      {
-        cwd: repositoryRoot,
-        env: createIsolatedProcessEnvironment(),
-        timeout: 30_000,
-        ...isolatedProcessOptions,
-      },
-    );
-    const revision = stdout.trim();
-    if (!exactRevisionPattern.test(revision)) fail("EVIDENCE_REVISION_INVALID");
-    return revision;
-  } catch (error) {
-    if (error instanceof StandardsLifecycleCertificationError) throw error;
-    fail("EVIDENCE_REVISION_UNAVAILABLE");
-  }
-}
+const createError = (code) => new StandardsLifecycleCertificationError(code);
+const preflightErrorCodes = Object.freeze({
+  adapterInvalid: "CERTIFICATION_ADAPTER_INVALID",
+  revisionInvalid: "EVIDENCE_REVISION_INVALID",
+  revisionUnavailable: "EVIDENCE_REVISION_UNAVAILABLE",
+  revisionMismatch: "EVIDENCE_REVISION_MISMATCH",
+  worktreeUnavailable: "EVIDENCE_WORKTREE_UNAVAILABLE",
+  worktreeDirty: "EVIDENCE_WORKTREE_DIRTY",
+});
+const { readCurrentRevision, readRepositoryStatus } =
+  createCertificationRepositoryReaders({
+    repositoryRoot,
+    revisionArguments: ["rev-parse", "HEAD"],
+    exactRevisionPattern,
+    createError,
+    isCertificationError: (error) =>
+      error instanceof StandardsLifecycleCertificationError,
+    errorCodes: preflightErrorCodes,
+  });
 
-async function readRepositoryStatus() {
-  try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
-      {
-        cwd: repositoryRoot,
-        env: createIsolatedProcessEnvironment(),
-        timeout: 30_000,
-        ...isolatedProcessOptions,
-      },
-    );
-    return stdout;
-  } catch {
-    fail("EVIDENCE_WORKTREE_UNAVAILABLE");
-  }
+function preflightFor(adapters) {
+  return createCertificationPreflight({
+    adapters,
+    requiredAdapterFunctions: [
+      "readCurrentRevision",
+      "readRepositoryStatus",
+      "runCommand",
+    ],
+    createError,
+    isCertificationError: (error) =>
+      error instanceof StandardsLifecycleCertificationError,
+    errorCodes: preflightErrorCodes,
+  });
 }
 
 async function runCommand(input) {
@@ -119,39 +119,9 @@ function productionAdapters() {
   return { readCurrentRevision, readRepositoryStatus, runCommand };
 }
 
-function requireAdapters(adapters) {
-  if (
-    adapters === null ||
-    typeof adapters !== "object" ||
-    typeof adapters.readCurrentRevision !== "function" ||
-    typeof adapters.readRepositoryStatus !== "function" ||
-    typeof adapters.runCommand !== "function"
-  ) {
-    fail("CERTIFICATION_ADAPTER_INVALID");
-  }
-}
-
-async function requireCleanRepository(adapters) {
-  let status;
-  try {
-    status = await adapters.readRepositoryStatus();
-  } catch (error) {
-    if (error instanceof StandardsLifecycleCertificationError) throw error;
-    fail("EVIDENCE_WORKTREE_UNAVAILABLE");
-  }
-  if (typeof status !== "string") fail("EVIDENCE_WORKTREE_UNAVAILABLE");
-  if (status.length !== 0) fail("EVIDENCE_WORKTREE_DIRTY");
-}
-
-async function requireRevision(revision, adapters) {
-  let current;
-  try {
-    current = await adapters.readCurrentRevision();
-  } catch (error) {
-    if (error instanceof StandardsLifecycleCertificationError) throw error;
-    fail("EVIDENCE_REVISION_UNAVAILABLE");
-  }
-  if (current !== revision) fail("EVIDENCE_REVISION_MISMATCH");
+async function requireCleanRepository(preflight) {
+  const status = await preflight.readRepositoryStatus();
+  preflight.requireCleanStatus(status);
 }
 
 function hasExactPassedTests(stdout, expectedTests) {
@@ -203,14 +173,15 @@ export function certifyStandardsLifecycle(input = {}) {
 }
 
 export async function certifyStandardsLifecycleForTesting(input = {}, adapters) {
-  requireAdapters(adapters);
+  const preflight = preflightFor(adapters);
+  preflight.requireAdapters();
   const revision = input?.revision;
   if (!exactRevisionPattern.test(revision ?? "")) {
     fail("EVIDENCE_REVISION_INVALID");
   }
 
-  await requireRevision(revision, adapters);
-  await requireCleanRepository(adapters);
+  await preflight.requireRevision(revision);
+  await requireCleanRepository(preflight);
   await runEvidenceCommand(adapters, [
     "--test",
     "--test-reporter=tap",
@@ -228,8 +199,8 @@ export async function certifyStandardsLifecycleForTesting(input = {}, adapters) 
     "^standards capability upgrade ",
     "packages/builder-core/tests/apply-capability-upgrade.test.mjs",
   ], builderCoreTests);
-  await requireRevision(revision, adapters);
-  await requireCleanRepository(adapters);
+  await preflight.requireRevision(revision);
+  await requireCleanRepository(preflight);
 
   return {
     ok: true,
