@@ -287,6 +287,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "lifecycle/capability-upgrade-writer.ts",
       "lifecycle/git-worktree-inspection.ts",
       "lifecycle/lifecycle-control-persistence.ts",
+      "lifecycle/lifecycle-control-snapshot.ts",
       "lifecycle/plan-capability-addition.ts",
       "lifecycle/plan-capability-removal.ts",
       "lifecycle/plan-capability-upgrade.ts",
@@ -585,6 +586,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderIndex, /apply-profile-transition\.js/);
   assert.match(builderIndex, /profile-transition-writer\.js/);
   assert.doesNotMatch(builderIndex, /lifecycle-control-persistence\.js/);
+  assert.doesNotMatch(builderIndex, /lifecycle-control-snapshot\.js/);
   assert.match(
     capabilityUpgradeExecutor,
     /export async function applyCapabilityUpgrade\(/,
