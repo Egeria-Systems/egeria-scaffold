@@ -1,8 +1,6 @@
-import { execFile } from "node:child_process";
 import { constants, copyFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
 import {
   certifyFreshScaffold,
@@ -10,11 +8,10 @@ import {
 } from "./lib/certify-fresh-scaffold.mjs";
 import { runCertificationCli } from "./lib/certification-cli.mjs";
 import {
-  createIsolatedProcessEnvironment,
-  isolatedProcessOptions,
-} from "./lib/isolated-process.mjs";
+  createCertificationPreflight,
+  createCertificationRepositoryReaders,
+} from "./lib/certification-preflight.mjs";
 
-const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
 const publicRegistry = "https://registry.npmjs.org/";
@@ -97,6 +94,40 @@ function createError(code) {
   return new SectionCompositionCertificationError(code);
 }
 
+const preflightErrorCodes = Object.freeze({
+  adapterInvalid: "CERTIFICATION_ADAPTER_INVALID",
+  revisionInvalid: "CERTIFICATION_REVISION_UNAVAILABLE",
+  revisionUnavailable: "CERTIFICATION_REVISION_UNAVAILABLE",
+  revisionMismatch: "CERTIFICATION_REVISION_MISMATCH",
+  worktreeUnavailable: "CERTIFICATION_WORKTREE_UNAVAILABLE",
+  worktreeDirty: "CERTIFICATION_WORKTREE_DIRTY",
+  indexFlags: "CERTIFICATION_INDEX_FLAGS",
+});
+const repositoryReaders = createCertificationRepositoryReaders({
+  repositoryRoot,
+  revisionArguments: ["rev-parse", "--verify", "HEAD"],
+  exactRevisionPattern,
+  createError,
+  isCertificationError: (error) =>
+    error instanceof SectionCompositionCertificationError,
+  errorCodes: preflightErrorCodes,
+});
+
+function preflightFor(adapters) {
+  return createCertificationPreflight({
+    adapters,
+    requiredAdapterFunctions: [
+      "readCurrentRevision",
+      "readRepositoryStatus",
+      "readRepositoryIndexEntries",
+    ],
+    createError,
+    isCertificationError: (error) =>
+      error instanceof SectionCompositionCertificationError,
+    errorCodes: preflightErrorCodes,
+  });
+}
+
 function configurationFor(profile, revision) {
   if (typeof revision !== "string" || !exactRevisionPattern.test(revision)) {
     throw createError("CERTIFICATION_REVISION_INVALID");
@@ -132,125 +163,15 @@ function configurationFor(profile, revision) {
   });
 }
 
-async function readCurrentRevision() {
-  try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["rev-parse", "--verify", "HEAD"],
-      {
-        cwd: repositoryRoot,
-        env: createIsolatedProcessEnvironment(),
-        timeout: 30_000,
-        ...isolatedProcessOptions,
-      },
-    );
-    const revision = stdout.trim();
-    if (!exactRevisionPattern.test(revision)) {
-      throw new Error("invalid revision");
-    }
-    return revision;
-  } catch {
-    throw createError("CERTIFICATION_REVISION_UNAVAILABLE");
-  }
-}
-
-async function readRepositoryStatus() {
-  try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
-      {
-        cwd: repositoryRoot,
-        env: createIsolatedProcessEnvironment(),
-        timeout: 30_000,
-        ...isolatedProcessOptions,
-      },
-    );
-    return stdout;
-  } catch {
-    throw createError("CERTIFICATION_WORKTREE_UNAVAILABLE");
-  }
-}
-
-async function readRepositoryIndexEntries() {
-  try {
-    const { stdout } = await execFileAsync("git", ["ls-files", "-v", "-z"], {
-      cwd: repositoryRoot,
-      env: createIsolatedProcessEnvironment(),
-      timeout: 30_000,
-      ...isolatedProcessOptions,
-    });
-    return stdout;
-  } catch {
-    throw createError("CERTIFICATION_WORKTREE_UNAVAILABLE");
-  }
-}
-
 function authorityAdapters() {
-  return {
-    readCurrentRevision,
-    readRepositoryStatus,
-    readRepositoryIndexEntries,
-  };
+  return { ...repositoryReaders };
 }
 
-function requireAuthorityAdapters(adapters) {
-  if (
-    adapters === null ||
-    typeof adapters !== "object" ||
-    typeof adapters.readCurrentRevision !== "function" ||
-    typeof adapters.readRepositoryStatus !== "function" ||
-    typeof adapters.readRepositoryIndexEntries !== "function"
-  ) {
-    throw createError("CERTIFICATION_ADAPTER_INVALID");
-  }
-}
-
-async function requireRevision(revision, adapters) {
-  let current;
-  try {
-    current = await adapters.readCurrentRevision();
-  } catch (error) {
-    if (error instanceof SectionCompositionCertificationError) throw error;
-    throw createError("CERTIFICATION_REVISION_UNAVAILABLE");
-  }
-  if (current !== revision) {
-    throw createError("CERTIFICATION_REVISION_MISMATCH");
-  }
-}
-
-async function requireCleanRepository(adapters) {
-  let status;
-  let indexEntries;
-  try {
-    status = await adapters.readRepositoryStatus();
-    indexEntries = await adapters.readRepositoryIndexEntries();
-  } catch (error) {
-    if (error instanceof SectionCompositionCertificationError) throw error;
-    throw createError("CERTIFICATION_WORKTREE_UNAVAILABLE");
-  }
-
-  if (typeof status !== "string" || typeof indexEntries !== "string") {
-    throw createError("CERTIFICATION_WORKTREE_UNAVAILABLE");
-  }
-  if (status.length !== 0) {
-    throw createError("CERTIFICATION_WORKTREE_DIRTY");
-  }
-  if (indexEntries.length === 0) return;
-
-  const entries = indexEntries.split("\0");
-  if (entries.at(-1) !== "") {
-    throw createError("CERTIFICATION_WORKTREE_UNAVAILABLE");
-  }
-  entries.pop();
-  for (const entry of entries) {
-    if (entry.length < 3 || entry[1] !== " ") {
-      throw createError("CERTIFICATION_WORKTREE_UNAVAILABLE");
-    }
-    if (entry[0] !== "H") {
-      throw createError("CERTIFICATION_INDEX_FLAGS");
-    }
-  }
+async function requireCleanRepository(preflight) {
+  const status = await preflight.readRepositoryStatus();
+  const indexEntries = await preflight.readRepositoryIndexEntries();
+  preflight.requireCleanStatus(status);
+  preflight.requireOrdinaryIndexEntries(indexEntries);
 }
 
 function arraysEqual(left, right) {
@@ -438,9 +359,10 @@ async function certifyWithAuthority(input, adapters, runJourney) {
   const configurations = profiles.map((profile) =>
     configurationFor(profile, revision),
   );
-  requireAuthorityAdapters(adapters);
-  await requireCleanRepository(adapters);
-  await requireRevision(revision, adapters);
+  const preflight = preflightFor(adapters);
+  preflight.requireAdapters();
+  await requireCleanRepository(preflight);
+  await preflight.requireRevision(revision);
 
   const results = [];
   for (const configuration of configurations) {
@@ -449,8 +371,8 @@ async function certifyWithAuthority(input, adapters, runJourney) {
     results.push(result);
   }
 
-  await requireRevision(revision, adapters);
-  await requireCleanRepository(adapters);
+  await preflight.requireRevision(revision);
+  await requireCleanRepository(preflight);
   return Object.freeze({
     ok: true,
     capability: "section-composition",
