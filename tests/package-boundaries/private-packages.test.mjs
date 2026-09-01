@@ -280,6 +280,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "lifecycle/apply-capability-removal.ts",
       "lifecycle/apply-capability-upgrade.ts",
       "lifecycle/apply-profile-transition.ts",
+      "lifecycle/atomic-file-change-writer.ts",
       "lifecycle/capability-addition-writer.ts",
       "lifecycle/capability-removal-file-operation.ts",
       "lifecycle/capability-removal-writer.ts",
