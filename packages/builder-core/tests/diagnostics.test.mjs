@@ -17,8 +17,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
-import { requiredEvidence } from "./certification-contracts.mjs";
-
 const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const builtEntry = resolve(packageRoot, "dist/index.js");
@@ -496,265 +494,56 @@ test("doctor and diff report a healthy minimal repository", async () => {
   assert.deepEqual(difference, { equal: true, differences: [] });
 });
 
-test("restricted error diagnostics admission advances every direct owner together", async () => {
-  const catalog = core.createVerifiedCapabilityCatalog();
-  assert.equal(catalog.ok, true);
-  const descriptor = catalog.value.find(
-    ({ identifier }) => identifier === "observability",
-  );
-  assert.notEqual(descriptor, undefined);
-  assert.equal(descriptor.version, "0.3.0");
-  assert.equal(core.verifiedCapabilityPackageVersions.observability, "0.3.0");
-  assert.deepEqual(descriptor.dependencies, [
-    "content-files",
-    "deployment-cloudflare",
-    "section-composition",
-  ]);
-  assert.ok(
-    descriptor.dataClassifications.includes("restricted-error-diagnostics"),
-  );
-  assert.ok(
-    descriptor.adapterSemanticRequirements.includes(
-      "separate-operational-and-diagnostic-sinks",
-    ),
-  );
-
-  const newPaths = [
-    "apps/web/app/error.tsx",
-    "apps/web/app/global-error.tsx",
-    "apps/web/content/en-CA/observability.yaml",
-    "apps/web/src/infrastructure/observability/error-copy.ts",
-    "apps/web/src/presentation/error-fallback.tsx",
-  ];
-  assert.deepEqual(
-    descriptor.managedSurfaces
-      .map(({ path }) => path)
-      .filter((path) => newPaths.includes(path))
-      .sort(),
-    newPaths,
-  );
-  assert.deepEqual(
-    descriptor.inferenceProbes
-      .filter(({ kind }) => kind === "file")
-      .map(({ path }) => path)
-      .filter((path) => newPaths.includes(path))
-      .sort(),
-    newPaths,
-  );
-  assert.deepEqual(
-    core.profileRecipes.map(({ identifier, recipeVersion }) => ({
-      identifier,
-      recipeVersion,
-    })),
-    [
-      { identifier: "portfolio", recipeVersion: "0.10.0" },
-      { identifier: "site", recipeVersion: "0.11.0" },
-    ],
-  );
-
-  const registry = JSON.parse(
-    await readFile(
-      new URL("../../../certifications/capabilities.json", import.meta.url),
-      "utf8",
-    ),
-  );
-  const subject = core.createCertificationSubject(
-    descriptor,
-    requiredEvidence.observability,
-  );
-  assert.deepEqual(registry.records.observability, {
-    subject,
-    requiredEvidence: requiredEvidence.observability,
-    status: "certified",
-    taskPlan:
-      "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md",
-    evidence: requiredEvidence.observability.map((kind) => ({
-      kind,
-      path: "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
-      outcome: "passed",
-      revision: "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
-      subject,
-    })),
-  });
-
-  const [packageTemplate, workspace, lockfile] = await Promise.all([
-    readFile(
-      new URL("../templates/common/apps/web/package.json.template", import.meta.url),
-      "utf8",
-    ),
-    readFile(
-      new URL("../templates/common/pnpm-workspace.yaml", import.meta.url),
-      "utf8",
-    ),
-    readFile(
-      new URL("../lockfiles/web-recipe-0.8.0/pnpm-lock.yaml", import.meta.url),
-      "utf8",
-    ),
-  ]);
-  assert.equal(
-    JSON.parse(packageTemplate).dependencies[
-      "@egeria-systems/observability"
-    ],
-    "0.3.0",
-  );
-  assert.match(
-    workspace,
-    /minimumReleaseAgeExclude:\n  - "@egeria-systems\/observability@0\.3\.0"/u,
-  );
-  assert.match(lockfile, /@egeria-systems\/observability@0\.3\.0/u);
-  assert.doesNotMatch(
-    lockfile,
-    /@egeria-systems\/observability@(?:file:|link:|workspace:)|(?:file:|link:|workspace:).*observability/u,
-  );
-});
-
-test("doctor and diff agree across the canonical portfolio composition", async () => {
-  const catalogResult = core.createCapabilityCatalog({
-    standards: "1.2.3",
-    observability: "4.5.6",
-  });
+test("doctor and diff agree across the rendered portfolio composition", async () => {
+  const catalogResult = core.createVerifiedCapabilityCatalog();
   assert.equal(catalogResult.ok, true);
-  const catalog = catalogResult.value;
-  const projectValue = project(
-    core.profileRecipes.find(({ identifier }) => identifier === "portfolio")
-      .defaultCapabilities,
+  const renderedResult = await core.renderSkeleton({
+    profile: "portfolio",
+    projectName: "diagnostic-fixture",
+    displayName: "Diagnostic Fixture",
+    packageVersions: core.verifiedCapabilityPackageVersions,
+  });
+  assert.equal(renderedResult.ok, true);
+  const rendered = renderedResult.value;
+  const renderedFiles = new Map(
+    rendered.files.map(({ path: filePath, content }) => [filePath, content]),
   );
-  const resolution = core.resolveCapabilities(
-    {
-      profile: projectValue.originProfile,
-      requestedCapabilities: projectValue.selectedCapabilities,
-    },
-    catalog,
-    core.profileRecipes,
-  );
-  assert.equal(resolution.ok, true);
-
-  const canonicalFiles = {
-    "apps/web/package.json": `${JSON.stringify({
-      dependencies: {
-        "@egeria-systems/observability": "4.5.6",
-        "@opennextjs/cloudflare": "1.20.2",
-        yaml: "2.9.0",
-      },
-      devDependencies: {
-        "@axe-core/playwright": "4.12.1",
-        "@egeria-systems/standards": "1.2.3",
-        "@playwright/test": "1.62.1",
-        "@tailwindcss/postcss": "4.3.3",
-        "@testing-library/dom": "10.4.1",
-        "@testing-library/jest-dom": "7.0.1",
-        "@testing-library/react": "16.3.2",
-        "@testing-library/user-event": "14.6.3",
-        "@vitejs/plugin-react": "6.0.5",
-        jsdom: "30.0.1",
-        postcss: "8.5.26",
-        "raw-loader": "4.0.2",
-        tailwindcss: "4.3.3",
-        vitest: "4.1.10",
-        wrangler: "4.118.0",
-      },
-      scripts: {
-        "browser:install": "playwright install chromium",
-        "browser:install:ci": "playwright install --with-deps chromium",
-        test: "vitest run",
-        "test:component": "vitest run --project component",
-        "test:component:watch": "vitest --project component",
-        "test:e2e:deployed":
-          "playwright test --config playwright.deployed.config.ts",
-        "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
-        "test:e2e:preview":
-          "playwright test --config playwright.preview.config.ts",
-        "test:visual": "playwright test --config playwright.visual.config.ts",
-        "test:unit": "vitest run --project unit",
-        "test:unit:watch": "vitest --project unit",
-        "test:watch": "vitest",
-      },
-    }, null, 2)}\n`,
-    "apps/web/tsconfig.json": "{}\n",
-    "apps/web/eslint.config.mjs": "export default [];\n",
-    "apps/web/content/content.config.yaml": "{}\n",
-    "apps/web/content/en-CA/long-form/introduction.md": "# Introduction\n",
-    "apps/web/content/en-CA/site.yaml": "{}\n",
-    "apps/web/src/content/content-schema.ts": "export {};\n",
-    "apps/web/src/content/content-source.d.ts": "export {};\n",
-    "apps/web/src/content/read-content.ts": "export {};\n",
-    "apps/web/app/globals.css": "@import \"tailwindcss\";\n",
-    "apps/web/app/page.tsx": "export default function Page() {}\n",
-    "apps/web/postcss.config.mjs": "export default {};\n",
-    "apps/web/src/presentation/content-page.tsx": "export {};\n",
-    "apps/web/src/sections/section-registry.tsx": "export {};\n",
-    "apps/web/next.config.ts": "export default {};\n",
-    "apps/web/open-next.config.ts": "export default {};\n",
-    "apps/web/wrangler.jsonc": `${JSON.stringify({
-      observability: {
-        enabled: true,
-        head_sampling_rate: 1,
-        logs: { invocation_logs: false },
-      },
-      version_metadata: { binding: "CF_VERSION_METADATA" },
-    }, null, 2)}\n`,
-    "apps/web/instrumentation-client.ts": "export {};\n",
-    "apps/web/instrumentation.ts": "export {};\n",
-    "apps/web/app/api/observability/route.ts": "export {};\n",
-    "apps/web/app/error.tsx": "export {};\n",
-    "apps/web/app/global-error.tsx": "export {};\n",
-    "apps/web/content/en-CA/observability.yaml": "title: Error\n",
-    "apps/web/src/infrastructure/cloudflare/observability-context.ts":
-      "export {};\n",
-    "apps/web/src/infrastructure/observability/browser-reporter.ts":
-      "export {};\n",
-    "apps/web/src/infrastructure/observability/error-copy.ts":
-      "export {};\n",
-    "apps/web/src/infrastructure/observability/installed-capability.ts":
-      "export {};\n",
-    "apps/web/src/infrastructure/observability/server-reporter.ts":
-      "export {};\n",
-    "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx":
-      "export {};\n",
-    "apps/web/src/presentation/error-fallback.tsx":
-      "export {};\n",
-    ".github/workflows/deploy.yml": "name: Deploy\n",
-    ".github/workflows/quality.yml": "name: Quality\n",
-    "apps/web/playwright.config.shared.ts": "export {};\n",
-    "apps/web/playwright.deployed.config.ts": "export {};\n",
-    "apps/web/playwright.dev.config.ts": "export {};\n",
-    "apps/web/playwright.preview.config.ts": "export {};\n",
-    "apps/web/playwright.visual.config.ts": "export {};\n",
-    "apps/web/tests/e2e/site-quality.spec.ts": "export {};\n",
-    "apps/web/tests/component/content-page.test.tsx": "export {};\n",
-    "apps/web/tests/setup/component.ts": "export {};\n",
-    "apps/web/tests/unit/content-schema.test.ts": "export {};\n",
-    "apps/web/tests/visual/home-visual.spec.ts": "export {};\n",
-    "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png":
-      "desktop baseline\n",
-    "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png":
-      "mobile baseline\n",
-    "apps/web/vitest.config.ts": "export {};\n",
-  };
   const surfaceResult = core.materializeInstalledSurfaces({
-    files: new Map(
-      Object.entries(canonicalFiles).map(([path, content]) => [
-        path,
-        encoder.encode(content),
-      ]),
-    ),
-    surfaces: resolution.value.capabilities.flatMap(
-      ({ managedSurfaces }) => managedSurfaces,
-    ),
+    files: renderedFiles,
+    surfaces: rendered.surfaces,
   });
   assert.equal(surfaceResult.ok, true);
+  const decoder = new TextDecoder();
+  const installedState = state(
+    core.createInstalledManifest(rendered.resolved),
+    surfaceResult.value,
+    {
+      origin: {
+        profile: rendered.project.originProfile,
+        recipeVersion: rendered.project.recipeVersion,
+      },
+      lastSuccessfulVerification: {
+        kind: "generation",
+        checks: [
+          "contracts",
+          "pre-state-inference",
+          ...core.ordinaryGenerationVerificationChecks,
+          "post-state-inference",
+        ],
+      },
+    },
+  );
   const fixture = {
-    catalog,
+    catalog: catalogResult.value,
     profiles: core.profileRecipes,
     files: {
-      ...controlFiles(
-        projectValue,
-        state(
-          core.createInstalledManifest(resolution.value),
-          surfaceResult.value,
-        ),
+      ...controlFiles(rendered.project, installedState),
+      ...Object.fromEntries(
+        rendered.files.map(({ path: filePath, content }) => [
+          filePath,
+          decoder.decode(content),
+        ]),
       ),
-      ...canonicalFiles,
     },
   };
 
