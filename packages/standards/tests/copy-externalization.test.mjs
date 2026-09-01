@@ -1,37 +1,19 @@
 import assert from "node:assert/strict";
-import { access } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { pathToFileURL, fileURLToPath } from "node:url";
 import test from "node:test";
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const configPath = resolve(packageRoot, "eslint/copy-externalization.mjs");
+import { createCopyExternalizationConfig } from "../eslint/copy-externalization.mjs";
+
 const eslintPackages = [
   ["ESLint 9", "eslint"],
   ["ESLint 10", "eslint-10"],
 ];
 const ruleId = "@egeria-systems/copy/externalize-visible-copy";
 
-async function loadCopyExternalizationFactory() {
-  try {
-    await access(configPath);
-  } catch {
-    assert.fail(
-      "eslint/copy-externalization.mjs must be a public standards API",
-    );
-  }
-
-  const standardsModule = await import(pathToFileURL(configPath));
-  return standardsModule.createCopyExternalizationConfig;
-}
-
 async function lintSource(
   eslintPackage,
   source,
   { invariantLiterals = [] } = {},
 ) {
-  const createCopyExternalizationConfig =
-    await loadCopyExternalizationFactory();
   const { Linter } = await import(eslintPackage);
   const linter = new Linter({ configType: "flat" });
 
@@ -55,9 +37,7 @@ function selectDiagnostics(messages) {
   }));
 }
 
-test("the copy config rejects invalid file and invariant allowlists", async () => {
-  const createCopyExternalizationConfig =
-    await loadCopyExternalizationFactory();
+test("the copy config rejects invalid file and invariant allowlists", () => {
   const expectedError = {
     name: "TypeError",
     message: "COPY_EXTERNALIZATION_CONFIG_INVALID",
