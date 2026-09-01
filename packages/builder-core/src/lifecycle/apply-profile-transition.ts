@@ -36,13 +36,7 @@ import {
   createFileSystemRepositoryReader,
   type RepositoryReader,
 } from "../repository/repository-reader.js";
-import {
-  parseMigrationLog,
-  parseProjectYaml,
-  parseStateJson,
-  serializeProjectYaml,
-  serializeStateJson,
-} from "../state/codecs.js";
+import { serializeProjectYaml, serializeStateJson } from "../state/codecs.js";
 import {
   createFileSystemProfileTransitionWriter,
   type ProfileTransitionFileChange,
@@ -64,6 +58,10 @@ import {
   persistMigrationRecord,
   prepareMigrationRecord,
 } from "./lifecycle-control-persistence.js";
+import {
+  readControlSnapshot,
+  type ControlSnapshot,
+} from "./lifecycle-control-snapshot.js";
 import {
   planProfileTransition,
   type ProfileTransitionAction,
@@ -161,15 +159,6 @@ type InspectExpectedChanges = (input: Readonly<{
 
 type ExactByteReader = RepositoryReader;
 
-type ControlSnapshot = Readonly<{
-  projectSource: string;
-  stateSource: string;
-  migrationSource: string;
-  project: ReturnType<typeof parseProjectYaml> & Readonly<{ ok: true }>;
-  state: ReturnType<typeof parseStateJson> & Readonly<{ ok: true }>;
-  migrations: ReturnType<typeof parseMigrationLog> & Readonly<{ ok: true }>;
-}>;
-
 type MaterializedTransition = Readonly<{
   changes: readonly ProfileTransitionFileChange[];
   targetBytes: ReadonlyMap<string, Uint8Array>;
@@ -242,39 +231,6 @@ function sameSurfaceDescriptor(
 
 function samePathIdentity(left: PathIdentity, right: PathIdentity): boolean {
   return left.device === right.device && left.inode === right.inode;
-}
-
-async function readControlSnapshot(
-  reader: RepositoryReader,
-): Promise<ControlSnapshot | undefined> {
-  const [projectRead, stateRead, migrationsRead] = await Promise.all([
-    reader.readText(".egeria/project.yaml"),
-    reader.readText(".egeria/state.json"),
-    reader.readText(".egeria/migrations.jsonl"),
-  ]);
-
-  if (
-    projectRead.kind !== "file" ||
-    stateRead.kind !== "file" ||
-    migrationsRead.kind !== "file"
-  ) {
-    return undefined;
-  }
-
-  const project = parseProjectYaml(projectRead.content);
-  const state = parseStateJson(stateRead.content);
-  const migrations = parseMigrationLog(migrationsRead.content);
-
-  return project.ok && state.ok && migrations.ok
-    ? {
-        projectSource: projectRead.content,
-        stateSource: stateRead.content,
-        migrationSource: migrationsRead.content,
-        project,
-        state,
-        migrations,
-      }
-    : undefined;
 }
 
 function controlEvidenceMatches(

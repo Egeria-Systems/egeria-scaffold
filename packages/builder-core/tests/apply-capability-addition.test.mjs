@@ -606,6 +606,31 @@ test("capability addition refuses an unapproved plan before writes or verificati
   assert.equal(JSON.stringify([...repository.files]), before);
 });
 
+test("capability addition leaves apply-time control read rejections for caller containment", async () => {
+  const repository = createRepository(await fixtureEntries());
+  const readFailure = new Error("private control read failure");
+  let projectReads = 0;
+
+  await assert.rejects(
+    runApply(repository, {
+      reader: {
+        ...repository.reader,
+        readText(path) {
+          if (
+            path === ".egeria/project.yaml" &&
+            ++projectReads === 3
+          ) {
+            return Promise.reject(readFailure);
+          }
+          return repository.reader.readText(path);
+        },
+      },
+    }),
+    (error) => error === readFailure,
+  );
+  assert.deepEqual(repository.writes, []);
+});
+
 test("capability addition preserves prior control state when verification fails", async () => {
   const repository = createRepository(await fixtureEntries());
   const initialState = repository.files.get(".egeria/state.json");
