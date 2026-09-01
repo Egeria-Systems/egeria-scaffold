@@ -1,5 +1,16 @@
+import assert from "node:assert/strict";
+import { mkdir, rename, symlink } from "node:fs/promises";
+import { join } from "node:path";
+import test from "node:test";
+
 import { createFileSystemCapabilityUpgradeWriter } from "../dist/lifecycle/capability-upgrade-writer.js";
-import { registerAtomicWriterConformanceTests } from "./atomic-writer-conformance.mjs";
+import {
+  assertMissing,
+  createTemporaryRoot,
+  creation,
+  encoder,
+  registerAtomicWriterConformanceTests,
+} from "./atomic-writer-conformance.mjs";
 
 registerAtomicWriterConformanceTests({
   createWriter: createFileSystemCapabilityUpgradeWriter,
