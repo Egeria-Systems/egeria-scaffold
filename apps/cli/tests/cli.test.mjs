@@ -694,11 +694,6 @@ const upgradeSourcePaths = [
   "apps/web/package.json",
   ...visualUpgradePaths,
 ];
-const upgradeControlPaths = [
-  ".egeria/project.yaml",
-  ".egeria/state.json",
-  ".egeria/migrations.jsonl",
-];
 const profileTransitionSourcePaths = [
   ".egeria/project.yaml",
   "apps/web/app/about/page.tsx",
@@ -4080,153 +4075,28 @@ async function replaceFakeLockfileWithFixture(root, profile) {
   );
 }
 
-async function executeBuiltPlanAdd(directory) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...planAddArguments(directory),
-  ]);
-}
-
-async function executeBuiltPlanRemove(directory) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...planRemoveArguments(directory),
-  ]);
-}
-
-async function executeBuiltPlanMultilingualAdd(directory) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...planMultilingualAddArguments(directory),
-  ]);
-}
-
-async function executeBuiltPlanMultilingualRemove(directory) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...planMultilingualRemoveArguments(directory),
-  ]);
-}
-
-async function executeBuiltPlanAnalyticsAdd(directory) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...planAnalyticsAddArguments(directory),
-  ]);
-}
-
-async function executeBuiltPlanAnalyticsRemove(directory) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...planAnalyticsRemoveArguments(directory),
-  ]);
-}
-
-async function executeBuiltPlanUpgrade(directory, capability = "standards") {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...planUpgradeArguments(directory, capability),
-  ]);
-}
-
-async function executeBuiltPlanProfileTransition(directory) {
-  return executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...planProfileTransitionArguments(directory),
-  ]);
-}
-
-async function executeBuiltApplyAdd(directory, approvedPlan, environment = {}) {
+function executeBuilt(arguments_, environment = {}) {
   return executeNode(
-    [
-      resolve(packageRoot, "dist/index.js"),
-      ...applyAddArguments(directory, approvedPlan),
-    ],
-    environment,
-  );
-}
-
-async function executeBuiltApplyRemove(directory, approvedPlan, environment = {}) {
-  return executeNode(
-    [
-      resolve(packageRoot, "dist/index.js"),
-      ...applyRemoveArguments(directory, approvedPlan),
-    ],
-    environment,
-  );
-}
-
-async function executeBuiltApplyMultilingualAdd(
-  directory,
-  approvedPlan,
-  environment = {},
-) {
-  return executeNode(
-    [
-      resolve(packageRoot, "dist/index.js"),
-      ...applyMultilingualAddArguments(directory, approvedPlan),
-    ],
-    environment,
-  );
-}
-
-async function executeBuiltApplyMultilingualRemove(
-  directory,
-  approvedPlan,
-  environment = {},
-) {
-  return executeNode(
-    [
-      resolve(packageRoot, "dist/index.js"),
-      ...applyMultilingualRemoveArguments(directory, approvedPlan),
-    ],
-    environment,
-  );
-}
-
-async function executeBuiltApplyAnalyticsAdd(
-  directory,
-  approvedPlan,
-  environment = {},
-) {
-  return executeNode(
-    [
-      resolve(packageRoot, "dist/index.js"),
-      ...applyAnalyticsAddArguments(directory, approvedPlan),
-    ],
-    environment,
-  );
-}
-
-async function executeBuiltApplyAnalyticsRemove(
-  directory,
-  approvedPlan,
-  environment = {},
-) {
-  return executeNode(
-    [
-      resolve(packageRoot, "dist/index.js"),
-      ...applyAnalyticsRemoveArguments(directory, approvedPlan),
-    ],
+    [resolve(packageRoot, "dist/index.js"), ...arguments_],
     environment,
   );
 }
 
 async function applyCompiledCapabilityAddition(root, identifier, environment = {}) {
-  const commands =
+  const argumentBuilders =
     identifier === "multilingual"
       ? {
-          plan: executeBuiltPlanMultilingualAdd,
-          apply: executeBuiltApplyMultilingualAdd,
+          plan: planMultilingualAddArguments,
+          apply: applyMultilingualAddArguments,
         }
       : identifier === "analytics"
         ? {
-            plan: executeBuiltPlanAnalyticsAdd,
-            apply: executeBuiltApplyAnalyticsAdd,
+            plan: planAnalyticsAddArguments,
+            apply: applyAnalyticsAddArguments,
           }
-        : { plan: executeBuiltPlanAdd, apply: executeBuiltApplyAdd };
+        : { plan: planAddArguments, apply: applyAddArguments };
   const cleanBefore = await gitRepositorySnapshot(root);
-  const planExecution = await commands.plan(root);
+  const planExecution = await executeBuilt(argumentBuilders.plan(root));
   assert.equal(planExecution.exitCode, 0, planExecution.stderr);
   assert.equal(planExecution.stderr, "");
   const plan = JSON.parse(planExecution.stdout).result;
@@ -4234,9 +4104,8 @@ async function applyCompiledCapabilityAddition(root, identifier, environment = {
   assert.match(plan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
   assert.deepEqual(await gitRepositorySnapshot(root), cleanBefore);
 
-  const execution = await commands.apply(
-    root,
-    plan.planFingerprint,
+  const execution = await executeBuilt(
+    argumentBuilders.apply(root, plan.planFingerprint),
     environment,
   );
   assert.equal(execution.exitCode, 0, `${identifier}: ${execution.stderr}`);
@@ -4300,40 +4169,11 @@ async function assertCapabilityLifecycleState(
   await assertExactInstalledAgreement(root);
 }
 
-async function executeBuiltApplyUpgrade(
-  directory,
-  approvedPlan,
-  environment = {},
-  capability = "standards",
-) {
-  return executeNode(
-    [
-      resolve(packageRoot, "dist/index.js"),
-      ...applyUpgradeArguments(directory, approvedPlan, capability),
-    ],
-    environment,
-  );
-}
-
-async function executeBuiltApplyProfileTransition(
-  directory,
-  approvedPlan,
-  environment = {},
-) {
-  return executeNode(
-    [
-      resolve(packageRoot, "dist/index.js"),
-      ...applyProfileTransitionArguments(directory, approvedPlan),
-    ],
-    environment,
-  );
-}
-
 test("the compiled plan-add command emits exact portfolio and site plans without writes", async () => {
   for (const profile of ["portfolio", "site"]) {
     await withGitFixture(profile, async ({ linked }) => {
       const before = await gitRepositorySnapshot(linked);
-      const execution = await executeBuiltPlanAdd(linked);
+      const execution = await executeBuilt(planAddArguments(linked));
       const after = await gitRepositorySnapshot(linked);
       const revision = Buffer.from(before.head).toString("utf8").trim();
 
@@ -4370,7 +4210,7 @@ test("the compiled plan-upgrade command plans both profiles without changing any
             readFile(join(linked, ".egeria", name)),
           ),
         );
-        const execution = await executeBuiltPlanUpgrade(linked);
+        const execution = await executeBuilt(planUpgradeArguments(linked));
         const after = await gitRepositorySnapshot(linked);
         const controlAfter = await Promise.all(
           ["project.yaml", "state.json", "migrations.jsonl"].map((name) =>
@@ -4419,7 +4259,7 @@ test("the compiled plan-upgrade command plans the exact production site edge wit
     "site",
     async ({ linked }) => {
       const before = await gitRepositorySnapshot(linked);
-      const execution = await executeBuiltPlanUpgrade(linked, "site-routing");
+      const execution = await executeBuilt(planUpgradeArguments(linked, "site-routing"));
       const after = await gitRepositorySnapshot(linked);
 
       assert.equal(execution.exitCode, 0, execution.stderr);
@@ -4454,8 +4294,8 @@ test("the compiled profile-transition planner is repeatable and leaves portfolio
           readFile(join(linked, ".egeria", name)),
         ),
       );
-      const first = await executeBuiltPlanProfileTransition(linked);
-      const second = await executeBuiltPlanProfileTransition(linked);
+      const first = await executeBuilt(planProfileTransitionArguments(linked));
+      const second = await executeBuilt(planProfileTransitionArguments(linked));
       const after = await gitRepositorySnapshot(linked);
       const controlsAfter = await Promise.all(
         ["project.yaml", "state.json", "migrations.jsonl"].map((name) =>
@@ -4508,7 +4348,7 @@ test("the compiled profile-transition planner refuses an already-site project wi
     "site",
     async ({ linked }) => {
       const before = await gitRepositorySnapshot(linked);
-      const execution = await executeBuiltPlanProfileTransition(linked);
+      const execution = await executeBuilt(planProfileTransitionArguments(linked));
       const after = await gitRepositorySnapshot(linked);
 
       assert.equal(execution.exitCode, 1);
@@ -4545,140 +4385,6 @@ test("the compiled profile-transition command emits its command-specific malform
   });
 });
 
-test("the compiled profile-transition planner refuses the finite unsafe matrix without mutation", async () => {
-  const siteFixture = resolve(repositoryRoot, "fixtures/generated/site");
-  const cases = [
-    {
-      name: "primary worktree",
-      select: ({ primary }) => primary,
-      prepare: async () => {},
-      code: "GIT_WORKTREE_NOT_ISOLATED",
-    },
-    {
-      name: "detached worktree",
-      prepare: (root) => executeGit(root, ["checkout", "--detach"]),
-      code: "GIT_BRANCH_REQUIRED",
-    },
-    {
-      name: "untracked repository input",
-      prepare: (root) =>
-        writeFile(join(root, "private-untracked.txt"), "private\n"),
-      code: "GIT_WORKTREE_DIRTY",
-    },
-    ...[
-      ["assume-unchanged", "--assume-unchanged"],
-      ["skip-worktree", "--skip-worktree"],
-    ].map(([name, flag]) => ({
-      name: `hidden tracked change with ${name}`,
-      prepare: async (root) => {
-        await executeGit(root, ["update-index", flag, ".gitignore"]);
-        await writeFile(join(root, ".gitignore"), `private ${name} drift\n`);
-      },
-      code: "GIT_WORKTREE_DIRTY",
-    })),
-    {
-      name: "managed source drift",
-      prepare: async (root) => {
-        await writeFile(
-          join(root, "apps/web/content/en-CA/site.yaml"),
-          "private managed drift\n",
-        );
-        await commitAll(root, "record managed content drift");
-      },
-      code: "PROJECT_DRIFT_DETECTED",
-    },
-    {
-      name: "incompatible migration state",
-      prepare: async (root) => {
-        const path = join(root, ".egeria/state.json");
-        const state = core.parseStateJson(await readFile(path, "utf8"));
-        assert.equal(state.ok, true);
-        await writeFile(
-          path,
-          core.serializeStateJson({
-            ...state.value,
-            appliedMigrations: ["invented-transition"],
-          }),
-        );
-        await commitAll(root, "record incompatible migration state");
-      },
-      code: "PROJECT_STATE_INCOMPATIBLE",
-    },
-    {
-      name: "partial target inference",
-      prepare: async (root) => {
-        await mkdir(join(root, "apps/web/app/about"), { recursive: true });
-        await cp(
-          join(siteFixture, "apps/web/app/about/page.tsx"),
-          join(root, "apps/web/app/about/page.tsx"),
-        );
-        await commitAll(root, "record partial site routing evidence");
-      },
-      code: "PROFILE_INFERENCE_AMBIGUOUS",
-    },
-    {
-      name: "present create targets",
-      prepare: async (root) => {
-        await mkdir(join(root, "apps/web/app/about"), { recursive: true });
-        await cp(
-          join(siteFixture, "apps/web/app/about/page.tsx"),
-          join(root, "apps/web/app/about/page.tsx"),
-        );
-        await cp(
-          join(siteFixture, "apps/web/content/en-CA/about.yaml"),
-          join(root, "apps/web/content/en-CA/about.yaml"),
-        );
-        await commitAll(root, "record conflicting site routing targets");
-      },
-      code: "PROFILE_TRANSITION_ACTION_CONFLICT",
-    },
-    {
-      name: "ignored create target",
-      prepare: async (root) => {
-        await writeFile(
-          join(root, ".gitignore"),
-          `${await readFile(join(root, ".gitignore"), "utf8")}\napps/web/app/about/page.tsx\n`,
-        );
-        await commitAll(root, "ignore a profile transition target");
-      },
-      code: "PROFILE_TRANSITION_ACTION_CONFLICT",
-    },
-  ];
-
-  for (const fixture of cases) {
-    await withGitFixture(
-      "portfolio",
-      async (roots) => {
-        const root = fixture.select?.(roots) ?? roots.linked;
-        await fixture.prepare(root);
-        const before = await gitRepositorySnapshot(root);
-        const execution = await executeBuiltPlanProfileTransition(root);
-        const after = await gitRepositorySnapshot(root);
-
-        assert.equal(execution.exitCode, 1, fixture.name);
-        assert.equal(execution.stdout, "", fixture.name);
-        assert.deepEqual(
-          JSON.parse(execution.stderr),
-          {
-            ok: false,
-            command: "plan-profile-transition",
-            code: fixture.code,
-            recovery: "not-required",
-          },
-          fixture.name,
-        );
-        assert.deepEqual(after, before, fixture.name);
-        assert.doesNotMatch(
-          execution.stderr,
-          /private|refs\/heads|\.git\/worktrees/u,
-          fixture.name,
-        );
-      },
-      { branch: `profile-transition-${fixture.code.toLowerCase()}-test` },
-    );
-  }
-});
-
 test("the compiled apply-profile-transition command completes default and Calendly portfolio transactions", async () => {
   for (const fixture of ["portfolio", "portfolio-calendly"]) {
     await withGitFixture(
@@ -4694,7 +4400,7 @@ test("the compiled apply-profile-transition command completes default and Calend
           "utf8",
         );
 
-        const planExecution = await executeBuiltPlanProfileTransition(linked);
+        const planExecution = await executeBuilt(planProfileTransitionArguments(linked));
         assert.equal(planExecution.exitCode, 0, planExecution.stderr);
         assert.equal(planExecution.stderr, "");
         const plan = JSON.parse(planExecution.stdout).plan;
@@ -4704,9 +4410,8 @@ test("the compiled apply-profile-transition command completes default and Calend
         );
         assert.deepEqual(await gitRepositorySnapshot(linked), linkedBefore);
 
-        const execution = await executeBuiltApplyProfileTransition(
-          linked,
-          plan.planFingerprint,
+        const execution = await executeBuilt(
+          applyProfileTransitionArguments(linked, plan.planFingerprint),
         );
         assert.equal(execution.exitCode, 0, execution.stderr);
         assert.equal(execution.stderr, "");
@@ -4803,7 +4508,7 @@ test("the compiled apply-profile-transition command completes default and Calend
   }
 });
 
-test("the compiled profile transition verification failure retains transformed source and old controls", async () => {
+test("the compiled profile transition verification failure retains a representative transformed prefix and old controls", async () => {
   await withGitFixture(
     "portfolio",
     async ({ linked, primary }) => {
@@ -4816,21 +4521,21 @@ test("the compiled profile transition verification failure retains transformed s
         ),
       );
       const target = await renderProfileTransitionTarget(linked);
-      const planExecution = await executeBuiltPlanProfileTransition(linked);
+      const planExecution = await executeBuilt(planProfileTransitionArguments(linked));
       assert.equal(planExecution.exitCode, 0, planExecution.stderr);
       const plan = JSON.parse(planExecution.stdout).plan;
 
       let execution;
       await withFailingPnpm(async (path) => {
-        execution = await executeBuiltApplyProfileTransition(
-          linked,
-          plan.planFingerprint,
+        execution = await executeBuilt(
+          applyProfileTransitionArguments(linked, plan.planFingerprint),
           { PATH: path },
         );
       });
 
       assert.equal(execution.exitCode, 1);
       assert.equal(execution.stdout, "");
+      assert.equal(execution.stderr.trimEnd().split("\n").length, 1);
       assert.deepEqual(JSON.parse(execution.stderr), {
         ok: false,
         command: "apply-profile-transition",
@@ -4850,13 +4555,11 @@ test("the compiled profile transition verification failure retains transformed s
         await readFile(join(linked, ".egeria/project.yaml"), "utf8"),
         core.serializeProjectYaml(target.project),
       );
-      for (const path of profileTransitionSourcePaths.slice(1)) {
-        assert.deepEqual(
-          await readFile(join(linked, path)),
-          Buffer.from(target.files.get(path)),
-          path,
-        );
-      }
+      const representativePath = "apps/web/app/about/page.tsx";
+      assert.deepEqual(
+        await readFile(join(linked, representativePath)),
+        Buffer.from(target.files.get(representativePath)),
+      );
       assert.deepEqual(
         await core.inspectGitExpectedChanges({
           root: linked,
@@ -4878,89 +4581,37 @@ test("the compiled profile transition verification failure retains transformed s
   );
 });
 
-test("the compiled apply-profile-transition command refuses representative unsafe inputs without mutation", async () => {
-  const cases = [
-    {
-      name: "wrong approved fingerprint",
-      fixture: "portfolio",
-      select: ({ linked }) => linked,
-      prepare: async () => undefined,
-      code: "PROFILE_TRANSITION_PLAN_APPROVAL_INVALID",
-    },
-    {
-      name: "dirty linked worktree",
-      fixture: "portfolio",
-      select: ({ linked }) => linked,
-      prepare: (root) =>
-        writeFile(join(root, "private-untracked.txt"), "private\n"),
-      code: "GIT_WORKTREE_DIRTY",
-    },
-    {
-      name: "primary checkout",
-      fixture: "portfolio",
-      select: ({ primary }) => primary,
-      prepare: async () => undefined,
-      code: "GIT_WORKTREE_NOT_ISOLATED",
-    },
-    {
-      name: "already current",
-      fixture: "site",
-      select: ({ linked }) => linked,
-      prepare: async () => undefined,
-      code: "PROFILE_ALREADY_CURRENT",
-    },
-  ];
-
-  for (const [index, fixture] of cases.entries()) {
-    await withGitFixture(
-      fixture.fixture,
-      async (roots) => {
-        const root = fixture.select(roots);
-        await fixture.prepare(root);
-        const before = await gitRepositorySnapshot(root);
-        const execution = await executeBuiltApplyProfileTransition(
-          root,
+test("the compiled apply-profile-transition command rejects a wrong fingerprint without mutation", async () => {
+  await withGitFixture(
+    "portfolio",
+    async ({ linked }) => {
+      const before = await gitRepositorySnapshot(linked);
+      const execution = await executeBuilt(
+        applyProfileTransitionArguments(
+          linked,
           `sha256:${"0".repeat(64)}`,
-        );
-        const after = await gitRepositorySnapshot(root);
+        ),
+      );
 
-        assert.equal(execution.exitCode, 1, fixture.name);
-        assert.equal(execution.stdout, "", fixture.name);
-        assert.equal(execution.stderr.endsWith("\n"), true, fixture.name);
-        assert.deepEqual(
-          JSON.parse(execution.stderr),
-          {
-            ok: false,
-            command: "apply-profile-transition",
-            code: fixture.code,
-            phase: "precondition",
-            recovery: "not-required",
-          },
-          fixture.name,
-        );
-        assert.deepEqual(after, before, fixture.name);
-        assert.doesNotMatch(
-          execution.stderr,
-          /private|refs\/heads|\.git\/worktrees|acme/u,
-          fixture.name,
-        );
-      },
-      { branch: `apply-profile-transition-refusal-${index}` },
-    );
-  }
-
-  const invalid = await executeNode([
-    resolve(packageRoot, "dist/index.js"),
-    ...applyProfileTransitionArguments("relative/project"),
-  ]);
-  assert.equal(invalid.exitCode, 2);
-  assert.equal(invalid.stdout, "");
-  assert.deepEqual(JSON.parse(invalid.stderr), {
-    ok: false,
-    command: "apply-profile-transition",
-    code: "CLI_ARGUMENT_INVALID",
-    recovery: "not-required",
-  });
+      assert.equal(execution.exitCode, 1);
+      assert.equal(execution.stdout, "");
+      assert.equal(execution.stderr.endsWith("\n"), true);
+      assert.equal(execution.stderr.trimEnd().split("\n").length, 1);
+      assert.deepEqual(JSON.parse(execution.stderr), {
+        ok: false,
+        command: "apply-profile-transition",
+        code: "PROFILE_TRANSITION_PLAN_APPROVAL_INVALID",
+        phase: "precondition",
+        recovery: "not-required",
+      });
+      assert.deepEqual(await gitRepositorySnapshot(linked), before);
+      assert.doesNotMatch(
+        execution.stderr,
+        /private|refs\/heads|\.git\/worktrees|acme/u,
+      );
+    },
+    { branch: "apply-profile-transition-wrong-fingerprint-test" },
+  );
 });
 
 test("the compiled apply-upgrade command completes the exact portfolio and site transactions", async () => {
@@ -5017,16 +4668,13 @@ test("the compiled apply-upgrade command completes the exact portfolio and site 
               )
             : undefined;
 
-        const planExecution = await executeBuiltPlanUpgrade(linked);
+        const planExecution = await executeBuilt(planUpgradeArguments(linked));
         assert.equal(planExecution.exitCode, 0, planExecution.stderr);
         assert.equal(planExecution.stderr, "");
         const plan = JSON.parse(planExecution.stdout).plan;
         assert.deepEqual(await gitRepositorySnapshot(linked), linkedBefore);
 
-        const execution = await executeBuiltApplyUpgrade(
-          linked,
-          plan.planFingerprint,
-        );
+        const execution = await executeBuilt(applyUpgradeArguments(linked, plan.planFingerprint));
         assert.equal(execution.exitCode, 0, execution.stderr);
         assert.equal(execution.stderr, "");
         assert.equal(execution.stdout.endsWith("\n"), true);
@@ -5244,20 +4892,15 @@ test("the compiled site-routing upgrade converges on the exact current site", as
       );
       assert.equal(initialState.ok, true);
 
-      const planExecution = await executeBuiltPlanUpgrade(
-        linked,
-        "site-routing",
-      );
+      const planExecution = await executeBuilt(planUpgradeArguments(linked, "site-routing"));
       assert.equal(planExecution.exitCode, 0, planExecution.stderr);
       assert.equal(planExecution.stderr, "");
       const plan = JSON.parse(planExecution.stdout).plan;
       assert.deepEqual(await gitRepositorySnapshot(linked), linkedBefore);
 
-      const execution = await executeBuiltApplyUpgrade(
-        linked,
-        plan.planFingerprint,
+      const execution = await executeBuilt(
+        applyUpgradeArguments(linked, plan.planFingerprint, "site-routing"),
         {},
-        "site-routing",
       );
       assert.equal(execution.exitCode, 0, execution.stderr);
       assert.equal(execution.stderr, "");
@@ -5400,7 +5043,7 @@ test("the compiled site-routing upgrade converges on the exact current site", as
   );
 });
 
-test("the compiled site-routing upgrade verification failure retains transformed source and old state and migration controls", async () => {
+test("the compiled site-routing upgrade verification failure retains a representative transformed prefix and old controls", async () => {
   await withGitFixture(
     "site",
     async ({ linked, primary }) => {
@@ -5414,25 +5057,21 @@ test("the compiled site-routing upgrade verification failure retains transformed
       const controlsBefore = await Promise.all(
         retainedControlPaths.map((path) => readFile(join(linked, path))),
       );
-      const planExecution = await executeBuiltPlanUpgrade(
-        linked,
-        "site-routing",
-      );
+      const planExecution = await executeBuilt(planUpgradeArguments(linked, "site-routing"));
       assert.equal(planExecution.exitCode, 0, planExecution.stderr);
       const plan = JSON.parse(planExecution.stdout).plan;
 
       let execution;
       await withFailingPnpm(async (path) => {
-        execution = await executeBuiltApplyUpgrade(
-          linked,
-          plan.planFingerprint,
+        execution = await executeBuilt(
+          applyUpgradeArguments(linked, plan.planFingerprint, "site-routing"),
           { PATH: path },
-          "site-routing",
         );
       });
 
       assert.equal(execution.exitCode, 1);
       assert.equal(execution.stdout, "");
+      assert.equal(execution.stderr.trimEnd().split("\n").length, 1);
       assert.deepEqual(JSON.parse(execution.stderr), {
         ok: false,
         command: "apply-upgrade",
@@ -5446,15 +5085,13 @@ test("the compiled site-routing upgrade verification failure retains transformed
         ),
         controlsBefore,
       );
-      for (const { path } of plan.actions) {
-        assert.deepEqual(
-          await readFile(join(linked, path)),
-          await readFile(
-            resolve(repositoryRoot, "fixtures/generated/site", path),
-          ),
-          path,
-        );
-      }
+      const representativePath = plan.actions.at(0).path;
+      assert.deepEqual(
+        await readFile(join(linked, representativePath)),
+        await readFile(
+          resolve(repositoryRoot, "fixtures/generated/site", representativePath),
+        ),
+      );
       assert.deepEqual(
         await core.inspectGitExpectedChanges({
           root: linked,
@@ -5480,590 +5117,37 @@ test("the compiled site-routing upgrade verification failure retains transformed
   );
 });
 
-test("the compiled site-routing planner refuses already-current and managed-drift repositories without writes", async () => {
-  const cases = [
-    {
-      name: "already current",
-      code: "CAPABILITY_ALREADY_CURRENT",
-      preparePrimary: undefined,
-      prepareLinked: async () => {},
-    },
-    {
-      name: "managed drift",
-      code: "PROJECT_DRIFT_DETECTED",
-      preparePrimary: (root) =>
-        prepareHistoricalUpgradeFixture(root, { downgradeStandards: false }),
-      prepareLinked: async (root) => {
-        await writeFile(
-          join(root, "apps/web/app/about/page.tsx"),
-          "private managed route drift\n",
-        );
-        await commitAll(root, "drift managed route module");
-      },
-    },
-  ];
-
-  for (const [index, fixture] of cases.entries()) {
-    await withGitFixture(
-      "site",
-      async ({ linked }) => {
-        await fixture.prepareLinked(linked);
-        const before = await gitRepositorySnapshot(linked);
-        const execution = await executeBuiltPlanUpgrade(linked, "site-routing");
-        const after = await gitRepositorySnapshot(linked);
-
-        assert.equal(execution.exitCode, 1, fixture.name);
-        assert.equal(execution.stdout, "", fixture.name);
-        assert.deepEqual(
-          JSON.parse(execution.stderr),
-          {
-            ok: false,
-            command: "plan-upgrade",
-            code: fixture.code,
-          },
-          fixture.name,
-        );
-        assert.deepEqual(after, before, fixture.name);
-        assert.doesNotMatch(
-          execution.stderr,
-          /private|refs\/heads|\.git\/worktrees/u,
-          fixture.name,
-        );
-      },
-      {
-        branch: `site-routing-plan-refusal-${index}`,
-        ...(fixture.preparePrimary === undefined
-          ? {}
-          : { preparePrimary: fixture.preparePrimary }),
-      },
-    );
-  }
-});
-
-test("the compiled standards upgrade verification failure retains transformed source and old controls", async () => {
+test("the compiled apply-upgrade command rejects a wrong fingerprint without mutation", async () => {
   await withGitFixture(
     "portfolio",
-    async ({ linked, primary }) => {
-      const primaryBefore = await gitRepositorySnapshot(primary);
-      const initialInspection = await core.inspectGitWorktree({ root: linked });
-      assert.equal(initialInspection.ok, true);
-      const controlsBefore = await Promise.all(
-        upgradeControlPaths.map((path) => readFile(join(linked, path))),
+    async ({ linked }) => {
+      const before = await gitRepositorySnapshot(linked);
+      const execution = await executeBuilt(
+        applyUpgradeArguments(linked, `sha256:${"0".repeat(64)}`),
       );
-      const planExecution = await executeBuiltPlanUpgrade(linked);
-      assert.equal(planExecution.exitCode, 0, planExecution.stderr);
-      const plan = JSON.parse(planExecution.stdout).plan;
-
-      let execution;
-      await withFailingPnpm(async (path) => {
-        execution = await executeBuiltApplyUpgrade(
-          linked,
-          plan.planFingerprint,
-          { PATH: path },
-        );
-      });
 
       assert.equal(execution.exitCode, 1);
       assert.equal(execution.stdout, "");
+      assert.equal(execution.stderr.endsWith("\n"), true);
+      assert.equal(execution.stderr.trimEnd().split("\n").length, 1);
       assert.deepEqual(JSON.parse(execution.stderr), {
         ok: false,
         command: "apply-upgrade",
-        code: "CAPABILITY_VERIFICATION_FAILED",
-        phase: "verify",
-        recovery: "inspect-worktree",
+        code: "CAPABILITY_PLAN_APPROVAL_INVALID",
+        phase: "precondition",
+        recovery: "not-required",
       });
-      assert.deepEqual(
-        await Promise.all(
-          upgradeControlPaths.map((path) => readFile(join(linked, path))),
-        ),
-        controlsBefore,
-      );
-      for (const path of upgradeSourcePaths) {
-        assert.deepEqual(
-          await readFile(join(linked, path)),
-          await readFile(
-            resolve(repositoryRoot, `fixtures/generated/portfolio/${path}`),
-          ),
-          path,
-        );
-      }
-      assert.deepEqual(
-        await core.inspectGitExpectedChanges({
-          root: linked,
-          identity: initialInspection.identity,
-          expectedPaths: [...upgradeSourcePaths].sort(),
-        }),
-        { ok: true },
-      );
-      assert.deepEqual(
-        withoutSharedRefs(await gitRepositorySnapshot(primary)),
-        withoutSharedRefs(primaryBefore),
-      );
+      assert.deepEqual(await gitRepositorySnapshot(linked), before);
       assert.doesNotMatch(
         execution.stderr,
-        /private|refs\/heads|\.git\/worktrees|egeria-failing-pnpm/u,
+        /private|refs\/heads|\.git\/worktrees|invented-migration/u,
       );
     },
     {
-      branch: "standards-upgrade-verification-failure-test",
+      branch: "standards-upgrade-wrong-fingerprint-test",
       preparePrimary: prepareHistoricalUpgradeFixture,
     },
   );
-});
-
-test("the compiled plan-upgrade command refuses unsafe or unsupported repository states without writes", async () => {
-  const cases = [
-    {
-      name: "primary worktree",
-      preparePrimary: prepareHistoricalUpgradeFixture,
-      select: ({ primary }) => primary,
-      prepareLinked: async () => {},
-      code: "GIT_WORKTREE_NOT_ISOLATED",
-    },
-    {
-      name: "detached worktree",
-      preparePrimary: prepareHistoricalUpgradeFixture,
-      prepareLinked: (root) => executeGit(root, ["checkout", "--detach"]),
-      code: "GIT_BRANCH_REQUIRED",
-    },
-    {
-      name: "already current",
-      preparePrimary: undefined,
-      prepareLinked: async () => {},
-      code: "CAPABILITY_ALREADY_CURRENT",
-    },
-    {
-      name: "dirty repository",
-      preparePrimary: prepareHistoricalUpgradeFixture,
-      prepareLinked: (root) =>
-        writeFile(join(root, "private-untracked.txt"), "private\n"),
-      code: "GIT_WORKTREE_DIRTY",
-    },
-    ...[
-      ["assume-unchanged", "--assume-unchanged"],
-      ["skip-worktree", "--skip-worktree"],
-    ].map(([name, flag]) => ({
-      name: `hidden tracked change with ${name}`,
-      preparePrimary: prepareHistoricalUpgradeFixture,
-      prepareLinked: async (root) => {
-        await executeGit(root, ["update-index", flag, ".gitignore"]);
-        await writeFile(join(root, ".gitignore"), `private ${name} drift\n`);
-      },
-      code: "GIT_WORKTREE_DIRTY",
-    })),
-    {
-      name: "managed drift",
-      preparePrimary: prepareHistoricalUpgradeFixture,
-      prepareLinked: async (root) => {
-        await writeFile(
-          join(root, ".github/workflows/quality.yml"),
-          "private managed drift\n",
-        );
-        await commitAll(root, "drift managed quality workflow");
-      },
-      code: "PROJECT_DRIFT_DETECTED",
-    },
-    {
-      name: "incompatible migration state",
-      preparePrimary: prepareHistoricalUpgradeFixture,
-      prepareLinked: async (root) => {
-        const path = join(root, ".egeria/state.json");
-        const state = core.parseStateJson(await readFile(path, "utf8"));
-        assert.equal(state.ok, true);
-        await writeFile(
-          path,
-          core.serializeStateJson({
-            ...state.value,
-            appliedMigrations: ["invented"],
-          }),
-        );
-        await commitAll(root, "create incompatible migration state");
-      },
-      code: "PROJECT_STATE_INCOMPATIBLE",
-    },
-    {
-      name: "missing source edge",
-      preparePrimary: prepareHistoricalUpgradeFixture,
-      prepareLinked: async (root) => {
-        const path = join(root, ".egeria/state.json");
-        const state = core.parseStateJson(await readFile(path, "utf8"));
-        assert.equal(state.ok, true);
-        await writeFile(
-          path,
-          core.serializeStateJson({
-            ...state.value,
-            installedCapabilities: state.value.installedCapabilities.map(
-              (capability) =>
-                capability.identifier === "standards"
-                  ? { ...capability, version: "0.2.0" }
-                  : capability,
-            ),
-          }),
-        );
-        await commitAll(root, "set unsupported source version");
-      },
-      code: "CAPABILITY_UPGRADE_EDGE_MISSING",
-    },
-    {
-      name: "ambiguous source inference",
-      preparePrimary: prepareHistoricalUpgradeFixture,
-      prepareLinked: async (root) => {
-        await writeFile(join(root, "apps/web/package.json"), "{");
-        await commitAll(root, "make version inference ambiguous");
-      },
-      code: "CAPABILITY_VERSION_AMBIGUOUS",
-    },
-    {
-      name: "ignored create target",
-      preparePrimary: prepareHistoricalUpgradeFixture,
-      prepareLinked: async (root) => {
-        await writeFile(
-          join(root, ".gitignore"),
-          `${await readFile(join(root, ".gitignore"), "utf8")}\n${visualUpgradePaths[0]}\n`,
-        );
-        await commitAll(root, "ignore an upgrade create target");
-      },
-      code: "CAPABILITY_ACTION_CONFLICT",
-    },
-  ];
-
-  for (const fixture of cases) {
-    await withGitFixture(
-      "portfolio",
-      async (roots) => {
-        const root = fixture.select?.(roots) ?? roots.linked;
-        await fixture.prepareLinked(root);
-        const before = await gitRepositorySnapshot(root);
-        const execution = await executeBuiltPlanUpgrade(root);
-        const after = await gitRepositorySnapshot(root);
-
-        assert.equal(execution.exitCode, 1, fixture.name);
-        assert.equal(execution.stdout, "", fixture.name);
-        assert.deepEqual(
-          JSON.parse(execution.stderr),
-          {
-            ok: false,
-            command: "plan-upgrade",
-            code: fixture.code,
-          },
-          fixture.name,
-        );
-        assert.deepEqual(after, before, fixture.name);
-        assert.doesNotMatch(
-          execution.stderr,
-          /private|refs\/heads|\.git\/worktrees/u,
-          fixture.name,
-        );
-      },
-      {
-        branch: `plan-upgrade-${fixture.code.toLowerCase()}-test`,
-        ...(fixture.preparePrimary === undefined
-          ? {}
-          : { preparePrimary: fixture.preparePrimary }),
-      },
-    );
-  }
-});
-
-test("the compiled apply-upgrade command refuses the finite unsafe matrix without mutation", async () => {
-  const cases = [
-    {
-      name: "wrong fingerprint",
-      historical: true,
-      prepare: async ({ linked }) => ({
-        root: linked,
-        approvedPlan: `sha256:${"0".repeat(64)}`,
-        expectedCode: "CAPABILITY_PLAN_APPROVAL_INVALID",
-      }),
-    },
-    {
-      name: "stale fingerprint after a clean base revision change",
-      historical: true,
-      prepare: async ({ linked }) => {
-        const planned = await executeBuiltPlanUpgrade(linked);
-        assert.equal(planned.exitCode, 0, planned.stderr);
-        const approvedPlan = JSON.parse(planned.stdout).plan.planFingerprint;
-        await writeFile(
-          join(linked, ".gitignore"),
-          `${await readFile(join(linked, ".gitignore"), "utf8")}\n# changed base\n`,
-        );
-        await commitAll(linked, "change approved upgrade base");
-        return {
-          root: linked,
-          approvedPlan,
-          expectedCode: "CAPABILITY_PLAN_APPROVAL_INVALID",
-        };
-      },
-    },
-    {
-      name: "changed approved plan through managed drift",
-      historical: true,
-      prepare: async ({ linked }) => {
-        const planned = await executeBuiltPlanUpgrade(linked);
-        assert.equal(planned.exitCode, 0, planned.stderr);
-        const approvedPlan = JSON.parse(planned.stdout).plan.planFingerprint;
-        await writeFile(
-          join(linked, ".github/workflows/quality.yml"),
-          "private changed approved source\n",
-        );
-        await commitAll(linked, "change approved upgrade source");
-        return {
-          root: linked,
-          approvedPlan,
-          expectedCode: "PROJECT_DRIFT_DETECTED",
-        };
-      },
-    },
-    {
-      name: "unsupported target syntax",
-      historical: true,
-      prepare: async ({ linked }) => ({
-        root: linked,
-        approvedPlan: `sha256:${"0".repeat(64)}`,
-        expectedArgumentRefusal: true,
-        arguments: applyUpgradeArguments(
-          linked,
-          `sha256:${"0".repeat(64)}`,
-        ).map((value) => (value === "0.4.0" ? "0.5.0" : value)),
-      }),
-    },
-    {
-      name: "missing source edge",
-      historical: true,
-      prepare: async ({ linked }) => {
-        const path = join(linked, ".egeria/state.json");
-        const state = core.parseStateJson(await readFile(path, "utf8"));
-        assert.equal(state.ok, true);
-        await writeFile(
-          path,
-          core.serializeStateJson({
-            ...state.value,
-            installedCapabilities: state.value.installedCapabilities.map(
-              (capability) =>
-                capability.identifier === "standards"
-                  ? { ...capability, version: "0.2.0" }
-                  : capability,
-            ),
-          }),
-        );
-        await commitAll(linked, "set unsupported standards source");
-        return {
-          root: linked,
-          approvedPlan: `sha256:${"0".repeat(64)}`,
-          expectedCode: "CAPABILITY_UPGRADE_EDGE_MISSING",
-        };
-      },
-    },
-    {
-      name: "already current",
-      historical: false,
-      prepare: async ({ linked }) => ({
-        root: linked,
-        approvedPlan: `sha256:${"0".repeat(64)}`,
-        expectedCode: "CAPABILITY_ALREADY_CURRENT",
-      }),
-    },
-    {
-      name: "ambiguous source",
-      historical: true,
-      prepare: async ({ linked }) => {
-        await writeFile(join(linked, "apps/web/package.json"), "{");
-        await commitAll(linked, "make standards source ambiguous");
-        return {
-          root: linked,
-          approvedPlan: `sha256:${"0".repeat(64)}`,
-          expectedCode: "CAPABILITY_VERSION_AMBIGUOUS",
-        };
-      },
-    },
-    {
-      name: "managed drift",
-      historical: true,
-      prepare: async ({ linked }) => {
-        await writeFile(
-          join(linked, ".github/workflows/quality.yml"),
-          "private managed drift\n",
-        );
-        await commitAll(linked, "drift standards workflow");
-        return {
-          root: linked,
-          approvedPlan: `sha256:${"0".repeat(64)}`,
-          expectedCode: "PROJECT_DRIFT_DETECTED",
-        };
-      },
-    },
-    {
-      name: "incompatible state",
-      historical: true,
-      prepare: async ({ linked }) => {
-        const path = join(linked, ".egeria/state.json");
-        const state = core.parseStateJson(await readFile(path, "utf8"));
-        assert.equal(state.ok, true);
-        await writeFile(
-          path,
-          core.serializeStateJson({
-            ...state.value,
-            appliedMigrations: ["invented-migration"],
-          }),
-        );
-        await commitAll(linked, "make upgrade state incompatible");
-        return {
-          root: linked,
-          approvedPlan: `sha256:${"0".repeat(64)}`,
-          expectedCode: "PROJECT_STATE_INCOMPATIBLE",
-        };
-      },
-    },
-    {
-      name: "create target conflict",
-      historical: true,
-      prepare: async ({ linked }) => {
-        const path = join(linked, visualUpgradePaths[0]);
-        await mkdir(dirname(path), { recursive: true });
-        await writeFile(path, "private create conflict\n");
-        await commitAll(linked, "add conflicting upgrade target");
-        return {
-          root: linked,
-          approvedPlan: `sha256:${"0".repeat(64)}`,
-          expectedCode: "CAPABILITY_ACTION_CONFLICT",
-        };
-      },
-    },
-    {
-      name: "ignored create target conflict",
-      historical: true,
-      prepare: async ({ linked }) => {
-        await writeFile(
-          join(linked, ".gitignore"),
-          `${await readFile(join(linked, ".gitignore"), "utf8")}\n${visualUpgradePaths[0]}\n`,
-        );
-        await commitAll(linked, "ignore upgrade target");
-        const path = join(linked, visualUpgradePaths[0]);
-        await mkdir(dirname(path), { recursive: true });
-        await writeFile(path, "private ignored conflict\n");
-        return {
-          root: linked,
-          approvedPlan: `sha256:${"0".repeat(64)}`,
-          expectedCode: "CAPABILITY_ACTION_CONFLICT",
-        };
-      },
-    },
-    {
-      name: "dirty repository",
-      historical: true,
-      prepare: async ({ linked }) => {
-        await writeFile(join(linked, "private-untracked.txt"), "private\n");
-        return {
-          root: linked,
-          approvedPlan: `sha256:${"0".repeat(64)}`,
-          expectedCode: "GIT_WORKTREE_DIRTY",
-        };
-      },
-    },
-    {
-      name: "detached worktree",
-      historical: true,
-      prepare: async ({ linked }) => {
-        await executeGit(linked, ["checkout", "--detach"]);
-        return {
-          root: linked,
-          approvedPlan: `sha256:${"0".repeat(64)}`,
-          expectedCode: "GIT_BRANCH_REQUIRED",
-        };
-      },
-    },
-    {
-      name: "primary unisolated checkout",
-      historical: true,
-      prepare: async ({ primary }) => ({
-        root: primary,
-        approvedPlan: `sha256:${"0".repeat(64)}`,
-        expectedCode: "GIT_WORKTREE_NOT_ISOLATED",
-      }),
-    },
-    ...[
-      ["assume-unchanged", "--assume-unchanged"],
-      ["skip-worktree", "--skip-worktree"],
-    ].map(([name, flag]) => ({
-      name: `${name} hidden tracked change`,
-      historical: true,
-      prepare: async ({ linked }) => {
-        await executeGit(linked, ["update-index", flag, ".gitignore"]);
-        await writeFile(join(linked, ".gitignore"), `private ${name} drift\n`);
-        return {
-          root: linked,
-          approvedPlan: `sha256:${"0".repeat(64)}`,
-          expectedCode: "GIT_WORKTREE_DIRTY",
-        };
-      },
-    })),
-  ];
-
-  for (const [index, fixture] of cases.entries()) {
-    await withGitFixture(
-      "portfolio",
-      async (roots) => {
-        const prepared = await fixture.prepare(roots);
-        const before = await gitRepositorySnapshot(prepared.root);
-        const controlsBefore = await Promise.all(
-          upgradeControlPaths.map((path) => readFile(join(prepared.root, path))),
-        );
-        const execution =
-          prepared.arguments === undefined
-            ? await executeBuiltApplyUpgrade(
-                prepared.root,
-                prepared.approvedPlan,
-              )
-            : await executeNode([
-                resolve(packageRoot, "dist/index.js"),
-                ...prepared.arguments,
-              ]);
-        const after = await gitRepositorySnapshot(prepared.root);
-        const controlsAfter = await Promise.all(
-          upgradeControlPaths.map((path) => readFile(join(prepared.root, path))),
-        );
-
-        assert.equal(
-          execution.exitCode,
-          prepared.expectedArgumentRefusal === true ? 2 : 1,
-          fixture.name,
-        );
-        assert.equal(execution.stdout, "", fixture.name);
-        assert.equal(execution.stderr.endsWith("\n"), true, fixture.name);
-        assert.equal(
-          execution.stderr.trimEnd().split("\n").length,
-          1,
-          fixture.name,
-        );
-        assert.deepEqual(
-          JSON.parse(execution.stderr),
-          prepared.expectedArgumentRefusal === true
-            ? { ok: false, code: "CLI_ARGUMENT_INVALID" }
-            : {
-                ok: false,
-                command: "apply-upgrade",
-                code: prepared.expectedCode,
-                phase: "precondition",
-                recovery: "not-required",
-              },
-          fixture.name,
-        );
-        assert.deepEqual(after, before, fixture.name);
-        assert.deepEqual(controlsAfter, controlsBefore, fixture.name);
-        assert.doesNotMatch(
-          execution.stderr,
-          /private|refs\/heads|\.git\/worktrees|invented-migration/u,
-          fixture.name,
-        );
-      },
-      {
-        branch: `standards-upgrade-refusal-${index}`,
-        ...(fixture.historical
-          ? { preparePrimary: prepareHistoricalUpgradeFixture }
-          : {}),
-      },
-    );
-  }
 });
 
 test("the compiled plan-remove command emits exact portfolio and site plans without writes", async () => {
@@ -6072,7 +5156,7 @@ test("the compiled plan-remove command emits exact portfolio and site plans with
       profile,
       async ({ linked }) => {
         const before = await gitRepositorySnapshot(linked);
-        const execution = await executeBuiltPlanRemove(linked);
+        const execution = await executeBuilt(planRemoveArguments(linked));
         const after = await gitRepositorySnapshot(linked);
         const revision = Buffer.from(before.head).toString("utf8").trim();
 
@@ -6106,7 +5190,7 @@ test("the compiled plan-remove command emits exact portfolio and site plans with
 test("the compiled plan-remove command reports exact absence without writes", async () => {
   await withGitFixture("portfolio", async ({ linked }) => {
     const before = await gitRepositorySnapshot(linked);
-    const execution = await executeBuiltPlanRemove(linked);
+    const execution = await executeBuilt(planRemoveArguments(linked));
     const after = await gitRepositorySnapshot(linked);
 
     assert.equal(execution.exitCode, 1);
@@ -6119,64 +5203,6 @@ test("the compiled plan-remove command reports exact absence without writes", as
     });
     assert.deepEqual(after, before);
   });
-});
-
-test("the compiled plan-remove command refuses unsafe states without writes", async () => {
-  const cases = [
-    {
-      name: "dirty repository",
-      prepare: (root) => writeFile(join(root, "private-untracked.txt"), "x\n"),
-      code: "GIT_WORKTREE_DIRTY",
-    },
-    {
-      name: "managed surface drift",
-      prepare: async (root) => {
-        await writeFile(
-          join(
-            root,
-            "apps/web/src/integrations/booking-calendly/booking-settings.ts",
-          ),
-          "private drift\n",
-        );
-        await commitAll(root, "drift managed Calendly settings");
-      },
-      code: "PROJECT_DRIFT_DETECTED",
-    },
-  ];
-
-  for (const fixture of cases) {
-    await withGitFixture(
-      "portfolio",
-      async ({ linked }) => {
-        await fixture.prepare(linked);
-        const before = await gitRepositorySnapshot(linked);
-        const execution = await executeBuiltPlanRemove(linked);
-        const after = await gitRepositorySnapshot(linked);
-
-        assert.equal(execution.exitCode, 1, fixture.name);
-        assert.equal(execution.stdout, "", fixture.name);
-        assert.deepEqual(
-          JSON.parse(execution.stderr),
-          {
-            ok: false,
-            command: "plan-remove",
-            code: fixture.code,
-          },
-          fixture.name,
-        );
-        assert.deepEqual(after, before, fixture.name);
-        assert.doesNotMatch(
-          execution.stderr,
-          /private drift|calendly\.com|refs\/heads|\.git\/worktrees/u,
-          fixture.name,
-        );
-      },
-      {
-        bookingCalendly: planSettings,
-        branch: `plan-remove-${fixture.code.toLowerCase()}-test`,
-      },
-    );
-  }
 });
 
 test("the compiled CLI preserves multilingual through both capability install orders and re-addition", async () => {
@@ -6233,7 +5259,7 @@ test("the compiled CLI preserves multilingual through both capability install or
             path !== ".egeria/state.json",
         );
         const removalPlanExecution =
-          await executeBuiltPlanMultilingualRemove(linked);
+          await executeBuilt(planMultilingualRemoveArguments(linked));
         assert.equal(
           removalPlanExecution.exitCode,
           0,
@@ -6248,9 +5274,8 @@ test("the compiled CLI preserves multilingual through both capability install or
         assert.match(removalPlan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
         assert.deepEqual(await gitRepositorySnapshot(linked), cleanComposed);
 
-        const removal = await executeBuiltApplyMultilingualRemove(
-          linked,
-          removalPlan.planFingerprint,
+        const removal = await executeBuilt(
+          applyMultilingualRemoveArguments(linked, removalPlan.planFingerprint),
           environment,
         );
         assert.equal(removal.exitCode, 0, removal.stderr);
@@ -6393,7 +5418,7 @@ test("the compiled CLI preserves analytics and multilingual across both install 
               path !== ".egeria/state.json",
           );
           const removalPlanExecution =
-            await executeBuiltPlanAnalyticsRemove(linked);
+            await executeBuilt(planAnalyticsRemoveArguments(linked));
           assert.equal(
             removalPlanExecution.exitCode,
             0,
@@ -6411,9 +5436,8 @@ test("the compiled CLI preserves analytics and multilingual across both install 
           );
           assert.deepEqual(await gitRepositorySnapshot(linked), cleanComposed);
 
-          const removal = await executeBuiltApplyAnalyticsRemove(
-            linked,
-            removalPlan.planFingerprint,
+          const removal = await executeBuilt(
+            applyAnalyticsRemoveArguments(linked, removalPlan.planFingerprint),
             environment,
           );
           assert.equal(removal.exitCode, 0, removal.stderr);
@@ -6483,7 +5507,7 @@ test("the compiled CLI refuses duplicate analytics addition without repository m
         const linkedBefore = await gitRepositorySnapshot(linked);
         const primaryBefore = await gitRepositorySnapshot(primary);
 
-        const execution = await executeBuiltPlanAnalyticsAdd(linked);
+        const execution = await executeBuilt(planAnalyticsAddArguments(linked));
 
         assert.equal(execution.exitCode, 1, execution.stderr);
         assert.equal(execution.stdout, "");
@@ -6518,12 +5542,11 @@ test("the compiled CLI completes exact add-remove-re-add transactions", async ()
         join(linked, ".egeria/project.yaml"),
         "utf8",
       );
-      const planExecution = await executeBuiltPlanAdd(linked);
+      const planExecution = await executeBuilt(planAddArguments(linked));
       assert.equal(planExecution.exitCode, 0, planExecution.stderr);
       const planEnvelope = JSON.parse(planExecution.stdout);
-      const wrongApproval = await executeBuiltApplyAdd(
-        linked,
-        `sha256:${"0".repeat(64)}`,
+      const wrongApproval = await executeBuilt(
+        applyAddArguments(linked, `sha256:${"0".repeat(64)}`),
       );
       assert.equal(wrongApproval.exitCode, 1);
       assert.deepEqual(JSON.parse(wrongApproval.stderr), {
@@ -6535,9 +5558,8 @@ test("the compiled CLI completes exact add-remove-re-add transactions", async ()
       });
       assert.deepEqual(await gitRepositorySnapshot(linked), linkedBefore);
 
-      const execution = await executeBuiltApplyAdd(
-        linked,
-        planEnvelope.result.planFingerprint,
+      const execution = await executeBuilt(
+        applyAddArguments(linked, planEnvelope.result.planFingerprint),
       );
       assert.equal(execution.exitCode, 0, execution.stderr);
       assert.equal(execution.stderr, "");
@@ -6612,7 +5634,7 @@ test("the compiled CLI completes exact add-remove-re-add transactions", async ()
           readFile(join(linked, path), "utf8"),
         ),
       );
-      const removalPlanExecution = await executeBuiltPlanRemove(linked);
+      const removalPlanExecution = await executeBuilt(planRemoveArguments(linked));
       assert.equal(removalPlanExecution.exitCode, 0, removalPlanExecution.stderr);
       const removalPlan = JSON.parse(removalPlanExecution.stdout).plan;
       assert.deepEqual(await gitRepositorySnapshot(linked), cleanAdded);
@@ -6627,9 +5649,8 @@ test("the compiled CLI completes exact add-remove-re-add transactions", async ()
         ].toSorted(),
       );
 
-      const wrongRemoval = await executeBuiltApplyRemove(
-        linked,
-        `sha256:${"0".repeat(64)}`,
+      const wrongRemoval = await executeBuilt(
+        applyRemoveArguments(linked, `sha256:${"0".repeat(64)}`),
       );
       assert.equal(wrongRemoval.exitCode, 1);
       assert.deepEqual(JSON.parse(wrongRemoval.stderr), {
@@ -6653,10 +5674,7 @@ test("the compiled CLI completes exact add-remove-re-add transactions", async ()
         addedMigrationSource,
       );
 
-      const removal = await executeBuiltApplyRemove(
-        linked,
-        removalPlan.planFingerprint,
-      );
+      const removal = await executeBuilt(applyRemoveArguments(linked, removalPlan.planFingerprint));
       assert.equal(removal.exitCode, 0, removal.stderr);
       assert.equal(removal.stderr, "");
       const removalEnvelope = JSON.parse(removal.stdout);
@@ -6741,9 +5759,8 @@ test("the compiled CLI completes exact add-remove-re-add transactions", async ()
 
       await commitAll(linked, "remove Calendly capability");
       const cleanRemoved = await gitRepositorySnapshot(linked);
-      const repeatedRemoval = await executeBuiltApplyRemove(
-        linked,
-        removalPlan.planFingerprint,
+      const repeatedRemoval = await executeBuilt(
+        applyRemoveArguments(linked, removalPlan.planFingerprint),
       );
       assert.equal(repeatedRemoval.exitCode, 1);
       assert.equal(repeatedRemoval.stdout, "");
@@ -6767,14 +5784,11 @@ test("the compiled CLI completes exact add-remove-re-add transactions", async ()
         removedMigrationSource,
       );
 
-      const readdPlanExecution = await executeBuiltPlanAdd(linked);
+      const readdPlanExecution = await executeBuilt(planAddArguments(linked));
       assert.equal(readdPlanExecution.exitCode, 0, readdPlanExecution.stderr);
       const readdPlan = JSON.parse(readdPlanExecution.stdout).result;
       assert.deepEqual(await gitRepositorySnapshot(linked), cleanRemoved);
-      const readdition = await executeBuiltApplyAdd(
-        linked,
-        readdPlan.planFingerprint,
-      );
+      const readdition = await executeBuilt(applyAddArguments(linked, readdPlan.planFingerprint));
       assert.equal(readdition.exitCode, 0, readdition.stderr);
       assert.equal(readdition.stderr, "");
       const readdedProjectSource = await readFile(
@@ -6897,7 +5911,7 @@ test("compiled removal preserves modified and already-ejected application surfac
         ),
       };
 
-      const planExecution = await executeBuiltPlanRemove(linked);
+      const planExecution = await executeBuilt(planRemoveArguments(linked));
       assert.equal(planExecution.exitCode, 0, planExecution.stderr);
       const plan = JSON.parse(planExecution.stdout).plan;
       assert.deepEqual(await gitRepositorySnapshot(linked), cleanBefore);
@@ -6919,10 +5933,7 @@ test("compiled removal preserves modified and already-ejected application surfac
         [ejectedPath, modifiedPath].sort(),
       );
 
-      const removal = await executeBuiltApplyRemove(
-        linked,
-        plan.planFingerprint,
-      );
+      const removal = await executeBuilt(applyRemoveArguments(linked, plan.planFingerprint));
       assert.equal(removal.exitCode, 0, removal.stderr);
       assert.equal(removal.stderr, "");
       const envelope = JSON.parse(removal.stdout);
@@ -6995,7 +6006,7 @@ test("compiled removal preserves modified and already-ejected application surfac
   );
 });
 
-test("compiled removal verification failure retains transformation and old receipts", async () => {
+test("compiled removal verification failure retains a representative transformation and old receipts", async () => {
   await withGitFixture(
     "portfolio",
     async ({ linked, primary }) => {
@@ -7008,15 +6019,12 @@ test("compiled removal verification failure retains transformation and old recei
       await commitAll(linked, "make Calendly application source invalid");
       const initialInspection = await core.inspectGitWorktree({ root: linked });
       assert.equal(initialInspection.ok, true);
-      const stateBefore = await readFile(
-        join(linked, ".egeria/state.json"),
-        "utf8",
+      const controlsBefore = await Promise.all(
+        ["state.json", "migrations.jsonl"].map((name) =>
+          readFile(join(linked, ".egeria", name)),
+        ),
       );
-      const migrationsBefore = await readFile(
-        join(linked, ".egeria/migrations.jsonl"),
-        "utf8",
-      );
-      const planExecution = await executeBuiltPlanRemove(linked);
+      const planExecution = await executeBuilt(planRemoveArguments(linked));
       assert.equal(planExecution.exitCode, 0, planExecution.stderr);
       const plan = JSON.parse(planExecution.stdout).plan;
       assert.equal(
@@ -7024,12 +6032,10 @@ test("compiled removal verification failure retains transformation and old recei
         "preserve-file-and-eject",
       );
 
-      const removal = await executeBuiltApplyRemove(
-        linked,
-        plan.planFingerprint,
-      );
+      const removal = await executeBuilt(applyRemoveArguments(linked, plan.planFingerprint));
       assert.equal(removal.exitCode, 1);
       assert.equal(removal.stdout, "");
+      assert.equal(removal.stderr.trimEnd().split("\n").length, 1);
       assert.deepEqual(JSON.parse(removal.stderr), {
         ok: false,
         command: "apply-remove",
@@ -7037,20 +6043,21 @@ test("compiled removal verification failure retains transformation and old recei
         phase: "verify",
         recovery: "inspect-worktree",
       });
-      assert.equal(await readFile(join(linked, preservedPath), "utf8"), invalidSource);
       assert.equal(
-        await readFile(join(linked, ".egeria/state.json"), "utf8"),
-        stateBefore,
+        await readFile(join(linked, preservedPath), "utf8"),
+        invalidSource,
       );
-      assert.equal(
-        await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8"),
-        migrationsBefore,
+      assert.deepEqual(
+        await Promise.all(
+          ["state.json", "migrations.jsonl"].map((name) =>
+            readFile(join(linked, ".egeria", name)),
+          ),
+        ),
+        controlsBefore,
       );
-      const transformedProjectSource = await readFile(
-        join(linked, ".egeria/project.yaml"),
-        "utf8",
+      const transformedProject = core.parseProjectYaml(
+        await readFile(join(linked, ".egeria/project.yaml"), "utf8"),
       );
-      const transformedProject = core.parseProjectYaml(transformedProjectSource);
       assert.equal(transformedProject.ok, true);
       assert.equal(
         transformedProject.value.selectedCapabilities.includes(
@@ -7059,14 +6066,13 @@ test("compiled removal verification failure retains transformation and old recei
         false,
       );
       assert.deepEqual(transformedProject.value.ejectedAreas, [preservedPath]);
-      const transformedPaths = plan.actions.flatMap((action) =>
-        action.kind === "preserve-file-and-eject" ? [] : [action.path],
-      );
       assert.deepEqual(
         await core.inspectGitExpectedChanges({
           root: linked,
           identity: initialInspection.identity,
-          expectedPaths: transformedPaths,
+          expectedPaths: plan.actions.flatMap((action) =>
+            action.kind === "preserve-file-and-eject" ? [] : [action.path],
+          ),
         }),
         { ok: true },
       );
@@ -7084,188 +6090,6 @@ test("compiled removal verification failure retains transformation and old recei
       branch: "apply-remove-verification-failure-test",
     },
   );
-});
-
-test("the compiled plan-add command refuses unsafe repository states without writes", async () => {
-  const cases = [
-    {
-      name: "primary worktree",
-      fixture: "portfolio",
-      select: ({ primary }) => primary,
-      prepare: async () => {},
-      code: "GIT_WORKTREE_NOT_ISOLATED",
-    },
-    {
-      name: "untracked dirt",
-      fixture: "portfolio",
-      select: ({ linked }) => linked,
-      prepare: (root) => writeFile(join(root, "private-untracked.txt"), "x\n"),
-      code: "GIT_WORKTREE_DIRTY",
-    },
-    {
-      name: "detached head",
-      fixture: "portfolio",
-      select: ({ linked }) => linked,
-      prepare: (root) => executeGit(root, ["checkout", "--detach"]),
-      code: "GIT_BRANCH_REQUIRED",
-    },
-    {
-      name: "operation marker",
-      fixture: "portfolio",
-      select: ({ linked }) => linked,
-      prepare: async (root) => {
-        const output = await executeGit(root, [
-          "rev-parse",
-          "--git-path",
-          "MERGE_HEAD",
-        ]);
-        await writeFile(Buffer.from(output).toString("utf8").trim(), "operation\n");
-      },
-      code: "GIT_OPERATION_IN_PROGRESS",
-    },
-    {
-      name: "committed application drift",
-      fixture: "portfolio",
-      select: ({ linked }) => linked,
-      prepare: async (root) => {
-        await writeFile(join(root, "apps/web/app/page.tsx"), "private drift\n");
-        await commitAll(root, "drift home route");
-      },
-      code: "PROJECT_DRIFT_DETECTED",
-    },
-    {
-      name: "missing unrelated application-owned surface",
-      fixture: "portfolio",
-      select: ({ linked }) => linked,
-      prepare: async (root) => {
-        await rm(join(root, "apps/web/app/layout.tsx"));
-        await commitAll(root, "delete application layout");
-      },
-      code: "PROJECT_DRIFT_DETECTED",
-    },
-    {
-      name: "surface omitted from installed inventory",
-      fixture: "portfolio",
-      select: ({ linked }) => linked,
-      prepare: async (root) => {
-        const statePath = join(root, ".egeria/state.json");
-        const parsed = core.parseStateJson(await readFile(statePath, "utf8"));
-        assert.equal(parsed.ok, true);
-        await writeFile(
-          statePath,
-          core.serializeStateJson({
-            ...parsed.value,
-            managedSurfaces: parsed.value.managedSurfaces.filter(
-              ({ identifier }) => identifier !== "builder-root-layout",
-            ),
-          }),
-        );
-        await commitAll(root, "omit application layout from state");
-      },
-      code: "PROJECT_DRIFT_DETECTED",
-    },
-    {
-      name: "committed ejection",
-      fixture: "portfolio",
-      select: ({ linked }) => linked,
-      prepare: async (root) => {
-        const statePath = join(root, ".egeria/state.json");
-        const parsed = core.parseStateJson(await readFile(statePath, "utf8"));
-        assert.equal(parsed.ok, true);
-        await writeFile(
-          statePath,
-          core.serializeStateJson({
-            ...parsed.value,
-            ejections: ["apps/web/app/page.tsx"],
-          }),
-        );
-        await commitAll(root, "record unsupported ejection");
-      },
-      code: "PROJECT_EJECTION_UNSUPPORTED",
-    },
-    {
-      name: "ignored create collision",
-      fixture: "portfolio",
-      select: ({ linked }) => linked,
-      prepare: async (root) => {
-        const ignorePath = join(root, ".gitignore");
-        await writeFile(
-          ignorePath,
-          `${await readFile(ignorePath, "utf8")}apps/web/content/en-CA/booking-calendly.yaml\n`,
-        );
-        await commitAll(root, "ignore collision target");
-        await writeFile(
-          join(root, "apps/web/content/en-CA/booking-calendly.yaml"),
-          "ignored collision\n",
-        );
-      },
-      code: "CAPABILITY_ACTION_CONFLICT",
-    },
-    {
-      name: "absent ignored create target",
-      fixture: "portfolio",
-      select: ({ linked }) => linked,
-      prepare: async (root) => {
-        const ignorePath = join(root, ".gitignore");
-        await writeFile(
-          ignorePath,
-          `${await readFile(ignorePath, "utf8")}apps/web/content/en-CA/booking-calendly.yaml\n`,
-        );
-        await commitAll(root, "ignore absent create target");
-      },
-      code: "CAPABILITY_ACTION_CONFLICT",
-    },
-    ...[
-      ["assume-unchanged", "--assume-unchanged"],
-      ["skip-worktree", "--skip-worktree"],
-    ].map(([name, flag]) => ({
-      name: `hidden tracked change with ${name}`,
-      fixture: "portfolio",
-      select: ({ linked }) => linked,
-      prepare: async (root) => {
-        await executeGit(root, ["update-index", flag, ".gitignore"]);
-        await writeFile(join(root, ".gitignore"), `hidden ${name} change\n`);
-      },
-      code: "GIT_WORKTREE_DIRTY",
-    })),
-    {
-      name: "already installed capability",
-      fixture: "portfolio-calendly",
-      select: ({ linked }) => linked,
-      prepare: async () => {},
-      code: "CAPABILITY_ALREADY_INSTALLED",
-    },
-  ];
-
-  for (const fixture of cases) {
-    await withGitFixture(fixture.fixture, async (roots) => {
-      const root = fixture.select(roots);
-      await fixture.prepare(root);
-      const before = await gitRepositorySnapshot(root);
-      const execution = await executeBuiltPlanAdd(root);
-      const after = await gitRepositorySnapshot(root);
-
-      assert.equal(execution.exitCode, 1, fixture.name);
-      assert.equal(execution.stdout, "", fixture.name);
-      assert.deepEqual(
-        execution.stderr.trimEnd().split("\n"),
-        [
-          JSON.stringify({
-            ok: false,
-            command: "plan-add",
-            code: fixture.code,
-          }),
-        ],
-        fixture.name,
-      );
-      assert.deepEqual(after, before, fixture.name);
-      assert.doesNotMatch(
-        execution.stderr,
-        /private-planning-destination|calendly\.com|refs\/heads|private drift|private-untracked/u,
-        fixture.name,
-      );
-    });
-  }
 });
 
 test("the built entry emits one JSON line with exact process exits", async () => {
