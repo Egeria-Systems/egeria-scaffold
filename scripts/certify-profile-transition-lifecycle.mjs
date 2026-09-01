@@ -5,6 +5,10 @@ import { fileURLToPath } from "node:url";
 
 import { runCertificationCli } from "./lib/certification-cli.mjs";
 import {
+  createCertificationPreflight,
+  createCertificationRepositoryReaders,
+} from "./lib/certification-preflight.mjs";
+import {
   createIsolatedProcessEnvironment,
   isolatedProcessOptions,
 } from "./lib/isolated-process.mjs";
@@ -83,59 +87,41 @@ function fail(code) {
   throw new ProfileTransitionLifecycleCertificationError(code);
 }
 
-async function readCurrentRevision() {
-  try {
-    const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
-      cwd: repositoryRoot,
-      env: createIsolatedProcessEnvironment(),
-      timeout: 30_000,
-      ...isolatedProcessOptions,
-    });
-    const revision = stdout.trim();
-    if (!exactRevisionPattern.test(revision)) fail("EVIDENCE_REVISION_INVALID");
-    return revision;
-  } catch (error) {
-    if (error instanceof ProfileTransitionLifecycleCertificationError) {
-      throw error;
-    }
-    fail("EVIDENCE_REVISION_UNAVAILABLE");
-  }
-}
+const createError = (code) =>
+  new ProfileTransitionLifecycleCertificationError(code);
+const preflightErrorCodes = Object.freeze({
+  adapterInvalid: "CERTIFICATION_ADAPTER_INVALID",
+  revisionInvalid: "EVIDENCE_REVISION_INVALID",
+  revisionUnavailable: "EVIDENCE_REVISION_UNAVAILABLE",
+  revisionMismatch: "EVIDENCE_REVISION_MISMATCH",
+  worktreeUnavailable: "EVIDENCE_WORKTREE_UNAVAILABLE",
+  worktreeDirty: "EVIDENCE_WORKTREE_DIRTY",
+  indexFlags: "EVIDENCE_WORKTREE_INDEX_FLAGS",
+});
+const repositoryReaders = createCertificationRepositoryReaders({
+  repositoryRoot,
+  revisionArguments: ["rev-parse", "HEAD"],
+  exactRevisionPattern,
+  createError,
+  isCertificationError: (error) =>
+    error instanceof ProfileTransitionLifecycleCertificationError,
+  errorCodes: preflightErrorCodes,
+});
 
-async function readRepositoryStatus() {
-  try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
-      {
-        cwd: repositoryRoot,
-        env: createIsolatedProcessEnvironment(),
-        timeout: 30_000,
-        ...isolatedProcessOptions,
-      },
-    );
-    return stdout;
-  } catch {
-    fail("EVIDENCE_WORKTREE_UNAVAILABLE");
-  }
-}
-
-async function readRepositoryIndexEntries() {
-  try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["ls-files", "-v", "-z"],
-      {
-        cwd: repositoryRoot,
-        env: createIsolatedProcessEnvironment(),
-        timeout: 30_000,
-        ...isolatedProcessOptions,
-      },
-    );
-    return stdout;
-  } catch {
-    fail("EVIDENCE_WORKTREE_UNAVAILABLE");
-  }
+function preflightFor(adapters) {
+  return createCertificationPreflight({
+    adapters,
+    requiredAdapterFunctions: [
+      "readCurrentRevision",
+      "readRepositoryStatus",
+      "readRepositoryIndexEntries",
+      "runCommand",
+    ],
+    createError,
+    isCertificationError: (error) =>
+      error instanceof ProfileTransitionLifecycleCertificationError,
+    errorCodes: preflightErrorCodes,
+  });
 }
 
 async function runCommand(input) {
@@ -149,72 +135,16 @@ async function runCommand(input) {
 
 function productionAdapters() {
   return {
-    readCurrentRevision,
-    readRepositoryStatus,
-    readRepositoryIndexEntries,
+    ...repositoryReaders,
     runCommand,
   };
 }
 
-function requireAdapters(adapters) {
-  if (
-    adapters === null ||
-    typeof adapters !== "object" ||
-    typeof adapters.readCurrentRevision !== "function" ||
-    typeof adapters.readRepositoryStatus !== "function" ||
-    typeof adapters.readRepositoryIndexEntries !== "function" ||
-    typeof adapters.runCommand !== "function"
-  ) {
-    fail("CERTIFICATION_ADAPTER_INVALID");
-  }
-}
-
-async function requireCleanRepository(adapters) {
-  let status;
-  try {
-    status = await adapters.readRepositoryStatus();
-  } catch (error) {
-    if (error instanceof ProfileTransitionLifecycleCertificationError) {
-      throw error;
-    }
-    fail("EVIDENCE_WORKTREE_UNAVAILABLE");
-  }
-  if (typeof status !== "string") fail("EVIDENCE_WORKTREE_UNAVAILABLE");
-  if (status.length !== 0) fail("EVIDENCE_WORKTREE_DIRTY");
-
-  let indexEntries;
-  try {
-    indexEntries = await adapters.readRepositoryIndexEntries();
-  } catch (error) {
-    if (error instanceof ProfileTransitionLifecycleCertificationError) {
-      throw error;
-    }
-    fail("EVIDENCE_WORKTREE_UNAVAILABLE");
-  }
-  if (typeof indexEntries !== "string") fail("EVIDENCE_WORKTREE_UNAVAILABLE");
-  if (indexEntries.length === 0) return;
-  const entries = indexEntries.split("\0");
-  if (entries.at(-1) !== "") fail("EVIDENCE_WORKTREE_UNAVAILABLE");
-  entries.pop();
-  for (const entry of entries) {
-    if (entry.length < 3 || entry[1] !== " ") {
-      fail("EVIDENCE_WORKTREE_UNAVAILABLE");
-    }
-    if (entry[0] !== "H") fail("EVIDENCE_WORKTREE_INDEX_FLAGS");
-  }
-}
-
-async function requireRevision(revision, adapters) {
-  let current;
-  try {
-    current = await adapters.readCurrentRevision();
-  } catch (error) {
-    if (error instanceof ProfileTransitionLifecycleCertificationError) {
-      throw error;
-    }
-    fail("EVIDENCE_REVISION_UNAVAILABLE");
-  }
-  if (current !== revision) fail("EVIDENCE_REVISION_MISMATCH");
+async function requireCleanRepository(preflight) {
+  const status = await preflight.readRepositoryStatus();
+  preflight.requireCleanStatus(status);
+  const indexEntries = await preflight.readRepositoryIndexEntries();
+  preflight.requireOrdinaryIndexEntries(indexEntries);
 }
 
 function hasExactPassedTests(stdout, expectedTests) {
@@ -272,14 +202,15 @@ export async function certifyProfileTransitionLifecycleForTesting(
   input = {},
   adapters,
 ) {
-  requireAdapters(adapters);
+  const preflight = preflightFor(adapters);
+  preflight.requireAdapters();
   const revision = input?.revision;
   if (!exactRevisionPattern.test(revision ?? "")) {
     fail("EVIDENCE_REVISION_INVALID");
   }
 
-  await requireRevision(revision, adapters);
-  await requireCleanRepository(adapters);
+  await preflight.requireRevision(revision);
+  await requireCleanRepository(preflight);
   await runEvidenceCommand(
     adapters,
     [
@@ -302,8 +233,8 @@ export async function certifyProfileTransitionLifecycleForTesting(
     ],
     builderCoreTests,
   );
-  await requireRevision(revision, adapters);
-  await requireCleanRepository(adapters);
+  await preflight.requireRevision(revision);
+  await requireCleanRepository(preflight);
 
   return {
     ok: true,
