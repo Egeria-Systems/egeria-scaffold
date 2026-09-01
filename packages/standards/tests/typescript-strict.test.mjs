@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { access } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { pathToFileURL, fileURLToPath } from "node:url";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
+import { createTypeScriptStrictConfig } from "../eslint/typescript-strict.mjs";
+
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const configPath = resolve(packageRoot, "eslint/typescript-strict.mjs");
 const fixtureRoot = resolve(
   packageRoot,
   "tests/fixtures/typescript-strict",
@@ -15,19 +15,6 @@ const eslintPackages = [
   ["ESLint 10", "eslint-10"],
 ];
 
-async function loadTypeScriptStrictFactory() {
-  try {
-    await access(configPath);
-  } catch {
-    assert.fail(
-      "eslint/typescript-strict.mjs must be a public standards API",
-    );
-  }
-
-  const standardsModule = await import(pathToFileURL(configPath));
-  return standardsModule.createTypeScriptStrictConfig;
-}
-
 function collectRules(configs) {
   return Object.assign(
     {},
@@ -35,17 +22,14 @@ function collectRules(configs) {
   );
 }
 
-test("the strict TypeScript factory requires an absolute project root", async () => {
-  const createTypeScriptStrictConfig = await loadTypeScriptStrictFactory();
-
+test("the strict TypeScript factory requires an absolute project root", () => {
   assert.throws(
     () => createTypeScriptStrictConfig({ tsconfigRootDir: "." }),
     /tsconfigRootDir must be an absolute path/,
   );
 });
 
-test("the strict TypeScript factory owns only the approved typed presets", async () => {
-  const createTypeScriptStrictConfig = await loadTypeScriptStrictFactory();
+test("the strict TypeScript factory owns only the approved typed presets", () => {
   const configs = createTypeScriptStrictConfig({
     tsconfigRootDir: fixtureRoot,
   });
@@ -86,7 +70,6 @@ test("the strict TypeScript factory owns only the approved typed presets", async
 
 for (const [eslintName, eslintPackage] of eslintPackages) {
   test(`${eslintName} accepts valid non-Prettier-formatted TypeScript`, async () => {
-    const createTypeScriptStrictConfig = await loadTypeScriptStrictFactory();
     const { ESLint } = await import(eslintPackage);
     const eslint = new ESLint({
       cwd: fixtureRoot,
@@ -104,7 +87,6 @@ for (const [eslintName, eslintPackage] of eslintPackages) {
   });
 
   test(`${eslintName} reports a typed floating-promise defect`, async () => {
-    const createTypeScriptStrictConfig = await loadTypeScriptStrictFactory();
     const { ESLint } = await import(eslintPackage);
     const eslint = new ESLint({
       cwd: fixtureRoot,

@@ -1,32 +1,14 @@
 import assert from "node:assert/strict";
-import { access } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { pathToFileURL, fileURLToPath } from "node:url";
 import test from "node:test";
 
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const configPath = resolve(packageRoot, "eslint/cloudflare-isolation.mjs");
+import { cloudflareIsolation } from "../eslint/cloudflare-isolation.mjs";
+
 const eslintPackages = [
   ["ESLint 9", "eslint"],
   ["ESLint 10", "eslint-10"],
 ];
 
-async function loadCloudflareIsolation() {
-  try {
-    await access(configPath);
-  } catch {
-    assert.fail(
-      "eslint/cloudflare-isolation.mjs must be a public standards API",
-    );
-  }
-
-  const standardsModule = await import(pathToFileURL(configPath));
-  return standardsModule.cloudflareIsolation;
-}
-
-test("the Cloudflare isolation API preserves the proof boundary", async () => {
-  const cloudflareIsolation = await loadCloudflareIsolation();
-
+test("the Cloudflare isolation API preserves the proof boundary", () => {
   assert.deepEqual(cloudflareIsolation, {
     name: "@egeria-systems/standards/cloudflare-isolation",
     files: ["app/**/*.{ts,tsx}", "src/**/*.{ts,tsx}"],
@@ -63,7 +45,6 @@ test("the Cloudflare isolation API preserves the proof boundary", async () => {
 
 for (const [eslintName, eslintPackage] of eslintPackages) {
   test(`${eslintName} rejects Cloudflare imports in protected code`, async () => {
-    const cloudflareIsolation = await loadCloudflareIsolation();
     const { Linter } = await import(eslintPackage);
     const linter = new Linter({ configType: "flat" });
 
@@ -131,7 +112,6 @@ for (const [eslintName, eslintPackage] of eslintPackages) {
   });
 
   test(`${eslintName} permits provider-neutral imports`, async () => {
-    const cloudflareIsolation = await loadCloudflareIsolation();
     const { Linter } = await import(eslintPackage);
     const linter = new Linter({ configType: "flat" });
 
@@ -146,7 +126,6 @@ for (const [eslintName, eslintPackage] of eslintPackages) {
   });
 
   test(`${eslintName} permits Cloudflare adapter imports in a composition root`, async () => {
-    const cloudflareIsolation = await loadCloudflareIsolation();
     const { Linter } = await import(eslintPackage);
     const linter = new Linter({ configType: "flat" });
 
