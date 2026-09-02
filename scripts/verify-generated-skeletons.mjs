@@ -1046,6 +1046,7 @@ async function measureVisualArtifactTree(root, maximumBytes) {
 }
 
 async function captureVisualFailureArtifacts({
+  failureCode = "VISUAL_REGRESSION_FAILED",
   identifier,
   validationRoot,
   artifactRoot = generatedVisualArtifactsRoot,
@@ -1107,7 +1108,7 @@ async function captureVisualFailureArtifacts({
   await writeFile(
     join(outputRoot, "failure.json"),
     `${JSON.stringify({
-      code: "VISUAL_REGRESSION_FAILED",
+      code: failureCode,
       fixture: identifier,
     })}\n`,
     { flag: "wx", mode: 0o600 },
@@ -1267,11 +1268,14 @@ async function verifySourcesWithAdapters(
         } catch (error) {
           if (
             error instanceof GeneratedFixtureVerificationError &&
-            error.code === "VISUAL_REGRESSION_FAILED" &&
+            ["BROWSER_PREVIEW_FAILED", "VISUAL_REGRESSION_FAILED"].includes(
+              error.code,
+            ) &&
             adapters.captureVisualArtifacts !== undefined
           ) {
             try {
               await adapters.captureVisualArtifacts({
+                failureCode: error.code,
                 identifier: source.contract.identifier,
                 validationRoot,
               });

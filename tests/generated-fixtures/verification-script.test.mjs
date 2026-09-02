@@ -863,6 +863,79 @@ test("single-project visual opt-in reports only checks that actually run", async
   }
 });
 
+test("preview failures export browser artifacts before owned cleanup", async () => {
+  await withPortfolioVisualFixture(async ({ ownerParent, sourceRoot }) => {
+    let capturedPreviewFailure;
+    let failedOwnerPath;
+    const failedArtifactRoot = join(ownerParent, "exported-artifacts");
+    await expectFixtureError(
+      () =>
+        verifyGeneratedProjectForTesting(sourceRoot, "portfolio", {
+          async createOwner() {
+            const owner = await createKnownOwner(ownerParent);
+            failedOwnerPath = owner.path;
+            return owner;
+          },
+          async runCommand(input) {
+            if (input.arguments.at(-1) === "test:e2e:preview") {
+              await mkdir(join(input.cwd, "apps/web/playwright-report"), {
+                recursive: true,
+              });
+              await mkdir(join(input.cwd, "apps/web/test-results"), {
+                recursive: true,
+              });
+              await writeFile(
+                join(input.cwd, "apps/web/playwright-report/index.html"),
+                "bounded preview report",
+              );
+              await writeFile(
+                join(input.cwd, "apps/web/test-results/trace.zip"),
+                "bounded preview trace",
+              );
+              throw new Error("PRIVATE_VALUE");
+            }
+            return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+          },
+          async captureVisualArtifacts(input) {
+            capturedPreviewFailure = {
+              failureCode: input.failureCode,
+              identifier: input.identifier,
+              ownerExists: await pathExists(failedOwnerPath),
+              validationRoot: input.validationRoot,
+            };
+            await captureVisualFailureArtifactsForTesting({
+              ...input,
+              artifactRoot: failedArtifactRoot,
+            });
+          },
+        }),
+      "BROWSER_PREVIEW_FAILED",
+    );
+    assert.deepEqual(capturedPreviewFailure, {
+      failureCode: "BROWSER_PREVIEW_FAILED",
+      identifier: "portfolio",
+      ownerExists: true,
+      validationRoot: join(failedOwnerPath, "portfolio-project"),
+    });
+    assert.equal(await pathExists(failedOwnerPath), false);
+    const exportedDirectories = await readdir(failedArtifactRoot);
+    assert.equal(exportedDirectories.length, 1);
+    const exportedRoot = join(failedArtifactRoot, exportedDirectories[0]);
+    assert.equal(
+      await readFile(join(exportedRoot, "playwright-report/index.html"), "utf8"),
+      "bounded preview report",
+    );
+    assert.equal(
+      await readFile(join(exportedRoot, "test-results/trace.zip"), "utf8"),
+      "bounded preview trace",
+    );
+    assert.deepEqual(
+      JSON.parse(await readFile(join(exportedRoot, "failure.json"), "utf8")),
+      { code: "BROWSER_PREVIEW_FAILED", fixture: "portfolio" },
+    );
+  });
+});
+
 test("visual failures export artifacts before owned cleanup", async () => {
   await withPortfolioVisualFixture(async ({ ownerParent, sourceRoot }) => {
     let capturedVisualFailure;
