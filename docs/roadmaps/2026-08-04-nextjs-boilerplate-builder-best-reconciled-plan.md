@@ -1352,6 +1352,8 @@ The normal P3B sequence begins only after P3 closes. The explicit independent-wo
 
 The combined journey uses tracked synthetic content and operator-owned non-production accounts under the [shared test deployment boundary](../governance/shared-test-deployment.md). It uses no actual client identity, content, approval, domain, or account and does not establish production deployment, provider certification, French certification, WCAG conformance, legal or privacy compliance, or production readiness.
 
+P3B closure is approved and closed under the exact evidence record in the [program roadmap](program-roadmap.md#p3b--client-required-public-site-expansion). P3C is the next eligible phase, but this closure does not authorize P3C planning or implementation, app-foundation work, deployment, publication, provider mutation, or any production action.
+
 ##### Relocation ledger
 
 No task, requirement, gate, or identifier is deleted or renumbered:
@@ -1370,7 +1372,7 @@ P5A and P5B are therefore not deleted and not renumbered.
 
 #### P3C — Automated removal-reference hardening
 
-P3C begins only after P3B closes. It strengthens the accepted removal lifecycle without reopening or weakening P3 or P3B acceptance. Existing fingerprint-bound repository-wide review and exact preserved/ejected-path reconciliation remain mandatory.
+P3C begins only after P3B closes. P3B is now closed, making P3C the next eligible phase; this closure does not authorize P3C planning or implementation. P3C strengthens the accepted removal lifecycle without reopening or weakening P3 or P3B acceptance. Existing fingerprint-bound repository-wide review and exact preserved/ejected-path reconciliation remain mandatory.
 
 Add a bounded Git-identity-bound repository inventory and capability-specific guards for surviving code, route, configuration, script, dynamic-loading, and package consumers. Exact resolved references and descriptor-specific exact guards require refusal or explicit reconciliation. Heuristic matches produce review warnings. Finding no detected match must never be represented as proof that no surviving dependency exists or that removal is complete.
 
