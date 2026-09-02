@@ -6,6 +6,7 @@ import {
 } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import { ordinaryGenerationVerificationChecks } from "../contracts/generation-verification.js";
+import { safeRelativePathSchema } from "../contracts/identifiers.js";
 import {
   migrationRecordSchema,
   type MigrationRecord,
@@ -45,6 +46,7 @@ import {
 } from "./capability-removal-writer.js";
 import {
   inspectGitExpectedChanges,
+  inspectGitRepositoryInventory,
   inspectGitWorktree,
   sameGitIdentity,
   type GitExpectedChangesInspection,
@@ -135,6 +137,7 @@ export type CapabilityRemovalExecutionResult =
   | Readonly<{
       ok: false;
       code: CapabilityRemovalFailureCode;
+      conflicts?: readonly string[];
       phase: CapabilityRemovalPhase;
       recovery: CapabilityRemovalRecovery;
     }>;
@@ -157,8 +160,15 @@ function failure(
   code: CapabilityRemovalFailureCode,
   phase: CapabilityRemovalPhase,
   recovery: CapabilityRemovalRecovery,
+  conflicts: readonly string[] = [],
 ): CapabilityRemovalExecutionResult {
-  return { ok: false, code, phase, recovery };
+  return {
+    ok: false,
+    code,
+    ...(conflicts.length === 0 ? {} : { conflicts }),
+    phase,
+    recovery,
+  };
 }
 
 function compareText(left: string, right: string): number {
@@ -507,6 +517,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
   writer?: CapabilityRemovalWriter;
   inspectWorktree?: InspectWorktree;
   inspectExpectedChanges?: InspectExpectedChanges;
+  inspectRepositoryInventory?: typeof inspectGitRepositoryInventory;
   now?: () => string;
 }>): Promise<CapabilityRemovalExecutionResult> {
   const root = resolve(input.root);
@@ -544,15 +555,29 @@ export async function applyCapabilityRemoval(input: Readonly<{
       reader,
       git: initialGit,
       capability: input.capability,
+      ...(input.inspectRepositoryInventory === undefined
+        ? {}
+        : { inspectRepositoryInventory: input.inspectRepositoryInventory }),
     });
   } catch {
     return failure("REPOSITORY_OPEN_FAILED", "precondition", "not-required");
   }
   if (!planResult.ok) {
+    const code = planResult.issues[0]?.code ?? "PROJECT_INSPECTION_INVALID";
+    const conflicts = code === "CAPABILITY_REMOVAL_REFERENCE_CONFLICT"
+      ? planResult.issues.flatMap((issue) => {
+          const path = issue.path.length === 1 ? issue.path[0] : undefined;
+          return typeof path === "string" &&
+            safeRelativePathSchema.safeParse(path).success
+            ? [path]
+            : [];
+        })
+      : [];
     return failure(
-      planResult.issues[0]?.code ?? "PROJECT_INSPECTION_INVALID",
+      code,
       "precondition",
       "not-required",
+      conflicts,
     );
   }
   const plan = planResult.value;
