@@ -394,8 +394,24 @@ test("Calendly removal reference guard refuses every exact surviving code consum
       'void import("@/src/integrations/booking-calendly/calendly-booking");\n',
     ],
     [
+      "apps/web/src/consumers/query-import.ts",
+      'void import("@/content/en-CA/booking-calendly.yaml?raw");\n',
+    ],
+    [
+      "apps/web/src/consumers/runtime-extension-import.ts",
+      'import { readBookingContent } from "../integrations/booking-calendly/booking-content.js";\n',
+    ],
+    [
       "apps/web/src/consumers/path-literal.ts",
       'export const source = "apps/web/content/en-CA/booking-calendly.yaml";\n',
+    ],
+    [
+      "apps/web/config/booking.yaml",
+      "source: apps/web/content/en-CA/booking-calendly.yaml\n",
+    ],
+    [
+      "scripts/check-booking.sh",
+      "test -f apps/web/src/integrations/booking-calendly/booking-settings.ts\n",
     ],
   ]);
 
@@ -523,6 +539,32 @@ test("Calendly removal reference guard refuses invalid Git inventory without pri
   });
 
   assertFailure(result, "CAPABILITY_REMOVAL_INVENTORY_INVALID");
+});
+
+test("Calendly removal reference guard marks aggregate scan truncation for manual review", async () => {
+  const entries = await installedEntries("portfolio");
+  const chunk = "x".repeat(1024 * 1024);
+  for (let index = 0; index < 33; index += 1) {
+    entries.set(
+      `apps/web/src/aggregate/file-${String(index).padStart(2, "0")}.txt`,
+      chunk,
+    );
+  }
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, true, JSON.stringify(result.issues));
+  const warnings = result.value.reviewRequirements.find(
+    ({ code }) => code === "review-capability-removal-reference-warnings",
+  )?.warnings;
+  assert.equal(
+    warnings.some(
+      (warning) =>
+        warning.code === "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE" &&
+        warning.path === undefined,
+    ),
+    true,
+  );
 });
 
 test("analytics removal restores the composed layout and requires provider disposition review", async () => {

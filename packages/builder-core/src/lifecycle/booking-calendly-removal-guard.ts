@@ -23,6 +23,16 @@ const sourceExtensions = [
   ".tsx",
 ] as const;
 const parsedExtensions = new Set([...sourceExtensions, ".json"]);
+const exactConfigurationAndScriptExtensions = new Set([
+  ".bash",
+  ".jsonc",
+  ".sh",
+  ".toml",
+  ".yaml",
+  ".yml",
+  ".zsh",
+]);
+const runtimeSpecifierExtensions = [".cjs", ".js", ".jsx", ".mjs"] as const;
 const referenceToken = /(?:booking-calendly|calendly)/iu;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -95,16 +105,23 @@ function localSpecifierBase(
   sourcePath: string,
   specifier: string,
 ): string | undefined {
+  const suffixIndex = specifier.search(/[?#]/u);
+  const pathSpecifier = suffixIndex < 0
+    ? specifier
+    : specifier.slice(0, suffixIndex);
   let candidate: string;
 
-  if (specifier.startsWith("@/")) {
-    candidate = posix.join("apps/web", specifier.slice(2));
-  } else if (specifier.startsWith("./") || specifier.startsWith("../")) {
-    candidate = posix.join(posix.dirname(sourcePath), specifier);
-  } else if (specifier.startsWith("/")) {
-    candidate = specifier.slice(1);
-  } else if (specifier.startsWith("apps/")) {
-    candidate = specifier;
+  if (pathSpecifier.startsWith("@/")) {
+    candidate = posix.join("apps/web", pathSpecifier.slice(2));
+  } else if (
+    pathSpecifier.startsWith("./") ||
+    pathSpecifier.startsWith("../")
+  ) {
+    candidate = posix.join(posix.dirname(sourcePath), pathSpecifier);
+  } else if (pathSpecifier.startsWith("/")) {
+    candidate = pathSpecifier.slice(1);
+  } else if (pathSpecifier.startsWith("apps/")) {
+    candidate = pathSpecifier;
   } else {
     return undefined;
   }
@@ -125,7 +142,13 @@ function deletedSpecifierTargets(
     const extension = posix.extname(path);
 
     if (extension !== "") {
-      targets.add(path.slice(0, -extension.length));
+      const base = path.slice(0, -extension.length);
+      targets.add(base);
+      if (sourceExtensions.includes(extension as typeof sourceExtensions[number])) {
+        for (const runtimeExtension of runtimeSpecifierExtensions) {
+          targets.add(`${base}${runtimeExtension}`);
+        }
+      }
     }
 
     const basename = posix.basename(path, extension);
@@ -141,9 +164,10 @@ function resolvesToDeletedPath(
   sourcePath: string,
   specifier: string,
   targets: ReadonlySet<string>,
+  availablePaths: ReadonlySet<string>,
 ): boolean {
   const base = localSpecifierBase(sourcePath, specifier);
-  return base !== undefined && targets.has(base);
+  return base !== undefined && !availablePaths.has(base) && targets.has(base);
 }
 
 function literalText(expression: ts.Expression | undefined): string | undefined {
@@ -168,6 +192,7 @@ function analyzeParsedSource(input: Readonly<{
   path: string;
   source: string;
   deletedTargets: ReadonlySet<string>;
+  availablePaths: ReadonlySet<string>;
 }>): Readonly<{ exact: boolean; dynamic: boolean }> {
   const sourceFile = ts.createSourceFile(
     input.path,
@@ -180,7 +205,14 @@ function analyzeParsedSource(input: Readonly<{
   let dynamic = false;
 
   function inspectSpecifier(value: string): void {
-    if (resolvesToDeletedPath(input.path, value, input.deletedTargets)) {
+    if (
+      resolvesToDeletedPath(
+        input.path,
+        value,
+        input.deletedTargets,
+        input.availablePaths,
+      )
+    ) {
       exact = true;
     }
   }
@@ -277,6 +309,11 @@ export async function guardBookingCalendlyRemovalReferences(input: Readonly<{
   }
 
   const deletedTargets = deletedSpecifierTargets(deletedPaths);
+  const availablePaths = new Set(
+    input.inventory.entries.flatMap((entry) =>
+      deletedPaths.has(entry.path) ? [] : [entry.path],
+    ),
+  );
   const conflicts = new Set<string>();
   const warnings: CapabilityRemovalReferenceWarning[] = input.inventory.truncated
     ? [coverageWarning()]
@@ -319,6 +356,7 @@ export async function guardBookingCalendlyRemovalReferences(input: Readonly<{
         path: entry.path,
         source: read.content,
         deletedTargets,
+        availablePaths,
       });
       if (analysis.exact) {
         conflicts.add(entry.path);
@@ -329,6 +367,15 @@ export async function guardBookingCalendlyRemovalReferences(input: Readonly<{
           path: entry.path,
         });
       }
+    }
+
+    if (
+      exactConfigurationAndScriptExtensions.has(
+        posix.extname(entry.path).toLowerCase(),
+      ) &&
+      [...deletedPaths].some((path) => read.content.includes(path))
+    ) {
+      conflicts.add(entry.path);
     }
 
     if (referenceToken.test(read.content) && !conflicts.has(entry.path)) {
