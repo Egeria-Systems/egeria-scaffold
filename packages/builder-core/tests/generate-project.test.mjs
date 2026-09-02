@@ -19,14 +19,18 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const reviewedRecipeLockfile = resolve(
+const portfolioRecipeLockfile = resolve(
   packageRoot,
-  "lockfiles/web-recipe-0.8.0/pnpm-lock.yaml",
+  "lockfiles/web-recipe-0.10.0/pnpm-lock.yaml",
 );
-const patchedRecipeLockfile = resolve(
+const siteRecipeLockfile = resolve(
   packageRoot,
   "lockfiles/web-recipe-0.9.0/pnpm-lock.yaml",
 );
+const portfolioRecipeIdentity = Object.freeze({
+  originProfile: "portfolio",
+  recipeVersion: "0.10.0",
+});
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
 const verifierModule = await import(
   pathToFileURL(
@@ -226,31 +230,52 @@ test("generated dependency recipes select only their exact reviewed lockfile", a
 
   assert.equal(
     recipeLockfiles.resolveRecipeLockfileVersion(
+      { originProfile: "site", recipeVersion: "0.10.0" },
       manifest("16.3.0", "16.3.0"),
     ),
     "0.8.0",
   );
   assert.equal(
     recipeLockfiles.resolveRecipeLockfileVersion(
+      { originProfile: "portfolio", recipeVersion: "0.10.0" },
+      manifest("16.3.0", "16.3.0"),
+    ),
+    "0.10.0",
+  );
+  assert.equal(
+    recipeLockfiles.resolveRecipeLockfileVersion(
+      { originProfile: "site", recipeVersion: "0.11.0" },
       manifest("16.3.3", "16.3.3"),
     ),
     "0.9.0",
   );
   assert.equal(
     recipeLockfiles.resolveRecipeLockfileVersion(
+      { originProfile: "site", recipeVersion: "0.11.0" },
       manifest("16.3.3", "16.3.0"),
     ),
     undefined,
   );
-  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({}), undefined);
+  assert.equal(
+    recipeLockfiles.resolveRecipeLockfileVersion(
+      {},
+      manifest("16.3.0", "16.3.0"),
+    ),
+    undefined,
+  );
 
-  const patchedLockfile = await readFile(patchedRecipeLockfile, "utf8");
+  const portfolioLockfile = await readFile(portfolioRecipeLockfile, "utf8");
   assert.match(
-    patchedLockfile,
+    portfolioLockfile,
+    /\n\s+next:\n\s+specifier: 16\.3\.0\n\s+version: 16\.3\.0/u,
+  );
+  const siteLockfile = await readFile(siteRecipeLockfile, "utf8");
+  assert.match(
+    siteLockfile,
     /\n\s+next:\n\s+specifier: 16\.3\.3\n\s+version: 16\.3\.3/u,
   );
   assert.match(
-    patchedLockfile,
+    siteLockfile,
     /eslint-config-next:\n\s+specifier: 16\.3\.3\n\s+version: 16\.3\.3/u,
   );
 });
@@ -325,6 +350,7 @@ test("lockfile preparation rejects a byte-identical replacement root", async (co
 
   const result = await verifierModule.prepareLockfile(
     source,
+    portfolioRecipeIdentity,
     async (lockfilePath, content) => {
       await rename(source, originalSource);
       await cp(originalSource, source, {
@@ -685,10 +711,14 @@ test("failed exclusive writes never delete a possibly replaced path", async () =
 test("lockfile preparation reports a failed exclusive-write source mutation", async () => {
   await withTestRoot(async (owner) => {
     const source = await createVerifierSource(owner);
-    const result = await verifierModule.prepareLockfile(source, async () => ({
-      ok: false,
-      sourceChanged: true,
-    }));
+    const result = await verifierModule.prepareLockfile(
+      source,
+      portfolioRecipeIdentity,
+      async () => ({
+        ok: false,
+        sourceChanged: true,
+      }),
+    );
 
     assert.deepEqual(result, {
       ok: false,
@@ -713,11 +743,13 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
       pnpmExecutable: fakePnpm.executable,
     });
 
-    assertSuccess(await verifier.prepareLockfile(source));
+    assertSuccess(
+      await verifier.prepareLockfile(source, portfolioRecipeIdentity),
+    );
     assert.deepEqual(await fakePnpm.readCalls(), []);
     assert.deepEqual(
       await readFile(join(source, "pnpm-lock.yaml")),
-      await readFile(reviewedRecipeLockfile),
+      await readFile(portfolioRecipeLockfile),
     );
     const beforeVerification = await snapshotFileBytes(source);
     assert.deepEqual(assertSuccess(await verifier.verifyInIsolatedCopy(source)), {
@@ -877,7 +909,7 @@ test("the pnpm verifier rejects pre-existing lockfile targets without invoking p
         pnpmExecutable: fakePnpm.executable,
       });
       assertFailure(
-        await verifier.prepareLockfile(source),
+        await verifier.prepareLockfile(source, portfolioRecipeIdentity),
         "LOCKFILE_PREPARATION_FAILED",
       );
       assert.deepEqual(await fakePnpm.readCalls(), []);
@@ -915,7 +947,9 @@ test("the pnpm verifier maps command failures without child output", async () =>
         pnpmExecutable: fakePnpm.executable,
       });
 
-      assertSuccess(await verifier.prepareLockfile(source));
+      assertSuccess(
+        await verifier.prepareLockfile(source, portfolioRecipeIdentity),
+      );
       if (match === "prefix") {
         await fakePnpm.configure({ failureOperationPrefix: operation.split(" ignored")[0] });
       } else {
@@ -938,7 +972,12 @@ test("the pnpm verifier maps command failures without child output", async () =>
     const overflowVerifier = core.createPnpmGeneratedProjectVerifier({
       pnpmExecutable: overflowPnpm.executable,
     });
-    assertSuccess(await overflowVerifier.prepareLockfile(overflowSource));
+    assertSuccess(
+      await overflowVerifier.prepareLockfile(
+        overflowSource,
+        portfolioRecipeIdentity,
+      ),
+    );
     await overflowPnpm.configure({ overflowOperation: "--version" });
     assertFailure(
       await overflowVerifier.verifyInIsolatedCopy(overflowSource),
@@ -951,7 +990,12 @@ test("the pnpm verifier maps command failures without child output", async () =>
     const versionVerifier = core.createPnpmGeneratedProjectVerifier({
       pnpmExecutable: versionPnpm.executable,
     });
-    assertSuccess(await versionVerifier.prepareLockfile(versionSource));
+    assertSuccess(
+      await versionVerifier.prepareLockfile(
+        versionSource,
+        portfolioRecipeIdentity,
+      ),
+    );
     await versionPnpm.configure({ version: "11.19.0" });
     assertFailure(
       await versionVerifier.verifyInIsolatedCopy(versionSource),

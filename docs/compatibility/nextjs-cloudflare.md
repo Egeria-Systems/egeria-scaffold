@@ -37,7 +37,7 @@ The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](..
 
 The table is the immutable package snapshot for the accepted hosted evidence named above. It does not mirror later manifest updates. A newer dependency has current compatibility evidence only from checks that ran against that exact revision until a separately approved evidence refresh replaces this snapshot.
 
-All package versions in this snapshot are exact. Current package versions remain exact in their executable manifests. The workspace uses a one-day package maturity policy, a reviewed lifecycle-script allowlist, and the narrow `miniflare>undici: 7.29.0` security override recorded in the preparation evidence.
+All package versions in this snapshot are exact. Current package versions remain exact in their executable manifests. The workspace uses a one-day package maturity policy, a reviewed lifecycle-script allowlist, and range-compatible security overrides recorded in the applicable preparation evidence. The current root policy constrains `miniflare>undici` to `7.29.0` and compatible `qs` consumers to `6.16.0` without changing the accepted direct-dependency snapshot.
 
 ## Informational deployment context
 

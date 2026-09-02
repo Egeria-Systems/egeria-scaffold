@@ -509,7 +509,10 @@ async function executeGeneration(input: Readonly<{
     return issue("SOURCE_SNAPSHOT_FAILED", [], "snapshot-failed");
   }
 
-  const prepared = await input.verifier.prepareLockfile(input.source.path);
+  const prepared = await input.verifier.prepareLockfile(
+    input.source.path,
+    input.rendered.project,
+  );
   const sourceAfterPreparation = await requireSourceIdentity(input.source);
   if (!sourceAfterPreparation.ok) {
     return sourceAfterPreparation;

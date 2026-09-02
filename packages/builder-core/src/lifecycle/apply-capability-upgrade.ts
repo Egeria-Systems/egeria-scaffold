@@ -124,6 +124,7 @@ const siteRoutingActionShape = [
   ["create-file", "apps/web/tests/e2e/site-routing.spec.ts"],
   ["create-file", "apps/web/tests/unit/routing-content.test.ts"],
   ["replace-file", "pnpm-lock.yaml"],
+  ["replace-file", "pnpm-workspace.yaml"],
 ] as const;
 
 export type CapabilityUpgradePhase =
@@ -611,6 +612,7 @@ function requirePendingInference(input: Readonly<{
       : new Set([
           "builder-dependency-lockfile",
           "builder-project-configuration",
+          "builder-workspace-configuration",
           "builder-web-package-eslint-next",
           "builder-web-package-next",
         ]);

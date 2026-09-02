@@ -130,12 +130,21 @@ async function acceptedSiteEntries() {
       ),
     ),
   );
+  const workspace = new Uint8Array(
+    await readFile(
+      resolve(
+        packageRoot,
+        "lockfiles/web-recipe-0.8.0/pnpm-workspace.yaml",
+      ),
+    ),
+  );
   const files = new Map(
     rendered.value.files.map(({ path, content }) => [path, content]),
   );
   files.set(".egeria/project.yaml", encoder.encode(projectSource));
   files.set(".egeria/migrations.jsonl", new Uint8Array());
   files.set("pnpm-lock.yaml", lockfile);
+  files.set("pnpm-workspace.yaml", workspace);
   const materialized = core.materializeInstalledSurfaces({
     files,
     surfaces: [...rendered.value.surfaces, ...createBuilderStateSurfaces()].sort(
@@ -738,6 +747,12 @@ test("site-routing upgrade replaces the exact production recipe and persists sta
   assert.deepEqual(state.value.appliedMigrations, [
     "upgrade-site-routing-0-3-0-to-0-4-0",
   ]);
+  assert.deepEqual(
+    repository.files.get("pnpm-workspace.yaml"),
+    new Uint8Array(
+      await readFile(resolve(packageRoot, "templates/common/pnpm-workspace.yaml")),
+    ),
+  );
   assert.equal(repository.writes.length, 3);
   assert.deepEqual(
     repository.writes.map((batch) => batch.map(({ path }) => path)),

@@ -1,15 +1,16 @@
 packages:
   - "apps/*"
-  - "packages/*"
-  - "proofs/*"
 
 pmOnFail: error
 
 minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - "@egeria-systems/observability@0.3.0"
+
+resolutionMode: time-based
 
 overrides:
   "miniflare>undici": 7.29.0
-  "qs@": 6.16.0
 
 allowBuilds:
   "@parcel/watcher": true

@@ -23,6 +23,7 @@ import type { ValidationResult } from "../contracts/result.js";
 import {
   createRecipeLockfileUrl,
   resolveRecipeLockfileVersion,
+  type RecipeLockfileIdentity,
 } from "./recipe-lockfiles.js";
 import {
   classifyLockfileOnlyTransition,
@@ -40,7 +41,10 @@ export type GeneratedProjectVerification = Readonly<{
 }>;
 
 export interface GeneratedProjectVerifier {
-  prepareLockfile(root: string): Promise<ValidationResult<void>>;
+  prepareLockfile(
+    root: string,
+    identity: RecipeLockfileIdentity,
+  ): Promise<ValidationResult<void>>;
   verifyInIsolatedCopy(
     root: string,
   ): Promise<ValidationResult<GeneratedProjectVerification>>;
@@ -393,6 +397,7 @@ async function requirePnpmVersion(input: Readonly<{
 
 export async function prepareLockfile(
   root: string,
+  recipeIdentity: RecipeLockfileIdentity,
   writer: ExclusiveFileWriter = writeExclusive,
 ): Promise<ValidationResult<void>> {
   const fixedRoot = resolve(root);
@@ -416,6 +421,7 @@ export async function prepareLockfile(
       "utf8",
     );
     const lockfileVersion = resolveRecipeLockfileVersion(
+      recipeIdentity,
       JSON.parse(manifestSource) as unknown,
     );
     if (lockfileVersion === undefined) {
@@ -586,8 +592,8 @@ export function createPnpmGeneratedProjectVerifier(input: Readonly<{
   const executable = input.pnpmExecutable;
 
   return {
-    prepareLockfile(root) {
-      return prepareLockfile(root);
+    prepareLockfile(root, identity) {
+      return prepareLockfile(root, identity);
     },
     verifyInIsolatedCopy(root) {
       return typeof executable === "string" && executable.length > 0
