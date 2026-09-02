@@ -831,6 +831,13 @@ async function prepareHistoricalUpgradeFixture(
       ),
       join(root, "pnpm-lock.yaml"),
     );
+    await cp(
+      resolve(
+        repositoryRoot,
+        "packages/builder-core/lockfiles/web-recipe-0.8.0/pnpm-workspace.yaml",
+      ),
+      join(root, "pnpm-workspace.yaml"),
+    );
     const files = new Map(
       await Promise.all(
         [
@@ -838,6 +845,7 @@ async function prepareHistoricalUpgradeFixture(
           ".egeria/project.yaml",
           ".egeria/migrations.jsonl",
           "pnpm-lock.yaml",
+          "pnpm-workspace.yaml",
         ].map(async (path) => [path, await readFile(join(root, path))]),
       ),
     );
@@ -4310,7 +4318,7 @@ test("the compiled plan-upgrade command plans the exact production site edge wit
         fromVersion: "0.3.0",
         toVersion: "0.4.0",
       });
-      assert.equal(emitted.plan.actions.length, 22);
+      assert.equal(emitted.plan.actions.length, 23);
       assert.match(emitted.plan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
       assert.deepEqual(after, before);
     },

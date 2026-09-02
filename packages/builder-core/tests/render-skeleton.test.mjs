@@ -1977,6 +1977,34 @@ test("generated unit and component tests use distinct named environments", async
   assert.ok(typescript.include.includes("tests/**/*.tsx"));
 });
 
+test("generated workspaces constrain vulnerable transitive dependency ranges", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  const rendered = assertSuccess(
+    await renderSkeleton({
+      profile: "portfolio",
+      projectName: "acme-studio",
+      displayName: "Acme Studio",
+      packageVersions,
+    }),
+  );
+
+  const workspace = parseGeneratedYaml(
+    rendered.files,
+    "pnpm-workspace.yaml",
+  );
+
+  assert.deepEqual(workspace.minimumReleaseAgeExclude, [
+    "@egeria-systems/observability@0.3.0",
+    "fast-uri@3.1.6",
+    "qs@6.16.0",
+  ]);
+  assert.deepEqual(workspace.overrides, {
+    "fast-uri@": "3.1.6",
+    "miniflare>undici": "7.29.0",
+    "qs@": "6.16.0",
+  });
+});
+
 test("production observability renders bounded Next and Cloudflare composition", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(

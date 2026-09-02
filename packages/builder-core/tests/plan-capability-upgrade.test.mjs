@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -37,6 +38,10 @@ const currentStandardsSurfaceIdentifiers = new Set([
   "standards-visual-regression-specification",
   "standards-visual-regression-test-script",
 ]);
+const acceptedSiteLockfileFingerprint =
+  "020061380ecdf4eaafdff982bc2cc3be4a7867f752f874bfc1eb6dbc1c983952";
+const acceptedSiteWorkspaceFingerprint =
+  "990f97df2cb8a4798c7ce039e7f6fa0e743ebaf93368fe0f1f90a7c796903b2b";
 
 function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -93,12 +98,16 @@ async function acceptedSiteEntries() {
   const lockfile = await readFile(
     resolve(packageRoot, "lockfiles/web-recipe-0.8.0/pnpm-lock.yaml"),
   );
+  const workspace = await readFile(
+    resolve(packageRoot, "lockfiles/web-recipe-0.8.0/pnpm-workspace.yaml"),
+  );
   const byteFiles = new Map(
     rendered.value.files.map(({ path, content }) => [path, content]),
   );
   byteFiles.set(".egeria/project.yaml", encoder.encode(projectSource));
   byteFiles.set(".egeria/migrations.jsonl", new Uint8Array());
   byteFiles.set("pnpm-lock.yaml", new Uint8Array(lockfile));
+  byteFiles.set("pnpm-workspace.yaml", new Uint8Array(workspace));
   const materialized = core.materializeInstalledSurfaces({
     files: byteFiles,
     surfaces: [...rendered.value.surfaces, ...createBuilderStateSurfaces()].sort(
@@ -129,6 +138,25 @@ async function acceptedSiteEntries() {
   }
   return entries;
 }
+
+test("historical site upgrades retain their accepted source lockfile", async () => {
+  const lockfile = await readFile(
+    resolve(packageRoot, "lockfiles/web-recipe-0.8.0/pnpm-lock.yaml"),
+  );
+
+  assert.equal(
+    createHash("sha256").update(lockfile).digest("hex"),
+    acceptedSiteLockfileFingerprint,
+  );
+
+  const workspace = await readFile(
+    resolve(packageRoot, "lockfiles/web-recipe-0.8.0/pnpm-workspace.yaml"),
+  );
+  assert.equal(
+    createHash("sha256").update(workspace).digest("hex"),
+    acceptedSiteWorkspaceFingerprint,
+  );
+});
 
 function historicalQualitySource(current) {
   const visualStep = [
@@ -474,6 +502,7 @@ test("the production site recipe has one exact certified site-routing upgrade ed
       ["create-file", "apps/web/tests/e2e/site-routing.spec.ts"],
       ["create-file", "apps/web/tests/unit/routing-content.test.ts"],
       ["replace-file", "pnpm-lock.yaml"],
+      ["replace-file", "pnpm-workspace.yaml"],
     ],
   );
   assert.equal(result.value.profile, "site");

@@ -576,11 +576,15 @@ pmOnFail: error
 minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - "@egeria-systems/observability@0.3.0"
+  - "fast-uri@3.1.6"
+  - "qs@6.16.0"
 
 resolutionMode: time-based
 
 overrides:
+  "fast-uri@": 3.1.6
   "miniflare>undici": 7.29.0
+  "qs@": 6.16.0
 
 allowBuilds:
   "@parcel/watcher": true
@@ -597,7 +601,9 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
+  fast-uri@: 3.1.6
   miniflare>undici: 7.29.0
+  qs@: 6.16.0
 
 importers:
 `;

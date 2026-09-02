@@ -617,6 +617,7 @@ const siteRoutingUpgradePaths = [
   "apps/web/tests/e2e/site-routing.spec.ts",
   "apps/web/tests/unit/routing-content.test.ts",
   "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
 ] as const;
 
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
@@ -656,7 +657,8 @@ function siteRoutingActionOwner(
   if (
     path === ".egeria/project.yaml" ||
     path === "apps/web/app/page.tsx" ||
-    path === "pnpm-lock.yaml"
+    path === "pnpm-lock.yaml" ||
+    path === "pnpm-workspace.yaml"
   ) {
     return { owner: "builder-kernel", ownership: "managed" };
   }
@@ -686,8 +688,14 @@ async function deriveSiteRoutingActions(input: Readonly<{
   source: RenderedSkeleton;
   target: RenderedSkeleton;
 }>): Promise<PlanningResult<readonly CapabilityUpgradeAction[]>> {
-  const [sourceLockfile, targetLockfile] = await Promise.all([
+  const [sourceLockfile, sourceWorkspace, targetLockfile] = await Promise.all([
     readFile(createRecipeLockfileUrl("0.8.0")),
+    readFile(
+      new URL(
+        "../../lockfiles/web-recipe-0.8.0/pnpm-workspace.yaml",
+        import.meta.url,
+      ),
+    ),
     readFile(createRecipeLockfileUrl("0.9.0")),
   ]);
   const sourceBytes = new Map(
@@ -698,6 +706,7 @@ async function deriveSiteRoutingActions(input: Readonly<{
     encoder.encode(serializeProjectYaml(input.source.project)),
   );
   sourceBytes.set("pnpm-lock.yaml", new Uint8Array(sourceLockfile));
+  sourceBytes.set("pnpm-workspace.yaml", new Uint8Array(sourceWorkspace));
   const targetBytes = new Map(
     input.target.files.map(({ path, content }) => [path, content]),
   );

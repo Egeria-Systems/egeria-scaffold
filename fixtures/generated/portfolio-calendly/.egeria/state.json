@@ -153,7 +153,7 @@
       "path": "apps/web/src/integrations/booking-calendly/booking-settings.ts"
     },
     {
-      "fingerprint": "sha256:020061380ecdf4eaafdff982bc2cc3be4a7867f752f874bfc1eb6dbc1c983952",
+      "fingerprint": "sha256:fa352bda70824e3e3f7a67d222d5d1755dac4cd79e7f3939de7761ca43d2418e",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -590,7 +590,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:990f97df2cb8a4798c7ce039e7f6fa0e743ebaf93368fe0f1f90a7c796903b2b",
+      "fingerprint": "sha256:120ed38ecde7523c9bd9bdf3041a84f7b78fdea75a9c5d258cdad647f44840b6",
       "fingerprintTarget": {
         "kind": "file"
       },
