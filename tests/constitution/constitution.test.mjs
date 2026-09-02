@@ -2780,6 +2780,66 @@ test("client-required public-site work is relocated after lifecycle without requ
       "iu",
     ),
   );
+
+  const closureStatusPattern = new RegExp(
+    escapeRegularExpression(
+      `${clientExpansionPhase} closure is approved and closed`,
+    ),
+    "iu",
+  );
+  const successorEligibilityPattern = new RegExp(
+    escapeRegularExpression(
+      `${referenceHardeningPhase} is the next eligible phase, but this closure does not authorize ${referenceHardeningPhase} planning or implementation`,
+    ),
+    "iu",
+  );
+
+  assert.doesNotMatch(
+    `${clientExpansionPhase} closure is not approved and not closed`,
+    closureStatusPattern,
+  );
+  assert.doesNotMatch(
+    `${referenceHardeningPhase} is the next eligible phase, but this closure does not authorize deployment; ${referenceHardeningPhase} planning and implementation are authorized.`,
+    successorEligibilityPattern,
+  );
+
+  for (const statusConsumer of [sourcePlan, programRoadmap, overview]) {
+    assert.match(statusConsumer, closureStatusPattern);
+    assert.match(statusConsumer, successorEligibilityPattern);
+  }
+
+  assert.doesNotMatch(
+    overview,
+    new RegExp(
+      `${escapeRegularExpression(clientExpansionPhase)} is the next eligible phase`,
+      "iu",
+    ),
+  );
+
+  assert.match(
+    programRoadmap,
+    /main@f7caa6ef0b8103c051c99eb6599debf969b8489c[^\n]+87d8be28fa2d611a07b5eb7c32712f0245d12b87/iu,
+  );
+  assert.match(
+    programRoadmap,
+    /site-routing@0\.4\.0[^\n]+6034d7330af912d1a1b9bcff3323ed360ebee2d0[^\n]+multilingual@0\.1\.0[^\n]+96b587a254cf6fc859867d6fc66c7e0c900c4cfd[^\n]+analytics@0\.1\.0[^\n]+a97341ea628210b6fa713fb12461084f20c3f8da/iu,
+  );
+  assert.match(
+    programRoadmap,
+    /9cd386ee637cad85162917b4f4a91e6c878fb75e[^\n]+e116adbff366be2bf674846f231e26a6e00d132f[^\n]+33456304959[^\n]+33456850947/iu,
+  );
+  assert.match(
+    programRoadmap,
+    /d0ad7eaaa9c7198a8a479540bdd8b4dcf4dee113[^\n]+3583e88902c8b2328da90b77e0a4edd112cdfd23/iu,
+  );
+  assert.match(
+    programRoadmap,
+    /33588604465[^\n]+f7caa6ef0b8103c051c99eb6599debf969b8489c[^\n]+passed every applicable job/iu,
+  );
+  assert.match(
+    programRoadmap,
+    /synthetic[^\n]+does not establish[^\n]+production readiness[^\n]+WCAG conformance/iu,
+  );
 });
 
 test("multilingual implementation and certification remain exact and claim-limited", async () => {
