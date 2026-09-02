@@ -23,12 +23,6 @@ const sourceExtensions = [
   ".tsx",
 ] as const;
 const parsedExtensions = new Set([...sourceExtensions, ".json"]);
-const typescriptResolutionExtensions = new Set([
-  ".cts",
-  ".mts",
-  ".ts",
-  ".tsx",
-]);
 const exactConfigurationAndScriptExtensions = new Set([
   ".bash",
   ".json",
@@ -177,6 +171,7 @@ function resolvesToDeletedPath(
   specifier: string,
   deletedPaths: ReadonlySet<string>,
   resolution: RepositoryModuleResolution,
+  resolveWithBundler: boolean,
 ): boolean {
   const base = localSpecifierBase(sourcePath, specifier);
   if (base === undefined) {
@@ -185,11 +180,7 @@ function resolvesToDeletedPath(
   if (deletedPaths.has(base)) {
     return true;
   }
-  if (
-    !typescriptResolutionExtensions.has(
-      posix.extname(sourcePath).toLowerCase(),
-    )
-  ) {
+  if (!resolveWithBundler) {
     return false;
   }
 
@@ -258,13 +249,17 @@ function analyzeParsedSource(input: Readonly<{
   let exact = false;
   let dynamic = false;
 
-  function inspectSpecifier(value: string): void {
+  function inspectSpecifier(
+    value: string,
+    resolveWithBundler: boolean,
+  ): void {
     if (
       resolvesToDeletedPath(
         input.path,
         value,
         input.deletedPaths,
         input.resolution,
+        resolveWithBundler,
       )
     ) {
       exact = true;
@@ -277,7 +272,7 @@ function analyzeParsedSource(input: Readonly<{
       node.moduleSpecifier !== undefined &&
       ts.isStringLiteralLike(node.moduleSpecifier)
     ) {
-      inspectSpecifier(node.moduleSpecifier.text);
+      inspectSpecifier(node.moduleSpecifier.text, true);
     }
 
     if (ts.isCallExpression(node)) {
@@ -289,13 +284,13 @@ function analyzeParsedSource(input: Readonly<{
         if (value === undefined) {
           dynamic = true;
         } else {
-          inspectSpecifier(value);
+          inspectSpecifier(value, isDynamicImport);
         }
       }
     }
 
     if (ts.isStringLiteralLike(node)) {
-      inspectSpecifier(node.text);
+      inspectSpecifier(node.text, false);
     }
 
     ts.forEachChild(node, visit);
@@ -306,10 +301,10 @@ function analyzeParsedSource(input: Readonly<{
     ...sourceFile.typeReferenceDirectives,
     ...sourceFile.libReferenceDirectives,
   ]) {
-    inspectSpecifier(reference.fileName);
+    inspectSpecifier(reference.fileName, true);
   }
   for (const dependency of sourceFile.amdDependencies) {
-    inspectSpecifier(dependency.path);
+    inspectSpecifier(dependency.path, true);
   }
 
   visit(sourceFile);
