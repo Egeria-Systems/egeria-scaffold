@@ -435,6 +435,83 @@ test("Calendly removal reference guard refuses every exact surviving code consum
   );
 });
 
+test("Calendly removal reference guard prefers a deleted TypeScript source over a surviving runtime-extension fallback", async () => {
+  const entries = await installedEntries("portfolio");
+  const consumerPath =
+    "apps/web/src/integrations/booking-calendly/custom-consumer.ts";
+  entries.set(
+    consumerPath,
+    'import { readBookingContent } from "./booking-content.js";\n',
+  );
+  entries.set(
+    "apps/web/src/integrations/booking-calendly/booking-content.js",
+    "export const readBookingContent = () => undefined;\n",
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.issues.map(({ code, path }) => ({ code, path })),
+    [
+      {
+        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+        path: [consumerPath],
+      },
+    ],
+  );
+});
+
+test("Calendly removal reference guard refuses an exact triple-slash path reference", async () => {
+  const entries = await installedEntries("portfolio");
+  const consumerPath =
+    "apps/web/src/integrations/booking-calendly/custom-types.d.ts";
+  entries.set(
+    consumerPath,
+    '/// <reference path="./booking-content.ts" />\n',
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.issues.map(({ code, path }) => ({ code, path })),
+    [
+      {
+        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+        path: [consumerPath],
+      },
+    ],
+  );
+});
+
+test("Calendly removal reference guard refuses a deleted path embedded in a JSON script", async () => {
+  const entries = await installedEntries("portfolio");
+  const consumerPath = "scripts/custom-tasks.json";
+  entries.set(
+    consumerPath,
+    JSON.stringify({
+      scripts: {
+        check:
+          "node apps/web/src/integrations/booking-calendly/booking-content.ts",
+      },
+    }),
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.issues.map(({ code, path }) => ({ code, path })),
+    [
+      {
+        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+        path: [consumerPath],
+      },
+    ],
+  );
+});
+
 test("Calendly removal reference guard fingerprints heuristic, dynamic, and coverage review paths", async () => {
   const entries = await installedEntries("portfolio");
   entries.set(

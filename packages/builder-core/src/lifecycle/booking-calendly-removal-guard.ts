@@ -25,6 +25,7 @@ const sourceExtensions = [
 const parsedExtensions = new Set([...sourceExtensions, ".json"]);
 const exactConfigurationAndScriptExtensions = new Set([
   ".bash",
+  ".json",
   ".jsonc",
   ".sh",
   ".toml",
@@ -32,7 +33,13 @@ const exactConfigurationAndScriptExtensions = new Set([
   ".yml",
   ".zsh",
 ]);
-const runtimeSpecifierExtensions = [".cjs", ".js", ".jsx", ".mjs"] as const;
+const virtualRepositoryRoot = "/repository";
+const moduleResolutionOptions: ts.CompilerOptions = {
+  allowJs: true,
+  module: ts.ModuleKind.ESNext,
+  moduleResolution: ts.ModuleResolutionKind.Bundler,
+  resolveJsonModule: true,
+};
 const referenceToken = /(?:booking-calendly|calendly)/iu;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -62,6 +69,11 @@ type ProjectedAction = Readonly<{
     | "replace-file"
     | "replace-project-configuration";
   path: string;
+}>;
+
+type RepositoryModuleResolution = Readonly<{
+  files: ReadonlySet<string>;
+  directories: ReadonlySet<string>;
 }>;
 
 function compareText(left: string, right: string): number {
@@ -132,42 +144,71 @@ function localSpecifierBase(
     : undefined;
 }
 
-function deletedSpecifierTargets(
-  deletedPaths: ReadonlySet<string>,
-): ReadonlySet<string> {
-  const targets = new Set<string>();
+function repositoryModuleResolution(
+  entries: readonly GitRepositoryInventoryEntry[],
+): RepositoryModuleResolution {
+  const files = new Set<string>();
+  const directories = new Set([virtualRepositoryRoot]);
 
-  for (const path of deletedPaths) {
-    targets.add(path);
-    const extension = posix.extname(path);
-
-    if (extension !== "") {
-      const base = path.slice(0, -extension.length);
-      targets.add(base);
-      if (sourceExtensions.includes(extension as typeof sourceExtensions[number])) {
-        for (const runtimeExtension of runtimeSpecifierExtensions) {
-          targets.add(`${base}${runtimeExtension}`);
-        }
-      }
+  for (const entry of entries) {
+    if (entry.kind !== "file") {
+      continue;
     }
 
-    const basename = posix.basename(path, extension);
-    if (basename === "index") {
-      targets.add(posix.dirname(path));
+    files.add(posix.join(virtualRepositoryRoot, entry.path));
+    let directory = posix.dirname(entry.path);
+    while (directory !== ".") {
+      directories.add(posix.join(virtualRepositoryRoot, directory));
+      directory = posix.dirname(directory);
     }
   }
 
-  return targets;
+  return { files, directories };
 }
 
 function resolvesToDeletedPath(
   sourcePath: string,
   specifier: string,
-  targets: ReadonlySet<string>,
-  availablePaths: ReadonlySet<string>,
+  deletedPaths: ReadonlySet<string>,
+  resolution: RepositoryModuleResolution,
 ): boolean {
   const base = localSpecifierBase(sourcePath, specifier);
-  return base !== undefined && !availablePaths.has(base) && targets.has(base);
+  if (base === undefined) {
+    return false;
+  }
+  if (deletedPaths.has(base)) {
+    return true;
+  }
+
+  const containingFile = posix.join(virtualRepositoryRoot, sourcePath);
+  const target = posix.join(virtualRepositoryRoot, base);
+  const relativeTarget = posix.relative(posix.dirname(containingFile), target);
+  const localSpecifier = relativeTarget.startsWith(".")
+    ? relativeTarget
+    : `./${relativeTarget}`;
+  const resolved = ts.resolveModuleName(
+    localSpecifier,
+    containingFile,
+    moduleResolutionOptions,
+    {
+      fileExists: (path) => resolution.files.has(posix.normalize(path)),
+      readFile: () => undefined,
+      directoryExists: (path) =>
+        resolution.directories.has(posix.normalize(path)),
+      realpath: (path) => path,
+    },
+  ).resolvedModule?.resolvedFileName;
+
+  if (resolved === undefined) {
+    return false;
+  }
+
+  const repositoryPath = posix.relative(
+    virtualRepositoryRoot,
+    posix.normalize(resolved),
+  );
+  return safeRelativePathSchema.safeParse(repositoryPath).success &&
+    deletedPaths.has(repositoryPath);
 }
 
 function literalText(expression: ts.Expression | undefined): string | undefined {
@@ -191,8 +232,8 @@ function isRequireCall(expression: ts.LeftHandSideExpression): boolean {
 function analyzeParsedSource(input: Readonly<{
   path: string;
   source: string;
-  deletedTargets: ReadonlySet<string>;
-  availablePaths: ReadonlySet<string>;
+  deletedPaths: ReadonlySet<string>;
+  resolution: RepositoryModuleResolution;
 }>): Readonly<{ exact: boolean; dynamic: boolean }> {
   const sourceFile = ts.createSourceFile(
     input.path,
@@ -209,8 +250,8 @@ function analyzeParsedSource(input: Readonly<{
       resolvesToDeletedPath(
         input.path,
         value,
-        input.deletedTargets,
-        input.availablePaths,
+        input.deletedPaths,
+        input.resolution,
       )
     ) {
       exact = true;
@@ -245,6 +286,17 @@ function analyzeParsedSource(input: Readonly<{
     }
 
     ts.forEachChild(node, visit);
+  }
+
+  for (const reference of [
+    ...sourceFile.referencedFiles,
+    ...sourceFile.typeReferenceDirectives,
+    ...sourceFile.libReferenceDirectives,
+  ]) {
+    inspectSpecifier(reference.fileName);
+  }
+  for (const dependency of sourceFile.amdDependencies) {
+    inspectSpecifier(dependency.path);
   }
 
   visit(sourceFile);
@@ -308,12 +360,7 @@ export async function guardBookingCalendlyRemovalReferences(input: Readonly<{
     }
   }
 
-  const deletedTargets = deletedSpecifierTargets(deletedPaths);
-  const availablePaths = new Set(
-    input.inventory.entries.flatMap((entry) =>
-      deletedPaths.has(entry.path) ? [] : [entry.path],
-    ),
-  );
+  const moduleResolution = repositoryModuleResolution(input.inventory.entries);
   const conflicts = new Set<string>();
   const warnings: CapabilityRemovalReferenceWarning[] = input.inventory.truncated
     ? [coverageWarning()]
@@ -355,8 +402,8 @@ export async function guardBookingCalendlyRemovalReferences(input: Readonly<{
       const analysis = analyzeParsedSource({
         path: entry.path,
         source: read.content,
-        deletedTargets,
-        availablePaths,
+        deletedPaths,
+        resolution: moduleResolution,
       });
       if (analysis.exact) {
         conflicts.add(entry.path);
