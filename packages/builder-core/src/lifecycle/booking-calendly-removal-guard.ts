@@ -23,6 +23,12 @@ const sourceExtensions = [
   ".tsx",
 ] as const;
 const parsedExtensions = new Set([...sourceExtensions, ".json"]);
+const typescriptResolutionExtensions = new Set([
+  ".cts",
+  ".mts",
+  ".ts",
+  ".tsx",
+]);
 const exactConfigurationAndScriptExtensions = new Set([
   ".bash",
   ".json",
@@ -178,6 +184,13 @@ function resolvesToDeletedPath(
   }
   if (deletedPaths.has(base)) {
     return true;
+  }
+  if (
+    !typescriptResolutionExtensions.has(
+      posix.extname(sourcePath).toLowerCase(),
+    )
+  ) {
+    return false;
   }
 
   const containingFile = posix.join(virtualRepositoryRoot, sourcePath);

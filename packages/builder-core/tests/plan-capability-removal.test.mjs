@@ -383,11 +383,11 @@ test("Calendly removal reference guard refuses every exact surviving code consum
     ],
     [
       "apps/web/src/consumers/commonjs.cjs",
-      'require("../integrations/booking-calendly/booking-content");\n',
+      'require("../integrations/booking-calendly/booking-content.ts");\n',
     ],
     [
       "apps/web/src/consumers/resolve.cjs",
-      'require.resolve("../integrations/booking-calendly/booking-settings");\n',
+      'require.resolve("../integrations/booking-calendly/booking-settings.ts");\n',
     ],
     [
       "apps/web/src/consumers/dynamic.ts",
@@ -460,6 +460,22 @@ test("Calendly removal reference guard prefers a deleted TypeScript source over 
       },
     ],
   );
+});
+
+test("Calendly removal reference guard honors an explicit surviving JavaScript target for CommonJS", async () => {
+  const entries = await installedEntries("portfolio");
+  entries.set(
+    "apps/web/src/integrations/booking-calendly/custom-consumer.cjs",
+    'require("./booking-content.js");\n',
+  );
+  entries.set(
+    "apps/web/src/integrations/booking-calendly/booking-content.js",
+    "module.exports = { readBookingContent: () => undefined };\n",
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, true);
 });
 
 test("Calendly removal reference guard refuses an exact triple-slash path reference", async () => {
