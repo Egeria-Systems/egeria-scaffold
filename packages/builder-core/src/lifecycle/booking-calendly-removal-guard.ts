@@ -275,6 +275,14 @@ function analyzeParsedSource(input: Readonly<{
       inspectSpecifier(node.moduleSpecifier.text, true);
     }
 
+    if (
+      ts.isImportTypeNode(node) &&
+      ts.isLiteralTypeNode(node.argument) &&
+      ts.isStringLiteralLike(node.argument.literal)
+    ) {
+      inspectSpecifier(node.argument.literal.text, true);
+    }
+
     if (ts.isCallExpression(node)) {
       const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
       const isRequire = isRequireCall(node.expression);

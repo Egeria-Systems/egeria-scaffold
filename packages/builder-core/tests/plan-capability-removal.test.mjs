@@ -501,6 +501,29 @@ test("Calendly removal reference guard resolves extensionless JavaScript ESM imp
   );
 });
 
+test("Calendly removal reference guard resolves extensionless TypeScript import types through the bundler", async () => {
+  const entries = await installedEntries("portfolio");
+  const consumerPath =
+    "apps/web/src/integrations/booking-calendly/custom-types.ts";
+  entries.set(
+    consumerPath,
+    'export type BookingContent = import("./booking-content").BookingContent;\n',
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.issues.map(({ code, path }) => ({ code, path })),
+    [
+      {
+        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+        path: [consumerPath],
+      },
+    ],
+  );
+});
+
 test("Calendly removal reference guard refuses an exact triple-slash path reference", async () => {
   const entries = await installedEntries("portfolio");
   const consumerPath =
