@@ -159,13 +159,13 @@ test("the private package manifests expose only their approved runtime boundarie
         "pnpm run build && pnpm run schema:check && pnpm run test && pnpm run typecheck && pnpm run lint",
     },
     dependencies: {
+      typescript: "6.0.3",
       yaml: "2.9.0",
       zod: "4.4.3",
     },
     devDependencies: {
       "@egeria-systems/standards": "workspace:*",
       "@types/node": "22.20.1",
-      typescript: "6.0.3",
     },
   });
 });
@@ -281,6 +281,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "lifecycle/apply-capability-upgrade.ts",
       "lifecycle/apply-profile-transition.ts",
       "lifecycle/atomic-file-change-writer.ts",
+      "lifecycle/booking-calendly-removal-guard.ts",
       "lifecycle/capability-addition-writer.ts",
       "lifecycle/capability-removal-file-operation.ts",
       "lifecycle/capability-removal-writer.ts",
