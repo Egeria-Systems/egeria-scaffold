@@ -21,12 +21,12 @@
     "verify": "pnpm run build && pnpm run schema:check && pnpm run test && pnpm run typecheck && pnpm run lint"
   },
   "dependencies": {
+    "typescript": "6.0.3",
     "yaml": "2.9.0",
     "zod": "4.4.3"
   },
   "devDependencies": {
     "@egeria-systems/standards": "workspace:*",
-    "@types/node": "22.20.1",
-    "typescript": "6.0.3"
+    "@types/node": "22.20.1"
   }
 }
