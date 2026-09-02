@@ -524,6 +524,34 @@ test("Calendly removal reference guard resolves extensionless TypeScript import 
   );
 });
 
+test("Calendly removal reference guard resolves TypeScript module augmentations and import-equals declarations", async () => {
+  const entries = await installedEntries("portfolio");
+  const consumers = new Map([
+    [
+      "apps/web/src/integrations/booking-calendly/custom-augmentation.ts",
+      'export {}; declare module "./booking-content" { interface BookingContent {} }\n',
+    ],
+    [
+      "apps/web/src/integrations/booking-calendly/custom-import-equals.ts",
+      'import BookingContent = require("./booking-content"); void BookingContent;\n',
+    ],
+  ]);
+  for (const [path, source] of consumers) {
+    entries.set(path, source);
+  }
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.issues.map(({ code, path }) => ({ code, path })),
+    [...consumers.keys()].sort(compareText).map((path) => ({
+      code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+      path: [path],
+    })),
+  );
+});
+
 test("Calendly removal reference guard refuses an exact triple-slash path reference", async () => {
   const entries = await installedEntries("portfolio");
   const consumerPath =

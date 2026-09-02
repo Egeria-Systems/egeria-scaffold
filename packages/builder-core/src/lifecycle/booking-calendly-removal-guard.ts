@@ -283,6 +283,18 @@ function analyzeParsedSource(input: Readonly<{
       inspectSpecifier(node.argument.literal.text, true);
     }
 
+    if (ts.isModuleDeclaration(node) && ts.isStringLiteralLike(node.name)) {
+      inspectSpecifier(node.name.text, true);
+    }
+
+    if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference) &&
+      ts.isStringLiteralLike(node.moduleReference.expression)
+    ) {
+      inspectSpecifier(node.moduleReference.expression.text, true);
+    }
+
     if (ts.isCallExpression(node)) {
       const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
       const isRequire = isRequireCall(node.expression);
