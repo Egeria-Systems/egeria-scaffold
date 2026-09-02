@@ -192,6 +192,26 @@ function createSnapshotReader(entries, overrides = new Map()) {
   };
 }
 
+function inventoryFromEntries(entries, options = {}) {
+  const kindByPath = options.kindByPath ?? new Map();
+  const paths = [...new Set([
+    ...entries.keys(),
+    ...(options.additionalPaths ?? []),
+  ])].sort(compareText);
+
+  return {
+    ok: true,
+    value: {
+      entries: paths.map((path) => ({
+        path,
+        kind: kindByPath.get(path) ?? "file",
+        source: "tracked",
+      })),
+      truncated: options.truncated ?? false,
+    },
+  };
+}
+
 async function planFromEntries(entries, options = {}) {
   const snapshotReader = createSnapshotReader(entries, options.overrides);
   const before = snapshotReader.snapshot();
@@ -201,6 +221,9 @@ async function planFromEntries(entries, options = {}) {
       reader: snapshotReader.reader,
       git: options.git ?? git,
       capability: options.capability ?? "booking-calendly",
+      inspectRepositoryInventory:
+        options.inspectRepositoryInventory ??
+        (() => Promise.resolve(inventoryFromEntries(entries, options.inventory))),
     });
   } finally {
     assert.equal(snapshotReader.snapshot(), before);
@@ -265,17 +288,42 @@ function expectedActions(overrides = new Map()) {
   return actions.sort((left, right) => compareText(left.path, right.path));
 }
 
+const expectedCalendlyReferenceWarningRequirement = Object.freeze({
+  code: "review-capability-removal-reference-warnings",
+  warnings: Object.freeze([
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+      path: "README.md",
+    }),
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+      path: "apps/web/AGENTS.md",
+    }),
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+      path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+    }),
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+      path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+    }),
+  ]),
+});
+
+const expectedCalendlyReviewRequirements = Object.freeze([
+  Object.freeze({
+    code: "review-surviving-references-to-removed-surfaces",
+    scope: "repository",
+  }),
+  expectedCalendlyReferenceWarningRequirement,
+]);
+
 function expectedPlan(
   profile,
   planFingerprint,
   currentCapabilities,
   actionOverrides,
-  reviewRequirements = [
-    {
-      code: "review-surviving-references-to-removed-surfaces",
-      scope: "repository",
-    },
-  ],
+  reviewRequirements = expectedCalendlyReviewRequirements,
 ) {
   return {
     operation: "remove-capability",
@@ -320,6 +368,382 @@ const expectedCurrentCapabilities = Object.freeze({
     "site-routing",
     "standards",
   ]),
+});
+
+test("Calendly removal reference guard refuses every exact surviving code consumer by path", async () => {
+  const entries = await installedEntries("portfolio");
+  const consumers = new Map([
+    [
+      "apps/web/src/consumers/alias-import.ts",
+      'import { CalendlyBooking } from "@/src/integrations/booking-calendly/calendly-booking";\n',
+    ],
+    [
+      "apps/web/src/consumers/relative-export.ts",
+      'export { CalendlyBooking } from "../integrations/booking-calendly/calendly-booking";\n',
+    ],
+    [
+      "apps/web/src/consumers/commonjs.cjs",
+      'require("../integrations/booking-calendly/booking-content.ts");\n',
+    ],
+    [
+      "apps/web/src/consumers/resolve.cjs",
+      'require.resolve("../integrations/booking-calendly/booking-settings.ts");\n',
+    ],
+    [
+      "apps/web/src/consumers/dynamic.ts",
+      'void import("@/src/integrations/booking-calendly/calendly-booking");\n',
+    ],
+    [
+      "apps/web/src/consumers/query-import.ts",
+      'void import("@/content/en-CA/booking-calendly.yaml?raw");\n',
+    ],
+    [
+      "apps/web/src/consumers/runtime-extension-import.ts",
+      'import { readBookingContent } from "../integrations/booking-calendly/booking-content.js";\n',
+    ],
+    [
+      "apps/web/src/consumers/path-literal.ts",
+      'export const source = "apps/web/content/en-CA/booking-calendly.yaml";\n',
+    ],
+    [
+      "apps/web/config/booking.yaml",
+      "source: apps/web/content/en-CA/booking-calendly.yaml\n",
+    ],
+    [
+      "scripts/check-booking.sh",
+      "test -f apps/web/src/integrations/booking-calendly/booking-settings.ts\n",
+    ],
+  ]);
+
+  for (const [path, source] of consumers) {
+    entries.set(path, source);
+  }
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.issues.map(({ code, path }) => ({ code, path })),
+    [...consumers.keys()].sort(compareText).map((path) => ({
+      code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+      path: [path],
+    })),
+  );
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    /CalendlyBooking|booking-content|booking-settings|private|refs\/heads/u,
+  );
+});
+
+test("Calendly removal reference guard prefers a deleted TypeScript source over a surviving runtime-extension fallback", async () => {
+  const entries = await installedEntries("portfolio");
+  const consumerPath =
+    "apps/web/src/integrations/booking-calendly/custom-consumer.ts";
+  entries.set(
+    consumerPath,
+    'import { readBookingContent } from "./booking-content.js";\n',
+  );
+  entries.set(
+    "apps/web/src/integrations/booking-calendly/booking-content.js",
+    "export const readBookingContent = () => undefined;\n",
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.issues.map(({ code, path }) => ({ code, path })),
+    [
+      {
+        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+        path: [consumerPath],
+      },
+    ],
+  );
+});
+
+test("Calendly removal reference guard honors an explicit surviving JavaScript target for CommonJS", async () => {
+  const entries = await installedEntries("portfolio");
+  entries.set(
+    "apps/web/src/integrations/booking-calendly/custom-consumer.cjs",
+    'require("./booking-content.js");\n',
+  );
+  entries.set(
+    "apps/web/src/integrations/booking-calendly/booking-content.js",
+    "module.exports = { readBookingContent: () => undefined };\n",
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, true);
+});
+
+test("Calendly removal reference guard resolves extensionless JavaScript ESM imports through the bundler", async () => {
+  const entries = await installedEntries("portfolio");
+  const consumerPath =
+    "apps/web/src/integrations/booking-calendly/custom-consumer.jsx";
+  entries.set(
+    consumerPath,
+    'import { readBookingContent } from "./booking-content";\n',
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.issues.map(({ code, path }) => ({ code, path })),
+    [
+      {
+        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+        path: [consumerPath],
+      },
+    ],
+  );
+});
+
+test("Calendly removal reference guard resolves extensionless TypeScript import types through the bundler", async () => {
+  const entries = await installedEntries("portfolio");
+  const consumerPath =
+    "apps/web/src/integrations/booking-calendly/custom-types.ts";
+  entries.set(
+    consumerPath,
+    'export type BookingContent = import("./booking-content").BookingContent;\n',
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.issues.map(({ code, path }) => ({ code, path })),
+    [
+      {
+        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+        path: [consumerPath],
+      },
+    ],
+  );
+});
+
+test("Calendly removal reference guard resolves TypeScript module augmentations and import-equals declarations", async () => {
+  const entries = await installedEntries("portfolio");
+  const consumers = new Map([
+    [
+      "apps/web/src/integrations/booking-calendly/custom-augmentation.ts",
+      'export {}; declare module "./booking-content" { interface BookingContent {} }\n',
+    ],
+    [
+      "apps/web/src/integrations/booking-calendly/custom-import-equals.ts",
+      'import BookingContent = require("./booking-content"); void BookingContent;\n',
+    ],
+  ]);
+  for (const [path, source] of consumers) {
+    entries.set(path, source);
+  }
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.issues.map(({ code, path }) => ({ code, path })),
+    [...consumers.keys()].sort(compareText).map((path) => ({
+      code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+      path: [path],
+    })),
+  );
+});
+
+test("Calendly removal reference guard does not treat an ambient module declaration as a consumer", async () => {
+  const entries = await installedEntries("portfolio");
+  entries.set(
+    "apps/web/src/custom-ambient.d.ts",
+    'declare module "apps/web/src/integrations/booking-calendly/booking-content" { export interface BookingContent {} }\n',
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, true);
+});
+
+test("Calendly removal reference guard refuses an exact triple-slash path reference", async () => {
+  const entries = await installedEntries("portfolio");
+  const consumerPath =
+    "apps/web/src/integrations/booking-calendly/custom-types.d.ts";
+  entries.set(
+    consumerPath,
+    '/// <reference path="./booking-content.ts" />\n',
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.issues.map(({ code, path }) => ({ code, path })),
+    [
+      {
+        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+        path: [consumerPath],
+      },
+    ],
+  );
+});
+
+test("Calendly removal reference guard refuses a deleted path embedded in a JSON script", async () => {
+  const entries = await installedEntries("portfolio");
+  const consumerPath = "scripts/custom-tasks.json";
+  entries.set(
+    consumerPath,
+    JSON.stringify({
+      scripts: {
+        check:
+          "node apps/web/src/integrations/booking-calendly/booking-content.ts",
+      },
+    }),
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(
+    result.issues.map(({ code, path }) => ({ code, path })),
+    [
+      {
+        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+        path: [consumerPath],
+      },
+    ],
+  );
+});
+
+test("Calendly removal reference guard fingerprints heuristic, dynamic, and coverage review paths", async () => {
+  const entries = await installedEntries("portfolio");
+  entries.set(
+    "apps/web/src/comment-only.ts",
+    "// booking-calendly remains a manual review candidate, not an exact import\n",
+  );
+  entries.set(
+    "apps/web/src/dynamic-loader.ts",
+    "export const load = (modulePath: string) => import(modulePath);\n",
+  );
+  entries.set("apps/web/src/binary.ts", "valid-prefix\0binary-suffix");
+  entries.set("apps/web/src/invalid.ts", {
+    kind: "error",
+    code: "FILE_ENCODING_INVALID",
+  });
+  entries.set("apps/web/src/oversized.ts", {
+    kind: "error",
+    code: "FILE_TOO_LARGE",
+  });
+
+  const result = await planFromEntries(entries, {
+    inventory: {
+      additionalPaths: ["linked-config.ts", "vendor/repository"],
+      kindByPath: new Map([
+        ["linked-config.ts", "symlink"],
+        ["vendor/repository", "gitlink"],
+      ]),
+      truncated: true,
+    },
+  });
+
+  assert.equal(result.ok, true, JSON.stringify(result.issues));
+  assert.deepEqual(result.value.reviewRequirements, [
+    {
+      code: "review-surviving-references-to-removed-surfaces",
+      scope: "repository",
+    },
+    {
+      code: "review-capability-removal-reference-warnings",
+      warnings: [
+        {
+          code: "CAPABILITY_REMOVAL_DYNAMIC_REFERENCE_POSSIBLE",
+          path: "apps/web/src/dynamic-loader.ts",
+        },
+        {
+          code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+          path: "README.md",
+        },
+        {
+          code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+          path: "apps/web/AGENTS.md",
+        },
+        {
+          code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+          path: "apps/web/src/comment-only.ts",
+        },
+        {
+          code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+        },
+        {
+          code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+          path: "apps/web/src/binary.ts",
+        },
+        {
+          code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+          path: "apps/web/src/invalid.ts",
+        },
+        {
+          code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+          path: "apps/web/src/oversized.ts",
+        },
+        {
+          code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+          path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+        },
+        {
+          code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+          path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+        },
+        {
+          code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+          path: "linked-config.ts",
+        },
+        {
+          code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+          path: "vendor/repository",
+        },
+      ],
+    },
+  ]);
+});
+
+test("Calendly removal reference guard refuses invalid Git inventory without private output", async () => {
+  const entries = await installedEntries("portfolio");
+  const result = await planFromEntries(entries, {
+    inspectRepositoryInventory: () =>
+      Promise.resolve({
+        ok: false,
+        code: "GIT_REPOSITORY_INVENTORY_INVALID",
+        detail: "private inventory failure",
+      }),
+  });
+
+  assertFailure(result, "CAPABILITY_REMOVAL_INVENTORY_INVALID");
+});
+
+test("Calendly removal reference guard marks aggregate scan truncation for manual review", async () => {
+  const entries = await installedEntries("portfolio");
+  const chunk = "x".repeat(1024 * 1024);
+  for (let index = 0; index < 33; index += 1) {
+    entries.set(
+      `apps/web/src/aggregate/file-${String(index).padStart(2, "0")}.txt`,
+      chunk,
+    );
+  }
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, true, JSON.stringify(result.issues));
+  const warnings = result.value.reviewRequirements.find(
+    ({ code }) => code === "review-capability-removal-reference-warnings",
+  )?.warnings;
+  assert.equal(
+    warnings.some(
+      (warning) =>
+        warning.code === "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE" &&
+        warning.path === undefined,
+    ),
+    true,
+  );
 });
 
 test("analytics removal restores the composed layout and requires provider disposition review", async () => {
@@ -506,10 +930,7 @@ test("capability removal plan preserves modified and already-ejected application
       expectedCurrentCapabilities.portfolio,
       new Map([[modifiedPath, preservedAction]]),
       [
-        {
-          code: "review-surviving-references-to-removed-surfaces",
-          scope: "repository",
-        },
+        ...expectedCalendlyReviewRequirements,
         {
           code: "reconcile-preserved-capability-surfaces",
           paths: [modifiedPath],
@@ -523,6 +944,7 @@ test("capability removal plan preserves modified and already-ejected application
     await installedEntries("portfolio"),
     [modifiedPath],
   );
+  alreadyEjected.set(modifiedPath, "private preserved application source\n");
   const ejectedResult = await planFromEntries(alreadyEjected);
   assert.equal(ejectedResult.ok, true, JSON.stringify(ejectedResult.issues));
   assert.deepEqual(
@@ -530,10 +952,7 @@ test("capability removal plan preserves modified and already-ejected application
     expectedActions(new Map([[modifiedPath, preservedAction]])),
   );
   assert.deepEqual(ejectedResult.value.reviewRequirements, [
-    {
-      code: "review-surviving-references-to-removed-surfaces",
-      scope: "repository",
-    },
+    ...expectedCalendlyReviewRequirements,
     {
       code: "reconcile-preserved-capability-surfaces",
       paths: [modifiedPath],
@@ -559,6 +978,7 @@ test("capability removal plan reconciles every preserved path in deterministic o
     await installedEntries("portfolio"),
     [alreadyEjectedPath],
   );
+  entries.set(alreadyEjectedPath, "private preserved application source\n");
   entries.set(modifiedPath, "private application customization\n");
 
   const result = await planFromEntries(entries);
@@ -580,10 +1000,7 @@ test("capability removal plan reconciles every preserved path in deterministic o
         [modifiedPath, preservedAction(modifiedPath)],
       ]),
       [
-        {
-          code: "review-surviving-references-to-removed-surfaces",
-          scope: "repository",
-        },
+        ...expectedCalendlyReviewRequirements,
         {
           code: "reconcile-preserved-capability-surfaces",
           paths: [alreadyEjectedPath, modifiedPath],

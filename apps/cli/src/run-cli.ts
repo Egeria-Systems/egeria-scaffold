@@ -10,6 +10,7 @@ import {
   doctorRepository,
   generateProject,
   inspectGitCreateTargets as inspectGitCreateTargetsDefault,
+  inspectGitRepositoryInventory as inspectGitRepositoryInventoryDefault,
   inferRepository,
   inspectGitWorktree as inspectGitWorktreeDefault,
   planCapabilityAddition,
@@ -30,6 +31,7 @@ import {
   type ProfileTransitionPlanningFailureCode,
   type GeneratedProjectVerifier,
   type GitCreateTargetInspection,
+  type GitRepositoryInventoryInspection,
   type GitWorktreeInspection,
   type PlanningFailureCode,
   type RepositoryReader,
@@ -65,6 +67,9 @@ type CliRunnerDependencies = Readonly<{
     root: string;
     paths: readonly string[];
   }>): Promise<GitCreateTargetInspection>;
+  inspectGitRepositoryInventory?(input: Parameters<
+    typeof inspectGitRepositoryInventoryDefault
+  >[0]): Promise<GitRepositoryInventoryInspection>;
   inspectGitWorktree?(input: Readonly<{ root: string }>): Promise<GitWorktreeInspection>;
 }>;
 
@@ -112,6 +117,8 @@ const removalPlannerRefusalCodes =
     "PROJECT_DRIFT_DETECTED",
     "PROJECT_EJECTION_INVALID",
     "CAPABILITY_NOT_INSTALLED",
+    "CAPABILITY_REMOVAL_INVENTORY_INVALID",
+    "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
     "CAPABILITY_REMOVAL_UNSUPPORTED",
   ]);
 
@@ -306,6 +313,7 @@ function writePlanRemoveRefusal(
   output: CliOutput,
   code: string,
   capability: Extract<CliCommand, Readonly<{ kind: "plan-remove" }>>["capability"],
+  conflicts: readonly string[] = [],
 ): 1 {
   writeJson(output.writeError, {
     ok: false,
@@ -313,6 +321,10 @@ function writePlanRemoveRefusal(
     code,
     ...(code === "CAPABILITY_NOT_INSTALLED"
       ? { capability }
+      : {}),
+    ...(code === "CAPABILITY_REMOVAL_REFERENCE_CONFLICT" &&
+    conflicts.length > 0
+      ? { conflicts }
       : {}),
   });
   return 1;
@@ -475,6 +487,9 @@ async function runPlanRemove(
         reader,
         git: initialGit,
         capability: command.capability,
+        inspectRepositoryInventory:
+          dependencies.inspectGitRepositoryInventory ??
+          inspectGitRepositoryInventoryDefault,
       }),
     };
   } catch {
@@ -501,12 +516,17 @@ async function runPlanRemove(
 
   if (!outcome.result.ok) {
     const code = outcome.result.issues[0]?.code;
+    const conflicts = outcome.result.issues.flatMap((issue) => {
+      const path = issue.path.length === 1 ? issue.path[0] : undefined;
+      return typeof path === "string" ? [path] : [];
+    });
     return writePlanRemoveRefusal(
       output,
       code !== undefined && isRemovalPlannerRefusalCode(code)
         ? code
         : "REPOSITORY_OPEN_FAILED",
       command.capability,
+      conflicts,
     );
   }
 
@@ -771,6 +791,9 @@ async function runApplyRemove(
       ok: false,
       command: "apply-remove",
       code: result.code,
+      ...(result.conflicts === undefined
+        ? {}
+        : { conflicts: result.conflicts }),
       ...(result.code === "CAPABILITY_NOT_INSTALLED"
         ? { capability: command.capability }
         : { phase: result.phase, recovery: result.recovery }),

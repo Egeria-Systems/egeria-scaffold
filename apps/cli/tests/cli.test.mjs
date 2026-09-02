@@ -185,7 +185,44 @@ function expectedAdditionPlan(profile, revision, planFingerprint, mode = "popup"
   };
 }
 
-function expectedRemovalPlan(profile, revision, planFingerprint) {
+const manualRemovalReviewRequirements = Object.freeze([
+  Object.freeze({
+    code: "review-surviving-references-to-removed-surfaces",
+    scope: "repository",
+  }),
+]);
+
+const generatedRemovalReviewRequirements = Object.freeze([
+  ...manualRemovalReviewRequirements,
+  Object.freeze({
+    code: "review-capability-removal-reference-warnings",
+    warnings: Object.freeze([
+      Object.freeze({
+        code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+        path: "README.md",
+      }),
+      Object.freeze({
+        code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+        path: "apps/web/AGENTS.md",
+      }),
+      Object.freeze({
+        code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+        path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      }),
+      Object.freeze({
+        code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+        path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      }),
+    ]),
+  }),
+]);
+
+function expectedRemovalPlan(
+  profile,
+  revision,
+  planFingerprint,
+  reviewRequirements = generatedRemovalReviewRequirements,
+) {
   const desiredCapabilities = [
     "content-files",
     "deployment-cloudflare",
@@ -251,12 +288,7 @@ function expectedRemovalPlan(profile, revision, planFingerprint) {
         owner: "booking-calendly",
       },
     ],
-    reviewRequirements: [
-      {
-        code: "review-surviving-references-to-removed-surfaces",
-        scope: "repository",
-      },
-    ],
+    reviewRequirements,
     requiredApprovals: ["transform", "verified-final-diff"],
     persistenceOrder: [
       "transform",
@@ -2583,6 +2615,11 @@ test("plan-remove emits the complete approval-required plan after two matching i
       createVerifier: createFakeVerifier,
       createReader: () => core.createFileSystemRepositoryReader(directory),
       inspectGitWorktree: () => Promise.resolve(inspections.shift()),
+      inspectGitRepositoryInventory: () =>
+        Promise.resolve({
+          ok: true,
+          value: { entries: [], truncated: false },
+        }),
     });
     const captured = captureOutput();
 
@@ -2604,6 +2641,7 @@ test("plan-remove emits the complete approval-required plan after two matching i
         "portfolio",
         inspection.identity.revision,
         emitted.plan.planFingerprint,
+        manualRemovalReviewRequirements,
       ),
     });
     assert.doesNotMatch(
@@ -5533,7 +5571,45 @@ test("the compiled CLI refuses duplicate analytics addition without repository m
   }
 });
 
-test("the compiled CLI completes exact add-remove-re-add transactions", async () => {
+test("the compiled CLI reports path-only Calendly removal reference conflicts", async () => {
+  await withGitFixture(
+    "portfolio",
+    async ({ linked, primary }) => {
+      const conflictPath = "apps/web/src/surviving-booking-consumer.ts";
+      await writeFile(
+        join(linked, conflictPath),
+        'export { CalendlyBooking } from "@/src/integrations/booking-calendly/calendly-booking";\n',
+        "utf8",
+      );
+      await commitAll(linked, "add surviving booking consumer");
+      const linkedBefore = await gitRepositorySnapshot(linked);
+      const primaryBefore = await gitRepositorySnapshot(primary);
+
+      const execution = await executeBuilt(planRemoveArguments(linked));
+
+      assert.equal(execution.exitCode, 1);
+      assert.equal(execution.stdout, "");
+      assert.deepEqual(JSON.parse(execution.stderr), {
+        ok: false,
+        command: "plan-remove",
+        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+        conflicts: [conflictPath],
+      });
+      assert.deepEqual(await gitRepositorySnapshot(linked), linkedBefore);
+      assert.deepEqual(await gitRepositorySnapshot(primary), primaryBefore);
+      assert.doesNotMatch(
+        execution.stderr,
+        /CalendlyBooking|calendly-booking|refs\/heads|\.git\/worktrees/u,
+      );
+    },
+    {
+      bookingCalendly: planSettings,
+      branch: "calendly-reference-conflict-test",
+    },
+  );
+});
+
+test("the compiled CLI reports Calendly reference warnings and completes exact add-remove-re-add transactions", async () => {
   for (const profile of ["portfolio", "site"]) {
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = await gitRepositorySnapshot(primary);
@@ -5637,6 +5713,33 @@ test("the compiled CLI completes exact add-remove-re-add transactions", async ()
       const removalPlanExecution = await executeBuilt(planRemoveArguments(linked));
       assert.equal(removalPlanExecution.exitCode, 0, removalPlanExecution.stderr);
       const removalPlan = JSON.parse(removalPlanExecution.stdout).plan;
+      assert.deepEqual(removalPlan.reviewRequirements, [
+        {
+          code: "review-surviving-references-to-removed-surfaces",
+          scope: "repository",
+        },
+        {
+          code: "review-capability-removal-reference-warnings",
+          warnings: [
+            {
+              code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+              path: "README.md",
+            },
+            {
+              code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+              path: "apps/web/AGENTS.md",
+            },
+            {
+              code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+              path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+            },
+            {
+              code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+              path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+            },
+          ],
+        },
+      ]);
       assert.deepEqual(await gitRepositorySnapshot(linked), cleanAdded);
       assert.deepEqual(
         await listCalendlyReferencePaths(linked),

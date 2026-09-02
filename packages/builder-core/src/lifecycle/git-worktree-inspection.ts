@@ -8,6 +8,7 @@ import { safeRelativePathSchema } from "../contracts/identifiers.js";
 const commandTimeoutMilliseconds = 10_000;
 const maximumCommandOutputBytes = 1024 * 1024;
 const maximumIdentityBytes = 64 * 1024;
+const maximumRepositoryInventoryEntries = 20_000;
 const fixedGlobalOptions = [
   "--no-optional-locks",
   "--no-replace-objects",
@@ -98,6 +99,25 @@ export type GitWorktreeIdentity = Readonly<{
   gitDirectory: string;
   commonDirectory: string;
 }>;
+
+export type GitRepositoryInventoryEntry = Readonly<{
+  path: string;
+  kind: "file" | "symlink" | "gitlink";
+  source: "tracked" | "untracked";
+}>;
+
+export type GitRepositoryInventoryInspection =
+  | Readonly<{
+      ok: true;
+      value: Readonly<{
+        entries: readonly GitRepositoryInventoryEntry[];
+        truncated: boolean;
+      }>;
+    }>
+  | Readonly<{
+      ok: false;
+      code: "GIT_REPOSITORY_INVENTORY_INVALID";
+    }>;
 
 export type GitWorktreeInspection =
   | Readonly<{
@@ -555,6 +575,168 @@ async function runInspectionCommand(
   } catch {
     return undefined;
   }
+}
+
+function decodeInventoryRecord(
+  output: Uint8Array,
+  start: number,
+  end: number,
+): string | undefined {
+  if (end <= start) {
+    return undefined;
+  }
+
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(
+      output.subarray(start, end),
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function parseNulRecords(
+  output: Uint8Array,
+  parseRecord: (record: string) => GitRepositoryInventoryEntry | undefined,
+): readonly GitRepositoryInventoryEntry[] | undefined {
+  if (output.length === 0) {
+    return [];
+  }
+
+  if (
+    output.length > maximumCommandOutputBytes ||
+    output[output.length - 1] !== 0
+  ) {
+    return undefined;
+  }
+
+  const entries: GitRepositoryInventoryEntry[] = [];
+  let offset = 0;
+
+  while (offset < output.length) {
+    const recordEnd = findNul(output, offset);
+    const record = recordEnd < 0
+      ? undefined
+      : decodeInventoryRecord(output, offset, recordEnd);
+    const entry = record === undefined ? undefined : parseRecord(record);
+
+    if (entry === undefined) {
+      return undefined;
+    }
+
+    entries.push(entry);
+    offset = recordEnd + 1;
+  }
+
+  return entries;
+}
+
+function trackedInventoryEntry(
+  record: string,
+): GitRepositoryInventoryEntry | undefined {
+  const match = /^(100644|100755|120000|160000) 0\t(.+)$/u.exec(record);
+
+  if (match === null) {
+    return undefined;
+  }
+
+  const mode = match[1];
+  const path = match[2];
+
+  if (mode === undefined || path === undefined) {
+    return undefined;
+  }
+
+  if (!safeRelativePathSchema.safeParse(path).success) {
+    return undefined;
+  }
+
+  return {
+    path,
+    kind:
+      mode === "120000"
+        ? "symlink"
+        : mode === "160000"
+          ? "gitlink"
+          : "file",
+    source: "tracked",
+  };
+}
+
+function untrackedInventoryEntry(
+  path: string,
+): GitRepositoryInventoryEntry | undefined {
+  return safeRelativePathSchema.safeParse(path).success
+    ? { path, kind: "file", source: "untracked" }
+    : undefined;
+}
+
+export async function inspectGitRepositoryInventory(
+  input: Readonly<{
+    root: string;
+    identity: GitWorktreeIdentity;
+    runGit?: GitCommandRunner;
+  }>,
+): Promise<GitRepositoryInventoryInspection> {
+  if (
+    !isAbsolute(input.root) ||
+    resolve(input.root) !== input.root ||
+    input.identity.root !== input.root
+  ) {
+    return { ok: false, code: "GIT_REPOSITORY_INVENTORY_INVALID" };
+  }
+
+  const runGit = input.runGit ?? createGitCommandRunner();
+  const trackedResult = await runInspectionCommand(runGit, input.root, [
+    "ls-files",
+    "--cached",
+    "--full-name",
+    "-z",
+    "--format=%(objectmode) %(stage)%x09%(path)",
+  ]);
+  const untrackedResult = await runInspectionCommand(runGit, input.root, [
+    "ls-files",
+    "--others",
+    "--exclude-standard",
+    "--full-name",
+    "-z",
+  ]);
+
+  if (
+    trackedResult?.exitCode !== 0 ||
+    untrackedResult?.exitCode !== 0
+  ) {
+    return { ok: false, code: "GIT_REPOSITORY_INVENTORY_INVALID" };
+  }
+
+  const tracked = parseNulRecords(
+    trackedResult.stdout,
+    trackedInventoryEntry,
+  );
+  const untracked = parseNulRecords(
+    untrackedResult.stdout,
+    untrackedInventoryEntry,
+  );
+
+  if (tracked === undefined || untracked === undefined) {
+    return { ok: false, code: "GIT_REPOSITORY_INVENTORY_INVALID" };
+  }
+
+  const entries = [...tracked, ...untracked].sort((left, right) =>
+    left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
+  );
+
+  if (new Set(entries.map(({ path }) => path)).size !== entries.length) {
+    return { ok: false, code: "GIT_REPOSITORY_INVENTORY_INVALID" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      entries: entries.slice(0, maximumRepositoryInventoryEntries),
+      truncated: entries.length > maximumRepositoryInventoryEntries,
+    },
+  };
 }
 
 export async function inspectGitCreateTargets(

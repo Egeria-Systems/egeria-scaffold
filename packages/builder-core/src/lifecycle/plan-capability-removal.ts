@@ -26,7 +26,14 @@ import { profileRecipes } from "../profiles/profile-recipes.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
 import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
 import { serializeProjectYaml } from "../state/codecs.js";
-import type { GitWorktreeInspection } from "./git-worktree-inspection.js";
+import {
+  guardBookingCalendlyRemovalReferences,
+  type CapabilityRemovalReferenceWarning,
+} from "./booking-calendly-removal-guard.js";
+import {
+  inspectGitRepositoryInventory,
+  type GitWorktreeInspection,
+} from "./git-worktree-inspection.js";
 
 export type CapabilityRemovalAction = Readonly<{
   kind:
@@ -58,6 +65,10 @@ export type CapabilityRemovalReviewRequirement =
   | Readonly<{
       code: "review-analytics-provider-and-client-storage-disposition";
       scope: "provider-accounts-retained-data-browser-storage-and-cookies";
+    }>
+  | Readonly<{
+      code: "review-capability-removal-reference-warnings";
+      warnings: readonly CapabilityRemovalReferenceWarning[];
     }>;
 
 export type CapabilityRemovalPlan = Readonly<{
@@ -95,6 +106,8 @@ export type CapabilityRemovalPlanningFailureCode =
   | "PROJECT_DRIFT_DETECTED"
   | "PROJECT_EJECTION_INVALID"
   | "CAPABILITY_NOT_INSTALLED"
+  | "CAPABILITY_REMOVAL_INVENTORY_INVALID"
+  | "CAPABILITY_REMOVAL_REFERENCE_CONFLICT"
   | "CAPABILITY_REMOVAL_UNSUPPORTED";
 
 type PlanningIssue = Omit<ContractIssue, "code"> &
@@ -143,6 +156,19 @@ function planningFailure(
         context: { reason: "precondition-refused" },
       },
     ],
+  };
+}
+
+function referenceConflict(
+  paths: readonly string[],
+): PlanningResult<never> {
+  return {
+    ok: false,
+    issues: paths.map((path) => ({
+      code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+      path: [path],
+      context: { reason: "surviving-reference" },
+    })),
   };
 }
 
@@ -612,6 +638,7 @@ async function deriveActions(input: Readonly<{
 function removalReviewRequirements(
   actions: readonly CapabilityRemovalAction[],
   capability: "analytics" | "booking-calendly" | "multilingual",
+  referenceWarnings: readonly CapabilityRemovalReferenceWarning[],
 ): readonly CapabilityRemovalReviewRequirement[] {
   const preservedPaths = actions
     .flatMap((action) =>
@@ -624,6 +651,14 @@ function removalReviewRequirements(
       code: "review-surviving-references-to-removed-surfaces",
       scope: "repository",
     },
+    ...(referenceWarnings.length === 0
+      ? []
+      : [
+          {
+            code: "review-capability-removal-reference-warnings" as const,
+            warnings: referenceWarnings,
+          },
+        ]),
     ...(capability === "analytics"
       ? [
           {
@@ -668,6 +703,7 @@ export async function planCapabilityRemoval(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: "analytics" | "booking-calendly" | "multilingual";
+  inspectRepositoryInventory?: typeof inspectGitRepositoryInventory;
 }>): Promise<PlanningResult<CapabilityRemovalPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
 
@@ -828,6 +864,37 @@ export async function planCapabilityRemoval(input: Readonly<{
     return actions;
   }
 
+  let referenceWarnings: readonly CapabilityRemovalReferenceWarning[] = [];
+  if (capabilityValue === "booking-calendly") {
+    try {
+      const inventory = await (
+        input.inspectRepositoryInventory ?? inspectGitRepositoryInventory
+      )({
+        root: input.git.identity.root,
+        identity: input.git.identity,
+      });
+
+      if (!inventory.ok) {
+        return planningFailure("CAPABILITY_REMOVAL_INVENTORY_INVALID");
+      }
+
+      const guard = await guardBookingCalendlyRemovalReferences({
+        reader: input.reader,
+        inventory: inventory.value,
+        actions: actions.value,
+        desiredFiles: desiredRender.value.files,
+      });
+
+      if (!guard.ok) {
+        return referenceConflict(guard.conflicts);
+      }
+
+      referenceWarnings = guard.warnings;
+    } catch {
+      return planningFailure("CAPABILITY_REMOVAL_INVENTORY_INVALID");
+    }
+  }
+
   const currentCapabilities = current.value.resolved.capabilities
     .map(({ identifier }) => identifier)
     .sort(compareText);
@@ -849,6 +916,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     reviewRequirements: removalReviewRequirements(
       actions.value,
       capabilityValue,
+      referenceWarnings,
     ),
     requiredApprovals: ["transform", "verified-final-diff"],
     persistenceOrder: [

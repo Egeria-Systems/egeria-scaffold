@@ -243,6 +243,27 @@ function createRepository(entries, options = {}) {
   };
 }
 
+function inventoryInspectorForFiles(files) {
+  return () =>
+    Promise.resolve({
+      ok: true,
+      value: {
+        entries: [...files.keys()].sort(compareText).map((path) => ({
+          path,
+          kind: "file",
+          source: "tracked",
+        })),
+        truncated: false,
+      },
+    });
+}
+
+const inspectEmptyRepositoryInventory = () =>
+  Promise.resolve({
+    ok: true,
+    value: { entries: [], truncated: false },
+  });
+
 async function runAddition(repository) {
   const planned = await core.planCapabilityAddition({
     reader: repository.reader,
@@ -273,6 +294,7 @@ async function approvedPlan(reader, capability = "booking-calendly") {
     reader,
     git,
     capability,
+    inspectRepositoryInventory: inspectEmptyRepositoryInventory,
   });
   assert.equal(result.ok, true, JSON.stringify(result.issues));
   return result.value;
@@ -319,6 +341,8 @@ async function runApply(repository, overrides = {}) {
         expectedInspections.push(input);
         return Promise.resolve({ ok: true });
       }),
+    inspectRepositoryInventory:
+      overrides.inspectRepositoryInventory ?? inspectEmptyRepositoryInventory,
     now: overrides.now ?? (() => completedAt),
   });
   return {
@@ -329,6 +353,56 @@ async function runApply(repository, overrides = {}) {
     worktreeInspections,
   };
 }
+
+test("capability removal recomputes the Calendly reference guard before its first write", async () => {
+  const entries = await installedEntries("portfolio");
+  const repository = createRepository(entries);
+  const inspectRepositoryInventory = inventoryInspectorForFiles(repository.files);
+  const planned = await core.planCapabilityRemoval({
+    reader: repository.reader,
+    git,
+    capability: "booking-calendly",
+    inspectRepositoryInventory,
+  });
+  assert.equal(planned.ok, true, JSON.stringify(planned.issues));
+
+  const consumerPath = "apps/web/src/surviving-booking-consumer.ts";
+  repository.files.set(
+    consumerPath,
+    'export { CalendlyBooking } from "@/src/integrations/booking-calendly/calendly-booking";\n',
+  );
+  const before = snapshot(repository.files);
+  const verifierCalls = [];
+  const finalDiffCalls = [];
+  const result = await core.applyCapabilityRemoval({
+    root,
+    capability: "booking-calendly",
+    approvedPlanFingerprint: planned.value.planFingerprint,
+    reader: repository.reader,
+    writer: repository.writer,
+    verifier: successfulVerifier(verifierCalls),
+    inspectWorktree: () => Promise.resolve(git),
+    inspectExpectedChanges: (input) => {
+      finalDiffCalls.push(input);
+      return Promise.resolve({ ok: true });
+    },
+    inspectRepositoryInventory,
+    now: () => completedAt,
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+    conflicts: [consumerPath],
+    phase: "precondition",
+    recovery: "not-required",
+  });
+  assert.equal(snapshot(repository.files), before);
+  assert.deepEqual(repository.writes, []);
+  assert.deepEqual(verifierCalls, []);
+  assert.deepEqual(finalDiffCalls, []);
+  assert.doesNotMatch(JSON.stringify(result), /CalendlyBooking|refs\/heads/u);
+});
 
 async function expectedSuccessfulArtifacts(
   entries,
@@ -1203,6 +1277,7 @@ test("capability removal refuses invalid roots, Git states, changed identity, an
         finalDiffCalls.push(input);
         return Promise.resolve({ ok: true });
       },
+      inspectRepositoryInventory: inspectEmptyRepositoryInventory,
       now: () => completedAt,
     });
     assert.deepEqual(result, {
