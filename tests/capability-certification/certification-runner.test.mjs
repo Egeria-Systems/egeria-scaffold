@@ -1566,7 +1566,7 @@ async function copyCertificationRuntime(cleanRoot) {
   await cp(builderCoreDistPath, join(cleanRoot, "packages/builder-core/dist"), {
     recursive: true,
   });
-  for (const dependency of ["yaml", "zod"]) {
+  for (const dependency of ["typescript", "yaml", "zod"]) {
     await cp(
       join(builderCoreNodeModulesPath, dependency),
       join(cleanRoot, "node_modules", dependency),
