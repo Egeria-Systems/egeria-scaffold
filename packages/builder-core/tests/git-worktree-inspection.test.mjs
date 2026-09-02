@@ -46,6 +46,16 @@ function commandResult(stdout = "", exitCode = 0) {
   return { exitCode, stdout: bytes(stdout) };
 }
 
+function inventoryIdentity(root = "/repository/worktree") {
+  return {
+    root,
+    revision: "0123456789abcdef0123456789abcdef01234567",
+    attachedRef: "refs/heads/transactional-change",
+    gitDirectory: "/repository/.git/worktrees/transactional-change",
+    commonDirectory: "/repository/.git",
+  };
+}
+
 function scriptedInspection(overrides = {}) {
   const root = overrides.root ?? "/repository/worktree";
   const revision =
@@ -146,6 +156,129 @@ async function inspectExpectedScript(script, expectedPaths) {
     readMetadata: script.readMetadata,
   });
 }
+
+test("repository inventory deterministically preserves Git-visible entry kinds", async () => {
+  const root = "/repository/worktree";
+  const calls = [];
+  const runGit = async (_root, arguments_) => {
+    calls.push(arguments_);
+    if (arguments_.includes("--cached")) {
+      return commandResult(
+        [
+          "100644 0\tzeta.ts",
+          "120000 0\tlinked-config.ts",
+          "160000 0\tvendor/repository",
+          "100755 0\tscripts/remove-booking.mjs",
+          "",
+        ].join("\0"),
+      );
+    }
+    return commandResult("alpha.ts\0");
+  };
+
+  const result = await core.inspectGitRepositoryInventory({
+    root,
+    identity: inventoryIdentity(root),
+    runGit,
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    value: {
+      entries: [
+        { path: "alpha.ts", kind: "file", source: "untracked" },
+        { path: "linked-config.ts", kind: "symlink", source: "tracked" },
+        {
+          path: "scripts/remove-booking.mjs",
+          kind: "file",
+          source: "tracked",
+        },
+        { path: "vendor/repository", kind: "gitlink", source: "tracked" },
+        { path: "zeta.ts", kind: "file", source: "tracked" },
+      ],
+      truncated: false,
+    },
+  });
+  assert.deepEqual(calls, [
+    [
+      "ls-files",
+      "--cached",
+      "--full-name",
+      "-z",
+      "--format=%(objectmode) %(stage)%x09%(path)",
+    ],
+    [
+      "ls-files",
+      "--others",
+      "--exclude-standard",
+      "--full-name",
+      "-z",
+    ],
+  ]);
+});
+
+test("repository inventory refuses malformed or identity-detached Git output", async () => {
+  const root = "/repository/worktree";
+  const validUntracked = commandResult();
+  const cases = [
+    {
+      identity: inventoryIdentity("/different/worktree"),
+      tracked: commandResult(),
+    },
+    { identity: inventoryIdentity(root), tracked: commandResult("100644 0\ta") },
+    { identity: inventoryIdentity(root), tracked: commandResult("100600 0\ta\0") },
+    { identity: inventoryIdentity(root), tracked: commandResult("100644 1\ta\0") },
+    {
+      identity: inventoryIdentity(root),
+      tracked: commandResult("100644 0\t../outside.ts\0"),
+    },
+    {
+      identity: inventoryIdentity(root),
+      tracked: commandResult(["100644 0\ta.ts", "100644 0\ta.ts", ""].join("\0")),
+    },
+  ];
+
+  for (const testCase of cases) {
+    let calls = 0;
+    const result = await core.inspectGitRepositoryInventory({
+      root,
+      identity: testCase.identity,
+      runGit: async () => {
+        calls += 1;
+        return calls === 1 ? testCase.tracked : validUntracked;
+      },
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      code: "GIT_REPOSITORY_INVENTORY_INVALID",
+    });
+  }
+});
+
+test("repository inventory reports deterministic entry-limit coverage", async () => {
+  const paths = Array.from(
+    { length: 20_001 },
+    (_, index) => `src/file-${String(index).padStart(5, "0")}.ts`,
+  );
+  const tracked = `${paths.map((path) => `100644 0\t${path}`).join("\0")}\0`;
+  let calls = 0;
+
+  const result = await core.inspectGitRepositoryInventory({
+    root: "/repository/worktree",
+    identity: inventoryIdentity(),
+    runGit: async () => {
+      calls += 1;
+      return calls === 1 ? commandResult(tracked) : commandResult();
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.value.entries.length, 20_000);
+  assert.equal(result.value.entries[0].path, "src/file-00000.ts");
+  assert.equal(result.value.entries.at(-1).path, "src/file-19999.ts");
+  assert.equal(result.value.truncated, true);
+});
 
 test("Git worktree inspection builds an exact bounded Git process request", async () => {
   const requests = [];
