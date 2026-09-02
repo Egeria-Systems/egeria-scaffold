@@ -233,6 +233,21 @@ function isRequireCall(expression: ts.LeftHandSideExpression): boolean {
   );
 }
 
+function isExternalModuleAugmentation(node: ts.ModuleDeclaration): boolean {
+  if (ts.isSourceFile(node.parent)) {
+    return ts.isExternalModule(node.parent);
+  }
+  if (!ts.isModuleBlock(node.parent)) {
+    return false;
+  }
+
+  const enclosingModule = node.parent.parent;
+  return ts.isModuleDeclaration(enclosingModule) &&
+    ts.isStringLiteralLike(enclosingModule.name) &&
+    ts.isSourceFile(enclosingModule.parent) &&
+    !ts.isExternalModule(enclosingModule.parent);
+}
+
 function analyzeParsedSource(input: Readonly<{
   path: string;
   source: string;
@@ -283,7 +298,11 @@ function analyzeParsedSource(input: Readonly<{
       inspectSpecifier(node.argument.literal.text, true);
     }
 
-    if (ts.isModuleDeclaration(node) && ts.isStringLiteralLike(node.name)) {
+    if (
+      ts.isModuleDeclaration(node) &&
+      ts.isStringLiteralLike(node.name) &&
+      isExternalModuleAugmentation(node)
+    ) {
       inspectSpecifier(node.name.text, true);
     }
 

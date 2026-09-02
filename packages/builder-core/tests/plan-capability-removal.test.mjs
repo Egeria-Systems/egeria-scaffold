@@ -552,6 +552,18 @@ test("Calendly removal reference guard resolves TypeScript module augmentations 
   );
 });
 
+test("Calendly removal reference guard does not treat an ambient module declaration as a consumer", async () => {
+  const entries = await installedEntries("portfolio");
+  entries.set(
+    "apps/web/src/custom-ambient.d.ts",
+    'declare module "apps/web/src/integrations/booking-calendly/booking-content" { export interface BookingContent {} }\n',
+  );
+
+  const result = await planFromEntries(entries);
+
+  assert.equal(result.ok, true);
+});
+
 test("Calendly removal reference guard refuses an exact triple-slash path reference", async () => {
   const entries = await installedEntries("portfolio");
   const consumerPath =
