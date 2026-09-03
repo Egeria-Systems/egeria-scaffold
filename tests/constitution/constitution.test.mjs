@@ -4630,6 +4630,13 @@ test("automated removal-reference hardening follows client expansion without wea
     removalReferenceGuardColumns[1],
     /finding no detected match may never be represented as proof of dependency absence or complete removal/iu,
   );
-  assert.match(removalReferenceGuardColumns[2], /^planned;/u);
+  assert.match(
+    removalReferenceGuardColumns[2],
+    /^actual for exact `booking-calendly@0\.1\.0`/u,
+  );
+  assert.match(
+    removalReferenceGuardColumns[2],
+    /equivalent guards for exact `multilingual@0\.1\.0` and `analytics@0\.1\.0` remain planned/iu,
+  );
   assert.equal(removalReferenceGuardColumns[4], referenceHardeningPhase);
 });
