@@ -5617,6 +5617,69 @@ test("the compiled CLI reports path-only Calendly removal reference conflicts", 
   );
 });
 
+test("the compiled CLI reports path-only multilingual and analytics removal reference conflicts", async () => {
+  const cases = [
+    {
+      capability: "multilingual",
+      fixtureOptions: { multilingual: true },
+      argumentsFor: planMultilingualRemoveArguments,
+      conflictPath: "apps/web/src/surviving-multilingual-consumer.ts",
+      source:
+        'import type { Locale } from "@/src/i18n/locale"; export type PrivateLocale = Locale;\n',
+    },
+    {
+      capability: "analytics",
+      fixtureOptions: { analytics: analyticsSettings },
+      argumentsFor: planAnalyticsRemoveArguments,
+      conflictPath: "apps/web/src/surviving-analytics-consumer.ts",
+      source:
+        'import { createAnalyticsRuntime } from "@/src/integrations/analytics/analytics-runtime"; void createAnalyticsRuntime;\n',
+    },
+  ];
+
+  for (const {
+    capability,
+    fixtureOptions,
+    argumentsFor,
+    conflictPath,
+    source,
+  } of cases) {
+    await withGitFixture(
+      "portfolio",
+      async ({ linked, primary }) => {
+        await writeFile(join(linked, conflictPath), source, "utf8");
+        await commitAll(linked, `add surviving ${capability} consumer`);
+        const linkedBefore = await gitRepositorySnapshot(linked);
+        const primaryBefore = await gitRepositorySnapshot(primary);
+
+        const execution = await executeBuilt(argumentsFor(linked));
+
+        assert.equal(execution.exitCode, 1);
+        assert.equal(execution.stdout, "");
+        assert.equal(
+          execution.stderr,
+          `${JSON.stringify({
+            ok: false,
+            command: "plan-remove",
+            code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+            conflicts: [conflictPath],
+          })}\n`,
+        );
+        assert.deepEqual(await gitRepositorySnapshot(linked), linkedBefore);
+        assert.deepEqual(await gitRepositorySnapshot(primary), primaryBefore);
+        assert.doesNotMatch(
+          execution.stderr,
+          /PrivateLocale|createAnalyticsRuntime|refs\/heads|\.git\/worktrees/u,
+        );
+      },
+      {
+        ...fixtureOptions,
+        branch: `${capability}-reference-conflict-test`,
+      },
+    );
+  }
+});
+
 test("the compiled CLI reports Calendly reference warnings and completes exact add-remove-re-add transactions", async () => {
   for (const profile of ["portfolio", "site"]) {
     await withGitFixture(profile, async ({ linked, primary }) => {

@@ -40,7 +40,6 @@ const moduleResolutionOptions: ts.CompilerOptions = {
   moduleResolution: ts.ModuleResolutionKind.Bundler,
   resolveJsonModule: true,
 };
-const referenceToken = /(?:booking-calendly|calendly)/iu;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
@@ -52,7 +51,7 @@ export type CapabilityRemovalReferenceWarning = Readonly<{
   path?: string;
 }>;
 
-export type BookingCalendlyRemovalGuardResult =
+export type CapabilityRemovalReferenceGuardResult =
   | Readonly<{
       ok: true;
       warnings: readonly CapabilityRemovalReferenceWarning[];
@@ -375,12 +374,14 @@ function coverageWarning(path?: string): CapabilityRemovalReferenceWarning {
   };
 }
 
-export async function guardBookingCalendlyRemovalReferences(input: Readonly<{
+export async function guardCapabilityRemovalReferences(input: Readonly<{
   reader: RepositoryReader;
   inventory: Extract<GitRepositoryInventoryInspection, Readonly<{ ok: true }>>["value"];
   actions: readonly ProjectedAction[];
   desiredFiles: readonly GeneratedFile[];
-}>): Promise<BookingCalendlyRemovalGuardResult> {
+  referenceToken: string;
+}>): Promise<CapabilityRemovalReferenceGuardResult> {
+  const referenceToken = new RegExp(input.referenceToken, "iu");
   const desiredFiles = new Map(
     input.desiredFiles.map((file) => [file.path, file.content]),
   );
