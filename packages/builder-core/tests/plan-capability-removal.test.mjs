@@ -318,6 +318,36 @@ const expectedCalendlyReviewRequirements = Object.freeze([
   expectedCalendlyReferenceWarningRequirement,
 ]);
 
+const expectedAnalyticsReferenceWarningRequirement = Object.freeze({
+  code: "review-capability-removal-reference-warnings",
+  warnings: Object.freeze([
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+      path: "AGENTS.md",
+    }),
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+      path: "README.md",
+    }),
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+      path: "apps/web/AGENTS.md",
+    }),
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+      path: "apps/web/src/sections/section-registry.tsx",
+    }),
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+      path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+    }),
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
+      path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+    }),
+  ]),
+});
+
 function expectedPlan(
   profile,
   planFingerprint,
@@ -746,6 +776,119 @@ test("Calendly removal reference guard marks aggregate scan truncation for manua
   );
 });
 
+test("multilingual and analytics removal reference guards enforce exact conflicts and fingerprinted review evidence", async () => {
+  const cases = [
+    {
+      capability: "multilingual",
+      installation: { multilingual: true },
+      importSource:
+        'import type { Locale } from "@/src/i18n/locale"; export type SelectedLocale = Locale;\n',
+    },
+    {
+      capability: "analytics",
+      installation: { analytics: analyticsSettings },
+      importSource:
+        'import { createAnalyticsRuntime } from "@/src/integrations/analytics/analytics-runtime"; void createAnalyticsRuntime;\n',
+    },
+  ];
+
+  for (const { capability, installation, importSource } of cases) {
+    const entries = await installedEntries("site", {
+      bookingSettings: undefined,
+      ...installation,
+    });
+    const baseline = await planFromEntries(entries, { capability });
+    assert.equal(baseline.ok, true, JSON.stringify(baseline.issues));
+
+    const conflictPaths = [
+      `apps/web/src/consumers/z-${capability}-consumer.ts`,
+      `apps/web/src/consumers/a-${capability}-consumer.ts`,
+    ];
+    const conflictingEntries = new Map(entries);
+    for (const path of conflictPaths) {
+      conflictingEntries.set(path, importSource);
+    }
+
+    const conflict = await planFromEntries(conflictingEntries, { capability });
+    assert.equal(conflict.ok, false);
+    assert.deepEqual(
+      conflict.issues.map(({ code, path }) => ({ code, path })),
+      [...conflictPaths].sort(compareText).map((path) => ({
+        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+        path: [path],
+      })),
+    );
+    assert.doesNotMatch(
+      JSON.stringify(conflict),
+      /createAnalyticsRuntime|SelectedLocale|refs\/heads|\/generated\//u,
+    );
+
+    const invalidInventory = await planFromEntries(entries, {
+      capability,
+      inspectRepositoryInventory: () =>
+        Promise.resolve({
+          ok: false,
+          code: "GIT_REPOSITORY_INVENTORY_INVALID",
+          detail: "PRIVATE_INVENTORY_FAILURE_DETAIL",
+        }),
+    });
+    assertFailure(
+      invalidInventory,
+      "CAPABILITY_REMOVAL_INVENTORY_INVALID",
+    );
+    assert.doesNotMatch(
+      JSON.stringify(invalidInventory),
+      /PRIVATE_INVENTORY_FAILURE_DETAIL/u,
+    );
+
+    const warningPaths = [
+      `apps/web/src/review/z-${capability}-reference.ts`,
+      `apps/web/src/review/a-${capability}-reference.ts`,
+    ];
+    const warningEntries = new Map(entries);
+    for (const path of warningPaths) {
+      warningEntries.set(
+        path,
+        `// ${capability} PRIVATE_HEURISTIC_REFERENCE_DETAIL\n`,
+      );
+    }
+
+    const warned = await planFromEntries(warningEntries, { capability });
+    assert.equal(warned.ok, true, JSON.stringify(warned.issues));
+    const warningRequirement = warned.value.reviewRequirements.find(
+      ({ code }) => code === "review-capability-removal-reference-warnings",
+    );
+    assert.notEqual(warningRequirement, undefined);
+    for (const path of warningPaths) {
+      assert.equal(
+        warningRequirement.warnings.some(
+          (warning) =>
+            warning.code ===
+              "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE" &&
+            warning.path === path,
+        ),
+        true,
+      );
+    }
+    const warningKeys = warningRequirement.warnings.map(
+      ({ code, path }) => `${code}\0${path ?? ""}`,
+    );
+    assert.deepEqual(warningKeys, [...warningKeys].sort(compareText));
+    assert.doesNotMatch(
+      JSON.stringify(warned),
+      /PRIVATE_HEURISTIC_REFERENCE_DETAIL|refs\/heads|\/generated\//u,
+    );
+
+    const repeated = await planFromEntries(warningEntries, { capability });
+    assert.equal(repeated.ok, true, JSON.stringify(repeated.issues));
+    assert.deepEqual(repeated.value, warned.value);
+    assert.notEqual(
+      warned.value.planFingerprint,
+      baseline.value.planFingerprint,
+    );
+  }
+});
+
 test("analytics removal restores the composed layout and requires provider disposition review", async () => {
   for (const multilingual of [false, true]) {
     const entries = await installedEntries("site", {
@@ -797,6 +940,7 @@ test("analytics removal restores the composed layout and requires provider dispo
         code: "review-surviving-references-to-removed-surfaces",
         scope: "repository",
       },
+      expectedAnalyticsReferenceWarningRequirement,
       {
         code: "review-analytics-provider-and-client-storage-disposition",
         scope: "provider-accounts-retained-data-browser-storage-and-cookies",

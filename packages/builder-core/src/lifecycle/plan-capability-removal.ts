@@ -27,9 +27,9 @@ import type { RepositoryReader } from "../repository/repository-reader.js";
 import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
 import { serializeProjectYaml } from "../state/codecs.js";
 import {
-  guardBookingCalendlyRemovalReferences,
+  guardCapabilityRemovalReferences,
   type CapabilityRemovalReferenceWarning,
-} from "./booking-calendly-removal-guard.js";
+} from "./capability-removal-reference-guard.js";
 import {
   inspectGitRepositoryInventory,
   type GitWorktreeInspection,
@@ -139,6 +139,11 @@ type ValidInspection = ProjectInspection &
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
+const removalReferenceTokens = {
+  analytics: "analytics",
+  "booking-calendly": "calendly",
+  multilingual: "multilingual",
+} as const;
 
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -864,35 +869,34 @@ export async function planCapabilityRemoval(input: Readonly<{
     return actions;
   }
 
-  let referenceWarnings: readonly CapabilityRemovalReferenceWarning[] = [];
-  if (capabilityValue === "booking-calendly") {
-    try {
-      const inventory = await (
-        input.inspectRepositoryInventory ?? inspectGitRepositoryInventory
-      )({
-        root: input.git.identity.root,
-        identity: input.git.identity,
-      });
+  let referenceWarnings: readonly CapabilityRemovalReferenceWarning[];
+  try {
+    const inventory = await (
+      input.inspectRepositoryInventory ?? inspectGitRepositoryInventory
+    )({
+      root: input.git.identity.root,
+      identity: input.git.identity,
+    });
 
-      if (!inventory.ok) {
-        return planningFailure("CAPABILITY_REMOVAL_INVENTORY_INVALID");
-      }
-
-      const guard = await guardBookingCalendlyRemovalReferences({
-        reader: input.reader,
-        inventory: inventory.value,
-        actions: actions.value,
-        desiredFiles: desiredRender.value.files,
-      });
-
-      if (!guard.ok) {
-        return referenceConflict(guard.conflicts);
-      }
-
-      referenceWarnings = guard.warnings;
-    } catch {
+    if (!inventory.ok) {
       return planningFailure("CAPABILITY_REMOVAL_INVENTORY_INVALID");
     }
+
+    const guard = await guardCapabilityRemovalReferences({
+      reader: input.reader,
+      inventory: inventory.value,
+      actions: actions.value,
+      desiredFiles: desiredRender.value.files,
+      referenceToken: removalReferenceTokens[capabilityValue],
+    });
+
+    if (!guard.ok) {
+      return referenceConflict(guard.conflicts);
+    }
+
+    referenceWarnings = guard.warnings;
+  } catch {
+    return planningFailure("CAPABILITY_REMOVAL_INVENTORY_INVALID");
   }
 
   const currentCapabilities = current.value.resolved.capabilities

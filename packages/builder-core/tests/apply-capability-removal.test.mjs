@@ -354,54 +354,84 @@ async function runApply(repository, overrides = {}) {
   };
 }
 
-test("capability removal recomputes the Calendly reference guard before its first write", async () => {
-  const entries = await installedEntries("portfolio");
-  const repository = createRepository(entries);
-  const inspectRepositoryInventory = inventoryInspectorForFiles(repository.files);
-  const planned = await core.planCapabilityRemoval({
-    reader: repository.reader,
-    git,
-    capability: "booking-calendly",
-    inspectRepositoryInventory,
-  });
-  assert.equal(planned.ok, true, JSON.stringify(planned.issues));
-
-  const consumerPath = "apps/web/src/surviving-booking-consumer.ts";
-  repository.files.set(
-    consumerPath,
-    'export { CalendlyBooking } from "@/src/integrations/booking-calendly/calendly-booking";\n',
-  );
-  const before = snapshot(repository.files);
-  const verifierCalls = [];
-  const finalDiffCalls = [];
-  const result = await core.applyCapabilityRemoval({
-    root,
-    capability: "booking-calendly",
-    approvedPlanFingerprint: planned.value.planFingerprint,
-    reader: repository.reader,
-    writer: repository.writer,
-    verifier: successfulVerifier(verifierCalls),
-    inspectWorktree: () => Promise.resolve(git),
-    inspectExpectedChanges: (input) => {
-      finalDiffCalls.push(input);
-      return Promise.resolve({ ok: true });
+test("capability removal recomputes every removal reference guard before its first write", async () => {
+  const cases = [
+    {
+      capability: "booking-calendly",
+      installation: {},
+      importSource:
+        'export { CalendlyBooking } from "@/src/integrations/booking-calendly/calendly-booking";\n',
     },
-    inspectRepositoryInventory,
-    now: () => completedAt,
-  });
+    {
+      capability: "multilingual",
+      installation: { booking: false, multilingual: true },
+      importSource:
+        'import type { Locale } from "@/src/i18n/locale"; export type SelectedLocale = Locale;\n',
+    },
+    {
+      capability: "analytics",
+      installation: { analytics: true, booking: false },
+      importSource:
+        'import { createAnalyticsRuntime } from "@/src/integrations/analytics/analytics-runtime"; void createAnalyticsRuntime;\n',
+    },
+  ];
 
-  assert.deepEqual(result, {
-    ok: false,
-    code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
-    conflicts: [consumerPath],
-    phase: "precondition",
-    recovery: "not-required",
-  });
-  assert.equal(snapshot(repository.files), before);
-  assert.deepEqual(repository.writes, []);
-  assert.deepEqual(verifierCalls, []);
-  assert.deepEqual(finalDiffCalls, []);
-  assert.doesNotMatch(JSON.stringify(result), /CalendlyBooking|refs\/heads/u);
+  for (const { capability, installation, importSource } of cases) {
+    const entries = await installedEntries("portfolio", installation);
+    const repository = createRepository(entries);
+    const inspectRepositoryInventory = inventoryInspectorForFiles(
+      repository.files,
+    );
+    const planned = await core.planCapabilityRemoval({
+      reader: repository.reader,
+      git,
+      capability,
+      inspectRepositoryInventory,
+    });
+    assert.equal(planned.ok, true, JSON.stringify(planned.issues));
+
+    const consumerPaths = [
+      `apps/web/src/z-surviving-${capability}-consumer.ts`,
+      `apps/web/src/a-surviving-${capability}-consumer.ts`,
+    ];
+    for (const path of consumerPaths) {
+      repository.files.set(path, importSource);
+    }
+    const before = snapshot(repository.files);
+    const verifierCalls = [];
+    const finalDiffCalls = [];
+    const result = await core.applyCapabilityRemoval({
+      root,
+      capability,
+      approvedPlanFingerprint: planned.value.planFingerprint,
+      reader: repository.reader,
+      writer: repository.writer,
+      verifier: successfulVerifier(verifierCalls),
+      inspectWorktree: () => Promise.resolve(git),
+      inspectExpectedChanges: (input) => {
+        finalDiffCalls.push(input);
+        return Promise.resolve({ ok: true });
+      },
+      inspectRepositoryInventory,
+      now: () => completedAt,
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+      conflicts: [...consumerPaths].sort(compareText),
+      phase: "precondition",
+      recovery: "not-required",
+    });
+    assert.equal(snapshot(repository.files), before);
+    assert.deepEqual(repository.writes, []);
+    assert.deepEqual(verifierCalls, []);
+    assert.deepEqual(finalDiffCalls, []);
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /CalendlyBooking|createAnalyticsRuntime|SelectedLocale|refs\/heads/u,
+    );
+  }
 });
 
 async function expectedSuccessfulArtifacts(
