@@ -22,7 +22,7 @@
     "verify": "pnpm run lint && pnpm run typecheck && pnpm run test:unit && pnpm run build && pnpm exec opennextjs-cloudflare build --skipNextBuild && pnpm run cf-typegen:check && pnpm run test:integration:cloudflare && pnpm run test:e2e:dev && pnpm run test:e2e:preview"
   },
   "dependencies": {
-    "@opennextjs/cloudflare": "1.20.2",
+    "@opennextjs/cloudflare": "1.20.4",
     "next": "16.3.2",
     "react": "19.2.8",
     "react-dom": "19.2.8"
