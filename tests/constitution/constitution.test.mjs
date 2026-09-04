@@ -295,6 +295,14 @@ test("generic increment requests preserve the complete delivery lifecycle", asyn
   );
   assert.match(
     rootInstructions,
+    /canonical owner of the implementation lifecycle/iu,
+  );
+  assert.match(
+    rootInstructions,
+    /generic request[^.]+never approves[^.]+unseen plan[^.]+later authority gate/iu,
+  );
+  assert.doesNotMatch(
+    rootInstructions,
     new RegExp(
       `${escapeRegularExpression(preparationGate)}[\\s\\S]+${escapeRegularExpression(planGate)}[\\s\\S]+Ponytail[\\s\\S]+independent review[\\s\\S]+${escapeRegularExpression(finalDiffGate)}`,
       "iu",
