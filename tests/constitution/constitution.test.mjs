@@ -4625,19 +4625,26 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
 });
 
-test("automated removal-reference hardening follows client expansion without weakening existing gates", async () => {
+test("accepted removal-reference hardening closes before app foundation eligibility without authorizing it", async () => {
   const architecturePhase = compactLabel("P", "0");
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3", "B");
   const referenceHardeningPhase = compactLabel("P", "3", "C");
   const appFoundationPhase = compactLabel("P", "4");
-  const [sourcePlan, roadmap, architectureOverview, enforcementMap] =
+  const [
+    sourcePlan,
+    roadmap,
+    architectureOverview,
+    capabilityModel,
+    enforcementMap,
+  ] =
     await Promise.all([
       readRepositoryFile(
         "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
       ),
       readRepositoryFile("docs/roadmaps/program-roadmap.md"),
       readRepositoryFile("docs/architecture/overview.md"),
+      readRepositoryFile("docs/architecture/capability-model.md"),
       readRepositoryFile("docs/architecture/enforcement-map.md"),
     ]);
 
@@ -4747,16 +4754,46 @@ test("automated removal-reference hardening follows client expansion without wea
   assert.match(
     roadmap,
     new RegExp(
-      `${referenceHardeningPhase} begins after ${clientExpansionPhase} closes[^\n]+does not reopen or weaken ${lifecyclePhase} or ${clientExpansionPhase}`,
+      `${referenceHardeningPhase} began after ${clientExpansionPhase} closed[^\n]+did not reopen or weaken ${lifecyclePhase} or ${clientExpansionPhase}`,
       "i",
     ),
   );
   assert.match(
     sourcePlan,
     new RegExp(
-      `${referenceHardeningPhase} begins only after ${clientExpansionPhase} closes.+no detected match.+never be represented as proof`,
+      `${referenceHardeningPhase} began only after ${clientExpansionPhase} closed.+no detected match.+never be represented as proof`,
       "is",
     ),
+  );
+  for (const closureConsumer of [
+    sourceReferenceHardening,
+    roadmapReferenceHardening,
+    architectureOverview,
+    capabilityModel,
+  ]) {
+    assert.match(
+      closureConsumer,
+      new RegExp(`${referenceHardeningPhase} is complete`, "u"),
+    );
+    assert.match(
+      closureConsumer,
+      new RegExp(`${appFoundationPhase} is the next eligible phase`, "u"),
+    );
+    assert.match(
+      closureConsumer,
+      new RegExp(
+        `does not authorize ${appFoundationPhase} planning or implementation`,
+        "u",
+      ),
+    );
+  }
+  assert.match(
+    roadmapReferenceHardening,
+    /Pull request 95 reviewed candidate `5d1e22a64c4d1b6dce476fa6a8ce02134e0fb6fa` with candidate tree `c66ba69d1206d3d3c66814f06105ebd0f3c73461` and accepted merge `51c1d2e48220e403fad68e9ce0f790df9e56cb6e` with the same tree[.].+Post-merge Repository quality run `33757605858` completed successfully for that exact accepted merge/isu,
+  );
+  assert.match(
+    roadmapReferenceHardening,
+    /accepted merge was the refreshed current accepted main/iu,
   );
   assert.ok(removalReferenceGuardRow);
   const removalReferenceGuardColumns = removalReferenceGuardRow
@@ -4773,11 +4810,19 @@ test("automated removal-reference hardening follows client expansion without wea
   );
   assert.match(
     removalReferenceGuardColumns[2],
-    /^actual for exact `booking-calendly@0\.1\.0`/u,
+    /^actual for exact `booking-calendly@0\.1\.0`, `multilingual@0\.1\.0`, and `analytics@0\.1\.0`/u,
   );
   assert.match(
     removalReferenceGuardColumns[2],
-    /equivalent guards for exact `multilingual@0\.1\.0` and `analytics@0\.1\.0` remain planned/iu,
+    /package-backed analysis remains deferred until a concrete removable package exists/iu,
+  );
+  assert.match(
+    removalReferenceGuardColumns[2],
+    /repository-wide manual review and exact preserved\/ejected-path reconciliation remain mandatory/iu,
+  );
+  assert.match(
+    removalReferenceGuardColumns[3],
+    /actual.+planner.+executor.+CLI.+all three capabilities/iu,
   );
   assert.equal(removalReferenceGuardColumns[4], referenceHardeningPhase);
 });
