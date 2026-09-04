@@ -117,7 +117,7 @@ For generated visual changes, run `pnpm run verify:generated-visuals` only in th
 
 ## Ponytail simplification gate
 
-After focused GREEN and before independent review, freeze the complete candidate and its exact comparison, including every tracked, staged, unstaged, and relevant untracked candidate byte. The Gate 2 plan must name exactly `@ponytail-review` and its bounded diff scope. Approval of that plan explicitly authorizes one read-only invocation against that comparison; it does not enable a persistent Ponytail implementation mode, a whole-repository audit, or any repair.
+After focused GREEN and before independent review, freeze the complete candidate and its exact comparison, including every tracked, staged, unstaged, and relevant untracked candidate byte. The Gate 2 plan must name exactly `@ponytail-review` and its bounded diff scope. Approval of that plan explicitly authorizes one read-only invocation for each frozen comparison required by the approved workflow: the initial candidate and, only when that candidate changes, one renewed comparison. It does not enable a persistent Ponytail implementation mode, a whole-repository audit, or any repair.
 
 Treat Ponytail output as evidence, not authority. The controller validates every finding against current behavior, accepted scope, architecture, security, privacy, accessibility, compatibility, test, migration, and recovery contracts. If a material simplification survives validation, stop and obtain a separate explicit request before applying the repair.
 

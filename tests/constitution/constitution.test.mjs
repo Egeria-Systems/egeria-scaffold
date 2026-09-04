@@ -216,6 +216,10 @@ test("generic increment requests preserve the complete delivery lifecycle", asyn
       "iu",
     ),
   );
+  assert.match(
+    routingSection,
+    /generic start request[\s\S]+not approval[\s\S]+later authority gate[\s\S]+commit[\s\S]+push[\s\S]+pull-request/iu,
+  );
 
   const lifecycleHeadings = [
     "## Test-driven implementation",
@@ -244,6 +248,10 @@ test("generic increment requests preserve the complete delivery lifecycle", asyn
   assert.match(ponytailSection, /@ponytail-review/u);
   assert.match(ponytailSection, /exact frozen comparison/iu);
   assert.match(ponytailSection, /read-only/iu);
+  assert.match(
+    ponytailSection,
+    /approval of that plan explicitly authorizes[\s\S]+one read-only invocation[\s\S]+each frozen comparison/iu,
+  );
   assert.match(
     ponytailSection,
     /evidence, not authority[\s\S]+validat/iu,
