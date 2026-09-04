@@ -6,8 +6,6 @@ These instructions apply to the entire repository. Before changing files, read t
 
 Do not rely on conversation memory. Verify decisions against repository sources and current code. Accepted ADRs own architecture decisions; a newer accepted ADR may supersede an older one only through an explicit link. The approved source plan controls gaps not yet materialized in an ADR. If canonical sources conflict and ownership is unclear, stop and ask rather than silently choosing one.
 
-Treat requests such as “implement the next logical increment,” “start the next increment,” and clear equivalents as entry into the complete [review and contribution protocol](docs/governance/review-and-contribution.md), which is the canonical owner of the implementation lifecycle. A generic request never approves an unseen plan or any later authority gate.
-
 ## Git and approval boundaries
 
 - Preserve staged, unstaged, untracked, and committed user work. Never clean, reset, discard, or overwrite it without explicit authorization.

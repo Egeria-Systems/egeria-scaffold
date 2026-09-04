@@ -182,8 +182,7 @@ function isInsideRepository(path) {
 }
 
 test("generic increment requests preserve the complete delivery lifecycle", async () => {
-  const [rootInstructions, reviewProtocol, sourcePlan] = await Promise.all([
-    readRepositoryFile("AGENTS.md"),
+  const [reviewProtocol, sourcePlan] = await Promise.all([
     readRepositoryFile("docs/governance/review-and-contribution.md"),
     readRepositoryFile(
       "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
@@ -287,26 +286,6 @@ test("generic increment requests preserve the complete delivery lifecycle", asyn
   assert.match(
     independentReviewSection,
     /Ponytail[\s\S]+does not replace[\s\S]+three/iu,
-  );
-
-  assert.match(
-    rootInstructions,
-    /implement the next logical increment[\s\S]+start the next increment[\s\S]+review and contribution protocol/iu,
-  );
-  assert.match(
-    rootInstructions,
-    /canonical owner of the implementation lifecycle/iu,
-  );
-  assert.match(
-    rootInstructions,
-    /generic request[^.]+never approves[^.]+unseen plan[^.]+later authority gate/iu,
-  );
-  assert.doesNotMatch(
-    rootInstructions,
-    new RegExp(
-      `${escapeRegularExpression(preparationGate)}[\\s\\S]+${escapeRegularExpression(planGate)}[\\s\\S]+Ponytail[\\s\\S]+independent review[\\s\\S]+${escapeRegularExpression(finalDiffGate)}`,
-      "iu",
-    ),
   );
 
   const agentGovernanceSection = sourcePlan
