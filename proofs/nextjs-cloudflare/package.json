@@ -22,8 +22,8 @@
     "verify": "pnpm run lint && pnpm run typecheck && pnpm run test:unit && pnpm run build && pnpm exec opennextjs-cloudflare build --skipNextBuild && pnpm run cf-typegen:check && pnpm run test:integration:cloudflare && pnpm run test:e2e:dev && pnpm run test:e2e:preview"
   },
   "dependencies": {
-    "@opennextjs/cloudflare": "1.20.2",
-    "next": "16.3.2",
+    "@opennextjs/cloudflare": "1.20.4",
+    "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -35,10 +35,10 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "eslint": "9.39.5",
-    "eslint-config-next": "16.3.2",
+    "eslint-config-next": "16.3.3",
     "typescript": "6.0.3",
     "typescript-eslint": "8.68.0",
     "vitest": "4.1.11",
-    "wrangler": "4.125.0"
+    "wrangler": "4.129.0"
   }
 }

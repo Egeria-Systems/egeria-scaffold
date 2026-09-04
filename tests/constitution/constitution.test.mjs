@@ -181,6 +181,134 @@ function isInsideRepository(path) {
   );
 }
 
+test("generic increment requests preserve the complete delivery lifecycle", async () => {
+  const [reviewProtocol, sourcePlan] = await Promise.all([
+    readRepositoryFile("docs/governance/review-and-contribution.md"),
+    readRepositoryFile(
+      "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+    ),
+  ]);
+  const preparationGate = namedLabel("Gate", "1");
+  const planGate = namedLabel("Gate", "2");
+  const finalDiffGate = namedLabel("Gate", "3");
+
+  assert.match(reviewProtocol, /^## Increment request routing$/mu);
+  const routingSection = reviewProtocol
+    .split("## Increment request routing\n", 2)[1]
+    .split(`## ${preparationGate}: preparation evidence`, 1)[0];
+  assert.ok(routingSection, "increment request routing is missing");
+  assert.match(
+    routingSection,
+    /implement the next logical increment[\s\S]+start the next increment/iu,
+  );
+  assert.match(
+    routingSection,
+    new RegExp(
+      `${escapeRegularExpression(preparationGate)}[\\s\\S]+${escapeRegularExpression(planGate)}[\\s\\S]+implementation[\\s\\S]+@ponytail-review[\\s\\S]+independent review[\\s\\S]+${escapeRegularExpression(finalDiffGate)}`,
+      "iu",
+    ),
+  );
+  assert.match(
+    routingSection,
+    new RegExp(
+      `generic[^.]+request[^.]+(?:does not|is not)[^.]+approval[^.]+${escapeRegularExpression(planGate)}[^.]+plan`,
+      "iu",
+    ),
+  );
+  assert.match(
+    routingSection,
+    /generic start request[\s\S]+not approval[\s\S]+later authority gate[\s\S]+commit[\s\S]+push[\s\S]+pull-request/iu,
+  );
+
+  const lifecycleHeadings = [
+    "## Test-driven implementation",
+    "## Ponytail simplification gate",
+    "## Independent review",
+    "## Final verification and packet",
+    `## ${finalDiffGate}: verified-final-diff approval`,
+  ];
+  const lifecycleHeadingIndexes = lifecycleHeadings.map((heading) =>
+    reviewProtocol.indexOf(heading),
+  );
+  assert.ok(
+    lifecycleHeadingIndexes.every((index) => index >= 0),
+    "a required lifecycle heading is missing",
+  );
+  assert.deepEqual(
+    lifecycleHeadingIndexes,
+    lifecycleHeadingIndexes.toSorted((left, right) => left - right),
+    "the Ponytail pass must precede independent review and final approval",
+  );
+
+  const ponytailSection = reviewProtocol
+    .split("## Ponytail simplification gate\n", 2)[1]
+    .split("## Independent review", 1)[0];
+  assert.ok(ponytailSection, "Ponytail simplification gate is missing");
+  assert.match(ponytailSection, /@ponytail-review/u);
+  assert.match(ponytailSection, /exact frozen comparison/iu);
+  assert.match(ponytailSection, /read-only/iu);
+  assert.match(
+    ponytailSection,
+    /approval of that plan explicitly authorizes[\s\S]+one read-only invocation[\s\S]+each frozen comparison/iu,
+  );
+  assert.match(
+    ponytailSection,
+    /evidence, not authority[\s\S]+validat/iu,
+  );
+  assert.match(
+    ponytailSection,
+    /separate explicit (?:request|approval)[\s\S]+repair/iu,
+  );
+  assert.match(
+    ponytailSection,
+    /candidate changes[\s\S]+rerun[\s\S]+@ponytail-review/iu,
+  );
+  assert.match(
+    ponytailSection,
+    /unavailable|fails/iu,
+  );
+  assert.match(
+    ponytailSection,
+    /plugin version[\s\S]+comparison[\s\S]+dispositions/iu,
+  );
+
+  const independentReviewSection = reviewProtocol
+    .split("## Independent review\n", 2)[1]
+    .split("## Final verification and packet", 1)[0];
+  assert.ok(independentReviewSection, "independent review is missing");
+  for (const scope of [
+    "Requirements reviewer",
+    "Architecture and anti-overengineering reviewer",
+    "Test-evidence reviewer",
+  ]) {
+    assert.match(independentReviewSection, new RegExp(scope, "u"));
+  }
+  assert.match(
+    independentReviewSection,
+    /Ponytail[\s\S]+does not replace[\s\S]+three/iu,
+  );
+
+  const agentGovernanceSection = sourcePlan
+    .split("## 20. AI-agent governance\n", 2)[1]
+    .split("## 21. Gradual implementation roadmap", 1)[0];
+  assert.ok(agentGovernanceSection, "AI-agent governance is missing");
+  const governanceMilestones = [
+    "test-driven development",
+    "@ponytail-review",
+    "independent non-overlapping reviewers",
+    "mandatory pause for user approval",
+  ].map((milestone) => agentGovernanceSection.indexOf(milestone));
+  assert.ok(
+    governanceMilestones.every((index) => index >= 0),
+    "a required per-increment governance milestone is missing",
+  );
+  assert.deepEqual(
+    governanceMilestones,
+    governanceMilestones.toSorted((left, right) => left - right),
+    "the source plan must place Ponytail before independent review",
+  );
+});
+
 test("the root workspace remains private and pins the compatibility-proof toolchain", async () => {
   const manifest = JSON.parse(await readRepositoryFile("package.json"));
   const nvmVersion = await readRepositoryFile(".nvmrc");
@@ -4484,19 +4612,26 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
 });
 
-test("automated removal-reference hardening follows client expansion without weakening existing gates", async () => {
+test("accepted removal-reference hardening closes before app foundation eligibility without authorizing it", async () => {
   const architecturePhase = compactLabel("P", "0");
   const lifecyclePhase = compactLabel("P", "3");
   const clientExpansionPhase = compactLabel("P", "3", "B");
   const referenceHardeningPhase = compactLabel("P", "3", "C");
   const appFoundationPhase = compactLabel("P", "4");
-  const [sourcePlan, roadmap, architectureOverview, enforcementMap] =
+  const [
+    sourcePlan,
+    roadmap,
+    architectureOverview,
+    capabilityModel,
+    enforcementMap,
+  ] =
     await Promise.all([
       readRepositoryFile(
         "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
       ),
       readRepositoryFile("docs/roadmaps/program-roadmap.md"),
       readRepositoryFile("docs/architecture/overview.md"),
+      readRepositoryFile("docs/architecture/capability-model.md"),
       readRepositoryFile("docs/architecture/enforcement-map.md"),
     ]);
 
@@ -4606,16 +4741,46 @@ test("automated removal-reference hardening follows client expansion without wea
   assert.match(
     roadmap,
     new RegExp(
-      `${referenceHardeningPhase} begins after ${clientExpansionPhase} closes[^\n]+does not reopen or weaken ${lifecyclePhase} or ${clientExpansionPhase}`,
+      `${referenceHardeningPhase} began after ${clientExpansionPhase} closed[^\n]+did not reopen or weaken ${lifecyclePhase} or ${clientExpansionPhase}`,
       "i",
     ),
   );
   assert.match(
     sourcePlan,
     new RegExp(
-      `${referenceHardeningPhase} begins only after ${clientExpansionPhase} closes.+no detected match.+never be represented as proof`,
+      `${referenceHardeningPhase} began only after ${clientExpansionPhase} closed.+no detected match.+never be represented as proof`,
       "is",
     ),
+  );
+  for (const closureConsumer of [
+    sourceReferenceHardening,
+    roadmapReferenceHardening,
+    architectureOverview,
+    capabilityModel,
+  ]) {
+    assert.match(
+      closureConsumer,
+      new RegExp(`${referenceHardeningPhase} is complete`, "u"),
+    );
+    assert.match(
+      closureConsumer,
+      new RegExp(`${appFoundationPhase} is the next eligible phase`, "u"),
+    );
+    assert.match(
+      closureConsumer,
+      new RegExp(
+        `does not authorize ${appFoundationPhase} planning or implementation`,
+        "u",
+      ),
+    );
+  }
+  assert.match(
+    roadmapReferenceHardening,
+    /Pull request 95 reviewed candidate `5d1e22a64c4d1b6dce476fa6a8ce02134e0fb6fa` with candidate tree `c66ba69d1206d3d3c66814f06105ebd0f3c73461` and accepted merge `51c1d2e48220e403fad68e9ce0f790df9e56cb6e` with the same tree[.].+Post-merge Repository quality run `33757605858` completed successfully for that exact accepted merge/isu,
+  );
+  assert.match(
+    roadmapReferenceHardening,
+    /accepted merge was the refreshed current accepted main/iu,
   );
   assert.ok(removalReferenceGuardRow);
   const removalReferenceGuardColumns = removalReferenceGuardRow
@@ -4632,11 +4797,19 @@ test("automated removal-reference hardening follows client expansion without wea
   );
   assert.match(
     removalReferenceGuardColumns[2],
-    /^actual for exact `booking-calendly@0\.1\.0`/u,
+    /^actual for exact `booking-calendly@0\.1\.0`, `multilingual@0\.1\.0`, and `analytics@0\.1\.0`/u,
   );
   assert.match(
     removalReferenceGuardColumns[2],
-    /equivalent guards for exact `multilingual@0\.1\.0` and `analytics@0\.1\.0` remain planned/iu,
+    /package-backed analysis remains deferred until a concrete removable package exists/iu,
+  );
+  assert.match(
+    removalReferenceGuardColumns[2],
+    /repository-wide manual review and exact preserved\/ejected-path reconciliation remain mandatory/iu,
+  );
+  assert.match(
+    removalReferenceGuardColumns[3],
+    /actual.+planner.+executor.+CLI.+all three capabilities/iu,
   );
   assert.equal(removalReferenceGuardColumns[4], referenceHardeningPhase);
 });
