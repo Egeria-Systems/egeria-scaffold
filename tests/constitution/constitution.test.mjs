@@ -181,6 +181,134 @@ function isInsideRepository(path) {
   );
 }
 
+test("generic increment requests preserve the complete delivery lifecycle", async () => {
+  const [reviewProtocol, sourcePlan] = await Promise.all([
+    readRepositoryFile("docs/governance/review-and-contribution.md"),
+    readRepositoryFile(
+      "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+    ),
+  ]);
+  const preparationGate = namedLabel("Gate", "1");
+  const planGate = namedLabel("Gate", "2");
+  const finalDiffGate = namedLabel("Gate", "3");
+
+  assert.match(reviewProtocol, /^## Increment request routing$/mu);
+  const routingSection = reviewProtocol
+    .split("## Increment request routing\n", 2)[1]
+    .split(`## ${preparationGate}: preparation evidence`, 1)[0];
+  assert.ok(routingSection, "increment request routing is missing");
+  assert.match(
+    routingSection,
+    /implement the next logical increment[\s\S]+start the next increment/iu,
+  );
+  assert.match(
+    routingSection,
+    new RegExp(
+      `${escapeRegularExpression(preparationGate)}[\\s\\S]+${escapeRegularExpression(planGate)}[\\s\\S]+implementation[\\s\\S]+@ponytail-review[\\s\\S]+independent review[\\s\\S]+${escapeRegularExpression(finalDiffGate)}`,
+      "iu",
+    ),
+  );
+  assert.match(
+    routingSection,
+    new RegExp(
+      `generic[^.]+request[^.]+(?:does not|is not)[^.]+approval[^.]+${escapeRegularExpression(planGate)}[^.]+plan`,
+      "iu",
+    ),
+  );
+  assert.match(
+    routingSection,
+    /generic start request[\s\S]+not approval[\s\S]+later authority gate[\s\S]+commit[\s\S]+push[\s\S]+pull-request/iu,
+  );
+
+  const lifecycleHeadings = [
+    "## Test-driven implementation",
+    "## Ponytail simplification gate",
+    "## Independent review",
+    "## Final verification and packet",
+    `## ${finalDiffGate}: verified-final-diff approval`,
+  ];
+  const lifecycleHeadingIndexes = lifecycleHeadings.map((heading) =>
+    reviewProtocol.indexOf(heading),
+  );
+  assert.ok(
+    lifecycleHeadingIndexes.every((index) => index >= 0),
+    "a required lifecycle heading is missing",
+  );
+  assert.deepEqual(
+    lifecycleHeadingIndexes,
+    lifecycleHeadingIndexes.toSorted((left, right) => left - right),
+    "the Ponytail pass must precede independent review and final approval",
+  );
+
+  const ponytailSection = reviewProtocol
+    .split("## Ponytail simplification gate\n", 2)[1]
+    .split("## Independent review", 1)[0];
+  assert.ok(ponytailSection, "Ponytail simplification gate is missing");
+  assert.match(ponytailSection, /@ponytail-review/u);
+  assert.match(ponytailSection, /exact frozen comparison/iu);
+  assert.match(ponytailSection, /read-only/iu);
+  assert.match(
+    ponytailSection,
+    /approval of that plan explicitly authorizes[\s\S]+one read-only invocation[\s\S]+each frozen comparison/iu,
+  );
+  assert.match(
+    ponytailSection,
+    /evidence, not authority[\s\S]+validat/iu,
+  );
+  assert.match(
+    ponytailSection,
+    /separate explicit (?:request|approval)[\s\S]+repair/iu,
+  );
+  assert.match(
+    ponytailSection,
+    /candidate changes[\s\S]+rerun[\s\S]+@ponytail-review/iu,
+  );
+  assert.match(
+    ponytailSection,
+    /unavailable|fails/iu,
+  );
+  assert.match(
+    ponytailSection,
+    /plugin version[\s\S]+comparison[\s\S]+dispositions/iu,
+  );
+
+  const independentReviewSection = reviewProtocol
+    .split("## Independent review\n", 2)[1]
+    .split("## Final verification and packet", 1)[0];
+  assert.ok(independentReviewSection, "independent review is missing");
+  for (const scope of [
+    "Requirements reviewer",
+    "Architecture and anti-overengineering reviewer",
+    "Test-evidence reviewer",
+  ]) {
+    assert.match(independentReviewSection, new RegExp(scope, "u"));
+  }
+  assert.match(
+    independentReviewSection,
+    /Ponytail[\s\S]+does not replace[\s\S]+three/iu,
+  );
+
+  const agentGovernanceSection = sourcePlan
+    .split("## 20. AI-agent governance\n", 2)[1]
+    .split("## 21. Gradual implementation roadmap", 1)[0];
+  assert.ok(agentGovernanceSection, "AI-agent governance is missing");
+  const governanceMilestones = [
+    "test-driven development",
+    "@ponytail-review",
+    "independent non-overlapping reviewers",
+    "mandatory pause for user approval",
+  ].map((milestone) => agentGovernanceSection.indexOf(milestone));
+  assert.ok(
+    governanceMilestones.every((index) => index >= 0),
+    "a required per-increment governance milestone is missing",
+  );
+  assert.deepEqual(
+    governanceMilestones,
+    governanceMilestones.toSorted((left, right) => left - right),
+    "the source plan must place Ponytail before independent review",
+  );
+});
+
 test("the root workspace remains private and pins the compatibility-proof toolchain", async () => {
   const manifest = JSON.parse(await readRepositoryFile("package.json"));
   const nvmVersion = await readRepositoryFile(".nvmrc");
