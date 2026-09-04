@@ -2,6 +2,12 @@
 
 This document is the canonical owner of the implementation lifecycle. Root and nested instructions link here instead of maintaining competing copies.
 
+## Increment request routing
+
+Treat requests such as “implement the next logical increment,” “start the next increment,” and clear equivalents as instructions to enter this complete lifecycle, not as implementation-only shortcuts. Resolve the next eligible increment from the approved source plan, current program roadmap, accepted evidence, and repository state; then complete Gate 1 preparation, Gate 2 exact-file plan approval, test-driven implementation, the plan-authorized `@ponytail-review`, independent review, final verification and the review packet, and the Gate 3 stop.
+
+A generic start request is not approval of an unseen Gate 2 plan or any later authority gate. Stop for every required approval even when the request also names implementation, commit, push, pull-request, merge, deployment, or another later action.
+
 ## Gate 1: preparation evidence
 
 Before implementation:
@@ -24,7 +30,7 @@ Gate 1 evidence is not permission to edit implementation files or take external 
 
 ## Gate 2: implementation-plan approval
 
-Write an exact-file, test-driven plan under the Git-ignored private local `docs/superpowers/plans/` directory. It must define interfaces, RED/GREEN checks, focused commit boundaries, reviewers, final verification, review-packet contents, deferred work, and recovery.
+Write an exact-file, test-driven plan under the Git-ignored private local `docs/superpowers/plans/` directory. It must define interfaces, RED/GREEN checks, focused commit boundaries, the exact frozen comparison and one-shot `@ponytail-review` scope, reviewers, final verification, review-packet contents, deferred work, and recovery.
 
 Stop for explicit approval. Plan approval authorizes only the bounded local implementation and commits described by the approved plan. It does not authorize a different increment, push, pull request, merge, deployment, publication, provider mutation, production action, permission change, or external message.
 
@@ -109,9 +115,19 @@ Configuration and documentation changes use dependency-free contract tests where
 
 For generated visual changes, run `pnpm run verify:generated-visuals` only in the pinned Linux/Chromium boundary after the generated OpenNext output is prepared. CI comparison is flag-free. Baseline updates require a causal source change, human review of expected, actual, and diff images, and a second comparison without update mode; they are never an automatic repair for a failing check. Screenshot equality does not establish visual quality, human accessibility, deployed behavior, production readiness, or WCAG conformance.
 
+## Ponytail simplification gate
+
+After focused GREEN and before independent review, freeze the complete candidate and its exact comparison, including every tracked, staged, unstaged, and relevant untracked candidate byte. The Gate 2 plan must name exactly `@ponytail-review` and its bounded diff scope. Approval of that plan explicitly authorizes one read-only invocation against that comparison; it does not enable a persistent Ponytail implementation mode, a whole-repository audit, or any repair.
+
+Treat Ponytail output as evidence, not authority. The controller validates every finding against current behavior, accepted scope, architecture, security, privacy, accessibility, compatibility, test, migration, and recovery contracts. If a material simplification survives validation, stop and obtain a separate explicit request before applying the repair.
+
+If the candidate changes after the pass, rerun affected checks and `@ponytail-review` against the new exact frozen comparison before independent review. If `@ponytail-review` is unavailable or fails, stop unless the user explicitly approves a Gate 2 plan amendment that waives or replaces the pass; record the limitation and reduced evidence.
+
+The gate closes only when no unresolved validated material simplification remains. Record the plugin version, exact comparison, output, validated dispositions, any separately authorized repairs, and renewed checks in the review packet.
+
 ## Independent review
 
-After the coherent increment, dispatch three non-overlapping read-only reviewers:
+After the Ponytail gate closes and the coherent candidate is refrozen, dispatch three non-overlapping read-only reviewers. Ponytail is complexity-focused evidence and does not replace any of these three scopes:
 
 - **Requirements reviewer:** compare the final diff with the approved source, increment acceptance, exact-file plan, file boundary, and non-goals.
 - **Architecture and anti-overengineering reviewer:** check architecture invariants, canonical ownership, internal consistency, premature implementation, generic abstractions, and churn whose benefit does not outweigh risk.

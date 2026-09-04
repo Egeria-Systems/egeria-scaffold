@@ -1197,10 +1197,11 @@ Every implementation increment requires:
 5. an exact-file private local implementation plan under `docs/superpowers/plans/`;
 6. test-driven development under the canonical builder-repository development boundary in `docs/governance/review-and-contribution.md`;
 7. small focused commits;
-8. independent non-overlapping reviewers;
-9. remediation and renewed verification;
-10. a private local review packet under `docs/review-packets/`;
-11. a mandatory pause for user approval.
+8. one explicitly plan-authorized read-only `@ponytail-review` against the frozen increment comparison, with validated dispositions and separate repair authority;
+9. independent non-overlapping reviewers;
+10. remediation and renewed verification;
+11. a private local review packet under `docs/review-packets/`;
+12. a mandatory pause for user approval.
 
 Reviewer scopes:
 
