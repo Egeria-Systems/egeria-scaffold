@@ -24,6 +24,29 @@ type JsonValue =
   | readonly JsonValue[]
   | Readonly<{ [key: string]: JsonValue }>;
 
+function metadataWithoutRootIdentifier(
+  rootSchema: z.ZodType,
+): typeof z.globalRegistry {
+  return new Proxy(z.globalRegistry, {
+    get(registry, property, receiver) {
+      if (property !== "get") {
+        return Reflect.get(registry, property, receiver) as unknown;
+      }
+
+      return (schema: z.ZodType) => {
+        const metadata = registry.get(schema);
+        if (schema !== rootSchema || metadata?.id === undefined) {
+          return metadata;
+        }
+
+        const rootMetadata = { ...metadata };
+        delete rootMetadata.id;
+        return rootMetadata;
+      };
+    },
+  });
+}
+
 function sortJsonValue(value: unknown): JsonValue {
   if (value === null || typeof value !== "object") {
     return value as null | boolean | number | string;
@@ -58,6 +81,7 @@ export function createJsonSchemaArtifacts(): JsonSchemaArtifacts {
       artifactName,
       sortJsonValue(
         z.toJSONSchema(schema, {
+          metadata: metadataWithoutRootIdentifier(schema),
           target: "draft-2020-12",
           unrepresentable: "throw",
         }),

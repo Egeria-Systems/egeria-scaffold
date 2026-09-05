@@ -161,7 +161,7 @@ test("the private package manifests expose only their approved runtime boundarie
     dependencies: {
       typescript: "6.0.3",
       yaml: "2.9.0",
-      zod: "4.4.3",
+      zod: "4.5.4",
     },
     devDependencies: {
       "@egeria-systems/standards": "workspace:*",

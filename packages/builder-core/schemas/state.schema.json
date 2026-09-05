@@ -134,6 +134,7 @@
             "checks": {
               "anyOf": [
                 {
+                  "items": false,
                   "maxItems": 9,
                   "minItems": 9,
                   "prefixItems": [
@@ -178,6 +179,7 @@
                   "type": "array"
                 },
                 {
+                  "items": false,
                   "maxItems": 11,
                   "minItems": 11,
                   "prefixItems": [
@@ -247,6 +249,7 @@
           "additionalProperties": false,
           "properties": {
             "checks": {
+              "items": false,
               "maxItems": 12,
               "minItems": 12,
               "prefixItems": [
@@ -317,6 +320,7 @@
           "additionalProperties": false,
           "properties": {
             "checks": {
+              "items": false,
               "maxItems": 12,
               "minItems": 12,
               "prefixItems": [
@@ -387,6 +391,7 @@
           "additionalProperties": false,
           "properties": {
             "checks": {
+              "items": false,
               "maxItems": 12,
               "minItems": 12,
               "prefixItems": [
@@ -457,6 +462,7 @@
           "additionalProperties": false,
           "properties": {
             "checks": {
+              "items": false,
               "maxItems": 12,
               "minItems": 12,
               "prefixItems": [
