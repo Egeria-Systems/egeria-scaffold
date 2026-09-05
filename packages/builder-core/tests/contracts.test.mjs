@@ -23,6 +23,24 @@ const schemaArtifactNames = [
   "state.schema.json",
 ];
 
+const schemaArtifactRootIdentifiers = {
+  "capability.schema.json": "urn:egeria-systems:schema:capability:1.0.0",
+  "certification-registry.schema.json":
+    "urn:egeria-systems:schema:capability-certification-registry:1.0.0",
+  "migration-record.schema.json":
+    "urn:egeria-systems:schema:migration-record:1.0.0",
+  "profile.schema.json": "urn:egeria-systems:schema:profile:1.0.0",
+  "project.schema.json": "urn:egeria-systems:schema:project:1.0.0",
+  "state.schema.json": "urn:egeria-systems:schema:state:1.0.0",
+};
+
+function resolveSchemaArtifactRoot(artifactName, artifact) {
+  const identifier = schemaArtifactRootIdentifiers[artifactName];
+  assert.equal(artifact.$ref, `#/$defs/${identifier}`);
+  assert.ok(artifact.$defs?.[identifier]);
+  return artifact.$defs[identifier];
+}
+
 const validCapability = {
   identifier: "standards",
   version: "0.1.0",
@@ -1143,26 +1161,32 @@ test("contract failures have deterministic paths without echoing invalid values"
 test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts", async () => {
   const generated = contracts.createJsonSchemaArtifacts();
   assert.deepEqual(Object.keys(generated), schemaArtifactNames);
+  const generatedRoots = Object.fromEntries(
+    schemaArtifactNames.map((artifactName) => [
+      artifactName,
+      resolveSchemaArtifactRoot(artifactName, generated[artifactName]),
+    ]),
+  );
   assert.equal(
-    generated["profile.schema.json"].title,
+    generatedRoots["profile.schema.json"].title,
     "Egeria portfolio and site profile recipe",
   );
   assert.equal(
-    generated["certification-registry.schema.json"].title,
+    generatedRoots["certification-registry.schema.json"].title,
     "Egeria capability certification coverage registry",
   );
   for (const [artifactName, recipeVersionSchema] of [
     [
       "profile.schema.json",
-      generated["profile.schema.json"].properties.recipeVersion,
+      generatedRoots["profile.schema.json"].properties.recipeVersion,
     ],
     [
       "project.schema.json",
-      generated["project.schema.json"].properties.recipeVersion,
+      generatedRoots["project.schema.json"].properties.recipeVersion,
     ],
     [
       "state.schema.json",
-      generated["state.schema.json"].properties.origin.properties.recipeVersion,
+      generatedRoots["state.schema.json"].properties.origin.properties.recipeVersion,
     ],
   ]) {
     assert.deepEqual(
@@ -1172,16 +1196,16 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
     );
   }
   const verificationCheckTuples =
-    generated["state.schema.json"].properties.lastSuccessfulVerification.oneOf
+    generatedRoots["state.schema.json"].properties.lastSuccessfulVerification.oneOf
       .flatMap(({ properties }) =>
         properties.checks.anyOf ?? [properties.checks],
       );
   assert.equal(
-    generated["state.schema.json"].properties.schemaVersion.const,
+    generatedRoots["state.schema.json"].properties.schemaVersion.const,
     "1.0.0",
   );
   assert.deepEqual(
-    generated["state.schema.json"].properties.lastSuccessfulVerification.oneOf.map(
+    generatedRoots["state.schema.json"].properties.lastSuccessfulVerification.oneOf.map(
       ({ properties }) => properties.kind.const,
     ),
     [
@@ -1193,7 +1217,7 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
     ],
   );
   const capabilityUpgradeSchema =
-    generated["state.schema.json"].properties.lastSuccessfulVerification.oneOf.find(
+    generatedRoots["state.schema.json"].properties.lastSuccessfulVerification.oneOf.find(
       ({ properties }) => properties.kind.const === "capability-upgrade",
     );
   assert.deepEqual(
@@ -1201,7 +1225,7 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
     capabilityUpgradePersistedVerificationChecks,
   );
   const profileTransitionSchema =
-    generated["state.schema.json"].properties.lastSuccessfulVerification.oneOf.find(
+    generatedRoots["state.schema.json"].properties.lastSuccessfulVerification.oneOf.find(
       ({ properties }) => properties.kind.const === "profile-transition",
     );
   assert.deepEqual(
@@ -1216,26 +1240,26 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
   }
   const displayNamePattern = /^(?=.{1,120}$)(?=.*\S)[^\p{Cc}]+$/u;
   const projectDisplayNamePattern =
-    generated["project.schema.json"].properties.project.properties.displayName
+    generatedRoots["project.schema.json"].properties.project.properties.displayName
       .pattern;
   const calendlyDestinationContract =
-    generated["project.schema.json"].properties.capabilitySettings.properties[
+    generatedRoots["project.schema.json"].properties.capabilitySettings.properties[
       "booking-calendly"
     ].properties.destination;
   const cloudflareWebAnalyticsTokenContract =
-    generated["project.schema.json"].properties.capabilitySettings.properties
+    generatedRoots["project.schema.json"].properties.capabilitySettings.properties
       .analytics.properties.providers.properties.cloudflareWebAnalytics
       .properties.siteToken;
 
   assert.deepEqual(
     Object.keys(
-      generated["project.schema.json"].properties.capabilitySettings
+      generatedRoots["project.schema.json"].properties.capabilitySettings
         .properties,
     ),
     ["analytics", "booking-calendly"],
   );
   assert.equal(
-    generated["project.schema.json"].properties.capabilitySettings
+    generatedRoots["project.schema.json"].properties.capabilitySettings
       .additionalProperties,
     false,
   );

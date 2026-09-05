@@ -1,5 +1,278 @@
 {
   "$defs": {
+    "urn:egeria-systems:schema:capability:1.0.0": {
+      "additionalProperties": false,
+      "properties": {
+        "adapterSemanticRequirements": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "browserStorage": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "conflicts": {
+          "items": {
+            "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "contentSecurityPolicyContributions": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "dataClassifications": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "deliveryMode": {
+          "enum": [
+            "package-backed",
+            "source-generated",
+            "hybrid"
+          ],
+          "type": "string"
+        },
+        "dependencies": {
+          "items": {
+            "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "documentationEvidenceRequirements": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "environmentVariables": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "externalDomains": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "identifier": {
+          "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+        },
+        "inferenceProbes": {
+          "items": {
+            "$ref": "#/$defs/urn:egeria-systems:schema:inference-probe:1.0.0"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "managedSurfaces": {
+          "items": {
+            "$ref": "#/$defs/urn:egeria-systems:schema:managed-surface-descriptor:1.0.0"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "migrationPlanners": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "optionalIntegrations": {
+          "items": {
+            "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "platformResources": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "privilegedOperations": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "removalAndRecoveryRequirements": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "removalPolicy": {
+          "enum": [
+            "automatic",
+            "reviewed",
+            "export-and-remove",
+            "eject-only",
+            "unsupported"
+          ],
+          "type": "string"
+        },
+        "requiredPackages": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "retentionAssumptions": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "secrets": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "stateClassifications": {
+          "items": {
+            "enum": [
+              "stateless",
+              "repository-stateful",
+              "external-stateful",
+              "persistent-data"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "readOnly": true,
+          "type": "array"
+        },
+        "supportedProfiles": {
+          "items": {
+            "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "threatReviewLevel": {
+          "maxLength": 512,
+          "minLength": 1,
+          "pattern": "\\S",
+          "type": "string"
+        },
+        "verificationPlan": {
+          "items": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "version": {
+          "$ref": "#/$defs/urn:egeria-systems:schema:semantic-version:1.0.0"
+        }
+      },
+      "readOnly": true,
+      "required": [
+        "identifier",
+        "version",
+        "deliveryMode",
+        "stateClassifications",
+        "removalPolicy",
+        "dependencies",
+        "optionalIntegrations",
+        "conflicts",
+        "supportedProfiles",
+        "requiredPackages",
+        "environmentVariables",
+        "secrets",
+        "platformResources",
+        "externalDomains",
+        "contentSecurityPolicyContributions",
+        "browserStorage",
+        "dataClassifications",
+        "retentionAssumptions",
+        "privilegedOperations",
+        "threatReviewLevel",
+        "adapterSemanticRequirements",
+        "managedSurfaces",
+        "inferenceProbes",
+        "migrationPlanners",
+        "verificationPlan",
+        "documentationEvidenceRequirements",
+        "removalAndRecoveryRequirements"
+      ],
+      "title": "Egeria capability descriptor",
+      "type": "object"
+    },
     "urn:egeria-systems:schema:inference-probe:1.0.0": {
       "oneOf": [
         {
@@ -217,276 +490,6 @@
       "type": "string"
     }
   },
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "adapterSemanticRequirements": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "browserStorage": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "conflicts": {
-      "items": {
-        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "contentSecurityPolicyContributions": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "dataClassifications": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "deliveryMode": {
-      "enum": [
-        "package-backed",
-        "source-generated",
-        "hybrid"
-      ],
-      "type": "string"
-    },
-    "dependencies": {
-      "items": {
-        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "documentationEvidenceRequirements": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "environmentVariables": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "externalDomains": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "identifier": {
-      "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
-    },
-    "inferenceProbes": {
-      "items": {
-        "$ref": "#/$defs/urn:egeria-systems:schema:inference-probe:1.0.0"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "managedSurfaces": {
-      "items": {
-        "$ref": "#/$defs/urn:egeria-systems:schema:managed-surface-descriptor:1.0.0"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "migrationPlanners": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "optionalIntegrations": {
-      "items": {
-        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "platformResources": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "privilegedOperations": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "removalAndRecoveryRequirements": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "removalPolicy": {
-      "enum": [
-        "automatic",
-        "reviewed",
-        "export-and-remove",
-        "eject-only",
-        "unsupported"
-      ],
-      "type": "string"
-    },
-    "requiredPackages": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "retentionAssumptions": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "secrets": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "stateClassifications": {
-      "items": {
-        "enum": [
-          "stateless",
-          "repository-stateful",
-          "external-stateful",
-          "persistent-data"
-        ],
-        "type": "string"
-      },
-      "minItems": 1,
-      "readOnly": true,
-      "type": "array"
-    },
-    "supportedProfiles": {
-      "items": {
-        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "threatReviewLevel": {
-      "maxLength": 512,
-      "minLength": 1,
-      "pattern": "\\S",
-      "type": "string"
-    },
-    "verificationPlan": {
-      "items": {
-        "maxLength": 512,
-        "minLength": 1,
-        "pattern": "\\S",
-        "type": "string"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "version": {
-      "$ref": "#/$defs/urn:egeria-systems:schema:semantic-version:1.0.0"
-    }
-  },
-  "readOnly": true,
-  "required": [
-    "identifier",
-    "version",
-    "deliveryMode",
-    "stateClassifications",
-    "removalPolicy",
-    "dependencies",
-    "optionalIntegrations",
-    "conflicts",
-    "supportedProfiles",
-    "requiredPackages",
-    "environmentVariables",
-    "secrets",
-    "platformResources",
-    "externalDomains",
-    "contentSecurityPolicyContributions",
-    "browserStorage",
-    "dataClassifications",
-    "retentionAssumptions",
-    "privilegedOperations",
-    "threatReviewLevel",
-    "adapterSemanticRequirements",
-    "managedSurfaces",
-    "inferenceProbes",
-    "migrationPlanners",
-    "verificationPlan",
-    "documentationEvidenceRequirements",
-    "removalAndRecoveryRequirements"
-  ],
-  "title": "Egeria capability descriptor",
-  "type": "object"
+  "$ref": "#/$defs/urn:egeria-systems:schema:capability:1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
 }

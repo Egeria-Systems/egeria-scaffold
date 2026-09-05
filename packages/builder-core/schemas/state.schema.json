@@ -23,168 +23,241 @@
       "minLength": 1,
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
-    }
-  },
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
-  "properties": {
-    "appliedMigrations": {
-      "items": {
-        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
-      },
-      "readOnly": true,
-      "type": "array"
     },
-    "builderVersion": {
-      "const": "0.0.0",
-      "type": "string"
-    },
-    "compatibility": {
+    "urn:egeria-systems:schema:state:1.0.0": {
       "additionalProperties": false,
       "properties": {
-        "node": {
-          "const": "22.23.2",
-          "type": "string"
-        },
-        "platformAdapter": {
-          "const": "cloudflare-workers",
-          "type": "string"
-        },
-        "pnpm": {
-          "const": "11.20.0",
-          "type": "string"
-        }
-      },
-      "readOnly": true,
-      "required": [
-        "node",
-        "pnpm",
-        "platformAdapter"
-      ],
-      "type": "object"
-    },
-    "ejections": {
-      "items": {
-        "$ref": "#/$defs/urn:egeria-systems:schema:safe-relative-path:1.0.0"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "installedCapabilities": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "deliveryMode": {
-            "enum": [
-              "package-backed",
-              "source-generated",
-              "hybrid"
-            ],
-            "type": "string"
-          },
-          "identifier": {
+        "appliedMigrations": {
+          "items": {
             "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
           },
-          "removalPolicy": {
-            "enum": [
-              "automatic",
-              "reviewed",
-              "export-and-remove",
-              "eject-only",
-              "unsupported"
-            ],
-            "type": "string"
-          },
-          "stateClassifications": {
-            "items": {
-              "enum": [
-                "stateless",
-                "repository-stateful",
-                "external-stateful",
-                "persistent-data"
-              ],
-              "type": "string"
-            },
-            "minItems": 1,
-            "readOnly": true,
-            "type": "array"
-          },
-          "version": {
-            "$ref": "#/$defs/urn:egeria-systems:schema:semantic-version:1.0.0"
-          }
+          "readOnly": true,
+          "type": "array"
         },
-        "readOnly": true,
-        "required": [
-          "identifier",
-          "version",
-          "deliveryMode",
-          "stateClassifications",
-          "removalPolicy"
-        ],
-        "type": "object"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "lastSuccessfulVerification": {
-      "oneOf": [
-        {
+        "builderVersion": {
+          "const": "0.0.0",
+          "type": "string"
+        },
+        "compatibility": {
           "additionalProperties": false,
           "properties": {
-            "checks": {
-              "anyOf": [
-                {
-                  "items": false,
-                  "maxItems": 9,
-                  "minItems": 9,
-                  "prefixItems": [
+            "node": {
+              "const": "22.23.2",
+              "type": "string"
+            },
+            "platformAdapter": {
+              "const": "cloudflare-workers",
+              "type": "string"
+            },
+            "pnpm": {
+              "const": "11.20.0",
+              "type": "string"
+            }
+          },
+          "readOnly": true,
+          "required": [
+            "node",
+            "pnpm",
+            "platformAdapter"
+          ],
+          "type": "object"
+        },
+        "ejections": {
+          "items": {
+            "$ref": "#/$defs/urn:egeria-systems:schema:safe-relative-path:1.0.0"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "installedCapabilities": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "deliveryMode": {
+                "enum": [
+                  "package-backed",
+                  "source-generated",
+                  "hybrid"
+                ],
+                "type": "string"
+              },
+              "identifier": {
+                "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+              },
+              "removalPolicy": {
+                "enum": [
+                  "automatic",
+                  "reviewed",
+                  "export-and-remove",
+                  "eject-only",
+                  "unsupported"
+                ],
+                "type": "string"
+              },
+              "stateClassifications": {
+                "items": {
+                  "enum": [
+                    "stateless",
+                    "repository-stateful",
+                    "external-stateful",
+                    "persistent-data"
+                  ],
+                  "type": "string"
+                },
+                "minItems": 1,
+                "readOnly": true,
+                "type": "array"
+              },
+              "version": {
+                "$ref": "#/$defs/urn:egeria-systems:schema:semantic-version:1.0.0"
+              }
+            },
+            "readOnly": true,
+            "required": [
+              "identifier",
+              "version",
+              "deliveryMode",
+              "stateClassifications",
+              "removalPolicy"
+            ],
+            "type": "object"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "lastSuccessfulVerification": {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "checks": {
+                  "anyOf": [
                     {
-                      "const": "contracts",
-                      "type": "string"
+                      "items": false,
+                      "maxItems": 9,
+                      "minItems": 9,
+                      "prefixItems": [
+                        {
+                          "const": "contracts",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pre-state-inference",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lockfile",
+                          "type": "string"
+                        },
+                        {
+                          "const": "frozen-install",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lint",
+                          "type": "string"
+                        },
+                        {
+                          "const": "typecheck",
+                          "type": "string"
+                        },
+                        {
+                          "const": "next-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "opennext-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "post-state-inference",
+                          "type": "string"
+                        }
+                      ],
+                      "readOnly": true,
+                      "type": "array"
                     },
                     {
-                      "const": "pre-state-inference",
-                      "type": "string"
-                    },
-                    {
-                      "const": "lockfile",
-                      "type": "string"
-                    },
-                    {
-                      "const": "frozen-install",
-                      "type": "string"
-                    },
-                    {
-                      "const": "lint",
-                      "type": "string"
-                    },
-                    {
-                      "const": "typecheck",
-                      "type": "string"
-                    },
-                    {
-                      "const": "next-build",
-                      "type": "string"
-                    },
-                    {
-                      "const": "opennext-build",
-                      "type": "string"
-                    },
-                    {
-                      "const": "post-state-inference",
-                      "type": "string"
+                      "items": false,
+                      "maxItems": 11,
+                      "minItems": 11,
+                      "prefixItems": [
+                        {
+                          "const": "contracts",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pre-state-inference",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lockfile",
+                          "type": "string"
+                        },
+                        {
+                          "const": "frozen-install",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lint",
+                          "type": "string"
+                        },
+                        {
+                          "const": "typecheck",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unit-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "component-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "next-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "opennext-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "post-state-inference",
+                          "type": "string"
+                        }
+                      ],
+                      "readOnly": true,
+                      "type": "array"
                     }
                   ],
-                  "readOnly": true,
-                  "type": "array"
+                  "readOnly": true
                 },
-                {
+                "kind": {
+                  "const": "generation",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "checks"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "checks": {
                   "items": false,
-                  "maxItems": 11,
-                  "minItems": 11,
+                  "maxItems": 12,
+                  "minItems": 12,
                   "prefixItems": [
                     {
                       "const": "contracts",
+                      "type": "string"
+                    },
+                    {
+                      "const": "plan-approval",
                       "type": "string"
                     },
                     {
@@ -224,485 +297,415 @@
                       "type": "string"
                     },
                     {
-                      "const": "post-state-inference",
+                      "const": "post-change-inference",
                       "type": "string"
                     }
                   ],
                   "readOnly": true,
                   "type": "array"
-                }
-              ],
-              "readOnly": true
-            },
-            "kind": {
-              "const": "generation",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "checks"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "checks": {
-              "items": false,
-              "maxItems": 12,
-              "minItems": 12,
-              "prefixItems": [
-                {
-                  "const": "contracts",
-                  "type": "string"
                 },
-                {
-                  "const": "plan-approval",
-                  "type": "string"
-                },
-                {
-                  "const": "pre-state-inference",
-                  "type": "string"
-                },
-                {
-                  "const": "lockfile",
-                  "type": "string"
-                },
-                {
-                  "const": "frozen-install",
-                  "type": "string"
-                },
-                {
-                  "const": "lint",
-                  "type": "string"
-                },
-                {
-                  "const": "typecheck",
-                  "type": "string"
-                },
-                {
-                  "const": "unit-tests",
-                  "type": "string"
-                },
-                {
-                  "const": "component-tests",
-                  "type": "string"
-                },
-                {
-                  "const": "next-build",
-                  "type": "string"
-                },
-                {
-                  "const": "opennext-build",
-                  "type": "string"
-                },
-                {
-                  "const": "post-change-inference",
+                "kind": {
+                  "const": "capability-addition",
                   "type": "string"
                 }
-              ],
-              "readOnly": true,
-              "type": "array"
-            },
-            "kind": {
-              "const": "capability-addition",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "checks"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "checks": {
-              "items": false,
-              "maxItems": 12,
-              "minItems": 12,
-              "prefixItems": [
-                {
-                  "const": "contracts",
-                  "type": "string"
-                },
-                {
-                  "const": "plan-approval",
-                  "type": "string"
-                },
-                {
-                  "const": "pre-state-inference",
-                  "type": "string"
-                },
-                {
-                  "const": "lockfile",
-                  "type": "string"
-                },
-                {
-                  "const": "frozen-install",
-                  "type": "string"
-                },
-                {
-                  "const": "lint",
-                  "type": "string"
-                },
-                {
-                  "const": "typecheck",
-                  "type": "string"
-                },
-                {
-                  "const": "unit-tests",
-                  "type": "string"
-                },
-                {
-                  "const": "component-tests",
-                  "type": "string"
-                },
-                {
-                  "const": "next-build",
-                  "type": "string"
-                },
-                {
-                  "const": "opennext-build",
-                  "type": "string"
-                },
-                {
-                  "const": "post-change-inference",
-                  "type": "string"
-                }
-              ],
-              "readOnly": true,
-              "type": "array"
-            },
-            "kind": {
-              "const": "capability-removal",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "checks"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "checks": {
-              "items": false,
-              "maxItems": 12,
-              "minItems": 12,
-              "prefixItems": [
-                {
-                  "const": "contracts",
-                  "type": "string"
-                },
-                {
-                  "const": "plan-approval",
-                  "type": "string"
-                },
-                {
-                  "const": "pre-state-inference",
-                  "type": "string"
-                },
-                {
-                  "const": "lockfile",
-                  "type": "string"
-                },
-                {
-                  "const": "frozen-install",
-                  "type": "string"
-                },
-                {
-                  "const": "lint",
-                  "type": "string"
-                },
-                {
-                  "const": "typecheck",
-                  "type": "string"
-                },
-                {
-                  "const": "unit-tests",
-                  "type": "string"
-                },
-                {
-                  "const": "component-tests",
-                  "type": "string"
-                },
-                {
-                  "const": "next-build",
-                  "type": "string"
-                },
-                {
-                  "const": "opennext-build",
-                  "type": "string"
-                },
-                {
-                  "const": "post-change-inference",
-                  "type": "string"
-                }
-              ],
-              "readOnly": true,
-              "type": "array"
-            },
-            "kind": {
-              "const": "capability-upgrade",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "checks"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "checks": {
-              "items": false,
-              "maxItems": 12,
-              "minItems": 12,
-              "prefixItems": [
-                {
-                  "const": "contracts",
-                  "type": "string"
-                },
-                {
-                  "const": "plan-approval",
-                  "type": "string"
-                },
-                {
-                  "const": "pre-state-inference",
-                  "type": "string"
-                },
-                {
-                  "const": "lockfile",
-                  "type": "string"
-                },
-                {
-                  "const": "frozen-install",
-                  "type": "string"
-                },
-                {
-                  "const": "lint",
-                  "type": "string"
-                },
-                {
-                  "const": "typecheck",
-                  "type": "string"
-                },
-                {
-                  "const": "unit-tests",
-                  "type": "string"
-                },
-                {
-                  "const": "component-tests",
-                  "type": "string"
-                },
-                {
-                  "const": "next-build",
-                  "type": "string"
-                },
-                {
-                  "const": "opennext-build",
-                  "type": "string"
-                },
-                {
-                  "const": "post-change-inference",
-                  "type": "string"
-                }
-              ],
-              "readOnly": true,
-              "type": "array"
-            },
-            "kind": {
-              "const": "profile-transition",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "checks"
-          ],
-          "type": "object"
-        }
-      ],
-      "readOnly": true
-    },
-    "managedSurfaces": {
-      "items": {
-        "additionalProperties": false,
-        "properties": {
-          "fingerprint": {
-            "$ref": "#/$defs/urn:egeria-systems:schema:sha256-fingerprint:1.0.0"
-          },
-          "fingerprintTarget": {
-            "oneOf": [
-              {
-                "additionalProperties": false,
-                "properties": {
-                  "kind": {
-                    "const": "file",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "kind"
-                ],
-                "type": "object"
               },
-              {
-                "additionalProperties": false,
-                "properties": {
-                  "kind": {
-                    "const": "json-value",
-                    "type": "string"
-                  },
-                  "pointer": {
-                    "$ref": "#/$defs/urn:egeria-systems:schema:json-pointer:1.0.0"
-                  }
+              "required": [
+                "kind",
+                "checks"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "checks": {
+                  "items": false,
+                  "maxItems": 12,
+                  "minItems": 12,
+                  "prefixItems": [
+                    {
+                      "const": "contracts",
+                      "type": "string"
+                    },
+                    {
+                      "const": "plan-approval",
+                      "type": "string"
+                    },
+                    {
+                      "const": "pre-state-inference",
+                      "type": "string"
+                    },
+                    {
+                      "const": "lockfile",
+                      "type": "string"
+                    },
+                    {
+                      "const": "frozen-install",
+                      "type": "string"
+                    },
+                    {
+                      "const": "lint",
+                      "type": "string"
+                    },
+                    {
+                      "const": "typecheck",
+                      "type": "string"
+                    },
+                    {
+                      "const": "unit-tests",
+                      "type": "string"
+                    },
+                    {
+                      "const": "component-tests",
+                      "type": "string"
+                    },
+                    {
+                      "const": "next-build",
+                      "type": "string"
+                    },
+                    {
+                      "const": "opennext-build",
+                      "type": "string"
+                    },
+                    {
+                      "const": "post-change-inference",
+                      "type": "string"
+                    }
+                  ],
+                  "readOnly": true,
+                  "type": "array"
                 },
-                "required": [
-                  "kind",
-                  "pointer"
-                ],
-                "type": "object"
-              }
-            ],
-            "readOnly": true
-          },
-          "identifier": {
-            "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
-          },
-          "mergeStrategy": {
-            "enum": [
-              "replace-file",
-              "json-property"
-            ],
-            "type": "string"
-          },
-          "owner": {
-            "oneOf": [
-              {
-                "additionalProperties": false,
-                "properties": {
-                  "kind": {
-                    "const": "builder-kernel",
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "kind"
-                ],
-                "type": "object"
+                "kind": {
+                  "const": "capability-removal",
+                  "type": "string"
+                }
               },
-              {
-                "additionalProperties": false,
-                "properties": {
-                  "identifier": {
-                    "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
-                  },
-                  "kind": {
-                    "const": "capability",
-                    "type": "string"
-                  }
+              "required": [
+                "kind",
+                "checks"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "checks": {
+                  "items": false,
+                  "maxItems": 12,
+                  "minItems": 12,
+                  "prefixItems": [
+                    {
+                      "const": "contracts",
+                      "type": "string"
+                    },
+                    {
+                      "const": "plan-approval",
+                      "type": "string"
+                    },
+                    {
+                      "const": "pre-state-inference",
+                      "type": "string"
+                    },
+                    {
+                      "const": "lockfile",
+                      "type": "string"
+                    },
+                    {
+                      "const": "frozen-install",
+                      "type": "string"
+                    },
+                    {
+                      "const": "lint",
+                      "type": "string"
+                    },
+                    {
+                      "const": "typecheck",
+                      "type": "string"
+                    },
+                    {
+                      "const": "unit-tests",
+                      "type": "string"
+                    },
+                    {
+                      "const": "component-tests",
+                      "type": "string"
+                    },
+                    {
+                      "const": "next-build",
+                      "type": "string"
+                    },
+                    {
+                      "const": "opennext-build",
+                      "type": "string"
+                    },
+                    {
+                      "const": "post-change-inference",
+                      "type": "string"
+                    }
+                  ],
+                  "readOnly": true,
+                  "type": "array"
                 },
-                "required": [
-                  "kind",
-                  "identifier"
-                ],
-                "type": "object"
-              }
-            ],
-            "readOnly": true
-          },
-          "ownership": {
-            "enum": [
-              "managed",
-              "merge-managed",
-              "application-owned",
-              "ejected"
-            ],
-            "type": "string"
-          },
-          "path": {
-            "$ref": "#/$defs/urn:egeria-systems:schema:safe-relative-path:1.0.0"
-          }
-        },
-        "readOnly": true,
-        "required": [
-          "identifier",
-          "owner",
-          "path",
-          "ownership",
-          "fingerprintTarget",
-          "mergeStrategy",
-          "fingerprint"
-        ],
-        "type": "object"
-      },
-      "readOnly": true,
-      "type": "array"
-    },
-    "origin": {
-      "additionalProperties": false,
-      "properties": {
-        "profile": {
-          "enum": [
-            "portfolio",
-            "site"
+                "kind": {
+                  "const": "capability-upgrade",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "checks"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "checks": {
+                  "items": false,
+                  "maxItems": 12,
+                  "minItems": 12,
+                  "prefixItems": [
+                    {
+                      "const": "contracts",
+                      "type": "string"
+                    },
+                    {
+                      "const": "plan-approval",
+                      "type": "string"
+                    },
+                    {
+                      "const": "pre-state-inference",
+                      "type": "string"
+                    },
+                    {
+                      "const": "lockfile",
+                      "type": "string"
+                    },
+                    {
+                      "const": "frozen-install",
+                      "type": "string"
+                    },
+                    {
+                      "const": "lint",
+                      "type": "string"
+                    },
+                    {
+                      "const": "typecheck",
+                      "type": "string"
+                    },
+                    {
+                      "const": "unit-tests",
+                      "type": "string"
+                    },
+                    {
+                      "const": "component-tests",
+                      "type": "string"
+                    },
+                    {
+                      "const": "next-build",
+                      "type": "string"
+                    },
+                    {
+                      "const": "opennext-build",
+                      "type": "string"
+                    },
+                    {
+                      "const": "post-change-inference",
+                      "type": "string"
+                    }
+                  ],
+                  "readOnly": true,
+                  "type": "array"
+                },
+                "kind": {
+                  "const": "profile-transition",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "checks"
+              ],
+              "type": "object"
+            }
           ],
+          "readOnly": true
+        },
+        "managedSurfaces": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "fingerprint": {
+                "$ref": "#/$defs/urn:egeria-systems:schema:sha256-fingerprint:1.0.0"
+              },
+              "fingerprintTarget": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "file",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "json-value",
+                        "type": "string"
+                      },
+                      "pointer": {
+                        "$ref": "#/$defs/urn:egeria-systems:schema:json-pointer:1.0.0"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "pointer"
+                    ],
+                    "type": "object"
+                  }
+                ],
+                "readOnly": true
+              },
+              "identifier": {
+                "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+              },
+              "mergeStrategy": {
+                "enum": [
+                  "replace-file",
+                  "json-property"
+                ],
+                "type": "string"
+              },
+              "owner": {
+                "oneOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "builder-kernel",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "identifier": {
+                        "$ref": "#/$defs/urn:egeria-systems:schema:stable-identifier:1.0.0"
+                      },
+                      "kind": {
+                        "const": "capability",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "identifier"
+                    ],
+                    "type": "object"
+                  }
+                ],
+                "readOnly": true
+              },
+              "ownership": {
+                "enum": [
+                  "managed",
+                  "merge-managed",
+                  "application-owned",
+                  "ejected"
+                ],
+                "type": "string"
+              },
+              "path": {
+                "$ref": "#/$defs/urn:egeria-systems:schema:safe-relative-path:1.0.0"
+              }
+            },
+            "readOnly": true,
+            "required": [
+              "identifier",
+              "owner",
+              "path",
+              "ownership",
+              "fingerprintTarget",
+              "mergeStrategy",
+              "fingerprint"
+            ],
+            "type": "object"
+          },
+          "readOnly": true,
+          "type": "array"
+        },
+        "origin": {
+          "additionalProperties": false,
+          "properties": {
+            "profile": {
+              "enum": [
+                "portfolio",
+                "site"
+              ],
+              "type": "string"
+            },
+            "recipeVersion": {
+              "enum": [
+                "0.1.0",
+                "0.2.0",
+                "0.3.0",
+                "0.4.0",
+                "0.5.0",
+                "0.6.0",
+                "0.7.0",
+                "0.8.0",
+                "0.9.0",
+                "0.10.0",
+                "0.11.0"
+              ],
+              "type": "string"
+            }
+          },
+          "readOnly": true,
+          "required": [
+            "profile",
+            "recipeVersion"
+          ],
+          "type": "object"
+        },
+        "projectSchemaVersion": {
+          "const": "1.0.0",
           "type": "string"
         },
-        "recipeVersion": {
-          "enum": [
-            "0.1.0",
-            "0.2.0",
-            "0.3.0",
-            "0.4.0",
-            "0.5.0",
-            "0.6.0",
-            "0.7.0",
-            "0.8.0",
-            "0.9.0",
-            "0.10.0",
-            "0.11.0"
-          ],
+        "schemaVersion": {
+          "const": "1.0.0",
           "type": "string"
         }
       },
       "readOnly": true,
       "required": [
-        "profile",
-        "recipeVersion"
+        "schemaVersion",
+        "builderVersion",
+        "projectSchemaVersion",
+        "origin",
+        "installedCapabilities",
+        "appliedMigrations",
+        "managedSurfaces",
+        "ejections",
+        "compatibility",
+        "lastSuccessfulVerification"
       ],
+      "title": "Egeria installed state",
       "type": "object"
-    },
-    "projectSchemaVersion": {
-      "const": "1.0.0",
-      "type": "string"
-    },
-    "schemaVersion": {
-      "const": "1.0.0",
-      "type": "string"
     }
   },
-  "readOnly": true,
-  "required": [
-    "schemaVersion",
-    "builderVersion",
-    "projectSchemaVersion",
-    "origin",
-    "installedCapabilities",
-    "appliedMigrations",
-    "managedSurfaces",
-    "ejections",
-    "compatibility",
-    "lastSuccessfulVerification"
-  ],
-  "title": "Egeria installed state",
-  "type": "object"
+  "$ref": "#/$defs/urn:egeria-systems:schema:state:1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
 }
