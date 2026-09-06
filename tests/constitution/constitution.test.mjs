@@ -3562,7 +3562,7 @@ test("canonical documentation records visual regression and the client-ready clo
     roadmap,
     builderInstructions,
   ]) {
-    assert.match(currentContractOwner, /ten[^\n]+pending/iu);
+    assert.match(currentContractOwner, /\bten\b[^\n]+\bpending\b/iu);
   }
 
   assert.match(
@@ -4151,7 +4151,7 @@ test("canonical documentation accepts profile-transition execution and records t
   ]) {
     assert.match(historicalCertificationOwner, multilingualEligibilityPattern);
   }
-  assert.match(builderCoreInstructions, /ten[^\n]+pending/iu);
+  assert.match(builderCoreInstructions, /\bten\b[^\n]+\bpending\b/iu);
 
   for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
     assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);

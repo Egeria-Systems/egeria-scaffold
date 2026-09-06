@@ -1782,7 +1782,10 @@ export function createCapabilityCatalogSnapshot(
       ),
     );
   }
-  if (supportedSnapshot === undefined) {
+  if (
+    typeof standardsSnapshot !== "string" ||
+    !isSupportedStandardsSnapshotVersion(standardsSnapshot)
+  ) {
     versionIssues.push({
       code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID",
       path: ["snapshot", "standards"],
