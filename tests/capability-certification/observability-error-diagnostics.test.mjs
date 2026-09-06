@@ -528,22 +528,20 @@ function validateCompletedCertificationReceipt(receipt) {
   return issues;
 }
 
-test("the diagnostics certification receipt accepts the exact reviewed subject and all required outcomes", async (t) => {
+test("the historical diagnostics receipt remains reviewable while the current subject is pending", async (t) => {
   const registry = JSON.parse(await readFile(registryPath, "utf8"));
   const record = registry.records.observability;
   assert.deepEqual(record, {
-    subject: exactSubject,
+    subject: {
+      descriptorVersion: "0.3.0",
+      behaviorContractDigest:
+        "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43",
+    },
     requiredEvidence,
-    status: "certified",
+    status: "pending",
     taskPlan:
-      "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md",
-    evidence: requiredEvidence.map((kind) => ({
-      kind,
-      path: "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
-      outcome: "passed",
-      revision: acceptedEvidenceRevision,
-      subject: exactSubject,
-    })),
+      "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+    evidence: [],
   });
 
   if (!(await pathExists(localReceiptPath))) {

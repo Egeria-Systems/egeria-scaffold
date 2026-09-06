@@ -6,6 +6,10 @@ export const requiredEvidence = Object.freeze({
     "fresh-scaffold",
     "provider-confirmed",
   ]),
+  "app-foundation": Object.freeze([
+    "existing-repository-lifecycle",
+    "fresh-scaffold",
+  ]),
   "booking-calendly": Object.freeze([
     "cleanup-recovery",
     "deployed-application",

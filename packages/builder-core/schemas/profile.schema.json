@@ -14,7 +14,8 @@
         "identifier": {
           "enum": [
             "portfolio",
-            "site"
+            "site",
+            "app"
           ],
           "type": "string"
         },
@@ -46,7 +47,7 @@
         "recipeVersion",
         "defaultCapabilities"
       ],
-      "title": "Egeria portfolio and site profile recipe",
+      "title": "Egeria portfolio, site, and app profile recipe",
       "type": "object"
     },
     "urn:egeria-systems:schema:stable-identifier:1.0.0": {

@@ -39,6 +39,227 @@ function resolveRequest(
   return core.resolveCapabilities(request, catalog, profiles);
 }
 
+const appFoundationFileSurfaces = [
+  ["app-foundation-health-route-entry", "apps/web/app/api/health/route.ts", "managed"],
+  ["app-foundation-build-information-domain", "apps/web/src/domain/build-information.ts", "managed"],
+  ["app-foundation-build-information-reader", "apps/web/src/application/build-information-reader.ts", "managed"],
+  ["app-foundation-request-context", "apps/web/src/application/request-context.ts", "managed"],
+  ["app-foundation-health-application", "apps/web/src/application/health.ts", "managed"],
+  ["app-foundation-cloudflare-build-information-reader", "apps/web/src/infrastructure/cloudflare/build-information-reader.ts", "managed"],
+  ["app-foundation-memory-build-information-reader", "apps/web/src/infrastructure/memory/build-information-reader.ts", "managed"],
+  ["app-foundation-server-health-composition", "apps/web/src/composition/server-health.ts", "managed"],
+  ["app-foundation-health-route-delivery", "apps/web/src/delivery/health-route.ts", "managed"],
+  ["app-foundation-application-boundaries-guide", "apps/web/docs/application-boundaries.md", "application-owned"],
+  ["app-foundation-request-context-specification", "apps/web/tests/unit/request-context.test.ts", "managed"],
+  ["app-foundation-build-information-specification", "apps/web/tests/unit/build-information.test.ts", "managed"],
+  ["app-foundation-health-specification", "apps/web/tests/unit/health.test.ts", "managed"],
+  ["app-foundation-cloudflare-reader-specification", "apps/web/tests/unit/cloudflare-build-information-reader.test.ts", "managed"],
+  ["app-foundation-health-route-specification", "apps/web/tests/unit/health-route.test.ts", "managed"],
+  ["app-foundation-whole-worker-specification", "apps/web/tests/integration/health-worker.test.ts", "managed"],
+  ["app-foundation-whole-worker-configuration", "apps/web/vitest.cloudflare.config.ts", "managed"],
+];
+
+test("app recipe resolves exact defaults, dependency order, optional subsets, and rejects unsupported combinations", () => {
+  assert.deepEqual(core.profileRecipes.at(-1), {
+    identifier: "app",
+    schemaVersion: "1.0.0",
+    recipeVersion: "0.1.0",
+    defaultCapabilities: ["app-foundation", "site-routing"],
+  });
+
+  const optionalCapabilities = [
+    "analytics",
+    "booking-calendly",
+    "multilingual",
+  ];
+  for (let mask = 0; mask < 8; mask += 1) {
+    const requestedCapabilities = optionalCapabilities.filter(
+      (_identifier, index) => (mask & (1 << index)) !== 0,
+    );
+    const resolution = assertOk(
+      resolveRequest({ profile: "app", requestedCapabilities }),
+    );
+    const identifiers = resolution.capabilities.map(({ identifier }) => identifier);
+
+    assert.equal(resolution.recipeVersion, "0.1.0");
+    assert.deepEqual(
+      identifiers,
+      [
+        "standards",
+        "deployment-cloudflare",
+        "content-files",
+        "section-composition",
+        "observability",
+        "app-foundation",
+        "site-routing",
+        ...requestedCapabilities,
+      ].filter((identifier, index, values) => values.indexOf(identifier) === index),
+    );
+  }
+
+  assertIssues(
+    resolveRequest({
+      profile: "portfolio",
+      requestedCapabilities: ["app-foundation"],
+    }),
+    [
+      {
+        code: "CAPABILITY_UNSUPPORTED",
+        path: ["capabilities", "app-foundation"],
+        context: { identifier: "app-foundation", profile: "portfolio" },
+      },
+    ],
+  );
+  assertIssues(
+    resolveRequest({ profile: "app", requestedCapabilities: ["unknown"] }),
+    [
+      {
+        code: "CAPABILITY_UNKNOWN",
+        path: ["requestedCapabilities", 0],
+        context: { identifier: "unknown" },
+      },
+    ],
+  );
+  assertIssues(
+    resolveRequest({ profile: "app" }, createCatalog(), [
+      ...core.profileRecipes.slice(0, -1),
+      {
+        ...core.profileRecipes.at(-1),
+        defaultCapabilities: ["unknown", "site-routing"],
+      },
+    ]),
+    [
+      {
+        code: "CAPABILITY_UNKNOWN",
+        path: ["profiles", 2, "defaultCapabilities", 0],
+        context: { identifier: "unknown" },
+      },
+    ],
+  );
+});
+
+test("app foundation descriptor owns only its exact server, dependency, and verification surfaces", () => {
+  const descriptor = createCatalog().find(
+    ({ identifier }) => identifier === "app-foundation",
+  );
+  assert.notEqual(descriptor, undefined);
+
+  assert.deepEqual(
+    {
+      identifier: descriptor.identifier,
+      version: descriptor.version,
+      deliveryMode: descriptor.deliveryMode,
+      stateClassifications: descriptor.stateClassifications,
+      removalPolicy: descriptor.removalPolicy,
+      dependencies: descriptor.dependencies,
+      optionalIntegrations: descriptor.optionalIntegrations,
+      supportedProfiles: descriptor.supportedProfiles,
+      requiredPackages: descriptor.requiredPackages,
+      environmentVariables: descriptor.environmentVariables,
+      secrets: descriptor.secrets,
+      platformResources: descriptor.platformResources,
+      externalDomains: descriptor.externalDomains,
+      browserStorage: descriptor.browserStorage,
+      dataClassifications: descriptor.dataClassifications,
+      retentionAssumptions: descriptor.retentionAssumptions,
+      privilegedOperations: descriptor.privilegedOperations,
+      migrationPlanners: descriptor.migrationPlanners,
+    },
+    {
+      identifier: "app-foundation",
+      version: "0.1.0",
+      deliveryMode: "hybrid",
+      stateClassifications: ["repository-stateful"],
+      removalPolicy: "reviewed",
+      dependencies: ["deployment-cloudflare", "observability", "standards"],
+      optionalIntegrations: [
+        "analytics",
+        "booking-calendly",
+        "multilingual",
+        "site-routing",
+      ],
+      supportedProfiles: ["app"],
+      requiredPackages: ["effect"],
+      environmentVariables: [],
+      secrets: [],
+      platformResources: [],
+      externalDomains: [],
+      browserStorage: [],
+      dataClassifications: [],
+      retentionAssumptions: [],
+      privilegedOperations: [],
+      migrationPlanners: [
+        "transition-portfolio-0-10-0-to-app-0-1-0",
+        "transition-site-0-11-0-to-app-0-1-0",
+      ],
+    },
+  );
+
+  assert.deepEqual(
+    descriptor.managedSurfaces.map(({ identifier, path, ownership }) => [
+      identifier,
+      path,
+      ownership,
+    ]),
+    [
+      ...appFoundationFileSurfaces,
+      ["app-foundation-effect-dependency", "apps/web/package.json", "merge-managed"],
+      ["app-foundation-whole-worker-script", "apps/web/package.json", "merge-managed"],
+    ],
+  );
+  assert.deepEqual(
+    descriptor.inferenceProbes,
+    [
+      ...appFoundationFileSurfaces.map(([, path]) => ({ kind: "file", path })),
+      {
+        kind: "package",
+        path: "apps/web/package.json",
+        section: "dependencies",
+        packageName: "effect",
+        version: "4.0.0-rc.112",
+      },
+      {
+        kind: "json-value",
+        path: "apps/web/package.json",
+        pointer: "/scripts/test:integration:cloudflare",
+        expected: "vitest run --config vitest.cloudflare.config.ts",
+      },
+    ],
+  );
+  assert.deepEqual(
+    descriptor.managedSurfaces.slice(-2).map(({ fingerprintTarget }) => fingerprintTarget),
+    [
+      { kind: "json-value", pointer: "/dependencies/effect" },
+      {
+        kind: "json-value",
+        pointer: "/scripts/test:integration:cloudflare",
+      },
+    ],
+  );
+  assert.deepEqual(descriptor.verificationPlan, [
+    "request-context-contracts",
+    "build-information-contracts",
+    "effect-application-behavior",
+    "cause-and-cancellation-contracts",
+    "health-delivery-contracts",
+    "whole-worker-execution",
+    "server-only-imports",
+  ]);
+  assert.deepEqual(descriptor.documentationEvidenceRequirements, [
+    "request-context-and-build-information-boundaries",
+    "effect-application-and-health-delivery-boundaries",
+    "cause-cancellation-and-whole-worker-claim-boundaries",
+    "server-only-import-boundary",
+  ]);
+  assert.deepEqual(descriptor.removalAndRecoveryRequirements, [
+    "recover-exact-effect-dependency",
+    "recover-whole-worker-verification-script",
+    "recover-managed-application-source",
+    "use-builder-kernel-lockfile-and-state-recovery",
+    "no-supported-removal-or-back-transition",
+  ]);
+});
+
 test("standards hybrid ownership declares generated unit, component, browser, and visual quality", () => {
   const standards = createCatalog().find(
     ({ identifier }) => identifier === "standards",
@@ -200,7 +421,7 @@ test("standards hybrid ownership declares generated unit, component, browser, an
   ]);
 });
 
-test("the portfolio and site catalog preserves the existing seven executable capability contracts", async () => {
+test("the current catalog preserves existing capability contracts while widening profile support", async () => {
   const catalogEntry = builtDeclaration.match(
     /export \* from "(\.\/catalog\/[^\"]+)\.js";/,
   )?.[1];
@@ -238,7 +459,7 @@ test("the portfolio and site catalog preserves the existing seven executable cap
       dependencies: ["standards"],
       optionalIntegrations: [],
       conflicts: [],
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: ["portfolio", "site", "app"],
       requiredPackages: ["raw-loader", "yaml"],
       environmentVariables: [],
       secrets: [],
@@ -365,7 +586,7 @@ test("the portfolio and site catalog preserves the existing seven executable cap
       dependencies: ["content-files"],
       optionalIntegrations: [],
       conflicts: [],
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: ["portfolio", "site", "app"],
       requiredPackages: ["@tailwindcss/postcss", "postcss", "tailwindcss"],
       environmentVariables: [],
       secrets: [],
@@ -494,7 +715,7 @@ test("the portfolio and site catalog preserves the existing seven executable cap
       dependencies: ["standards"],
       optionalIntegrations: [],
       conflicts: [],
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: ["portfolio", "site", "app"],
       requiredPackages: ["@opennextjs/cloudflare", "wrangler"],
       environmentVariables: ["DEPLOY_URL"],
       secrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
@@ -613,7 +834,7 @@ test("the portfolio and site catalog preserves the existing seven executable cap
       ],
       optionalIntegrations: [],
       conflicts: [],
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: ["portfolio", "site", "app"],
       requiredPackages: ["@egeria-systems/observability"],
       environmentVariables: [],
       secrets: [
@@ -885,7 +1106,7 @@ test("the portfolio and site catalog preserves the existing seven executable cap
       dependencies: ["content-files", "observability", "section-composition"],
       optionalIntegrations: [],
       conflicts: [],
-      supportedProfiles: ["site"],
+      supportedProfiles: ["site", "app"],
       requiredPackages: [],
       environmentVariables: [],
       secrets: [],
@@ -1018,7 +1239,7 @@ test("the portfolio and site catalog preserves the existing seven executable cap
       dependencies: ["section-composition"],
       optionalIntegrations: [],
       conflicts: [],
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: ["portfolio", "site", "app"],
       requiredPackages: [],
       environmentVariables: [],
       secrets: [],
@@ -1158,7 +1379,7 @@ test("the catalog declares the exact multilingual capability contract", () => {
     dependencies: ["content-files", "observability", "section-composition"],
     optionalIntegrations: ["booking-calendly", "site-routing"],
     conflicts: [],
-    supportedProfiles: ["portfolio", "site"],
+    supportedProfiles: ["portfolio", "site", "app"],
     requiredPackages: [],
     environmentVariables: [],
     secrets: [],
@@ -1318,7 +1539,7 @@ test("the catalog declares the exact analytics capability contract without obser
   assert.deepEqual(analytics.dependencies, ["content-files", "section-composition"]);
   assert.deepEqual(analytics.optionalIntegrations, ["multilingual", "site-routing"]);
   assert.equal(analytics.dependencies.includes("observability"), false);
-  assert.deepEqual(analytics.supportedProfiles, ["portfolio", "site"]);
+  assert.deepEqual(analytics.supportedProfiles, ["portfolio", "site", "app"]);
   assert.deepEqual(analytics.requiredPackages, []);
   assert.deepEqual(analytics.environmentVariables, []);
   assert.deepEqual(analytics.secrets, []);
@@ -1504,7 +1725,7 @@ test("the verified generation catalog pins exact public package releases", () =>
   assert.equal(core.verifiedCapabilityPackageVersions.standards, "0.1.0");
 
   const catalog = assertOk(core.createVerifiedCapabilityCatalog());
-  assert.equal(catalog.length, 9);
+  assert.equal(catalog.length, 10);
   assert.deepEqual(
     catalog.map(({ identifier }) => identifier),
     [
@@ -1517,6 +1738,7 @@ test("the verified generation catalog pins exact public package releases", () =>
       "booking-calendly",
       "multilingual",
       "analytics",
+      "app-foundation",
     ],
   );
 
@@ -1544,7 +1766,11 @@ test("the verified generation catalog pins exact public package releases", () =>
       },
     ],
   );
-  for (const { version } of packageProbes) {
+  for (const { packageName, version } of packageProbes) {
+    if (packageName === "effect") {
+      assert.equal(version, "4.0.0-rc.112");
+      continue;
+    }
     assert.match(version, /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/);
     assert.doesNotMatch(
       version,
@@ -1553,7 +1779,7 @@ test("the verified generation catalog pins exact public package releases", () =>
   }
 });
 
-test("portfolio and site recipes resolve to deterministic dependency-first manifests", () => {
+test("current recipes resolve to deterministic dependency-first manifests", () => {
   assert.deepEqual(core.profileRecipes, [
     {
       identifier: "portfolio",
@@ -1579,6 +1805,12 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
         "observability",
         "site-routing",
       ],
+    },
+    {
+      identifier: "app",
+      schemaVersion: "1.0.0",
+      recipeVersion: "0.1.0",
+      defaultCapabilities: ["app-foundation", "site-routing"],
     },
   ]);
 
@@ -1726,7 +1958,7 @@ test("portfolio and site recipes resolve to deterministic dependency-first manif
   ]);
 });
 
-test("current public recipes advance only the production site subject", () => {
+test("current recipes add app while historical portfolio and site snapshots stay exact", () => {
   assert.deepEqual(
     core.profileRecipes.map(({ identifier, recipeVersion }) => ({
       identifier,
@@ -1735,6 +1967,7 @@ test("current public recipes advance only the production site subject", () => {
     [
       { identifier: "portfolio", recipeVersion: "0.10.0" },
       { identifier: "site", recipeVersion: "0.11.0" },
+      { identifier: "app", recipeVersion: "0.1.0" },
     ],
   );
 
@@ -1757,6 +1990,20 @@ test("current public recipes advance only the production site subject", () => {
       ?.version,
     "0.3.0",
   );
+  assert.equal(historicalCatalog.length, 9);
+  assert.equal(
+    historicalCatalog.some(({ identifier }) => identifier === "app-foundation"),
+    false,
+  );
+  for (const descriptor of historicalCatalog) {
+    assert.deepEqual(
+      descriptor.supportedProfiles,
+      descriptor.identifier === "site-routing"
+        ? ["site"]
+        : ["portfolio", "site"],
+      descriptor.identifier,
+    );
+  }
   assert.deepEqual(core.createProfileRecipeSnapshot("0.10.0"), [
     { ...core.profileRecipes[0], recipeVersion: "0.10.0" },
     { ...core.profileRecipes[1], recipeVersion: "0.10.0" },
@@ -1794,7 +2041,7 @@ test("resolution traverses dependency identifiers lexically rather than trusting
 });
 
 test("resolution rejects unknown profiles and capability identifiers without implementations", () => {
-  for (const identifier of ["app", "authenticated-app"]) {
+  for (const identifier of ["authenticated-app"]) {
     assertIssues(resolveRequest({ profile: identifier }), [
       {
         code: "PROFILE_UNKNOWN",
@@ -1805,7 +2052,6 @@ test("resolution rejects unknown profiles and capability identifiers without imp
   }
 
   for (const identifier of [
-    "app-foundation",
     "application-persistence",
     "transactional-email-resend",
     "background-job-delivery",

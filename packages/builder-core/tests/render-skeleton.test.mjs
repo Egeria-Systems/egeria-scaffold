@@ -5780,7 +5780,7 @@ test("rendering rejects invalid requests with stable existing contract failures"
         displayName: "Acme Studio",
         packageVersions,
       },
-      code: "PROFILE_UNKNOWN",
+      code: "CONTRACT_VALIDATION_FAILED",
     },
     {
       request: {

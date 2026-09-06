@@ -4,7 +4,7 @@
     "analytics": {
       "subject": {
         "descriptorVersion": "0.1.0",
-        "behaviorContractDigest": "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378"
+        "behaviorContractDigest": "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba"
       },
       "requiredEvidence": [
         "cleanup-recovery",
@@ -13,65 +13,27 @@
         "fresh-scaffold",
         "provider-confirmed"
       ],
-      "status": "certified",
-      "taskPlan": "docs/superpowers/plans/2026-08-27-analytics-capability-certification.md",
-      "evidence": [
-        {
-          "kind": "cleanup-recovery",
-          "path": "docs/implementation-evidence/2026-08-28-analytics-capability-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "a97341ea628210b6fa713fb12461084f20c3f8da",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378"
-          }
-        },
-        {
-          "kind": "deployed-application",
-          "path": "docs/implementation-evidence/2026-08-28-analytics-capability-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "a97341ea628210b6fa713fb12461084f20c3f8da",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378"
-          }
-        },
-        {
-          "kind": "existing-repository-lifecycle",
-          "path": "docs/implementation-evidence/2026-08-28-analytics-capability-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "a97341ea628210b6fa713fb12461084f20c3f8da",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378"
-          }
-        },
-        {
-          "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-28-analytics-capability-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "a97341ea628210b6fa713fb12461084f20c3f8da",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378"
-          }
-        },
-        {
-          "kind": "provider-confirmed",
-          "path": "docs/implementation-evidence/2026-08-28-analytics-capability-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "a97341ea628210b6fa713fb12461084f20c3f8da",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378"
-          }
-        }
-      ]
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+      "evidence": []
+    },
+    "app-foundation": {
+      "subject": {
+        "descriptorVersion": "0.1.0",
+        "behaviorContractDigest": "sha256:6d9cf389441064a96d2b47bb309becab37358fcc2952335feffae8720eb6f497"
+      },
+      "requiredEvidence": [
+        "existing-repository-lifecycle",
+        "fresh-scaffold"
+      ],
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+      "evidence": []
     },
     "booking-calendly": {
       "subject": {
         "descriptorVersion": "0.1.0",
-        "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
+        "behaviorContractDigest": "sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca"
       },
       "requiredEvidence": [
         "cleanup-recovery",
@@ -80,294 +42,96 @@
         "fresh-scaffold",
         "provider-confirmed"
       ],
-      "status": "certified",
-      "taskPlan": "docs/superpowers/plans/2026-08-24-booking-calendly-lifecycle-certification.md",
-      "evidence": [
-        {
-          "kind": "cleanup-recovery",
-          "path": "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
-          "outcome": "passed",
-          "revision": "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
-          }
-        },
-        {
-          "kind": "deployed-application",
-          "path": "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
-          "outcome": "passed",
-          "revision": "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
-          }
-        },
-        {
-          "kind": "existing-repository-lifecycle",
-          "path": "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md",
-          "outcome": "passed",
-          "revision": "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
-          }
-        },
-        {
-          "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md",
-          "outcome": "passed",
-          "revision": "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
-          }
-        },
-        {
-          "kind": "provider-confirmed",
-          "path": "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
-          "outcome": "passed",
-          "revision": "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2"
-          }
-        }
-      ]
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+      "evidence": []
     },
     "content-files": {
       "subject": {
         "descriptorVersion": "0.4.0",
-        "behaviorContractDigest": "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05"
+        "behaviorContractDigest": "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4"
       },
       "requiredEvidence": ["fresh-scaffold"],
-      "status": "certified",
-      "taskPlan": "docs/superpowers/plans/2026-08-25-content-files-certification.md",
-      "evidence": [
-        {
-          "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-25-content-files-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "f03b9f624c370728f678924ce34e5287558d2a87",
-          "subject": {
-            "descriptorVersion": "0.4.0",
-            "behaviorContractDigest": "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05"
-          }
-        }
-      ]
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+      "evidence": []
     },
     "deployment-cloudflare": {
       "subject": {
         "descriptorVersion": "0.3.0",
-        "behaviorContractDigest": "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41"
+        "behaviorContractDigest": "sha256:fb2464553830b052428773286689dc91984d662bf999b267aefbcb66e045ed6e"
       },
       "requiredEvidence": [
         "cleanup-recovery",
         "deployed-application",
         "fresh-scaffold"
       ],
-      "status": "certified",
-      "taskPlan": "docs/superpowers/plans/2026-08-18-generated-cloudflare-deployment-certification.md",
-      "evidence": [
-        {
-          "kind": "cleanup-recovery",
-          "path": "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2",
-          "subject": {
-            "descriptorVersion": "0.3.0",
-            "behaviorContractDigest": "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41"
-          }
-        },
-        {
-          "kind": "deployed-application",
-          "path": "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2",
-          "subject": {
-            "descriptorVersion": "0.3.0",
-            "behaviorContractDigest": "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41"
-          }
-        },
-        {
-          "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2",
-          "subject": {
-            "descriptorVersion": "0.3.0",
-            "behaviorContractDigest": "sha256:1690cf9bb12e33a07ea2b91f125cdec62d1d302f35bcc7d533c6a89797481d41"
-          }
-        }
-      ]
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+      "evidence": []
     },
     "multilingual": {
       "subject": {
         "descriptorVersion": "0.1.0",
-        "behaviorContractDigest": "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41"
+        "behaviorContractDigest": "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891"
       },
       "requiredEvidence": [
         "existing-repository-lifecycle",
         "fresh-scaffold"
       ],
-      "status": "certified",
-      "taskPlan": "docs/superpowers/plans/2026-08-27-multilingual-certification.md",
-      "evidence": [
-        {
-          "kind": "existing-repository-lifecycle",
-          "path": "docs/implementation-evidence/2026-08-27-multilingual-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "96b587a254cf6fc859867d6fc66c7e0c900c4cfd",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41"
-          }
-        },
-        {
-          "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-27-multilingual-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "96b587a254cf6fc859867d6fc66c7e0c900c4cfd",
-          "subject": {
-            "descriptorVersion": "0.1.0",
-            "behaviorContractDigest": "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41"
-          }
-        }
-      ]
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+      "evidence": []
     },
     "observability": {
       "subject": {
         "descriptorVersion": "0.3.0",
-        "behaviorContractDigest": "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99"
+        "behaviorContractDigest": "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43"
       },
       "requiredEvidence": [
         "cleanup-recovery",
         "deployed-application",
         "fresh-scaffold"
       ],
-      "status": "certified",
-      "taskPlan": "docs/superpowers/plans/2026-08-12-observability-error-diagnostics-certification.md",
-      "evidence": [
-        {
-          "kind": "cleanup-recovery",
-          "path": "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
-          "subject": {
-            "descriptorVersion": "0.3.0",
-            "behaviorContractDigest": "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99"
-          }
-        },
-        {
-          "kind": "deployed-application",
-          "path": "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
-          "subject": {
-            "descriptorVersion": "0.3.0",
-            "behaviorContractDigest": "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99"
-          }
-        },
-        {
-          "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
-          "subject": {
-            "descriptorVersion": "0.3.0",
-            "behaviorContractDigest": "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99"
-          }
-        }
-      ]
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+      "evidence": []
     },
     "section-composition": {
       "subject": {
         "descriptorVersion": "0.3.0",
-        "behaviorContractDigest": "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696"
+        "behaviorContractDigest": "sha256:9f9830fd6fc0674d3851e42ca6b7f3a14b2182b60a994bc470399043b98b771e"
       },
       "requiredEvidence": ["fresh-scaffold"],
-      "status": "certified",
-      "taskPlan": "docs/superpowers/plans/2026-08-26-section-composition-certification.md",
-      "evidence": [
-        {
-          "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-26-section-composition-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "f74459c8833833186bb651c116ed524e51044677",
-          "subject": {
-            "descriptorVersion": "0.3.0",
-            "behaviorContractDigest": "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696"
-          }
-        }
-      ]
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+      "evidence": []
     },
     "site-routing": {
       "subject": {
         "descriptorVersion": "0.4.0",
-        "behaviorContractDigest": "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3"
+        "behaviorContractDigest": "sha256:a8bd53e9b32546266efd3dde9dc96fc3914cb06e9e811b8bf96ebd42822e2dac"
       },
       "requiredEvidence": [
         "existing-repository-lifecycle",
         "fresh-scaffold"
       ],
-      "status": "certified",
-      "taskPlan": "docs/superpowers/plans/2026-08-26-production-site-routing-certification.md",
-      "evidence": [
-        {
-          "kind": "existing-repository-lifecycle",
-          "path": "docs/implementation-evidence/2026-08-26-production-site-routing-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "6034d7330af912d1a1b9bcff3323ed360ebee2d0",
-          "subject": {
-            "descriptorVersion": "0.4.0",
-            "behaviorContractDigest": "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3"
-          }
-        },
-        {
-          "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-26-production-site-routing-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "6034d7330af912d1a1b9bcff3323ed360ebee2d0",
-          "subject": {
-            "descriptorVersion": "0.4.0",
-            "behaviorContractDigest": "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3"
-          }
-        }
-      ]
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+      "evidence": []
     },
     "standards": {
       "subject": {
         "descriptorVersion": "0.4.0",
-        "behaviorContractDigest": "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4"
+        "behaviorContractDigest": "sha256:640d95879a1e40e8fe26cf350453e01ead9fd031f30d53c4dd64552046449607"
       },
       "requiredEvidence": [
         "existing-repository-lifecycle",
         "fresh-scaffold"
       ],
-      "status": "certified",
-      "taskPlan": "docs/superpowers/plans/2026-08-25-standards-lifecycle-certification.md",
-      "evidence": [
-        {
-          "kind": "existing-repository-lifecycle",
-          "path": "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "d7f9dac6e25d5dde32015968d0912b45e73644e7",
-          "subject": {
-            "descriptorVersion": "0.4.0",
-            "behaviorContractDigest": "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4"
-          }
-        },
-        {
-          "kind": "fresh-scaffold",
-          "path": "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md",
-          "outcome": "passed",
-          "revision": "d7f9dac6e25d5dde32015968d0912b45e73644e7",
-          "subject": {
-            "descriptorVersion": "0.4.0",
-            "behaviorContractDigest": "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4"
-          }
-        }
-      ]
+      "status": "pending",
+      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+      "evidence": []
     }
   }
 }

@@ -2463,7 +2463,11 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     architectureOverview,
-    /architecture and governance candidate[\s\S]+executable[\s\S]+unimplemented/iu,
+    /app-foundation@0\.1\.0[\s\S]+recipe, catalog, schema, and pending-certification contracts[\s\S]+generated runtime[\s\S]+unimplemented/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /Runtime status:[^\n]+ten[^\n]+descriptors[^\n]+three[^\n]+recipe[^\n]+pending[^\n]+generation[^\n]+portfolio[^\n]+site/iu,
   );
   const completedRemovalGuardStage = ["P", "3", "C"].join("");
   const appFoundationStage = ["P", "4"].join("");
@@ -2483,16 +2487,24 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
     /exact app recipe[\s\S]+Effect boundary[\s\S]+Cause[\s\S]+cancellation[\s\S]+enable_request_signal[\s\S]+lockfile[\s\S]+optional[\s\S]+transition[\s\S]+visual[\s\S]+claim/iu,
   );
   assert.match(
+    enforcementMap,
+    /INV-APP-ARCHITECTURE[^\n]+actual[^\n]+recipe[^\n]+catalog[^\n]+schema[^\n]+pending certification[^\n]+runtime[^\n]+planned/iu,
+  );
+  assert.match(
     packageOwnership,
     /effect@4\.0\.0-rc\.112[\s\S]+ordinary generated-app dependency[\s\S]+builder-core[\s\S]+CLI[\s\S]+Effect-free[\s\S]+no new public package/iu,
   );
   assert.match(
-    programRoadmap,
-    /verified-final-diff approval[\s\S]+next executable contract increment[\s\S]+eligible[\s\S]+not authorized/iu,
+    packageOwnership,
+    /ten capability descriptors[^\n]+contract-only[^\n]+app@0\.1\.0[^\n]+generation[^\n]+portfolio[^\n]+site/iu,
   );
   assert.match(
     programRoadmap,
-    /\*\*Stop gate:\*\* This architecture increment stops at verified-final-diff approval of the architecture and governance candidate\.[\s\S]+Generated-project and transition evidence remain unimplemented/iu,
+    /Current increment status:[^\n]+recipe[^\n]+catalog[^\n]+schema[^\n]+pending-certification[^\n]+implemented[^\n]+generated runtime[^\n]+unimplemented/iu,
+  );
+  assert.match(
+    programRoadmap,
+    /\*\*Stop gate:\*\* This contract increment stops at a review-ready merge request with terminal hosted checks\.[^\n]+Generated-project and transition evidence remain unimplemented/iu,
   );
   assert.match(
     convergentProfileAdr,
@@ -2502,11 +2514,11 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
     effectRuntimeAdr,
     /This ADR owns the exact runtime decision\.[\s\S]+enforcement map owns the actual and planned gate mapping/iu,
   );
-  for (const instructions of [
+  assert.match(
     rootInstructions,
-    builderInstructions,
-    cliInstructions,
-  ]) {
+    /contract-only `app@0\.1\.0` recipe is implemented[\s\S]+dependency installation[\s\S]+certification execution are unimplemented/iu,
+  );
+  for (const instructions of [builderInstructions, cliInstructions]) {
     assert.match(
       instructions,
       /future[\s\S]+Effect[\s\S]+unimplemented/iu,
@@ -2681,9 +2693,10 @@ const capabilityIdentifiers = [
 ];
 
 test("the documented capability catalog uses the normalized contract", async () => {
-  const document = await readRepositoryFile(
-    "docs/architecture/capability-model.md",
-  );
+  const [document, builderInstructions] = await Promise.all([
+    readRepositoryFile("docs/architecture/capability-model.md"),
+    readRepositoryFile("packages/builder-core/AGENTS.md"),
+  ]);
   const descriptorMatch = document.match(
     /interface CapabilityDescriptor \{([\s\S]*?)\n\}/,
   );
@@ -2810,6 +2823,10 @@ test("the documented capability catalog uses the normalized contract", async () 
       `${identifier} repeats a profile inclusion`,
     );
   }
+  assert.match(
+    builderInstructions,
+    /ten-capability catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.1\.0[^\n]+project[^\n]+state[^\n]+generation[^\n]+portfolio[^\n]+site/iu,
+  );
 });
 
 test("capability delivery requires a separately planned certification task", async () => {
@@ -3005,11 +3022,7 @@ test("capability delivery requires a separately planned certification task", asy
 
   assert.match(
     enforcementMap,
-    /INV-CAPABILITY-CERTIFICATION[^\n]+actual[^\n]+certification coverage registry/i,
-  );
-  assert.match(
-    enforcementMap,
-    /INV-CAPABILITY-CERTIFICATION[^\n]+content-safe tracked receipts[^\n]+exact ignore exceptions/i,
+    /INV-CAPABILITY-CERTIFICATION[^\n]+actual tracked registry coverage[^\n]+ten current pending subjects[^\n]+historical evidence[^\n]+prior descriptor digests/i,
   );
   assert.match(
     enforcementMap,
@@ -3017,19 +3030,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /documentation contract[^\n]+does not prove[^\n]+runtime or provider result/i,
-  );
-  assert.match(
-    enforcementMap,
-    /standards@0\.4\.0[^\n]+certified[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7[^\n]+booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0[^\n]+certified[^\n]+content-files@0\.4\.0[^\n]+certified[^\n]+f03b9f624c370728f678924ce34e5287558d2a87[^\n]+section-composition@0\.3\.0[^\n]+certified[^\n]+f74459c8833833186bb651c116ed524e51044677[^\n]+site-routing@0\.3\.0[^\n]+certified[^\n]+77cea944513e521939bf4de088048f67acdfbc3c/i,
-  );
-  assert.match(
-    enforcementMap,
-    /descriptor version or behavior-contract digest[^\n]+material change[^\n]+new task-linked pending record/i,
-  );
-  assert.match(
-    enforcementMap,
-    /analytics@0\.1\.0[^\n]+certified[^\n]+a97341ea628210b6fa713fb12461084f20c3f8da[^\n]+descriptor admission[^\n]+all-certified[^\n]+pass/i,
+    /INV-APP-ARCHITECTURE[^\n]+runtime[^\n]+certification-execution gates remain planned/i,
   );
   assert.doesNotMatch(enforcementMap, /legacy-backfill-exempt/iu);
 });
@@ -3359,189 +3360,37 @@ test("executable capability certification ownership is current", async () => {
 
   for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
     assert.match(document, /certifications\/capabilities\.json/u);
-    assert.match(
-      document,
-      /booking-calendly[^\n]+(?:active|current)[^\n]+certified/iu,
-    );
+    assert.match(document, /ten[^\n]+pending/iu);
   }
   assert.match(
     capabilityModel,
-    /booking-calendly[^\n]+certified[^\n]+fresh-add lifecycle[^\n]+protected-staging\/provider receipts/iu,
+    /All ten changed current subjects[^\n]+pending[^\n]+historical[^\n]+prior descriptor digests/iu,
   );
   assert.match(
     enforcementMap,
-    /booking-calendly[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+provider-confirmed[^\n]+cleanup[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d/iu,
+    /ten current pending subjects[^\n]+all-certified[^\n]+ten pending subjects[^\n]+historical[^\n]+prior descriptor digests/iu,
   );
   const registry = JSON.parse(registrySource);
-  const bookingRecord = registry.records["booking-calendly"];
-  const deploymentRecord = registry.records["deployment-cloudflare"];
-  const observabilityRecord = registry.records.observability;
-  const multilingualRecord = registry.records.multilingual;
-  const siteRoutingRecord = registry.records["site-routing"];
-  const standardsRecord = registry.records.standards;
-  assert.equal(bookingRecord.status, "certified");
-  assert.equal(
-    bookingRecord.taskPlan,
-    "docs/superpowers/plans/2026-08-24-booking-calendly-lifecycle-certification.md",
-  );
-  assert.deepEqual(bookingRecord.requiredEvidence, [
-    "cleanup-recovery",
-    "deployed-application",
-    "existing-repository-lifecycle",
-    "fresh-scaffold",
-    "provider-confirmed",
+  assert.deepEqual(Object.keys(registry.records), [
+    "analytics",
+    "app-foundation",
+    "booking-calendly",
+    "content-files",
+    "deployment-cloudflare",
+    "multilingual",
+    "observability",
+    "section-composition",
+    "site-routing",
+    "standards",
   ]);
-  const bookingSubject = {
-    descriptorVersion: "0.1.0",
-    behaviorContractDigest:
-      "sha256:ee498aac3a9701829ea9345a3281958e6e05f22941a85896dac3b239b0f452f2",
-  };
-  assert.deepEqual(bookingRecord.evidence, [
-    {
-      kind: "cleanup-recovery",
-      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
-      outcome: "passed",
-      revision: "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
-      subject: bookingSubject,
-    },
-    {
-      kind: "deployed-application",
-      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
-      outcome: "passed",
-      revision: "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
-      subject: bookingSubject,
-    },
-    {
-      kind: "existing-repository-lifecycle",
-      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md",
-      outcome: "passed",
-      revision: "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059",
-      subject: bookingSubject,
-    },
-    {
-      kind: "fresh-scaffold",
-      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-certification-verification.md",
-      outcome: "passed",
-      revision: "b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059",
-      subject: bookingSubject,
-    },
-    {
-      kind: "provider-confirmed",
-      path: "docs/implementation-evidence/2026-08-24-booking-calendly-lifecycle-provider-receipt.md",
-      outcome: "passed",
-      revision: "f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d",
-      subject: bookingSubject,
-    },
-  ]);
-  assert.equal(deploymentRecord.status, "certified");
-  assert.deepEqual(
-    deploymentRecord.evidence.map(({ kind, path, outcome, revision }) => ({
-      kind,
-      path,
-      outcome,
-      revision,
-    })),
-    ["cleanup-recovery", "deployed-application", "fresh-scaffold"].map(
-      (kind) => ({
-        kind,
-        path: "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md",
-        outcome: "passed",
-        revision: "ea5a8ae8a6b0aa5fd7b8bc3bab3e03a52242aee2",
-      }),
-    ),
-  );
-  assert.equal(observabilityRecord.status, "certified");
-  assert.deepEqual(multilingualRecord, {
-    subject: {
-      descriptorVersion: "0.1.0",
-      behaviorContractDigest:
-        "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41",
-    },
-    requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
-    status: "certified",
-    taskPlan: "docs/superpowers/plans/2026-08-27-multilingual-certification.md",
-    evidence: ["existing-repository-lifecycle", "fresh-scaffold"].map(
-      (kind) => ({
-        kind,
-        path: "docs/implementation-evidence/2026-08-27-multilingual-certification-receipt.md",
-        outcome: "passed",
-        revision: "96b587a254cf6fc859867d6fc66c7e0c900c4cfd",
-        subject: {
-          descriptorVersion: "0.1.0",
-          behaviorContractDigest:
-            "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41",
-        },
-      }),
-    ),
-  });
-  assert.deepEqual(siteRoutingRecord, {
-    subject: {
-      descriptorVersion: "0.4.0",
-      behaviorContractDigest:
-        "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3",
-    },
-    requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
-    status: "certified",
-    taskPlan:
-      "docs/superpowers/plans/2026-08-26-production-site-routing-certification.md",
-    evidence: ["existing-repository-lifecycle", "fresh-scaffold"].map(
-      (kind) => ({
-        kind,
-        path: "docs/implementation-evidence/2026-08-26-production-site-routing-certification-receipt.md",
-        outcome: "passed",
-        revision: "6034d7330af912d1a1b9bcff3323ed360ebee2d0",
-        subject: {
-          descriptorVersion: "0.4.0",
-          behaviorContractDigest:
-            "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3",
-        },
-      }),
-    ),
-  });
-  assert.equal(standardsRecord.status, "certified");
-  assert.deepEqual(standardsRecord.requiredEvidence, [
-    "existing-repository-lifecycle",
-    "fresh-scaffold",
-  ]);
-  assert.deepEqual(
-    standardsRecord.evidence,
-    ["existing-repository-lifecycle", "fresh-scaffold"].map((kind) => ({
-      kind,
-      path: "docs/implementation-evidence/2026-08-25-standards-lifecycle-certification-receipt.md",
-      outcome: "passed",
-      revision: "d7f9dac6e25d5dde32015968d0912b45e73644e7",
-      subject: {
-        descriptorVersion: "0.4.0",
-        behaviorContractDigest:
-          "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4",
-      },
-    })),
-  );
-  assert.equal(
-    standardsRecord.taskPlan,
-    "docs/superpowers/plans/2026-08-25-standards-lifecycle-certification.md",
-  );
-  assert.deepEqual(observabilityRecord.requiredEvidence, [
-    "cleanup-recovery",
-    "deployed-application",
-    "fresh-scaffold",
-  ]);
-  assert.deepEqual(
-    observabilityRecord.evidence.map(({ kind, path, outcome, revision }) => ({
-      kind,
-      path,
-      outcome,
-      revision,
-    })),
-    ["cleanup-recovery", "deployed-application", "fresh-scaffold"].map(
-      (kind) => ({
-        kind,
-        path: "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
-        outcome: "passed",
-        revision: "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad",
-      }),
-    ),
-  );
+  for (const record of Object.values(registry.records)) {
+    assert.equal(record.status, "pending");
+    assert.equal(
+      record.taskPlan,
+      "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+    );
+    assert.deepEqual(record.evidence, []);
+  }
   assert.match(
     rootReadme,
     /recipe `0\.10\.0`[^\n]+standards@0\.4\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0/iu,
@@ -3556,7 +3405,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /executable recipes are `portfolio@0\.10\.0` and `site@0\.11\.0`[^\n]+site-routing@0\.4\.0[^\n]+observability@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+deployment-cloudflare@0\.3\.0/iu,
+    /generation-executable recipes remain `portfolio@0\.10\.0` and `site@0\.11\.0`[^\n]+app@0\.1\.0[^\n]+resolver-available[^\n]+not accepted by project\/state schemas or generation/iu,
   );
   assert.match(
     capabilityModel,
@@ -3566,7 +3415,7 @@ test("executable capability certification ownership is current", async () => {
     capabilityModel,
     /Workers custom records receive only the bounded safe operational event[^\n]+only the Better Stack diagnostic adapter receives the restricted message/iu,
   );
-  for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
+  for (const document of [overview, capabilityModel, roadmap]) {
     assert.match(
       document,
       /observability@0\.3\.0[^\n]+certified[^\n]+bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad/iu,
@@ -3608,11 +3457,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /analytics@0\.1\.0[^\n]+certified[^\n]+a97341ea628210b6fa713fb12461084f20c3f8da[^\n]+descriptor admission[^\n]+all-certified[^\n]+pass/iu,
-  );
-  assert.match(
-    enforcementMap,
-    /booking-calendly@0\.1\.0[^\n]+certified[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+provider-confirmed[^\n]+cleanup[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d/iu,
+    /ten current pending subjects[^\n]+all-certified[^\n]+ten pending subjects[^\n]+historical[^\n]+prior descriptor digests/iu,
   );
   assert.match(
     reviewProtocol,
@@ -3690,26 +3535,34 @@ test("canonical documentation records visual regression and the client-ready clo
       /8e5f376f32a95f87420fd82a61566c08c2db020e[^\n]+32399819237[^\n]+integration evidence[^\n]+not[^\n]+certification evidence/iu,
     );
   }
-  for (const currentOwner of [
+  for (const historicalEvidenceOwner of [
     rootReadme,
     sourcePlan,
+    capabilityModel,
+    overview,
+    packageOwnership,
+    roadmap,
+    builderReadme,
+  ]) {
+    assert.match(historicalEvidenceOwner, /standards@0\.4\.0/iu);
+    assert.match(
+      historicalEvidenceOwner,
+      /standards@0\.4\.0[^\n]+certified|certified[^\n]+standards@0\.4\.0/iu,
+    );
+    assert.match(
+      historicalEvidenceOwner,
+      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7/iu,
+    );
+  }
+  for (const currentContractOwner of [
     capabilityModel,
     enforcementMap,
     overview,
     packageOwnership,
     roadmap,
     builderInstructions,
-    builderReadme,
   ]) {
-    assert.match(currentOwner, /standards@0\.4\.0/iu);
-    assert.match(
-      currentOwner,
-      /standards@0\.4\.0[^\n]+certified|certified[^\n]+standards@0\.4\.0/iu,
-    );
-    assert.match(
-      currentOwner,
-      /standards@0\.4\.0[^\n]+fresh-scaffold[^\n]+d7f9dac6e25d5dde32015968d0912b45e73644e7/iu,
-    );
+    assert.match(currentContractOwner, /ten[^\n]+pending/iu);
   }
 
   assert.match(
@@ -4289,8 +4142,16 @@ test("canonical documentation accepts profile-transition execution and records t
     builderCoreInstructions,
   ]) {
     assert.match(closureStatusConsumer, finalLifecycleClosurePattern);
-    assert.match(closureStatusConsumer, multilingualEligibilityPattern);
   }
+  for (const historicalCertificationOwner of [
+    sourcePlan,
+    roadmap,
+    overview,
+    capabilityModel,
+  ]) {
+    assert.match(historicalCertificationOwner, multilingualEligibilityPattern);
+  }
+  assert.match(builderCoreInstructions, /ten[^\n]+pending/iu);
 
   for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
     assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);
@@ -4325,7 +4186,6 @@ test("canonical documentation accepts profile-transition execution and records t
   for (const certificationStatusOwner of [
     overview,
     capabilityModel,
-    enforcementMap,
   ]) {
     assert.match(
       certificationStatusOwner,
@@ -4344,6 +4204,10 @@ test("canonical documentation accepts profile-transition execution and records t
       /site-routing@0\.3\.0[^\n]+certified[^\n]+77cea944513e521939bf4de088048f67acdfbc3c/iu,
     );
   }
+  assert.match(
+    enforcementMap,
+    /INV-CAPABILITY-CERTIFICATION[^\n]+ten current pending subjects[^\n]+historical evidence[^\n]+prior descriptor digests/iu,
+  );
 
   assert.match(
     sourcePlan,
@@ -4744,11 +4608,11 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     capabilityModel,
-    /nine `portfolio`\/`site` descriptors.*executable.*analytics@0\.1\.0.*ninth executable descriptor/isu,
+    /ten current capability descriptors.*app-foundation@0\.1\.0.*App generation is not executable.*restricted to portfolio and site/isu,
   );
   assert.match(
     packageOwnership,
-    /nine capability descriptors/iu,
+    /ten capability descriptors[^\n]+contract-only `app-foundation@0\.1\.0`[^\n]+Project\/state parsing, generation[^\n]+portfolio@0\.10\.0[^\n]+site@0\.11\.0/iu,
   );
   assert.match(
     builderCoreReadme,
