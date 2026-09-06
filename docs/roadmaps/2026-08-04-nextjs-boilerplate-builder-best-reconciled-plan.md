@@ -15,7 +15,7 @@ The following decisions supersede conflicting wording in earlier plans:
 1. Generated client repositories use a lightweight pnpm workspace from the beginning.
 2. Profiles are versioned materialized recipes. They resolve to explicit installed capabilities and do not provide live inheritance afterward.
 3. `app-foundation` is an internal backend-ready capability with no database, queue, authentication, payment, or invented business CRUD.
-4. `app` is a public profile whose default recipe materializes `app-foundation`. During scaffolding or later upgrades, the user may independently select stateful backend capabilities.
+4. `app@0.1.0` is a public profile whose default recipe materializes exact `app-foundation@0.1.0` plus `site-routing@0.4.0`, retaining the complete production-site experience. During scaffolding or later lifecycle changes, the user may independently select optional website and stateful backend capabilities.
 5. The following are independent capabilities rather than automatic parts of `app`:
    - `application-persistence`;
    - `transactional-email-resend`;
@@ -36,6 +36,7 @@ The following decisions supersede conflicting wording in earlier plans:
 15. Every capability declares whether its delivery is package-backed, source-generated, or hybrid.
 16. Test tooling is selected by execution and evidence boundary rather than standardized on one runner. Builder, CLI, and package tests retain the Node.js test runner; generated TypeScript and React tests use Vitest with React Testing Library; binding-level Cloudflare runtime tests use Workers Vitest only after a capability installs the relevant binding; and Playwright retains browser, route, layout, and end-to-end responsibilities.
 17. Every applicable repository and generated-project `AGENTS.md` must name the correct test tool, command, escalation boundary, and claim limit for the code it governs. Continuous integration must execute every applicable test boundary for the builder, CLI, packages, compatibility proof, retained generated fixtures, and generated repositories.
+18. The first generated app pins `effect@4.0.0-rc.112` directly and confines it to application, infrastructure, composition, and delivery server modules. Builder-core, CLI, pure domain transforms, presentation, client modules, and content remain Effect-free. [ADR-0014](../adr/0014-selective-effect-application-runtime.md) owns the exact runtime decision.
 
 ## 2. Product model
 
@@ -108,6 +109,8 @@ Adds:
 - backend-oriented test infrastructure;
 - health/build-information behavior.
 
+The accepted runtime design uses an application-owned Effect service, Cloudflare and in-memory Layers, one delivery execution, and full Cause interpretation. Request context remains an explicit readonly value. `deployment-cloudflare` alone owns the generated `enable_request_signal` flag, and cancellation claims remain bounded to the demonstrated fiber and response path rather than already-started provider work.
+
 Adds no:
 
 - database;
@@ -126,9 +129,12 @@ Purpose: a backend-ready application profile without customer identity.
 Default materialization:
 
 ```text
-app
-  = app-foundation
+app@0.1.0
+  = app-foundation@0.1.0
+  + site-routing@0.4.0
 ```
+
+The profile retains the complete production-site content, navigation, contact, localization-readiness, accessibility, responsive, and visual contracts. `booking-calendly`, `multilingual`, and `analytics` remain independent optional choices; none becomes an implicit `app-foundation` dependency. [ADR-0013](../adr/0013-convergent-app-profile.md) owns this convergent recipe.
 
 At creation or later, the user may add independently:
 
@@ -995,7 +1001,7 @@ The approved private generated unit and component testing design owns the detail
 - P3 introduces `fast-check` with the Node.js test runner for materially combinatorial capability resolution, state, migration, version-graph, and recovery invariants. Property failures must retain counterexample, seed, path, and any model-command replay data. `fast-check` is not a default generated-project dependency.
 - Generated pure TypeScript tests use a named Vitest Node project. Generated synchronous React component tests use a separate named Vitest jsdom project with React Testing Library, `user-event` where interaction exists, and `jest-dom` assertions. Tests use explicit Vitest imports, and continuous integration uses explicit non-watch commands.
 - Playwright remains responsible for CSS layout, computed focus visibility, real browser APIs, dialogs, iframes, async Server Components, routes, development/OpenNext behavior, and complete journeys. jsdom results must not be presented as evidence for those boundaries.
-- P4 provider-neutral app-foundation contracts use the generated Vitest Node project. Whole built-Worker route contracts may use Wrangler `createTestHarness()` under a Node runner. P4 installs no Workers Vitest pool because it creates no D1, KV, R2, Queue, Durable Object, or equivalent binding.
+- P4 provider-neutral app-foundation contracts use the generated Vitest Node project. Whole built-Worker route contracts may use Wrangler `createTestHarness()` under a Node runner. The generated application uses the exact direct Effect dependency but adds neither `@effect/vitest` nor a Workers Vitest pool because it creates no D1, KV, R2, Queue, Durable Object, or equivalent binding.
 - P5C `application-persistence` is the first planned owner of Workers Vitest, for direct D1 and Workers-runtime assertions. Shared Workers-runtime configuration belongs to `deployment-cloudflare`; later binding capabilities reuse it while owning their capability-specific fixtures and tests. Workers Vitest does not replace provider-neutral tests, whole-Worker harness tests, browser tests, or deployed certification.
 - Exact dependency versions and peer/runtime compatibility are revalidated and frozen at each implementation entry. A coverage provider or threshold, Vitest Browser Mode, MSW, Cypress, and additional generated test dependencies require their own evidenced need; they are not part of the initial foundation.
 
@@ -1407,11 +1413,18 @@ The stop gate is satisfied by the accepted implementation and exact closure evid
 
 #### P4 — App foundation
 
-- internal `app-foundation` capability;
-- public `app` recipe resolving to `app-foundation`;
-- generated Vitest Node tests for provider-neutral use cases, ports, errors, and in-memory adapters;
-- whole built-Worker contracts through `createTestHarness()` where justified, without adding Workers Vitest before a binding exists;
-- tested portfolio/site-to-app transitions without automatically adding stateful infrastructure.
+The accepted architecture candidate establishes these requirements only; every executable contract, descriptor, schema, dependency, lockfile, generated source, fixture, lifecycle edge, visual result, deployment configuration, and certification change remains unimplemented.
+
+- internal hybrid `app-foundation@0.1.0` with direct exact generated dependency `effect@4.0.0-rc.112`;
+- public `app@0.1.0` resolving exactly to `app-foundation@0.1.0` plus `site-routing@0.4.0`, thereby retaining the complete production-site experience;
+- independent optional Calendly, multilingual, and analytics selection across all eight subsets, with no implicit coupling;
+- Effect restricted to generated application, infrastructure, composition, and delivery server modules, with explicit request context, one application-owned service, Cloudflare and in-memory Layers, one execution, full Cause priority, native abort, no retry, and deployment-owned `enable_request_signal`;
+- generated Vitest Node tests for provider-neutral application behavior plus whole built-Worker contracts through `createTestHarness()` where justified, without `@effect/vitest` or Workers Vitest before a binding exists;
+- exact `portfolio@0.10.0 -> app@0.1.0` and `site@0.11.0 -> app@0.1.0` transitions across all eight optional subsets, preserving compatible UI/content, forbidding deletion, replacing the builder-kernel-owned root lockfile, persisting state last, and refusing unproved changes before mutation;
+- four regenerated visual comparisons bound to all influencing content and UI inputs, without inferring visual quality, accessibility conformance, deployed behavior, or production readiness;
+- fresh pending evidence for app-foundation and all nine existing descriptors materially widened to app support; the ten exact subjects cannot inherit historical certification.
+
+The next executable contract increment becomes eligible only after this architecture candidate receives verified-final-diff approval. Eligibility is not authorization. Certification, commit, push, pull-request creation, merge, deployment, provider mutation, publication, and production action remain separately gated.
 
 #### P5C–P5F — Remaining independent backend capabilities
 

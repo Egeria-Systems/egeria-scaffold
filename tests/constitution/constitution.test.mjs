@@ -2293,6 +2293,235 @@ test("repository documentation has no broken local Markdown links", async () => 
   assert.deepEqual(brokenLinks, []);
 });
 
+test("accepted app architecture keeps the public recipe convergent and Effect selective", async () => {
+  const [
+    convergentProfileAdr,
+    effectRuntimeAdr,
+    adrIndex,
+    rootInstructions,
+    builderInstructions,
+    cliInstructions,
+    architectureOverview,
+    capabilityModel,
+    enforcementMap,
+    packageOwnership,
+    sourcePlan,
+    programRoadmap,
+  ] = await Promise.all([
+    readRepositoryFile("docs/adr/0013-convergent-app-profile.md"),
+    readRepositoryFile(
+      "docs/adr/0014-selective-effect-application-runtime.md",
+    ),
+    readRepositoryFile("docs/adr/README.md"),
+    readRepositoryFile("AGENTS.md"),
+    readRepositoryFile("packages/builder-core/AGENTS.md"),
+    readRepositoryFile("apps/cli/AGENTS.md"),
+    readRepositoryFile("docs/architecture/overview.md"),
+    readRepositoryFile("docs/architecture/capability-model.md"),
+    readRepositoryFile("docs/architecture/enforcement-map.md"),
+    readRepositoryFile("docs/architecture/package-ownership.md"),
+    readRepositoryFile(
+      "docs/roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md",
+    ),
+    readRepositoryFile("docs/roadmaps/program-roadmap.md"),
+  ]);
+
+  for (const [document, identifier, fileName, decision] of [
+    [
+      convergentProfileAdr,
+      "ADR-0013",
+      "0013-convergent-app-profile.md",
+      "Convergent app profile",
+    ],
+    [
+      effectRuntimeAdr,
+      "ADR-0014",
+      "0014-selective-effect-application-runtime.md",
+      "Selective Effect application runtime",
+    ],
+  ]) {
+    assert.match(document, new RegExp(`^# ${identifier}: ${decision}$`, "m"));
+    assert.match(document, /^\*\*Status:\*\* Accepted$/m);
+    assert.match(document, /^\*\*Date:\*\* 2026-09-05$/m);
+    assert.match(
+      adrIndex,
+      new RegExp(
+        `^\\| \\[${identifier}\\]\\(${fileName}\\) \\| ${decision} \\| Accepted \\| 2026-09-05 \\|$`,
+        "m",
+      ),
+    );
+  }
+
+  assert.match(
+    convergentProfileAdr,
+    /app@0\.1\.0 = app-foundation@0\.1\.0 \+ site-routing@0\.4\.0/u,
+  );
+  assert.match(
+    convergentProfileAdr,
+    /complete production-site experience[\s\S]+content[\s\S]+navigation[\s\S]+contact[\s\S]+accessibility[\s\S]+visual/iu,
+  );
+  for (const optionalSubset of [
+    "none",
+    "booking-calendly",
+    "multilingual",
+    "analytics",
+    "booking-calendly + multilingual",
+    "booking-calendly + analytics",
+    "multilingual + analytics",
+    "booking-calendly + multilingual + analytics",
+  ]) {
+    assert.match(
+      convergentProfileAdr,
+      new RegExp(`^${escapeRegularExpression(optionalSubset)}$`, "m"),
+    );
+  }
+  assert.match(
+    convergentProfileAdr,
+    /portfolio@0\.10\.0 -> app@0\.1\.0/iu,
+  );
+  assert.match(convergentProfileAdr, /site@0\.11\.0 -> app@0\.1\.0/iu);
+  assert.match(
+    convergentProfileAdr,
+    /preserve[\s\S]+create[\s\S]+replace[\s\S]+migrate structurally[\s\S]+refuse/iu,
+  );
+  assert.match(
+    convergentProfileAdr,
+    /no transition action deletes a UI or content file/iu,
+  );
+  assert.match(
+    convergentProfileAdr,
+    /supersedes only[\s\S]+ADR-0001[\s\S]+future default-app recipe sentence/iu,
+  );
+  assert.doesNotMatch(
+    convergentProfileAdr,
+    /supersedes ADR-0001(?:\s|\.)/iu,
+  );
+
+  assert.match(effectRuntimeAdr, /effect@4\.0\.0-rc\.112/u);
+  assert.match(
+    effectRuntimeAdr,
+    /direct[\s\S]+exactly pinned[\s\S]+ordinary generated-app dependency/iu,
+  );
+  assert.match(
+    effectRuntimeAdr,
+    /application[\s\S]+infrastructure[\s\S]+composition[\s\S]+delivery[\s\S]+server/iu,
+  );
+  assert.match(
+    effectRuntimeAdr,
+    /builder-core[\s\S]+CLI[\s\S]+domain[\s\S]+presentation[\s\S]+client[\s\S]+content[\s\S]+Effect-free/iu,
+  );
+  assert.match(
+    effectRuntimeAdr,
+    /no[\s\S]+wrapper[\s\S]+new package[\s\S]+effect\/unstable\//iu,
+  );
+  assert.match(
+    effectRuntimeAdr,
+    /RequestContext[\s\S]+plain readonly value[\s\S]+explicitly[\s\S]+not[\s\S]+FiberRef[\s\S]+AsyncLocalStorage/iu,
+  );
+  assert.match(
+    effectRuntimeAdr,
+    /BuildInformationReader[\s\S]+application-owned[^\n]+Context\.Service[\s\S]+Cloudflare[\s\S]+in-memory[\s\S]+Layers/iu,
+  );
+  assert.match(effectRuntimeAdr, /Effect\.runPromiseExit[\s\S]+exactly once/iu);
+  assert.match(
+    effectRuntimeAdr,
+    /defect[\s\S]+interruption[\s\S]+BuildInformationUnavailable[\s\S]+unrecognized or mixed/iu,
+  );
+  assert.match(
+    effectRuntimeAdr,
+    /native[^\n]+DOMException[\s\S]+AbortError[\s\S]+no custom abort/iu,
+  );
+  assert.match(
+    effectRuntimeAdr,
+    /deployment-cloudflare[\s\S]+sole owner[\s\S]+enable_request_signal/iu,
+  );
+  assert.match(
+    effectRuntimeAdr,
+    /fiber and response path[\s\S]+not cancellation of already-started provider work/iu,
+  );
+  assert.match(effectRuntimeAdr, /no retry/iu);
+
+  const canonicalArchitecture = [
+    architectureOverview,
+    capabilityModel,
+    enforcementMap,
+    packageOwnership,
+    sourcePlan,
+    programRoadmap,
+  ].join("\n");
+  assert.match(
+    canonicalArchitecture,
+    /builder-kernel[\s\S]+pnpm-lock\.yaml[\s\S]+\.egeria\/project\.yaml[\s\S]+\.egeria\/state\.json[\s\S]+\.egeria\/migrations\.jsonl/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /ten exact subjects[\s\S]+pending certification/iu,
+  );
+  assert.match(
+    capabilityModel,
+    /^\| `app-foundation` \| `hybrid` \| `repository-stateful` \| `reviewed` \| default: app, authenticated-app; dependency-only: portfolio, site \|/mu,
+  );
+  assert.match(
+    architectureOverview,
+    /architecture and governance candidate[\s\S]+executable[\s\S]+unimplemented/iu,
+  );
+  const completedRemovalGuardStage = ["P", "3", "C"].join("");
+  const appFoundationStage = ["P", "4"].join("");
+  assert.match(
+    architectureOverview,
+    new RegExp(
+      `At that historical boundary, ${completedRemovalGuardStage} became the next eligible phase[\\s\\S]+${completedRemovalGuardStage} is now complete, and ${appFoundationStage} is the next eligible phase`,
+      "iu",
+    ),
+  );
+  assert.match(
+    architectureOverview,
+    /no database[^.]+queue[^.]+identity[^.]+payments[^.]+invented (?:business )?CRUD/iu,
+  );
+  assert.match(
+    enforcementMap,
+    /exact app recipe[\s\S]+Effect boundary[\s\S]+Cause[\s\S]+cancellation[\s\S]+enable_request_signal[\s\S]+lockfile[\s\S]+optional[\s\S]+transition[\s\S]+visual[\s\S]+claim/iu,
+  );
+  assert.match(
+    packageOwnership,
+    /effect@4\.0\.0-rc\.112[\s\S]+ordinary generated-app dependency[\s\S]+builder-core[\s\S]+CLI[\s\S]+Effect-free[\s\S]+no new public package/iu,
+  );
+  assert.match(
+    programRoadmap,
+    /verified-final-diff approval[\s\S]+next executable contract increment[\s\S]+eligible[\s\S]+not authorized/iu,
+  );
+  assert.match(
+    programRoadmap,
+    /\*\*Stop gate:\*\* This architecture increment stops at verified-final-diff approval of the architecture and governance candidate\.[\s\S]+Generated-project and transition evidence remain unimplemented/iu,
+  );
+  assert.match(
+    convergentProfileAdr,
+    /This ADR owns the exact app recipe and transition decisions\.[\s\S]+ADR-0001 continues to own materialization and installed-manifest authority\.[\s\S]+enforcement map owns the actual and planned gate mapping/iu,
+  );
+  assert.match(
+    effectRuntimeAdr,
+    /This ADR owns the exact runtime decision\.[\s\S]+enforcement map owns the actual and planned gate mapping/iu,
+  );
+  for (const instructions of [
+    rootInstructions,
+    builderInstructions,
+    cliInstructions,
+  ]) {
+    assert.match(
+      instructions,
+      /future[\s\S]+Effect[\s\S]+unimplemented/iu,
+    );
+  }
+  assert.match(
+    rootInstructions,
+    /Direct adoption or use of `fast-check`[\s\S]+Audited transitive dependencies of a separately approved package do not authorize direct imports or property testing/iu,
+  );
+  assert.doesNotMatch(
+    canonicalArchitecture,
+    /(?:app runtime|app profile|Effect runtime) (?:is|is now) (?:complete|implemented|executable)/iu,
+  );
+});
+
 const acceptedAdrs = [
   ["0001-materialized-profile-recipes.md", "ADR-0001"],
   ["0002-capability-delivery-and-state.md", "ADR-0002"],
@@ -2306,13 +2535,25 @@ const acceptedAdrs = [
   ["0010-analytics-and-observability.md", "ADR-0010"],
   ["0011-github-actions-deployment-authority.md", "ADR-0011"],
   ["0012-purpose-based-analytics-consent.md", "ADR-0012"],
+  ["0013-convergent-app-profile.md", "ADR-0013", "2026-09-05"],
+  [
+    "0014-selective-effect-application-runtime.md",
+    "ADR-0014",
+    "2026-09-05",
+  ],
 ];
 
 function escapeRegularExpression(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function validateAcceptedAdr({ document, fileName, identifier, index }) {
+function validateAcceptedAdr({
+  document,
+  fileName,
+  identifier,
+  index,
+  acceptedDate = "2026-08-04",
+}) {
   const problems = [];
 
   if (!document.startsWith(`# ${identifier}: `)) {
@@ -2326,7 +2567,7 @@ function validateAcceptedAdr({ document, fileName, identifier, index }) {
     problems.push("document must declare Accepted exactly once");
   }
 
-  if (dateLines.length !== 1 || dateLines[0][1] !== "2026-08-04") {
+  if (dateLines.length !== 1 || dateLines[0][1] !== acceptedDate) {
     problems.push("document must declare the accepted date exactly once");
   }
 
@@ -2371,7 +2612,7 @@ function validateAcceptedAdr({ document, fileName, identifier, index }) {
     new RegExp(`\\[${escapedIdentifier}\\]\\(`, "g"),
   );
   const acceptedRow = new RegExp(
-    `^\\| \\[${escapedIdentifier}\\]\\(${escapedFileName}\\) \\| [^|\\n]+ \\| Accepted \\| 2026-08-04 \\|$`,
+    `^\\| \\[${escapedIdentifier}\\]\\(${escapedFileName}\\) \\| [^|\\n]+ \\| Accepted \\| ${escapeRegularExpression(acceptedDate)} \\|$`,
     "m",
   );
 
@@ -2921,6 +3162,12 @@ test("client-required public-site work is relocated after lifecycle without requ
     ),
     "iu",
   );
+  const historicalSuccessorEligibilityPattern = new RegExp(
+    escapeRegularExpression(
+      `At that historical boundary, ${referenceHardeningPhase} became the next eligible phase, but that closure did not authorize ${referenceHardeningPhase} planning or implementation`,
+    ),
+    "iu",
+  );
 
   assert.doesNotMatch(
     `${clientExpansionPhase} closure is not approved and not closed`,
@@ -2931,10 +3178,12 @@ test("client-required public-site work is relocated after lifecycle without requ
     successorEligibilityPattern,
   );
 
-  for (const statusConsumer of [sourcePlan, programRoadmap, overview]) {
+  for (const statusConsumer of [sourcePlan, programRoadmap]) {
     assert.match(statusConsumer, closureStatusPattern);
     assert.match(statusConsumer, successorEligibilityPattern);
   }
+  assert.match(overview, closureStatusPattern);
+  assert.match(overview, historicalSuccessorEligibilityPattern);
 
   assert.doesNotMatch(
     overview,
@@ -4391,12 +4640,18 @@ test("accepted ADRs use the repository decision contract", async () => {
   const index = await readRepositoryFile("docs/adr/README.md");
   const rowPositions = [];
 
-  for (const [fileName, identifier] of acceptedAdrs) {
+  for (const [fileName, identifier, acceptedDate] of acceptedAdrs) {
     const relativePath = `docs/adr/${fileName}`;
     const document = await readRepositoryFile(relativePath);
 
     assert.deepEqual(
-      validateAcceptedAdr({ document, fileName, identifier, index }),
+      validateAcceptedAdr({
+        document,
+        fileName,
+        identifier,
+        index,
+        acceptedDate,
+      }),
       [],
       relativePath,
     );

@@ -20,3 +20,5 @@ If an ADR conflicts with implementation or another canonical document, identify 
 | [ADR-0010](0010-analytics-and-observability.md) | Analytics and observability separation | Accepted | 2026-08-04 |
 | [ADR-0011](0011-github-actions-deployment-authority.md) | GitHub Actions deployment authority | Accepted | 2026-08-04 |
 | [ADR-0012](0012-purpose-based-analytics-consent.md) | Purpose-based analytics consent | Accepted | 2026-08-04 |
+| [ADR-0013](0013-convergent-app-profile.md) | Convergent app profile | Accepted | 2026-09-05 |
+| [ADR-0014](0014-selective-effect-application-runtime.md) | Selective Effect application runtime | Accepted | 2026-09-05 |
