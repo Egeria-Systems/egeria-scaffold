@@ -1662,14 +1662,14 @@ async function runCheck(
   }
 }
 
-test("the repository registry admits current subjects and passes full closure", async () => {
+test("the repository registry admits current subjects and reports coordinated pending closure", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
     stdout: `${JSON.stringify({
       ok: true,
       gate: "admission",
-      records: 9,
+      records: 10,
     })}\n`,
     stderr: "",
   });
@@ -1689,15 +1689,29 @@ test("the repository registry admits current subjects and passes full closure", 
   assert.doesNotMatch(retiredClosure.stderr, /legacy-backfill-exempt/u);
 
   const fullClosure = await runCheck(["--closure", "all-certified"]);
-  assert.deepEqual(fullClosure, {
-    exitCode: 0,
-    stdout: `${JSON.stringify({
-      ok: true,
-      gate: "closure",
-      policy: "all-certified",
-    })}\n`,
-    stderr: "",
-  });
+  assert.equal(fullClosure.exitCode, 1);
+  assert.equal(fullClosure.stderr, "");
+  assert.deepEqual(
+    JSON.parse(fullClosure.stdout).issues.map(({ code, path }) => ({
+      code,
+      identifier: path[1],
+    })),
+    [
+      "analytics",
+      "app-foundation",
+      "booking-calendly",
+      "content-files",
+      "deployment-cloudflare",
+      "multilingual",
+      "observability",
+      "section-composition",
+      "site-routing",
+      "standards",
+    ].map((identifier) => ({
+      code: "CAPABILITY_CERTIFICATION_PENDING",
+      identifier,
+    })),
+  );
 });
 
 test("ordinary admission requires a new pending task for a changed accepted subject", async () => {
@@ -1714,9 +1728,16 @@ test("ordinary admission requires a new pending task for a changed accepted subj
     const baselineRecord = baselineRegistry.records["booking-calendly"];
     baselineRecord.subject.descriptorVersion = "0.0.1";
     baselineRecord.subject.behaviorContractDigest = `sha256:${"0".repeat(64)}`;
-    for (const evidence of baselineRecord.evidence) {
-      evidence.subject = structuredClone(baselineRecord.subject);
-    }
+    baselineRecord.status = "certified";
+    baselineRecord.taskPlan =
+      "docs/superpowers/plans/accepted-booking-certification.md";
+    baselineRecord.evidence = baselineRecord.requiredEvidence.map((kind) => ({
+      kind,
+      path: "docs/implementation-evidence/accepted-booking-certification.md",
+      outcome: "passed",
+      revision: "a".repeat(40),
+      subject: structuredClone(baselineRecord.subject),
+    }));
     await writeFile(
       join(cleanRoot, "certifications/capabilities.json"),
       `${JSON.stringify(baselineRegistry, null, 2)}\n`,
@@ -1757,9 +1778,23 @@ test("ordinary admission requires a new pending task for a changed accepted subj
       { cwd: cleanRoot },
     );
 
+    const changedCertifiedRegistry = structuredClone(currentRegistry);
+    const changedCertifiedRecord =
+      changedCertifiedRegistry.records["booking-calendly"];
+    changedCertifiedRecord.status = "certified";
+    changedCertifiedRecord.taskPlan = baselineRecord.taskPlan;
+    changedCertifiedRecord.evidence = changedCertifiedRecord.requiredEvidence.map(
+      (kind) => ({
+        kind,
+        path: "docs/implementation-evidence/changed-booking-certification.md",
+        outcome: "passed",
+        revision: "b".repeat(40),
+        subject: structuredClone(changedCertifiedRecord.subject),
+      }),
+    );
     await writeFile(
       join(cleanRoot, "certifications/capabilities.json"),
-      `${JSON.stringify(currentRegistry, null, 2)}\n`,
+      `${JSON.stringify(changedCertifiedRegistry, null, 2)}\n`,
       "utf8",
     );
     const changedCertified = await runCheck([], {
@@ -1776,10 +1811,6 @@ test("ordinary admission requires a new pending task for a changed accepted subj
       ],
     );
 
-    currentRegistry.records["booking-calendly"].status = "pending";
-    currentRegistry.records["booking-calendly"].taskPlan =
-      "docs/superpowers/plans/replacement-certification.md";
-    currentRegistry.records["booking-calendly"].evidence = [];
     await writeFile(
       join(cleanRoot, "certifications/capabilities.json"),
       `${JSON.stringify(currentRegistry, null, 2)}\n`,
@@ -1792,7 +1823,7 @@ test("ordinary admission requires a new pending task for a changed accepted subj
         stdout: `${JSON.stringify({
           ok: true,
           gate: "admission",
-          records: 9,
+          records: 10,
         })}\n`,
         stderr: "",
       },
@@ -1824,7 +1855,7 @@ test("the ordinary certification gate does not require private workflow artifact
       stdout: `${JSON.stringify({
         ok: true,
         gate: "admission",
-        records: 9,
+        records: 10,
       })}\n`,
       stderr: "",
     });

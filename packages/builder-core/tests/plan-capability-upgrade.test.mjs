@@ -409,6 +409,26 @@ test("catalog snapshots refuse undeclared standards versions at runtime", () => 
   );
 });
 
+test("catalog snapshot validation attributes an unsupported app foundation version to its field", () => {
+  const result = core.createCapabilityCatalogSnapshot(
+    core.verifiedCapabilityPackageVersions,
+    {
+      standards: "0.4.0",
+      siteRouting: "0.4.0",
+      appFoundation: "0.2.0",
+    },
+  );
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.issues, [
+    {
+      code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID",
+      path: ["snapshot", "appFoundation"],
+      context: { reason: "unsupported-version" },
+    },
+  ]);
+});
+
 test("the supported standards edge refuses every undeclared pair", () => {
   const cases = [
     {

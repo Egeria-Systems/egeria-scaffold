@@ -46,7 +46,15 @@ export function createProfileRecipeSnapshot(
   return createRecipes({ portfolio: recipeVersion, site: recipeVersion });
 }
 
-export const profileRecipes = createRecipes({
-  portfolio: "0.10.0",
-  site: "0.11.0",
-});
+export const profileRecipes: readonly ProfileRecipe[] = [
+  ...createRecipes({
+    portfolio: "0.10.0",
+    site: "0.11.0",
+  }),
+  {
+    identifier: "app",
+    schemaVersion: "1.0.0",
+    recipeVersion: "0.1.0",
+    defaultCapabilities: ["app-foundation", "site-routing"],
+  },
+];

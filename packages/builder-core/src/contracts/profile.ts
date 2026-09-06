@@ -3,6 +3,7 @@ import { z } from "zod";
 import { stableIdentifierSchema } from "./identifiers.js";
 
 export const profileIdentifierSchema = z.enum(["portfolio", "site"]);
+const profileRecipeIdentifierSchema = z.enum(["portfolio", "site", "app"]);
 export const profileRecipeVersionSchema = z.enum([
   "0.1.0",
   "0.2.0",
@@ -19,7 +20,7 @@ export const profileRecipeVersionSchema = z.enum([
 
 export const profileRecipeSchema = z
   .strictObject({
-    identifier: profileIdentifierSchema,
+    identifier: profileRecipeIdentifierSchema,
     schemaVersion: z.literal("1.0.0"),
     recipeVersion: profileRecipeVersionSchema,
     defaultCapabilities: z.array(stableIdentifierSchema).min(1).readonly(),
@@ -36,7 +37,7 @@ export const profileRecipeSchema = z
   .readonly()
   .meta({
     id: "urn:egeria-systems:schema:profile:1.0.0",
-    title: "Egeria portfolio and site profile recipe",
+    title: "Egeria portfolio, site, and app profile recipe",
   });
 
 export type ProfileIdentifier = z.infer<typeof profileIdentifierSchema>;

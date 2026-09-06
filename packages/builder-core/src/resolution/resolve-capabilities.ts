@@ -12,12 +12,12 @@ import type {
 } from "../contracts/result.js";
 
 export type ResolutionRequest = Readonly<{
-  profile: "portfolio" | "site";
+  profile: ProfileRecipe["identifier"];
   requestedCapabilities?: readonly string[];
 }>;
 
 export type ResolvedCapabilities = Readonly<{
-  profile: "portfolio" | "site";
+  profile: ProfileRecipe["identifier"];
   recipeVersion: ProfileRecipe["recipeVersion"];
   capabilities: readonly CapabilityDescriptor[];
 }>;

@@ -22,11 +22,13 @@ export type CapabilityPackageVersions = Readonly<{
 export type CapabilityCatalogSnapshot = Readonly<{
   standards: "0.3.0" | "0.4.0";
   siteRouting?: "0.3.0" | "0.4.0";
+  appFoundation?: "0.1.0";
 }>;
 
 const currentCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = {
   standards: "0.4.0",
   siteRouting: "0.4.0",
+  appFoundation: "0.1.0",
 };
 
 function isSupportedStandardsSnapshotVersion(
@@ -39,6 +41,12 @@ function isSupportedSiteRoutingSnapshotVersion(
   value: string,
 ): value is NonNullable<CapabilityCatalogSnapshot["siteRouting"]> {
   return value === "0.3.0" || value === "0.4.0";
+}
+
+function isSupportedAppFoundationSnapshotVersion(
+  value: string,
+): value is NonNullable<CapabilityCatalogSnapshot["appFoundation"]> {
+  return value === "0.1.0";
 }
 
 const sharedCapabilityMetadata = {
@@ -200,6 +208,13 @@ function createDescriptors(
   snapshot: CapabilityCatalogSnapshot,
 ): readonly CapabilityDescriptor[] {
   const siteRoutingVersion = snapshot.siteRouting ?? "0.3.0";
+  const supportsApp = snapshot.appFoundation !== undefined;
+  const sharedSupportedProfiles = supportsApp
+    ? (["portfolio", "site", "app"] as const)
+    : (["portfolio", "site"] as const);
+  const siteRoutingSupportedProfiles = supportsApp
+    ? (["site", "app"] as const)
+    : (["site"] as const);
   const standardsEvidencePoints = [
     createPackageEvidencePoint(
       "standards-axe-playwright-package",
@@ -1018,6 +1033,124 @@ function createDescriptors(
     ),
   ] as const;
 
+  const appFoundationEvidencePoints = [
+    createFileEvidencePoint(
+      "app-foundation-health-route-entry",
+      "app-foundation",
+      "apps/web/app/api/health/route.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-build-information-domain",
+      "app-foundation",
+      "apps/web/src/domain/build-information.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-build-information-reader",
+      "app-foundation",
+      "apps/web/src/application/build-information-reader.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-request-context",
+      "app-foundation",
+      "apps/web/src/application/request-context.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-health-application",
+      "app-foundation",
+      "apps/web/src/application/health.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-cloudflare-build-information-reader",
+      "app-foundation",
+      "apps/web/src/infrastructure/cloudflare/build-information-reader.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-memory-build-information-reader",
+      "app-foundation",
+      "apps/web/src/infrastructure/memory/build-information-reader.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-server-health-composition",
+      "app-foundation",
+      "apps/web/src/composition/server-health.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-health-route-delivery",
+      "app-foundation",
+      "apps/web/src/delivery/health-route.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-application-boundaries-guide",
+      "app-foundation",
+      "apps/web/docs/application-boundaries.md",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-request-context-specification",
+      "app-foundation",
+      "apps/web/tests/unit/request-context.test.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-build-information-specification",
+      "app-foundation",
+      "apps/web/tests/unit/build-information.test.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-health-specification",
+      "app-foundation",
+      "apps/web/tests/unit/health.test.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-cloudflare-reader-specification",
+      "app-foundation",
+      "apps/web/tests/unit/cloudflare-build-information-reader.test.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-health-route-specification",
+      "app-foundation",
+      "apps/web/tests/unit/health-route.test.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-whole-worker-specification",
+      "app-foundation",
+      "apps/web/tests/integration/health-worker.test.ts",
+      "managed",
+    ),
+    createFileEvidencePoint(
+      "app-foundation-whole-worker-configuration",
+      "app-foundation",
+      "apps/web/vitest.cloudflare.config.ts",
+      "managed",
+    ),
+    createPackageEvidencePoint(
+      "app-foundation-effect-dependency",
+      "app-foundation",
+      "dependencies",
+      "effect",
+      "4.0.0-rc.112",
+    ),
+    createPackageJsonValueEvidencePoint(
+      "app-foundation-whole-worker-script",
+      "app-foundation",
+      "/scripts/test:integration:cloudflare",
+      "vitest run --config vitest.cloudflare.config.ts",
+    ),
+  ] as const;
+
   return [
     {
       identifier: "standards",
@@ -1027,7 +1160,7 @@ function createDescriptors(
       removalPolicy: "reviewed",
       dependencies: [],
       ...sharedCapabilityMetadata,
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: sharedSupportedProfiles,
       requiredPackages: [
         "@axe-core/playwright",
         "@egeria-systems/standards",
@@ -1102,7 +1235,7 @@ function createDescriptors(
       removalPolicy: "reviewed",
       dependencies: ["standards"],
       ...sharedCapabilityMetadata,
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: sharedSupportedProfiles,
       requiredPackages: ["raw-loader", "yaml"],
       platformResources: [],
       adapterSemanticRequirements: [],
@@ -1119,7 +1252,7 @@ function createDescriptors(
       removalPolicy: "reviewed",
       dependencies: ["content-files"],
       ...sharedCapabilityMetadata,
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: sharedSupportedProfiles,
       requiredPackages: ["@tailwindcss/postcss", "postcss", "tailwindcss"],
       platformResources: [],
       adapterSemanticRequirements: [],
@@ -1155,7 +1288,7 @@ function createDescriptors(
       removalPolicy: "reviewed",
       dependencies: ["standards"],
       ...sharedCapabilityMetadata,
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: sharedSupportedProfiles,
       requiredPackages: ["@opennextjs/cloudflare", "wrangler"],
       environmentVariables: ["DEPLOY_URL"],
       secrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
@@ -1192,7 +1325,7 @@ function createDescriptors(
         "section-composition",
       ],
       ...sharedCapabilityMetadata,
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: sharedSupportedProfiles,
       requiredPackages: ["@egeria-systems/observability"],
       secrets: [
         "BETTER_STACK_INGESTING_HOST",
@@ -1314,7 +1447,7 @@ function createDescriptors(
         siteRoutingVersion === "0.4.0"
           ? ["upgrade-site-routing-0-3-0-to-0-4-0"]
           : [],
-      supportedProfiles: ["site"],
+      supportedProfiles: siteRoutingSupportedProfiles,
       requiredPackages: [],
       platformResources: [],
       adapterSemanticRequirements: [],
@@ -1356,7 +1489,7 @@ function createDescriptors(
       removalPolicy: "automatic",
       dependencies: ["section-composition"],
       ...sharedCapabilityMetadata,
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: sharedSupportedProfiles,
       requiredPackages: [],
       externalDomains: ["calendly.com", "www.calendly.com"],
       contentSecurityPolicyContributions: [
@@ -1393,7 +1526,7 @@ function createDescriptors(
       dependencies: ["content-files", "observability", "section-composition"],
       ...sharedCapabilityMetadata,
       optionalIntegrations: ["booking-calendly", "site-routing"],
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: sharedSupportedProfiles,
       requiredPackages: [],
       platformResources: [],
       adapterSemanticRequirements: [],
@@ -1433,7 +1566,7 @@ function createDescriptors(
       dependencies: ["content-files", "section-composition"],
       ...sharedCapabilityMetadata,
       optionalIntegrations: ["multilingual", "site-routing"],
-      supportedProfiles: ["portfolio", "site"],
+      supportedProfiles: sharedSupportedProfiles,
       requiredPackages: [],
       platformResources: [
         "cloudflare-web-analytics-site",
@@ -1524,6 +1657,63 @@ function createDescriptors(
         "verify-closed-analytics-and-multilingual-lifecycle",
       ],
     },
+    ...(snapshot.appFoundation === undefined
+      ? []
+      : [
+          {
+            identifier: "app-foundation",
+            version: snapshot.appFoundation,
+            deliveryMode: "hybrid",
+            stateClassifications: ["repository-stateful"],
+            removalPolicy: "reviewed",
+            dependencies: [
+              "deployment-cloudflare",
+              "observability",
+              "standards",
+            ],
+            ...sharedCapabilityMetadata,
+            optionalIntegrations: [
+              "analytics",
+              "booking-calendly",
+              "multilingual",
+              "site-routing",
+            ],
+            supportedProfiles: ["app"],
+            requiredPackages: ["effect"],
+            platformResources: [],
+            adapterSemanticRequirements: [
+              "cloudflare-version-metadata",
+              "cloudflare-request-signal",
+            ],
+            ...projectEvidencePoints(appFoundationEvidencePoints),
+            migrationPlanners: [
+              "transition-portfolio-0-10-0-to-app-0-1-0",
+              "transition-site-0-11-0-to-app-0-1-0",
+            ],
+            verificationPlan: [
+              "request-context-contracts",
+              "build-information-contracts",
+              "effect-application-behavior",
+              "cause-and-cancellation-contracts",
+              "health-delivery-contracts",
+              "whole-worker-execution",
+              "server-only-imports",
+            ],
+            documentationEvidenceRequirements: [
+              "request-context-and-build-information-boundaries",
+              "effect-application-and-health-delivery-boundaries",
+              "cause-cancellation-and-whole-worker-claim-boundaries",
+              "server-only-import-boundary",
+            ],
+            removalAndRecoveryRequirements: [
+              "recover-exact-effect-dependency",
+              "recover-whole-worker-verification-script",
+              "recover-managed-application-source",
+              "use-builder-kernel-lockfile-and-state-recovery",
+              "no-supported-removal-or-back-transition",
+            ],
+          } as const,
+        ]),
   ];
 }
 
@@ -1552,6 +1742,10 @@ export function createCapabilityCatalogSnapshot(
     typeof snapshotValue === "object" && snapshotValue !== null
       ? (Reflect.get(snapshotValue, "siteRouting") as unknown)
       : undefined;
+  const appFoundationSnapshot =
+    typeof snapshotValue === "object" && snapshotValue !== null
+      ? (Reflect.get(snapshotValue, "appFoundation") as unknown)
+      : undefined;
   const resolvedSiteRoutingSnapshot =
     siteRoutingSnapshot === undefined
       ? "0.3.0"
@@ -1562,10 +1756,16 @@ export function createCapabilityCatalogSnapshot(
   const supportedSnapshot =
     typeof standardsSnapshot === "string" &&
     isSupportedStandardsSnapshotVersion(standardsSnapshot) &&
-    resolvedSiteRoutingSnapshot !== undefined
+    resolvedSiteRoutingSnapshot !== undefined &&
+    (appFoundationSnapshot === undefined ||
+      (typeof appFoundationSnapshot === "string" &&
+        isSupportedAppFoundationSnapshotVersion(appFoundationSnapshot)))
       ? ({
           standards: standardsSnapshot,
           siteRouting: resolvedSiteRoutingSnapshot,
+          ...(appFoundationSnapshot === undefined
+            ? {}
+            : { appFoundation: appFoundationSnapshot }),
         } as const)
       : undefined;
 
@@ -1582,7 +1782,10 @@ export function createCapabilityCatalogSnapshot(
       ),
     );
   }
-  if (supportedSnapshot === undefined) {
+  if (
+    typeof standardsSnapshot !== "string" ||
+    !isSupportedStandardsSnapshotVersion(standardsSnapshot)
+  ) {
     versionIssues.push({
       code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID",
       path: ["snapshot", "standards"],
@@ -1596,6 +1799,17 @@ export function createCapabilityCatalogSnapshot(
     versionIssues.push({
       code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID",
       path: ["snapshot", "siteRouting"],
+      context: { reason: "unsupported-version" },
+    });
+  }
+  if (
+    appFoundationSnapshot !== undefined &&
+    (typeof appFoundationSnapshot !== "string" ||
+      !isSupportedAppFoundationSnapshotVersion(appFoundationSnapshot))
+  ) {
+    versionIssues.push({
+      code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID",
+      path: ["snapshot", "appFoundation"],
       context: { reason: "unsupported-version" },
     });
   }

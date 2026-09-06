@@ -555,10 +555,6 @@ test("project configuration is strict and materializes safe capability identifie
     ...validProject,
     secret: "must-not-exist",
   });
-  assertRejects(contracts.profileRecipeSchema, {
-    ...validProfile,
-    identifier: "app",
-  });
   for (const recipeVersion of ["0.12.0", "0.10", "latest"]) {
     assertRejects(contracts.projectConfigurationSchema, {
       ...validProject,
@@ -569,6 +565,30 @@ test("project configuration is strict and materializes safe capability identifie
       recipeVersion,
     });
   }
+});
+
+test("app recipe validation stays separate from project and state profile identifiers", () => {
+  const appRecipe = {
+    identifier: "app",
+    schemaVersion: "1.0.0",
+    recipeVersion: "0.1.0",
+    defaultCapabilities: ["app-foundation", "site-routing"],
+  };
+
+  assertAccepts(contracts.profileRecipeSchema, appRecipe);
+  assertRejects(contracts.profileRecipeSchema, {
+    ...appRecipe,
+    defaultCapabilities: ["app-foundation", "app-foundation"],
+  });
+  assertRejects(contracts.profileIdentifierSchema, "app");
+  assertRejects(contracts.projectConfigurationSchema, {
+    ...validProject,
+    originProfile: "app",
+  });
+  assertRejects(contracts.installedStateSchema, {
+    ...validState,
+    origin: { profile: "app", recipeVersion: "0.1.0" },
+  });
 });
 
 test("Calendly settings enforce paired capability state and sanitized destinations", () => {
@@ -1169,7 +1189,7 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
   );
   assert.equal(
     generatedRoots["profile.schema.json"].title,
-    "Egeria portfolio and site profile recipe",
+    "Egeria portfolio, site, and app profile recipe",
   );
   assert.equal(
     generatedRoots["certification-registry.schema.json"].title,
