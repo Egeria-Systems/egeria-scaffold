@@ -2465,6 +2465,15 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
     architectureOverview,
     /architecture and governance candidate[\s\S]+executable[\s\S]+unimplemented/iu,
   );
+  const completedRemovalGuardStage = ["P", "3", "C"].join("");
+  const appFoundationStage = ["P", "4"].join("");
+  assert.match(
+    architectureOverview,
+    new RegExp(
+      `At that historical boundary, ${completedRemovalGuardStage} became the next eligible phase[\\s\\S]+${completedRemovalGuardStage} is now complete, and ${appFoundationStage} is the next eligible phase`,
+      "iu",
+    ),
+  );
   assert.match(
     architectureOverview,
     /no database[^.]+queue[^.]+identity[^.]+payments[^.]+invented (?:business )?CRUD/iu,
@@ -2480,6 +2489,10 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   assert.match(
     programRoadmap,
     /verified-final-diff approval[\s\S]+next executable contract increment[\s\S]+eligible[\s\S]+not authorized/iu,
+  );
+  assert.match(
+    programRoadmap,
+    /\*\*Stop gate:\*\* This architecture increment stops at verified-final-diff approval of the architecture and governance candidate\.[\s\S]+Generated-project and transition evidence remain unimplemented/iu,
   );
   assert.match(
     convergentProfileAdr,
@@ -3149,6 +3162,12 @@ test("client-required public-site work is relocated after lifecycle without requ
     ),
     "iu",
   );
+  const historicalSuccessorEligibilityPattern = new RegExp(
+    escapeRegularExpression(
+      `At that historical boundary, ${referenceHardeningPhase} became the next eligible phase, but that closure did not authorize ${referenceHardeningPhase} planning or implementation`,
+    ),
+    "iu",
+  );
 
   assert.doesNotMatch(
     `${clientExpansionPhase} closure is not approved and not closed`,
@@ -3159,10 +3178,12 @@ test("client-required public-site work is relocated after lifecycle without requ
     successorEligibilityPattern,
   );
 
-  for (const statusConsumer of [sourcePlan, programRoadmap, overview]) {
+  for (const statusConsumer of [sourcePlan, programRoadmap]) {
     assert.match(statusConsumer, closureStatusPattern);
     assert.match(statusConsumer, successorEligibilityPattern);
   }
+  assert.match(overview, closureStatusPattern);
+  assert.match(overview, historicalSuccessorEligibilityPattern);
 
   assert.doesNotMatch(
     overview,

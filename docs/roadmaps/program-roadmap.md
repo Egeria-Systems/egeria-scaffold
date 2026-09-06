@@ -166,7 +166,7 @@ Only exact future edges `portfolio@0.10.0 -> app@0.1.0` and `site@0.11.0 -> app@
 
 **Approval boundary:** Verified-final-diff approval is required for this architecture increment. After that approval, the next executable contract increment becomes eligible but is not authorized. Certification, commit, push, pull-request creation, merge, deployment, provider mutation, publication, and production action remain separately gated.
 
-**Stop gate:** Architecture, generated-project, and transition evidence is approved.
+**Stop gate:** This architecture increment stops at verified-final-diff approval of the architecture and governance candidate. Generated-project and transition evidence remain unimplemented and require separately approved executable increments.
 
 ## P5 — Remaining independent backend capabilities
 
