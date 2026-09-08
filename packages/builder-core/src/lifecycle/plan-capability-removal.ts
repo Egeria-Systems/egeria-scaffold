@@ -740,6 +740,10 @@ export async function planCapabilityRemoval(input: Readonly<{
 
   const project = inspection.project.value;
   const state = inspection.inference.state.value;
+  // Remove when app capability lifecycle is activated.
+  if (project.originProfile === "app") {
+    return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
+  }
   const desired = project.selectedCapabilities.includes(capabilityValue);
   const installedCapability = state.installedCapabilities.find(
     ({ identifier }) => identifier === capabilityValue,

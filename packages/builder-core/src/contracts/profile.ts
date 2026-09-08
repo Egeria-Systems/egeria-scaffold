@@ -2,8 +2,7 @@ import { z } from "zod";
 
 import { stableIdentifierSchema } from "./identifiers.js";
 
-export const profileIdentifierSchema = z.enum(["portfolio", "site"]);
-const profileRecipeIdentifierSchema = z.enum(["portfolio", "site", "app"]);
+export const profileIdentifierSchema = z.enum(["portfolio", "site", "app"]);
 export const profileRecipeVersionSchema = z.enum([
   "0.1.0",
   "0.2.0",
@@ -20,7 +19,7 @@ export const profileRecipeVersionSchema = z.enum([
 
 export const profileRecipeSchema = z
   .strictObject({
-    identifier: profileRecipeIdentifierSchema,
+    identifier: profileIdentifierSchema,
     schemaVersion: z.literal("1.0.0"),
     recipeVersion: profileRecipeVersionSchema,
     defaultCapabilities: z.array(stableIdentifierSchema).min(1).readonly(),

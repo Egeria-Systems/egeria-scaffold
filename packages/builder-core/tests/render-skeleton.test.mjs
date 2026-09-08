@@ -44,6 +44,111 @@ const visualBaselinePaths = [
   "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
 ];
 
+const appFoundationPaths = [
+  "apps/web/app/api/health/route.ts",
+  "apps/web/src/domain/build-information.ts",
+  "apps/web/src/application/build-information-reader.ts",
+  "apps/web/src/application/request-context.ts",
+  "apps/web/src/application/health.ts",
+  "apps/web/src/infrastructure/cloudflare/build-information-reader.ts",
+  "apps/web/src/infrastructure/memory/build-information-reader.ts",
+  "apps/web/src/composition/server-health.ts",
+  "apps/web/src/delivery/health-route.ts",
+  "apps/web/docs/application-boundaries.md",
+  "apps/web/tests/unit/request-context.test.ts",
+  "apps/web/tests/unit/build-information.test.ts",
+  "apps/web/tests/unit/health.test.ts",
+  "apps/web/tests/unit/cloudflare-build-information-reader.test.ts",
+  "apps/web/tests/unit/health-route.test.ts",
+  "apps/web/tests/integration/health-worker.test.ts",
+  "apps/web/vitest.cloudflare.config.ts",
+].sort();
+
+test("app generation preserves production-site bytes across all optional subsets", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  for (let subset = 0; subset < 8; subset += 1) {
+    const request = {
+      projectName: "acme-app",
+      displayName: "Acme App",
+      packageVersions: { standards: "0.1.0", observability: "0.3.0" },
+      ...(subset & 1 ? { bookingCalendly: {
+        destination: "https://calendly.com/acme/intro", mode: "popup",
+      } } : {}),
+      ...(subset & 2 ? { multilingual: true } : {}),
+      ...(subset & 4 ? { analytics: analyticsSettings } : {}),
+    };
+    const site = assertSuccess(await renderSkeleton({ ...request, profile: "site" }));
+    const app = assertSuccess(await renderSkeleton({ ...request, profile: "app" }));
+    assert.equal(app.project.originProfile, "app");
+    assert.equal(app.project.recipeVersion, "0.1.0");
+    assert.deepEqual(app.project.capabilitySettings, site.project.capabilitySettings);
+    assert.deepEqual(
+      app.resolved.capabilities.map(({ identifier }) => identifier).sort(),
+      [...site.resolved.capabilities.map(({ identifier }) => identifier), "app-foundation"].sort(),
+    );
+    const siteFiles = new Map(site.files.map(({ path, content }) => [path, content]));
+    assert.deepEqual(
+      app.files.map(({ path }) => path),
+      [...siteFiles.keys(), ...appFoundationPaths].sort(),
+    );
+    for (const { path, content } of app.files) {
+      if (siteFiles.has(path) && path !== "apps/web/package.json" && path !== "pnpm-workspace.yaml") {
+        assert.deepEqual(content, siteFiles.get(path), `${subset}: ${path}`);
+      }
+    }
+    const manifest = parseGeneratedJson(app.files, "apps/web/package.json");
+    const siteManifest = parseGeneratedJson(site.files, "apps/web/package.json");
+    assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
+    assert.equal(manifest.scripts["test:integration:cloudflare"],
+      "vitest run --config vitest.cloudflare.config.ts");
+    delete manifest.dependencies.effect;
+    delete manifest.scripts["test:integration:cloudflare"];
+    assert.deepEqual(manifest, siteManifest);
+    const workspace = parseGeneratedYaml(app.files, "pnpm-workspace.yaml");
+    const siteWorkspace = parseGeneratedYaml(site.files, "pnpm-workspace.yaml");
+    assert.equal(workspace.allowBuilds["msgpackr-extract"], false);
+    delete workspace.allowBuilds["msgpackr-extract"];
+    assert.deepEqual(workspace, siteWorkspace);
+    const foundation = app.resolved.capabilities.find(({ identifier }) => identifier === "app-foundation");
+    assert.deepEqual(foundation.managedSurfaces.filter(({ fingerprintTarget }) => fingerprintTarget.kind === "file")
+      .map(({ path }) => path).sort(), appFoundationPaths);
+    assert.deepEqual(snapshotBytes(app.files), snapshotBytes(
+      assertSuccess(await renderSkeleton({ ...request, profile: "app" })).files,
+    ));
+  }
+});
+
+test("Worker integration workflows run after OpenNext and before credentials", async () => {
+  const renderSkeleton = await loadRenderSkeleton();
+  for (const profile of ["portfolio", "site", "app"]) {
+    const rendered = assertSuccess(await renderSkeleton({
+      profile, projectName: "acme-web", displayName: "Acme Web",
+      packageVersions: { standards: "0.1.0", observability: "0.3.0" },
+    }));
+    const files = indexFiles(rendered.files);
+    const wrangler = JSON.parse(files.get("apps/web/wrangler.jsonc"));
+    assert.ok(wrangler.compatibility_flags.includes("nodejs_compat"));
+    assert.ok(wrangler.compatibility_flags.includes("enable_request_signal"));
+    for (const path of [".github/workflows/quality.yml", ".github/workflows/deploy.yml"]) {
+      const workflow = parseGeneratedYaml(rendered.files, path);
+      const steps = Object.values(workflow.jobs)[0].steps;
+      const integration = steps.findIndex(({ run }) => run ===
+        "pnpm --dir apps/web run --if-present test:integration:cloudflare");
+      const build = steps.findIndex(({ run }) => run ===
+        "pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild");
+      assert.equal(integration, build + 1);
+      for (const [index, step] of steps.entries()) {
+        if (JSON.stringify(step.env ?? {}).includes("secrets.")) assert.ok(index > integration);
+      }
+    }
+    const manifest = parseGeneratedJson(rendered.files, "apps/web/package.json");
+    if (profile !== "app") {
+      assert.equal(manifest.dependencies.effect, undefined);
+      assert.equal(manifest.scripts["test:integration:cloudflare"], undefined);
+    }
+  }
+});
+
 const portfolioPaths = [
   ".github/workflows/deploy.yml",
   ".github/workflows/quality.yml",
@@ -3640,6 +3745,7 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
     "Test generated components",
     "Build Next.js application",
     "Build OpenNext application",
+    "Test built Worker when installed",
     "Install Chromium",
     "Test Next.js development",
     "Test OpenNext workerd preview",
@@ -4085,6 +4191,10 @@ test("generated browser quality is environment-specific and content-agnostic", a
         {
           name: "Build OpenNext application",
           run: "pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild",
+        },
+        {
+          name: "Test built Worker when installed",
+          run: "pnpm --dir apps/web run --if-present test:integration:cloudflare",
         },
         {
           name: "Install Chromium",
@@ -5775,12 +5885,12 @@ test("rendering rejects invalid requests with stable existing contract failures"
   const invalidRequests = [
     {
       request: {
-        profile: "app",
+        profile: "unsupported-profile",
         projectName: "acme-studio",
         displayName: "Acme Studio",
         packageVersions,
       },
-      code: "CONTRACT_VALIDATION_FAILED",
+      code: "PROFILE_UNKNOWN",
     },
     {
       request: {

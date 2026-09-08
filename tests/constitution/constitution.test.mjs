@@ -2455,7 +2455,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     capabilityModel,
-    /ten exact subjects[\s\S]+pending certification/iu,
+    /ten current pending certification subjects/iu,
   );
   assert.match(
     capabilityModel,
@@ -2463,11 +2463,11 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     architectureOverview,
-    /app-foundation@0\.1\.0[\s\S]+recipe, catalog, schema, and pending-certification contracts[\s\S]+generated runtime[\s\S]+unimplemented/iu,
+    /app-foundation@0\.1\.0[\s\S]+shared project\/state parsing[\s\S]+generated server runtime[\s\S]+state-last new-directory generation/iu,
   );
   assert.match(
     capabilityModel,
-    /Runtime status:[^\n]+ten[^\n]+descriptors[^\n]+three[^\n]+recipe[^\n]+pending[^\n]+generation[^\n]+portfolio[^\n]+site/iu,
+    /Runtime status:[^\n]+ten[^\n]+descriptors[^\n]+three[^\n]+recipe[^\n]+App project\/state parsing[^\n]+generation are implemented[^\n]+pending fresh certification/iu,
   );
   const completedRemovalGuardStage = ["P", "3", "C"].join("");
   const appFoundationStage = ["P", "4"].join("");
@@ -2488,7 +2488,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     enforcementMap,
-    /INV-APP-ARCHITECTURE[^\n]+actual[^\n]+recipe[^\n]+catalog[^\n]+schema[^\n]+pending certification[^\n]+runtime[^\n]+planned/iu,
+    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+staged CLI\/lifecycle refusals[^\n]+certification execution remain later gates/iu,
   );
   assert.match(
     packageOwnership,
@@ -2496,15 +2496,15 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     packageOwnership,
-    /ten capability descriptors[^\n]+contract-only[^\n]+app@0\.1\.0[^\n]+generation[^\n]+portfolio[^\n]+site/iu,
+    /ten capability descriptors[^\n]+three generation recipes[^\n]+app@0\.1\.0[^\n]+pending fresh certification/iu,
   );
   assert.match(
     programRoadmap,
-    /Current increment status:[^\n]+recipe[^\n]+catalog[^\n]+schema[^\n]+pending-certification[^\n]+implemented[^\n]+generated runtime[^\n]+unimplemented/iu,
+    /Current increment status:[^\n]+implements shared app project\/state parsing[^\n]+generated server runtime and tests[^\n]+state-last atomic generation[^\n]+whole-Worker verification receipt/iu,
   );
   assert.match(
     programRoadmap,
-    /\*\*Stop gate:\*\* This contract increment stops at a review-ready merge request with terminal hosted checks\.[^\n]+Generated-project and transition evidence remain unimplemented/iu,
+    /\*\*Stop gate:\*\* Complete the current generation candidate's required deterministic and generated-runtime verification[^\n]+independent requirements[^\n]+test-evidence reviews[^\n]+exact review packet before final-diff approval/iu,
   );
   assert.match(
     convergentProfileAdr,
@@ -2516,12 +2516,12 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     rootInstructions,
-    /contract-only `app@0\.1\.0` recipe is implemented[\s\S]+dependency installation[\s\S]+certification execution are unimplemented/iu,
+    /Builder-core supports `app@0\.1\.0` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+staged CLI, lifecycle, transition, fixture, and certification boundaries/iu,
   );
   for (const instructions of [builderInstructions, cliInstructions]) {
     assert.match(
       instructions,
-      /future[\s\S]+Effect[\s\S]+unimplemented/iu,
+      /(?:shared profile\/project\/state contracts|shared profile\/state contracts)[\s\S]+app[\s\S]+Keep Effect out/iu,
     );
   }
   assert.match(
@@ -2825,7 +2825,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /ten-capability catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.1\.0[^\n]+project[^\n]+state[^\n]+generation[^\n]+portfolio[^\n]+site/iu,
+    /ten-capability catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.1\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+does not activate app CLI creation or existing-repository mutations/iu,
   );
 });
 
@@ -3030,7 +3030,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /INV-APP-ARCHITECTURE[^\n]+runtime[^\n]+certification-execution gates remain planned/i,
+    /INV-APP-ARCHITECTURE[^\n]+runtime[^\n]+certification execution remain later gates/i,
   );
   assert.doesNotMatch(enforcementMap, /legacy-backfill-exempt/iu);
 });
@@ -3134,7 +3134,7 @@ test("client-required public-site work is relocated after lifecycle without requ
   );
   assert.match(
     capabilityModel,
-    /multilingual[\s\S]+analytics[\s\S]+optional[\s\S]+initial scaffolding[\s\S]+addable later[\s\S]+no composite/iu,
+    /Multilingual and analytics remain independent optional capabilities during initial portfolio\/site\/app generation[^\n]+addition\/removal and CLI creation remain limited to portfolio\/site[^\n]+no composite profile or capability/iu,
   );
   assert.match(
     enforcementMap,
@@ -3364,7 +3364,7 @@ test("executable capability certification ownership is current", async () => {
   }
   assert.match(
     capabilityModel,
-    /All ten changed current subjects[^\n]+pending[^\n]+historical[^\n]+prior descriptor digests/iu,
+    /All ten current subjects[^\n]+pending[^\n]+historical[^\n]+prior descriptor digests/iu,
   );
   assert.match(
     enforcementMap,
@@ -3405,7 +3405,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /generation-executable recipes remain `portfolio@0\.10\.0` and `site@0\.11\.0`[^\n]+app@0\.1\.0[^\n]+resolver-available[^\n]+not accepted by project\/state schemas or generation/iu,
+    /generation-executable recipes are `portfolio@0\.10\.0`, `site@0\.11\.0`, and `app@0\.1\.0`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
   );
   assert.match(
     capabilityModel,
@@ -4608,15 +4608,15 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     capabilityModel,
-    /ten current capability descriptors.*app-foundation@0\.1\.0.*App generation is not executable.*restricted to portfolio and site/isu,
+    /ten current capability descriptors.*app-foundation@0\.1\.0.*App project\/state parsing, rendering, and state-last new-directory generation are implemented.*pending fresh certification/isu,
   );
   assert.match(
     packageOwnership,
-    /ten capability descriptors[^\n]+contract-only `app-foundation@0\.1\.0`[^\n]+Project\/state parsing, generation[^\n]+portfolio@0\.10\.0[^\n]+site@0\.11\.0/iu,
+    /ten capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.1\.0[^\n]+pending fresh certification/iu,
   );
   assert.match(
     builderCoreReadme,
-    /exact nine executable capability descriptors/iu,
+    /exact ten executable capability descriptors/iu,
   );
   assert.match(
     cliReadme,

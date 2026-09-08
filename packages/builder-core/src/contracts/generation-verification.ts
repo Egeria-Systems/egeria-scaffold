@@ -8,3 +8,8 @@ export const ordinaryGenerationVerificationChecks = Object.freeze([
   "next-build",
   "opennext-build",
 ] as const);
+
+export const appGenerationVerificationChecks = Object.freeze([
+  ...ordinaryGenerationVerificationChecks,
+  "worker-integration",
+] as const);

@@ -1,4 +1,4 @@
-type RecipeLockfileVersion = "0.8.0" | "0.9.0" | "0.10.0";
+type RecipeLockfileVersion = "0.8.0" | "0.9.0" | "0.10.0" | "app-0.1.0";
 
 export type RecipeLockfileIdentity = Readonly<{
   originProfile: string;
@@ -25,6 +25,14 @@ export function resolveRecipeLockfileVersion(
 
   const next = dependencies.next;
   const eslintConfigNext = devDependencies["eslint-config-next"];
+  if (identity.originProfile === "app") {
+    return identity.recipeVersion === "0.1.0" &&
+      next === "16.3.3" &&
+      eslintConfigNext === "16.3.3" &&
+      dependencies.effect === "4.0.0-rc.112"
+      ? "app-0.1.0"
+      : undefined;
+  }
   if (next === "16.3.0" && eslintConfigNext === "16.3.0") {
     if (
       identity.originProfile === "site" &&

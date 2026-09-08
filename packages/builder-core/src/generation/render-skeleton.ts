@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { parseDocument } from "yaml";
 
 import {
   createCapabilityCatalog,
@@ -24,7 +25,7 @@ import {
 } from "../contracts/surface-target.js";
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
 import { profileRecipes } from "../profiles/profile-recipes.js";
-import type { ProfileRecipe } from "../contracts/profile.js";
+import type { ProfileIdentifier, ProfileRecipe } from "../contracts/profile.js";
 import {
   resolveCapabilities,
   type ResolvedCapabilities,
@@ -40,7 +41,7 @@ import {
 } from "./render-template.js";
 
 export type GenerationRequest = Readonly<{
-  profile: "portfolio" | "site";
+  profile: ProfileIdentifier;
   projectName: string;
   displayName: string;
   analytics?: AnalyticsSettings;
@@ -197,6 +198,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function enrichApplicationManifest(
   files: readonly GeneratedFile[],
   packageVersions: CapabilityPackageVersions,
+  profile: ProfileIdentifier,
   recipeVersion: string,
 ): ValidationResult<readonly GeneratedFile[]> {
   const manifestIndex = files.findIndex(
@@ -225,6 +227,7 @@ function enrichApplicationManifest(
 
   if (
     !isPlainObject(manifest) ||
+    !isPlainObject(manifest.scripts) ||
     !isPlainObject(manifest.dependencies) ||
     !isPlainObject(manifest.devDependencies)
   ) {
@@ -235,29 +238,44 @@ function enrichApplicationManifest(
     );
   }
 
+  const app = profile === "app" && recipeVersion === "0.1.0";
+  const productionSite = app || (profile === "site" && recipeVersion === "0.11.0");
   const enrichedManifest = {
     ...manifest,
+    scripts: {
+      ...manifest.scripts,
+      ...(app
+        ? { "test:integration:cloudflare": "vitest run --config vitest.cloudflare.config.ts" }
+        : {}),
+    },
     dependencies: {
       ...manifest.dependencies,
       "@egeria-systems/observability": packageVersions.observability,
-      ...(recipeVersion === "0.11.0" ? { next: "16.3.3" } : {}),
+      ...(productionSite ? { next: "16.3.3" } : {}),
+      ...(app ? { effect: "4.0.0-rc.112" } : {}),
     },
     devDependencies: {
       ...manifest.devDependencies,
       "@egeria-systems/standards": packageVersions.standards,
-      ...(recipeVersion === "0.11.0"
+      ...(productionSite
         ? { "eslint-config-next": "16.3.3" }
         : {}),
     },
   };
-  const nextFiles = files.map((file, index) =>
-    index === manifestIndex
-      ? {
-          path: file.path,
-          content: encoder.encode(`${stringifyCanonicalJson(enrichedManifest)}\n`),
-        }
-      : file,
-  );
+  const nextFiles = files.map((file, index) => {
+    if (index === manifestIndex) {
+      return {
+        path: file.path,
+        content: encoder.encode(`${stringifyCanonicalJson(enrichedManifest)}\n`),
+      };
+    }
+    if (app && file.path === "pnpm-workspace.yaml") {
+      const workspace = parseDocument(decoder.decode(file.content));
+      workspace.setIn(["allowBuilds", "msgpackr-extract"], false);
+      return { path: file.path, content: encoder.encode(workspace.toString()) };
+    }
+    return file;
+  });
 
   return { ok: true, value: nextFiles };
 }
@@ -489,6 +507,7 @@ export async function renderSkeleton(
   const manifestResult = enrichApplicationManifest(
     files,
     packageVersions,
+    projectResult.value.originProfile,
     resolutionResult.value.recipeVersion,
   );
   if (!manifestResult.ok) {

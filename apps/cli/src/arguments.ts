@@ -5,16 +5,18 @@ import {
   projectConfigurationSchema,
   type AnalyticsSettings,
   type CalendlyBookingSettings,
-  type ProfileIdentifier,
   type ValidationResult,
 } from "@egeria-systems/builder-core";
 import { parseArgs } from "node:util";
 import { isAbsolute } from "node:path";
 
+// Remove when app CLI creation is exposed.
+const cliProfileIdentifierSchema = profileIdentifierSchema.exclude(["app"]);
+
 export type CliCommand =
   | Readonly<{
       kind: "create";
-      profile: ProfileIdentifier;
+      profile: ReturnType<typeof cliProfileIdentifierSchema.parse>;
       projectName: string;
       displayName: string;
       directory: string;
@@ -229,7 +231,7 @@ function parseCreate(
     const calendlyMode = values["calendly-mode"];
     const multilingual = values.multilingual;
     const parsedAnalytics = parseAnalyticsSettings(values);
-    const parsedProfile = profileIdentifierSchema.safeParse(profile);
+    const parsedProfile = cliProfileIdentifierSchema.safeParse(profile);
     const parsedProjectName = projectFields.name.safeParse(projectName);
     const parsedDisplayName = projectFields.displayName.safeParse(displayName);
     const hasCalendlyUrl = calendlyUrl !== undefined;

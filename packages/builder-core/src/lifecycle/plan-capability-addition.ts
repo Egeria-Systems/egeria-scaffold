@@ -529,6 +529,12 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
+  const project = inspection.project.value;
+  // Remove when app capability lifecycle is activated.
+  if (project.originProfile === "app") {
+    return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
+  }
+
   if (hasMaterialDrift(inspection)) {
     return planningFailure("PROJECT_DRIFT_DETECTED");
   }
@@ -537,7 +543,6 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("PROJECT_EJECTION_UNSUPPORTED");
   }
 
-  const project = inspection.project.value;
   const state = inspection.inference.state.value;
   const capabilityInstalled =
     project.selectedCapabilities.includes(capabilityValue) ||

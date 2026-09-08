@@ -16,6 +16,7 @@
 
 - Run `pnpm run test:unit` for pure parsing and domain behavior in Node.
 - Run `pnpm run test:component` for synchronous React presentation behavior in jsdom.
+- After the Next and OpenNext builds, run `pnpm --dir apps/web run --if-present test:integration:cloudflare` before browser checks or deployment credentials. A selected app foundation uses the built Worker harness; absence of the script records no Worker integration result. Local evidence does not establish deployed disconnect handling, provider-acquisition cancellation, or production behavior.
 - Run `pnpm --dir apps/web run test:e2e:dev` for real-browser development behavior and `pnpm --dir apps/web run test:e2e:preview` for the OpenNext/workerd preview boundary. Preview E2E consumes already prepared `.open-next` output, so run the Next build followed by the OpenNext `--skipNextBuild` transform first.
 - Run `pnpm --dir apps/web run test:visual` only after preparing the same OpenNext output. Screenshot equality is bounded regression evidence; it does not establish visual quality, human usability, deployed behavior, or WCAG conformance.
 - Use `pnpm run verify` for the complete static, unit, component, and build boundary. No automated result alone establishes deployment, production safety, visual quality, human usability, or WCAG conformance.

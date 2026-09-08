@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
 import { verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
+import type { ProfileIdentifier } from "../contracts/profile.js";
 import type { ContractIssue } from "../contracts/result.js";
 import type { InstalledState, InstalledSurface } from "../contracts/state.js";
 import {
@@ -93,7 +94,7 @@ export type CapabilityUpgradePlan = Readonly<{
   status: "approval-required";
   planFingerprint: `sha256:${string}`;
   baseRevision: string;
-  profile: "portfolio" | "site";
+  profile: ProfileIdentifier;
   capability: Readonly<{
     identifier: "site-routing" | "standards";
     fromVersion: "0.3.0";
@@ -773,6 +774,10 @@ async function planSiteRoutingUpgrade(input: Readonly<{
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
   }
 
+  if (controls.state.origin.profile === "app") {
+    return planningFailure("CAPABILITY_UPGRADE_UNSUPPORTED");
+  }
+
   const installedVersion = sourceVersion(controls.state, "site-routing");
   if (installedVersion === undefined) {
     return planningFailure("CAPABILITY_VERSION_AMBIGUOUS");
@@ -927,6 +932,10 @@ export async function planCapabilityUpgrade(input: Readonly<{
 
   if (!controls.ok) {
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
+  }
+
+  if (controls.state.origin.profile === "app") {
+    return planningFailure("CAPABILITY_UPGRADE_UNSUPPORTED");
   }
 
   const installedVersion = sourceVersion(controls.state, "standards");

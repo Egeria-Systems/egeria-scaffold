@@ -6,6 +6,7 @@ import type {
 
 const templateLayers = new Set([
   "analytics",
+  "app-foundation",
   "booking-calendly",
   "common",
   "multilingual",

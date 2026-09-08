@@ -567,7 +567,7 @@ test("project configuration is strict and materializes safe capability identifie
   }
 });
 
-test("app recipe validation stays separate from project and state profile identifiers", () => {
+test("app profile shares recipe, project, and state identifiers", () => {
   const appRecipe = {
     identifier: "app",
     schemaVersion: "1.0.0",
@@ -580,15 +580,153 @@ test("app recipe validation stays separate from project and state profile identi
     ...appRecipe,
     defaultCapabilities: ["app-foundation", "app-foundation"],
   });
-  assertRejects(contracts.profileIdentifierSchema, "app");
-  assertRejects(contracts.projectConfigurationSchema, {
+  for (const profile of ["portfolio", "site", "app"]) {
+    assertAccepts(contracts.profileIdentifierSchema, profile);
+  }
+  assertRejects(contracts.profileIdentifierSchema, "unknown");
+  assertAccepts(contracts.projectConfigurationSchema, {
     ...validProject,
     originProfile: "app",
+    selectedCapabilities: ["app-foundation", "site-routing"],
   });
-  assertRejects(contracts.installedStateSchema, {
+  assertAccepts(contracts.installedStateSchema, {
     ...validState,
     origin: { profile: "app", recipeVersion: "0.1.0" },
+    lastSuccessfulVerification: {
+      kind: "generation",
+      checks: [
+        ...currentVerificationChecks.slice(0, -1),
+        "worker-integration",
+        "post-state-inference",
+      ],
+    },
   });
+});
+
+test("app generation verification requires the exact Worker receipt and preserves historical vectors", () => {
+  const ordinaryChecks = [
+    "lockfile",
+    "frozen-install",
+    "lint",
+    "typecheck",
+    "unit-tests",
+    "component-tests",
+    "next-build",
+    "opennext-build",
+  ];
+  const appChecks = [...ordinaryChecks, "worker-integration"];
+  assert.deepEqual(contracts.ordinaryGenerationVerificationChecks, ordinaryChecks);
+  assert.deepEqual(contracts.appGenerationVerificationChecks, appChecks);
+  const appState = {
+    ...validState,
+    origin: { profile: "app", recipeVersion: "0.1.0" },
+  };
+  const generationChecks = [
+    "contracts",
+    "pre-state-inference",
+    ...appChecks,
+    "post-state-inference",
+  ];
+  for (const checks of [
+    legacyVerificationChecks,
+    currentVerificationChecks,
+    generationChecks.filter((check) => check !== "worker-integration"),
+    [...generationChecks, "worker-integration"],
+    generationChecks.map((check) => check === "worker-integration" ? "deployment" : check),
+  ]) {
+    assertRejects(contracts.installedStateSchema, {
+      ...appState,
+      lastSuccessfulVerification: { kind: "generation", checks },
+    });
+  }
+  assertAccepts(contracts.installedStateSchema, {
+    ...appState,
+    lastSuccessfulVerification: { kind: "generation", checks: generationChecks },
+  });
+  for (const profile of ["portfolio", "site"]) {
+    for (const recipeVersion of readableRecipeVersions) {
+      const historicalChecks = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0"]
+        .includes(recipeVersion) ? legacyVerificationChecks : currentVerificationChecks;
+      assertAccepts(contracts.installedStateSchema, {
+        ...validState,
+        origin: { profile, recipeVersion },
+        lastSuccessfulVerification: { kind: "generation", checks: historicalChecks },
+      });
+      assertRejects(contracts.installedStateSchema, {
+        ...validState,
+        origin: { profile, recipeVersion },
+        lastSuccessfulVerification: { kind: "generation", checks: generationChecks },
+      });
+    }
+  }
+  for (const recipeVersion of readableRecipeVersions.filter((version) => version !== "0.1.0")) {
+    assertRejects(contracts.installedStateSchema, {
+      ...appState,
+      origin: { profile: "app", recipeVersion },
+      lastSuccessfulVerification: { kind: "generation", checks: generationChecks },
+    });
+  }
+});
+
+test("app generation verification supplies only supported persisted and full lifecycle vectors", () => {
+  const appPersistedChecks = [
+    "contracts",
+    "plan-approval",
+    "pre-state-inference",
+    "lockfile",
+    "frozen-install",
+    "lint",
+    "typecheck",
+    "unit-tests",
+    "component-tests",
+    "next-build",
+    "opennext-build",
+    "worker-integration",
+    "post-change-inference",
+  ];
+  const appFullChecks = [...appPersistedChecks, "migration-record", "post-state-inference"];
+  const appState = {
+    ...validState,
+    origin: { profile: "app", recipeVersion: "0.1.0" },
+  };
+  for (const [kind, persistedExport, fullExport, ordinaryPersisted, ordinaryFull] of [
+    ["capability-addition", "appCapabilityAdditionPersistedVerificationChecks", "appCapabilityAdditionVerificationChecks", persistedVerificationChecks, capabilityAdditionVerificationChecks],
+    ["capability-removal", "appCapabilityRemovalPersistedVerificationChecks", "appCapabilityRemovalVerificationChecks", persistedVerificationChecks, capabilityRemovalVerificationChecks],
+    ["profile-transition", "appProfileTransitionPersistedVerificationChecks", "appProfileTransitionVerificationChecks", profileTransitionPersistedVerificationChecks, profileTransitionVerificationChecks],
+  ]) {
+    assert.deepEqual(contracts[persistedExport], appPersistedChecks);
+    assert.deepEqual(contracts[fullExport], appFullChecks);
+    assertAccepts(contracts.installedStateSchema, {
+      ...appState,
+      lastSuccessfulVerification: { kind, checks: appPersistedChecks },
+    });
+    for (const checks of [ordinaryPersisted, ordinaryFull, appFullChecks]) {
+      assertRejects(contracts.installedStateSchema, {
+        ...appState,
+        lastSuccessfulVerification: { kind, checks },
+      });
+    }
+    for (const profile of ["portfolio", "site"]) {
+      assertAccepts(contracts.installedStateSchema, {
+        ...validState,
+        origin: { profile, recipeVersion: "0.10.0" },
+        lastSuccessfulVerification: { kind, checks: ordinaryPersisted },
+      });
+      assertRejects(contracts.installedStateSchema, {
+        ...validState,
+        origin: { profile, recipeVersion: "0.10.0" },
+        lastSuccessfulVerification: { kind, checks: appPersistedChecks },
+      });
+    }
+  }
+  assert.deepEqual(contracts.capabilityUpgradePersistedVerificationChecks, capabilityUpgradePersistedVerificationChecks);
+  assert.deepEqual(contracts.capabilityUpgradeVerificationChecks, capabilityUpgradeVerificationChecks);
+  for (const checks of [capabilityUpgradePersistedVerificationChecks, appPersistedChecks]) {
+    assertRejects(contracts.installedStateSchema, {
+      ...appState,
+      lastSuccessfulVerification: { kind: "capability-upgrade", checks },
+    });
+  }
 });
 
 test("Calendly settings enforce paired capability state and sanitized destinations", () => {
@@ -1249,10 +1387,17 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
       ({ properties }) => properties.kind.const === "profile-transition",
     );
   assert.deepEqual(
-    profileTransitionSchema.properties.checks.prefixItems.map(
-      ({ const: value }) => value,
+    profileTransitionSchema.properties.checks.anyOf.map(({ prefixItems }) =>
+      prefixItems.map(({ const: value }) => value),
     ),
-    profileTransitionPersistedVerificationChecks,
+    [
+      profileTransitionPersistedVerificationChecks,
+      [
+        ...profileTransitionPersistedVerificationChecks.slice(0, -1),
+        "worker-integration",
+        "post-change-inference",
+      ],
+    ],
   );
   for (const tuple of verificationCheckTuples) {
     assert.equal(tuple.minItems, tuple.prefixItems.length);

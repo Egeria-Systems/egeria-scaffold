@@ -229,6 +229,62 @@
                       ],
                       "readOnly": true,
                       "type": "array"
+                    },
+                    {
+                      "items": false,
+                      "maxItems": 12,
+                      "minItems": 12,
+                      "prefixItems": [
+                        {
+                          "const": "contracts",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pre-state-inference",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lockfile",
+                          "type": "string"
+                        },
+                        {
+                          "const": "frozen-install",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lint",
+                          "type": "string"
+                        },
+                        {
+                          "const": "typecheck",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unit-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "component-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "next-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "opennext-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "worker-integration",
+                          "type": "string"
+                        },
+                        {
+                          "const": "post-state-inference",
+                          "type": "string"
+                        }
+                      ],
+                      "type": "array"
                     }
                   ],
                   "readOnly": true
@@ -248,61 +304,125 @@
               "additionalProperties": false,
               "properties": {
                 "checks": {
-                  "items": false,
-                  "maxItems": 12,
-                  "minItems": 12,
-                  "prefixItems": [
+                  "anyOf": [
                     {
-                      "const": "contracts",
-                      "type": "string"
+                      "items": false,
+                      "maxItems": 12,
+                      "minItems": 12,
+                      "prefixItems": [
+                        {
+                          "const": "contracts",
+                          "type": "string"
+                        },
+                        {
+                          "const": "plan-approval",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pre-state-inference",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lockfile",
+                          "type": "string"
+                        },
+                        {
+                          "const": "frozen-install",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lint",
+                          "type": "string"
+                        },
+                        {
+                          "const": "typecheck",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unit-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "component-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "next-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "opennext-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "post-change-inference",
+                          "type": "string"
+                        }
+                      ],
+                      "type": "array"
                     },
                     {
-                      "const": "plan-approval",
-                      "type": "string"
-                    },
-                    {
-                      "const": "pre-state-inference",
-                      "type": "string"
-                    },
-                    {
-                      "const": "lockfile",
-                      "type": "string"
-                    },
-                    {
-                      "const": "frozen-install",
-                      "type": "string"
-                    },
-                    {
-                      "const": "lint",
-                      "type": "string"
-                    },
-                    {
-                      "const": "typecheck",
-                      "type": "string"
-                    },
-                    {
-                      "const": "unit-tests",
-                      "type": "string"
-                    },
-                    {
-                      "const": "component-tests",
-                      "type": "string"
-                    },
-                    {
-                      "const": "next-build",
-                      "type": "string"
-                    },
-                    {
-                      "const": "opennext-build",
-                      "type": "string"
-                    },
-                    {
-                      "const": "post-change-inference",
-                      "type": "string"
+                      "items": false,
+                      "maxItems": 13,
+                      "minItems": 13,
+                      "prefixItems": [
+                        {
+                          "const": "contracts",
+                          "type": "string"
+                        },
+                        {
+                          "const": "plan-approval",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pre-state-inference",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lockfile",
+                          "type": "string"
+                        },
+                        {
+                          "const": "frozen-install",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lint",
+                          "type": "string"
+                        },
+                        {
+                          "const": "typecheck",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unit-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "component-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "next-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "opennext-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "worker-integration",
+                          "type": "string"
+                        },
+                        {
+                          "const": "post-change-inference",
+                          "type": "string"
+                        }
+                      ],
+                      "type": "array"
                     }
                   ],
-                  "readOnly": true,
-                  "type": "array"
+                  "readOnly": true
                 },
                 "kind": {
                   "const": "capability-addition",
@@ -319,61 +439,125 @@
               "additionalProperties": false,
               "properties": {
                 "checks": {
-                  "items": false,
-                  "maxItems": 12,
-                  "minItems": 12,
-                  "prefixItems": [
+                  "anyOf": [
                     {
-                      "const": "contracts",
-                      "type": "string"
+                      "items": false,
+                      "maxItems": 12,
+                      "minItems": 12,
+                      "prefixItems": [
+                        {
+                          "const": "contracts",
+                          "type": "string"
+                        },
+                        {
+                          "const": "plan-approval",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pre-state-inference",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lockfile",
+                          "type": "string"
+                        },
+                        {
+                          "const": "frozen-install",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lint",
+                          "type": "string"
+                        },
+                        {
+                          "const": "typecheck",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unit-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "component-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "next-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "opennext-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "post-change-inference",
+                          "type": "string"
+                        }
+                      ],
+                      "type": "array"
                     },
                     {
-                      "const": "plan-approval",
-                      "type": "string"
-                    },
-                    {
-                      "const": "pre-state-inference",
-                      "type": "string"
-                    },
-                    {
-                      "const": "lockfile",
-                      "type": "string"
-                    },
-                    {
-                      "const": "frozen-install",
-                      "type": "string"
-                    },
-                    {
-                      "const": "lint",
-                      "type": "string"
-                    },
-                    {
-                      "const": "typecheck",
-                      "type": "string"
-                    },
-                    {
-                      "const": "unit-tests",
-                      "type": "string"
-                    },
-                    {
-                      "const": "component-tests",
-                      "type": "string"
-                    },
-                    {
-                      "const": "next-build",
-                      "type": "string"
-                    },
-                    {
-                      "const": "opennext-build",
-                      "type": "string"
-                    },
-                    {
-                      "const": "post-change-inference",
-                      "type": "string"
+                      "items": false,
+                      "maxItems": 13,
+                      "minItems": 13,
+                      "prefixItems": [
+                        {
+                          "const": "contracts",
+                          "type": "string"
+                        },
+                        {
+                          "const": "plan-approval",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pre-state-inference",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lockfile",
+                          "type": "string"
+                        },
+                        {
+                          "const": "frozen-install",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lint",
+                          "type": "string"
+                        },
+                        {
+                          "const": "typecheck",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unit-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "component-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "next-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "opennext-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "worker-integration",
+                          "type": "string"
+                        },
+                        {
+                          "const": "post-change-inference",
+                          "type": "string"
+                        }
+                      ],
+                      "type": "array"
                     }
                   ],
-                  "readOnly": true,
-                  "type": "array"
+                  "readOnly": true
                 },
                 "kind": {
                   "const": "capability-removal",
@@ -461,61 +645,125 @@
               "additionalProperties": false,
               "properties": {
                 "checks": {
-                  "items": false,
-                  "maxItems": 12,
-                  "minItems": 12,
-                  "prefixItems": [
+                  "anyOf": [
                     {
-                      "const": "contracts",
-                      "type": "string"
+                      "items": false,
+                      "maxItems": 12,
+                      "minItems": 12,
+                      "prefixItems": [
+                        {
+                          "const": "contracts",
+                          "type": "string"
+                        },
+                        {
+                          "const": "plan-approval",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pre-state-inference",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lockfile",
+                          "type": "string"
+                        },
+                        {
+                          "const": "frozen-install",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lint",
+                          "type": "string"
+                        },
+                        {
+                          "const": "typecheck",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unit-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "component-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "next-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "opennext-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "post-change-inference",
+                          "type": "string"
+                        }
+                      ],
+                      "type": "array"
                     },
                     {
-                      "const": "plan-approval",
-                      "type": "string"
-                    },
-                    {
-                      "const": "pre-state-inference",
-                      "type": "string"
-                    },
-                    {
-                      "const": "lockfile",
-                      "type": "string"
-                    },
-                    {
-                      "const": "frozen-install",
-                      "type": "string"
-                    },
-                    {
-                      "const": "lint",
-                      "type": "string"
-                    },
-                    {
-                      "const": "typecheck",
-                      "type": "string"
-                    },
-                    {
-                      "const": "unit-tests",
-                      "type": "string"
-                    },
-                    {
-                      "const": "component-tests",
-                      "type": "string"
-                    },
-                    {
-                      "const": "next-build",
-                      "type": "string"
-                    },
-                    {
-                      "const": "opennext-build",
-                      "type": "string"
-                    },
-                    {
-                      "const": "post-change-inference",
-                      "type": "string"
+                      "items": false,
+                      "maxItems": 13,
+                      "minItems": 13,
+                      "prefixItems": [
+                        {
+                          "const": "contracts",
+                          "type": "string"
+                        },
+                        {
+                          "const": "plan-approval",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pre-state-inference",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lockfile",
+                          "type": "string"
+                        },
+                        {
+                          "const": "frozen-install",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lint",
+                          "type": "string"
+                        },
+                        {
+                          "const": "typecheck",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unit-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "component-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "next-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "opennext-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "worker-integration",
+                          "type": "string"
+                        },
+                        {
+                          "const": "post-change-inference",
+                          "type": "string"
+                        }
+                      ],
+                      "type": "array"
                     }
                   ],
-                  "readOnly": true,
-                  "type": "array"
+                  "readOnly": true
                 },
                 "kind": {
                   "const": "profile-transition",
@@ -652,7 +900,8 @@
             "profile": {
               "enum": [
                 "portfolio",
-                "site"
+                "site",
+                "app"
               ],
               "type": "string"
             },

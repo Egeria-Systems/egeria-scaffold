@@ -8,7 +8,10 @@ import {
   surfaceOwnerSchema,
   surfaceOwnershipModeSchema,
 } from "./capability.js";
-import { ordinaryGenerationVerificationChecks } from "./generation-verification.js";
+import {
+  appGenerationVerificationChecks,
+  ordinaryGenerationVerificationChecks,
+} from "./generation-verification.js";
 import {
   fingerprintSchema,
   safeRelativePathSchema,
@@ -74,6 +77,13 @@ const currentVerificationChecks = [
   "post-state-inference",
 ] as const;
 
+const appVerificationChecks = [
+  "contracts",
+  "pre-state-inference",
+  ...appGenerationVerificationChecks,
+  "post-state-inference",
+] as const;
+
 export const capabilityAdditionPersistedVerificationChecks = [
   "contracts",
   "plan-approval",
@@ -130,6 +140,48 @@ export const profileTransitionVerificationChecks = [
   "post-state-inference",
 ] as const;
 
+export const appCapabilityAdditionPersistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  ...appGenerationVerificationChecks,
+  "post-change-inference",
+] as const;
+
+export const appCapabilityAdditionVerificationChecks = [
+  ...appCapabilityAdditionPersistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+] as const;
+
+export const appCapabilityRemovalPersistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  ...appGenerationVerificationChecks,
+  "post-change-inference",
+] as const;
+
+export const appCapabilityRemovalVerificationChecks = [
+  ...appCapabilityRemovalPersistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+] as const;
+
+export const appProfileTransitionPersistedVerificationChecks = [
+  "contracts",
+  "plan-approval",
+  "pre-state-inference",
+  ...appGenerationVerificationChecks,
+  "post-change-inference",
+] as const;
+
+export const appProfileTransitionVerificationChecks = [
+  ...appProfileTransitionPersistedVerificationChecks,
+  "migration-record",
+  "post-state-inference",
+] as const;
+
 const legacyVerificationChecksSchema = z
   .tuple([
     z.literal("contracts"),
@@ -158,24 +210,31 @@ const currentVerificationChecksSchema = createLiteralTupleSchema(
   currentVerificationChecks,
 ).readonly();
 
-const capabilityAdditionVerificationChecksSchema = createLiteralTupleSchema(
-  capabilityAdditionPersistedVerificationChecks,
-).readonly();
+const capabilityAdditionVerificationChecksSchema = z.union([
+  createLiteralTupleSchema(capabilityAdditionPersistedVerificationChecks),
+  createLiteralTupleSchema(appCapabilityAdditionPersistedVerificationChecks),
+]).readonly();
 
-const capabilityRemovalVerificationChecksSchema = createLiteralTupleSchema(
-  capabilityRemovalPersistedVerificationChecks,
-).readonly();
+const capabilityRemovalVerificationChecksSchema = z.union([
+  createLiteralTupleSchema(capabilityRemovalPersistedVerificationChecks),
+  createLiteralTupleSchema(appCapabilityRemovalPersistedVerificationChecks),
+]).readonly();
 
 const capabilityUpgradeVerificationChecksSchema = createLiteralTupleSchema(
   capabilityUpgradePersistedVerificationChecks,
 ).readonly();
 
-const profileTransitionVerificationChecksSchema = createLiteralTupleSchema(
-  profileTransitionPersistedVerificationChecks,
-).readonly();
+const profileTransitionVerificationChecksSchema = z.union([
+  createLiteralTupleSchema(profileTransitionPersistedVerificationChecks),
+  createLiteralTupleSchema(appProfileTransitionPersistedVerificationChecks),
+]).readonly();
 
 const verificationChecksSchema = z
-  .union([legacyVerificationChecksSchema, currentVerificationChecksSchema])
+  .union([
+    legacyVerificationChecksSchema,
+    currentVerificationChecksSchema,
+    createLiteralTupleSchema(appVerificationChecks),
+  ])
   .readonly();
 
 function hasExactChecks(
@@ -242,16 +301,26 @@ export const installedStateSchema = z
       .readonly(),
   })
   .superRefine((state, context) => {
+    const isCurrentApp = state.origin.profile === "app" &&
+      state.origin.recipeVersion === "0.1.0";
     const expectedChecks = state.lastSuccessfulVerification.kind ===
       "capability-addition"
-      ? capabilityAdditionPersistedVerificationChecks
+      ? isCurrentApp
+        ? appCapabilityAdditionPersistedVerificationChecks
+        : capabilityAdditionPersistedVerificationChecks
       : state.lastSuccessfulVerification.kind === "capability-removal"
-        ? capabilityRemovalPersistedVerificationChecks
+        ? isCurrentApp
+          ? appCapabilityRemovalPersistedVerificationChecks
+          : capabilityRemovalPersistedVerificationChecks
         : state.lastSuccessfulVerification.kind === "capability-upgrade"
           ? capabilityUpgradePersistedVerificationChecks
           : state.lastSuccessfulVerification.kind === "profile-transition"
-            ? profileTransitionPersistedVerificationChecks
-            : state.origin.recipeVersion === "0.7.0" ||
+            ? isCurrentApp
+              ? appProfileTransitionPersistedVerificationChecks
+              : profileTransitionPersistedVerificationChecks
+            : isCurrentApp
+              ? appVerificationChecks
+              : state.origin.recipeVersion === "0.7.0" ||
                 state.origin.recipeVersion === "0.8.0" ||
                 state.origin.recipeVersion === "0.9.0" ||
                 state.origin.recipeVersion === "0.10.0" ||
@@ -259,7 +328,11 @@ export const installedStateSchema = z
               ? currentVerificationChecks
               : legacyVerificationChecks;
 
-    if (!hasExactChecks(state.lastSuccessfulVerification.checks, expectedChecks)) {
+    if (
+      (state.origin.profile === "app" &&
+        state.lastSuccessfulVerification.kind === "capability-upgrade") ||
+      !hasExactChecks(state.lastSuccessfulVerification.checks, expectedChecks)
+    ) {
       context.addIssue({
         code: "custom",
         message: "verification checks must match the originating recipe version",
