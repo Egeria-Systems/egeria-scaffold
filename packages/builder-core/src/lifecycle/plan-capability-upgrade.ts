@@ -4,7 +4,6 @@ import { readFile } from "node:fs/promises";
 import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
 import { verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
-import type { ProfileIdentifier } from "../contracts/profile.js";
 import type { ContractIssue } from "../contracts/result.js";
 import type { InstalledState, InstalledSurface } from "../contracts/state.js";
 import {
@@ -94,7 +93,7 @@ export type CapabilityUpgradePlan = Readonly<{
   status: "approval-required";
   planFingerprint: `sha256:${string}`;
   baseRevision: string;
-  profile: ProfileIdentifier;
+  profile: "portfolio" | "site";
   capability: Readonly<{
     identifier: "site-routing" | "standards";
     fromVersion: "0.3.0";
@@ -1075,7 +1074,7 @@ export async function planCapabilityUpgrade(input: Readonly<{
     operation: "upgrade-capability",
     status: "approval-required",
     baseRevision: input.git.identity.revision,
-    profile: project.originProfile,
+    profile: controls.state.origin.profile,
     capability: {
       identifier: "standards",
       fromVersion: edgeResult.value.fromVersion,
