@@ -773,6 +773,10 @@ async function planSiteRoutingUpgrade(input: Readonly<{
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
   }
 
+  if (controls.state.origin.profile === "app") {
+    return planningFailure("CAPABILITY_UPGRADE_UNSUPPORTED");
+  }
+
   const installedVersion = sourceVersion(controls.state, "site-routing");
   if (installedVersion === undefined) {
     return planningFailure("CAPABILITY_VERSION_AMBIGUOUS");
@@ -929,6 +933,10 @@ export async function planCapabilityUpgrade(input: Readonly<{
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
   }
 
+  if (controls.state.origin.profile === "app") {
+    return planningFailure("CAPABILITY_UPGRADE_UNSUPPORTED");
+  }
+
   const installedVersion = sourceVersion(controls.state, "standards");
   if (installedVersion === undefined) {
     return planningFailure("CAPABILITY_VERSION_AMBIGUOUS");
@@ -1066,7 +1074,7 @@ export async function planCapabilityUpgrade(input: Readonly<{
     operation: "upgrade-capability",
     status: "approval-required",
     baseRevision: input.git.identity.revision,
-    profile: project.originProfile,
+    profile: controls.state.origin.profile,
     capability: {
       identifier: "standards",
       fromVersion: edgeResult.value.fromVersion,

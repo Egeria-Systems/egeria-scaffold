@@ -164,7 +164,8 @@
         "originProfile": {
           "enum": [
             "portfolio",
-            "site"
+            "site",
+            "app"
           ],
           "type": "string"
         },

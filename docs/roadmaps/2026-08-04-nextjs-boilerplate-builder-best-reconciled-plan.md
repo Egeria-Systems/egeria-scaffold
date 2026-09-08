@@ -1413,7 +1413,7 @@ The stop gate is satisfied by the accepted implementation and exact closure evid
 
 #### P4 — App foundation
 
-The accepted architecture candidate establishes these requirements only; every executable contract, descriptor, schema, dependency, lockfile, generated source, fixture, lifecycle edge, visual result, deployment configuration, and certification change remains unimplemented.
+The accepted architecture and contract increments establish the recipe, ten-capability catalog, and pending certification subjects. The current generation increment implements app project/state parsing, deterministic rendering, the exact generated Effect dependency and lockfile, server runtime and tests, whole-Worker verification, and state-last new-directory generation. The [capability model](../architecture/capability-model.md#accepted-app-architecture-boundary) owns that executable boundary and its claim limits; the [program roadmap](program-roadmap.md#p4--app-foundation) owns current sequencing, remaining work, and approval gates. These requirements cover both that generation implementation and the separately gated successors:
 
 - internal hybrid `app-foundation@0.1.0` with direct exact generated dependency `effect@4.0.0-rc.112`;
 - public `app@0.1.0` resolving exactly to `app-foundation@0.1.0` plus `site-routing@0.4.0`, thereby retaining the complete production-site experience;
@@ -1424,7 +1424,7 @@ The accepted architecture candidate establishes these requirements only; every e
 - four regenerated visual comparisons bound to all influencing content and UI inputs, without inferring visual quality, accessibility conformance, deployed behavior, or production readiness;
 - fresh pending evidence for app-foundation and all nine existing descriptors materially widened to app support; the ten exact subjects cannot inherit historical certification.
 
-The next executable contract increment becomes eligible only after this architecture candidate receives verified-final-diff approval. Eligibility is not authorization. Certification, commit, push, pull-request creation, merge, deployment, provider mutation, publication, and production action remain separately gated.
+The current candidate stops for its required verification, independent review, and verified-final-diff approval. App capability addition/removal, incoming transition planning/execution, public CLI exposure, dedicated retained app fixtures, and certification remain separately approved increments; app capability upgrades remain unsupported. Eligibility is not authorization. Certification, commit, push, pull-request creation, merge, deployment, provider mutation, publication, and production action remain separately gated.
 
 #### P5C–P5F — Remaining independent backend capabilities
 

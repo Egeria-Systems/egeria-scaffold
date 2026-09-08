@@ -959,6 +959,22 @@ async function withHistoricalUpgradeFixture(profile, run) {
   }
 }
 
+test("staged app boundary keeps CLI creation unavailable", () => {
+  const result = cliArguments.parseCliArguments([
+    "create",
+    "--profile", "app",
+    "--name", "sample-app",
+    "--display-name", "Sample App",
+    "--directory", "/private/tmp/sample-app",
+  ]);
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.issues, [{
+    code: "CLI_ARGUMENT_INVALID",
+    path: [],
+    context: { reason: "invalid-arguments" },
+  }]);
+});
+
 test("the parser accepts only the exact command-specific arguments", () => {
   assert.deepEqual(
     assertSuccess(

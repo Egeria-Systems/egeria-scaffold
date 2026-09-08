@@ -18,7 +18,10 @@ import {
 } from "node:path";
 import { promisify } from "node:util";
 
-import { ordinaryGenerationVerificationChecks } from "../contracts/generation-verification.js";
+import {
+  appGenerationVerificationChecks,
+  ordinaryGenerationVerificationChecks,
+} from "../contracts/generation-verification.js";
 import type { ValidationResult } from "../contracts/result.js";
 import {
   createRecipeLockfileUrl,
@@ -37,7 +40,7 @@ import {
 } from "./source-tree-safety.js";
 
 export type GeneratedProjectVerification = Readonly<{
-  checks: typeof verificationChecks;
+  checks: typeof verificationChecks | typeof appGenerationVerificationChecks;
 }>;
 
 export interface GeneratedProjectVerifier {
@@ -469,6 +472,23 @@ async function verifyInIsolatedCopy(
     return issue("FROZEN_INSTALL_FAILED", "source-invalid");
   }
 
+  let workerIntegrationPresent: boolean;
+  try {
+    const manifest = JSON.parse(
+      await readFile(join(fixedRoot, "apps/web/package.json"), "utf8"),
+    ) as { scripts?: Record<string, unknown> };
+    const script = manifest.scripts?.["test:integration:cloudflare"];
+    if (
+      script !== undefined &&
+      script !== "vitest run --config vitest.cloudflare.config.ts"
+    ) {
+      return issue("WORKER_INTEGRATION_INVALID", "script-mismatch");
+    }
+    workerIntegrationPresent = script !== undefined;
+  } catch {
+    return issue("WORKER_INTEGRATION_INVALID", "manifest-invalid");
+  }
+
   const owner = await createOwnedTemporaryDirectory(
     dirname(fixedRoot),
     ".egeria-validation-",
@@ -548,8 +568,25 @@ async function verifyInIsolatedCopy(
             ],
             failureCode: "OPENNEXT_BUILD_FAILED",
           },
+          {
+            arguments: [
+              "--dir",
+              "apps/web",
+              "run",
+              "--if-present",
+              "test:integration:cloudflare",
+            ],
+            failureCode: "WORKER_INTEGRATION_FAILED",
+          },
         ] as const;
-        result = { ok: true, value: { checks: verificationChecks } };
+        result = {
+          ok: true,
+          value: {
+            checks: workerIntegrationPresent
+              ? appGenerationVerificationChecks
+              : verificationChecks,
+          },
+        };
 
         for (const command of commands) {
           const commandResult = await runCommand({

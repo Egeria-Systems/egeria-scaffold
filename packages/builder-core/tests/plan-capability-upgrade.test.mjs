@@ -77,6 +77,74 @@ async function currentEntries(profile) {
   return loadEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
 }
 
+async function appControlEntries() {
+  const source = await currentEntries("site");
+  const project = core.parseProjectYaml(source.get(".egeria/project.yaml"));
+  assert.equal(project.ok, true);
+  const catalog = core.createVerifiedCapabilityCatalog();
+  assert.equal(catalog.ok, true);
+  const resolved = core.resolveCapabilities({ profile: "app" }, catalog.value, core.profileRecipes);
+  assert.equal(resolved.ok, true);
+  const state = JSON.parse(source.get(".egeria/state.json"));
+  return new Map([
+    [".egeria/project.yaml", JSON.stringify({
+      ...project.value,
+      originProfile: "app",
+      recipeVersion: "0.1.0",
+      selectedCapabilities: resolved.value.capabilities.map(({ identifier }) => identifier),
+    })],
+    [".egeria/state.json", JSON.stringify({
+      ...state,
+      origin: { profile: "app", recipeVersion: "0.1.0" },
+      installedCapabilities: core.createInstalledManifest(resolved.value),
+      managedSurfaces: [],
+      lastSuccessfulVerification: {
+        kind: "generation",
+        checks: [...state.lastSuccessfulVerification.checks.slice(0, -1), "worker-integration", "post-state-inference"],
+      },
+    })],
+    [".egeria/migrations.jsonl", ""],
+  ]);
+}
+
+test("staged app boundary refuses both capability upgrades and forged approval before effects", async () => {
+  const entries = await appControlEntries();
+  for (const capability of ["standards", "site-routing"]) {
+    assertFailure(await planFromEntries(entries, { capability }), "CAPABILITY_UPGRADE_UNSUPPORTED");
+    const snapshot = createSnapshotReader(entries);
+    const before = snapshot.snapshot();
+    const effects = [];
+    const forbiddenEffect = async () => {
+      effects.push("unexpected-effect");
+      throw new Error("app capability upgrades must remain unavailable");
+    };
+    const applied = await core.applyCapabilityUpgrade({
+      root: git.identity.root,
+      reader: snapshot.reader,
+      capability,
+      toVersion: "0.4.0",
+      approvedPlanFingerprint: `sha256:${"a".repeat(64)}`,
+      inspectWorktree: async () => git,
+      writer: { write: forbiddenEffect },
+      verifier: {
+        prepareLockfile: forbiddenEffect,
+        verifyInIsolatedCopy: forbiddenEffect,
+      },
+      inspectCreateTargets: forbiddenEffect,
+      inspectExpectedChanges: forbiddenEffect,
+      now: forbiddenEffect,
+    });
+    assert.deepEqual(applied, {
+      ok: false,
+      code: "CAPABILITY_UPGRADE_UNSUPPORTED",
+      phase: "precondition",
+      recovery: "not-required",
+    });
+    assert.deepEqual(effects, []);
+    assert.equal(snapshot.snapshot(), before);
+  }
+});
+
 async function acceptedSiteEntries() {
   const current = await currentEntries("site");
   const currentState = core.parseStateJson(current.get(".egeria/state.json"));

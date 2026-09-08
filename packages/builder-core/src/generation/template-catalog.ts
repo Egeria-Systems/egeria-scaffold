@@ -1,4 +1,5 @@
 import type { ContractIssue, ValidationResult } from "../contracts/result.js";
+import type { ProfileIdentifier } from "../contracts/profile.js";
 import { deriveTemplateDestination } from "./render-template.js";
 
 export type TemplateCatalogEntry = Readonly<{
@@ -67,6 +68,26 @@ const commonTemplateSources = textTemplateSources([
   "common/apps/web/tests/unit/content-schema.test.ts",
   "common/apps/web/tests/visual/home-visual.spec.ts",
   "common/apps/web/vitest.config.ts",
+] as const);
+
+const appFoundationTemplateSources = textTemplateSources([
+  "app-foundation/apps/web/app/api/health/route.ts",
+  "app-foundation/apps/web/src/domain/build-information.ts",
+  "app-foundation/apps/web/src/application/build-information-reader.ts",
+  "app-foundation/apps/web/src/application/request-context.ts",
+  "app-foundation/apps/web/src/application/health.ts",
+  "app-foundation/apps/web/src/infrastructure/cloudflare/build-information-reader.ts",
+  "app-foundation/apps/web/src/infrastructure/memory/build-information-reader.ts",
+  "app-foundation/apps/web/src/composition/server-health.ts",
+  "app-foundation/apps/web/src/delivery/health-route.ts",
+  "app-foundation/apps/web/docs/application-boundaries.md",
+  "app-foundation/apps/web/tests/unit/request-context.test.ts",
+  "app-foundation/apps/web/tests/unit/build-information.test.ts",
+  "app-foundation/apps/web/tests/unit/health.test.ts",
+  "app-foundation/apps/web/tests/unit/cloudflare-build-information-reader.test.ts",
+  "app-foundation/apps/web/tests/unit/health-route.test.ts",
+  "app-foundation/apps/web/tests/integration/health-worker.test.ts",
+  "app-foundation/apps/web/vitest.cloudflare.config.ts",
 ] as const);
 
 const portfolioTemplateSources: readonly TemplateSource[] = [
@@ -276,13 +297,14 @@ function remapSourceIssue(
 }
 
 export function createTemplateCatalog(
-  profile: "portfolio" | "site",
+  profile: ProfileIdentifier,
   includeBookingCalendly = false,
-  recipeVersion = profile === "site" ? "0.11.0" : "0.10.0",
+  recipeVersion = profile === "app" ? "0.1.0" : profile === "site" ? "0.11.0" : "0.10.0",
   includeMultilingual = false,
   includeAnalytics = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
-  const productionSite = profile === "site" && recipeVersion === "0.11.0";
+  const app = profile === "app" && recipeVersion === "0.1.0";
+  const productionSite = app || (profile === "site" && recipeVersion === "0.11.0");
   const sources = [
     ...commonTemplateSources.filter(
       ({ source }) =>
@@ -330,13 +352,14 @@ export function createTemplateCatalog(
                 source === "multilingual/apps/web/app/layout.tsx"
               ),
           ),
-          ...multilingualProfileSources(profile),
+          ...multilingualProfileSources(profile === "app" ? "site" : profile),
           multilingualBookingSource(includeBookingCalendly),
         ]
       : []),
     ...(includeAnalytics
       ? [...analyticsTemplateSources, analyticsLayoutSource(includeMultilingual)]
       : []),
+    ...(app ? appFoundationTemplateSources : []),
   ];
   const destinations = new Set<string>();
   const entries: TemplateCatalogEntry[] = [];

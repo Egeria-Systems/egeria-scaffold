@@ -55,6 +55,9 @@ jobs:
       - name: Build OpenNext application
         run: pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild
 
+      - name: Test built Worker when installed
+        run: pnpm --dir apps/web run --if-present test:integration:cloudflare
+
       - name: Install Chromium
         run: pnpm --dir apps/web exec playwright install chromium
 

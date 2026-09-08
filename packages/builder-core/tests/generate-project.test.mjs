@@ -60,6 +60,93 @@ const completeChecks = [
   ...generatedChecks,
   "post-state-inference",
 ];
+
+test("app lockfile selection requires exact profile, recipe, Next, ESLint, and Effect", async () => {
+  const identity = { originProfile: "app", recipeVersion: "0.1.0" };
+  const manifest = {
+    dependencies: { next: "16.3.3", effect: "4.0.0-rc.112" },
+    devDependencies: { "eslint-config-next": "16.3.3" },
+  };
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), "app-0.1.0");
+  for (const changed of [
+    { ...identity, originProfile: "site" },
+    { ...identity, recipeVersion: "0.2.0" },
+  ]) assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(changed, manifest), undefined);
+  for (const version of [undefined, "^4.0.0-rc.112", "4.0.0-rc.111"]) {
+    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, {
+      ...manifest, dependencies: { ...manifest.dependencies, effect: version },
+    }), undefined);
+  }
+  for (const section of ["dependencies", "devDependencies"]) {
+    const key = section === "dependencies" ? "next" : "eslint-config-next";
+    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, {
+      ...manifest, [section]: { ...manifest[section], [key]: "16.3.0" },
+    }), undefined);
+  }
+  assert.equal(new URL(recipeLockfiles.createRecipeLockfileUrl("app-0.1.0")).pathname,
+    resolve(packageRoot, "lockfiles/web-recipe-app-0.1.0/pnpm-lock.yaml"));
+});
+
+test("Worker integration verifier records execution only for the exact owned script", async () => {
+  for (const scenario of ["absent", "present", "invalid", "failed"]) {
+    await withTestRoot(async (owner) => {
+      const fake = await createFakePnpmExecutable(owner);
+      const source = await createVerifierSource(owner);
+      const manifestPath = join(source, "apps/web/package.json");
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+      manifest.scripts ??= {};
+      if (scenario !== "absent") manifest.scripts["test:integration:cloudflare"] =
+        scenario === "invalid" ? "echo skipped" : "vitest run --config vitest.cloudflare.config.ts";
+      await writeFile(manifestPath, JSON.stringify(manifest));
+      const command = "--dir apps/web run --if-present test:integration:cloudflare";
+      if (scenario === "failed") await fake.configure({ failureOperation: command });
+      const verifier = core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: fake.executable });
+      const before = await snapshotFileBytes(source);
+      const result = await verifier.verifyInIsolatedCopy(source);
+      assert.deepEqual(await snapshotFileBytes(source), before);
+      const calls = await fake.readCalls();
+      if (scenario === "invalid") {
+        assert.equal(result.ok, false);
+        assert.equal(result.issues[0].code, "WORKER_INTEGRATION_INVALID");
+        assert.deepEqual(calls, []);
+      } else {
+        assert.equal(calls.at(-1).arguments.join(" "), command);
+        assert.deepEqual(calls.at(-2).arguments,
+          ["--dir", "apps/web", "exec", "opennextjs-cloudflare", "build", "--skipNextBuild"]);
+        if (scenario === "failed") {
+          assert.equal(result.ok, false);
+          assert.equal(result.issues[0].code, "WORKER_INTEGRATION_FAILED");
+        } else {
+          assert.deepEqual(assertSuccess(result).checks,
+            scenario === "present" ? [...generatedChecks, "worker-integration"] : generatedChecks);
+        }
+      }
+    });
+  }
+});
+
+test("app generation requires its complete verification vector before state or destination persistence", async () => {
+  for (const checks of [generatedChecks, [...generatedChecks, "worker-integration"]]) {
+    await withTestRoot(async (owner) => {
+      const fake = createFakeVerifier({ verify: async () => ({ ok: true, value: { checks } }) });
+      const destination = join(owner, "app");
+      const result = await core.generateProject({
+        request: { profile: "app", projectName: "acme-app", displayName: "Acme App" },
+        destination, verifier: fake.verifier,
+      });
+      if (checks.length === generatedChecks.length) {
+        assert.equal(result.ok, false);
+        assert.equal(result.issues[0].code, "GENERATED_VERIFICATION_INVALID");
+        assert.equal(await exists(destination), false);
+      } else {
+        const generated = assertSuccess(result);
+        assert.deepEqual(generated.state.lastSuccessfulVerification.checks,
+          ["contracts", "pre-state-inference", ...checks, "post-state-inference"]);
+        assert.equal((await infer(destination)).state.kind, "valid");
+      }
+    });
+  }
+});
 const portfolioRenderedPaths = [
   ".github/workflows/deploy.yml",
   ".github/workflows/quality.yml",
@@ -781,6 +868,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
           "build",
           "--skipNextBuild",
         ],
+        ["--dir", "apps/web", "run", "--if-present", "test:integration:cloudflare"],
       ],
     );
     assert.notEqual(calls[0].cwd, canonicalSource);
@@ -851,7 +939,7 @@ test("the pnpm verifier preserves only derived Volta tool resolution with an iso
     });
     const calls = await fakePnpm.readCalls();
     const canonicalVoltaHome = await realpath(fakePnpm.voltaHome);
-    assert.equal(calls.length, 8);
+    assert.equal(calls.length, 9);
     for (const { environment } of calls) {
       assert.equal(environment.VOLTA_HOME, canonicalVoltaHome);
       assert.equal(environment.VOLTA_FEATURE_PNPM, "1");

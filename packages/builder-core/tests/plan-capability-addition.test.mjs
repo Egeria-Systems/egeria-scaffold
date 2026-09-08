@@ -131,6 +131,77 @@ async function fixtureEntries(name) {
   return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${name}`));
 }
 
+async function appControlEntries() {
+  const source = await fixtureEntries("site");
+  const project = core.parseProjectYaml(source.get(".egeria/project.yaml"));
+  assert.equal(project.ok, true);
+  const catalog = core.createVerifiedCapabilityCatalog();
+  assert.equal(catalog.ok, true);
+  const resolved = core.resolveCapabilities({ profile: "app" }, catalog.value, core.profileRecipes);
+  assert.equal(resolved.ok, true);
+  const state = JSON.parse(source.get(".egeria/state.json"));
+  return new Map([
+    [".egeria/project.yaml", JSON.stringify({
+      ...project.value,
+      originProfile: "app",
+      recipeVersion: "0.1.0",
+      selectedCapabilities: resolved.value.capabilities.map(({ identifier }) => identifier),
+    })],
+    [".egeria/state.json", JSON.stringify({
+      ...state,
+      origin: { profile: "app", recipeVersion: "0.1.0" },
+      installedCapabilities: core.createInstalledManifest(resolved.value),
+      managedSurfaces: [],
+      lastSuccessfulVerification: {
+        kind: "generation",
+        checks: [...state.lastSuccessfulVerification.checks.slice(0, -1), "worker-integration", "post-state-inference"],
+      },
+    })],
+    [".egeria/migrations.jsonl", ""],
+  ]);
+}
+
+test("staged app boundary refuses capability addition and forged approval before effects", async () => {
+  const entries = await appControlEntries();
+  for (const capability of ["booking-calendly", "multilingual", "analytics"]) {
+    const selectedSettings = capability === "booking-calendly" ? settings
+      : capability === "analytics" ? analyticsSettings : undefined;
+    const planned = await planFromEntries(entries, { capability, settings: selectedSettings });
+    assertFailure(planned, "CAPABILITY_ADDITION_UNSUPPORTED");
+    const snapshot = createSnapshotReader(entries);
+    const before = snapshot.snapshot();
+    const effects = [];
+    const forbiddenEffect = async () => {
+      effects.push("unexpected-effect");
+      throw new Error("app lifecycle must remain unavailable");
+    };
+    const applied = await core.applyCapabilityAddition({
+      root: git.identity.root,
+      reader: snapshot.reader,
+      capability,
+      ...(selectedSettings === undefined ? {} : { settings: selectedSettings }),
+      approvedPlanFingerprint: `sha256:${"a".repeat(64)}`,
+      inspectWorktree: async () => git,
+      writer: { write: forbiddenEffect },
+      verifier: {
+        prepareLockfile: forbiddenEffect,
+        verifyInIsolatedCopy: forbiddenEffect,
+      },
+      inspectCreateTargets: forbiddenEffect,
+      inspectExpectedChanges: forbiddenEffect,
+      now: forbiddenEffect,
+    });
+    assert.deepEqual(applied, {
+      ok: false,
+      code: "CAPABILITY_ADDITION_UNSUPPORTED",
+      phase: "precondition",
+      recovery: "not-required",
+    });
+    assert.deepEqual(effects, []);
+    assert.equal(snapshot.snapshot(), before);
+  }
+});
+
 function assertFailure(result, code) {
   assert.equal(result.ok, false);
   assert.deepEqual(result.issues.map(({ code: issueCode }) => issueCode), [code]);

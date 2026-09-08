@@ -403,7 +403,7 @@
       "path": "README.md"
     },
     {
-      "fingerprint": "sha256:a5f1850d016e554b9a43ce03b9bf7827e3c5d777d5748f45cb19aad61b3b5e32",
+      "fingerprint": "sha256:2ce67f4dac8fe11f55abca96c0e25fb07221a8511e6895258cdd4c16501f2a62",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -498,7 +498,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:8061047cb70c5f6ee42a817312bd973eef404de342063809250f0d059da5a3cb",
+      "fingerprint": "sha256:2504d930ca099664209ee1361ee48e4427fbfda6e2ed51ec3cce2ab9dd3ba275",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -919,7 +919,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:44fd40dbd7c7df5c884efe754676b0457b7bf9e131599033a8a3818c41bb7065",
+      "fingerprint": "sha256:e3f68b090ab131fc6cb0563b8393002ce5d938c4ca3c20f3ffaf1d8c206ee541",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -933,7 +933,7 @@
       "path": ".github/workflows/deploy.yml"
     },
     {
-      "fingerprint": "sha256:4d3a30b0271adb61d3e4503ed872f44e75be507d7b31abe22f917a08dd23ce2c",
+      "fingerprint": "sha256:e20ba1889b7871a7525d98731d14eafb9f72af483d2a30d94b708158e068514d",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -2043,7 +2043,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:188a4d93a9d6ef7493e569d4851bbb408f0ac6c21620000b5620a5ab9be4f8cc",
+      "fingerprint": "sha256:2f717d48e4ea5b9177fef09cb0bcef1422b22a117150dc0548fa0c5d647e6759",
       "fingerprintTarget": {
         "kind": "file"
       },

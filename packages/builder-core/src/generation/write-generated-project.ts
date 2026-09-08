@@ -16,6 +16,7 @@ import type {
   CapabilityDescriptor,
 } from "../contracts/capability.js";
 import { safeRelativePathSchema } from "../contracts/identifiers.js";
+import { appGenerationVerificationChecks } from "../contracts/generation-verification.js";
 import type {
   ContractIssue,
   ValidationResult,
@@ -366,16 +367,25 @@ async function requirePreStateInference(
   return { ok: true, value: undefined };
 }
 
-function verificationIsExact(value: unknown): value is GeneratedProjectVerification {
+function verificationIsExact(
+  value: unknown,
+  rendered: RenderedSkeleton,
+): value is GeneratedProjectVerification {
   if (!isPlainObject(value) || !Array.isArray(value.checks)) {
     return false;
   }
 
   const checks = value.checks;
+  const app = rendered.project.originProfile === "app" &&
+    rendered.project.recipeVersion === "0.1.0" &&
+    rendered.resolved.capabilities.some(
+      ({ identifier, version }) => identifier === "app-foundation" && version === "0.1.0",
+    );
+  const expectedChecks = app ? appGenerationVerificationChecks : verificationChecks;
 
   return (
-    checks.length === verificationChecks.length &&
-    verificationChecks.every(
+    checks.length === expectedChecks.length &&
+    expectedChecks.every(
       (expectedCheck, index) => checks[index] === expectedCheck,
     )
   );
@@ -385,6 +395,7 @@ async function createInstalledState(input: Readonly<{
   source: PathIdentity;
   rendered: RenderedSkeleton;
   projectContent: Uint8Array;
+  verification: GeneratedProjectVerification;
 }>): Promise<ValidationResult<InstalledState>> {
   let lockfileContent: Uint8Array;
   try {
@@ -443,7 +454,7 @@ async function createInstalledState(input: Readonly<{
       checks: [
         "contracts",
         "pre-state-inference",
-        ...verificationChecks,
+        ...input.verification.checks,
         "post-state-inference",
       ],
     },
@@ -554,7 +565,7 @@ async function executeGeneration(input: Readonly<{
   if (!verified.ok) {
     return verified;
   }
-  if (!verificationIsExact(verified.value)) {
+  if (!verificationIsExact(verified.value, input.rendered)) {
     return issue(
       "GENERATED_VERIFICATION_INVALID",
       [],
@@ -576,6 +587,7 @@ async function executeGeneration(input: Readonly<{
     source: input.source,
     rendered: input.rendered,
     projectContent,
+    verification: verified.value,
   });
   if (!state.ok) {
     return state;
