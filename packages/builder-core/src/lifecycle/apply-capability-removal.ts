@@ -5,7 +5,11 @@ import {
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
-import { ordinaryGenerationVerificationChecks } from "../contracts/generation-verification.js";
+import {
+  appGenerationVerificationChecks,
+  ordinaryGenerationVerificationChecks,
+} from "../contracts/generation-verification.js";
+import type { ProfileIdentifier } from "../contracts/profile.js";
 import { safeRelativePathSchema } from "../contracts/identifiers.js";
 import {
   migrationRecordSchema,
@@ -16,6 +20,8 @@ import {
   type ProjectConfiguration,
 } from "../contracts/project.js";
 import {
+  appCapabilityRemovalPersistedVerificationChecks,
+  appCapabilityRemovalVerificationChecks,
   capabilityRemovalPersistedVerificationChecks,
   capabilityRemovalVerificationChecks,
   installedStateSchema,
@@ -131,7 +137,9 @@ export type CapabilityRemovalExecutionResult =
         migration: ReturnType<typeof removalMigrationIdentifier>;
         changedPaths: readonly string[];
         preservedPaths: readonly string[];
-        verificationChecks: typeof capabilityRemovalVerificationChecks;
+        verificationChecks:
+          | typeof capabilityRemovalVerificationChecks
+          | typeof appCapabilityRemovalVerificationChecks;
       }>;
     }>
   | Readonly<{
@@ -212,8 +220,13 @@ async function readExpectedFileStates(
   return true;
 }
 
-function verificationIsExact(value: GeneratedProjectVerification): boolean {
-  return sameValues(value.checks, ordinaryGenerationVerificationChecks);
+function verificationIsExact(
+  value: GeneratedProjectVerification,
+  profile: ProfileIdentifier,
+): boolean {
+  return sameValues(value.checks, profile === "app"
+    ? appGenerationVerificationChecks
+    : ordinaryGenerationVerificationChecks);
 }
 
 function sameSurfaceDescriptor(
@@ -502,7 +515,7 @@ function createNextState(input: Readonly<{
     ejections: input.ejections,
     lastSuccessfulVerification: {
       kind: "capability-removal",
-      checks: capabilityRemovalPersistedVerificationChecks,
+      checks: input.migration.verificationChecks,
     },
   });
   return parsed.success ? parsed.data : undefined;
@@ -731,7 +744,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       "inspect-worktree",
     );
   }
-  if (!verified.ok || !verificationIsExact(verified.value)) {
+  if (!verified.ok || !verificationIsExact(verified.value, plan.profile)) {
     return failure(
       "CAPABILITY_VERIFICATION_FAILED",
       "verify",
@@ -799,7 +812,9 @@ export async function applyCapabilityRemoval(input: Readonly<{
     capabilities: plan.desiredCapabilities,
     persistentDataAuthorizations: [],
     remainingKnownDrift: [],
-    verificationChecks: capabilityRemovalPersistedVerificationChecks,
+    verificationChecks: plan.profile === "app"
+      ? appCapabilityRemovalPersistedVerificationChecks
+      : capabilityRemovalPersistedVerificationChecks,
   });
   if (!migration.success) {
     return failure(
@@ -984,7 +999,9 @@ export async function applyCapabilityRemoval(input: Readonly<{
       migration: removalMigrationIdentifier(input.capability),
       changedPaths,
       preservedPaths,
-      verificationChecks: capabilityRemovalVerificationChecks,
+      verificationChecks: plan.profile === "app"
+        ? appCapabilityRemovalVerificationChecks
+        : capabilityRemovalVerificationChecks,
     },
   };
 }

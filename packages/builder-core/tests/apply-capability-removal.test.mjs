@@ -83,6 +83,9 @@ async function loadTextEntries(directory) {
 }
 
 async function installedEntries(profile, options = {}) {
+  const selectedVerificationChecks = profile === "app"
+    ? core.appCapabilityAdditionPersistedVerificationChecks
+    : persistedVerificationChecks;
   const includeBooking = options.booking ?? true;
   const includeMultilingual = options.multilingual ?? false;
   const includeAnalytics = options.analytics ?? false;
@@ -104,7 +107,9 @@ async function installedEntries(profile, options = {}) {
     "pnpm-lock.yaml",
     new Uint8Array(
       await readFile(
-        resolve(repositoryRoot, `fixtures/generated/${profile}/pnpm-lock.yaml`),
+        profile === "app"
+          ? resolve(packageRoot, "lockfiles/web-recipe-app-0.1.0/pnpm-lock.yaml")
+          : resolve(repositoryRoot, `fixtures/generated/${profile}/pnpm-lock.yaml`),
       ),
     ),
   );
@@ -131,7 +136,7 @@ async function installedEntries(profile, options = {}) {
       .sort(compareText),
     persistentDataAuthorizations: [],
     remainingKnownDrift: [],
-    verificationChecks: persistedVerificationChecks,
+    verificationChecks: selectedVerificationChecks,
   }));
   byteFiles.set(
     ".egeria/migrations.jsonl",
@@ -164,7 +169,7 @@ async function installedEntries(profile, options = {}) {
     },
     lastSuccessfulVerification: {
       kind: "capability-addition",
-      checks: persistedVerificationChecks,
+      checks: selectedVerificationChecks,
     },
   };
   const entries = new Map(
@@ -300,7 +305,7 @@ async function approvedPlan(reader, capability = "booking-calendly") {
   return result.value;
 }
 
-function successfulVerifier(calls) {
+function successfulVerifier(calls, checks = core.ordinaryGenerationVerificationChecks) {
   return {
     prepareLockfile() {
       throw new Error("removal must not prepare a lockfile");
@@ -309,7 +314,7 @@ function successfulVerifier(calls) {
       calls.push(receivedRoot);
       return Promise.resolve({
         ok: true,
-        value: { checks: core.ordinaryGenerationVerificationChecks },
+        value: { checks },
       });
     },
   };
@@ -353,6 +358,427 @@ async function runApply(repository, overrides = {}) {
     worktreeInspections,
   };
 }
+
+const appOperations = [
+  { kind: "addition", capability: "booking-calendly", option: "booking", settings },
+  { kind: "removal", capability: "booking-calendly", option: "booking" },
+  { kind: "addition", capability: "multilingual", option: "multilingual" },
+  { kind: "removal", capability: "multilingual", option: "multilingual" },
+  { kind: "addition", capability: "analytics", option: "analytics", settings: analyticsSettings },
+  { kind: "removal", capability: "analytics", option: "analytics" },
+];
+const appVerifierChecks = [
+  "lockfile", "frozen-install", "lint", "typecheck", "unit-tests",
+  "component-tests", "next-build", "opennext-build", "worker-integration",
+];
+
+function planAppOperation(repository, operation) {
+  const input = { reader: repository.reader, git, capability: operation.capability };
+  return operation.kind === "addition"
+    ? core.planCapabilityAddition({ ...input, settings: operation.settings })
+    : core.planCapabilityRemoval({
+        ...input,
+        inspectRepositoryInventory: inventoryInspectorForFiles(repository.files),
+      });
+}
+
+function applyAppOperation(repository, operation, plan, overrides = {}) {
+  const input = {
+    root,
+    capability: operation.capability,
+    approvedPlanFingerprint: plan.planFingerprint,
+    reader: repository.reader,
+    writer: repository.writer,
+    verifier: successfulVerifier([], appVerifierChecks),
+    inspectWorktree: () => Promise.resolve(git),
+    inspectExpectedChanges: () => Promise.resolve({ ok: true }),
+    now: () => completedAt,
+    ...overrides,
+  };
+  return operation.kind === "addition"
+    ? core.applyCapabilityAddition({
+        ...input,
+        settings: operation.settings,
+        inspectCreateTargets: () => Promise.resolve({ ok: true }),
+      })
+    : core.applyCapabilityRemoval({
+        ...input,
+        inspectRepositoryInventory: inventoryInspectorForFiles(repository.files),
+      });
+}
+
+test("app optional lifecycle preserves the foundation and composes every optional selection", async (context) => {
+  for (const operation of appOperations) {
+    await context.test(`${operation.kind} ${operation.capability}`, async () => {
+      const otherOptions = ["booking", "multilingual", "analytics"]
+        .filter((option) => option !== operation.option);
+      for (const selection of [0, 1, 2, 3]) {
+        const options = {
+          [operation.option]: operation.kind === "removal",
+          [otherOptions[0]]: Boolean(selection & 1),
+          [otherOptions[1]]: Boolean(selection & 2),
+        };
+        const entries = await installedEntries("app", options);
+        const guidePath = "apps/web/docs/application-boundaries.md";
+        const customizedGuide = `${entries.get(guidePath)}\nApplication-specific architectural notes.\n`;
+        entries.set(guidePath, customizedGuide);
+        const contentPath = "apps/web/content/en-CA/about.yaml";
+        const customizedContent = entries.get(contentPath).replace(
+          "Clear communication, careful craft, and practical outcomes guide the work.",
+          "Application-owned working principles remain authoritative.",
+        );
+        assert.notEqual(customizedContent, entries.get(contentPath));
+        entries.set(contentPath, customizedContent);
+        const repository = createRepository(entries);
+        const beforePlanning = snapshot(repository.files);
+        const planned = await planAppOperation(repository, operation);
+        if (operation.kind === "removal" && operation.capability === "multilingual" && options.analytics) {
+          assert.equal(planned.ok, false);
+          assert.deepEqual(planned.issues.map(({ code, path }) => ({ code, path })), [{
+            code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+            path: ["apps/web/tests/e2e/analytics-consent.spec.ts"],
+          }]);
+          const refused = await applyAppOperation(repository, operation, {
+            planFingerprint: `sha256:${"a".repeat(64)}`,
+          });
+          assert.deepEqual(refused, {
+            ok: false,
+            code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+            conflicts: ["apps/web/tests/e2e/analytics-consent.spec.ts"],
+            phase: "precondition",
+            recovery: "not-required",
+          });
+          assert.equal(snapshot(repository.files), beforePlanning);
+          assert.deepEqual(repository.writes, []);
+          continue;
+        }
+        assert.equal(planned.ok, true, JSON.stringify(planned));
+        assert.equal(planned.value.profile, "app");
+        const repeated = await planAppOperation(repository, operation);
+        assert.equal(repeated.ok, true, JSON.stringify(repeated));
+        assert.equal(repeated.value.planFingerprint, planned.value.planFingerprint);
+        assert.equal(snapshot(repository.files), beforePlanning);
+        assert.deepEqual(repository.writes, []);
+
+        const result = await applyAppOperation(repository, operation, planned.value);
+        assert.equal(result.ok, true, JSON.stringify(result));
+        assert.equal(result.value.status, "verified-final-diff-approval-required");
+        assert.deepEqual(result.value.capability, {
+          identifier: operation.capability,
+          version: "0.1.0",
+        });
+        assert.equal(result.value.migration,
+          `${operation.kind === "addition" ? "add" : "remove"}-${operation.capability}-0-1-0`);
+        assert.deepEqual(result.value.verificationChecks, [
+          "contracts", "plan-approval", "pre-state-inference", ...appVerifierChecks,
+          "post-change-inference", "migration-record", "post-state-inference",
+        ]);
+        assert.deepEqual(repository.writes.slice(1).map((batch) => batch.map(({ path }) => path)), [
+          [".egeria/migrations.jsonl"],
+          [".egeria/state.json"],
+        ]);
+        assert.equal(repository.files.get(guidePath), customizedGuide);
+        assert.equal(repository.files.get(contentPath), customizedContent);
+        assert.equal(repository.files.get("pnpm-lock.yaml"), entries.get("pnpm-lock.yaml"));
+        assert.equal(repository.files.get("apps/web/package.json"), entries.get("apps/web/package.json"));
+
+        const oldState = core.parseStateJson(entries.get(".egeria/state.json"));
+        const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
+        assert.equal(state.ok, true, JSON.stringify(state));
+        assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.1.0" });
+        for (const identifier of ["app-foundation", "site-routing"]) {
+          assert.deepEqual(
+            state.value.installedCapabilities.find((item) => item.identifier === identifier),
+            oldState.value.installedCapabilities.find((item) => item.identifier === identifier),
+          );
+        }
+        const foundationSurfaces = oldState.value.managedSurfaces
+          .filter(({ owner }) => owner.kind === "capability" && owner.identifier === "app-foundation");
+        assert.ok(foundationSurfaces.some(({ path }) => path === "apps/web/app/api/health/route.ts"));
+        assert.deepEqual(
+          state.value.managedSurfaces.filter(({ owner }) =>
+            owner.kind === "capability" && owner.identifier === "app-foundation"),
+          foundationSurfaces,
+        );
+        for (const surface of foundationSurfaces) {
+          assert.equal(repository.files.get(surface.path), entries.get(surface.path));
+        }
+        assert.deepEqual(state.value.lastSuccessfulVerification, {
+          kind: `capability-${operation.kind}`,
+          checks: [
+            "contracts", "plan-approval", "pre-state-inference", ...appVerifierChecks,
+            "post-change-inference",
+          ],
+        });
+        const desiredOptions = { ...options, [operation.option]: operation.kind === "addition" };
+        const fresh = await installedEntries("app", desiredOptions);
+        for (const [path, content] of fresh) {
+          if (path.startsWith(".egeria/") || path === guidePath || path === contentPath) continue;
+          assert.deepEqual(repository.files.get(path), content, path);
+        }
+        assert.deepEqual([...repository.files.keys()].sort(), [...fresh.keys()].sort());
+        const project = core.parseProjectYaml(repository.files.get(".egeria/project.yaml"));
+        const freshProject = core.parseProjectYaml(fresh.get(".egeria/project.yaml"));
+        assert.deepEqual(project, freshProject);
+        assert.equal(repository.files.has("apps/web/app/[locale]/[[...segments]]/page.tsx"),
+          desiredOptions.multilingual);
+        assert.equal(repository.files.has("apps/web/content/fr-CA/localized-content.yaml"),
+          desiredOptions.multilingual);
+        assert.ok(repository.files.has("apps/web/content/en-CA/about.yaml"));
+        const catalog = core.createVerifiedCapabilityCatalog();
+        assert.equal(catalog.ok, true);
+        const inference = await core.inferRepository({ reader: repository.reader, catalog: catalog.value });
+        assert.deepEqual(
+          inference.capabilities.filter(({ category }) => category === "confirmed")
+            .map(({ identifier }) => identifier).sort(),
+          state.value.installedCapabilities.map(({ identifier }) => identifier).sort(),
+        );
+        assert.deepEqual(inference.capabilities.filter(({ category }) =>
+          !["confirmed", "absent"].includes(category)), []);
+      }
+    });
+  }
+});
+
+test("app multilingual removal retains a modified locale catalog as an explicit ejection", async () => {
+  const operation = appOperations.find(({ kind, capability }) =>
+    kind === "removal" && capability === "multilingual");
+  const repository = createRepository(await installedEntries("app", {
+    booking: false, multilingual: true,
+  }));
+  const path = "apps/web/content/fr-CA/localized-content.yaml";
+  const customized = `${repository.files.get(path)}# application translation review\n`;
+  repository.files.set(path, customized);
+  const planned = await planAppOperation(repository, operation);
+  assert.equal(planned.ok, true, JSON.stringify(planned));
+  assert.equal(planned.value.actions.find((action) => action.path === path)?.kind,
+    "preserve-file-and-eject");
+  const result = await applyAppOperation(repository, operation, planned.value);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.value.preservedPaths, [path]);
+  assert.equal(repository.files.get(path), customized);
+  const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
+  const project = core.parseProjectYaml(repository.files.get(".egeria/project.yaml"));
+  assert.equal(state.ok, true);
+  assert.equal(project.ok, true);
+  assert.deepEqual(state.value.ejections, [path]);
+  assert.deepEqual(project.value.ejectedAreas, [path]);
+  assert.equal(state.value.managedSurfaces.find((surface) => surface.path === path)?.ownership, "ejected");
+});
+
+test("multilingual removal preserves the existing analytics reference refusal on public profiles", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    const repository = createRepository(await installedEntries(profile, {
+      booking: false, multilingual: true, analytics: true,
+    }));
+    const before = snapshot(repository.files);
+    const planned = await core.planCapabilityRemoval({
+      reader: repository.reader, git, capability: "multilingual",
+      inspectRepositoryInventory: inventoryInspectorForFiles(repository.files),
+    });
+    assert.equal(planned.ok, false);
+    assert.deepEqual(planned.issues.map(({ code, path }) => ({ code, path })), [{
+      code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+      path: ["apps/web/tests/e2e/analytics-consent.spec.ts"],
+    }]);
+    assert.equal(snapshot(repository.files), before);
+    assert.deepEqual(repository.writes, []);
+  }
+});
+
+test("app optional lifecycle refuses forged approval, invalid identity, drift and ejection before mutation", async (context) => {
+  for (const operation of appOperations) {
+    await context.test(`${operation.kind} ${operation.capability}`, async () => {
+      const entries = await installedEntries("app", {
+        booking: false, multilingual: false, analytics: false,
+        [operation.option]: operation.kind === "removal",
+      });
+      const planned = await planAppOperation(createRepository(entries), operation);
+      assert.equal(planned.ok, true, JSON.stringify(planned));
+      const cases = [
+        {
+          name: "forged approval", code: "CAPABILITY_PLAN_APPROVAL_INVALID",
+          overrides: { approvedPlanFingerprint: `sha256:${"0".repeat(64)}` },
+        },
+        {
+          name: "invalid root", code: "GIT_WORKTREE_IDENTITY_INVALID",
+          overrides: { root: "relative/app" },
+        },
+        {
+          name: "dirty worktree", code: "GIT_WORKTREE_DIRTY",
+          overrides: { inspectWorktree: async () => ({ ok: false, code: "GIT_WORKTREE_DIRTY" }) },
+        },
+        {
+          name: "foundation drift", code: "PROJECT_DRIFT_DETECTED",
+          change(files) { files.set("apps/web/app/api/health/route.ts", "// managed drift\n"); },
+        },
+        {
+          name: "unreconciled ejection",
+          code: operation.kind === "addition" ? "PROJECT_EJECTION_UNSUPPORTED" : "PROJECT_EJECTION_INVALID",
+          change(files) {
+            const project = core.parseProjectYaml(files.get(".egeria/project.yaml"));
+            const state = core.parseStateJson(files.get(".egeria/state.json"));
+            const ejections = ["apps/web/docs/application-boundaries.md"];
+            files.set(".egeria/project.yaml", core.serializeProjectYaml({
+              ...project.value, ejectedAreas: ejections,
+            }));
+            files.set(".egeria/state.json", core.serializeStateJson({
+              ...state.value, ejections,
+              managedSurfaces: state.value.managedSurfaces.map((surface) =>
+                surface.path === ".egeria/project.yaml"
+                  ? { ...surface, fingerprint: core.fingerprintFileContent(
+                      encoder.encode(files.get(".egeria/project.yaml")),
+                    ) }
+                  : operation.kind === "addition" && ejections.includes(surface.path)
+                  ? { ...surface, ownership: "ejected" }
+                  : surface),
+            }));
+          },
+        },
+      ];
+      for (const example of cases) {
+        const repository = createRepository(entries);
+        example.change?.(repository.files);
+        const before = snapshot(repository.files);
+        const verifierCalls = [];
+        const result = await applyAppOperation(repository, operation, planned.value, {
+          verifier: successfulVerifier(verifierCalls, appVerifierChecks),
+          ...example.overrides,
+        });
+        assert.deepEqual(result, {
+          ok: false, code: example.code, phase: "precondition", recovery: "not-required",
+        }, example.name);
+        assert.equal(snapshot(repository.files), before, example.name);
+        assert.deepEqual(repository.writes, [], example.name);
+        assert.deepEqual(verifierCalls, [], example.name);
+      }
+      const changed = createRepository(await installedEntries("app", {
+        booking: operation.option !== "booking",
+        multilingual: operation.option === "booking",
+        analytics: false,
+        [operation.option]: operation.kind === "removal",
+      }));
+      const changedBefore = snapshot(changed.files);
+      const changedPlan = await planAppOperation(changed, operation);
+      assert.equal(changedPlan.ok, true, JSON.stringify(changedPlan));
+      assert.notEqual(changedPlan.value.planFingerprint, planned.value.planFingerprint);
+      assert.deepEqual(await applyAppOperation(changed, operation, planned.value), {
+        ok: false, code: "CAPABILITY_PLAN_APPROVAL_INVALID",
+        phase: "precondition", recovery: "not-required",
+      });
+      assert.equal(snapshot(changed.files), changedBefore);
+      assert.deepEqual(changed.writes, []);
+    });
+  }
+});
+
+test("app removal recomputes surviving references after approval for each optional capability", async () => {
+  const imports = {
+    "booking-calendly": "@/src/integrations/booking-calendly/calendly-booking",
+    multilingual: "@/src/i18n/locale",
+    analytics: "@/src/integrations/analytics/analytics-runtime",
+  };
+  for (const operation of appOperations.filter(({ kind }) => kind === "removal")) {
+    const repository = createRepository(await installedEntries("app", {
+      booking: false, multilingual: false, analytics: false, [operation.option]: true,
+    }));
+    const planned = await planAppOperation(repository, operation);
+    assert.equal(planned.ok, true, JSON.stringify(planned));
+    const consumer = "apps/web/src/presentation/application-consumer.ts";
+    repository.files.set(consumer, `export * from "${imports[operation.capability]}";\n`);
+    const before = snapshot(repository.files);
+    const result = await applyAppOperation(repository, operation, planned.value);
+    assert.deepEqual(result, {
+      ok: false, code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT", conflicts: [consumer],
+      phase: "precondition", recovery: "not-required",
+    });
+    assert.equal(snapshot(repository.files), before);
+    assert.deepEqual(repository.writes, []);
+  }
+});
+
+test("app optional lifecycle requires exact Worker receipts and retains failed persistence prefixes", async (context) => {
+  for (const operation of appOperations) {
+    await context.test(`${operation.kind} ${operation.capability}`, async () => {
+      const entries = await installedEntries("app", {
+        booking: false, multilingual: false, analytics: false,
+        [operation.option]: operation.kind === "removal",
+      });
+      const planned = await planAppOperation(createRepository(entries), operation);
+      assert.equal(planned.ok, true, JSON.stringify(planned));
+      for (const checks of [
+        appVerifierChecks.slice(0, -1),
+        [...appVerifierChecks].reverse(),
+        [...appVerifierChecks, "unexpected-check"],
+      ]) {
+        const repository = createRepository(entries);
+        const result = await applyAppOperation(repository, operation, planned.value, {
+          verifier: successfulVerifier([], checks),
+        });
+        assert.deepEqual(result, {
+          ok: false, code: "CAPABILITY_VERIFICATION_FAILED",
+          phase: "verify", recovery: "inspect-worktree",
+        });
+        assert.equal(repository.writes.length, 1);
+        for (const path of [".egeria/state.json", ".egeria/migrations.jsonl"]) {
+          assert.equal(repository.files.get(path), entries.get(path));
+        }
+        assert.notEqual(repository.files.get(".egeria/project.yaml"), entries.get(".egeria/project.yaml"));
+      }
+      for (const example of [
+        { failBatch: 1, code: "CAPABILITY_TRANSFORM_FAILED", phase: "transform", recovery: "not-required" },
+        { failBatch: 2, code: "CAPABILITY_MIGRATION_WRITE_FAILED", phase: "persist-migration", recovery: "inspect-worktree" },
+        { failBatch: 3, code: "CAPABILITY_STATE_WRITE_FAILED", phase: "persist-state", recovery: "inspect-worktree" },
+      ]) {
+        const repository = createRepository(entries, { failBatch: example.failBatch });
+        const result = await applyAppOperation(repository, operation, planned.value);
+        assert.deepEqual(result, {
+          ok: false, code: example.code, phase: example.phase, recovery: example.recovery,
+        });
+        assert.equal(repository.writes.length, example.failBatch - 1);
+        assert.equal(repository.files.get(".egeria/state.json"), entries.get(".egeria/state.json"));
+        assert.equal(
+          repository.files.get(".egeria/migrations.jsonl") === entries.get(".egeria/migrations.jsonl"),
+          example.failBatch < 3,
+        );
+        if (example.failBatch === 1) assert.equal(snapshot(repository.files), snapshot(entries));
+      }
+      const partial = createRepository(entries);
+      const partialResult = await applyAppOperation(partial, operation, planned.value, {
+        writer: {
+          async write(changes) {
+            const written = await partial.writer.write(changes.slice(0, 1));
+            assert.equal(written.ok, true);
+            return { ok: false, sourceChanged: true };
+          },
+        },
+      });
+      assert.deepEqual(partialResult, {
+        ok: false, code: "CAPABILITY_TRANSFORM_FAILED",
+        phase: "transform", recovery: "inspect-worktree",
+      });
+      assert.notEqual(snapshot(partial.files), snapshot(entries));
+      assert.equal(partial.files.get(".egeria/state.json"), entries.get(".egeria/state.json"));
+      assert.equal(partial.files.get(".egeria/migrations.jsonl"), entries.get(".egeria/migrations.jsonl"));
+      const race = createRepository(entries);
+      const finalResult = await applyAppOperation(race, operation, planned.value, {
+        inspectExpectedChanges: async () => {
+          race.files.set(".egeria/project.yaml", "concurrent final edit\n");
+          return { ok: true };
+        },
+      });
+      assert.deepEqual(finalResult, {
+        ok: false, code: "CAPABILITY_POST_STATE_FAILED",
+        phase: "post-state", recovery: "inspect-worktree",
+      });
+      assert.equal(race.writes.length, 3);
+      assert.equal(race.files.get(".egeria/project.yaml"), "concurrent final edit\n");
+      const retainedState = core.parseStateJson(race.files.get(".egeria/state.json"));
+      assert.equal(retainedState.ok, true);
+      assert.equal(retainedState.value.lastSuccessfulVerification.checks.includes("worker-integration"), true);
+    });
+  }
+});
 
 test("capability removal recomputes every removal reference guard before its first write", async () => {
   const cases = [

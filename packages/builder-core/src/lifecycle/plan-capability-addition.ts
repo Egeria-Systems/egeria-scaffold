@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { createVerifiedCapabilityCatalog, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
+import type { ProfileIdentifier } from "../contracts/profile.js";
 import {
   analyticsSettingsSchema,
   type AnalyticsSettings,
@@ -39,7 +40,7 @@ export type CapabilityAdditionPlan = Readonly<{
   status: "approval-required";
   planFingerprint: `sha256:${string}`;
   baseRevision: string;
-  profile: "portfolio" | "site";
+  profile: ProfileIdentifier;
   capability: Readonly<{
     identifier: "analytics" | "booking-calendly" | "multilingual";
     version: "0.1.0";
@@ -530,10 +531,6 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   }
 
   const project = inspection.project.value;
-  // Remove when app capability lifecycle is activated.
-  if (project.originProfile === "app") {
-    return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
-  }
 
   if (hasMaterialDrift(inspection)) {
     return planningFailure("PROJECT_DRIFT_DETECTED");
