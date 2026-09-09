@@ -354,7 +354,7 @@ test("generated dependency recipes select only their exact reviewed lockfile", a
   const portfolioLockfile = await readFile(portfolioRecipeLockfile, "utf8");
   assert.match(
     portfolioLockfile,
-    /\n\s+next:\n\s+specifier: 16\.3\.0\n\s+version: 16\.3\.0/u,
+    /\n\s+next:\n\s+specifier: 16\.3\.3\n\s+version: 16\.3\.3/u,
   );
   const siteLockfile = await readFile(siteRecipeLockfile, "utf8");
   assert.match(
