@@ -312,7 +312,7 @@
       "path": "apps/web/src/integrations/analytics/analytics-settings.ts"
     },
     {
-      "fingerprint": "sha256:e10ba2f4b56a4e3e86ee2a3c2e5d6eb924c2b87017261b72cb77091f627a159e",
+      "fingerprint": "sha256:1024811a7b2faf01a25d1d08e4ccff723eb067751705d40eaf08e5113ab6d790",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -749,7 +749,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:120ed38ecde7523c9bd9bdf3041a84f7b78fdea75a9c5d258cdad647f44840b6",
+      "fingerprint": "sha256:fb27c8cf44d0e3acf70a9254619c0511d868d337e75c80b9a6730928bb228e01",
       "fingerprintTarget": {
         "kind": "file"
       },

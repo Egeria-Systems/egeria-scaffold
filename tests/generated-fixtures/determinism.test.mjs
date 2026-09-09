@@ -140,7 +140,7 @@ function assertPortablePublicLockfile(lockfile) {
   assert.match(lockfile, /@testing-library\/user-event@14\.6\.3/u);
   assert.match(lockfile, /@vitejs\/plugin-react@6\.0\.5/u);
   assert.match(lockfile, /jsdom@30\.0\.1/u);
-  assert.match(lockfile, /vitest@4\.1\.10/u);
+  assert.match(lockfile, /vitest@4\.1\.11/u);
   assert.match(lockfile, /raw-loader@4\.0\.2/u);
   assert.match(lockfile, /@tailwindcss\/postcss@4\.3\.3/u);
   assert.match(lockfile, /postcss@8\.5\.26/u);
