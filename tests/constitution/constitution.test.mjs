@@ -2488,7 +2488,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     enforcementMap,
-    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+staged CLI\/lifecycle refusals[^\n]+certification execution remain later gates/iu,
+    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+app optional-capability addition\/removal with exact Worker receipts[^\n]+staged CLI\/transition refusals[^\n]+certification execution remain later gates/iu,
   );
   assert.match(
     packageOwnership,
@@ -2500,11 +2500,11 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     programRoadmap,
-    /Current increment status:[^\n]+implements shared app project\/state parsing[^\n]+generated server runtime and tests[^\n]+state-last atomic generation[^\n]+whole-Worker verification receipt/iu,
+    /Current increment status:[^\n]+activates exact app addition\/removal for Calendly, multilingual, and analytics through the existing planners and state-last executors[^\n]+preserves the accepted Effect runtime[^\n]+whole-Worker verification receipt/iu,
   );
   assert.match(
     programRoadmap,
-    /\*\*Stop gate:\*\* Complete the current generation candidate's required deterministic and generated-runtime verification[^\n]+independent requirements[^\n]+test-evidence reviews[^\n]+exact review packet before final-diff approval/iu,
+    /\*\*Stop gate:\*\* Complete the current optional-lifecycle candidate's required deterministic and generated-runtime verification[^\n]+independent requirements[^\n]+test-evidence reviews[^\n]+exact review packet before final-diff approval/iu,
   );
   assert.match(
     convergentProfileAdr,
@@ -2516,7 +2516,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     rootInstructions,
-    /Builder-core supports `app@0\.1\.0` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+staged CLI, lifecycle, transition, fixture, and certification boundaries/iu,
+    /Builder-core supports `app@0\.1\.0` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+staged CLI, transition, fixture, and certification boundaries/iu,
   );
   for (const instructions of [builderInstructions, cliInstructions]) {
     assert.match(
@@ -2825,7 +2825,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /ten-capability catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.1\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+does not activate app CLI creation or existing-repository mutations/iu,
+    /ten-capability catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.1\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+app CLI creation and incoming transitions remain separately gated/iu,
   );
 });
 
@@ -3134,7 +3134,7 @@ test("client-required public-site work is relocated after lifecycle without requ
   );
   assert.match(
     capabilityModel,
-    /Multilingual and analytics remain independent optional capabilities during initial portfolio\/site\/app generation[^\n]+addition\/removal and CLI creation remain limited to portfolio\/site[^\n]+no composite profile or capability/iu,
+    /Multilingual and analytics remain independent optional capabilities during initial portfolio\/site\/app generation[^\n]+addition\/removal supports all three profiles under the existing lifecycle preconditions[^\n]+CLI creation remains limited to portfolio\/site[^\n]+no composite profile or capability/iu,
   );
   assert.match(
     enforcementMap,

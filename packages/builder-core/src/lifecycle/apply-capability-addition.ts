@@ -5,7 +5,11 @@ import {
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
-import { ordinaryGenerationVerificationChecks } from "../contracts/generation-verification.js";
+import {
+  appGenerationVerificationChecks,
+  ordinaryGenerationVerificationChecks,
+} from "../contracts/generation-verification.js";
+import type { ProfileIdentifier } from "../contracts/profile.js";
 import {
   migrationRecordSchema,
   type MigrationRecord,
@@ -17,6 +21,8 @@ import {
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
 import {
+  appCapabilityAdditionPersistedVerificationChecks,
+  appCapabilityAdditionVerificationChecks,
   capabilityAdditionPersistedVerificationChecks,
   capabilityAdditionVerificationChecks,
   installedStateSchema,
@@ -124,7 +130,9 @@ export type CapabilityAdditionExecutionResult =
         }>;
         migration: ReturnType<typeof additionMigrationIdentifier>;
         changedPaths: readonly string[];
-        verificationChecks: typeof capabilityAdditionVerificationChecks;
+        verificationChecks:
+          | typeof capabilityAdditionVerificationChecks
+          | typeof appCapabilityAdditionVerificationChecks;
       }>;
     }>
   | Readonly<{
@@ -197,8 +205,11 @@ async function readExactFileBytes(
 
 function verificationIsExact(
   value: GeneratedProjectVerification,
+  profile: ProfileIdentifier,
 ): boolean {
-  return sameValues(value.checks, ordinaryGenerationVerificationChecks);
+  return sameValues(value.checks, profile === "app"
+    ? appGenerationVerificationChecks
+    : ordinaryGenerationVerificationChecks);
 }
 
 function sameSurfaceDescriptor(
@@ -340,7 +351,7 @@ function createNextState(input: Readonly<{
     managedSurfaces,
     lastSuccessfulVerification: {
       kind: "capability-addition",
-      checks: capabilityAdditionPersistedVerificationChecks,
+      checks: input.migration.verificationChecks,
     },
   });
   return parsed.success ? parsed.data : undefined;
@@ -558,7 +569,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       "inspect-worktree",
     );
   }
-  if (!verified.ok || !verificationIsExact(verified.value)) {
+  if (!verified.ok || !verificationIsExact(verified.value, plan.profile)) {
     return failure(
       "CAPABILITY_VERIFICATION_FAILED",
       "verify",
@@ -628,7 +639,9 @@ export async function applyCapabilityAddition(input: Readonly<{
     capabilities: plan.desiredCapabilities,
     persistentDataAuthorizations: [],
     remainingKnownDrift: [],
-    verificationChecks: capabilityAdditionPersistedVerificationChecks,
+    verificationChecks: plan.profile === "app"
+      ? appCapabilityAdditionPersistedVerificationChecks
+      : capabilityAdditionPersistedVerificationChecks,
   });
   if (!migration.success) {
     return failure(
@@ -762,7 +775,9 @@ export async function applyCapabilityAddition(input: Readonly<{
       capability: { identifier: input.capability, version: "0.1.0" },
       migration: additionMigrationIdentifier(input.capability),
       changedPaths,
-      verificationChecks: capabilityAdditionVerificationChecks,
+      verificationChecks: plan.profile === "app"
+        ? appCapabilityAdditionVerificationChecks
+        : capabilityAdditionVerificationChecks,
     },
   };
 }

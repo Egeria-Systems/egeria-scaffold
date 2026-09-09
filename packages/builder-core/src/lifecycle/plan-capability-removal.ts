@@ -9,6 +9,7 @@ import type {
   ManagedSurfaceDescriptor,
 } from "../contracts/capability.js";
 import type { ContractIssue } from "../contracts/result.js";
+import type { ProfileIdentifier } from "../contracts/profile.js";
 import type { InstalledState, InstalledSurface } from "../contracts/state.js";
 import {
   deriveProjectDiscrepancies,
@@ -76,7 +77,7 @@ export type CapabilityRemovalPlan = Readonly<{
   status: "approval-required";
   planFingerprint: `sha256:${string}`;
   baseRevision: string;
-  profile: "portfolio" | "site";
+  profile: ProfileIdentifier;
   capability: Readonly<{
     identifier: "analytics" | "booking-calendly" | "multilingual";
     version: "0.1.0";
@@ -740,10 +741,6 @@ export async function planCapabilityRemoval(input: Readonly<{
 
   const project = inspection.project.value;
   const state = inspection.inference.state.value;
-  // Remove when app capability lifecycle is activated.
-  if (project.originProfile === "app") {
-    return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
-  }
   const desired = project.selectedCapabilities.includes(capabilityValue);
   const installedCapability = state.installedCapabilities.find(
     ({ identifier }) => identifier === capabilityValue,
