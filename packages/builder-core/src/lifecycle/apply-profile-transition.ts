@@ -673,6 +673,8 @@ export async function applyProfileTransition(input: Readonly<{
   afterExactFileRead?: (path: string) => Promise<unknown>;
   now?: () => string;
 }>): Promise<ProfileTransitionExecutionResult> {
+  const runtimeTarget: unknown = Reflect.get(input, "toProfile");
+  if (runtimeTarget !== "site") return failure("PROFILE_TRANSITION_UNSUPPORTED", "precondition", "not-required");
   const root = resolve(input.root);
   if (!isAbsolute(input.root) || root !== input.root) {
     return failure(
@@ -724,7 +726,8 @@ export async function applyProfileTransition(input: Readonly<{
       "not-required",
     );
   }
-  const plan = planResult.value;
+  if (planResult.value.target.profile !== "site" || planResult.value.source.profile !== "portfolio") return failure("PROFILE_TRANSITION_UNSUPPORTED", "precondition", "not-required");
+  const plan = planResult.value as ProfileTransitionPlan;
   const desiredCapabilities = plan.target.capabilities.map(
     ({ identifier }) => identifier,
   );

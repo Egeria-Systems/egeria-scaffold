@@ -59,9 +59,7 @@ type CliRunnerDependencies = Readonly<{
   applyProfileTransition?(input: Parameters<
     typeof applyProfileTransitionDefault
   >[0]): Promise<ProfileTransitionExecutionResult>;
-  planProfileTransition?(input: Parameters<
-    typeof planProfileTransitionDefault
-  >[0]): ReturnType<typeof planProfileTransitionDefault>;
+  planProfileTransition?: typeof planHistoricalProfileTransition;
   createReader?(root: string): RepositoryReader;
   inspectGitCreateTargets?(input: Readonly<{
     root: string;
@@ -72,6 +70,15 @@ type CliRunnerDependencies = Readonly<{
   >[0]): Promise<GitRepositoryInventoryInspection>;
   inspectGitWorktree?(input: Readonly<{ root: string }>): Promise<GitWorktreeInspection>;
 }>;
+
+// Keep the CLI's existing edge narrow while builder-core stages app planning.
+function planHistoricalProfileTransition(input: Readonly<{
+  reader: RepositoryReader;
+  git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
+  toProfile: "site";
+}>) {
+  return planProfileTransitionDefault(input);
+}
 
 type CliRunner = (
   arguments_: readonly string[],
@@ -644,7 +651,7 @@ async function runPlanProfileTransition(
   let outcome:
     | Readonly<{
         kind: "result";
-        result: Awaited<ReturnType<typeof planProfileTransitionDefault>>;
+        result: Awaited<ReturnType<typeof planHistoricalProfileTransition>>;
       }>
     | Readonly<{ kind: "failure"; code: "REPOSITORY_OPEN_FAILED" }>;
 
@@ -653,7 +660,7 @@ async function runPlanProfileTransition(
     outcome = {
       kind: "result",
       result: await (
-        dependencies.planProfileTransition ?? planProfileTransitionDefault
+        dependencies.planProfileTransition ?? planHistoricalProfileTransition
       )({
         reader,
         git: initialGit,
