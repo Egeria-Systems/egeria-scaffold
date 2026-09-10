@@ -288,7 +288,7 @@ jobs:
           name: app-transition-visual-artifacts
           path: generated-visual-artifacts/app-transitions/
           if-no-files-found: ignore
-          include-hidden-files: false
+          include-hidden-files: true
           retention-days: 7
 
   compatibility-proof:
