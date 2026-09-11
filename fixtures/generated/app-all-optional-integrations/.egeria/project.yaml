@@ -1,0 +1,41 @@
+builderCompatibility: 0.0.0
+capabilitySettings:
+  analytics:
+    consent:
+      policy: explicit-opt-in
+    operationalIntegrations:
+      googleSearchConsole:
+        verificationToken: search-console-verification-token
+      lookerStudio:
+        connector: google-analytics-4
+    providers:
+      cloudflareWebAnalytics:
+        siteToken: 0123456789abcdef0123456789abcdef
+      googleAnalytics4:
+        measurementId: G-ABCDEF1234
+      microsoftClarity:
+        audience: not-directed-to-minors
+        projectId: clarity123
+  booking-calendly:
+    destination: https://calendly.com/example/intro
+    mode: popup
+ejectedAreas: []
+originProfile: app
+platformAdapter: cloudflare-workers
+project:
+  defaultLocale: en-CA
+  displayName: Acme App All Optional Integrations
+  name: acme-app-all-optional-integrations
+recipeVersion: 0.1.0
+schemaVersion: 1.0.0
+selectedCapabilities:
+  - standards
+  - deployment-cloudflare
+  - content-files
+  - section-composition
+  - observability
+  - app-foundation
+  - site-routing
+  - analytics
+  - booking-calendly
+  - multilingual

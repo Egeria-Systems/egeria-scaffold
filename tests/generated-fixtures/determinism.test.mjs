@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createRequire } from "node:module";
 import { mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -18,6 +19,7 @@ const cliEntry = resolve(repositoryRoot, "apps/cli/dist/index.js");
 const core = await import(
   pathToFileURL(resolve(repositoryRoot, "packages/builder-core/dist/index.js"))
 );
+const { parseDocument } = createRequire(resolve(repositoryRoot, "packages/builder-core/package.json"))("yaml");
 const maximumOutputBytes = 1024 * 1024;
 const commandTimeoutMilliseconds = 45 * 60 * 1000;
 const codePointCompare = (left, right) =>
@@ -65,7 +67,7 @@ async function snapshotTree(root) {
   }
 
   await visit(root, "");
-  return snapshot;
+  return snapshot.sort((left, right) => codePointCompare(left.path, right.path));
 }
 
 async function runCli(arguments_) {
@@ -147,7 +149,66 @@ function assertPortablePublicLockfile(lockfile) {
   assert.match(lockfile, /tailwindcss@4\.3\.3/u);
 }
 
+test("representative app fixtures retain exact descriptor ownership, production-site output and workflow ordering", async () => {
+  for (const fixture of generatedFixtureContracts.filter(({ profile }) => profile === "app")) {
+    const root = resolve(repositoryRoot, fixture.relativeRoot);
+    const rendered = await core.renderSkeleton({
+      profile: "app", projectName: fixture.projectName, displayName: fixture.displayName,
+      packageVersions: { standards: "0.1.0", observability: "0.3.0" },
+      ...(fixture.expectedBookingCalendlyVersion ? { bookingCalendly: fixture.expectedCapabilitySettings["booking-calendly"] } : {}),
+      ...(fixture.expectedAnalyticsVersion ? { analytics: fixture.expectedCapabilitySettings.analytics } : {}),
+      ...(fixture.expectedMultilingualVersion ? { multilingual: true } : {}),
+    });
+    assert.equal(rendered.ok, true);
+    for (const { path, content } of rendered.value.files) {
+      assert.deepEqual(await readFile(join(root, path)), Buffer.from(content), path);
+    }
+    assert.deepEqual(
+      [...rendered.value.files.map(({ path }) => path), ".egeria/project.yaml", ".egeria/state.json", ".egeria/migrations.jsonl", "pnpm-lock.yaml"].sort(codePointCompare),
+      fixture.expectedFiles,
+    );
+    const state = core.installedStateSchema.parse(JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8")));
+    assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.1.0" });
+    assert.equal(state.managedSurfaces.length, rendered.value.surfaces.length + 3);
+    for (const surface of rendered.value.surfaces) {
+      const installed = state.managedSurfaces.find(({ identifier }) => identifier === surface.identifier);
+      assert.ok(installed, surface.identifier);
+      for (const key of ["owner", "path", "ownership", "fingerprintTarget", "mergeStrategy"]) {
+        assert.deepEqual(installed[key], surface[key], `${surface.identifier}: ${key}`);
+      }
+    }
+    const foundation = rendered.value.resolved.capabilities.find(({ identifier }) => identifier === "app-foundation");
+    assert.equal(foundation.managedSurfaces.length, 17 + 2, "seventeen files and two package members");
+    assert.deepEqual(foundation.managedSurfaces.filter(({ fingerprintTarget }) => fingerprintTarget.kind === "json-value")
+      .map(({ fingerprintTarget }) => fingerprintTarget.pointer).sort(), ["/dependencies/effect", "/scripts/test:integration:cloudflare"]);
+    assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, "packages/builder-core/lockfiles/web-recipe-app-0.1.0/pnpm-lock.yaml")));
+    const wrangler = JSON.parse(await readFile(join(root, "apps/web/wrangler.jsonc"), "utf8"));
+    assert.ok(wrangler.compatibility_flags.includes("enable_request_signal"));
+    assert.equal(state.managedSurfaces.find(({ path }) => path === "apps/web/wrangler.jsonc").owner.identifier, "deployment-cloudflare");
+    for (const path of [".github/workflows/quality.yml", ".github/workflows/deploy.yml"]) {
+      const document = parseDocument(await readFile(join(root, path), "utf8"));
+      assert.deepEqual(document.errors, []);
+      const steps = Object.values(document.toJS().jobs)[0].steps;
+      const integration = steps.findIndex(({ run }) => run === "pnpm --dir apps/web run --if-present test:integration:cloudflare");
+      assert.ok(integration > 0);
+      assert.equal(steps[integration - 1].run, "pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild");
+      assert.equal(steps.filter(({ run }) => run === steps[integration].run).length, 1);
+      for (const [index, step] of steps.entries()) {
+        if (JSON.stringify(step.env ?? {}).includes("secrets.")) assert.ok(index > integration);
+      }
+    }
+    await assertReadOnlyAgreement(root, await snapshotTree(root));
+  }
+});
+
 test("compiled project generation matches every committed fixture identifier", async (context) => {
+  for (const identifier of ["app", "app-all-optional-integrations"]) {
+    assert.equal(
+      await pathExists(resolve(repositoryRoot, "fixtures/generated", identifier)),
+      true,
+      `representative app fixture is absent: ${identifier}`,
+    );
+  }
   for (const fixtureCase of generatedFixtureContracts) {
     assert.equal(
       await pathExists(resolve(repositoryRoot, fixtureCase.relativeRoot)),
@@ -257,6 +318,10 @@ test("compiled project generation matches every committed fixture identifier", a
           state.managedSurfaces.length,
           fixtureCase.expectedSurfaces,
         );
+        assert.equal(
+          state.installedCapabilities.find(({ identifier }) => identifier === "app-foundation")?.version ?? null,
+          fixtureCase.expectedAppFoundationVersion ?? null,
+        );
         const projectConfiguration = await readFile(
           join(destination, ".egeria/project.yaml"),
           "utf8",
@@ -278,6 +343,7 @@ test("compiled project generation matches every committed fixture identifier", a
           "component-tests",
           "next-build",
           "opennext-build",
+          ...(fixtureCase.profile === "app" ? ["worker-integration"] : []),
           "post-state-inference",
         ]);
 

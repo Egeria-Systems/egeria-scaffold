@@ -1,0 +1,18 @@
+metadata:
+  title: About
+  description: Background, working principles, and approach.
+sections:
+  - id: introduction
+    type: hero
+    variant: default
+    enabled: true
+    content:
+      heading: About
+      summary: Background and approach.
+  - id: principles
+    type: text
+    variant: default
+    enabled: true
+    content:
+      heading: Working principles
+      body: Clear communication, careful craft, and practical outcomes guide the work.

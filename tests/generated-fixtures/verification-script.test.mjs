@@ -92,6 +92,141 @@ async function withPortfolioVisualFixture(callback) {
   }
 }
 
+async function writeSyntheticAppBuild(root, { effectVersion = "4.0.0-rc.112", client = "export const browser = true;" } = {}) {
+  const files = {
+    "apps/web/node_modules/effect/package.json": JSON.stringify({ name: "effect", version: effectVersion, exports: { "./package.json": "./package.json" } }),
+    "apps/web/node_modules/effect/dist/index.js": 'export const marker = "~effect/Effect";',
+    "apps/web/.next/static/chunks/app.js": client,
+    "apps/web/.next/server/app.js": 'export const server = "~effect/Effect";',
+    "apps/web/.open-next/server-functions/default/handler.mjs": "export default { fetch() {} };",
+  };
+  for (const [path, content] of Object.entries(files)) {
+    await mkdir(dirname(join(root, path)), { recursive: true });
+    await writeFile(join(root, path), content);
+  }
+}
+
+async function successfulCommand(input) {
+  if (input.arguments.at(-1) === "--skipNextBuild") {
+    const manifest = JSON.parse(await readFile(join(input.cwd, "apps/web/package.json"), "utf8"));
+    if (manifest.dependencies.effect && !await pathExists(join(input.cwd, "apps/web/node_modules/effect/package.json"))) {
+      await writeSyntheticAppBuild(input.cwd);
+    }
+  }
+  if (input.arguments[0] === "--version") return "11.20.0\n";
+  return "";
+}
+
+test("fixture Effect source imports cannot enter domain, content, presentation or client modules", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-effect-sources-"));
+  try {
+    for (const [index, [identifier, path, source]] of [
+      ["app", "apps/web/src/domain/build-information.ts", 'import { Effect } from "effect";'],
+      ["app", "apps/web/src/content/read-content.ts", 'import { Effect } from "effect";'],
+      ["app", "apps/web/src/presentation/content-page.tsx", 'import { Effect } from "effect";'],
+      ["app", "apps/web/src/application/health.ts", '"use client"; import { Effect } from "effect";'],
+      ["portfolio", "apps/web/src/infrastructure/observability/server-reporter.ts", 'import { Effect } from "effect";'],
+    ].entries()) {
+      const root = await copyFixture(owner, identifier, `source-${index}`);
+      await writeFile(join(root, path), source);
+      await expectFixtureError(() => inspectGeneratedFixture(root, identifier), "FIXTURE_EFFECT_BOUNDARY_INVALID");
+    }
+  } finally { await rm(owner, { recursive: true, force: true }); }
+});
+
+test("app build evidence refuses client Effect markers and the wrong installed pin before browsers", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-effect-build-"));
+  try {
+    for (const variant of [{ client: 'export const leaked = "~effect/Effect";' }, { effectVersion: "4.0.0-rc.113" }]) {
+      const commands = [];
+      await expectFixtureError(() => verifyGeneratedProjectForTesting(
+        resolve(repositoryRoot, "fixtures/generated/app"), "app",
+        {
+          createOwner: () => createKnownOwner(owner),
+          async runCommand(input) {
+            commands.push(input.arguments.at(-1));
+            if (input.arguments.at(-1) === "--skipNextBuild") await writeSyntheticAppBuild(input.cwd, variant);
+            return successfulCommand(input);
+          },
+        },
+      ), "EFFECT_BUILD_BOUNDARY_FAILED");
+      assert.ok(!commands.includes("browser:install"));
+    }
+  } finally { await rm(owner, { recursive: true, force: true }); }
+});
+
+test("fixture dependency graphs keep the approved app lock and native-build denial", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-app-dependency-policy-"));
+  try {
+    for (const [index, { identifier, path, change, code }] of [
+      { identifier: "portfolio", path: "pnpm-lock.yaml", change: (text) => `${text}\n  effect@4.0.0-rc.112: {}\n`, code: "FIXTURE_EFFECT_BOUNDARY_INVALID" },
+      { identifier: "app", path: "pnpm-lock.yaml", change: (text) => text.replaceAll("4.0.0-rc.112", "4.0.0-rc.113"), code: "FIXTURE_LOCKFILE_INVALID" },
+      { identifier: "app", path: "pnpm-workspace.yaml", change: (text) => text.replace("msgpackr-extract: false", "msgpackr-extract: true"), code: "FIXTURE_WORKSPACE_POLICY_INVALID" },
+      { identifier: "app", path: "apps/web/package.json", change: (text) => text.replace("vitest run --config vitest.cloudflare.config.ts", "echo skipped"), code: "FIXTURE_MANIFEST_INVALID" },
+    ].entries()) {
+      const root = await copyFixture(owner, identifier, `policy-${index}`);
+      const original = await readFile(join(root, path), "utf8");
+      const changed = change(original);
+      assert.notEqual(changed, original);
+      await writeFile(join(root, path), changed);
+      await expectFixtureError(() => inspectGeneratedFixture(root, identifier), code);
+    }
+  } finally { await rm(owner, { recursive: true, force: true }); }
+});
+
+test("app Worker integration executes after OpenNext and records non-app absence separately", async () => {
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-worker-order-"));
+  try {
+    for (const identifier of ["portfolio", "app", "app-all-optional-integrations"]) {
+      const commands = [];
+      const result = await verifyGeneratedProjectForTesting(
+        resolve(repositoryRoot, "fixtures/generated", identifier), identifier,
+        {
+          createOwner: () => createKnownOwner(ownerParent),
+          async runCommand(input) {
+            commands.push(input.arguments);
+            return successfulCommand(input);
+          },
+        },
+      );
+      const worker = commands.findIndex((arguments_) => arguments_.at(-1) === "test:integration:cloudflare");
+      assert.deepEqual(commands[worker], ["--dir", "apps/web", "run", "--if-present", "test:integration:cloudflare"]);
+      assert.equal(commands[worker - 1].at(-1), "--skipNextBuild");
+      assert.equal(commands[worker + 1].at(-1), "browser:install");
+      assert.deepEqual(result.workerIntegration, {
+        executed: identifier === "portfolio" ? [] : [identifier],
+        skipped: identifier === "portfolio" ? [identifier] : [],
+      });
+      assert.ok(!result.checks.includes("worker-integration"), "aggregate checks cannot imply execution for every fixture");
+    }
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
+});
+
+test("a failing present Worker script refuses success and still cleans its temporary copy", async () => {
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-worker-failure-"));
+  let ownedPath;
+  const commands = [];
+  try {
+    await expectFixtureError(() => verifyGeneratedProjectForTesting(
+      resolve(repositoryRoot, "fixtures/generated/app"), "app",
+      {
+        async createOwner() { const owner = await createKnownOwner(ownerParent); ownedPath = owner.path; return owner; },
+        async runCommand(input) {
+          commands.push(input.arguments.at(-1));
+          if (input.arguments.at(-1) === "test:integration:cloudflare") throw new Error("PRIVATE_VALUE");
+          return successfulCommand(input);
+        },
+      },
+    ), "WORKER_INTEGRATION_FAILED");
+    assert.ok(!commands.includes("browser:install"));
+    assert.equal(await pathExists(ownedPath), false);
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
+});
+
 test("fixture inspection accepts only the exact portable generated trees", async () => {
   assert.deepEqual(
     generatedFixtureContracts.map(({ identifier, profile, relativeRoot }) => ({
@@ -125,13 +260,23 @@ test("fixture inspection accepts only the exact portable generated trees", async
         profile: "site",
         relativeRoot: "fixtures/generated/site-multilingual-analytics",
       },
+      {
+        identifier: "app",
+        profile: "app",
+        relativeRoot: "fixtures/generated/app",
+      },
+      {
+        identifier: "app-all-optional-integrations",
+        profile: "app",
+        relativeRoot: "fixtures/generated/app-all-optional-integrations",
+      },
     ],
   );
 
   for (const contract of generatedFixtureContracts) {
     assert.equal(
       contract.expectedRecipeVersion,
-      contract.profile === "site" ? "0.11.0" : "0.10.0",
+      contract.profile === "app" ? "0.1.0" : contract.profile === "site" ? "0.11.0" : "0.10.0",
     );
     assert.equal(contract.expectedStandardsVersion, "0.4.0");
     assert.equal(contract.expectedObservabilityVersion, "0.3.0");
@@ -139,22 +284,23 @@ test("fixture inspection accepts only the exact portable generated trees", async
     assert.equal(contract.expectedDeploymentCloudflareVersion, "0.3.0");
     assert.equal(
       contract.expectedSiteRoutingVersion,
-      contract.profile === "site" ? "0.4.0" : null,
+      contract.profile === "portfolio" ? null : "0.4.0",
     );
     assert.equal(
       contract.expectedBookingCalendlyVersion,
-      contract.identifier === "portfolio-calendly" ? "0.1.0" : null,
+      ["portfolio-calendly", "app-all-optional-integrations"].includes(contract.identifier) ? "0.1.0" : null,
     );
     assert.equal(
       contract.expectedMultilingualVersion,
       contract.identifier === "site-multilingual" ||
-        contract.identifier === "site-multilingual-analytics"
+        contract.identifier === "site-multilingual-analytics" ||
+        contract.identifier === "app-all-optional-integrations"
         ? "0.1.0"
         : null,
     );
     assert.equal(
       contract.expectedAnalyticsVersion,
-      contract.identifier === "site-multilingual-analytics" ? "0.1.0" : null,
+      ["site-multilingual-analytics", "app-all-optional-integrations"].includes(contract.identifier) ? "0.1.0" : null,
     );
     assert.equal(
       contract.expectedSurfaces,
@@ -166,13 +312,15 @@ test("fixture inspection accepts only the exact portable generated trees", async
             ? 123
             : contract.identifier === "site-multilingual"
               ? 139
-              : 154,
+              : contract.identifier === "app" ? 142
+                : contract.identifier === "app-all-optional-integrations" ? 178 : 154,
     );
     assert.equal(
       contract.visualRegression,
       ![
         "site-multilingual",
         "site-multilingual-analytics",
+        "app-all-optional-integrations",
       ].includes(contract.identifier),
     );
     const snapshot = await inspectGeneratedFixture(
@@ -376,6 +524,10 @@ test("generated fixture text and visual baseline attributes are explicit", async
     "fixtures/generated/site-multilingual/package.json: eol: lf",
     "fixtures/generated/site-multilingual-analytics/package.json: text: set",
     "fixtures/generated/site-multilingual-analytics/package.json: eol: lf",
+    "fixtures/generated/app/package.json: text: set",
+    "fixtures/generated/app/package.json: eol: lf",
+    "fixtures/generated/app-all-optional-integrations/package.json: text: set",
+    "fixtures/generated/app-all-optional-integrations/package.json: eol: lf",
   ]);
 
   const baselineDirectory =
@@ -405,7 +557,7 @@ test("generated fixture text and visual baseline attributes are explicit", async
     { cwd: repositoryRoot, encoding: "utf8" },
   );
 
-  assert.equal(baselinePaths.length, 14);
+  assert.equal(baselinePaths.length, 18);
   assert.deepEqual(
     binaryAttributes.trimEnd().split("\n"),
     baselinePaths.flatMap((path) => [
@@ -602,7 +754,7 @@ test("single-root verification runs the exact fixed checks against caller output
         },
         async runCommand(input) {
           commands.push(input);
-          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+          return successfulCommand(input);
         },
       },
     );
@@ -610,6 +762,8 @@ test("single-root verification runs the exact fixed checks against caller output
     assert.deepEqual(result, {
       ok: true,
       fixtures: ["portfolio-calendly"],
+      workerIntegration: { executed: [], skipped: ["portfolio-calendly"] },
+      appBuildEvidence: [],
       profiles: ["portfolio"],
       checks: [
         "pnpm-version",
@@ -629,7 +783,7 @@ test("single-root verification runs the exact fixed checks against caller output
         "browser-preview",
       ],
     });
-    assert.equal(commands.length, 15);
+    assert.equal(commands.length, 16);
     assert.equal(commands.every(({ cwd }) => cwd.startsWith(`${ownedPath}/`)), true);
     assert.equal(await pathExists(ownedPath), false);
     assert.deepEqual(
@@ -702,7 +856,7 @@ test("multilingual browser verification injects its error-boundary proof only in
               /toHaveAttribute\("lang", "fr-CA"\)[\s\S]+main\[aria-labelledby="error-fallback-heading"\][\s\S]+fallback\.getByRole\("heading", \{ level: 1 \}\)[\s\S]+fallback\.getByRole\("button"\)[\s\S]+sessionStorage[\s\S]+retry\.click\(\)[\s\S]+getByTestId\("verifier-recovery"\)/u,
             );
           }
-          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+          return successfulCommand(input);
         },
       },
     );
@@ -750,7 +904,7 @@ test("visual verification runs after prepared preview behavior", async () => {
         },
         async runCommand(input) {
           commands.push(input.arguments);
-          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+          return successfulCommand(input);
         },
       },
       undefined,
@@ -775,7 +929,7 @@ test("visual verification runs after prepared preview behavior", async () => {
       "browser-preview",
       "visual-regression",
     ]);
-    assert.equal(commands.length, 16);
+    assert.equal(commands.length, 17);
     assert.deepEqual(commands.at(-2), [
       "--dir",
       "apps/web",
@@ -803,7 +957,7 @@ test("visual opt-in leaves the multilingual fixture outside the established matr
         },
         async runCommand(input) {
           commands.push(input);
-          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+          return successfulCommand(input);
         },
       },
       { includeVisual: true },
@@ -817,7 +971,7 @@ test("visual opt-in leaves the multilingual fixture outside the established matr
         )
         .map(({ cwd }) => basename(cwd))
         .sort(),
-      ["portfolio-calendly-project", "portfolio-project", "site-project"],
+      ["app-project", "portfolio-calendly-project", "portfolio-project", "site-project"],
     );
     assert.equal(
       commands.some(
@@ -846,7 +1000,7 @@ test("single-project visual opt-in reports only checks that actually run", async
         },
         async runCommand(input) {
           commands.push(input.arguments);
-          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+          return successfulCommand(input);
         },
       },
       undefined,
@@ -894,7 +1048,7 @@ test("preview failures export browser artifacts before owned cleanup", async () 
               );
               throw new Error("PRIVATE_VALUE");
             }
-            return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+            return successfulCommand(input);
           },
           async captureVisualArtifacts(input) {
             capturedPreviewFailure = {
@@ -970,7 +1124,7 @@ test("visual failures export artifacts before owned cleanup", async () => {
                 );
                 throw new Error("PRIVATE_VALUE");
               }
-              return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+              return successfulCommand(input);
             },
             async captureVisualArtifacts(input) {
               capturedVisualFailure = {
@@ -1031,7 +1185,7 @@ test("visual artifact export failure preserves the primary regression code", asy
               if (input.arguments.at(-1) === "test:visual") {
                 throw new Error("PRIVATE_VALUE");
               }
-              return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+              return successfulCommand(input);
             },
             async captureVisualArtifacts() {
               throw new Error("PRIVATE_EXPORT_VALUE");
@@ -1137,7 +1291,7 @@ test("single-root verification accepts an explicit generated project identity", 
           return identity;
         },
         async runCommand(input) {
-          return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+          return successfulCommand(input);
         },
       },
       "acme-generated-project",
@@ -1236,11 +1390,20 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
           "USERPROFILE",
           "XDG_CACHE_HOME",
         ].sort());
-        return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+        return successfulCommand(input);
       },
     });
 
-    assert.deepEqual(result, {
+    const { appBuildEvidence, ...verification } = result;
+    assert.deepEqual(appBuildEvidence.map(({ fixture }) => fixture), ["app", "app-all-optional-integrations"]);
+    for (const build of appBuildEvidence) {
+      assert.equal(build.effect.version, "4.0.0-rc.112");
+      assert.equal(build.client.files.length, 1);
+      assert.deepEqual(build.client.inspectedEffectMarkers, ["~effect/Effect"]);
+      assert.equal(build.worker.path, "apps/web/.open-next/server-functions/default/handler.mjs");
+      assert.match(build.worker.sha256, /^[a-f0-9]{64}$/u);
+    }
+    assert.deepEqual(verification, {
       ok: true,
       fixtures: [
         "portfolio",
@@ -1248,8 +1411,14 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         "site",
         "site-multilingual",
         "site-multilingual-analytics",
+        "app",
+        "app-all-optional-integrations",
       ],
-      profiles: ["portfolio", "site"],
+      profiles: ["portfolio", "site", "app"],
+      workerIntegration: {
+        executed: ["app", "app-all-optional-integrations"],
+        skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-multilingual-analytics"],
+      },
       checks: [
         "pnpm-version",
         "frozen-install",
@@ -1278,14 +1447,14 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     }
   }
 
-  const commandsPerFixture = 15;
+  const commandsPerFixture = 16;
   const fixtureCommands = generatedFixtureContracts.map((_, index) =>
     commands.slice(
       index * commandsPerFixture,
       (index + 1) * commandsPerFixture,
     ),
   );
-  assert.equal(fixtureCommands.every((entries) => entries.length === 15), true);
+  assert.equal(fixtureCommands.every((entries) => entries.length === 16), true);
   const firstCommands = fixtureCommands.map(
     ([command]) => command,
   );
@@ -1316,7 +1485,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   );
 
   const argumentLists = commands.map(({ arguments: arguments_ }) => arguments_);
-  const perFixture = argumentLists.slice(0, 15).map((arguments_) =>
+  const perFixture = argumentLists.slice(0, 16).map((arguments_) =>
     arguments_.map((argument) =>
       ownedPath !== undefined && argument.startsWith(ownedPath)
         ? "<owned-path>"
@@ -1355,6 +1524,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
       "build",
       "--skipNextBuild",
     ],
+    ["--dir", "apps/web", "run", "--if-present", "test:integration:cloudflare"],
     ["--dir", "apps/web", "run", "browser:install"],
     ["--dir", "apps/web", "run", "test:e2e:dev"],
     ["--dir", "apps/web", "run", "test:e2e:preview"],
@@ -1387,7 +1557,7 @@ test("live verification reports a stable failure and still removes its owner", a
             if (input.arguments.join(" ") === "audit --audit-level moderate") {
               throw new Error("PRIVATE_VALUE");
             }
-            return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+            return successfulCommand(input);
           },
         }),
       "DEPENDENCY_AUDIT_FAILED",
@@ -1418,7 +1588,7 @@ test("live verification maps the prepared OpenNext transform failure", async () 
             ) {
               throw new Error("PRIVATE_VALUE");
             }
-            return input.arguments[0] === "--version" ? "11.20.0\n" : "";
+            return successfulCommand(input);
           },
         }),
       "OPENNEXT_BUILD_FAILED",
