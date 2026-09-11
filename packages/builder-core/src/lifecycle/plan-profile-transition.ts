@@ -881,7 +881,16 @@ async function readReviewedAppTransitionVisualEvidence(input: Readonly<{
     return undefined;
   }
 }
-async function planAppProfileTransition(input: Readonly<{
+export type PreparedAppProfileTransition = Readonly<{
+  plan: AppProfileTransitionPlan;
+  currentFiles: ReadonlyMap<string, Uint8Array>;
+  targetFiles: ReadonlyMap<string, Uint8Array>;
+  rendered: RenderedSkeleton;
+}>;
+
+// Private builder boundary: the public planner exposes only the redacted plan.
+// Execution consumes the same proved bytes instead of duplicating domain policy.
+export async function prepareAppProfileTransitionExecution(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{
     ok: true;
@@ -889,7 +898,7 @@ async function planAppProfileTransition(input: Readonly<{
   readReviewedVisualEvidence?: ReadReviewedAppTransitionVisualEvidence;
   inspectCreateTargets?: typeof inspectGitCreateTargets;
   inspectWorktree?: typeof inspectGitWorktree;
-}>): Promise<PlanningResult<AppProfileTransitionPlan>> {
+}>): Promise<PlanningResult<PreparedAppProfileTransition>> {
   const identity = input.git.identity;
   if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(identity.revision) || !identity.root.startsWith("/") || !identity.attachedRef.startsWith("refs/heads/") || !identity.gitDirectory.startsWith(`${identity.commonDirectory}/worktrees/`)) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -1029,7 +1038,19 @@ async function planAppProfileTransition(input: Readonly<{
       project: controls.project.value, state: controls.state.value, migrations: controls.migrations.value
     }, recipes: profileRecipes, sourceCatalog: catalog.value, targetCatalog: catalog.value, sourceManifest: createInstalledManifest(source.resolved), targetManifest: createInstalledManifest(target.resolved), sourceSurfaces: expectedSourceSurfaces({ rendered: source }), targetSurfaces: expectedSourceSurfaces({ rendered: target }), sourceFiles: [...currentFiles].map(([path, content]) => ({ path, content: encodeBytes(content) })), targetFiles: selected.value.files.map(({ path, content }) => ({ path, content: encodeBytes(content) })), sourceLock: encodeBytes(sourceLock), targetLock: encodeBytes(targetLock), preservedFingerprints: selected.value.preservedFingerprints, influencingFingerprints: selected.value.influencingFingerprints, visualEvidence: evidence === undefined ? null : { ...evidence, baselines: evidence.baselines.map(({ path, content }) => ({ path, content: encodeBytes(content) })) }, gitIdentity: identity
   };
-  return { ok: true, value: { ...plan, planFingerprint: fingerprintFileContent(encoder.encode(stringifyCanonicalJson(fingerprintMaterial))) } };
+  return { ok: true, value: {
+    plan: { ...plan, planFingerprint: fingerprintFileContent(encoder.encode(stringifyCanonicalJson(fingerprintMaterial))) },
+    currentFiles: new Map([
+      ...currentFiles,
+      ["pnpm-lock.yaml", currentLock.content],
+      ...[...controls.sources].map(([path, content]) => [path, encoder.encode(content)] as const),
+    ]),
+    targetFiles: new Map([
+      ...selected.value.files.map(({ path, content }) => [path, content] as const),
+      ["pnpm-lock.yaml", targetLock],
+    ]),
+    rendered: target,
+  } };
 }
 export function planProfileTransition(input: Readonly<{
   reader: RepositoryReader;
@@ -1070,7 +1091,8 @@ export async function planProfileTransition(input: Readonly<{
 }>): Promise<PlanningResult<ProfileTransitionPlan | AppProfileTransitionPlan>> {
   try {
     if (input.toProfile === "app") {
-      return await planAppProfileTransition(input);
+      const prepared = await prepareAppProfileTransitionExecution(input);
+      return prepared.ok ? { ok: true, value: prepared.value.plan } : prepared;
     }
     return await planProfileTransitionInternal({ ...input, toProfile: input.toProfile });
   }
