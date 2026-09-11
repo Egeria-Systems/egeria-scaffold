@@ -146,7 +146,7 @@ test("the private package manifests expose only their approved runtime boundarie
       "./package.json": "./package.json",
     },
     scripts: {
-      build: "tsc -p tsconfig.json",
+      build: "tsc -p tsconfig.json && node scripts/compile-content-validation.mjs",
       lint:
         "pnpm --dir ../.. exec eslint packages/builder-core/src --max-warnings 0",
       "schema:check": "node scripts/generate-json-schemas.mjs --check",
@@ -276,6 +276,8 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "index.ts",
       "inference/evaluate-probe.ts",
       "inference/infer-repository.ts",
+      "lifecycle/app-profile-transition.ts",
+      "lifecycle/app-transition-content-validation.ts",
       "lifecycle/apply-capability-addition.ts",
       "lifecycle/apply-capability-removal.ts",
       "lifecycle/apply-capability-upgrade.ts",
@@ -426,6 +428,10 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "multilingual/site/apps/web/tests/e2e/site-routing.spec.ts.template",
       "portfolio/apps/web/content/en-CA/long-form/introduction.md.template",
       "portfolio/apps/web/content/en-CA/site.yaml.template",
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-home-desktop-chromium-linux.png",
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-home-mobile-chromium-linux.png",
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-multilingual-home-desktop-chromium-linux.png",
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-multilingual-home-mobile-chromium-linux.png",
       "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
       "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
       "site/apps/web/app/about/page.tsx",
@@ -516,7 +522,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /canonical managed-surface inventory/);
   assert.match(
     builderInstructions,
-    /Git preflight, deterministic addition, removal, exact supported-upgrade planning, and exact `portfolio@0\.10\.0` to historical `site@0\.10\.0` profile-transition planning, exact-diff inspection/,
+    /Git preflight, deterministic addition, removal, exact supported-upgrade planning, and exact historical portfolio-to-site and incoming app profile-transition planning under the capability model, exact-diff inspection/,
   );
   assert.match(builderInstructions, /`applyCapabilityAddition`/);
   assert.match(builderInstructions, /`applyCapabilityRemoval`/);
