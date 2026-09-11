@@ -2513,7 +2513,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     enforcementMap,
-    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+app optional-capability addition\/removal with exact Worker receipts[^\n]+incoming app transition planning and state-last execution across sixteen cases[^\n]+staged CLI refusals[^\n]+certification execution remain later gates/iu,
+    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+app optional-capability addition\/removal with exact Worker receipts[^\n]+incoming app transition planning and state-last execution across sixteen cases[^\n]+thin CLI app creation and incoming-transition exposure[^\n]+certification execution remain later gates/iu,
   );
   assert.match(
     packageOwnership,
@@ -2529,7 +2529,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     programRoadmap,
-    /\*\*Stop gate:\*\* Complete the current transition-execution candidate's required deterministic and generated-runtime verification[^\n]+default app-transition and separate retained-fixture visual comparisons against existing approved baselines[^\n]+independent requirements[^\n]+test-evidence reviews[^\n]+exact review packet before final-diff approval[^\n]+separate exact-manifest visual approval/iu,
+    /\*\*Stop gate:\*\* Complete the current CLI exposure candidate's required deterministic and generated-runtime verification[^\n]+default app-transition and separate retained-fixture visual comparisons against existing approved baselines[^\n]+independent requirements[^\n]+test-evidence reviews[^\n]+exact review packet before final-diff approval[^\n]+separate exact-manifest visual approval/iu,
   );
   assert.match(
     convergentProfileAdr,
@@ -2850,7 +2850,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /ten-capability catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.1\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+app CLI creation and incoming transition exposure remain separately gated/iu,
+    /ten-capability catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.1\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
   );
 });
 
@@ -3159,7 +3159,7 @@ test("client-required public-site work is relocated after lifecycle without requ
   );
   assert.match(
     capabilityModel,
-    /Multilingual and analytics remain independent optional capabilities during initial portfolio\/site\/app generation[^\n]+addition\/removal supports all three profiles under the existing lifecycle preconditions[^\n]+CLI creation remains limited to portfolio\/site[^\n]+no composite profile or capability/iu,
+    /Multilingual and analytics remain independent optional capabilities during initial portfolio\/site\/app generation[^\n]+addition\/removal supports all three profiles under the existing lifecycle preconditions[^\n]+CLI creation supports portfolio\/site\/app[^\n]+no composite profile or capability/iu,
   );
   assert.match(
     enforcementMap,

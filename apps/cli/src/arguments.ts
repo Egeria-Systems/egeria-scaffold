@@ -10,13 +10,10 @@ import {
 import { parseArgs } from "node:util";
 import { isAbsolute } from "node:path";
 
-// Remove when app CLI creation is exposed.
-const cliProfileIdentifierSchema = profileIdentifierSchema.exclude(["app"]);
-
 export type CliCommand =
   | Readonly<{
       kind: "create";
-      profile: ReturnType<typeof cliProfileIdentifierSchema.parse>;
+      profile: ReturnType<typeof profileIdentifierSchema.parse>;
       projectName: string;
       displayName: string;
       directory: string;
@@ -48,7 +45,7 @@ export type CliCommand =
   | Readonly<{
       kind: "plan-profile-transition";
       directory: string;
-      toProfile: "site";
+      toProfile: "site" | "app";
     }>
   | Readonly<{
       kind: "apply-add";
@@ -73,7 +70,7 @@ export type CliCommand =
   | Readonly<{
       kind: "apply-profile-transition";
       directory: string;
-      toProfile: "site";
+      toProfile: "site" | "app";
       approvedPlanFingerprint: string;
     }>;
 
@@ -231,7 +228,7 @@ function parseCreate(
     const calendlyMode = values["calendly-mode"];
     const multilingual = values.multilingual;
     const parsedAnalytics = parseAnalyticsSettings(values);
-    const parsedProfile = cliProfileIdentifierSchema.safeParse(profile);
+    const parsedProfile = profileIdentifierSchema.safeParse(profile);
     const parsedProjectName = projectFields.name.safeParse(projectName);
     const parsedDisplayName = projectFields.displayName.safeParse(displayName);
     const hasCalendlyUrl = calendlyUrl !== undefined;
@@ -558,7 +555,7 @@ function parseProfileTransition(
         ...(applying ? ["approved-plan"] : []),
       ]) ||
       !validAbsoluteDirectory(directory) ||
-      toProfile !== "site"
+      (toProfile !== "site" && toProfile !== "app")
     ) {
       return invalidArguments();
     }

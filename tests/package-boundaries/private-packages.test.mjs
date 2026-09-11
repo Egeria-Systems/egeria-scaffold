@@ -658,10 +658,10 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliInstructions, /`plan-upgrade` remains read-only/);
   assert.match(cliInstructions, /`apply-upgrade` is limited/);
   assert.match(cliInstructions, /`plan-profile-transition` remains read-only/);
-  assert.match(cliInstructions, /`apply-profile-transition` is limited/);
+  assert.match(cliInstructions, /`apply-profile-transition` accepts exactly/);
   assert.match(
     cliInstructions,
-    /`plan-profile-transition`[^\n]+`--directory`[^\n]+`--to-profile site`[^\n]+no[^\n]+`--from-profile`/,
+    /`plan-profile-transition`[^\n]+`--directory`[^\n]+`--to-profile <site\|app>`[^\n]+no[^\n]+`--from-profile`/,
   );
   assert.match(
     cliInstructions,
@@ -685,11 +685,11 @@ test("builder-core direct consumers describe the private generation boundary", a
   );
   assert.match(
     cliReadme,
-    /`plan-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site`/,
+    /`plan-profile-transition --directory <absolute-existing-linked-worktree> --to-profile <site\|app>`/,
   );
   assert.match(
     cliReadme,
-    /`apply-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site --approved-plan sha256:<digest>`/,
+    /`apply-profile-transition --directory <absolute-existing-linked-worktree> --to-profile <site\|app> --approved-plan sha256:<digest>`/,
   );
   assert.match(cliReadme, /recovery[^\n]+`not-required`/);
   assert.match(cliReadme, /migration append[^\n]+state-last persistence/);

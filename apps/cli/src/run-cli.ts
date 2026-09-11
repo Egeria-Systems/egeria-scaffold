@@ -27,6 +27,7 @@ import {
   type CapabilityUpgradePlan,
   type CapabilityUpgradePlanningFailureCode,
   type ProfileTransitionPlan,
+  type AppProfileTransitionPlan,
   type ProfileTransitionExecutionResult,
   type ProfileTransitionPlanningFailureCode,
   type GeneratedProjectVerifier,
@@ -59,7 +60,7 @@ type CliRunnerDependencies = Readonly<{
   applyProfileTransition?(input: Parameters<
     typeof applyProfileTransitionDefault
   >[0]): Promise<ProfileTransitionExecutionResult>;
-  planProfileTransition?: typeof planHistoricalProfileTransition;
+  planProfileTransition?: typeof planProfileTransitionDefault;
   createReader?(root: string): RepositoryReader;
   inspectGitCreateTargets?(input: Readonly<{
     root: string;
@@ -70,15 +71,6 @@ type CliRunnerDependencies = Readonly<{
   >[0]): Promise<GitRepositoryInventoryInspection>;
   inspectGitWorktree?(input: Readonly<{ root: string }>): Promise<GitWorktreeInspection>;
 }>;
-
-// Keep the CLI's existing edge narrow while builder-core stages app planning.
-function planHistoricalProfileTransition(input: Readonly<{
-  reader: RepositoryReader;
-  git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  toProfile: "site";
-}>) {
-  return planProfileTransitionDefault(input);
-}
 
 type CliRunner = (
   arguments_: readonly string[],
@@ -106,7 +98,7 @@ type PlanUpgradeSuccess = Readonly<{
 type PlanProfileTransitionSuccess = Readonly<{
   ok: true;
   command: "plan-profile-transition";
-  plan: ProfileTransitionPlan;
+  plan: ProfileTransitionPlan | AppProfileTransitionPlan;
 }>;
 
 const plannerRefusalCodes = new Set<PlanningFailureCode>([
@@ -147,9 +139,11 @@ const profileTransitionPlannerRefusalCodes =
     "PROFILE_ALREADY_CURRENT",
     "PROFILE_INFERENCE_AMBIGUOUS",
     "PROFILE_TRANSITION_ACTION_CONFLICT",
+    "PROFILE_TRANSITION_CONTENT_INVALID",
     "PROFILE_TRANSITION_EDGE_MISSING",
     "PROFILE_TRANSITION_SOURCE_UNSUPPORTED",
     "PROFILE_TRANSITION_UNSUPPORTED",
+    "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED",
     "PROJECT_DRIFT_DETECTED",
     "PROJECT_EJECTION_UNSUPPORTED",
     "PROJECT_INSPECTION_INVALID",
@@ -651,7 +645,7 @@ async function runPlanProfileTransition(
   let outcome:
     | Readonly<{
         kind: "result";
-        result: Awaited<ReturnType<typeof planHistoricalProfileTransition>>;
+        result: Awaited<ReturnType<typeof planProfileTransitionDefault>>;
       }>
     | Readonly<{ kind: "failure"; code: "REPOSITORY_OPEN_FAILED" }>;
 
@@ -660,7 +654,7 @@ async function runPlanProfileTransition(
     outcome = {
       kind: "result",
       result: await (
-        dependencies.planProfileTransition ?? planHistoricalProfileTransition
+        dependencies.planProfileTransition ?? planProfileTransitionDefault
       )({
         reader,
         git: initialGit,
