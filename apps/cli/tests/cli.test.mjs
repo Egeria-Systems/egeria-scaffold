@@ -27,6 +27,14 @@ const cli = await import(pathToFileURL(resolve(packageRoot, "dist/run-cli.js")))
 const core = await import(
   pathToFileURL(resolve(repositoryRoot, "packages/builder-core/dist/index.js"))
 );
+const {
+  appTransitionVisualProject,
+  appTransitionVisualBookingSettings,
+  appTransitionVisualAnalyticsSettings,
+} = await import(pathToFileURL(resolve(
+  repositoryRoot,
+  "packages/builder-core/dist/lifecycle/app-profile-transition.js",
+)));
 const { createBuilderStateSurfaces } = await import(
   pathToFileURL(
     resolve(
@@ -416,13 +424,13 @@ function planUpgradeArguments(directory, capability = "standards") {
   ];
 }
 
-function planProfileTransitionArguments(directory) {
+function planProfileTransitionArguments(directory, toProfile = "site") {
   return [
     "plan-profile-transition",
     "--directory",
     directory,
     "--to-profile",
-    "site",
+    toProfile,
   ];
 }
 
@@ -543,13 +551,14 @@ function applyUpgradeArguments(
 function applyProfileTransitionArguments(
   directory,
   approvedPlan = `sha256:${"a".repeat(64)}`,
+  toProfile = "site",
 ) {
   return [
     "apply-profile-transition",
     "--directory",
     directory,
     "--to-profile",
-    "site",
+    toProfile,
     "--approved-plan",
     approvedPlan,
   ];
@@ -959,20 +968,208 @@ async function withHistoricalUpgradeFixture(profile, run) {
   }
 }
 
-test("staged app boundary keeps CLI creation unavailable", () => {
-  const result = cliArguments.parseCliArguments([
+function appCreateArguments(directory, allOptionals = false) {
+  return [
     "create",
     "--profile", "app",
     "--name", "sample-app",
     "--display-name", "Sample App",
-    "--directory", "/private/tmp/sample-app",
-  ]);
-  assert.equal(result.ok, false);
-  assert.deepEqual(result.issues, [{
-    code: "CLI_ARGUMENT_INVALID",
-    path: [],
-    context: { reason: "invalid-arguments" },
-  }]);
+    "--directory", directory,
+    ...(allOptionals ? [
+      "--calendly-url", planSettings.destination,
+      "--calendly-mode", planSettings.mode,
+      "--multilingual",
+      ...analyticsSelectionArguments(),
+    ] : []),
+  ];
+}
+
+test("app profile creation parses existing options independently and delegates generation", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-app-create-cli-"));
+  try {
+    for (const allOptionals of [false, true]) {
+      const destination = join(owner, allOptionals ? "all-optionals" : "default");
+      const arguments_ = appCreateArguments(destination, allOptionals);
+      assert.deepEqual(assertSuccess(cliArguments.parseCliArguments(arguments_)), {
+        kind: "create", profile: "app", projectName: "sample-app",
+        displayName: "Sample App", directory: destination,
+        ...(allOptionals ? {
+          bookingCalendly: planSettings, multilingual: true, analytics: analyticsSettings,
+        } : {}),
+      });
+      let verificationCalls = 0;
+      const runner = cli.createCliRunner({
+        createVerifier: () => ({
+          ...core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
+          async verifyInIsolatedCopy(root) {
+            verificationCalls += 1;
+            const manifest = JSON.parse(await readFile(join(root, "apps/web/package.json"), "utf8"));
+            assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
+            await assert.rejects(readFile(join(root, ".egeria/state.json")), { code: "ENOENT" });
+            return { ok: true, value: { checks: core.appGenerationVerificationChecks } };
+          },
+        }),
+      });
+      const captured = captureOutput();
+      assert.equal(await runner(arguments_, captured.output), 0);
+      assert.equal(verificationCalls, 1);
+      assert.deepEqual(captured.error, []);
+      assert.equal(captured.standard.length, 1);
+      const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8")));
+      assert.equal(project.originProfile, "app");
+      assert.equal(project.recipeVersion, "0.1.0");
+      assert.deepEqual(project.capabilitySettings, allOptionals ? {
+        "booking-calendly": planSettings, analytics: analyticsSettings,
+      } : {});
+      assert.equal(project.selectedCapabilities.includes("multilingual"), allOptionals);
+      assert.doesNotMatch(captured.standard[0], /calendly\.com|G-ABCDEF1234|clarity123|search-console-verification/u);
+    }
+  } finally {
+    await rm(owner, { recursive: true, force: false });
+  }
+});
+
+test("app profile and app transition parser refusals never invoke builder dependencies", async () => {
+  const forbidden = () => assert.fail("parser rejection invoked builder dependency");
+  const runner = cli.createCliRunner({
+    createVerifier: forbidden, createReader: forbidden,
+    inspectGitWorktree: forbidden, inspectGitCreateTargets: forbidden,
+    planProfileTransition: forbidden, applyProfileTransition: forbidden,
+  });
+  const create = appCreateArguments("/private/tmp/sample-app");
+  const cases = [
+    create.slice(0, -2), [...create, "--profile", "app"],
+    create.map((value) => value === "app" ? "unknown" : value),
+    [...create, "--capabilities", "analytics"],
+    [...create, "--calendly-url", planSettings.destination],
+    [...create, "--multilingual=false"],
+    appCreateArguments(""), appCreateArguments("bad\0directory"),
+  ];
+  for (const command of ["plan-profile-transition", "apply-profile-transition"]) {
+    const valid = command === "plan-profile-transition"
+      ? planProfileTransitionArguments("/private/tmp/sample-app", "app")
+      : applyProfileTransitionArguments("/private/tmp/sample-app", undefined, "app");
+    assert.equal(assertSuccess(cliArguments.parseCliArguments(valid)).toProfile, "app");
+    cases.push(
+      valid.slice(0, -2), [...valid, "--directory", "/private/tmp/other"],
+      [...valid, "--to-profile", "app"], [...valid, "--unknown", "private-value"],
+      [...valid, "positional"], [...valid, "--from-profile", "portfolio"],
+      [...valid, "--from-version", "0.10.0"], [...valid, "--to-version", "0.1.0"],
+      [...valid, "--multilingual"], [...valid, "--calendly-url", planSettings.destination],
+      [...valid, ...analyticsSelectionArguments()], [...valid, "--capabilities", "analytics"],
+      valid.map((value) => value === "app" ? "portfolio" : value),
+      valid.map((value) => value === "app" ? "unknown" : value),
+      valid.map((value) => value === "/private/tmp/sample-app" ? "relative" : value),
+      valid.map((value) => value === "/private/tmp/sample-app" ? "" : value),
+      valid.map((value) => value === "/private/tmp/sample-app" ? "/bad\0directory" : value),
+    );
+    if (command === "apply-profile-transition") {
+      for (const fingerprint of ["", "private-value", `sha256:${"a".repeat(63)}`, `sha256:${"A".repeat(64)}`]) {
+        cases.push(applyProfileTransitionArguments("/private/tmp/sample-app", fingerprint, "app"));
+      }
+      cases.push([...valid, "--approved-plan", `sha256:${"b".repeat(64)}`]);
+    } else {
+      cases.push([...valid, "--approved-plan", `sha256:${"a".repeat(64)}`]);
+    }
+  }
+  for (const arguments_ of cases) {
+    const captured = captureOutput();
+    assert.equal(await runner(arguments_, captured.output), 2, JSON.stringify(arguments_));
+    assert.deepEqual(captured.standard, []);
+    assert.deepEqual(captured.error, [JSON.stringify({
+      ok: false,
+      ...(arguments_[0] === "create" ? {} : { command: arguments_[0] }),
+      code: "CLI_ARGUMENT_INVALID",
+      ...(arguments_[0] === "create" ? {} : { recovery: "not-required" }),
+    })]);
+  }
+});
+
+test("app transition planning preserves semantic refusal codes and sanitized reader failures", async () => {
+  for (const code of [
+    "PROFILE_TRANSITION_CONTENT_INVALID", "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED",
+    "PROFILE_TRANSITION_SOURCE_UNSUPPORTED", "PROFILE_ALREADY_CURRENT",
+    "PROFILE_TRANSITION_EDGE_MISSING", "PROJECT_DRIFT_DETECTED", "unexpected-private-code",
+  ]) {
+    let calls = 0;
+    const runner = cli.createCliRunner({
+      createVerifier: () => assert.fail("planning must not create a verifier"),
+      inspectGitWorktree: async () => cleanGitInspection(),
+      createReader: () => core.createFileSystemRepositoryReader("/private/generated-worktree"),
+      inspectGitCreateTargets: () => assert.fail("refused plan has no create targets"),
+      async planProfileTransition(input) {
+        calls += 1;
+        assert.equal(input.toProfile, "app");
+        assert.deepEqual(Object.keys(input).sort(), ["git", "reader", "toProfile"]);
+        return { ok: false, issues: [{ code, path: [], context: { reason: "private detail" } }] };
+      },
+    });
+    const captured = captureOutput();
+    assert.equal(await runner(planProfileTransitionArguments("/private/generated-worktree", "app"), captured.output), 1);
+    assert.equal(calls, 1);
+    assert.deepEqual(captured.standard, []);
+    assert.deepEqual(captured.error, [JSON.stringify({
+      ok: false, command: "plan-profile-transition",
+      code: code === "unexpected-private-code" ? "REPOSITORY_OPEN_FAILED" : code,
+      recovery: "not-required",
+    })]);
+  }
+});
+
+test("app transition application parses and forwards only the exact approved fingerprint", async () => {
+  const fingerprint = `sha256:${"b".repeat(64)}`;
+  const arguments_ = applyProfileTransitionArguments("/private/tmp/app-worktree", fingerprint, "app");
+  assert.deepEqual(assertSuccess(cliArguments.parseCliArguments(arguments_)), {
+    kind: "apply-profile-transition", directory: "/private/tmp/app-worktree",
+    toProfile: "app", approvedPlanFingerprint: fingerprint,
+  });
+  let calls = 0;
+  const runner = cli.createCliRunner({
+    createVerifier: createFakeVerifier,
+    async applyProfileTransition(input) {
+      calls += 1;
+      assert.deepEqual(Object.keys(input).sort(), ["approvedPlanFingerprint", "root", "toProfile", "verifier"]);
+      assert.equal(input.root, "/private/tmp/app-worktree");
+      assert.equal(input.toProfile, "app");
+      assert.equal(input.approvedPlanFingerprint, fingerprint);
+      return {
+        ok: false, code: "PROFILE_TRANSITION_PLAN_APPROVAL_INVALID",
+        phase: "precondition", recovery: "not-required", privateDetail: "private executor data",
+      };
+    },
+  });
+  const captured = captureOutput();
+  assert.equal(await runner(arguments_, captured.output), 1);
+  assert.equal(calls, 1);
+  assert.deepEqual(captured.standard, []);
+  assert.deepEqual(captured.error, [JSON.stringify({
+    ok: false, command: "apply-profile-transition", code: "PROFILE_TRANSITION_PLAN_APPROVAL_INVALID",
+    phase: "precondition", recovery: "not-required",
+  })]);
+});
+
+test("compiled app profile creation contains verification failure and invalid options", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-app-create-process-"));
+  try {
+    for (const allOptionals of [false, true]) {
+      const destination = join(owner, allOptionals ? "all-optionals" : "default");
+      const arguments_ = appCreateArguments(destination, allOptionals);
+      await withFailingPnpm(async (path) => {
+        const failure = await executeBuilt(arguments_, { PATH: path });
+        assert.equal(failure.exitCode, 1);
+        assert.equal(failure.stdout, "");
+        assert.equal(failure.stderr.trimEnd().split("\n").length, 1);
+        assert.doesNotMatch(failure.stderr, /CLI_ARGUMENT_INVALID|calendly\.com|G-ABCDEF1234|sample-app|egeria-failing-pnpm/u);
+      });
+      await assert.rejects(lstat(destination), { code: "ENOENT" });
+      const invalid = await executeBuilt([...arguments_, "--overwrite"]);
+      assert.equal(invalid.exitCode, 2);
+      assert.equal(invalid.stdout, "");
+      assert.deepEqual(JSON.parse(invalid.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
+    }
+  } finally {
+    await rm(owner, { recursive: true, force: false });
+  }
 });
 
 test("the parser accepts only the exact command-specific arguments", () => {
@@ -3923,6 +4120,7 @@ async function withGitFixture(name, run, options = {}) {
 
   try {
     if (
+      options.generationRequest === undefined &&
       options.analytics === undefined &&
       options.bookingCalendly === undefined &&
       options.multilingual !== true
@@ -3944,9 +4142,10 @@ async function withGitFixture(name, run, options = {}) {
               ? {}
               : { analytics: options.analytics }),
             ...(options.multilingual === true ? { multilingual: true } : {}),
+            ...options.generationRequest,
           },
           destination: primary,
-          verifier: createFakeVerifier(),
+          verifier: options.verifier ?? createFakeVerifier(),
         }),
       );
     }
@@ -4344,6 +4543,173 @@ test("the compiled plan-upgrade command plans the exact production site edge wit
         prepareHistoricalUpgradeFixture(root, { downgradeStandards: false }),
     },
   );
+});
+
+async function withAppTransitionFixture(profile, allOptionals, run) {
+  await withGitFixture(profile, run, {
+    branch: `app-transition-${profile}-${allOptionals ? "all-optionals" : "default"}-test`,
+    generationRequest: {
+      profile,
+      ...appTransitionVisualProject,
+      ...(allOptionals ? {
+        bookingCalendly: appTransitionVisualBookingSettings,
+        multilingual: true,
+        analytics: appTransitionVisualAnalyticsSettings,
+      } : {}),
+    },
+    // Source setup uses real recipe lockfile preparation but injected verification.
+    // The compiled apply command below uses the complete production verifier.
+    verifier: {
+      ...createFakeVerifier(),
+      prepareLockfile: core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }).prepareLockfile,
+    },
+    async preparePrimary(root) {
+      const path = join(root, "README.md");
+      await writeFile(path, `${await readFile(path, "utf8")}\nFictional client preservation note.\n`);
+    },
+  });
+}
+
+for (const profile of ["portfolio", "site"]) {
+  for (const allOptionals of [false, true]) {
+    test(`compiled app transition from ${profile} with ${allOptionals ? "all optionals" : "no optionals"} preserves content through production verification`, async () => {
+      await withAppTransitionFixture(profile, allOptionals, async ({ linked, primary }) => {
+        const before = await gitRepositorySnapshot(linked);
+        const primaryBefore = await gitRepositorySnapshot(primary);
+        const gitBefore = await listTree(join(primary, ".git"));
+        const initialGit = await core.inspectGitWorktree({ root: linked });
+        assert.equal(initialGit.ok, true);
+        const sourceProject = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
+        const sourceMigration = await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8");
+        const sourceReadme = await readFile(join(linked, "README.md"));
+        const planning = planProfileTransitionArguments(linked, "app");
+        const first = await executeBuilt(planning);
+        assert.equal(first.exitCode, 0, first.stderr);
+        assert.equal(first.stderr, "");
+        assert.equal(first.stdout.trimEnd().split("\n").length, 1);
+        await withFailingPnpm(async (path) => {
+          assert.deepEqual(await executeBuilt(planning, { PATH: path }), first);
+        });
+        assert.deepEqual(await gitRepositorySnapshot(linked), before);
+        assert.deepEqual(await listTree(join(primary, ".git")), gitBefore);
+        const plan = JSON.parse(first.stdout).plan;
+        assert.deepEqual([plan.source.profile, plan.source.recipeVersion], [profile, profile === "portfolio" ? "0.10.0" : "0.11.0"]);
+        assert.deepEqual([plan.target.profile, plan.target.recipeVersion], ["app", "0.1.0"]);
+        assert.deepEqual(plan.requiredApprovals, ["transform", "verified-final-diff"]);
+        const preserved = new Map(await Promise.all(plan.dispositions
+          .filter(({ kind }) => kind === "preserve-file")
+          .map(async ({ path }) => [path, await readFile(join(linked, path))])));
+        const execution = await executeBuilt(applyProfileTransitionArguments(linked, plan.planFingerprint, "app"));
+        assert.equal(execution.exitCode, 0, execution.stderr);
+        assert.equal(execution.stderr, "");
+        assert.equal(execution.stdout.endsWith("\n"), true);
+        assert.equal(execution.stdout.trimEnd().split("\n").length, 1);
+        const migration = profile === "portfolio"
+          ? "transition-portfolio-0-10-0-to-app-0-1-0"
+          : "transition-site-0-11-0-to-app-0-1-0";
+        const changedPaths = [...new Set([
+          ...plan.actions.map(({ path }) => path),
+          ".egeria/project.yaml", ".egeria/migrations.jsonl", ".egeria/state.json",
+        ])].sort();
+        assert.deepEqual(JSON.parse(execution.stdout), {
+          ok: true, command: "apply-profile-transition", result: {
+            status: "verified-final-diff-approval-required",
+            baseRevision: initialGit.identity.revision,
+            transition: {
+              fromProfile: profile,
+              fromRecipeVersion: profile === "portfolio" ? "0.10.0" : "0.11.0",
+              toProfile: "app", toRecipeVersion: "0.1.0",
+            },
+            migration, changedPaths,
+            verificationChecks: core.appProfileTransitionVerificationChecks,
+          },
+        });
+        for (const [path, bytes] of preserved) {
+          assert.deepEqual(await readFile(join(linked, path)), bytes, path);
+        }
+        assert.deepEqual(await readFile(join(linked, "README.md")), sourceReadme);
+        const project = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
+        assert.deepEqual(project.capabilitySettings, sourceProject.capabilitySettings);
+        assert.equal(project.selectedCapabilities.includes("multilingual"), allOptionals);
+        const state = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8")));
+        assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.1.0" });
+        assert.deepEqual(state.appliedMigrations, [migration]);
+        assert.deepEqual(state.lastSuccessfulVerification, {
+          kind: "profile-transition", checks: core.appProfileTransitionPersistedVerificationChecks,
+        });
+        const migrationSource = await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8");
+        assert.equal(migrationSource.startsWith(sourceMigration), true);
+        const migrations = assertSuccess(core.parseMigrationLog(migrationSource));
+        assert.equal(migrations.length, 1);
+        assert.equal(migrations[0].identifier, migration);
+        assert.deepEqual(migrations[0].verificationChecks, core.appProfileTransitionPersistedVerificationChecks);
+        assert.equal((await core.inspectGitExpectedChanges({ root: linked, identity: initialGit.identity, expectedPaths: changedPaths })).ok, true);
+        await assertExactInstalledAgreement(linked);
+        assert.deepEqual(await gitRepositorySnapshot(primary), primaryBefore);
+        assert.doesNotMatch(first.stdout + execution.stdout, /calendly\.com|aaaaaaaaaaaaaaaa|Fictional client|refs\/heads|\.git\/worktrees|app-transition-visual/u);
+      });
+    });
+  }
+}
+
+test("compiled app transition refusals retain fingerprint gates and pre-write or retained-write recovery", async () => {
+  await withAppTransitionFixture("portfolio", false, async ({ linked, primary }) => {
+    const planning = planProfileTransitionArguments(linked, "app");
+    const first = await executeBuilt(planning);
+    assert.equal(first.exitCode, 0, first.stderr);
+    const staleFingerprint = JSON.parse(first.stdout).plan.planFingerprint;
+    const before = await gitRepositorySnapshot(linked);
+    const wrong = await executeBuilt(applyProfileTransitionArguments(linked, `sha256:${"0".repeat(64)}`, "app"));
+    assert.equal(wrong.exitCode, 1);
+    assert.equal(wrong.stdout, "");
+    const approvalRefusal = {
+      ok: false, command: "apply-profile-transition",
+      code: "PROFILE_TRANSITION_PLAN_APPROVAL_INVALID", phase: "precondition", recovery: "not-required",
+    };
+    assert.deepEqual(JSON.parse(wrong.stderr), approvalRefusal);
+    assert.deepEqual(await gitRepositorySnapshot(linked), before);
+    await writeFile(join(linked, "README.md"), "Fictional changed client note.\n");
+    await executeGit(linked, ["add", "README.md"]);
+    await executeGit(linked, ["commit", "-m", "Update synthetic client note"]);
+    const changed = await gitRepositorySnapshot(linked);
+    const stale = await executeBuilt(applyProfileTransitionArguments(linked, staleFingerprint, "app"));
+    assert.equal(stale.exitCode, 1);
+    assert.equal(stale.stdout, "");
+    assert.deepEqual(JSON.parse(stale.stderr), approvalRefusal);
+    assert.deepEqual(await gitRepositorySnapshot(linked), changed);
+    const current = await executeBuilt(planning);
+    assert.equal(current.exitCode, 0, current.stderr);
+    const controls = ["project.yaml", "migrations.jsonl", "state.json"];
+    const controlsBefore = await Promise.all(controls.map((name) => readFile(join(linked, ".egeria", name))));
+    const primaryBefore = await gitRepositorySnapshot(primary);
+    await withFailingPnpm(async (path) => {
+      const failure = await executeBuilt(applyProfileTransitionArguments(linked, JSON.parse(current.stdout).plan.planFingerprint, "app"), { PATH: path });
+      assert.equal(failure.exitCode, 1);
+      assert.equal(failure.stdout, "");
+      assert.equal(failure.stderr.trimEnd().split("\n").length, 1);
+      assert.deepEqual(JSON.parse(failure.stderr), {
+        ok: false, command: "apply-profile-transition", code: "PROFILE_TRANSITION_VERIFICATION_FAILED",
+        phase: "verify", recovery: "inspect-worktree",
+      });
+    });
+    assert.deepEqual(await Promise.all(controls.map((name) => readFile(join(linked, ".egeria", name)))), controlsBefore);
+    assert.equal((await readFile(join(linked, "apps/web/src/application/health.ts"), "utf8")).length > 0, true);
+    assert.notDeepEqual(await gitRepositorySnapshot(linked), changed);
+    assert.deepEqual(await gitRepositorySnapshot(primary), primaryBefore);
+  });
+});
+
+test("compiled app transition unsupported source is a builder refusal without mutation", async () => {
+  await withGitFixture("site", async ({ linked }) => {
+    const before = await gitRepositorySnapshot(linked);
+    const execution = await executeBuilt(planProfileTransitionArguments(linked, "app"));
+    assert.equal(execution.exitCode, 1);
+    assert.equal(execution.stdout, "");
+    assert.deepEqual(JSON.parse(execution.stderr), {
+      ok: false, command: "plan-profile-transition", code: "PROFILE_TRANSITION_EDGE_MISSING", recovery: "not-required",
+    });
+    assert.deepEqual(await gitRepositorySnapshot(linked), before);
+  }, { preparePrimary: (root) => prepareHistoricalUpgradeFixture(root, { downgradeStandards: false }) });
 });
 
 test("the compiled profile-transition planner is repeatable and leaves portfolio controls and Git unchanged", async () => {
