@@ -27,6 +27,7 @@ import {
   type CapabilityUpgradePlan,
   type CapabilityUpgradePlanningFailureCode,
   type ProfileTransitionPlan,
+  type AppProfileTransitionPlan,
   type ProfileTransitionExecutionResult,
   type ProfileTransitionPlanningFailureCode,
   type GeneratedProjectVerifier,
@@ -59,9 +60,7 @@ type CliRunnerDependencies = Readonly<{
   applyProfileTransition?(input: Parameters<
     typeof applyProfileTransitionDefault
   >[0]): Promise<ProfileTransitionExecutionResult>;
-  planProfileTransition?(input: Parameters<
-    typeof planProfileTransitionDefault
-  >[0]): ReturnType<typeof planProfileTransitionDefault>;
+  planProfileTransition?: typeof planProfileTransitionDefault;
   createReader?(root: string): RepositoryReader;
   inspectGitCreateTargets?(input: Readonly<{
     root: string;
@@ -99,7 +98,7 @@ type PlanUpgradeSuccess = Readonly<{
 type PlanProfileTransitionSuccess = Readonly<{
   ok: true;
   command: "plan-profile-transition";
-  plan: ProfileTransitionPlan;
+  plan: ProfileTransitionPlan | AppProfileTransitionPlan;
 }>;
 
 const plannerRefusalCodes = new Set<PlanningFailureCode>([
@@ -140,9 +139,11 @@ const profileTransitionPlannerRefusalCodes =
     "PROFILE_ALREADY_CURRENT",
     "PROFILE_INFERENCE_AMBIGUOUS",
     "PROFILE_TRANSITION_ACTION_CONFLICT",
+    "PROFILE_TRANSITION_CONTENT_INVALID",
     "PROFILE_TRANSITION_EDGE_MISSING",
     "PROFILE_TRANSITION_SOURCE_UNSUPPORTED",
     "PROFILE_TRANSITION_UNSUPPORTED",
+    "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED",
     "PROJECT_DRIFT_DETECTED",
     "PROJECT_EJECTION_UNSUPPORTED",
     "PROJECT_INSPECTION_INVALID",

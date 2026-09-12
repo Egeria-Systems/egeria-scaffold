@@ -472,6 +472,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "scope",
     "builder-and-packages",
     "generated-projects",
+    "app-transition-visuals",
     "compatibility-proof",
     "dependency-review",
   ];
@@ -488,6 +489,8 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "packages/standards/**",
     "fixtures/generated/**",
     "scripts/verify-generated-skeletons.mjs",
+    "scripts/verify-app-transition-visuals.mjs",
+    "scripts/lib/isolated-process.mjs",
     "tests/generated-fixtures/**",
   ];
   const compatibilityPaths = [
@@ -502,7 +505,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
 
   assert.equal(workflow.name, "Repository quality");
   assert.deepEqual(workflow.on, {
-    pull_request: null,
+    pull_request: { types: ["opened", "synchronize", "reopened", "ready_for_review"] },
     push: { branches: ["main"] },
   });
   assert.deepEqual(workflow.permissions, { contents: "read" });
@@ -604,6 +607,26 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
     options: "--shm-size=1g",
   });
+  assert.equal(workflow.jobs["app-transition-visuals"].if,
+    "needs.scope.outputs.generated-projects == 'true'");
+  assert.deepEqual(workflow.jobs["app-transition-visuals"].needs, ["scope"]);
+  assert.deepEqual(workflow.jobs["app-transition-visuals"].container,
+    workflow.jobs["generated-projects"].container);
+  assert.equal(workflow.jobs["app-transition-visuals"].env.EGERIA_VISUAL_IMAGE,
+    workflow.jobs["app-transition-visuals"].container.image);
+  assert.equal(workflow.jobs["app-transition-visuals"].steps.filter(
+    ({ run }) => run === "pnpm run verify:app-transition-visuals").length, 1);
+  assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
+    ({ run }) => run === "pnpm run verify:app-transition-visuals").if,
+    "github.event_name != 'pull_request' || !github.event.pull_request.draft");
+  assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --candidates").if,
+    "github.event_name == 'pull_request' && github.event.pull_request.draft");
+  assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
+    ({ uses }) => uses?.startsWith("actions/checkout@")).with.ref,
+    "${{ github.event.pull_request.head.sha || github.sha }}");
+  assert.doesNotMatch(workflowCommands(workflow.jobs["app-transition-visuals"]),
+    /--promote|--update-snapshots/u);
   assert.equal(
     workflow.jobs["compatibility-proof"].if,
     "needs.scope.outputs.compatibility-proof == 'true'",
@@ -704,11 +727,13 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "scope",
     "builder-and-packages",
     "generated-projects",
+    "app-transition-visuals",
     "compatibility-proof",
   ];
   const jobsWithToolchain = [
     "builder-and-packages",
     "generated-projects",
+    "app-transition-visuals",
     "compatibility-proof",
   ];
   for (const [identifier, job] of Object.entries(workflow.jobs)) {
@@ -2488,7 +2513,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     enforcementMap,
-    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+app optional-capability addition\/removal with exact Worker receipts[^\n]+staged CLI\/transition refusals[^\n]+certification execution remain later gates/iu,
+    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+app optional-capability addition\/removal with exact Worker receipts[^\n]+incoming app transition planning and state-last execution across sixteen cases[^\n]+thin CLI app creation and incoming-transition exposure[^\n]+certification execution remain later gates/iu,
   );
   assert.match(
     packageOwnership,
@@ -2500,11 +2525,11 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     programRoadmap,
-    /Current increment status:[^\n]+activates exact app addition\/removal for Calendly, multilingual, and analytics through the existing planners and state-last executors[^\n]+preserves the accepted Effect runtime[^\n]+whole-Worker verification receipt/iu,
+    /Accepted predecessor:[^\n]+activates exact app addition\/removal for Calendly, multilingual, and analytics through the existing planners and state-last executors[^\n]+preserves the accepted Effect runtime[^\n]+whole-Worker verification receipt/iu,
   );
   assert.match(
     programRoadmap,
-    /\*\*Stop gate:\*\* Complete the current optional-lifecycle candidate's required deterministic and generated-runtime verification[^\n]+independent requirements[^\n]+test-evidence reviews[^\n]+exact review packet before final-diff approval/iu,
+    /\*\*Stop gate:\*\* Complete the current CLI exposure candidate's required deterministic and generated-runtime verification[^\n]+default app-transition and separate retained-fixture visual comparisons against existing approved baselines[^\n]+independent requirements[^\n]+test-evidence reviews[^\n]+exact review packet before final-diff approval[^\n]+separate exact-manifest visual approval/iu,
   );
   assert.match(
     convergentProfileAdr,
@@ -2825,7 +2850,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /ten-capability catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.1\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+app CLI creation and incoming transitions remain separately gated/iu,
+    /ten-capability catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.1\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
   );
 });
 
@@ -3134,7 +3159,7 @@ test("client-required public-site work is relocated after lifecycle without requ
   );
   assert.match(
     capabilityModel,
-    /Multilingual and analytics remain independent optional capabilities during initial portfolio\/site\/app generation[^\n]+addition\/removal supports all three profiles under the existing lifecycle preconditions[^\n]+CLI creation remains limited to portfolio\/site[^\n]+no composite profile or capability/iu,
+    /Multilingual and analytics remain independent optional capabilities during initial portfolio\/site\/app generation[^\n]+addition\/removal supports all three profiles under the existing lifecycle preconditions[^\n]+CLI creation supports portfolio\/site\/app[^\n]+no composite profile or capability/iu,
   );
   assert.match(
     enforcementMap,

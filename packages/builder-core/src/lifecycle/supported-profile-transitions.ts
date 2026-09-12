@@ -5,15 +5,25 @@ export type SupportedProfileTransitionResolutionFailureCode =
   | "PROFILE_TRANSITION_UNSUPPORTED";
 
 export type SupportedProfileTransitionEndpoint = Readonly<{
-  profile: "portfolio" | "site";
-  recipeVersion: "0.10.0";
+  profile: "portfolio" | "site" | "app";
+  recipeVersion: "0.10.0" | "0.11.0" | "0.1.0";
 }>;
 
-export type SupportedProfileTransition = Readonly<{
-  source: SupportedProfileTransitionEndpoint &
-    Readonly<{ profile: "portfolio" }>;
-  target: SupportedProfileTransitionEndpoint & Readonly<{ profile: "site" }>;
+export type SupportedHistoricalProfileTransition = Readonly<{
+  source: Readonly<{ profile: "portfolio"; recipeVersion: "0.10.0" }>;
+  target: Readonly<{ profile: "site"; recipeVersion: "0.10.0" }>;
 }>;
+
+export type SupportedAppProfileTransition = Readonly<{
+  source:
+    | Readonly<{ profile: "portfolio"; recipeVersion: "0.10.0" }>
+    | Readonly<{ profile: "site"; recipeVersion: "0.11.0" }>;
+  target: Readonly<{ profile: "app"; recipeVersion: "0.1.0" }>;
+}>;
+
+export type SupportedProfileTransition =
+  | SupportedHistoricalProfileTransition
+  | SupportedAppProfileTransition;
 
 export type SupportedProfileTransitionResolution =
   | Readonly<{ ok: true; value: SupportedProfileTransition }>
@@ -28,6 +38,24 @@ export function resolveSupportedProfileTransition(input: Readonly<{
   toProfile: string;
   toRecipeVersion: string;
 }>): SupportedProfileTransitionResolution {
+  if (input.toProfile === "app") {
+    if (input.fromProfile === "app" && input.fromRecipeVersion === input.toRecipeVersion) {
+      return { ok: false, code: "PROFILE_ALREADY_CURRENT" };
+    }
+    if (input.fromProfile !== "portfolio" && input.fromProfile !== "site") {
+      return { ok: false, code: "PROFILE_TRANSITION_SOURCE_UNSUPPORTED" };
+    }
+    if (input.toRecipeVersion !== "0.1.0" ||
+        (input.fromProfile === "portfolio" ? input.fromRecipeVersion !== "0.10.0" : input.fromRecipeVersion !== "0.11.0")) {
+      return { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" };
+    }
+    return { ok: true, value: {
+      source: input.fromProfile === "portfolio"
+        ? { profile: "portfolio", recipeVersion: "0.10.0" }
+        : { profile: "site", recipeVersion: "0.11.0" },
+      target: { profile: "app", recipeVersion: "0.1.0" },
+    } };
+  }
   if (input.toProfile !== "site") {
     return { ok: false, code: "PROFILE_TRANSITION_UNSUPPORTED" };
   }

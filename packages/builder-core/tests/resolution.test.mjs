@@ -2222,3 +2222,22 @@ test("resolution reports unsupported capabilities, missing dependencies, cycles,
     ],
   );
 });
+
+
+test("supported profile transition admits only the historical and two exact incoming app edges", () => {
+  for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion] of [
+    ["portfolio", "0.10.0", "site", "0.10.0"],
+    ["portfolio", "0.10.0", "app", "0.1.0"],
+    ["site", "0.11.0", "app", "0.1.0"],
+  ]) {
+    assert.deepEqual(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}), {
+      ok: true, value: {source: {profile: fromProfile, recipeVersion: fromRecipeVersion}, target: {profile: toProfile, recipeVersion: toRecipeVersion}},
+    });
+  }
+  for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion] of [
+    ["site", "0.10.0", "app", "0.1.0"], ["portfolio", "0.9.0", "app", "0.1.0"],
+    ["site", "0.12.0", "app", "0.1.0"], ["app", "0.1.0", "app", "0.1.0"],
+    ["app", "0.1.0", "portfolio", "0.10.0"], ["portfolio", "0.10.0", "app", "0.2.0"],
+    ["unknown", "0.10.0", "app", "0.1.0"],
+  ]) assert.equal(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}).ok, false);
+});

@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import {
   mkdir,
   mkdtemp,
   lstat,
   readFile,
   readdir,
+  realpath,
   rename,
   rm,
   symlink,
@@ -13,7 +15,15 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import test from "node:test";
+import { parseDocument } from "yaml";
+import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
+import {
+  appTransitionVisualProject,
+  appTransitionVisualBookingSettings,
+  appTransitionVisualAnalyticsSettings,
+} from "../dist/lifecycle/app-profile-transition.js";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
@@ -216,7 +226,7 @@ async function approvedPlan(reader, gitInspection = git) {
   return result.value;
 }
 
-function successfulVerifier(calls) {
+function successfulVerifier(calls, profile = "site") {
   return {
     prepareLockfile() {
       throw new Error("transition must not prepare a lockfile");
@@ -225,7 +235,7 @@ function successfulVerifier(calls) {
       calls.push(receivedRoot);
       return Promise.resolve({
         ok: true,
-        value: { checks: core.ordinaryGenerationVerificationChecks },
+        value: { checks: profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks },
       });
     },
   };
@@ -244,7 +254,7 @@ async function invokeApply(repository, overrides = {}) {
       overrides.approvedPlanFingerprint ?? `sha256:${"0".repeat(64)}`,
     reader: repository.reader,
     writer: repository.writer,
-    verifier: overrides.verifier ?? successfulVerifier(verifierCalls),
+    verifier: overrides.verifier ?? successfulVerifier(verifierCalls, overrides.toProfile),
     inspectWorktree:
       overrides.inspectWorktree ??
       ((input) => {
@@ -414,6 +424,372 @@ function assertFailure(result, expected) {
   );
 }
 
+async function appTransitionSource(profile, subset = 0) {
+  const rendered = await core.renderSkeleton({
+    profile,
+    ...appTransitionVisualProject,
+    packageVersions: core.verifiedCapabilityPackageVersions,
+    ...(subset & 1 ? { bookingCalendly: appTransitionVisualBookingSettings } : {}),
+    ...(subset & 2 ? { multilingual: true } : {}),
+    ...(subset & 4 ? { analytics: appTransitionVisualAnalyticsSettings } : {}),
+  });
+  assert.equal(rendered.ok, true, JSON.stringify(rendered));
+  const files = new Map(rendered.value.files.map(({ path, content }) => [path, bytes(content)]));
+  files.set("pnpm-lock.yaml", bytes(await readFile(resolve(packageRoot,
+    `lockfiles/web-recipe-${profile === "portfolio" ? "0.10.0" : "0.9.0"}/pnpm-lock.yaml`))));
+  files.set(".egeria/project.yaml", bytes(core.serializeProjectYaml(rendered.value.project)));
+  files.set(".egeria/migrations.jsonl", bytes(""));
+  const surfaces = core.materializeInstalledSurfaces({
+    files, surfaces: [...rendered.value.surfaces, ...createBuilderStateSurfaces()],
+  });
+  assert.equal(surfaces.ok, true, JSON.stringify(surfaces));
+  const state = {
+    schemaVersion: "1.0.0", builderVersion: "0.0.0", projectSchemaVersion: "1.0.0",
+    origin: { profile, recipeVersion: rendered.value.project.recipeVersion },
+    installedCapabilities: core.createInstalledManifest(rendered.value.resolved),
+    appliedMigrations: [], managedSurfaces: surfaces.value, ejections: [],
+    compatibility: { node: "22.23.2", pnpm: "11.20.0", platformAdapter: "cloudflare-workers" },
+    lastSuccessfulVerification: { kind: "generation", checks: [
+      "contracts", "pre-state-inference", ...core.ordinaryGenerationVerificationChecks,
+      "post-state-inference",
+    ] },
+  };
+  files.set(".egeria/state.json", bytes(core.serializeStateJson(state)));
+  assert.equal(core.parseStateJson(decode(files.get(".egeria/state.json"))).ok, true);
+  return files;
+}
+
+async function approvedAppPlan(reader, inspection = git) {
+  const result = await core.planProfileTransition({
+    reader, git: inspection, toProfile: "app",
+    inspectCreateTargets: async () => ({ ok: true }),
+    inspectWorktree: async () => inspection,
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  return result.value;
+}
+
+async function runAppTransition(repository, overrides = {}) {
+  const plan = await approvedAppPlan(repository.reader);
+  await overrides.afterPlan?.(repository);
+  return invokeApply(repository, {
+    ...overrides, toProfile: "app", approvedPlanFingerprint: overrides.approvedPlanFingerprint ?? plan.planFingerprint,
+  });
+}
+
+test("app transitions refuse stale action, preserved, control and visual inputs before any side effect", async () => {
+  for (const [profile, path, replacement] of [
+    ["site", "apps/web/app/api/health/route.ts", "collision"],
+    ["site", "pnpm-workspace.yaml", "drift"],
+    ["site", "pnpm-lock.yaml", "drift"],
+    ["site", "apps/web/content/en-CA/long-form/introduction.md", "---\ntitle: Changed\nsummary: Still valid\n---\nChanged prose.\n"],
+    ["site", "apps/web/package.json", undefined],
+    ["portfolio", "apps/web/content/en-CA/site.yaml", "metadata: ["],
+    ["portfolio", baselinePaths[0], "changed PNG"],
+    ["site", ".egeria/project.yaml", undefined],
+  ]) {
+    const repository = createRepository(await appTransitionSource(profile));
+    let expected;
+    const execution = await runAppTransition(repository, { afterPlan() {
+      if (replacement !== undefined) repository.files.set(path, bytes(replacement));
+      else repository.files.set(path, bytes(`${decode(repository.files.get(path))}\n`));
+      expected = snapshotFiles(repository.files);
+    } });
+    assert.equal(execution.result.ok, false, path);
+    assert.equal(execution.result.recovery, "not-required", path);
+    assert.equal(execution.result.phase, "precondition", path);
+    assert.deepEqual(repository.writes, [], path);
+    assert.deepEqual(execution.verifierCalls, [], path);
+    assertUnchanged(repository, expected);
+  }
+});
+
+test("app transitions recheck every action kind and preserved bytes after plan recomputation", async () => {
+  for (const path of [
+    "apps/web/app/api/health/route.ts", "pnpm-workspace.yaml", "pnpm-lock.yaml",
+    "apps/web/package.json", "apps/web/content/en-CA/site.yaml",
+    "apps/web/content/en-CA/long-form/introduction.md", ".egeria/state.json",
+  ]) {
+    const repository = createRepository(await appTransitionSource("portfolio"));
+    let inspections = 0;
+    let expected;
+    const execution = await runAppTransition(repository, {
+      async inspectWorktree() {
+        inspections += 1;
+        if (inspections === 4) {
+          repository.files.set(path, bytes("late source mutation"));
+          expected = snapshotFiles(repository.files);
+        }
+        return git;
+      },
+    });
+    assert.equal(inspections, 4);
+    assert.equal(execution.result.ok, false, path);
+    assert.equal(execution.result.phase, "precondition");
+    assert.equal(execution.result.recovery, "not-required");
+    assert.deepEqual(repository.writes, []);
+    assert.deepEqual(execution.verifierCalls, []);
+    assertUnchanged(repository, expected);
+  }
+});
+
+test("app transitions refuse wrong approval, create eligibility and late Git changes without writes", async () => {
+  for (const overrides of [
+    { approvedPlanFingerprint: `sha256:${"0".repeat(64)}` },
+    { inspectCreateTargets: async () => ({ ok: false, code: "CAPABILITY_ACTION_CONFLICT" }) },
+    { inspectWorktree: (() => { let calls = 0; return async () => ++calls === 4
+      ? { ok: true, identity: { ...git.identity, revision: "b".repeat(40) } } : git; })() },
+  ]) {
+    const repository = createRepository(await appTransitionSource("site"));
+    const before = snapshotFiles(repository.files);
+    const execution = await runAppTransition(repository, overrides);
+    assert.equal(execution.result.ok, false);
+    assert.equal(execution.result.recovery, "not-required");
+    assert.deepEqual(repository.writes, []);
+    assert.deepEqual(execution.verifierCalls, []);
+    assertUnchanged(repository, before);
+  }
+});
+
+test("app transition failures retain the exact source and control prefix at every persistence boundary", async () => {
+  const cases = [
+    { name: "verification rejection", prefix: 1, phase: "verify", overrides: { verifier: { async verifyInIsolatedCopy() { return { ok: false, issues: [] }; } } } },
+    { name: "missing Worker receipt", prefix: 1, phase: "verify", overrides: { verifier: successfulVerifier([]) } },
+    { name: "invalid migration", prefix: 1, phase: "persist-migration", overrides: { now: () => "invalid" } },
+    { name: "project write", prefix: 1, phase: "persist-project", writer: { failBatch: 2 } },
+    { name: "migration write", prefix: 2, phase: "persist-migration", writer: { failBatch: 3 } },
+    { name: "state write", prefix: 3, phase: "persist-state", writer: { failBatch: 4 } },
+    { name: "state construction", prefix: 3, phase: "persist-state", overrides: { constructState: () => undefined } },
+    { name: "project reread", prefix: 2, phase: "persist-project", readFailure: [2, ".egeria/project.yaml", "bytes"] },
+    { name: "migration reread", prefix: 3, phase: "persist-migration", readFailure: [3, ".egeria/migrations.jsonl", "text"] },
+    { name: "state reread", prefix: 4, phase: "post-state", readFailure: [4, ".egeria/state.json", "text"] },
+    { name: "pending inference", prefix: 1, phase: "re-infer", readFailure: [1, "apps/web/app/api/health/route.ts", "text"] },
+    { name: "final Git diff", prefix: 4, phase: "final-diff", overrides: { inspectExpectedChanges: async () => ({ ok: false, code: "GIT_WORKTREE_CHANGED" }) } },
+  ];
+  for (const entry of cases) {
+    const source = await appTransitionSource("site", 7);
+    const repository = createRepository(source, entry.writer);
+    if (entry.readFailure) {
+      const [batch, path, mode] = entry.readFailure;
+      const method = mode === "bytes" ? "readBytes" : "readText";
+      const read = repository.reader[method];
+      repository.reader[method] = async value => repository.writes.length === batch && value === path
+        ? { kind: "error", code: "FILE_READ_FAILED" } : read(value);
+    }
+    const execution = await runAppTransition(repository, entry.overrides);
+    assert.equal(execution.result.ok, false, entry.name);
+    assert.equal(execution.result.phase, entry.phase, entry.name);
+    assert.equal(execution.result.recovery, "inspect-worktree", entry.name);
+    assert.equal(repository.writes.length, entry.prefix, entry.name);
+    const retained = new Map(source);
+    for (const change of repository.writes.flat()) retained.set(change.path, change.content);
+    assert.deepEqual(snapshotFiles(repository.files), snapshotFiles(retained), entry.name);
+    assert.equal(repository.writes[0].some(({ path }) => path.startsWith(".egeria/")), false);
+  }
+});
+
+test("app transition exact rereads reject changed preserved files both before persistence and at final diff", async () => {
+  for (const phase of ["re-infer", "final-diff"]) {
+    const path = "apps/web/content/en-CA/long-form/introduction.md";
+    const source = await appTransitionSource("site");
+    const corrupted = bytes("retained concurrent change");
+    const repository = createRepository(source, {
+      afterWrite({ batch, files }) { if (phase === "re-infer" && batch === 1) files.set(path, corrupted); },
+    });
+    const execution = await runAppTransition(repository, phase === "final-diff" ? {
+      async inspectExpectedChanges() { repository.files.set(path, corrupted); return { ok: true }; },
+    } : {});
+    assert.equal(execution.result.ok, false);
+    assert.equal(execution.result.phase, phase);
+    assert.equal(execution.result.recovery, "inspect-worktree");
+    assert.deepEqual(repository.files.get(path), corrupted);
+    assert.equal(repository.writes.length, phase === "re-infer" ? 1 : 4);
+    if (phase === "re-infer") assertControlBytes(repository, source);
+  }
+});
+
+test("site app execution preserves customized UI, locale values and unrelated package members", async () => {
+  const source = await appTransitionSource("site", 7);
+  const manifestPath = "apps/web/package.json";
+  const manifest = JSON.parse(decode(source.get(manifestPath)));
+  manifest.description = "Retained package metadata";
+  manifest.scripts.custom = "node --version";
+  source.set(manifestPath, bytes(JSON.stringify(manifest)));
+  const uiPath = "apps/web/src/presentation/content-page.tsx";
+  source.set(uiPath, bytes(`${decode(source.get(uiPath))}\n// Application customization.\n`));
+  const localePath = "apps/web/content/fr-CA/localized-content.yaml";
+  source.set(localePath, bytes(`${decode(source.get(localePath))}\n# Application locale comment.\n`));
+  const repository = createRepository(source);
+  const execution = await runAppTransition(repository);
+  assert.equal(execution.result.ok, true, JSON.stringify(execution.result));
+  const merged = JSON.parse(decode(repository.files.get(manifestPath)));
+  assert.equal(merged.description, manifest.description);
+  assert.equal(merged.scripts.custom, manifest.scripts.custom);
+  assert.deepEqual(repository.files.get(uiPath), source.get(uiPath));
+  assert.deepEqual(repository.files.get(localePath), source.get(localePath));
+});
+
+test("app execution retains actual atomic-writer prefixes for every transformation action kind", async () => {
+  for (const kind of ["create-file", "replace-file", "merge-json", "migrate-file"]) {
+    const source = await appTransitionSource("portfolio");
+    await withFileSystemRepository(source, async directory => {
+      const identity = { ...git.identity, root: directory };
+      const inspection = { ok: true, identity };
+      const reader = core.createFileSystemRepositoryReader(directory);
+      const plan = await approvedAppPlan(reader, inspection);
+      const cut = plan.actions.findIndex((action, index) => index > 0 && action.kind === kind);
+      assert.ok(cut > 0, kind);
+      const stoppedPath = plan.actions[cut].path;
+      const atomic = core.createFileSystemProfileTransitionWriter(directory, {
+        async beforeCommit(path) { if (path === stoppedPath) throw new Error("synthetic commit interruption"); },
+      });
+      let supplied;
+      let verifications = 0;
+      const result = await core.applyProfileTransition({
+        root: directory, toProfile: "app", approvedPlanFingerprint: plan.planFingerprint,
+        writer: { async write(changes) { supplied = changes; return atomic.write(changes); } },
+        verifier: { async verifyInIsolatedCopy() { verifications += 1; throw new Error("must not verify a prefix"); } },
+        inspectWorktree: async () => inspection,
+        inspectCreateTargets: async () => ({ ok: true }),
+      });
+      assertFailure(result, { code: "PROFILE_TRANSITION_TRANSFORM_FAILED", phase: "transform", recovery: "inspect-worktree" });
+      assert.equal(verifications, 0);
+      const expected = new Map(source);
+      for (const change of supplied.slice(0, cut)) expected.set(change.path, change.content);
+      const retained = await loadEntries(directory);
+      const temporaryPaths = [...retained.keys()].filter(path => path.includes(".egeria-profile-transition-"));
+      // A newly created parent retains the interrupted temporary file; an
+      // existing parent permits the unchanged writer's identity-checked cleanup.
+      const createdParent = ![...expected.keys()].some(path => path.startsWith(`${dirname(stoppedPath)}/`));
+      assert.equal(temporaryPaths.length, createdParent ? 1 : 0, kind);
+      if (createdParent) {
+        assert.equal(dirname(temporaryPaths[0]), dirname(stoppedPath));
+        assert.deepEqual(retained.get(temporaryPaths[0]), supplied[cut].content);
+        expected.set(temporaryPaths[0], supplied[cut].content);
+      }
+      assert.deepEqual(snapshotFiles(retained), snapshotFiles(expected), kind);
+    });
+  }
+});
+
+test("app transitions execute in real linked worktrees through production Git and filesystem boundaries", async () => {
+  const execute = promisify(execFile);
+  for (const profile of ["portfolio", "site"]) {
+    for (const subset of [0, 7]) {
+      const owner = await realpath(await mkdtemp(join(tmpdir(), "egeria-app-transition-linked-")));
+      try {
+        const source = await appTransitionSource(profile, subset);
+        const checkout = join(owner, "source");
+        const worktree = join(owner, "transition");
+        await mkdir(checkout);
+        await writeEntries(checkout, source);
+        const environment = {
+          PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: "1",
+          GIT_CONFIG_GLOBAL: join(owner, "absent-global-config"), GIT_TERMINAL_PROMPT: "0",
+        };
+        const gitCommand = arguments_ => execute("git", arguments_, { cwd: checkout, env: environment });
+        await gitCommand(["init", "--initial-branch=main"]);
+        await gitCommand(["add", "."]);
+        await gitCommand(["-c", "user.name=Synthetic Verification", "-c", "user.email=verification@example.invalid",
+          "-c", "commit.gpgsign=false", "commit", "-m", "Synthetic transition source"]);
+        await gitCommand(["worktree", "add", "-b", "app-transition", worktree]);
+        const inspection = await core.inspectGitWorktree({ root: worktree });
+        assert.equal(inspection.ok, true, JSON.stringify(inspection));
+        const planned = await core.planProfileTransition({
+          reader: core.createFileSystemRepositoryReader(worktree), git: inspection, toProfile: "app",
+        });
+        assert.equal(planned.ok, true, JSON.stringify(planned));
+        const calls = [];
+        const result = await core.applyProfileTransition({
+          root: worktree, toProfile: "app", approvedPlanFingerprint: planned.value.planFingerprint,
+          verifier: successfulVerifier(calls, "app"), now: () => completedAt,
+        });
+        assert.equal(result.ok, true, `${profile}/${subset}: ${JSON.stringify(result)}`);
+        assert.deepEqual(calls, [worktree]);
+        assert.equal(result.value.baseRevision, inspection.identity.revision);
+        const state = core.parseStateJson(await readFile(join(worktree, ".egeria/state.json"), "utf8"));
+        assert.equal(state.ok, true);
+        assert.deepEqual(state.value.appliedMigrations, [result.value.migration]);
+        assert.equal((await execute("git", ["rev-parse", "HEAD"], { cwd: worktree, env: environment })).stdout.trim(), inspection.identity.revision);
+        assert.equal((await gitCommand(["status", "--porcelain"])).stdout, "");
+      } finally {
+        await rm(owner, { recursive: true, force: true });
+      }
+    }
+  }
+});
+
+for (const profile of ["portfolio", "site"]) {
+  for (let subset = 0; subset < 8; subset += 1) {
+    test(`app transition executes ${profile} optional subset ${subset} with state-last persistence`, async () => {
+      const source = await appTransitionSource(profile, subset);
+      const repository = createRepository(source);
+      const plan = await approvedAppPlan(repository.reader);
+      const execution = await invokeApply(repository, {
+        toProfile: "app", approvedPlanFingerprint: plan.planFingerprint,
+        verifier: {
+          prepareLockfile() { throw new Error("must not resolve a new graph"); },
+          async verifyInIsolatedCopy(receivedRoot) {
+            assert.equal(receivedRoot, root);
+            assertControlBytes(repository, source);
+            assert.equal(repository.writes.length, 1);
+            return { ok: true, value: { checks: core.appGenerationVerificationChecks } };
+          },
+        },
+      });
+      assert.equal(execution.result.ok, true, JSON.stringify(execution.result));
+      assert.equal(execution.result.value.status, "verified-final-diff-approval-required");
+      assert.equal(execution.result.value.migration,
+        profile === "portfolio" ? "transition-portfolio-0-10-0-to-app-0-1-0" : "transition-site-0-11-0-to-app-0-1-0");
+      assert.deepEqual(execution.result.value.verificationChecks, core.appProfileTransitionVerificationChecks);
+      assert.deepEqual(repository.writes.map(batch => batch.map(({ path }) => path)), [
+        plan.actions.map(({ path }) => path),
+        [".egeria/project.yaml"], [".egeria/migrations.jsonl"], [".egeria/state.json"],
+      ]);
+      assertExactChangedPaths(repository.files, snapshotFiles(source), execution.result.value.changedPaths);
+      for (const { path, kind } of plan.dispositions) {
+        assert.notEqual(kind, "delete-file");
+        if (kind === "preserve-file") assert.deepEqual(repository.files.get(path), source.get(path), path);
+      }
+      const project = core.parseProjectYaml(decode(repository.files.get(".egeria/project.yaml")));
+      const previousProject = core.parseProjectYaml(decode(source.get(".egeria/project.yaml")));
+      assert.equal(project.ok, true);
+      assert.equal(project.value.originProfile, "app");
+      assert.equal(project.value.recipeVersion, "0.1.0");
+      assert.deepEqual(project.value.capabilitySettings, previousProject.value.capabilitySettings);
+      const manifest = JSON.parse(decode(repository.files.get("apps/web/package.json")));
+      assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
+      assert.equal(manifest.dependencies.next, "16.3.3");
+      assert.equal(manifest.scripts["test:integration:cloudflare"], "vitest run --config vitest.cloudflare.config.ts");
+      assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.1.0/pnpm-lock.yaml"))));
+      if (profile === "portfolio") {
+        for (const locale of subset & 2 ? ["en-CA", "fr-CA"] : ["en-CA"]) {
+          const path = `apps/web/content/${locale}/${subset & 2 ? "localized-content" : "site"}.yaml`;
+          const before = parseDocument(decode(source.get(path))).toJS();
+          const after = parseDocument(decode(repository.files.get(path))).toJS();
+          assert.deepEqual(after.metadata, before.metadata);
+          assert.deepEqual(after.accessibility, before.accessibility);
+          assert.deepEqual(subset & 2 ? after.pages.home : after.home, subset & 2 ? before.pages.home : before.home);
+        }
+      }
+      const state = core.parseStateJson(decode(repository.files.get(".egeria/state.json")));
+      const migrations = core.parseMigrationLog(decode(repository.files.get(".egeria/migrations.jsonl")));
+      assert.equal(state.ok, true, JSON.stringify(state));
+      assert.equal(migrations.ok, true);
+      assert.equal(migrations.value.length, 1);
+      assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.1.0" });
+      assert.deepEqual(state.value.appliedMigrations, [execution.result.value.migration]);
+      assert.deepEqual(state.value.ejections, []);
+      assert.deepEqual(state.value.lastSuccessfulVerification.checks, core.appProfileTransitionPersistedVerificationChecks);
+      const catalog = core.createCapabilityCatalog(core.verifiedCapabilityPackageVersions);
+      assert.equal(catalog.ok, true);
+      const inferred = await core.inferRepository({ reader: repository.reader, catalog: catalog.value });
+      assert.ok(inferred.capabilities.every(({ category }) => category === "confirmed"));
+      assert.ok(inferred.surfaces.every(({ status }) => status === "confirmed" || status === "application-owned"));
+    });
+  }
+}
+
 test("the exact portfolio-to-site profile transition executor and writer are exported", () => {
   assert.equal(typeof core.applyProfileTransition, "function");
   assert.equal(typeof core.createFileSystemProfileTransitionWriter, "function");
@@ -422,7 +798,7 @@ test("the exact portfolio-to-site profile transition executor and writer are exp
 test("portfolio-to-site profile transition refuses unsupported target inputs without mutation", async () => {
   for (const unsupported of [
     { toProfile: "portfolio" },
-    { toProfile: "app" },
+    { toProfile: "unknown" },
   ]) {
     const repository = createRepository(await sourceEntries("portfolio"));
     const before = snapshotFiles(repository.files);

@@ -265,7 +265,7 @@ async function expectedActions(entries) {
   });
 }
 
-test("the supported profile-transition matrix contains only exact portfolio 0.10.0 to site 0.10.0", () => {
+test("the historical profile-transition edge preserves exact portfolio 0.10.0 to site 0.10.0", () => {
   assert.deepEqual(
     core.resolveSupportedProfileTransition({
       fromProfile: "portfolio",
@@ -289,7 +289,7 @@ test("the supported profile-transition matrix contains only exact portfolio 0.10
     ["portfolio", "0.9.0", "site", "0.10.0", "PROFILE_TRANSITION_EDGE_MISSING"],
     ["portfolio", "0.10.0", "site", "0.9.0", "PROFILE_TRANSITION_EDGE_MISSING"],
     ["portfolio", "0.10.0", "portfolio", "0.10.0", "PROFILE_TRANSITION_UNSUPPORTED"],
-    ["portfolio", "0.10.0", "app", "0.10.0", "PROFILE_TRANSITION_UNSUPPORTED"],
+    ["portfolio", "0.10.0", "app", "0.10.0", "PROFILE_TRANSITION_EDGE_MISSING"],
   ];
 
   for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion, code] of refusals) {
@@ -565,4 +565,11 @@ test("planning contains unexpected reader failures and fingerprints every privat
     differentGit.value.planFingerprint,
     baseline.value.planFingerprint,
   );
+});
+
+
+test("app transition planning reaches content and visual eligibility after exact source admission", async () => {
+  const result = await planFromEntries(await portfolioEntries(), {toProfile: "app"});
+  assert.equal(result.ok, false);
+  assert.equal(result.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
 });

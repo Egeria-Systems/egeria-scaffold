@@ -146,7 +146,7 @@ test("the private package manifests expose only their approved runtime boundarie
       "./package.json": "./package.json",
     },
     scripts: {
-      build: "tsc -p tsconfig.json",
+      build: "tsc -p tsconfig.json && node scripts/compile-content-validation.mjs",
       lint:
         "pnpm --dir ../.. exec eslint packages/builder-core/src --max-warnings 0",
       "schema:check": "node scripts/generate-json-schemas.mjs --check",
@@ -276,6 +276,8 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "index.ts",
       "inference/evaluate-probe.ts",
       "inference/infer-repository.ts",
+      "lifecycle/app-profile-transition.ts",
+      "lifecycle/app-transition-content-validation.ts",
       "lifecycle/apply-capability-addition.ts",
       "lifecycle/apply-capability-removal.ts",
       "lifecycle/apply-capability-upgrade.ts",
@@ -426,6 +428,10 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "multilingual/site/apps/web/tests/e2e/site-routing.spec.ts.template",
       "portfolio/apps/web/content/en-CA/long-form/introduction.md.template",
       "portfolio/apps/web/content/en-CA/site.yaml.template",
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-home-desktop-chromium-linux.png",
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-home-mobile-chromium-linux.png",
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-multilingual-home-desktop-chromium-linux.png",
+      "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-multilingual-home-mobile-chromium-linux.png",
       "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
       "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
       "site/apps/web/app/about/page.tsx",
@@ -516,7 +522,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /canonical managed-surface inventory/);
   assert.match(
     builderInstructions,
-    /Git preflight, deterministic addition, removal, exact supported-upgrade planning, and exact `portfolio@0\.10\.0` to historical `site@0\.10\.0` profile-transition planning, exact-diff inspection/,
+    /Git preflight, deterministic addition, removal, exact supported-upgrade planning, and exact historical portfolio-to-site and incoming app profile-transition planning under the capability model, exact-diff inspection/,
   );
   assert.match(builderInstructions, /`applyCapabilityAddition`/);
   assert.match(builderInstructions, /`applyCapabilityRemoval`/);
@@ -652,10 +658,10 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(cliInstructions, /`plan-upgrade` remains read-only/);
   assert.match(cliInstructions, /`apply-upgrade` is limited/);
   assert.match(cliInstructions, /`plan-profile-transition` remains read-only/);
-  assert.match(cliInstructions, /`apply-profile-transition` is limited/);
+  assert.match(cliInstructions, /`apply-profile-transition` accepts exactly/);
   assert.match(
     cliInstructions,
-    /`plan-profile-transition`[^\n]+`--directory`[^\n]+`--to-profile site`[^\n]+no[^\n]+`--from-profile`/,
+    /`plan-profile-transition`[^\n]+`--directory`[^\n]+`--to-profile <site\|app>`[^\n]+no[^\n]+`--from-profile`/,
   );
   assert.match(
     cliInstructions,
@@ -679,11 +685,11 @@ test("builder-core direct consumers describe the private generation boundary", a
   );
   assert.match(
     cliReadme,
-    /`plan-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site`/,
+    /`plan-profile-transition --directory <absolute-existing-linked-worktree> --to-profile <site\|app>`/,
   );
   assert.match(
     cliReadme,
-    /`apply-profile-transition --directory <absolute-existing-linked-worktree> --to-profile site --approved-plan sha256:<digest>`/,
+    /`apply-profile-transition --directory <absolute-existing-linked-worktree> --to-profile <site\|app> --approved-plan sha256:<digest>`/,
   );
   assert.match(cliReadme, /recovery[^\n]+`not-required`/);
   assert.match(cliReadme, /migration append[^\n]+state-last persistence/);
