@@ -1,0 +1,19 @@
+builderCompatibility: 0.0.0
+capabilitySettings: {}
+ejectedAreas: []
+originProfile: app
+platformAdapter: cloudflare-workers
+project:
+  defaultLocale: en-CA
+  displayName: Acme App
+  name: acme-app
+recipeVersion: 0.1.0
+schemaVersion: 1.0.0
+selectedCapabilities:
+  - standards
+  - deployment-cloudflare
+  - content-files
+  - section-composition
+  - observability
+  - app-foundation
+  - site-routing

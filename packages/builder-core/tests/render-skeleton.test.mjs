@@ -101,8 +101,12 @@ test("app generation preserves production-site bytes across all optional subsets
     assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
     assert.equal(manifest.scripts["test:integration:cloudflare"],
       "vitest run --config vitest.cloudflare.config.ts");
+    assert.equal(manifest.devDependencies.vitest, "4.1.11");
+    assert.equal(siteManifest.devDependencies.vitest, "4.1.10");
     delete manifest.dependencies.effect;
     delete manifest.scripts["test:integration:cloudflare"];
+    delete manifest.devDependencies.vitest;
+    delete siteManifest.devDependencies.vitest;
     assert.deepEqual(manifest, siteManifest);
     const workspace = parseGeneratedYaml(app.files, "pnpm-workspace.yaml");
     const siteWorkspace = parseGeneratedYaml(site.files, "pnpm-workspace.yaml");

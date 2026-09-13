@@ -2513,7 +2513,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     enforcementMap,
-    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+app optional-capability addition\/removal with exact Worker receipts[^\n]+incoming app transition planning and state-last execution across sixteen cases[^\n]+thin CLI app creation and incoming-transition exposure[^\n]+certification execution remain later gates/iu,
+    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+app optional-capability addition\/removal with exact Worker receipts[^\n]+incoming app transition planning and state-last execution across sixteen cases[^\n]+thin CLI app creation and incoming-transition exposure[^\n]+immutable app fixtures[^\n]+certification execution remains a later gate/iu,
   );
   assert.match(
     packageOwnership,
@@ -2529,7 +2529,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     programRoadmap,
-    /\*\*Stop gate:\*\* Complete the current CLI exposure candidate's required deterministic and generated-runtime verification[^\n]+default app-transition and separate retained-fixture visual comparisons against existing approved baselines[^\n]+independent requirements[^\n]+test-evidence reviews[^\n]+exact review packet before final-diff approval[^\n]+separate exact-manifest visual approval/iu,
+    /\*\*Stop gate:\*\* Complete the current fixture candidate's required deterministic and generated-runtime verification[^\n]+default app-transition and separate retained-fixture visual comparisons against existing approved baselines[^\n]+independent requirements[^\n]+test-evidence reviews[^\n]+exact review packet before final-diff approval[^\n]+separate exact-manifest visual approval/iu,
   );
   assert.match(
     convergentProfileAdr,
@@ -2541,7 +2541,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     rootInstructions,
-    /Builder-core supports `app@0\.1\.0` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+staged CLI, transition, fixture, and certification boundaries/iu,
+    /Builder-core supports `app@0\.1\.0` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
   );
   for (const instructions of [builderInstructions, cliInstructions]) {
     assert.match(
@@ -3055,7 +3055,7 @@ test("capability delivery requires a separately planned certification task", asy
   );
   assert.match(
     enforcementMap,
-    /INV-APP-ARCHITECTURE[^\n]+runtime[^\n]+certification execution remain later gates/i,
+    /INV-APP-ARCHITECTURE[^\n]+runtime[^\n]+certification execution remains a later gate/i,
   );
   assert.doesNotMatch(enforcementMap, /legacy-backfill-exempt/iu);
 });
@@ -4616,6 +4616,8 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
       "fixtures/generated/site",
       "fixtures/generated/site-multilingual",
       "fixtures/generated/site-multilingual-analytics",
+      "fixtures/generated/app",
+      "fixtures/generated/app-all-optional-integrations",
     ].map((path) => access(resolve(repositoryRoot, path))),
   );
 

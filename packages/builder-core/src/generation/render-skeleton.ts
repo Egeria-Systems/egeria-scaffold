@@ -257,6 +257,7 @@ function enrichApplicationManifest(
     devDependencies: {
       ...manifest.devDependencies,
       "@egeria-systems/standards": packageVersions.standards,
+      ...(app ? { vitest: "4.1.11" } : {}),
       ...(productionSite
         ? { "eslint-config-next": "16.3.3" }
         : {}),

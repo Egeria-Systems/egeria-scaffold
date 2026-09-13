@@ -494,6 +494,43 @@ test("probe evidence is deterministic, exact, RFC 6901 aware, and content-safe",
   );
 });
 
+test("standards recognizes retained and patched Vitest declarations without accepting other versions or managed drift", async () => {
+  const root = resolve(packageRoot, "../../fixtures/generated/app");
+  const reader = core.createFileSystemRepositoryReader(root);
+  const manifest = JSON.parse((await reader.readText("apps/web/package.json")).content);
+  const originalState = JSON.parse((await reader.readText(".egeria/state.json")).content);
+  const catalog = core.createCapabilityCatalog({ standards: "0.1.0", observability: "0.3.0" });
+  assert.equal(catalog.ok, true);
+
+  for (const version of ["4.1.10", "4.1.11", "4.1.9", "4.1.12", "5.0.0", "^4.1.11"]) {
+    const state = structuredClone(originalState);
+    const surface = state.managedSurfaces.find(({ identifier }) => identifier === "standards-vitest-package");
+    surface.fingerprint = core.fingerprintJsonValue(version);
+    const files = {
+      "apps/web/package.json": JSON.stringify({ ...manifest, devDependencies: { ...manifest.devDependencies, vitest: version } }),
+      ".egeria/state.json": core.serializeStateJson(state),
+    };
+    const inference = await core.inferRepository({
+      catalog: catalog.value,
+      reader: { readText: async (path) => Object.hasOwn(files, path) ? { kind: "file", content: files[path] } : reader.readText(path) },
+    });
+    const accepted = version === "4.1.10" || version === "4.1.11";
+    assert.equal(inference.capabilities.find(({ identifier }) => identifier === "standards").category,
+      accepted ? "confirmed" : "contradictory", version);
+    assert.equal(inference.surfaces.find(({ identifier }) => identifier === "standards-vitest-package").status, "confirmed");
+
+    if (accepted) {
+      surface.fingerprint = core.fingerprintJsonValue(version === "4.1.10" ? "4.1.11" : "4.1.10");
+      files[".egeria/state.json"] = core.serializeStateJson(state);
+      const drifted = await core.inferRepository({
+        catalog: catalog.value,
+        reader: { readText: async (path) => Object.hasOwn(files, path) ? { kind: "file", content: files[path] } : reader.readText(path) },
+      });
+      assert.equal(drifted.surfaces.find(({ identifier }) => identifier === "standards-vitest-package").status, "drifted", version);
+    }
+  }
+});
+
 test("probe failures distinguish missing, mismatch, and ambiguity", async () => {
   const invalidJson = createDescriptor("invalid-json", [
       { kind: "json-value", path: "invalid.json", pointer: "/enabled", expected: true },

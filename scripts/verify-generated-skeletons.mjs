@@ -22,6 +22,7 @@ import {
   pathIdentityMatches,
   readPathIdentity,
 } from "./lib/isolated-process.mjs";
+import { inspectAppEffectBuild, inspectEffectSourceBoundary } from "./verify-app-transition-visuals.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -114,6 +115,46 @@ const bookingCalendlyFiles = Object.freeze([
   "apps/web/src/integrations/booking-calendly/booking-settings.ts",
   "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
   "apps/web/tests/e2e/calendly-booking.spec.ts",
+].sort(codePointCompare));
+
+const siteRoutingFiles = Object.freeze([
+  "apps/web/app/about/page.tsx",
+  "apps/web/app/not-found.tsx",
+  "apps/web/app/robots.ts",
+  "apps/web/app/sitemap.ts",
+  "apps/web/app/work/error.tsx",
+  "apps/web/app/work/featured/page.tsx",
+  "apps/web/app/work/page.tsx",
+  "apps/web/content/en-CA/about.yaml",
+  "apps/web/content/en-CA/not-found.yaml",
+  "apps/web/content/en-CA/routing.yaml",
+  "apps/web/content/en-CA/work-featured.yaml",
+  "apps/web/src/routing/read-routing-content.ts",
+  "apps/web/src/routing/routing-content-schema.ts",
+  "apps/web/src/routing/site-page.tsx",
+  "apps/web/tests/component/site-page.test.tsx",
+  "apps/web/tests/e2e/site-routing.spec.ts",
+  "apps/web/tests/unit/routing-content.test.ts",
+].sort(codePointCompare));
+
+const appFoundationFiles = Object.freeze([
+  "apps/web/app/api/health/route.ts",
+  "apps/web/src/domain/build-information.ts",
+  "apps/web/src/application/build-information-reader.ts",
+  "apps/web/src/application/request-context.ts",
+  "apps/web/src/application/health.ts",
+  "apps/web/src/infrastructure/cloudflare/build-information-reader.ts",
+  "apps/web/src/infrastructure/memory/build-information-reader.ts",
+  "apps/web/src/composition/server-health.ts",
+  "apps/web/src/delivery/health-route.ts",
+  "apps/web/docs/application-boundaries.md",
+  "apps/web/tests/unit/request-context.test.ts",
+  "apps/web/tests/unit/build-information.test.ts",
+  "apps/web/tests/unit/health.test.ts",
+  "apps/web/tests/unit/cloudflare-build-information-reader.test.ts",
+  "apps/web/tests/unit/health-route.test.ts",
+  "apps/web/tests/integration/health-worker.test.ts",
+  "apps/web/vitest.cloudflare.config.ts",
 ].sort(codePointCompare));
 
 const multilingualFiles = Object.freeze([
@@ -374,23 +415,7 @@ export const generatedFixtureContracts = Object.freeze([
     relativeRoot: "fixtures/generated/site",
     expectedFiles: Object.freeze([
       ...portfolioFiles,
-      "apps/web/app/about/page.tsx",
-      "apps/web/app/not-found.tsx",
-      "apps/web/app/robots.ts",
-      "apps/web/app/sitemap.ts",
-      "apps/web/app/work/error.tsx",
-      "apps/web/app/work/featured/page.tsx",
-      "apps/web/app/work/page.tsx",
-      "apps/web/content/en-CA/about.yaml",
-      "apps/web/content/en-CA/not-found.yaml",
-      "apps/web/content/en-CA/routing.yaml",
-      "apps/web/content/en-CA/work-featured.yaml",
-      "apps/web/src/routing/read-routing-content.ts",
-      "apps/web/src/routing/routing-content-schema.ts",
-      "apps/web/src/routing/site-page.tsx",
-      "apps/web/tests/component/site-page.test.tsx",
-      "apps/web/tests/e2e/site-routing.spec.ts",
-      "apps/web/tests/unit/routing-content.test.ts",
+      ...siteRoutingFiles,
     ].sort(codePointCompare)),
     expectedCapabilities: Object.freeze([
       "standards",
@@ -428,23 +453,7 @@ export const generatedFixtureContracts = Object.freeze([
     relativeRoot: "fixtures/generated/site-multilingual",
     expectedFiles: Object.freeze([
       ...portfolioFiles,
-      "apps/web/app/about/page.tsx",
-      "apps/web/app/not-found.tsx",
-      "apps/web/app/robots.ts",
-      "apps/web/app/sitemap.ts",
-      "apps/web/app/work/error.tsx",
-      "apps/web/app/work/featured/page.tsx",
-      "apps/web/app/work/page.tsx",
-      "apps/web/content/en-CA/about.yaml",
-      "apps/web/content/en-CA/not-found.yaml",
-      "apps/web/content/en-CA/routing.yaml",
-      "apps/web/content/en-CA/work-featured.yaml",
-      "apps/web/src/routing/read-routing-content.ts",
-      "apps/web/src/routing/routing-content-schema.ts",
-      "apps/web/src/routing/site-page.tsx",
-      "apps/web/tests/component/site-page.test.tsx",
-      "apps/web/tests/e2e/site-routing.spec.ts",
-      "apps/web/tests/unit/routing-content.test.ts",
+      ...siteRoutingFiles,
       ...multilingualFiles,
     ].sort(codePointCompare)),
     expectedCapabilities: Object.freeze([
@@ -485,23 +494,7 @@ export const generatedFixtureContracts = Object.freeze([
     relativeRoot: "fixtures/generated/site-multilingual-analytics",
     expectedFiles: Object.freeze([
       ...portfolioFiles,
-      "apps/web/app/about/page.tsx",
-      "apps/web/app/not-found.tsx",
-      "apps/web/app/robots.ts",
-      "apps/web/app/sitemap.ts",
-      "apps/web/app/work/error.tsx",
-      "apps/web/app/work/featured/page.tsx",
-      "apps/web/app/work/page.tsx",
-      "apps/web/content/en-CA/about.yaml",
-      "apps/web/content/en-CA/not-found.yaml",
-      "apps/web/content/en-CA/routing.yaml",
-      "apps/web/content/en-CA/work-featured.yaml",
-      "apps/web/src/routing/read-routing-content.ts",
-      "apps/web/src/routing/routing-content-schema.ts",
-      "apps/web/src/routing/site-page.tsx",
-      "apps/web/tests/component/site-page.test.tsx",
-      "apps/web/tests/e2e/site-routing.spec.ts",
-      "apps/web/tests/unit/routing-content.test.ts",
+      ...siteRoutingFiles,
       ...multilingualFiles,
       ...analyticsFiles,
     ].sort(codePointCompare)),
@@ -526,6 +519,78 @@ export const generatedFixtureContracts = Object.freeze([
     expectedAnalyticsVersion: "0.1.0",
     expectedMultilingualVersion: "0.1.0",
     expectedSurfaces: 154,
+    visualRegression: false,
+  }),
+  Object.freeze({
+    identifier: "app",
+    profile: "app",
+    projectName: "acme-app",
+    displayName: "Acme App",
+    createArguments: createArguments({
+      profile: "app", projectName: "acme-app", displayName: "Acme App",
+    }),
+    expectedCapabilitySettings: noCapabilitySettings,
+    relativeRoot: "fixtures/generated/app",
+    expectedFiles: Object.freeze([
+      ...portfolioFiles, ...siteRoutingFiles, ...appFoundationFiles,
+    ].sort(codePointCompare)),
+    expectedCapabilities: Object.freeze([
+      "standards", "deployment-cloudflare", "content-files", "section-composition",
+      "observability", "app-foundation", "site-routing",
+    ]),
+    expectedRecipeVersion: "0.1.0",
+    expectedStandardsVersion: "0.4.0",
+    expectedObservabilityVersion: "0.3.0",
+    expectedContentFilesVersion: "0.4.0",
+    expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.3.0",
+    expectedAppFoundationVersion: "0.1.0",
+    expectedSiteRoutingVersion: "0.4.0",
+    expectedBookingCalendlyVersion: null,
+    expectedAnalyticsVersion: null,
+    expectedMultilingualVersion: null,
+    expectedSurfaces: 142,
+    visualRegression: true,
+  }),
+  Object.freeze({
+    identifier: "app-all-optional-integrations",
+    profile: "app",
+    projectName: "acme-app-all-optional-integrations",
+    displayName: "Acme App All Optional Integrations",
+    createArguments: createArguments({
+      profile: "app",
+      projectName: "acme-app-all-optional-integrations",
+      displayName: "Acme App All Optional Integrations",
+      analytics: siteAnalyticsSettings.analytics,
+      bookingCalendly: portfolioCalendlySettings["booking-calendly"],
+      multilingual: true,
+    }),
+    expectedCapabilitySettings: Object.freeze({
+      ...siteAnalyticsSettings, ...portfolioCalendlySettings,
+    }),
+    relativeRoot: "fixtures/generated/app-all-optional-integrations",
+    expectedFiles: Object.freeze([
+      ...portfolioFiles.filter((path) => !bookingCalendlyFiles.includes(path)),
+      ...siteRoutingFiles, ...appFoundationFiles, ...bookingCalendlyFiles,
+      ...multilingualFiles, ...analyticsFiles,
+    ].sort(codePointCompare)),
+    expectedCapabilities: Object.freeze([
+      "standards", "deployment-cloudflare", "content-files", "section-composition",
+      "observability", "app-foundation", "site-routing", "analytics",
+      "booking-calendly", "multilingual",
+    ]),
+    expectedRecipeVersion: "0.1.0",
+    expectedStandardsVersion: "0.4.0",
+    expectedObservabilityVersion: "0.3.0",
+    expectedContentFilesVersion: "0.4.0",
+    expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.3.0",
+    expectedAppFoundationVersion: "0.1.0",
+    expectedSiteRoutingVersion: "0.4.0",
+    expectedBookingCalendlyVersion: "0.1.0",
+    expectedAnalyticsVersion: "0.1.0",
+    expectedMultilingualVersion: "0.1.0",
+    expectedSurfaces: 178,
     visualRegression: false,
   }),
 ]);
@@ -670,11 +735,12 @@ function expectedRootManifest(projectName) {
   };
 }
 
-function expectedWebManifest(projectName, nextVersion) {
+function expectedWebManifest(projectName, nextVersion, appFoundation) {
   return {
     dependencies: {
       "@egeria-systems/observability": "0.3.0",
       "@opennextjs/cloudflare": "1.20.2",
+      ...(appFoundation ? { effect: "4.0.0-rc.112" } : {}),
       next: nextVersion,
       react: "19.2.8",
       "react-dom": "19.2.8",
@@ -701,7 +767,7 @@ function expectedWebManifest(projectName, nextVersion) {
       tailwindcss: "4.3.3",
       typescript: "6.0.3",
       "typescript-eslint": "8.66.0",
-      vitest: "4.1.10",
+      vitest: appFoundation ? "4.1.11" : "4.1.10",
       wrangler: "4.118.0",
     },
     name: `${projectName}-web`,
@@ -720,6 +786,9 @@ function expectedWebManifest(projectName, nextVersion) {
       test: "vitest run",
       "test:component": "vitest run --project component",
       "test:component:watch": "vitest --project component",
+      ...(appFoundation ? {
+        "test:integration:cloudflare": "vitest run --config vitest.cloudflare.config.ts",
+      } : {}),
       "test:e2e:deployed":
         "playwright test --config playwright.deployed.config.ts",
       "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
@@ -869,7 +938,7 @@ async function snapshotTree(root) {
   }
 
   await visit(root, "");
-  return snapshot;
+  return snapshot.sort((left, right) => codePointCompare(left.path, right.path));
 }
 
 function hasLocalSource(value) {
@@ -952,7 +1021,8 @@ async function inspectFixture(root, contract) {
       webManifest,
       expectedWebManifest(
         contract.projectName,
-        contract.profile === "site" ? "16.3.3" : "16.3.0",
+        contract.profile === "portfolio" ? "16.3.0" : "16.3.3",
+        contract.profile === "app",
       ),
     )
   ) {
@@ -976,7 +1046,10 @@ async function inspectFixture(root, contract) {
   } catch {
     fail("FIXTURE_WORKSPACE_POLICY_INVALID");
   }
-  if (workspacePolicy !== expectedWorkspacePolicy) {
+  const expectedPolicy = contract.profile === "app"
+    ? `${expectedWorkspacePolicy}  msgpackr-extract: false\n`
+    : expectedWorkspacePolicy;
+  if (workspacePolicy !== expectedPolicy) {
     fail("FIXTURE_WORKSPACE_POLICY_INVALID");
   }
 
@@ -1010,7 +1083,26 @@ async function inspectFixture(root, contract) {
     }
   }
 
+  if (contract.profile === "app") {
+    if (fingerprint(lockfile) !== "6be34179936a9a700b51c0dc0d8c7b6c3472c7caf585bcb8caeb2005a2abd546") {
+      fail("FIXTURE_LOCKFILE_INVALID");
+    }
+  } else if (/^\s+(?:effect:|['"]?effect@)/mu.test(lockfile)) {
+    fail("FIXTURE_EFFECT_BOUNDARY_INVALID");
+  }
+
+  try {
+    inspectEffectSourceBoundary(await readFixtureSources(root, snapshot), contract.profile === "app");
+  } catch {
+    fail("FIXTURE_EFFECT_BOUNDARY_INVALID");
+  }
   return snapshot;
+}
+
+async function readFixtureSources(root, snapshot) {
+  return Promise.all(snapshot.filter(({ path }) => /\.[cm]?[jt]sx?$/u.test(path)).map(async ({ path }) => ({
+    path, content: await readFile(join(root, path)),
+  })));
 }
 
 function contractForIdentifier(identifier) {
@@ -1185,6 +1277,8 @@ async function verifySourcesWithAdapters(
   }
 
   let pendingError;
+  const workerIntegration = { executed: [], skipped: [] };
+  const appBuildEvidence = [];
   try {
     for (const source of sourcesBefore) {
       const validationRoot = join(
@@ -1210,6 +1304,10 @@ async function verifySourcesWithAdapters(
         fail("VERIFICATION_SETUP_FAILED");
       }
       const environment = createChildEnvironment(support);
+      const webManifest = await readJson(
+        join(validationRoot, "apps/web/package.json"), "FIXTURE_MANIFEST_INVALID",
+      );
+      const hasWorkerIntegration = Object.hasOwn(webManifest.scripts, "test:integration:cloudflare");
       const commandInput = (arguments_, timeout = commandTimeoutMilliseconds) => ({
         executable: "pnpm",
         arguments: arguments_,
@@ -1279,6 +1377,10 @@ async function verifySourcesWithAdapters(
           failureCode: "OPENNEXT_BUILD_FAILED",
         },
         {
+          arguments: ["--dir", "apps/web", "run", "--if-present", "test:integration:cloudflare"],
+          failureCode: "WORKER_INTEGRATION_FAILED",
+        },
+        {
           arguments: ["--dir", "apps/web", "run", "browser:install"],
           failureCode: "BROWSER_INSTALL_FAILED",
         },
@@ -1307,6 +1409,19 @@ async function verifySourcesWithAdapters(
             commandInput(command.arguments),
             command.failureCode,
           );
+          if (command.failureCode === "WORKER_INTEGRATION_FAILED") {
+            workerIntegration[hasWorkerIntegration ? "executed" : "skipped"].push(source.contract.identifier);
+            if (hasWorkerIntegration) {
+              try {
+                appBuildEvidence.push({
+                  fixture: source.contract.identifier,
+                  ...await inspectAppEffectBuild(validationRoot, await readFixtureSources(source.root, source.snapshot)),
+                });
+              } catch {
+                fail("EFFECT_BUILD_BOUNDARY_FAILED");
+              }
+            }
+          }
         } catch (error) {
           if (
             error instanceof GeneratedFixtureVerificationError &&
@@ -1376,6 +1491,8 @@ async function verifySourcesWithAdapters(
   return {
     ok: true,
     fixtures: sourcesBefore.map(({ contract }) => contract.identifier),
+    workerIntegration,
+    appBuildEvidence,
     profiles: [
       ...new Set(sourcesBefore.map(({ contract }) => contract.profile)),
     ],

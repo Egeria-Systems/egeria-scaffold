@@ -362,13 +362,17 @@ async function inspectBrowser(project, environment, command) {
   return { executable, version: version.stdout.trim(), packageSha256: digest(await filesystem.readFile(playwrightPackage)), browsersSha256: digest(await filesystem.readFile(join(dirname(playwrightPackage), "browsers.json"))) };
 }
 
-async function inspectBuild(project, sourceFiles) {
+export function inspectEffectSourceBoundary(sourceFiles, appFoundation) {
   for (const { path, content } of sourceFiles) {
     if (!/\.[cm]?[jt]sx?$/.test(path) || path.includes("/tests/")) continue;
     const source = Buffer.from(content).toString("utf8");
     if (/\b(?:from\s*|import\s*(?:\(\s*)?)["']effect(?:\/[^"']*)?["']/.test(source) &&
-        (!/^apps\/web\/src\/(application|infrastructure|composition|delivery)\//.test(path) || /["']use client["']/.test(source))) fail("VISUAL_EFFECT_BOUNDARY_INVALID");
+        (!appFoundation || !/^apps\/web\/src\/(application|infrastructure|composition|delivery)\//.test(path) || /["']use client["']/.test(source))) fail("VISUAL_EFFECT_BOUNDARY_INVALID");
   }
+}
+
+export async function inspectAppEffectBuild(project, sourceFiles) {
+  inspectEffectSourceBoundary(sourceFiles, true);
   const require = createRequire(join(project, "apps/web/package.json"));
   const effectPackagePath = require.resolve("effect/package.json");
   const effectPackage = JSON.parse(await filesystem.readFile(effectPackagePath, "utf8"));
@@ -492,7 +496,7 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
     for (const [name, arguments_] of commands) {
       await checked(name, arguments_);
       if (name === "opennext-build") {
-        build = await (injected.inspectBuild ?? inspectBuild)(project, prepared.files);
+        build = await (injected.inspectBuild ?? inspectAppEffectBuild)(project, prepared.files);
         checks.push({ name: "effect-source-and-bundle-boundary", exitCode: 0 });
       }
     }
