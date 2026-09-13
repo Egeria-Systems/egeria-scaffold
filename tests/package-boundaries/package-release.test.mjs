@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { execFileSync, spawnSync } from "node:child_process";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -761,4 +763,75 @@ test("package release workflow mutations cannot expose authentication, drop prov
   for (const mutation of mutations) {
     assert.notDeepEqual(releaseWorkflowProblems(mutation), []);
   }
+});
+
+test("dependency-only release intent follows the Git diff without requiring a Changeset", async (t) => {
+  const temporaryRoot = await mkdtemp(resolve(tmpdir(), "release-intent-"));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const git = (...arguments_) => execFileSync("git", arguments_, {
+    cwd: temporaryRoot,
+    encoding: "utf8",
+    env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1" },
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+  const write = async (path, value) => {
+    await mkdir(dirname(resolve(temporaryRoot, path)), { recursive: true });
+    await writeFile(resolve(temporaryRoot, path), value);
+  };
+  const manifestPath = "packages/standards/package.json";
+  const manifest = {
+    name: "@egeria-systems/standards",
+    version: "0.2.0",
+    private: false,
+    dependencies: { "typescript-eslint": "8.68.0" },
+    devDependencies: { "eslint-10": "npm:eslint@10.8.0" },
+    peerDependencies: { eslint: "^9.0.0 || ^10.0.0" },
+    scripts: { test: "node --test" },
+  };
+  await write(manifestPath, JSON.stringify(manifest));
+  await write("pnpm-lock.yaml", "lockfileVersion: '9.0'\n");
+  await write(".changeset/existing.md", '---\n"@egeria-systems/standards": patch\n---\nExisting release intent.\n');
+  await write("packages/standards/eslint/index.mjs", "export default {};\n");
+  await write("fixtures/generated/portfolio/apps/web/package.json", JSON.stringify(manifest));
+  await mkdir(resolve(temporaryRoot, "scripts"));
+  await cp(resolve(repositoryRoot, "scripts/check-package-release.mjs"), resolve(temporaryRoot, "scripts/check-package-release.mjs"));
+  git("init", "--quiet");
+  git("add", ".");
+  git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "Initial fixture");
+  const baseRevision = git("rev-parse", "HEAD");
+  const check = (base = baseRevision) => spawnSync(process.execPath, [
+    "scripts/check-package-release.mjs", "dependency-update", base,
+  ], { cwd: temporaryRoot, encoding: "utf8" });
+
+  const cases = [
+    ["minor update", manifestPath, { ...manifest, dependencies: { "typescript-eslint": "8.70.0" } }, true],
+    ["future patch", manifestPath, { ...manifest, dependencies: { "typescript-eslint": "8.99.1" } }, true],
+    ["pinned npm alias", manifestPath, { ...manifest, devDependencies: { "eslint-10": "npm:eslint@10.9.1" } }, true],
+    ["lock-only update", "pnpm-lock.yaml", "lockfileVersion: '9.0'\npackages: {}\n", true],
+    ["source edit", "packages/standards/eslint/index.mjs", "export default { rules: {} };\n", false],
+    ["script edit", manifestPath, { ...manifest, scripts: { test: "true" } }, false],
+    ["package version", manifestPath, { ...manifest, version: "0.3.0" }, false],
+    ["visibility change", manifestPath, { ...manifest, private: true }, false],
+    ["dependency addition", manifestPath, { ...manifest, dependencies: { ...manifest.dependencies, other: "1.0.0" } }, false],
+    ["dependency removal", manifestPath, { ...manifest, dependencies: {} }, false],
+    ["peer contract", manifestPath, { ...manifest, peerDependencies: { eslint: "^10.0.0" } }, false],
+    ["unpinned version", manifestPath, { ...manifest, dependencies: { "typescript-eslint": "*" } }, false],
+    ["alias substitution", manifestPath, { ...manifest, devDependencies: { "eslint-10": "npm:other@10.9.1" } }, false],
+    ["generated fixture", "fixtures/generated/portfolio/apps/web/package.json", { ...manifest, version: "0.3.0" }, false],
+    ["invalid manifest", manifestPath, "{", false],
+    ["deleted manifest", manifestPath, null, false],
+  ];
+  for (const [name, path, value, accepted] of cases) {
+    await t.test(name, async () => {
+      git("read-tree", "--reset", "-u", baseRevision);
+      if (value === null) await rm(resolve(temporaryRoot, path));
+      else await write(path, typeof value === "string" ? value : JSON.stringify(value));
+      git("add", ".");
+      git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", name);
+      const result = check();
+      assert.equal(result.status === 0, accepted, result.stderr);
+    });
+  }
+  assert.notEqual(check("missing-base").status, 0);
+  assert.notEqual(check("--help").status, 0);
 });
