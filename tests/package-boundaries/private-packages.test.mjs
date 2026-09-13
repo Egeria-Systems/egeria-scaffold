@@ -6,6 +6,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
+import { exactSemanticVersionPattern } from "../helpers/semantic-version.mjs";
+
 const execFileAsync = promisify(execFile);
 
 const repositoryRoot = resolve(
@@ -109,7 +111,22 @@ test("the private package manifests expose only their approved runtime boundarie
   assert.equal(await pathExists("apps/cli/package.json"), true);
   assert.equal(await pathExists("packages/builder-core/package.json"), true);
 
-  assert.deepEqual(await readJson("apps/cli/package.json"), {
+  const cliManifest = await readJson("apps/cli/package.json");
+  const builderManifest = await readJson("packages/builder-core/package.json");
+  for (const [manifest, sections] of [
+    [cliManifest, { devDependencies: ["@types/node", "typescript"] }],
+    [builderManifest, { dependencies: ["typescript", "yaml", "zod"], devDependencies: ["@types/node"] }],
+  ]) {
+    for (const [section, names] of Object.entries(sections)) {
+      for (const name of names) {
+        assert.equal(typeof manifest[section]?.[name], "string", name);
+        assert.match(manifest[section][name], exactSemanticVersionPattern, name);
+        manifest[section][name] = "<pinned-version>";
+      }
+    }
+  }
+
+  assert.deepEqual(cliManifest, {
     name: "@egeria-systems/cli",
     version: "0.0.0",
     private: true,
@@ -129,11 +146,11 @@ test("the private package manifests expose only their approved runtime boundarie
     },
     devDependencies: {
       "@egeria-systems/standards": "workspace:*",
-      "@types/node": "22.20.1",
-      typescript: "6.0.3",
+      "@types/node": "<pinned-version>",
+      typescript: "<pinned-version>",
     },
   });
-  assert.deepEqual(await readJson("packages/builder-core/package.json"), {
+  assert.deepEqual(builderManifest, {
     name: "@egeria-systems/builder-core",
     version: "0.0.0",
     private: true,
@@ -159,13 +176,13 @@ test("the private package manifests expose only their approved runtime boundarie
         "pnpm run build && pnpm run schema:check && pnpm run test && pnpm run typecheck && pnpm run lint",
     },
     dependencies: {
-      typescript: "6.0.3",
-      yaml: "2.9.0",
-      zod: "4.5.4",
+      typescript: "<pinned-version>",
+      yaml: "<pinned-version>",
+      zod: "<pinned-version>",
     },
     devDependencies: {
       "@egeria-systems/standards": "workspace:*",
-      "@types/node": "22.20.1",
+      "@types/node": "<pinned-version>",
     },
   });
 });
