@@ -238,8 +238,8 @@ function enrichApplicationManifest(
     );
   }
 
-  const app = profile === "app" && recipeVersion === "0.1.0";
-  const productionSite = app || (profile === "site" && recipeVersion === "0.11.0");
+  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0");
+  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0"));
   const enrichedManifest = {
     ...manifest,
     scripts: {
@@ -257,7 +257,7 @@ function enrichApplicationManifest(
     devDependencies: {
       ...manifest.devDependencies,
       "@egeria-systems/standards": packageVersions.standards,
-      ...(app ? { vitest: "4.1.11" } : {}),
+      ...(app && recipeVersion === "0.1.0" ? { vitest: "4.1.11" } : {}),
       ...(productionSite
         ? { "eslint-config-next": "16.3.3" }
         : {}),

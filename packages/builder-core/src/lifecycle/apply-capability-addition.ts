@@ -1,7 +1,7 @@
 import { isAbsolute, resolve } from "node:path";
 
 import {
-  createVerifiedCapabilityCatalog,
+  createVerifiedProjectSnapshot,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
@@ -458,6 +458,10 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
+  const snapshot = createVerifiedProjectSnapshot(controls.project.value, controls.state.value);
+  if (!snapshot.ok) {
+    return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+  }
   const desired = await renderSkeleton({
     profile: controls.project.value.originProfile,
     projectName: controls.project.value.project.name,
@@ -480,7 +484,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       ? { multilingual: true as const }
       : {}),
     packageVersions: verifiedCapabilityPackageVersions,
-  });
+  }, snapshot.value.renderingContext);
   if (!desired.ok) {
     return failure(
       "PROJECT_INSPECTION_INVALID",
@@ -577,15 +581,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
-  const catalog = createVerifiedCapabilityCatalog();
-  if (!catalog.ok) {
-    return failure(
-      "CAPABILITY_REINFERENCE_FAILED",
-      "re-infer",
-      "inspect-worktree",
-    );
-  }
-  const pendingInference = await inferRepository({ reader, catalog: catalog.value });
+  const pendingInference = await inferRepository({ reader, catalog: snapshot.value.catalog });
   if (
     !requirePendingInference(
       pendingInference,
@@ -720,7 +716,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   }
   actualFiles.set(".egeria/state.json", persistedState.content);
 
-  const finalInference = await inferRepository({ reader, catalog: catalog.value });
+  const finalInference = await inferRepository({ reader, catalog: snapshot.value.catalog });
   if (
     !requireFinalInference(
       finalInference,

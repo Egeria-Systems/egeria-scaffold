@@ -1,3 +1,4 @@
+import { createRetainedGenerationEntries, retainedRenderingContext } from "./retained-generation.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, readlink, rename, rm, symlink, writeFile } from "node:fs/promises";
@@ -496,10 +497,16 @@ test("probe evidence is deterministic, exact, RFC 6901 aware, and content-safe",
 
 test("standards recognizes retained and patched Vitest declarations without accepting other versions or managed drift", async () => {
   const root = resolve(packageRoot, "../../fixtures/generated/app");
-  const reader = core.createFileSystemRepositoryReader(root);
+  const retained = await createRetainedGenerationEntries(root);
+  const reader = { async readText(path) {
+    const content = retained.get(path);
+    if (content === undefined) return { kind: "missing" };
+    try { return { kind: "file", content: new TextDecoder("utf-8", { fatal: true }).decode(content) }; }
+    catch { return { kind: "error", code: "FILE_ENCODING_INVALID" }; }
+  } };
   const manifest = JSON.parse((await reader.readText("apps/web/package.json")).content);
   const originalState = JSON.parse((await reader.readText(".egeria/state.json")).content);
-  const catalog = core.createCapabilityCatalog({ standards: "0.1.0", observability: "0.3.0" });
+  const catalog = core.createCapabilityCatalogSnapshot({ standards: "0.1.0", observability: "0.3.0" }, retainedRenderingContext.catalogSnapshot);
   assert.equal(catalog.ok, true);
 
   for (const version of ["4.1.10", "4.1.11", "4.1.9", "4.1.12", "5.0.0", "^4.1.11"]) {
@@ -887,4 +894,20 @@ test("application-owned and ejected surfaces are reported without reading their 
     { identifier: "application-surface", path: "private/application.txt", status: "application-owned" },
     { identifier: "ejected-surface", path: "private/ejected.txt", status: "ejected" },
   ]);
+});
+
+
+test("Vitest five standards refuse retained declarations and ranges even with matching installed fingerprints", async () => {
+  const reader = core.createFileSystemRepositoryReader(resolve(packageRoot, "../../fixtures/generated/app"));
+  const manifest = JSON.parse((await reader.readText("apps/web/package.json")).content);
+  const originalState = JSON.parse((await reader.readText(".egeria/state.json")).content);
+  const catalog = core.createVerifiedCapabilityCatalog();
+  assert.equal(catalog.ok, true);
+  for (const version of ["5.0.0", "4.1.10", "4.1.11", "^5.0.0", "5.0.1"]) {
+    const state = structuredClone(originalState);
+    state.managedSurfaces.find(({ identifier }) => identifier === "standards-vitest-package").fingerprint = core.fingerprintJsonValue(version);
+    const files = { "apps/web/package.json": JSON.stringify({ ...manifest, devDependencies: { ...manifest.devDependencies, vitest: version } }), ".egeria/state.json": core.serializeStateJson(state) };
+    const inference = await core.inferRepository({ catalog: catalog.value, reader: { readText: async path => Object.hasOwn(files, path) ? { kind: "file", content: files[path] } : reader.readText(path) } });
+    assert.equal(inference.capabilities.find(({ identifier }) => identifier === "standards").category, version === "5.0.0" ? "confirmed" : "contradictory", version);
+  }
 });

@@ -5,7 +5,7 @@ import {
   applyProfileTransition as applyProfileTransitionDefault,
   createFileSystemRepositoryReader,
   createPnpmGeneratedProjectVerifier,
-  createVerifiedCapabilityCatalog,
+  readVerifiedProjectSnapshot,
   diffProject,
   doctorRepository,
   generateProject,
@@ -17,7 +17,6 @@ import {
   planCapabilityRemoval,
   planCapabilityUpgrade,
   planProfileTransition as planProfileTransitionDefault,
-  profileRecipes,
   type CapabilityAdditionPlan,
   type CapabilityAdditionExecutionResult,
   type CapabilityRemovalPlan,
@@ -261,34 +260,36 @@ async function runCreate(
 async function runReadOnly(
   command: Extract<CliCommand, Readonly<{ kind: "infer" | "doctor" | "diff" }>>,
   output: CliOutput,
-  catalog: ReturnType<typeof createVerifiedCapabilityCatalog> & {
-    ok: true;
-  },
   dependencies: CliRunnerDependencies,
 ): Promise<0 | 1> {
   try {
     const reader = (dependencies.createReader ??
       createCliRepositoryReader)(resolve(command.directory));
+    const snapshot = await readVerifiedProjectSnapshot(reader);
+    if (!snapshot.ok) {
+      writeJson(output.writeError, { ok: false, code: "VERIFIED_CATALOG_INVALID" });
+      return 1;
+    }
     if (command.kind === "infer") {
-      const result = await inferRepository({ reader, catalog: catalog.value });
+      const result = await inferRepository({ reader: snapshot.value.reader, catalog: snapshot.value.catalog });
       writeJson(output.write, { ok: true, command: "infer", result });
       return 0;
     }
 
     if (command.kind === "doctor") {
       const result = await doctorRepository({
-        reader,
-        catalog: catalog.value,
-        profiles: profileRecipes,
+        reader: snapshot.value.reader,
+        catalog: snapshot.value.catalog,
+        profiles: snapshot.value.profiles,
       });
       writeJson(output.write, { ok: true, command: "doctor", result });
       return result.healthy ? 0 : 1;
     }
 
     const result = await diffProject({
-      reader,
-      catalog: catalog.value,
-      profiles: profileRecipes,
+      reader: snapshot.value.reader,
+      catalog: snapshot.value.catalog,
+      profiles: snapshot.value.profiles,
     });
     writeJson(output.write, { ok: true, command: "diff", result });
     return result.equal ? 0 : 1;
@@ -973,16 +974,7 @@ export function createCliRunner(
       return runApplyProfileTransition(parsed.value, output, dependencies);
     }
 
-    const catalog = createVerifiedCapabilityCatalog();
-    if (!catalog.ok) {
-      writeJson(output.writeError, {
-        ok: false,
-        code: "VERIFIED_CATALOG_INVALID",
-      });
-      return 1;
-    }
-
-    return runReadOnly(parsed.value, output, catalog, dependencies);
+    return runReadOnly(parsed.value, output, dependencies);
   };
 }
 

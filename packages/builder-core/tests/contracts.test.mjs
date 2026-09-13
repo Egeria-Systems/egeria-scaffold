@@ -234,6 +234,7 @@ const readableRecipeVersions = [
   "0.9.0",
   "0.10.0",
   "0.11.0",
+  "0.12.0",
 ];
 
 const validState = {
@@ -555,7 +556,7 @@ test("project configuration is strict and materializes safe capability identifie
     ...validProject,
     secret: "must-not-exist",
   });
-  for (const recipeVersion of ["0.12.0", "0.10", "latest"]) {
+  for (const recipeVersion of ["0.13.0", "0.10", "latest"]) {
     assertRejects(contracts.projectConfigurationSchema, {
       ...validProject,
       recipeVersion,
@@ -659,7 +660,7 @@ test("app generation verification requires the exact Worker receipt and preserve
       });
     }
   }
-  for (const recipeVersion of readableRecipeVersions.filter((version) => version !== "0.1.0")) {
+  for (const recipeVersion of readableRecipeVersions.filter((version) => version !== "0.1.0" && version !== "0.2.0")) {
     assertRejects(contracts.installedStateSchema, {
       ...appState,
       origin: { profile: "app", recipeVersion },
@@ -1508,4 +1509,14 @@ test("the schema generator checks artifacts without rewriting them", async () =>
       "--unsupported",
     ]),
   );
+});
+
+
+test("Vitest five app receipts require Worker integration for generation and each supported lifecycle", () => {
+  for (const recipeVersion of ["0.1.0", "0.2.0"]) {
+    for (const [kind, checks] of [["generation", [...currentVerificationChecks.slice(0, -1), "worker-integration", "post-state-inference"]], ["capability-addition", contracts.appCapabilityAdditionPersistedVerificationChecks], ["capability-removal", contracts.appCapabilityRemovalPersistedVerificationChecks], ["profile-transition", contracts.appProfileTransitionPersistedVerificationChecks]]) {
+      assertAccepts(contracts.installedStateSchema, { ...validState, origin: { profile: "app", recipeVersion }, lastSuccessfulVerification: { kind, checks } });
+      assertRejects(contracts.installedStateSchema, { ...validState, origin: { profile: "app", recipeVersion }, lastSuccessfulVerification: { kind, checks: checks.filter(check => check !== "worker-integration") } });
+    }
+  }
 });

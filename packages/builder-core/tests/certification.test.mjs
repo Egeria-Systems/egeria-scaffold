@@ -30,7 +30,7 @@ const descriptorDigests = Object.freeze({
   "site-routing":
     "sha256:a8bd53e9b32546266efd3dde9dc96fc3914cb06e9e811b8bf96ebd42822e2dac",
   standards:
-    "sha256:640d95879a1e40e8fe26cf350453e01ead9fd031f30d53c4dd64552046449607",
+    "sha256:56a667594f2cbf43beed6e23471e4d8bf28fcbbf54d6f13530191153c84d4de9",
 });
 const descriptorVersions = Object.freeze({
   analytics: "0.1.0",
@@ -42,7 +42,7 @@ const descriptorVersions = Object.freeze({
   observability: "0.3.0",
   "section-composition": "0.3.0",
   "site-routing": "0.4.0",
-  standards: "0.4.0",
+  standards: "0.5.0",
 });
 const expectedIdentifiers = Object.freeze([
   "analytics",
@@ -81,7 +81,7 @@ function createRecord(identifier) {
     },
     requiredEvidence: requiredEvidence[identifier],
     status: "pending",
-    taskPlan: coordinatedPlanPath,
+    taskPlan: identifier === "standards" ? "docs/superpowers/plans/2026-09-12-vitest-five-migration.md" : coordinatedPlanPath,
     evidence: [],
   };
 }
@@ -177,6 +177,12 @@ test("certification subjects bind the descriptor and required evidence", () => {
     );
   }
 
+  const retainedCatalog = assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, core.vitestFourCapabilityCatalogSnapshot));
+  assert.deepEqual(core.createCertificationSubject(retainedCatalog.find(({ identifier }) => identifier === "standards"), requiredEvidence.standards), {
+    descriptorVersion: "0.4.0",
+    behaviorContractDigest: "sha256:640d95879a1e40e8fe26cf350453e01ead9fd031f30d53c4dd64552046449607",
+  });
+
   const bookingDescriptor = descriptorsByIdentifier.get("booking-calendly");
   assert.notEqual(bookingDescriptor, undefined);
   assert.notEqual(
@@ -191,9 +197,9 @@ test("coordinated pending certification covers every current app foundation subj
   assert.deepEqual(Object.keys(requiredEvidence), expectedIdentifiers);
   assert.deepEqual(committedRegistry, registry);
 
-  for (const record of Object.values(committedRegistry.records)) {
+  for (const [identifier, record] of Object.entries(committedRegistry.records)) {
     assert.equal(record.status, "pending");
-    assert.equal(record.taskPlan, coordinatedPlanPath);
+    assert.equal(record.taskPlan, identifier === "standards" ? "docs/superpowers/plans/2026-09-12-vitest-five-migration.md" : coordinatedPlanPath);
     assert.deepEqual(record.evidence, []);
   }
 });
@@ -254,6 +260,7 @@ test("repository artifacts bind evidence to its plan, subject, revision, and rev
   booking.evidence = evidenceFor(booking, ["fresh-scaffold"]);
   const artifacts = {
     [coordinatedPlanPath]: "# approved plan",
+    [registry.records.standards.taskPlan]: "# approved standards migration plan",
     [evidencePath]: createEvidenceDocument(),
   };
 

@@ -1,3 +1,4 @@
+import { createRetainedGenerationEntries } from "./retained-generation.mjs";
 import assert from "node:assert/strict";
 import {
   mkdir,
@@ -99,7 +100,7 @@ async function loadEntries(directory) {
 }
 
 async function currentEntries(profile) {
-  return loadEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
+  return createRetainedGenerationEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
 }
 
 async function acceptedSiteEntries() {
@@ -696,6 +697,26 @@ test("standards capability upgrade transforms, verifies, persists state last, an
       checks: core.capabilityUpgradePersistedVerificationChecks,
     });
     assert.doesNotMatch(JSON.stringify(execution.result), /refs\/heads|displayName/u);
+  }
+});
+
+test("retained upgrades ignore changed generation recipes", async () => {
+  for (const capability of ["standards", "site-routing"]) {
+    const entries = capability === "standards" ? await historicalEntries("portfolio") : await acceptedSiteEntries();
+    const repository = createRepository(entries);
+    const recipes = core.profileRecipes.splice(0);
+    try {
+      const execution = await runApply(repository, { capability });
+      assert.equal(execution.result.ok, true, JSON.stringify(execution.result));
+      const state = core.parseStateJson(decode(repository.files.get(".egeria/state.json")));
+      assert.equal(state.ok, true);
+      assert.deepEqual(state.value.origin, capability === "standards"
+        ? { profile: "portfolio", recipeVersion: "0.9.0" }
+        : { profile: "site", recipeVersion: "0.11.0" });
+      assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === capability).version, "0.4.0");
+    } finally {
+      core.profileRecipes.push(...recipes);
+    }
   }
 });
 

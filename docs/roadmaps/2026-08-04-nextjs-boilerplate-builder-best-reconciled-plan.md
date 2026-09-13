@@ -15,7 +15,7 @@ The following decisions supersede conflicting wording in earlier plans:
 1. Generated client repositories use a lightweight pnpm workspace from the beginning.
 2. Profiles are versioned materialized recipes. They resolve to explicit installed capabilities and do not provide live inheritance afterward.
 3. `app-foundation` is an internal backend-ready capability with no database, queue, authentication, payment, or invented business CRUD.
-4. `app@0.1.0` is a public profile whose default recipe materializes exact `app-foundation@0.1.0` plus `site-routing@0.4.0`, retaining the complete production-site experience. During scaffolding or later lifecycle changes, the user may independently select optional website and stateful backend capabilities.
+4. `app@0.2.0` is a public profile whose default recipe materializes exact `app-foundation@0.1.0` plus `site-routing@0.4.0`, retaining the complete production-site experience. During scaffolding or later lifecycle changes, the user may independently select optional website and stateful backend capabilities.
 5. The following are independent capabilities rather than automatic parts of `app`:
    - `application-persistence`;
    - `transactional-email-resend`;
@@ -129,7 +129,7 @@ Purpose: a backend-ready application profile without customer identity.
 Default materialization:
 
 ```text
-app@0.1.0
+app@0.2.0
   = app-foundation@0.1.0
   + site-routing@0.4.0
 ```
@@ -1416,15 +1416,15 @@ The stop gate is satisfied by the accepted implementation and exact closure evid
 The accepted architecture and contract increments establish the recipe, ten-capability catalog, and pending certification subjects. The current generation increment implements app project/state parsing, deterministic rendering, the exact generated Effect dependency and lockfile, server runtime and tests, whole-Worker verification, and state-last new-directory generation. The [capability model](../architecture/capability-model.md#accepted-app-architecture-boundary) owns that executable boundary and its claim limits; the [program roadmap](program-roadmap.md#p4--app-foundation) owns current sequencing, remaining work, and approval gates. These requirements cover both that generation implementation and the separately gated successors:
 
 - internal hybrid `app-foundation@0.1.0` with direct exact generated dependency `effect@4.0.0-rc.112`;
-- public `app@0.1.0` resolving exactly to `app-foundation@0.1.0` plus `site-routing@0.4.0`, thereby retaining the complete production-site experience;
+- public `app@0.2.0` resolving exactly to `app-foundation@0.1.0` plus `site-routing@0.4.0`, thereby retaining the complete production-site experience;
 - independent optional Calendly, multilingual, and analytics selection across all eight subsets, with no implicit coupling;
 - Effect restricted to generated application, infrastructure, composition, and delivery server modules, with explicit request context, one application-owned service, Cloudflare and in-memory Layers, one execution, full Cause priority, native abort, no retry, and deployment-owned `enable_request_signal`;
 - generated Vitest Node tests for provider-neutral application behavior plus whole built-Worker contracts through `createTestHarness()` where justified, without `@effect/vitest` or Workers Vitest before a binding exists;
-- exact `portfolio@0.10.0 -> app@0.1.0` and `site@0.11.0 -> app@0.1.0` transitions across all eight optional subsets, preserving compatible UI/content, forbidding deletion, replacing the builder-kernel-owned root lockfile, persisting state last, and refusing unproved changes before mutation;
+- the exact retained and Vitest 5 incoming app edges owned by [ADR-0015](../adr/0015-vitest-five-generation.md) across all eight optional subsets, preserving compatible UI/content, forbidding deletion, replacing the builder-kernel-owned root lockfile, persisting state last, and refusing unproved changes before mutation;
 - four regenerated visual comparisons bound to all influencing content and UI inputs, without inferring visual quality, accessibility conformance, deployed behavior, or production readiness;
 - fresh pending evidence for app-foundation and all nine existing descriptors materially widened to app support; the ten exact subjects cannot inherit historical certification.
 
-The accepted CLI exposure supplies generation for the current two-fixture candidate under the [capability model](../architecture/capability-model.md#representative-immutable-app-fixtures). The candidate adds default app and app with Calendly, multilingual, and analytics, extends exact fixed-root verification, and preserves existing fixture bytes and visual policy. It requires recorded verification, independent review, and verified-final-diff acceptance. Certification and global closeout remain later increments; app capability upgrades remain unsupported. Eligibility is not authorization. Certification, commit, push, pull-request creation, merge, deployment, provider mutation, publication, and production action remain separately gated.
+The accepted app-fixture predecessor supplies default app and app with Calendly, multilingual, and analytics under the [capability model](../architecture/capability-model.md#representative-immutable-app-fixtures). The separately approved Vitest 5 increment regenerates all seven current fixture roots with standards `0.5.0` and the exact ADR-0015 recipe matrix while preserving historical Vitest 4 descriptors, locks, output, and supported operations. It requires recorded verification, independent review, exact approval of the separate fixed visual-input candidate and manifest, and verified-final-diff acceptance. Passing comparisons and recomputed fingerprints do not supply visual approval. Certification and global closeout remain later increments; app capability upgrades remain unsupported. Eligibility is not authorization. Certification, commit, push, pull-request creation, merge, deployment, provider mutation, publication, and production action remain separately gated.
 
 #### P5C–P5F — Remaining independent backend capabilities
 

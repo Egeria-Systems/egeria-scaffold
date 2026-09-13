@@ -15,7 +15,7 @@
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.4.0"
+      "version": "0.5.0"
     },
     {
       "deliveryMode": "hybrid",
@@ -361,7 +361,7 @@
       "path": "apps/web/tests/integration/health-worker.test.ts"
     },
     {
-      "fingerprint": "sha256:6be34179936a9a700b51c0dc0d8c7b6c3472c7caf585bcb8caeb2005a2abd546",
+      "fingerprint": "sha256:30b508b027b4ead219c5af2aec281b65bed7dd63ec3e338df9e5dec93597c1e4",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -426,7 +426,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:c20e49f68715383bceeb6b28ee6aaa77eb10d72b416c9ab4933aedbf11449645",
+      "fingerprint": "sha256:1d315ddd558d181392acae0a3203bfad07365a0aea9fb1561a65724919e3dc7e",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -798,7 +798,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:4e962b602905c170fcbc6f986663d9b6b62afe563d4c5543b1aa4cacd61abb6b",
+      "fingerprint": "sha256:a2929e9a4745c82ab64ea3758645dc72f1b2af5a2f9639a8ee64e2c89e826867",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1621,7 +1621,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:c2ccf2417a8183a91935356b3d91c9aefc75b23abe2e72e335e671c12654f65d",
+      "fingerprint": "sha256:486fd3f10a1d0e0b37727ce3a79368e408f90c3dac604ca18fdfd0bec7dd0dc2",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -2086,7 +2086,7 @@
       "path": "apps/web/vitest.config.ts"
     },
     {
-      "fingerprint": "sha256:ed1ce9bbc2bcbbea5e6ebab073d005f386cd755bc814d43bf3954610a7567aec",
+      "fingerprint": "sha256:95ccc76176af7a0746cd34976a22903bbd99a9cd5018191165fba387c60ac538",
       "fingerprintTarget": {
         "kind": "json-value",
         "pointer": "/devDependencies/vitest"
@@ -2103,7 +2103,7 @@
   ],
   "origin": {
     "profile": "app",
-    "recipeVersion": "0.1.0"
+    "recipeVersion": "0.2.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

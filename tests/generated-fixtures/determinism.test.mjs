@@ -142,7 +142,7 @@ function assertPortablePublicLockfile(lockfile) {
   assert.match(lockfile, /@testing-library\/user-event@14\.6\.3/u);
   assert.match(lockfile, /@vitejs\/plugin-react@6\.0\.5/u);
   assert.match(lockfile, /jsdom@30\.0\.1/u);
-  assert.match(lockfile, /vitest@4\.1\.11/u);
+  assert.match(lockfile, /vitest@5\.0\.0/u);
   assert.match(lockfile, /raw-loader@4\.0\.2/u);
   assert.match(lockfile, /@tailwindcss\/postcss@4\.3\.3/u);
   assert.match(lockfile, /postcss@8\.5\.26/u);
@@ -168,7 +168,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
       fixture.expectedFiles,
     );
     const state = core.installedStateSchema.parse(JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8")));
-    assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.1.0" });
+    assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.2.0" });
     assert.equal(state.managedSurfaces.length, rendered.value.surfaces.length + 3);
     for (const surface of rendered.value.surfaces) {
       const installed = state.managedSurfaces.find(({ identifier }) => identifier === surface.identifier);
@@ -181,7 +181,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
     assert.equal(foundation.managedSurfaces.length, 17 + 2, "seventeen files and two package members");
     assert.deepEqual(foundation.managedSurfaces.filter(({ fingerprintTarget }) => fingerprintTarget.kind === "json-value")
       .map(({ fingerprintTarget }) => fingerprintTarget.pointer).sort(), ["/dependencies/effect", "/scripts/test:integration:cloudflare"]);
-    assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, "packages/builder-core/lockfiles/web-recipe-app-0.1.0/pnpm-lock.yaml")));
+    assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, "packages/builder-core/lockfiles/web-recipe-app-0.2.0/pnpm-lock.yaml")));
     const wrangler = JSON.parse(await readFile(join(root, "apps/web/wrangler.jsonc"), "utf8"));
     assert.ok(wrangler.compatibility_flags.includes("enable_request_signal"));
     assert.equal(state.managedSurfaces.find(({ path }) => path === "apps/web/wrangler.jsonc").owner.identifier, "deployment-cloudflare");

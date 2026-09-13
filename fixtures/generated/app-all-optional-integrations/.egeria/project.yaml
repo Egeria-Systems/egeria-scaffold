@@ -26,7 +26,7 @@ project:
   defaultLocale: en-CA
   displayName: Acme App All Optional Integrations
   name: acme-app-all-optional-integrations
-recipeVersion: 0.1.0
+recipeVersion: 0.2.0
 schemaVersion: 1.0.0
 selectedCapabilities:
   - standards

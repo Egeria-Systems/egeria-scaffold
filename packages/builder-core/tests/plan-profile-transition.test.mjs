@@ -1,3 +1,4 @@
+import { createRetainedGenerationEntries } from "./retained-generation.mjs";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -76,7 +77,7 @@ async function loadEntries(root) {
 }
 
 async function portfolioEntries() {
-  return loadEntries(resolve(repositoryRoot, "fixtures/generated/portfolio"));
+  return createRetainedGenerationEntries(resolve(repositoryRoot, "fixtures/generated/portfolio"));
 }
 
 function cloneEntries(entries) {
@@ -352,7 +353,7 @@ test("portfolio-to-site planning returns the exact seven-action approval plan wi
 });
 
 test("planning preserves exact optional Calendly selection while adding only site routing", async () => {
-  const entries = await loadEntries(
+  const entries = await createRetainedGenerationEntries(
     resolve(repositoryRoot, "fixtures/generated/portfolio-calendly"),
   );
   const result = await planFromEntries(entries);

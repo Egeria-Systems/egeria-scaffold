@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { parseDocument } from "yaml";
 
+import { retainedRenderingContext } from "./retained-generation.mjs";
 import { createTemplateCatalog } from "../dist/generation/template-catalog.js";
 import {
   deriveTemplateDestination,
@@ -486,7 +487,7 @@ function contrastRatio(foreground, background) {
 async function loadRenderSkeleton() {
   const module = await import("../dist/index.js");
   assert.equal(typeof module.renderSkeleton, "function");
-  return module.renderSkeleton;
+  return (request, context = retainedRenderingContext) => module.renderSkeleton(request, context);
 }
 
 async function compileGeneratedContentModule(files) {
@@ -6037,4 +6038,33 @@ test("rendering returns isolated byte arrays and performs no repository write", 
     ),
     /(?:node:(?:child_process|fs)|\b(?:appendFile|copyFile|cp|createWriteStream|mkdir|mkdtemp|open|rename|rm|writeFile)\s*\()/,
   );
+});
+
+
+test("Vitest five generation materializes each exact recipe without changing the retained generation", async () => {
+  const core = await import("../dist/index.js");
+  const { createVitestFourProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+  const retained = { catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: createVitestFourProfileRecipes() };
+  for (const [profile, recipeVersion, oldRecipeVersion] of [["portfolio", "0.11.0", "0.10.0"], ["site", "0.12.0", "0.11.0"], ["app", "0.2.0", "0.1.0"]]) {
+    const request = { profile, projectName: "vitest-contract", displayName: "Vitest contract", packageVersions: core.verifiedCapabilityPackageVersions };
+    const current = await core.renderSkeleton(request);
+    const historical = await core.renderSkeleton(request, retained);
+    assert.equal(current.ok, true, JSON.stringify(current));
+    assert.equal(historical.ok, true, JSON.stringify(historical));
+    assert.equal(current.value.project.recipeVersion, recipeVersion);
+    assert.equal(historical.value.project.recipeVersion, oldRecipeVersion);
+    for (const [rendered, version, standards] of [[current.value, "5.0.0", "0.5.0"], [historical.value, profile === "app" ? "4.1.11" : "4.1.10", "0.4.0"]]) {
+      const files = new Map(rendered.files.map(({ path, content }) => [path, Buffer.from(content).toString("utf8")]));
+      const manifest = JSON.parse(files.get("apps/web/package.json"));
+      assert.equal(manifest.devDependencies.vitest, version);
+      assert.equal(manifest.dependencies.next, profile === "portfolio" ? "16.3.0" : "16.3.3");
+      assert.equal(manifest.dependencies.effect, profile === "app" ? "4.0.0-rc.112" : undefined);
+      assert.equal(core.createInstalledManifest(rendered.resolved).find(({ identifier }) => identifier === "standards").version, standards);
+      assert.equal(parseDocument(files.get("pnpm-workspace.yaml")).toJS().overrides["vitest@4.1.10"], version === "5.0.0" ? undefined : "4.1.11");
+      assert.equal(files.has("apps/web/vitest.cloudflare.config.ts"), profile === "app");
+    }
+    const currentFiles = new Map(current.value.files.map(({ path, content }) => [path, content]));
+    const changed = historical.value.files.filter(({ path, content }) => !Buffer.from(content).equals(currentFiles.get(path))).map(({ path }) => path).sort();
+    assert.deepEqual(changed, ["apps/web/package.json", "apps/web/tests/setup/component.ts", "pnpm-workspace.yaml"]);
+  }
 });

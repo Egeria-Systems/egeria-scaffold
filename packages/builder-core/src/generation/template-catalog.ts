@@ -299,14 +299,23 @@ function remapSourceIssue(
 export function createTemplateCatalog(
   profile: ProfileIdentifier,
   includeBookingCalendly = false,
-  recipeVersion = profile === "app" ? "0.1.0" : profile === "site" ? "0.11.0" : "0.10.0",
+  recipeVersion = profile === "app" ? "0.2.0" : profile === "site" ? "0.12.0" : "0.11.0",
   includeMultilingual = false,
   includeAnalytics = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
-  const app = profile === "app" && recipeVersion === "0.1.0";
-  const productionSite = app || (profile === "site" && recipeVersion === "0.11.0");
+  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0");
+  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0"));
+  const vitestFive = (profile === "portfolio" && recipeVersion === "0.11.0") ||
+    (profile === "site" && recipeVersion === "0.12.0") ||
+    (profile === "app" && recipeVersion === "0.2.0");
   const sources = [
-    ...commonTemplateSources.filter(
+    ...commonTemplateSources.map(entry => vitestFive && [
+      "common/apps/web/package.json.template",
+      "common/apps/web/tests/setup/component.ts",
+      "common/pnpm-workspace.yaml",
+    ].includes(entry.source)
+      ? { ...entry, source: entry.source.replace("common/", "common/vitest-five/"), destinationSource: entry.source }
+      : entry).filter(
       ({ source }) =>
         !(
           (includeBookingCalendly || productionSite) &&

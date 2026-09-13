@@ -294,7 +294,7 @@ async function prepareProject(root, subset) {
   if (!prepared.ok) fail("VISUAL_PREPARATION_FAILED");
   const manifest = JSON.parse(Buffer.from(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content).toString("utf8"));
   const version = lockfiles.resolveRecipeLockfileVersion(target.value.project, manifest);
-  if (version !== "app-0.1.0") fail("VISUAL_LOCKFILE_INVALID");
+  if (version !== "app-0.2.0") fail("VISUAL_LOCKFILE_INVALID");
   const lockfile = await filesystem.readFile(lockfiles.createRecipeLockfileUrl(version));
   return { request, sourceProject: source.value.project, targetProject: target.value.project,
     files: [...prepared.value.files, { path: "pnpm-lock.yaml", content: lockfile }], influencingFingerprints: prepared.value.influencingFingerprints };

@@ -11,8 +11,8 @@ const sharedPortfolioCapabilities = [
 ] as const;
 
 function createRecipes(input: Readonly<{
-  portfolio: "0.9.0" | "0.10.0";
-  site: "0.9.0" | "0.10.0" | "0.11.0";
+  portfolio: "0.9.0" | "0.10.0" | "0.11.0";
+  site: "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0";
 }>): readonly ProfileRecipe[] {
   return [
     {
@@ -46,15 +46,31 @@ export function createProfileRecipeSnapshot(
   return createRecipes({ portfolio: recipeVersion, site: recipeVersion });
 }
 
-export const profileRecipes: readonly ProfileRecipe[] = [
-  ...createRecipes({
-    portfolio: "0.10.0",
-    site: "0.11.0",
-  }),
-  {
-    identifier: "app",
-    schemaVersion: "1.0.0",
-    recipeVersion: "0.1.0",
-    defaultCapabilities: ["app-foundation", "site-routing"],
-  },
-];
+export function createVitestFourProfileRecipes(): readonly ProfileRecipe[] {
+  return [
+    ...createRecipes({
+      portfolio: "0.10.0",
+      site: "0.11.0",
+    }),
+    {
+      identifier: "app",
+      schemaVersion: "1.0.0",
+      recipeVersion: "0.1.0",
+      defaultCapabilities: ["app-foundation", "site-routing"],
+    },
+  ];
+}
+
+export function createVitestFiveProfileRecipes(): readonly ProfileRecipe[] {
+  return [
+    ...createRecipes({ portfolio: "0.11.0", site: "0.12.0" }),
+    {
+      identifier: "app",
+      schemaVersion: "1.0.0",
+      recipeVersion: "0.2.0",
+      defaultCapabilities: ["app-foundation", "site-routing"],
+    },
+  ];
+}
+
+export const profileRecipes: readonly ProfileRecipe[] = createVitestFiveProfileRecipes();

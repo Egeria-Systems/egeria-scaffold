@@ -2513,7 +2513,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     enforcementMap,
-    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+app optional-capability addition\/removal with exact Worker receipts[^\n]+incoming app transition planning and state-last execution across sixteen cases[^\n]+thin CLI app creation and incoming-transition exposure[^\n]+immutable app fixtures[^\n]+certification execution remains a later gate/iu,
+    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+app optional-capability addition\/removal with exact Worker receipts[^\n]+incoming app transition planning and state-last execution across eight optional subsets per retained and current edge[^\n]+thin CLI app creation and incoming-transition exposure[^\n]+immutable app fixtures[^\n]+certification execution remains a later gate/iu,
   );
   assert.match(
     packageOwnership,
@@ -2521,7 +2521,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     packageOwnership,
-    /ten capability descriptors[^\n]+three generation recipes[^\n]+app@0\.1\.0[^\n]+pending fresh certification/iu,
+    /ten capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.0[^\n]+pending fresh certification/iu,
   );
   assert.match(
     programRoadmap,
@@ -2529,7 +2529,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     programRoadmap,
-    /\*\*Stop gate:\*\* Complete the current fixture candidate's required deterministic and generated-runtime verification[^\n]+default app-transition and separate retained-fixture visual comparisons against existing approved baselines[^\n]+independent requirements[^\n]+test-evidence reviews[^\n]+exact review packet before final-diff approval[^\n]+separate exact-manifest visual approval/iu,
+    /\*\*Stop gate:\*\* Complete the Vitest 5 candidate's required deterministic and generated-runtime verification[^\n]+default app-transition and separate retained-fixture visual comparisons against existing approved baselines[^\n]+independent requirements[^\n]+test-evidence reviews[^\n]+exact review packet before final-diff approval[^\n]+separate exact-manifest human approval/iu,
   );
   assert.match(
     convergentProfileAdr,
@@ -2541,7 +2541,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     rootInstructions,
-    /Builder-core supports `app@0\.1\.0` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
+    /Builder-core supports `app@0\.2\.0` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
   );
   for (const instructions of [builderInstructions, cliInstructions]) {
     assert.match(
@@ -2578,6 +2578,7 @@ const acceptedAdrs = [
     "ADR-0014",
     "2026-09-05",
   ],
+  ["0015-vitest-five-generation.md", "ADR-0015", "2026-09-12"],
 ];
 
 function escapeRegularExpression(value) {
@@ -2850,7 +2851,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /ten-capability catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.1\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
+    /ten-capability catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
   );
 });
 
@@ -3408,11 +3409,13 @@ test("executable capability certification ownership is current", async () => {
     "site-routing",
     "standards",
   ]);
-  for (const record of Object.values(registry.records)) {
+  for (const [capabilityId, record] of Object.entries(registry.records)) {
     assert.equal(record.status, "pending");
     assert.equal(
       record.taskPlan,
-      "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+      capabilityId === "standards"
+        ? "docs/superpowers/plans/2026-09-12-vitest-five-migration.md"
+        : "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
     );
     assert.deepEqual(record.evidence, []);
   }
@@ -3430,7 +3433,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /generation-executable recipes are `portfolio@0\.10\.0`, `site@0\.11\.0`, and `app@0\.1\.0`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
+    /generation-executable recipes are `portfolio@0\.11\.0`, `site@0\.12\.0`, and `app@0\.2\.0`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
   );
   assert.match(
     capabilityModel,
@@ -3478,7 +3481,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     packageOwnership,
-    /descriptor `standards@0\.4\.0` is certified from accepted existing-repository-lifecycle and renewed fresh-scaffold evidence at revision `d7f9dac6e25d5dde32015968d0912b45e73644e7`[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
+    /earlier `standards@0\.4\.0` subject was certified from accepted existing-repository-lifecycle and renewed fresh-scaffold evidence at revision `d7f9dac6e25d5dde32015968d0912b45e73644e7`[^\n]+generated repositories retain exact public package pin `0\.1\.0`/iu,
   );
   assert.match(
     enforcementMap,
@@ -4639,7 +4642,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     packageOwnership,
-    /ten capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.1\.0[^\n]+pending fresh certification/iu,
+    /ten capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+pending fresh certification/iu,
   );
   assert.match(
     builderCoreReadme,
