@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-import { promisify } from "node:util";
+import { isDeepStrictEqual, promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -423,7 +423,74 @@ async function loadRegistryResults() {
   );
 }
 
+// This exception concerns release metadata only. Install, behavior, security,
+// package-boundary, and publication checks retain their own requirements.
+function containsOnlyDependencyVersionChanges(before, after) {
+  const previous = structuredClone(before);
+  const current = structuredClone(after);
+  for (const section of [
+    "dependencies", "devDependencies", "optionalDependencies",
+  ]) {
+    const oldDependencies = previous?.[section] ?? {};
+    const newDependencies = current?.[section] ?? {};
+    if (!isDeepStrictEqual(
+      Object.keys(oldDependencies).sort(), Object.keys(newDependencies).sort(),
+    )) return false;
+    for (const name of Object.keys(oldDependencies)) {
+      const oldVersion = oldDependencies[name];
+      const newVersion = newDependencies[name];
+      if (oldVersion === newVersion) continue;
+      if (typeof oldVersion !== "string" || typeof newVersion !== "string") {
+        return false;
+      }
+      const oldAlias = /^(npm:(?:@[^/]+\/)?[^@]+@)(.+)$/.exec(oldVersion);
+      const newAlias = /^(npm:(?:@[^/]+\/)?[^@]+@)(.+)$/.exec(newVersion);
+      if (oldAlias?.[1] !== newAlias?.[1]) return false;
+      if (
+        !semverPattern.test(oldAlias?.[2] ?? oldVersion) ||
+        !semverPattern.test(newAlias?.[2] ?? newVersion)
+      ) return false;
+      newDependencies[name] = oldVersion;
+    }
+  }
+  return isDeepStrictEqual(previous, current);
+}
+
+async function isDependencyUpdate(revision) {
+  if (!revisionPattern.test(revision ?? "")) throw new Error("invalid revision");
+  const git = async (...arguments_) => (await execFileAsync("git", arguments_, {
+    cwd: repositoryRoot, encoding: "utf8",
+  })).stdout;
+  const base = (await git("merge-base", revision, "HEAD")).trim();
+  const paths = (await git(
+    "diff", "--name-only", "--no-renames", "-z", base, "HEAD", "--",
+  )).split("\0").filter(Boolean);
+  if (paths.length === 0) return false;
+  for (const path of paths) {
+    if (path === "pnpm-lock.yaml") {
+      // A removed lockfile is not an update.
+      await git("cat-file", "-e", `${base}:${path}`);
+      await git("cat-file", "-e", `HEAD:${path}`);
+      continue;
+    }
+    if (!isWorkspaceManifestPath(path)) return false;
+    const before = JSON.parse(await git("show", `${base}:${path}`));
+    const after = JSON.parse(await git("show", `HEAD:${path}`));
+    if (!containsOnlyDependencyVersionChanges(before, after)) return false;
+  }
+  return true;
+}
+
 async function run(mode) {
+  if (mode === "dependency-update") {
+    return await isDependencyUpdate(process.argv[3])
+      ? freezeProblems([])
+      : freezeProblems([createProblem(
+          "NOT_DEPENDENCY_UPDATE",
+          "The diff requires ordinary release-intent validation.",
+        )]);
+  }
+
   if (mode === "context") {
     return checkReleaseContext({
       githubRef: process.env.GITHUB_REF,
@@ -456,7 +523,7 @@ async function run(mode) {
   return freezeProblems([
     createProblem(
       "RELEASE_CHECK_MODE_INVALID",
-      "Release check mode must be context, local, pull-request, or registry.",
+      "Release check mode must be context, local, pull-request, dependency-update, or registry.",
     ),
   ]);
 }
