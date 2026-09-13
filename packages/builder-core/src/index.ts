@@ -1,5 +1,9 @@
 export * from "./catalog/capability-catalog.js";
-export * from "./catalog/verified-package-versions.js";
+export {
+  createVerifiedCapabilityCatalog,
+  readVerifiedProjectSnapshot,
+  verifiedCapabilityPackageVersions,
+} from "./catalog/verified-package-versions.js";
 export * from "./certification/capability-certification.js";
 export * from "./contracts/capability.js";
 export * from "./contracts/certification.js";

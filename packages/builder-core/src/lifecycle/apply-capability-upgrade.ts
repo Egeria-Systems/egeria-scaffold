@@ -36,7 +36,7 @@ import {
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
 import {
   createProfileRecipeSnapshot,
-  profileRecipes,
+  createVitestFourProfileRecipes,
 } from "../profiles/profile-recipes.js";
 import {
   createFileSystemRepositoryReader,
@@ -374,7 +374,7 @@ async function materializeUpgrade(input: Readonly<{
         }
       : {
           catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0" },
-          profiles: profileRecipes,
+          profiles: createVitestFourProfileRecipes(),
         },
   );
   if (!rendered.ok) {

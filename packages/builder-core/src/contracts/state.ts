@@ -301,30 +301,31 @@ export const installedStateSchema = z
       .readonly(),
   })
   .superRefine((state, context) => {
-    const isCurrentApp = state.origin.profile === "app" &&
-      state.origin.recipeVersion === "0.1.0";
+    const isSupportedApp = state.origin.profile === "app" &&
+      (state.origin.recipeVersion === "0.1.0" || state.origin.recipeVersion === "0.2.0");
     const expectedChecks = state.lastSuccessfulVerification.kind ===
       "capability-addition"
-      ? isCurrentApp
+      ? isSupportedApp
         ? appCapabilityAdditionPersistedVerificationChecks
         : capabilityAdditionPersistedVerificationChecks
       : state.lastSuccessfulVerification.kind === "capability-removal"
-        ? isCurrentApp
+        ? isSupportedApp
           ? appCapabilityRemovalPersistedVerificationChecks
           : capabilityRemovalPersistedVerificationChecks
         : state.lastSuccessfulVerification.kind === "capability-upgrade"
           ? capabilityUpgradePersistedVerificationChecks
           : state.lastSuccessfulVerification.kind === "profile-transition"
-            ? isCurrentApp
+            ? isSupportedApp
               ? appProfileTransitionPersistedVerificationChecks
               : profileTransitionPersistedVerificationChecks
-            : isCurrentApp
+            : isSupportedApp
               ? appVerificationChecks
               : state.origin.recipeVersion === "0.7.0" ||
                 state.origin.recipeVersion === "0.8.0" ||
                 state.origin.recipeVersion === "0.9.0" ||
                 state.origin.recipeVersion === "0.10.0" ||
-                state.origin.recipeVersion === "0.11.0"
+                state.origin.recipeVersion === "0.11.0" ||
+                state.origin.recipeVersion === "0.12.0"
               ? currentVerificationChecks
               : legacyVerificationChecks;
 

@@ -20,21 +20,29 @@ export type CapabilityPackageVersions = Readonly<{
 }>;
 
 export type CapabilityCatalogSnapshot = Readonly<{
-  standards: "0.3.0" | "0.4.0";
+  standards: "0.3.0" | "0.4.0" | "0.5.0";
   siteRouting?: "0.3.0" | "0.4.0";
   appFoundation?: "0.1.0";
 }>;
 
-const currentCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = {
+export const vitestFourCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
   standards: "0.4.0",
   siteRouting: "0.4.0",
   appFoundation: "0.1.0",
-};
+});
+
+export const vitestFiveCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
+  standards: "0.5.0",
+  siteRouting: "0.4.0",
+  appFoundation: "0.1.0",
+});
+
+const currentCapabilityCatalogSnapshot = vitestFiveCapabilityCatalogSnapshot;
 
 function isSupportedStandardsSnapshotVersion(
   value: string,
 ): value is CapabilityCatalogSnapshot["standards"] {
-  return value === "0.3.0" || value === "0.4.0";
+  return value === "0.3.0" || value === "0.4.0" || value === "0.5.0";
 }
 
 function isSupportedSiteRoutingSnapshotVersion(
@@ -428,7 +436,7 @@ function createDescriptors(
       "standards",
       "devDependencies",
       "vitest",
-      "4.1.10",
+      snapshot.standards === "0.5.0" ? "5.0.0" : "4.1.10",
     ),
     createFileEvidencePoint(
       "standards-visual-regression-specification",
@@ -464,7 +472,7 @@ function createDescriptors(
     "standards-visual-regression-test-script",
   ]);
   const selectedStandardsEvidencePoints =
-    snapshot.standards === "0.4.0"
+    snapshot.standards !== "0.3.0"
       ? standardsEvidencePoints
       : standardsEvidencePoints.filter(
           ({ managedSurface }) =>
@@ -1189,7 +1197,7 @@ function createDescriptors(
       adapterSemanticRequirements: [],
       managedSurfaces: [
         ...projectManagedSurfaces(selectedStandardsEvidencePoints),
-        ...(snapshot.standards === "0.4.0"
+        ...(snapshot.standards !== "0.3.0"
           ? standardsVisualBaselineSurfaces
           : []),
       ],
@@ -1205,7 +1213,7 @@ function createDescriptors(
         "browser-development",
         "browser-preview",
         "deployed-configuration",
-        ...(snapshot.standards === "0.4.0"
+        ...(snapshot.standards !== "0.3.0"
           ? (["visual-regression"] as const)
           : []),
         "workflow-contracts",
@@ -1214,7 +1222,7 @@ function createDescriptors(
         "public-package-version-and-provenance",
         "unit-and-component-testing-claim-boundaries",
         "browser-testing-claim-boundaries",
-        ...(snapshot.standards === "0.4.0"
+        ...(snapshot.standards !== "0.3.0"
           ? (["visual-regression-baseline-and-claim-boundaries"] as const)
           : []),
       ],
@@ -1222,7 +1230,7 @@ function createDescriptors(
         "review-package-and-configuration-removal",
         "review-generated-test-surface-removal",
         "review-generated-quality-surface-removal",
-        ...(snapshot.standards === "0.4.0"
+        ...(snapshot.standards !== "0.3.0"
           ? (["review-visual-regression-configuration-and-baselines"] as const)
           : []),
       ],

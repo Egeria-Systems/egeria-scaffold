@@ -4,6 +4,8 @@
 
 **Date:** 2026-09-05
 
+[ADR-0015](0015-vitest-five-generation.md) extends only this decision's exact current recipe and incoming-edge limitation. The first app recipe and its historical edges remain unchanged.
+
 ## Context
 
 The first public `app` profile must add backend-ready application boundaries without discarding the production-site experience already owned by `site`. Treating `app` as only `app-foundation` would omit the established content, navigation, contact, accessibility, responsive, and visual contracts. Making website capabilities implicit inside `app-foundation` would instead blur ownership and prevent independent lifecycle behavior.

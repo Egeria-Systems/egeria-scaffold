@@ -551,6 +551,45 @@ test("the adapter applies exactly the declared writes and emits a bounded receip
   }
 });
 
+test("the adapter accepts exact generation identities and refuses mixed or unsupported identities", async () => {
+  const identities = [
+    { recipe: "0.11.0", standards: "0.4.0", stateRecipe: "0.11.0", accepted: true },
+    { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.12.0", accepted: true },
+    { recipe: "0.11.0", standards: "0.5.0", stateRecipe: "0.11.0", accepted: false },
+    { recipe: "0.12.0", standards: "0.4.0", stateRecipe: "0.12.0", accepted: false },
+    { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.11.0", accepted: false },
+    { recipe: "0.13.0", standards: "0.5.0", stateRecipe: "0.13.0", accepted: false },
+  ];
+  for (const identity of identities) {
+    const fixture = await createProjectFixture();
+    try {
+      const projectPath = resolve(fixture.projectRoot, ".egeria/project.yaml");
+      const statePath = resolve(fixture.projectRoot, ".egeria/state.json");
+      const project = parse(await readFile(projectPath, "utf8"));
+      const state = JSON.parse(await readFile(statePath, "utf8"));
+      project.recipeVersion = identity.recipe;
+      state.origin.recipeVersion = identity.stateRecipe;
+      state.installedCapabilities.find(({ identifier }) => identifier === "standards").version = identity.standards;
+      await writeFile(projectPath, stringify(project));
+      await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
+      await runGit(fixture.projectRoot, ["add", "."]);
+      await runGit(fixture.projectRoot, ["commit", "--allow-empty", "-m", "Set synthetic identity precondition"]);
+      if (identity.accepted) {
+        const receipt = await applySyntheticClientPacket({ projectRoot: fixture.projectRoot });
+        assert.deepEqual(receipt.writes.map(({ path }) => path), expectedWritePaths);
+      } else {
+        await assert.rejects(
+          applySyntheticClientPacket({ projectRoot: fixture.projectRoot }),
+          { code: "PROJECT_IDENTITY_INVALID" },
+        );
+        assert.deepEqual(await readStatusPaths(fixture.projectRoot), []);
+      }
+    } finally {
+      await fixture.cleanup();
+    }
+  }
+});
+
 test("the adapter refuses packet, manifest, content, and source drift before writing", async () => {
   const cases = [
     {

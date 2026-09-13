@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 
-import { createVerifiedCapabilityCatalog, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
+import { readVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
-import type { ProfileIdentifier } from "../contracts/profile.js";
+import type { ProfileIdentifier, ProfileRecipe } from "../contracts/profile.js";
 import {
   analyticsSettingsSchema,
   type AnalyticsSettings,
@@ -22,7 +22,6 @@ import {
   type RenderedSkeleton,
 } from "../generation/render-skeleton.js";
 import { createBuilderStateSurfaces } from "../generation/builder-state-surfaces.js";
-import { profileRecipes } from "../profiles/profile-recipes.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
 import { serializeProjectYaml } from "../state/codecs.js";
 import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
@@ -174,6 +173,7 @@ function fingerprintPlan(input: Readonly<{
 
 function validatedInspection(
   inspection: ProjectInspection,
+  profiles: readonly ProfileRecipe[],
 ): ValidInspection | undefined {
   if (
     inspection.project.kind !== "valid" ||
@@ -186,7 +186,7 @@ function validatedInspection(
 
   const project = inspection.project.value;
   const state = inspection.inference.state.value;
-  const currentProfile = profileRecipes.find(
+  const currentProfile = profiles.find(
     ({ identifier }) => identifier === project.originProfile,
   );
   const migrationIdentifiers = inspection.migrations.value.map(
@@ -512,18 +512,19 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
 
-  const catalogResult = createVerifiedCapabilityCatalog();
+  const snapshot = await readVerifiedProjectSnapshot(input.reader);
 
-  if (!catalogResult.ok) {
+  if (!snapshot.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
   const inspection = validatedInspection(
     await inspectProject({
-      reader: input.reader,
-      catalog: catalogResult.value,
-      profiles: profileRecipes,
+      reader: snapshot.value.reader,
+      catalog: snapshot.value.catalog,
+      profiles: snapshot.value.profiles,
     }),
+    snapshot.value.profiles,
   );
 
   if (inspection === undefined) {
@@ -566,7 +567,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       : { analytics: project.capabilitySettings.analytics }),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
-  const currentResult = await renderSkeleton(renderRequest);
+  const currentResult = await renderSkeleton(renderRequest, snapshot.value.renderingContext);
 
   if (!currentResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -588,7 +589,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("PROJECT_DRIFT_DETECTED");
   }
 
-  const descriptor = catalogResult.value.find(
+  const descriptor = snapshot.value.catalog.find(
     ({ identifier }) => identifier === capabilityValue,
   );
 
@@ -603,7 +604,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       : capabilityValue === "booking-calendly" && settingsResult?.success === true
         ? { bookingCalendly: settingsResult.data }
         : { multilingual: true as const }),
-  });
+  }, snapshot.value.renderingContext);
 
   if (!desiredResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");

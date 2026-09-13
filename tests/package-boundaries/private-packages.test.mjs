@@ -401,6 +401,9 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/wrangler.jsonc.template",
       "common/package.json.template",
       "common/pnpm-workspace.yaml",
+      "common/vitest-five/apps/web/package.json.template",
+      "common/vitest-five/apps/web/tests/setup/component.ts",
+      "common/vitest-five/pnpm-workspace.yaml",
       "multilingual/apps/web/app/[locale]/[[...segments]]/page.tsx",
       "multilingual/apps/web/app/[locale]/layout.tsx",
       "multilingual/apps/web/app/[locale]/not-found.tsx",
@@ -540,7 +543,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /portfolio@0.10.0/);
   assert.match(builderReadme, /four source-registered typed section shapes/);
   assert.match(builderReadme, /Tailwind CSS and PostCSS/);
-  assert.match(builderReadme, /named generated Vitest unit\/component projects/);
+  assert.match(builderReadme, /named generated Vitest 5 unit\/component projects/);
   assert.match(builderReadme, /Playwright\/axe/);
   assert.match(builderReadme, /verify:generated-visuals/);
   assert.match(builderReadme, /generateProject/);

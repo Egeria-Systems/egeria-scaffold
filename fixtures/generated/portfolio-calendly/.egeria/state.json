@@ -15,7 +15,7 @@
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.4.0"
+      "version": "0.5.0"
     },
     {
       "deliveryMode": "source-generated",
@@ -153,7 +153,7 @@
       "path": "apps/web/src/integrations/booking-calendly/booking-settings.ts"
     },
     {
-      "fingerprint": "sha256:b52db524e54c68987f74a4b442df1045b195b5a2f7b1bdd0d041656e76332e80",
+      "fingerprint": "sha256:e37025f54c469f7d7f6e74c5049a52667b561261dd556a757ea87da2f51b891a",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -218,7 +218,7 @@
       "path": ".nvmrc"
     },
     {
-      "fingerprint": "sha256:364c722bbf1b3832171c87dfd0a33619f8f8746499bf4ec503ba4d4a7850e192",
+      "fingerprint": "sha256:6ed0092e45b0f31abecdb92ba57eb6af11174160c5d2613d0edf45d41e5d11e4",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -590,7 +590,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:fb27c8cf44d0e3acf70a9254619c0511d868d337e75c80b9a6730928bb228e01",
+      "fingerprint": "sha256:e275962d66858bac11abb379d17774c3cb4719a71aee683565fa7a07b4096ea7",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1175,7 +1175,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:c2ccf2417a8183a91935356b3d91c9aefc75b23abe2e72e335e671c12654f65d",
+      "fingerprint": "sha256:486fd3f10a1d0e0b37727ce3a79368e408f90c3dac604ca18fdfd0bec7dd0dc2",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1640,7 +1640,7 @@
       "path": "apps/web/vitest.config.ts"
     },
     {
-      "fingerprint": "sha256:cbb84a3868c92d45819f65514b9759aa915c523229e29af624ea51415a0ea10f",
+      "fingerprint": "sha256:95ccc76176af7a0746cd34976a22903bbd99a9cd5018191165fba387c60ac538",
       "fingerprintTarget": {
         "kind": "json-value",
         "pointer": "/devDependencies/vitest"
@@ -1657,7 +1657,7 @@
   ],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.10.0"
+    "recipeVersion": "0.11.0"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

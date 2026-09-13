@@ -377,7 +377,7 @@ function verificationIsExact(
 
   const checks = value.checks;
   const app = rendered.project.originProfile === "app" &&
-    rendered.project.recipeVersion === "0.1.0" &&
+    (rendered.project.recipeVersion === "0.1.0" || rendered.project.recipeVersion === "0.2.0") &&
     rendered.resolved.capabilities.some(
       ({ identifier, version }) => identifier === "app-foundation" && version === "0.1.0",
     );

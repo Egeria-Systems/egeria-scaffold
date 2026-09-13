@@ -15,6 +15,7 @@ export const profileRecipeVersionSchema = z.enum([
   "0.9.0",
   "0.10.0",
   "0.11.0",
+  "0.12.0",
 ]);
 
 export const profileRecipeSchema = z

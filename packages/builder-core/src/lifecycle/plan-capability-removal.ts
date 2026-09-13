@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import {
-  createVerifiedCapabilityCatalog,
+  readVerifiedProjectSnapshot,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
 import type {
@@ -23,7 +23,7 @@ import {
   type RenderedSkeleton,
 } from "../generation/render-skeleton.js";
 import { fingerprintFileContent } from "../ownership/fingerprint.js";
-import { profileRecipes } from "../profiles/profile-recipes.js";
+import type { ProfileRecipe } from "../contracts/profile.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
 import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
 import { serializeProjectYaml } from "../state/codecs.js";
@@ -190,6 +190,7 @@ function sameOrderedValues(
 
 function validatedInspection(
   inspection: ProjectInspection,
+  profiles: readonly ProfileRecipe[],
 ): ValidInspection | undefined {
   if (
     inspection.project.kind !== "valid" ||
@@ -202,7 +203,7 @@ function validatedInspection(
 
   const project = inspection.project.value;
   const state = inspection.inference.state.value;
-  const currentProfile = profileRecipes.find(
+  const currentProfile = profiles.find(
     ({ identifier }) => identifier === project.originProfile,
   );
   const migrationIdentifiers = inspection.migrations.value.map(
@@ -721,18 +722,19 @@ export async function planCapabilityRemoval(input: Readonly<{
     return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
   }
 
-  const catalog = createVerifiedCapabilityCatalog();
+  const snapshot = await readVerifiedProjectSnapshot(input.reader);
 
-  if (!catalog.ok) {
+  if (!snapshot.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
   const inspection = validatedInspection(
     await inspectProject({
-      reader: input.reader,
-      catalog: catalog.value,
-      profiles: profileRecipes,
+      reader: snapshot.value.reader,
+      catalog: snapshot.value.catalog,
+      profiles: snapshot.value.profiles,
     }),
+    snapshot.value.profiles,
   );
 
   if (inspection === undefined) {
@@ -748,7 +750,7 @@ export async function planCapabilityRemoval(input: Readonly<{
   const inferred = inspection.inference.capabilities.find(
     ({ identifier }) => identifier === capabilityValue,
   );
-  const descriptor = catalog.value.find(
+  const descriptor = snapshot.value.catalog.find(
     ({ identifier }) => identifier === capabilityValue,
   );
 
@@ -805,7 +807,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
   const [current, desiredRender] = await Promise.all([
-    renderSkeleton(renderRequest),
+    renderSkeleton(renderRequest, snapshot.value.renderingContext),
     renderSkeleton({
       profile: renderRequest.profile,
       projectName: renderRequest.projectName,
@@ -822,7 +824,7 @@ export async function planCapabilityRemoval(input: Readonly<{
         ? {}
         : { analytics: analyticsSettings }),
       packageVersions: verifiedCapabilityPackageVersions,
-    }),
+    }, snapshot.value.renderingContext),
   ]);
 
   if (!current.ok || !desiredRender.ok) {

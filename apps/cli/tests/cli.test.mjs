@@ -1,3 +1,4 @@
+import { createRetainedGenerationEntries, retainedRenderingContext } from "../../../packages/builder-core/tests/retained-generation.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import {
@@ -672,22 +673,31 @@ async function withSuccessfulPnpm(run) {
   }
 }
 
-async function withGeneratedFixture(run) {
+async function restoreRetainedTestGeneration(directory) {
+  const files = await createRetainedGenerationEntries(directory);
+  for (const [path, content] of files) {
+    await mkdir(dirname(join(directory, path)), { recursive: true });
+    await writeFile(join(directory, path), content);
+  }
+}
+
+async function withGeneratedFixture(run, profile = "portfolio") {
   const owner = await mkdtemp(join(tmpdir(), "egeria-cli-test-"));
-  const destination = join(owner, "acme-portfolio");
+  const destination = join(owner, `acme-${profile}`);
 
   try {
     assertSuccess(
       await core.generateProject({
         request: {
-          profile: "portfolio",
-          projectName: "acme-portfolio",
+          profile,
+          projectName: `acme-${profile}`,
           displayName: "Acme Portfolio",
         },
         destination,
         verifier: createFakeVerifier(),
       }),
     );
+    await restoreRetainedTestGeneration(destination);
     await run(destination);
   } finally {
     await rm(owner, { recursive: true, force: true });
@@ -711,6 +721,7 @@ async function withGeneratedCalendlyFixture(profile, run) {
         verifier: createFakeVerifier(),
       }),
     );
+    await restoreRetainedTestGeneration(destination);
     await run(destination);
   } finally {
     await rm(owner, { recursive: true, force: true });
@@ -961,6 +972,7 @@ async function withHistoricalUpgradeFixture(profile, run) {
     await cp(resolve(repositoryRoot, `fixtures/generated/${profile}`), destination, {
       recursive: true,
     });
+    await restoreRetainedTestGeneration(destination);
     await prepareHistoricalUpgradeFixture(destination);
     await run(destination);
   } finally {
@@ -1017,7 +1029,7 @@ test("app profile creation parses existing options independently and delegates g
       assert.equal(captured.standard.length, 1);
       const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8")));
       assert.equal(project.originProfile, "app");
-      assert.equal(project.recipeVersion, "0.1.0");
+      assert.equal(project.recipeVersion, "0.2.0");
       assert.deepEqual(project.capabilitySettings, allOptionals ? {
         "booking-calendly": planSettings, analytics: analyticsSettings,
       } : {});
@@ -2722,7 +2734,10 @@ test("real invalid repository roots emit the sanitized open failure", async () =
 
 test("infer, doctor, and diff preserve every fixture path and byte", async () => {
   await withGeneratedFixture(async (directory) => {
-    const catalog = assertSuccess(core.createVerifiedCapabilityCatalog());
+    const catalog = assertSuccess(core.createCapabilityCatalogSnapshot(
+      core.verifiedCapabilityPackageVersions,
+      retainedRenderingContext.catalogSnapshot,
+    ));
     const operations = [
       {
         kind: "infer",
@@ -2737,7 +2752,7 @@ test("infer, doctor, and diff preserve every fixture path and byte", async () =>
         expected: await core.doctorRepository({
           reader: core.createFileSystemRepositoryReader(directory),
           catalog,
-          profiles: core.profileRecipes,
+          profiles: retainedRenderingContext.profiles,
         }),
         exitCode: 0,
       },
@@ -2746,7 +2761,7 @@ test("infer, doctor, and diff preserve every fixture path and byte", async () =>
         expected: await core.diffProject({
           reader: core.createFileSystemRepositoryReader(directory),
           catalog,
-          profiles: core.profileRecipes,
+          profiles: retainedRenderingContext.profiles,
         }),
         exitCode: 0,
       },
@@ -2773,6 +2788,93 @@ test("infer, doctor, and diff preserve every fixture path and byte", async () =>
       assert.deepEqual(await listTree(directory), original);
     }
   });
+});
+
+test("retained CLI diagnostics ignore changed generation recipes", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-retained-cli-"));
+  try {
+    for (const profile of ["portfolio", "site", "app"]) {
+      const directory = join(owner, profile);
+      await cp(resolve(repositoryRoot, `fixtures/generated/${profile}`), directory, { recursive: true });
+      await restoreRetainedTestGeneration(directory);
+      const recipes = core.profileRecipes.splice(0);
+      try {
+        for (const kind of ["infer", "doctor", "diff"]) {
+          const captured = captureOutput();
+          assert.equal(await cli.runCli([kind, "--directory", directory], captured.output), 0);
+          assert.deepEqual(captured.error, []);
+          const { result } = JSON.parse(captured.standard[0]);
+          if (kind === "infer") {
+            assert.equal(result.capabilities.find(({ identifier }) => identifier === "standards").category, "confirmed");
+          } else {
+            assert.deepEqual(result, kind === "doctor" ? { healthy: true, diagnostics: [] } : { equal: true, differences: [] });
+          }
+        }
+      } finally {
+        core.profileRecipes.push(...recipes);
+      }
+    }
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+});
+
+test("historical diagnostic outcomes retain installed-version contradictions and upgraded provenance", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    for (const upgradedStandards of [false, true]) {
+      await withGeneratedFixture(async (directory) => {
+        if (!upgradedStandards || profile === "site") {
+          await prepareHistoricalUpgradeFixture(directory, { downgradeStandards: !upgradedStandards });
+        }
+        if (upgradedStandards && profile === "portfolio") {
+          const projectPath = join(directory, ".egeria/project.yaml");
+          const statePath = join(directory, ".egeria/state.json");
+          const project = assertSuccess(core.parseProjectYaml(await readFile(projectPath, "utf8")));
+          const state = assertSuccess(core.parseStateJson(await readFile(statePath, "utf8")));
+          const projectSource = core.serializeProjectYaml({ ...project, recipeVersion: "0.9.0" });
+          await writeFile(projectPath, projectSource);
+          await writeFile(statePath, core.serializeStateJson({
+            ...state,
+            origin: { profile, recipeVersion: "0.9.0" },
+            managedSurfaces: state.managedSurfaces.map(surface => surface.identifier === "builder-project-configuration"
+              ? { ...surface, fingerprint: core.fingerprintFileContent(new TextEncoder().encode(projectSource)) }
+              : surface),
+          }));
+        }
+        const before = await listTree(directory);
+        const contradictions = [
+          ...(profile === "site" ? ["site-routing"] : []),
+          ...(!upgradedStandards ? ["standards"] : []),
+        ];
+        const recipes = core.profileRecipes.splice(0);
+        try {
+          for (const kind of ["infer", "doctor", "diff"]) {
+            const captured = captureOutput();
+            assert.equal(await cli.runCli([kind, "--directory", directory], captured.output),
+              kind === "infer" || contradictions.length === 0 ? 0 : 1);
+            assert.deepEqual(captured.error, []);
+            const { result } = JSON.parse(captured.standard[0]);
+            if (kind === "infer") {
+              assert.deepEqual(result.capabilities.filter(({ category }) => category === "contradictory").map(({ identifier }) => identifier), contradictions);
+            } else if (kind === "doctor") {
+              assert.deepEqual(result, {
+                healthy: contradictions.length === 0,
+                diagnostics: contradictions.map(capability => ({ code: "INSTALLED_INFERENCE_CONTRADICTION", severity: "error", capability, context: { category: "contradictory" } })),
+              });
+            } else {
+              assert.deepEqual(result, {
+                equal: contradictions.length === 0,
+                differences: contradictions.map(capability => ({ kind: "inference-mismatch", capability })),
+              });
+            }
+          }
+        } finally {
+          core.profileRecipes.push(...recipes);
+        }
+        assert.deepEqual(await listTree(directory), before);
+      }, profile);
+    }
+  }
 });
 
 test("doctor and diff return exit one for diagnosed repository drift", async () => {
@@ -4149,6 +4251,7 @@ async function withGitFixture(name, run, options = {}) {
         }),
       );
     }
+    if (options.generation !== "vitest-five") await restoreRetainedTestGeneration(primary);
     if (options.preparePrimary !== undefined) {
       await options.preparePrimary(primary);
     }
@@ -4266,7 +4369,7 @@ async function assertExactInstalledAgreement(root, options = {}) {
         core.verifiedCapabilityPackageVersions,
         options.catalogSnapshot,
       )
-    : core.createVerifiedCapabilityCatalog();
+    : core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, retainedRenderingContext.catalogSnapshot);
   assert.equal(project.ok, true);
   assert.equal(state.ok, true);
   assert.equal(catalog.ok, true);
@@ -4313,7 +4416,7 @@ async function commitAll(root, message) {
 async function replaceFakeLockfileWithFixture(root, profile) {
   const lockfile = new Uint8Array(
     await readFile(
-      resolve(repositoryRoot, `fixtures/generated/${profile}/pnpm-lock.yaml`),
+      resolve(repositoryRoot, `packages/builder-core/lockfiles/web-recipe-${profile === "app" ? "app-0.1.0" : profile === "site" ? "0.9.0" : "0.10.0"}/pnpm-lock.yaml`),
     ),
   );
   await writeFile(join(root, "pnpm-lock.yaml"), lockfile);
@@ -4545,9 +4648,10 @@ test("the compiled plan-upgrade command plans the exact production site edge wit
   );
 });
 
-async function withAppTransitionFixture(profile, allOptionals, run) {
+async function withAppTransitionFixture(profile, allOptionals, run, generation = "vitest-four") {
   await withGitFixture(profile, run, {
     branch: `app-transition-${profile}-${allOptionals ? "all-optionals" : "default"}-test`,
+    generation,
     generationRequest: {
       profile,
       ...appTransitionVisualProject,
@@ -5047,6 +5151,9 @@ test("the compiled apply-upgrade command completes the exact portfolio and site 
     await withGitFixture(
       profile,
       async ({ linked, primary }) => {
+        const retainedTargetEntries = await createRetainedGenerationEntries(
+          resolve(repositoryRoot, `fixtures/generated/${profile}`),
+        );
         const linkedBefore = await gitRepositorySnapshot(linked);
         const primaryBefore = await gitRepositorySnapshot(primary);
         const initialInspection = await core.inspectGitWorktree({ root: linked });
@@ -5134,9 +5241,7 @@ test("the compiled apply-upgrade command completes the exact portfolio and site 
           assert.deepEqual(
             await readFile(join(linked, path)),
             historicalSiteFiles?.get(path) ??
-              (await readFile(
-                resolve(repositoryRoot, `fixtures/generated/${profile}`, path),
-              )),
+              Buffer.from(retainedTargetEntries.get(path)),
             `${profile}:${path}`,
           );
         }
@@ -5202,13 +5307,7 @@ test("the compiled apply-upgrade command completes the exact portfolio and site 
           targetManagedSurfaces = materialized.value;
         } else {
           const targetState = core.parseStateJson(
-            await readFile(
-              resolve(
-                repositoryRoot,
-                `fixtures/generated/${profile}/.egeria/state.json`,
-              ),
-              "utf8",
-            ),
+            Buffer.from(retainedTargetEntries.get(".egeria/state.json")).toString("utf8"),
           );
           assert.equal(targetState.ok, true);
           targetManagedSurfaces = targetState.value.managedSurfaces;
@@ -5303,10 +5402,13 @@ test("the compiled apply-upgrade command completes the exact portfolio and site 
   }
 });
 
-test("the compiled site-routing upgrade converges on the exact current site", async () => {
+test("the compiled site-routing upgrade converges on the exact retained site", async () => {
   await withGitFixture(
     "site",
     async ({ linked, primary }) => {
+      const retainedTargetEntries = await createRetainedGenerationEntries(
+        resolve(repositoryRoot, "fixtures/generated/site"),
+      );
       const linkedBefore = await gitRepositorySnapshot(linked);
       const primaryBefore = await gitRepositorySnapshot(primary);
       const initialInspection = await core.inspectGitWorktree({ root: linked });
@@ -5358,7 +5460,7 @@ test("the compiled site-routing upgrade converges on the exact current site", as
       for (const { path } of plan.actions) {
         assert.deepEqual(
           await readFile(join(linked, path)),
-          await readFile(resolve(repositoryRoot, "fixtures/generated/site", path)),
+          Buffer.from(retainedTargetEntries.get(path)),
           path,
         );
       }
@@ -5397,10 +5499,7 @@ test("the compiled site-routing upgrade converges on the exact current site", as
       );
 
       const targetState = core.parseStateJson(
-        await readFile(
-          resolve(repositoryRoot, "fixtures/generated/site/.egeria/state.json"),
-          "utf8",
-        ),
+        Buffer.from(retainedTargetEntries.get(".egeria/state.json")).toString("utf8"),
       );
       assert.equal(targetState.ok, true);
       const expectedManagedSurfaces = targetState.value.managedSurfaces.map(
@@ -5513,12 +5612,13 @@ test("the compiled site-routing upgrade verification failure retains a represent
         ),
         controlsBefore,
       );
+      const retainedTargetEntries = await createRetainedGenerationEntries(
+        resolve(repositoryRoot, "fixtures/generated/site"),
+      );
       const representativePath = plan.actions.at(0).path;
       assert.deepEqual(
         await readFile(join(linked, representativePath)),
-        await readFile(
-          resolve(repositoryRoot, "fixtures/generated/site", representativePath),
-        ),
+        Buffer.from(retainedTargetEntries.get(representativePath)),
       );
       assert.deepEqual(
         await core.inspectGitExpectedChanges({
@@ -6677,3 +6777,27 @@ test("the built entry emits one JSON line with exact process exits", async () =>
     );
   });
 });
+
+
+for (const profile of ["portfolio", "site"]) {
+  test(`compiled Vitest five app transition from ${profile} completes production verification`, async () => {
+    await withAppTransitionFixture(profile, false, async ({ linked }) => {
+      const before = await gitRepositorySnapshot(linked);
+      const planning = await executeBuilt(planProfileTransitionArguments(linked, "app"));
+      assert.equal(planning.exitCode, 0, planning.stderr);
+      assert.deepEqual(await gitRepositorySnapshot(linked), before);
+      const plan = JSON.parse(planning.stdout).plan;
+      assert.deepEqual([plan.source.profile, plan.source.recipeVersion], [profile, profile === "portfolio" ? "0.11.0" : "0.12.0"]);
+      assert.deepEqual([plan.target.profile, plan.target.recipeVersion], ["app", "0.2.0"]);
+      const result = await executeBuilt(applyProfileTransitionArguments(linked, plan.planFingerprint, "app"));
+      assert.equal(result.exitCode, 0, result.stderr);
+      assert.equal(JSON.parse(result.stdout).result.status, "verified-final-diff-approval-required");
+      const state = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8")));
+      assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.2.0" });
+      assert.deepEqual(state.lastSuccessfulVerification.checks, core.appProfileTransitionPersistedVerificationChecks);
+      assert.equal(JSON.parse(await readFile(join(linked, "apps/web/package.json"), "utf8")).devDependencies.vitest, "5.0.0");
+      assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, "packages/builder-core/lockfiles/web-recipe-app-0.2.0/pnpm-lock.yaml")));
+      await assertExactInstalledAgreement(linked, { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } });
+    }, "vitest-five");
+  });
+}
