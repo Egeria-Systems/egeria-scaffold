@@ -4282,6 +4282,32 @@ async function withGitFixture(name, run, options = {}) {
   }
 }
 
+async function restoreArchivedAppFixture(root) {
+  const revision = "f4d4833e33893719c36f5848f22e1749fc659488";
+  const source = `${revision}:fixtures/generated/app`;
+  const inventory = Buffer.from(await executeGit(
+    repositoryRoot, ["ls-tree", "-r", "-z", source], true,
+  )).toString("utf8").split("\0").filter(Boolean);
+  const expected = [];
+  for (const entry of inventory) {
+    const match = /^100644 blob ([a-f0-9]{40})\t(.+)$/u.exec(entry);
+    assert.notEqual(match, null, entry);
+    const [, object, path] = match;
+    assert.equal(path.split("/").every((part) => part !== ".." && part !== ""), true);
+    const content = Buffer.from(await executeGit(
+      repositoryRoot, ["cat-file", "blob", object], true,
+    ));
+    await mkdir(dirname(join(root, path)), { recursive: true });
+    await writeFile(join(root, path), content);
+    expected.push({ kind: "file", path, content: content.toString("base64") });
+  }
+  assert.deepEqual(
+    (await listTree(root)).filter(({ kind }) => kind === "file")
+      .sort((left, right) => left.path.localeCompare(right.path)),
+    expected.sort((left, right) => left.path.localeCompare(right.path)),
+  );
+}
+
 async function operationSnapshot(root) {
   const states = [];
 
@@ -4447,6 +4473,9 @@ function executeBuilt(arguments_, environment = {}) {
 }
 
 async function applyCompiledCapabilityAddition(root, identifier, environment = {}) {
+  const project = assertSuccess(core.parseProjectYaml(await readFile(
+    join(root, ".egeria/project.yaml"), "utf8",
+  )));
   const argumentBuilders =
     identifier === "multilingual"
       ? {
@@ -4487,7 +4516,9 @@ async function applyCompiledCapabilityAddition(root, identifier, environment = {
         ".egeria/migrations.jsonl",
         ".egeria/state.json",
       ].sort(),
-      verificationChecks: core.capabilityAdditionVerificationChecks,
+      verificationChecks: project.originProfile === "app"
+        ? core.appCapabilityAdditionVerificationChecks
+        : core.capabilityAdditionVerificationChecks,
     },
   });
   return { execution, plan };
@@ -4497,6 +4528,7 @@ async function assertCapabilityLifecycleState(
   root,
   expectedMigrations,
   expectedOptionalCapabilities,
+  options = {},
 ) {
   const projectSource = await readFile(
     join(root, ".egeria/project.yaml"),
@@ -4530,7 +4562,7 @@ async function assertCapabilityLifecycleState(
     migrationSource,
     migrations.value.map(core.serializeMigrationRecord).join(""),
   );
-  await assertExactInstalledAgreement(root);
+  await assertExactInstalledAgreement(root, options);
 }
 
 test("the compiled plan-add command emits exact portfolio and site plans without writes", async () => {
@@ -6799,5 +6831,100 @@ for (const profile of ["portfolio", "site"]) {
       assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, "packages/builder-core/lockfiles/web-recipe-app-0.2.0/pnpm-lock.yaml")));
       await assertExactInstalledAgreement(linked, { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } });
     }, "vitest-five");
+  });
+}
+
+for (const generation of [
+  { name: "retained", recipe: "0.1.0", vitest: "4.1.11", preparePrimary: restoreArchivedAppFixture },
+  { name: "current", recipe: "0.2.0", vitest: "5.0.0", catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
+]) {
+  test(`compiled ${generation.name} app optional lifecycle completes production verification`, { timeout: 1_800_000 }, async (context) => {
+    await withGitFixture("app", async ({ linked, primary }) => {
+      const primaryBefore = await gitRepositorySnapshot(primary);
+      const foundationPaths = assertSuccess(core.createVerifiedCapabilityCatalog())
+        .find(({ identifier }) => identifier === "app-foundation").managedSurfaces
+        .filter(({ fingerprintTarget }) => fingerprintTarget.kind === "file")
+        .map(({ path }) => path);
+      const foundationBefore = await Promise.all(foundationPaths.map((path) => readFile(join(linked, path))));
+      const expectedMigrations = [];
+      const selected = [];
+      const output = [];
+
+      async function assertAppState(checks) {
+        await assertCapabilityLifecycleState(linked, expectedMigrations, selected, generation);
+        const state = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8")));
+        assert.deepEqual(state.origin, { profile: "app", recipeVersion: generation.recipe });
+        assert.deepEqual(state.lastSuccessfulVerification.checks, checks);
+        assert.equal(JSON.parse(await readFile(join(linked, "apps/web/package.json"), "utf8")).devDependencies.vitest, generation.vitest);
+        assert.deepEqual(await Promise.all(foundationPaths.map((path) => readFile(join(linked, path)))), foundationBefore);
+      }
+
+      for (const identifier of ["booking-calendly", "multilingual", "analytics"]) {
+        const started = performance.now();
+        const addition = await applyCompiledCapabilityAddition(linked, identifier);
+        output.push(addition.execution.stdout);
+        selected.push(identifier);
+        expectedMigrations.push(`add-${identifier}-0-1-0`);
+        await assertAppState(core.appCapabilityAdditionPersistedVerificationChecks);
+        await commitAll(linked, `add ${identifier} capability`);
+        context.diagnostic(`${identifier} addition with Worker integration: ${Math.round(performance.now() - started)} ms`);
+      }
+
+      const composedBefore = await gitRepositorySnapshot(linked);
+      const refusal = await executeBuilt(planMultilingualRemoveArguments(linked));
+      assert.equal(refusal.exitCode, 1);
+      assert.equal(refusal.stdout, "");
+      assert.deepEqual(JSON.parse(refusal.stderr), {
+        ok: false,
+        command: "plan-remove",
+        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
+        conflicts: ["apps/web/tests/e2e/analytics-consent.spec.ts"],
+      });
+      assert.deepEqual(await gitRepositorySnapshot(linked), composedBefore);
+      output.push(refusal.stderr);
+
+      for (const [identifier, planArguments, applyArguments] of [
+        ["analytics", planAnalyticsRemoveArguments, applyAnalyticsRemoveArguments],
+        ["multilingual", planMultilingualRemoveArguments, applyMultilingualRemoveArguments],
+        ["booking-calendly", planRemoveArguments, applyRemoveArguments],
+      ]) {
+        const started = performance.now();
+        const before = await gitRepositorySnapshot(linked);
+        const planning = await executeBuilt(planArguments(linked));
+        assert.equal(planning.exitCode, 0, planning.stderr);
+        assert.equal(planning.stderr, "");
+        const plan = JSON.parse(planning.stdout).plan;
+        assert.match(plan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
+        assert.deepEqual(await gitRepositorySnapshot(linked), before);
+        const removal = await executeBuilt(applyArguments(linked, plan.planFingerprint));
+        assert.equal(removal.exitCode, 0, removal.stderr);
+        assert.equal(removal.stderr, "");
+        assert.deepEqual(JSON.parse(removal.stdout), {
+          ok: true,
+          command: "apply-remove",
+          result: {
+            status: "verified-final-diff-approval-required",
+            baseRevision: Buffer.from(before.head).toString("utf8").trim(),
+            capability: { identifier, version: "0.1.0" },
+            migration: `remove-${identifier}-0-1-0`,
+            changedPaths: [...plan.actions.filter(({ kind }) => kind !== "preserve-file-and-eject").map(({ path }) => path), ".egeria/migrations.jsonl", ".egeria/state.json"].sort(),
+            preservedPaths: [],
+            verificationChecks: core.appCapabilityRemovalVerificationChecks,
+          },
+        });
+        output.push(removal.stdout);
+        selected.splice(selected.indexOf(identifier), 1);
+        expectedMigrations.push(`remove-${identifier}-0-1-0`);
+        await assertAppState(core.appCapabilityRemovalPersistedVerificationChecks);
+        await commitAll(linked, `remove ${identifier} capability`);
+        context.diagnostic(`${identifier} removal with Worker integration: ${Math.round(performance.now() - started)} ms`);
+      }
+      assert.deepEqual(withoutSharedRefs(await gitRepositorySnapshot(primary)), withoutSharedRefs(primaryBefore));
+      assert.doesNotMatch(output.join(""), /private-planning-destination|calendly\.com|0123456789abcdef|G-ABCDEF1234|clarity123|search-console-verification|refs\/heads|\.git\/worktrees/u);
+    }, {
+      generation: "vitest-five",
+      preparePrimary: generation.preparePrimary,
+      branch: `${generation.name}-app-optional-lifecycle-test`,
+    });
   });
 }

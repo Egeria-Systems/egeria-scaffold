@@ -2529,7 +2529,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     programRoadmap,
-    /\*\*Stop gate:\*\* Complete the Vitest 5 candidate's required deterministic and generated-runtime verification[^\n]+default app-transition and separate retained-fixture visual comparisons against existing approved baselines[^\n]+independent requirements[^\n]+test-evidence reviews[^\n]+exact review packet before final-diff approval[^\n]+separate exact-manifest human approval/iu,
+    /\*\*Stop gate:\*\* Complete every subject's required evidence and review[^\n]+all-certified machine closure check[^\n]+explicit phase acceptance[^\n]+Local execution[^\n]+implementation closeout[^\n]+historical certification[^\n]+passing image comparisons alone cannot satisfy that gate[^\n]+separate exact-manifest human approval/iu,
   );
   assert.match(
     convergentProfileAdr,
