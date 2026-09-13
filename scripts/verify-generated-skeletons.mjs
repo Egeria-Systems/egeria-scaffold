@@ -348,8 +348,8 @@ export const generatedFixtureContracts = Object.freeze([
       "deployment-cloudflare",
       "observability",
     ]),
-    expectedRecipeVersion: "0.10.0",
-    expectedStandardsVersion: "0.4.0",
+    expectedRecipeVersion: "0.11.0",
+    expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
@@ -388,8 +388,8 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "booking-calendly",
     ]),
-    expectedRecipeVersion: "0.10.0",
-    expectedStandardsVersion: "0.4.0",
+    expectedRecipeVersion: "0.11.0",
+    expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
@@ -425,8 +425,8 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "site-routing",
     ]),
-    expectedRecipeVersion: "0.11.0",
-    expectedStandardsVersion: "0.4.0",
+    expectedRecipeVersion: "0.12.0",
+    expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
@@ -465,8 +465,8 @@ export const generatedFixtureContracts = Object.freeze([
       "site-routing",
       "multilingual",
     ]),
-    expectedRecipeVersion: "0.11.0",
-    expectedStandardsVersion: "0.4.0",
+    expectedRecipeVersion: "0.12.0",
+    expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
@@ -508,8 +508,8 @@ export const generatedFixtureContracts = Object.freeze([
       "analytics",
       "multilingual",
     ]),
-    expectedRecipeVersion: "0.11.0",
-    expectedStandardsVersion: "0.4.0",
+    expectedRecipeVersion: "0.12.0",
+    expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
@@ -538,8 +538,8 @@ export const generatedFixtureContracts = Object.freeze([
       "standards", "deployment-cloudflare", "content-files", "section-composition",
       "observability", "app-foundation", "site-routing",
     ]),
-    expectedRecipeVersion: "0.1.0",
-    expectedStandardsVersion: "0.4.0",
+    expectedRecipeVersion: "0.2.0",
+    expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
@@ -579,8 +579,8 @@ export const generatedFixtureContracts = Object.freeze([
       "observability", "app-foundation", "site-routing", "analytics",
       "booking-calendly", "multilingual",
     ]),
-    expectedRecipeVersion: "0.1.0",
-    expectedStandardsVersion: "0.4.0",
+    expectedRecipeVersion: "0.2.0",
+    expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
@@ -681,7 +681,6 @@ overrides:
   "next@16.3.0": 16.3.3
   "qs@": 6.16.0
   "sharp@>=0.35.0 <0.35.4": 0.35.4
-  "vitest@4.1.10": 4.1.11
 
 allowBuilds:
   "@parcel/watcher": true
@@ -704,7 +703,6 @@ overrides:
   next@16.3.0: 16.3.3
   qs@: 6.16.0
   sharp@>=0.35.0 <0.35.4: 0.35.4
-  vitest@4.1.10: 4.1.11
 
 importers:
 `;
@@ -767,7 +765,7 @@ function expectedWebManifest(projectName, nextVersion, appFoundation) {
       tailwindcss: "4.3.3",
       typescript: "6.0.3",
       "typescript-eslint": "8.66.0",
-      vitest: appFoundation ? "4.1.11" : "4.1.10",
+      vitest: "5.0.0",
       wrangler: "4.118.0",
     },
     name: `${projectName}-web`,
@@ -1084,7 +1082,7 @@ async function inspectFixture(root, contract) {
   }
 
   if (contract.profile === "app") {
-    if (fingerprint(lockfile) !== "6be34179936a9a700b51c0dc0d8c7b6c3472c7caf585bcb8caeb2005a2abd546") {
+    if (fingerprint(lockfile) !== "30b508b027b4ead219c5af2aec281b65bed7dd63ec3e338df9e5dec93597c1e4") {
       fail("FIXTURE_LOCKFILE_INVALID");
     }
   } else if (/^\s+(?:effect:|['"]?effect@)/mu.test(lockfile)) {

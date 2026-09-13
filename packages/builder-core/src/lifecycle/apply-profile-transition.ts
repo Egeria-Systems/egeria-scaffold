@@ -3,8 +3,9 @@ import { lstat, open } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 
 import {
-  createCapabilityCatalog,
   createCapabilityCatalogSnapshot,
+  vitestFourCapabilityCatalogSnapshot,
+  vitestFiveCapabilityCatalogSnapshot,
 } from "../catalog/capability-catalog.js";
 import { verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
@@ -140,12 +141,14 @@ export type ProfileTransitionExecutionResult =
           fromProfile: "portfolio" | "site";
           fromRecipeVersion: string;
           toProfile: "site" | "app";
-          toRecipeVersion: "0.10.0" | "0.1.0";
+          toRecipeVersion: "0.10.0" | "0.1.0" | "0.2.0";
         }>;
         migration:
           | typeof historicalMigrationIdentifier
           | "transition-portfolio-0-10-0-to-app-0-1-0"
-          | "transition-site-0-11-0-to-app-0-1-0";
+          | "transition-site-0-11-0-to-app-0-1-0"
+          | "transition-portfolio-0-11-0-to-app-0-2-0"
+          | "transition-site-0-12-0-to-app-0-2-0";
         changedPaths: readonly string[];
         verificationChecks:
           | typeof profileTransitionVerificationChecks
@@ -821,9 +824,13 @@ export async function applyProfileTransition(input: Readonly<{
   const plan = planResult.value;
   const app = plan.target.profile === "app";
   const migrationIdentifier = app
-    ? plan.source.profile === "portfolio"
-      ? "transition-portfolio-0-10-0-to-app-0-1-0"
-      : "transition-site-0-11-0-to-app-0-1-0"
+    ? plan.target.recipeVersion === "0.2.0"
+      ? plan.source.profile === "portfolio"
+        ? "transition-portfolio-0-11-0-to-app-0-2-0"
+        : "transition-site-0-12-0-to-app-0-2-0"
+      : plan.source.profile === "portfolio"
+        ? "transition-portfolio-0-10-0-to-app-0-1-0"
+        : "transition-site-0-11-0-to-app-0-1-0"
     : historicalMigrationIdentifier;
   const persistedChecks = app
     ? appProfileTransitionPersistedVerificationChecks
@@ -997,12 +1004,14 @@ export async function applyProfileTransition(input: Readonly<{
     );
   }
 
-  const targetCatalog = app
-    ? createCapabilityCatalog(verifiedCapabilityPackageVersions)
-    : createCapabilityCatalogSnapshot(
-        verifiedCapabilityPackageVersions,
-        { standards: "0.4.0" },
-      );
+  const targetCatalog = createCapabilityCatalogSnapshot(
+    verifiedCapabilityPackageVersions,
+    app
+      ? plan.target.recipeVersion === "0.2.0"
+        ? vitestFiveCapabilityCatalogSnapshot
+        : vitestFourCapabilityCatalogSnapshot
+      : { standards: "0.4.0" },
+  );
   if (!targetCatalog.ok) {
     return failure(
       "PROFILE_TRANSITION_REINFERENCE_FAILED",

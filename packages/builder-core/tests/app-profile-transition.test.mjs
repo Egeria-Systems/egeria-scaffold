@@ -5,6 +5,11 @@ import { deflateSync } from "node:zlib";
 import { parseDocument, stringify } from "yaml";
 import * as core from "../dist/index.js";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
+const { createVitestFourProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+const retainedRenderingContext = {
+  catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0", appFoundation: "0.1.0" },
+  profiles: createVitestFourProfileRecipes(),
+};
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const bookingCalendly = { destination: "https://calendly.com/example/discovery", mode: "popup" };
@@ -15,16 +20,17 @@ const git = { ok: true, identity: {
     root: "/private/app-plan", revision: "a".repeat(40), attachedRef: "refs/heads/app-plan", gitDirectory: "/private/common/.git/worktrees/app-plan", commonDirectory: "/private/common/.git"
   } };
 const checks = ["contracts", "pre-state-inference", "lockfile", "frozen-install", "lint", "typecheck", "unit-tests", "component-tests", "next-build", "opennext-build", "post-state-inference"];
-async function fixture(profile, subset = 0, project = { projectName: "transition-test", displayName: "Private display sentinel" }) {
+async function fixture(profile, subset = 0, project = { projectName: "transition-test", displayName: "Private display sentinel" }, generation = "vitest-four") {
   const request = {
     profile, ...project, packageVersions: core.verifiedCapabilityPackageVersions, ...(subset & 1 ? { bookingCalendly } : {}), ...(subset & 2 ? { multilingual: true } : {}), ...(subset & 4 ? { analytics } : {})
   };
-  const rendered = await core.renderSkeleton(request);
+  const context = generation === "vitest-four" ? retainedRenderingContext : undefined;
+  const rendered = await core.renderSkeleton(request, context);
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
-  const target = await core.renderSkeleton({ ...request, profile: "app" });
+  const target = await core.renderSkeleton({ ...request, profile: "app" }, context);
   assert.equal(target.ok, true);
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, new Uint8Array(content)]));
-  files.set("pnpm-lock.yaml", new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${profile === "portfolio" ? "0.10.0" : "0.9.0"}/pnpm-lock.yaml`, import.meta.url))));
+  files.set("pnpm-lock.yaml", new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${generation === "vitest-four" ? (profile === "portfolio" ? "0.10.0" : "0.9.0") : (profile === "portfolio" ? "portfolio-0.11.0" : "site-0.12.0")}/pnpm-lock.yaml`, import.meta.url))));
   files.set(".egeria/project.yaml", encoder.encode(core.serializeProjectYaml(rendered.value.project)));
   files.set(".egeria/migrations.jsonl", encoder.encode(""));
   const surfaces = core.materializeInstalledSurfaces({ files, surfaces: [...rendered.value.surfaces, ...createBuilderStateSurfaces()] });
@@ -422,8 +428,8 @@ test("frozen visual inputs reject changed runtime or lockfile identities and ret
       ...(subset & 2 ? {multilingual:true}:{}),
       ...(subset & 4 ? {analytics:policy.appTransitionVisualAnalyticsSettings}:{}),
     };
-    const source = await core.renderSkeleton({...request,profile:"portfolio"});
-    const target = await core.renderSkeleton({...request,profile:"app"});
+    const source = await core.renderSkeleton({...request,profile:"portfolio"}, retainedRenderingContext);
+    const target = await core.renderSkeleton({...request,profile:"app"}, retainedRenderingContext);
     assert.equal(source.ok,true);assert.equal(target.ok,true);
     const currentFiles = new Map(source.value.files.map(({path,content})=>[path,content]));
     const prepared = policy.prepareAppProfileTransition({source:source.value,target:target.value,currentFiles,validators});
@@ -464,3 +470,27 @@ function onePixelPng(pixel) {
   header.writeUInt32BE(1,0); header.writeUInt32BE(1,4); header[8]=8; header[9]=6;
   return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk("IHDR",header),chunk("IDAT",deflateSync(Buffer.from([0,...pixel]))),chunk("IEND",Buffer.alloc(0))]);
 }
+
+
+test("Vitest five incoming app plans preserve all optional subsets and refuse mixed generations", async () => {
+  const { resolveSupportedProfileTransition } = await import("../dist/lifecycle/supported-profile-transitions.js");
+  for (const [profile, version, retainedVersion] of [["portfolio", "0.11.0", "0.10.0"], ["site", "0.12.0", "0.11.0"]]) {
+    assert.deepEqual(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: version, toProfile: "app", toRecipeVersion: "0.2.0" }), { ok: true, value: { source: { profile, recipeVersion: version }, target: { profile: "app", recipeVersion: "0.2.0" } } });
+    for (const [source, target] of [[version, "0.1.0"], [retainedVersion, "0.2.0"]]) assert.deepEqual(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: source, toProfile: "app", toRecipeVersion: target }), { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" });
+    for (let subset = 0; subset < 8; subset++) {
+      const f = await fixture(profile, subset, undefined, "vitest-five");
+      const prepared = await prepare(f);
+      assert.equal(prepared.ok, true, JSON.stringify(prepared));
+      const manifest = JSON.parse(decoder.decode(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content));
+      assert.equal(manifest.devDependencies.vitest, "5.0.0");
+      const result = await plan(f, await reviewed(f));
+      assert.equal(result.ok, true, JSON.stringify(result));
+      assert.equal(result.value.target.recipeVersion, "0.2.0");
+      assert.equal(result.value.target.capabilities.find(({ identifier }) => identifier === "standards").version, "0.5.0");
+      assert.equal(result.value.actions.some(({ kind }) => kind.includes("delete")), false);
+      assert.equal(result.value.actions.filter(({ path }) => path === "pnpm-lock.yaml").length, 1);
+      assert.deepEqual(result.value.requiredApprovals, ["transform", "verified-final-diff"]);
+      assert.deepEqual(f.source.project.capabilitySettings, f.target.project.capabilitySettings);
+    }
+  }
+});

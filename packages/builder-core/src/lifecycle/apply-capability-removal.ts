@@ -1,7 +1,7 @@
 import { isAbsolute, resolve } from "node:path";
 
 import {
-  createVerifiedCapabilityCatalog,
+  createVerifiedProjectSnapshot,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
@@ -626,6 +626,10 @@ export async function applyCapabilityRemoval(input: Readonly<{
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
 
+  const snapshot = createVerifiedProjectSnapshot(controls.project.value, controls.state.value);
+  if (!snapshot.ok) {
+    return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+  }
   const desired = await renderSkeleton({
     profile: controls.project.value.originProfile,
     projectName: controls.project.value.project.name,
@@ -647,7 +651,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
         ? { multilingual: true as const }
         : {}),
     packageVersions: verifiedCapabilityPackageVersions,
-  });
+  }, snapshot.value.renderingContext);
   if (!desired.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
@@ -752,17 +756,9 @@ export async function applyCapabilityRemoval(input: Readonly<{
     );
   }
 
-  const catalog = createVerifiedCapabilityCatalog();
-  if (!catalog.ok) {
-    return failure(
-      "CAPABILITY_REINFERENCE_FAILED",
-      "re-infer",
-      "inspect-worktree",
-    );
-  }
   let pendingInference;
   try {
-    pendingInference = await inferRepository({ reader, catalog: catalog.value });
+    pendingInference = await inferRepository({ reader, catalog: snapshot.value.catalog });
   } catch {
     return failure(
       "CAPABILITY_REINFERENCE_FAILED",
@@ -930,7 +926,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
 
   let finalInference;
   try {
-    finalInference = await inferRepository({ reader, catalog: catalog.value });
+    finalInference = await inferRepository({ reader, catalog: snapshot.value.catalog });
   } catch {
     return failure(
       "CAPABILITY_POST_STATE_FAILED",

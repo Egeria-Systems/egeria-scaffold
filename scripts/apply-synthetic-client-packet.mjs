@@ -511,6 +511,9 @@ async function validateProjectIdentity(projectRoot, packet) {
   }
 
   const analytics = project.capabilitySettings?.analytics;
+  const standardsVersion = project.recipeVersion === "0.11.0"
+    ? "0.4.0"
+    : project.recipeVersion === "0.12.0" ? "0.5.0" : undefined;
   if (
     packageManifest.name !== packet.identifier ||
     webPackageManifest.name !== `${packet.identifier}-web` ||
@@ -520,7 +523,7 @@ async function validateProjectIdentity(projectRoot, packet) {
       name: packet.identifier,
     }) ||
     project.originProfile !== packet.profile ||
-    project.recipeVersion !== "0.11.0" ||
+    standardsVersion === undefined ||
     !sameJson(project.selectedCapabilities, expectedProjectCapabilities) ||
     !sameJson(Object.keys(analytics?.providers ?? {}), [
       "cloudflareWebAnalytics",
@@ -532,14 +535,18 @@ async function validateProjectIdentity(projectRoot, packet) {
     analytics?.consent?.policy !== packet.analytics.consentPolicy ||
     !sameJson(state.origin, {
       profile: packet.profile,
-      recipeVersion: "0.11.0",
+      recipeVersion: project.recipeVersion,
     }) ||
     !sameJson(
       state.installedCapabilities?.map(({ identifier, version }) => ({
         identifier,
         version,
       })),
-      expectedInstalledCapabilities,
+      expectedInstalledCapabilities.map((capability) =>
+        capability.identifier === "standards"
+          ? { ...capability, version: standardsVersion }
+          : capability,
+      ),
     )
   ) {
     refuse("PROJECT_IDENTITY_INVALID");

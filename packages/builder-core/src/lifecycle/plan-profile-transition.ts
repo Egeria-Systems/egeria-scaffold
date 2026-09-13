@@ -1,13 +1,11 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { createCapabilityCatalog } from "../catalog/capability-catalog.js";
-import { profileRecipes } from "../profiles/profile-recipes.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../generation/recipe-lockfiles.js";
 import { loadAppTransitionContentValidators } from "./app-transition-content-validation.js";
 import { appTransitionBaselinePaths, appTransitionVisualProject, appTransitionVisualBookingSettings, appTransitionVisualAnalyticsSettings, verifyAppTransitionVisualInputRecord, prepareAppProfileTransition, selectAppTransitionVisuals, type AppTransitionDisposition, type AppTransitionVisualEvidence, type AppTransitionPreparation, type AppTransitionFailureCode } from "./app-profile-transition.js";
 
 import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
-import { verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
+import { createVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import type { ContractIssue } from "../contracts/result.js";
 import type { InstalledState, InstalledSurface } from "../contracts/state.js";
@@ -655,7 +653,7 @@ async function planProfileTransitionInternal(input: Readonly<{
   if (!edge.ok) {
     return planningFailure(edge.code);
   }
-  if (edge.value.source.profile !== "portfolio" || edge.value.target.profile !== "site") return planningFailure("PROFILE_TRANSITION_UNSUPPORTED");
+  if (edge.value.source.profile !== "portfolio" || edge.value.source.recipeVersion !== "0.10.0" || edge.value.target.profile !== "site") return planningFailure("PROFILE_TRANSITION_UNSUPPORTED");
 
   const catalog = createCapabilityCatalogSnapshot(
     verifiedCapabilityPackageVersions,
@@ -812,7 +810,7 @@ export type AppProfileTransitionPlan = Readonly<{
   }>;
   target: Readonly<{
     profile: "app";
-    recipeVersion: "0.1.0";
+    recipeVersion: "0.1.0" | "0.2.0";
     capabilities: readonly ProfileTransitionCapabilitySubject[];
   }>;
   actions: readonly AppTransitionDisposition[];
@@ -853,7 +851,7 @@ async function readReviewedAppTransitionVisualEvidence(input: Readonly<{
     return undefined;
   }
   const optionalCapabilities = input.source.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
-  const targetLockfileFingerprint = fingerprintFileContent(new Uint8Array(await readFile(createRecipeLockfileUrl("app-0.1.0"))));
+  const targetLockfileFingerprint = fingerprintFileContent(new Uint8Array(await readFile(createRecipeLockfileUrl(input.target.project.recipeVersion === "0.2.0" ? "app-0.2.0" : "app-0.1.0"))));
   const inputRecord = verifyAppTransitionVisualInputRecord({
     optionalCapabilities,
     influencingFingerprints: canonical.value.influencingFingerprints,
@@ -912,8 +910,14 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
   if (project.ejectedAreas.length > 0 || controls.state.value.ejections.length > 0) {
     return planningFailure("PROJECT_EJECTION_UNSUPPORTED");
   }
+  const snapshot = createVerifiedProjectSnapshot(project, controls.state.value);
+  if (!snapshot.ok || snapshot.value.renderingContext === undefined) {
+    return planningFailure("PROJECT_STATE_INCOMPATIBLE");
+  }
+  const renderingContext = snapshot.value.renderingContext;
+  const targetRecipeVersion = renderingContext.catalogSnapshot.standards === "0.5.0" ? "0.2.0" : "0.1.0";
   const edge = resolveSupportedProfileTransition({
-    fromProfile: project.originProfile, fromRecipeVersion: project.recipeVersion, toProfile: "app", toRecipeVersion: "0.1.0"
+    fromProfile: project.originProfile, fromRecipeVersion: project.recipeVersion, toProfile: "app", toRecipeVersion: targetRecipeVersion
   });
   if (!edge.ok) {
     return planningFailure(edge.code);
@@ -921,12 +925,12 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
   if (project.originProfile !== "portfolio" && project.originProfile !== "site") {
     return planningFailure("PROFILE_TRANSITION_SOURCE_UNSUPPORTED");
   }
-  const catalog = createCapabilityCatalog(verifiedCapabilityPackageVersions);
+  const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, renderingContext.catalogSnapshot);
   if (!catalog.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
   const inspected = validInspection(await inspectProject({
-    reader, catalog: catalog.value, profiles: profileRecipes
+    reader, catalog: catalog.value, profiles: renderingContext.profiles
   }));
   if (inspected === undefined) {
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
@@ -934,8 +938,8 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
   const renderInput = {
     projectName: project.project.name, displayName: project.project.displayName, packageVersions: verifiedCapabilityPackageVersions, ...(project.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: project.capabilitySettings["booking-calendly"] }), ...(project.capabilitySettings.analytics === undefined ? {} : { analytics: project.capabilitySettings.analytics }), ...(project.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {})
   };
-  const sourceResult = await renderSkeleton({ ...renderInput, profile: project.originProfile });
-  const targetResult = await renderSkeleton({ ...renderInput, profile: "app" });
+  const sourceResult = await renderSkeleton({ ...renderInput, profile: project.originProfile }, renderingContext);
+  const targetResult = await renderSkeleton({ ...renderInput, profile: "app" }, renderingContext);
   if (!sourceResult.ok || !targetResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
@@ -1002,8 +1006,8 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
   const fromLock = resolveRecipeLockfileVersion({ originProfile: project.originProfile, recipeVersion: project.recipeVersion }, JSON.parse(new TextDecoder().decode(sourceManifest.content)));
-  const toLock = resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: "0.1.0" }, JSON.parse(new TextDecoder().decode(targetManifest.content)));
-  if (fromLock === undefined || toLock !== "app-0.1.0") {
+  const toLock = resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: targetRecipeVersion }, JSON.parse(new TextDecoder().decode(targetManifest.content)));
+  if (fromLock === undefined || toLock !== (targetRecipeVersion === "0.2.0" ? "app-0.2.0" : "app-0.1.0")) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
   const sourceLock = new Uint8Array(await readFile(createRecipeLockfileUrl(fromLock)));
@@ -1022,7 +1026,7 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
     operation: "transition-profile", status: "approval-required", source: {
       profile: project.originProfile, recipeVersion: project.recipeVersion, capabilities: capabilitySubjects(source)
     }, target: {
-      profile: "app", recipeVersion: "0.1.0", capabilities: capabilitySubjects(target)
+      profile: "app", recipeVersion: targetRecipeVersion, capabilities: capabilitySubjects(target)
     }, actions: dispositions.filter(({ kind }) => kind !== "preserve-file"), dispositions, requiredApprovals: ["transform", "verified-final-diff"], persistenceOrder: ["transform", "verify", "re-infer", "append-migration-record", "persist-state", "verify-state-and-inference"]
   } as const;
   const createTargets = await (input.inspectCreateTargets ?? inspectGitCreateTargets)({ root: identity.root, paths: plan.actions.filter(({ kind }) => kind === "create-file").map(({ path }) => path) });
@@ -1036,7 +1040,7 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
   const fingerprintMaterial = {
     plan, rawControls: Object.fromEntries(controls.sources), parsedControls: {
       project: controls.project.value, state: controls.state.value, migrations: controls.migrations.value
-    }, recipes: profileRecipes, sourceCatalog: catalog.value, targetCatalog: catalog.value, sourceManifest: createInstalledManifest(source.resolved), targetManifest: createInstalledManifest(target.resolved), sourceSurfaces: expectedSourceSurfaces({ rendered: source }), targetSurfaces: expectedSourceSurfaces({ rendered: target }), sourceFiles: [...currentFiles].map(([path, content]) => ({ path, content: encodeBytes(content) })), targetFiles: selected.value.files.map(({ path, content }) => ({ path, content: encodeBytes(content) })), sourceLock: encodeBytes(sourceLock), targetLock: encodeBytes(targetLock), preservedFingerprints: selected.value.preservedFingerprints, influencingFingerprints: selected.value.influencingFingerprints, visualEvidence: evidence === undefined ? null : { ...evidence, baselines: evidence.baselines.map(({ path, content }) => ({ path, content: encodeBytes(content) })) }, gitIdentity: identity
+    }, recipes: renderingContext.profiles, sourceCatalog: catalog.value, targetCatalog: catalog.value, sourceManifest: createInstalledManifest(source.resolved), targetManifest: createInstalledManifest(target.resolved), sourceSurfaces: expectedSourceSurfaces({ rendered: source }), targetSurfaces: expectedSourceSurfaces({ rendered: target }), sourceFiles: [...currentFiles].map(([path, content]) => ({ path, content: encodeBytes(content) })), targetFiles: selected.value.files.map(({ path, content }) => ({ path, content: encodeBytes(content) })), sourceLock: encodeBytes(sourceLock), targetLock: encodeBytes(targetLock), preservedFingerprints: selected.value.preservedFingerprints, influencingFingerprints: selected.value.influencingFingerprints, visualEvidence: evidence === undefined ? null : { ...evidence, baselines: evidence.baselines.map(({ path, content }) => ({ path, content: encodeBytes(content) })) }, gitIdentity: identity
   };
   return { ok: true, value: {
     plan: { ...plan, planFingerprint: fingerprintFileContent(encoder.encode(stringifyCanonicalJson(fingerprintMaterial))) },

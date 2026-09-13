@@ -1,3 +1,4 @@
+import { retainedRenderingContext } from "./retained-generation.mjs";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -97,7 +98,7 @@ async function installedEntries(profile, options = {}) {
     ...(includeBooking ? { bookingCalendly: settings } : {}),
     ...(includeMultilingual ? { multilingual: true } : {}),
     ...(includeAnalytics ? { analytics: analyticsSettings } : {}),
-  });
+  }, options.generation === "vitest-five" ? undefined : retainedRenderingContext);
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
 
   const byteFiles = new Map(
@@ -112,9 +113,9 @@ async function installedEntries(profile, options = {}) {
     "pnpm-lock.yaml",
     new Uint8Array(
       await readFile(
-        profile === "app"
-          ? resolve(packageRoot, "lockfiles/web-recipe-app-0.1.0/pnpm-lock.yaml")
-          : resolve(repositoryRoot, `fixtures/generated/${profile}/pnpm-lock.yaml`),
+        resolve(packageRoot, `lockfiles/web-recipe-${options.generation === "vitest-five"
+          ? (profile === "app" ? "app-0.2.0" : profile === "site" ? "site-0.12.0" : "portfolio-0.11.0")
+          : (profile === "app" ? "app-0.1.0" : profile === "site" ? "0.9.0" : "0.10.0")}/pnpm-lock.yaml`),
       ),
     ),
   );
@@ -412,6 +413,36 @@ function applyAppOperation(repository, operation, plan, overrides = {}) {
       });
 }
 
+test("retained optional lifecycle ignores changed generation recipes", async () => {
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (const vitestDeclaration of profile === "app" ? ["4.1.10", "4.1.11"] : ["4.1.10"]) {
+      for (const operation of appOperations.filter(({ capability }) => capability === "booking-calendly")) {
+        const entries = await installedEntries(profile, {
+          booking: operation.kind === "removal", vitestDeclaration,
+        });
+        const repository = createRepository(entries);
+        const recipes = core.profileRecipes.splice(0);
+        try {
+          const planned = await planAppOperation(repository, operation);
+          assert.equal(planned.ok, true, JSON.stringify(planned));
+          const applied = await applyAppOperation(repository, operation, planned.value, {
+            verifier: successfulVerifier([], profile === "app" ? appVerifierChecks : core.ordinaryGenerationVerificationChecks),
+          });
+          assert.equal(applied.ok, true, JSON.stringify(applied));
+          assert.equal(repository.files.get("apps/web/package.json"), entries.get("apps/web/package.json"));
+          assert.equal(repository.files.get("pnpm-lock.yaml"), entries.get("pnpm-lock.yaml"));
+          const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
+          assert.equal(state.ok, true);
+          assert.deepEqual(state.value.origin, { profile, recipeVersion: { portfolio: "0.10.0", site: "0.11.0", app: "0.1.0" }[profile] });
+          assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.4.0");
+        } finally {
+          core.profileRecipes.push(...recipes);
+        }
+      }
+    }
+  }
+});
+
 test("app optional lifecycle preserves retained and patched Vitest manifests", async () => {
   for (const vitestDeclaration of ["4.1.10", "4.1.11"]) {
     for (const operation of appOperations.filter(({ capability }) => capability === "booking-calendly")) {
@@ -550,7 +581,7 @@ test("app optional lifecycle preserves the foundation and composes every optiona
         assert.equal(repository.files.has("apps/web/content/fr-CA/localized-content.yaml"),
           desiredOptions.multilingual);
         assert.ok(repository.files.has("apps/web/content/en-CA/about.yaml"));
-        const catalog = core.createVerifiedCapabilityCatalog();
+        const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, retainedRenderingContext.catalogSnapshot);
         assert.equal(catalog.ok, true);
         const inference = await core.inferRepository({ reader: repository.reader, catalog: catalog.value });
         assert.deepEqual(
@@ -915,7 +946,7 @@ async function expectedSuccessfulArtifacts(
     projectName: currentProject.value.project.name,
     displayName: currentProject.value.project.displayName,
     packageVersions: core.verifiedCapabilityPackageVersions,
-  });
+  }, retainedRenderingContext);
   assert.equal(desired.ok, true);
   const expectedFiles = new Map(entries);
   const desiredText = new Map(
@@ -1026,7 +1057,7 @@ test("capability removal executes the approved plan once and persists migration 
       worktreeInspections,
     } = await runApply(repository);
 
-    const catalog = core.createVerifiedCapabilityCatalog();
+    const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, retainedRenderingContext.catalogSnapshot);
     assert.equal(catalog.ok, true);
     const finalInference = await core.inferRepository({
       reader: repository.reader,
@@ -1104,7 +1135,7 @@ test("multilingual and Calendly removal preserve the other capability in both in
         }),
       );
       const { result } = await runApply(repository, { capability });
-      const catalog = core.createVerifiedCapabilityCatalog();
+      const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, retainedRenderingContext.catalogSnapshot);
       const failedInference = result.ok || !catalog.ok
         ? undefined
         : await core.inferRepository({
@@ -1345,7 +1376,7 @@ test("analytics removal can be re-added with exact repaired surfaces and ordered
     ),
   );
 
-  const catalog = core.createVerifiedCapabilityCatalog();
+  const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, retainedRenderingContext.catalogSnapshot);
   assert.equal(catalog.ok, true, JSON.stringify(catalog.issues));
   const inference = await core.inferRepository({
     reader: repository.reader,
@@ -2350,4 +2381,43 @@ test("analytics removal retains failure prefixes and final authority", async () 
     finalBytesRepository.files.get(deletedPath),
     "concurrent final file\n",
   );
+});
+
+
+test("Vitest five optional lifecycle preserves its generation across every supported selection", async () => {
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (const operation of appOperations) {
+      const otherOptions = ["booking", "multilingual", "analytics"].filter(option => option !== operation.option);
+      for (let selection = 0; selection < 4; selection++) {
+        const options = { generation: "vitest-five", [operation.option]: operation.kind === "removal", [otherOptions[0]]: Boolean(selection & 1), [otherOptions[1]]: Boolean(selection & 2) };
+        const entries = await installedEntries(profile, options);
+        const repository = createRepository(entries);
+        const before = snapshot(repository.files);
+        const planned = await planAppOperation(repository, operation);
+        if (operation.kind === "removal" && operation.capability === "multilingual" && options.analytics) {
+          assert.equal(planned.ok, false);
+          assert.equal(planned.issues[0].code, "CAPABILITY_REMOVAL_REFERENCE_CONFLICT");
+          assert.equal(snapshot(repository.files), before);
+          assert.deepEqual(repository.writes, []);
+          continue;
+        }
+        assert.equal(planned.ok, true, `${profile}/${selection}: ${JSON.stringify(planned)}`);
+        const applied = await applyAppOperation(repository, operation, planned.value, {
+          verifier: successfulVerifier([], profile === "app" ? appVerifierChecks : core.ordinaryGenerationVerificationChecks),
+        });
+        assert.equal(applied.ok, true, JSON.stringify(applied));
+        assert.equal(applied.value.status, "verified-final-diff-approval-required");
+        assert.equal(repository.files.get("apps/web/package.json"), entries.get("apps/web/package.json"));
+        assert.equal(repository.files.get("pnpm-lock.yaml"), entries.get("pnpm-lock.yaml"));
+        const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
+        assert.equal(state.ok, true);
+        assert.deepEqual(state.value.origin, { profile, recipeVersion: { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" }[profile] });
+        assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.0");
+        assert.equal(state.value.lastSuccessfulVerification.checks.includes("worker-integration"), profile === "app");
+        const expected = await installedEntries(profile, { ...options, [operation.option]: operation.kind === "addition" });
+        for (const [path, content] of expected) if (!path.startsWith(".egeria/")) assert.deepEqual(repository.files.get(path), content, path);
+        assert.deepEqual([...repository.files.keys()].sort(), [...expected.keys()].sort());
+      }
+    }
+  }
 });

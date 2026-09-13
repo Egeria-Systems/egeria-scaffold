@@ -21,7 +21,7 @@ import { createRecipeLockfileUrl } from "../generation/recipe-lockfiles.js";
 import { fingerprintFileContent, fingerprintJsonValue } from "../ownership/fingerprint.js";
 import {
   createProfileRecipeSnapshot,
-  profileRecipes,
+  createVitestFourProfileRecipes,
 } from "../profiles/profile-recipes.js";
 import { createCachingRepositoryReader } from "../repository/cache-reader.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
@@ -845,7 +845,7 @@ async function planSiteRoutingUpgrade(input: Readonly<{
     }),
     renderSkeleton(request, {
       catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0" },
-      profiles: profileRecipes,
+      profiles: createVitestFourProfileRecipes(),
     }),
   ]);
   if (!sourceResult.ok || !targetResult.ok) {

@@ -1,3 +1,4 @@
+import { createRetainedGenerationEntries, retainedRenderingContext } from "./retained-generation.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import {
@@ -106,7 +107,7 @@ async function loadEntries(directory) {
 }
 
 async function currentEntries(profile) {
-  return loadEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
+  return createRetainedGenerationEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
 }
 
 async function sourceEntries(variant = "portfolio") {
@@ -424,7 +425,7 @@ function assertFailure(result, expected) {
   );
 }
 
-async function appTransitionSource(profile, subset = 0) {
+async function appTransitionSource(profile, subset = 0, generation = "vitest-four") {
   const rendered = await core.renderSkeleton({
     profile,
     ...appTransitionVisualProject,
@@ -432,11 +433,11 @@ async function appTransitionSource(profile, subset = 0) {
     ...(subset & 1 ? { bookingCalendly: appTransitionVisualBookingSettings } : {}),
     ...(subset & 2 ? { multilingual: true } : {}),
     ...(subset & 4 ? { analytics: appTransitionVisualAnalyticsSettings } : {}),
-  });
+  }, generation === "vitest-four" ? retainedRenderingContext : undefined);
   assert.equal(rendered.ok, true, JSON.stringify(rendered));
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, bytes(content)]));
   files.set("pnpm-lock.yaml", bytes(await readFile(resolve(packageRoot,
-    `lockfiles/web-recipe-${profile === "portfolio" ? "0.10.0" : "0.9.0"}/pnpm-lock.yaml`))));
+    `lockfiles/web-recipe-${generation === "vitest-four" ? (profile === "portfolio" ? "0.10.0" : "0.9.0") : (profile === "portfolio" ? "portfolio-0.11.0" : "site-0.12.0")}/pnpm-lock.yaml`))));
   files.set(".egeria/project.yaml", bytes(core.serializeProjectYaml(rendered.value.project)));
   files.set(".egeria/migrations.jsonl", bytes(""));
   const surfaces = core.materializeInstalledSurfaces({
@@ -719,6 +720,31 @@ test("app transitions execute in real linked worktrees through production Git an
   }
 });
 
+test("retained incoming app transitions ignore changed generation recipes", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    const source = await appTransitionSource(profile);
+    const repository = createRepository(source);
+    const recipes = core.profileRecipes.splice(0);
+    try {
+      const execution = await runAppTransition(repository, {
+        verifier: {
+          prepareLockfile() { throw new Error("must not resolve a new graph"); },
+          async verifyInIsolatedCopy() { return { ok: true, value: { checks: core.appGenerationVerificationChecks } }; },
+        },
+      });
+      assert.equal(execution.result.ok, true, JSON.stringify(execution.result));
+      const manifest = JSON.parse(decode(repository.files.get("apps/web/package.json")));
+      assert.equal(manifest.devDependencies.vitest, "4.1.10");
+      const state = core.parseStateJson(decode(repository.files.get(".egeria/state.json")));
+      assert.equal(state.ok, true);
+      assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.1.0" });
+      assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.1.0/pnpm-lock.yaml"))));
+    } finally {
+      core.profileRecipes.push(...recipes);
+    }
+  }
+});
+
 for (const profile of ["portfolio", "site"]) {
   for (let subset = 0; subset < 8; subset += 1) {
     test(`app transition executes ${profile} optional subset ${subset} with state-last persistence`, async () => {
@@ -781,7 +807,7 @@ for (const profile of ["portfolio", "site"]) {
       assert.deepEqual(state.value.appliedMigrations, [execution.result.value.migration]);
       assert.deepEqual(state.value.ejections, []);
       assert.deepEqual(state.value.lastSuccessfulVerification.checks, core.appProfileTransitionPersistedVerificationChecks);
-      const catalog = core.createCapabilityCatalog(core.verifiedCapabilityPackageVersions);
+      const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, retainedRenderingContext.catalogSnapshot);
       assert.equal(catalog.ok, true);
       const inferred = await core.inferRepository({ reader: repository.reader, catalog: catalog.value });
       assert.ok(inferred.capabilities.every(({ category }) => category === "confirmed"));
@@ -2000,4 +2026,39 @@ test("filesystem-backed portfolio-to-site transition rejects an ancestor swap du
       );
     },
   );
+});
+
+
+test("Vitest five incoming app execution preserves all subsets with exact state-last receipts", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    for (let subset = 0; subset < 8; subset++) {
+      const source = await appTransitionSource(profile, subset, "vitest-five");
+      const repository = createRepository(source);
+      const plan = await approvedAppPlan(repository.reader);
+      const execution = await invokeApply(repository, {
+        toProfile: "app", approvedPlanFingerprint: plan.planFingerprint,
+        verifier: {
+          prepareLockfile() { throw new Error("must not resolve a new graph"); },
+          async verifyInIsolatedCopy() {
+            assertControlBytes(repository, source);
+            assert.equal(repository.writes.length, 1);
+            return { ok: true, value: { checks: core.appGenerationVerificationChecks } };
+          },
+        },
+      });
+      assert.equal(execution.result.ok, true, JSON.stringify(execution.result));
+      assert.equal(execution.result.value.status, "verified-final-diff-approval-required");
+      assert.equal(execution.result.value.migration, profile === "portfolio" ? "transition-portfolio-0-11-0-to-app-0-2-0" : "transition-site-0-12-0-to-app-0-2-0");
+      assert.deepEqual(repository.writes.map(batch => batch.map(({ path }) => path)), [plan.actions.map(({ path }) => path), [".egeria/project.yaml"], [".egeria/migrations.jsonl"], [".egeria/state.json"]]);
+      const state = core.parseStateJson(decode(repository.files.get(".egeria/state.json")));
+      assert.equal(state.ok, true);
+      assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.2.0" });
+      assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.0");
+      assert.deepEqual(state.value.lastSuccessfulVerification.checks, core.appProfileTransitionPersistedVerificationChecks);
+      assert.equal(JSON.parse(decode(repository.files.get("apps/web/package.json"))).devDependencies.vitest, "5.0.0");
+      assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.0/pnpm-lock.yaml"))));
+      for (const { path, kind } of plan.dispositions) if (kind === "preserve-file") assert.deepEqual(repository.files.get(path), source.get(path), path);
+      assertExactChangedPaths(repository.files, snapshotFiles(source), execution.result.value.changedPaths);
+    }
+  }
 });

@@ -276,9 +276,9 @@ test("fixture inspection accepts only the exact portable generated trees", async
   for (const contract of generatedFixtureContracts) {
     assert.equal(
       contract.expectedRecipeVersion,
-      contract.profile === "app" ? "0.1.0" : contract.profile === "site" ? "0.11.0" : "0.10.0",
+      contract.profile === "app" ? "0.2.0" : contract.profile === "site" ? "0.12.0" : "0.11.0",
     );
-    assert.equal(contract.expectedStandardsVersion, "0.4.0");
+    assert.equal(contract.expectedStandardsVersion, "0.5.0");
     assert.equal(contract.expectedObservabilityVersion, "0.3.0");
     assert.equal(contract.expectedContentFilesVersion, "0.4.0");
     assert.equal(contract.expectedDeploymentCloudflareVersion, "0.3.0");

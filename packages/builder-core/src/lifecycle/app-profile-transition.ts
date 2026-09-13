@@ -85,22 +85,44 @@ export const appTransitionVisualInputRecord = Object.freeze({
     "analytics+booking-calendly+multilingual": "sha256:01e06ed6a197332aeba54da7273eaf1890d08e85f51357332fb38f3862dd5b69",
   }),
 });
+// Fixed candidate inputs for the Vitest five generation. Acceptance remains
+// subject to the exact-manifest human review; existing image bytes are retained.
+export const vitestFiveAppTransitionVisualInputRecord = Object.freeze({
+  targetLockfileFingerprint: "sha256:30b508b027b4ead219c5af2aec281b65bed7dd63ec3e338df9e5dec93597c1e4",
+  baselines: appTransitionVisualInputRecord.baselines,
+  subsets: Object.freeze({
+    "none": "sha256:dfc60385615cb729f0598c01452cd2f7290ba564391c966d92229b0390ccde27",
+    "analytics": "sha256:ed4a015fc8567ccf180fea629dd384791a5ac500f3a990e1b4557e56526490db",
+    "booking-calendly": "sha256:84187c5699c6d2c4568e513ca458ea0a26f2d69bb6b5beef9f9b8897528c2cbb",
+    "analytics+booking-calendly": "sha256:a08e75ec88cbfd65fff093d783c90c9344d604edb0f74c5856a1919a391a0556",
+    "multilingual": "sha256:8a6a1c5d0ba31a4639922a381f9c8e05fc4231dbaef17f8ab44e6870be929bb8",
+    "analytics+multilingual": "sha256:d16ebfc8c831567dd8269be596c94f94ed7757e561688acaea4ea69d796359b8",
+    "booking-calendly+multilingual": "sha256:007ce32bc0d33ffa11dcf31a988e72227747230f27274cb495906db7ec06ece3",
+    "analytics+booking-calendly+multilingual": "sha256:3baacdc7a131838d5a5a3431e71beb7788550500c852002864e2e60f89da90a2",
+  }),
+});
 export function verifyAppTransitionVisualInputRecord(input: Readonly<{
   optionalCapabilities: readonly string[];
   influencingFingerprints: readonly AppTransitionPathFingerprint[];
   targetLockfileFingerprint: `sha256:${string}`;
   baselines?: readonly GeneratedFile[];
 }>): AppTransitionResult<Readonly<{ fingerprint: `sha256:${string}` }>> {
+  const record = input.targetLockfileFingerprint === appTransitionVisualInputRecord.targetLockfileFingerprint
+    ? appTransitionVisualInputRecord
+    : input.targetLockfileFingerprint === vitestFiveAppTransitionVisualInputRecord.targetLockfileFingerprint
+      ? vitestFiveAppTransitionVisualInputRecord
+      : undefined;
+  if (record === undefined) return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
   const optionalCapabilities = [...input.optionalCapabilities].sort(compareText);
   const key = optionalCapabilities.join("+") || "none";
   const fingerprint = fingerprintJsonValue(input.influencingFingerprints);
   if (new Set(optionalCapabilities).size !== optionalCapabilities.length ||
-      !Object.hasOwn(appTransitionVisualInputRecord.subsets, key) ||
-      Reflect.get(appTransitionVisualInputRecord.subsets, key) !== fingerprint ||
-      input.targetLockfileFingerprint !== appTransitionVisualInputRecord.targetLockfileFingerprint) {
+      !Object.hasOwn(record.subsets, key) ||
+      Reflect.get(record.subsets, key) !== fingerprint ||
+      input.targetLockfileFingerprint !== record.targetLockfileFingerprint) {
     return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
   }
-  const expectedBaselines = appTransitionVisualInputRecord.baselines[optionalCapabilities.includes("multilingual") ? "multilingual" : "monolingual"];
+  const expectedBaselines = record.baselines[optionalCapabilities.includes("multilingual") ? "multilingual" : "monolingual"];
   if (input.baselines !== undefined) {
     const baselines = input.baselines;
     if (baselines.length !== appTransitionBaselinePaths.length ||

@@ -1,3 +1,4 @@
+import { createRetainedGenerationEntries, retainedRenderingContext } from "./retained-generation.mjs";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -74,16 +75,20 @@ async function loadEntries(root) {
 }
 
 async function currentEntries(profile) {
-  return loadEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
+  const entries = await createRetainedGenerationEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
+  return new Map([...entries].map(([path, content]) => {
+    try { return [path, new TextDecoder("utf-8", { fatal: true }).decode(content)]; }
+    catch { return [path, { kind: "error", code: "FILE_ENCODING_INVALID" }]; }
+  }));
 }
 
 async function appControlEntries() {
   const source = await currentEntries("site");
   const project = core.parseProjectYaml(source.get(".egeria/project.yaml"));
   assert.equal(project.ok, true);
-  const catalog = core.createVerifiedCapabilityCatalog();
+  const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, retainedRenderingContext.catalogSnapshot);
   assert.equal(catalog.ok, true);
-  const resolved = core.resolveCapabilities({ profile: "app" }, catalog.value, core.profileRecipes);
+  const resolved = core.resolveCapabilities({ profile: "app" }, catalog.value, retainedRenderingContext.profiles);
   assert.equal(resolved.ok, true);
   const state = JSON.parse(source.get(".egeria/state.json"));
   return new Map([
@@ -451,7 +456,7 @@ test("the supported standards edge binds the accepted endpoint subjects", () => 
 
 test("catalog snapshots refuse undeclared standards versions at runtime", () => {
   for (const snapshot of [
-    { standards: "0.5.0" },
+    { standards: "0.6.0" },
     {},
     null,
     undefined,

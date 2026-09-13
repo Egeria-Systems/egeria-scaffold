@@ -63,7 +63,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
   assert.deepEqual(core.profileRecipes.at(-1), {
     identifier: "app",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.1.0",
+    recipeVersion: "0.2.0",
     defaultCapabilities: ["app-foundation", "site-routing"],
   });
 
@@ -81,7 +81,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
     );
     const identifiers = resolution.capabilities.map(({ identifier }) => identifier);
 
-    assert.equal(resolution.recipeVersion, "0.1.0");
+    assert.equal(resolution.recipeVersion, "0.2.0");
     assert.deepEqual(
       identifiers,
       [
@@ -266,7 +266,7 @@ test("standards hybrid ownership declares generated unit, component, browser, an
   );
 
   assert.notEqual(standards, undefined);
-  assert.equal(standards.version, "0.4.0");
+  assert.equal(standards.version, "0.5.0");
   assert.equal(standards.deliveryMode, "hybrid");
   assert.deepEqual(standards.requiredPackages, [
     "@axe-core/playwright",
@@ -1784,7 +1784,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.10.0",
+      recipeVersion: "0.11.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1796,7 +1796,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.11.0",
+      recipeVersion: "0.12.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1809,7 +1809,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "app",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.1.0",
+      recipeVersion: "0.2.0",
       defaultCapabilities: ["app-foundation", "site-routing"],
     },
   ]);
@@ -1833,7 +1833,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.10.0");
+  assert.equal(portfolio.recipeVersion, "0.11.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1869,7 +1869,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
 
     assert.equal(
       selected.recipeVersion,
-      profile === "portfolio" ? "0.10.0" : "0.11.0",
+      profile === "portfolio" ? "0.11.0" : "0.12.0",
     );
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
@@ -1915,7 +1915,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
   assert.deepEqual(core.createInstalledManifest(site), [
     {
       identifier: "standards",
-      version: "0.4.0",
+      version: "0.5.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -1965,9 +1965,9 @@ test("current recipes add app while historical portfolio and site snapshots stay
       recipeVersion,
     })),
     [
-      { identifier: "portfolio", recipeVersion: "0.10.0" },
-      { identifier: "site", recipeVersion: "0.11.0" },
-      { identifier: "app", recipeVersion: "0.1.0" },
+      { identifier: "portfolio", recipeVersion: "0.11.0" },
+      { identifier: "site", recipeVersion: "0.12.0" },
+      { identifier: "app", recipeVersion: "0.2.0" },
     ],
   );
 
@@ -2229,6 +2229,8 @@ test("supported profile transition admits only the historical and two exact inco
     ["portfolio", "0.10.0", "site", "0.10.0"],
     ["portfolio", "0.10.0", "app", "0.1.0"],
     ["site", "0.11.0", "app", "0.1.0"],
+    ["portfolio", "0.11.0", "app", "0.2.0"],
+    ["site", "0.12.0", "app", "0.2.0"],
   ]) {
     assert.deepEqual(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}), {
       ok: true, value: {source: {profile: fromProfile, recipeVersion: fromRecipeVersion}, target: {profile: toProfile, recipeVersion: toRecipeVersion}},
