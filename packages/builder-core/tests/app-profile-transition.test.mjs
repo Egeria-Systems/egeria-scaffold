@@ -77,6 +77,10 @@ for (const profile of ["portfolio", "site"])
       const result = await plan(f, { manifestFingerprint: `sha256:${"b".repeat(64)}` });
       assert.notEqual(result.issues?.[0]?.code, "PROFILE_TRANSITION_UNSUPPORTED");
       const evidence = await reviewed(f);
+      const prepared = await prepare(f);
+      assert.equal(prepared.ok, true);
+      const manifest = JSON.parse(decoder.decode(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content));
+      assert.equal(manifest.devDependencies.vitest, "4.1.10", "incoming transitions preserve the source declaration");
       const successful = await plan(f, evidence);
       assert.equal(successful.ok, true, JSON.stringify(successful));
       assert.deepEqual(await plan(f, evidence), successful);

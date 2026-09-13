@@ -103,6 +103,11 @@ async function installedEntries(profile, options = {}) {
   const byteFiles = new Map(
     rendered.value.files.map(({ path, content }) => [path, content]),
   );
+  if (options.vitestDeclaration !== undefined) {
+    const manifest = JSON.parse(decoder.decode(byteFiles.get("apps/web/package.json")));
+    manifest.devDependencies.vitest = options.vitestDeclaration;
+    byteFiles.set("apps/web/package.json", encoder.encode(`${JSON.stringify(manifest)}\n`));
+  }
   byteFiles.set(
     "pnpm-lock.yaml",
     new Uint8Array(
@@ -406,6 +411,26 @@ function applyAppOperation(repository, operation, plan, overrides = {}) {
         inspectRepositoryInventory: inventoryInspectorForFiles(repository.files),
       });
 }
+
+test("app optional lifecycle preserves retained and patched Vitest manifests", async () => {
+  for (const vitestDeclaration of ["4.1.10", "4.1.11"]) {
+    for (const operation of appOperations.filter(({ capability }) => capability === "booking-calendly")) {
+      const entries = await installedEntries("app", {
+        booking: operation.kind === "removal", vitestDeclaration,
+      });
+      const repository = createRepository(entries);
+      const planned = await planAppOperation(repository, operation);
+      assert.equal(planned.ok, true, JSON.stringify(planned));
+      const applied = await applyAppOperation(repository, operation, planned.value);
+      assert.equal(applied.ok, true, JSON.stringify(applied));
+      assert.equal(repository.files.get("apps/web/package.json"), entries.get("apps/web/package.json"));
+      const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
+      assert.equal(state.ok, true);
+      assert.equal(state.value.managedSurfaces.find(({ identifier }) => identifier === "standards-vitest-package").fingerprint,
+        core.fingerprintJsonValue(vitestDeclaration));
+    }
+  }
+});
 
 test("app optional lifecycle preserves the foundation and composes every optional selection", async (context) => {
   for (const operation of appOperations) {

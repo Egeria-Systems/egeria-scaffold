@@ -767,7 +767,7 @@ function expectedWebManifest(projectName, nextVersion, appFoundation) {
       tailwindcss: "4.3.3",
       typescript: "6.0.3",
       "typescript-eslint": "8.66.0",
-      vitest: "4.1.10",
+      vitest: appFoundation ? "4.1.11" : "4.1.10",
       wrangler: "4.118.0",
     },
     name: `${projectName}-web`,

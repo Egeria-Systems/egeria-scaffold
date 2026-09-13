@@ -2086,7 +2086,7 @@
       "path": "apps/web/vitest.config.ts"
     },
     {
-      "fingerprint": "sha256:cbb84a3868c92d45819f65514b9759aa915c523229e29af624ea51415a0ea10f",
+      "fingerprint": "sha256:ed1ce9bbc2bcbbea5e6ebab073d005f386cd755bc814d43bf3954610a7567aec",
       "fingerprintTarget": {
         "kind": "json-value",
         "pointer": "/devDependencies/vitest"
