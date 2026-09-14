@@ -10,6 +10,13 @@ export const requiredEvidence = Object.freeze({
     "existing-repository-lifecycle",
     "fresh-scaffold",
   ]),
+  "application-persistence": Object.freeze([
+    "cleanup-recovery",
+    "deployed-application",
+    "existing-repository-lifecycle",
+    "fresh-scaffold",
+    "provider-confirmed",
+  ]),
   "booking-calendly": Object.freeze([
     "cleanup-recovery",
     "deployed-application",

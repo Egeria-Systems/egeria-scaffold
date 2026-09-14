@@ -117,6 +117,41 @@ async function successfulCommand(input) {
   return "";
 }
 
+test("persistence fixture binding verification executes separately and a failed binding lane refuses success", async () => {
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-binding-order-"));
+  try {
+    for (const bindingFails of [false, true]) {
+      const commands = [];
+      let ownedPath;
+      const run = () => verifyGeneratedProjectForTesting(
+        resolve(repositoryRoot, "fixtures/generated/app-persistence"), "app-persistence",
+        {
+          async createOwner() { const owner = await createKnownOwner(ownerParent); ownedPath = owner.path; return owner; },
+          async runCommand(input) {
+            commands.push(input.arguments);
+            if (bindingFails && input.arguments.at(-1) === "test:integration:bindings") throw new Error("PRIVATE_VALUE");
+            return successfulCommand(input);
+          },
+        },
+      );
+      if (bindingFails) {
+        await expectFixtureError(run, "BINDING_INTEGRATION_FAILED");
+        assert.equal(commands.some((arguments_) => arguments_.at(-1) === "browser:install"), false);
+      } else {
+        const result = await run();
+        assert.deepEqual(result.bindingIntegration, { executed: ["app-persistence"], skipped: [] });
+        assert.deepEqual(result.workerIntegration, { executed: ["app-persistence"], skipped: [] });
+        assert.equal(result.checks.includes("binding-integration"), false);
+        const binding = commands.findIndex((arguments_) => arguments_.at(-1) === "test:integration:bindings");
+        assert.deepEqual(commands[binding], ["--dir", "apps/web", "run", "test:integration:bindings"]);
+        assert.equal(commands[binding - 1].at(-1), "test:integration:cloudflare");
+        assert.equal(commands[binding + 1].at(-1), "browser:install");
+      }
+      assert.equal(await pathExists(ownedPath), false);
+    }
+  } finally { await rm(ownerParent, { recursive: true, force: true }); }
+});
+
 test("fixture Effect source imports cannot enter domain, content, presentation or client modules", async () => {
   const owner = await mkdtemp(join(tmpdir(), "egeria-effect-sources-"));
   try {
@@ -163,6 +198,10 @@ test("fixture dependency graphs keep the approved app lock and native-build deni
       { identifier: "app", path: "pnpm-lock.yaml", change: (text) => text.replaceAll("4.0.0-rc.112", "4.0.0-rc.113"), code: "FIXTURE_LOCKFILE_INVALID" },
       { identifier: "app", path: "pnpm-workspace.yaml", change: (text) => text.replace("msgpackr-extract: false", "msgpackr-extract: true"), code: "FIXTURE_WORKSPACE_POLICY_INVALID" },
       { identifier: "app", path: "apps/web/package.json", change: (text) => text.replace("vitest run --config vitest.cloudflare.config.ts", "echo skipped"), code: "FIXTURE_MANIFEST_INVALID" },
+      { identifier: "app-persistence", path: "apps/web/package.json", change: (text) => text.replace("vitest run --config vitest.bindings.config.ts", "echo skipped"), code: "FIXTURE_MANIFEST_INVALID" },
+      { identifier: "app-persistence", path: "apps/web/package.json", change: (text) => text.replace("0.45.2", "0.45.3"), code: "FIXTURE_MANIFEST_INVALID" },
+      { identifier: "app-persistence", path: "pnpm-lock.yaml", change: (text) => text.replace("drizzle-kit@0.31.10", "drizzle-kit@0.31.11"), code: "FIXTURE_LOCKFILE_INVALID" },
+      { identifier: "app-persistence", path: "pnpm-workspace.yaml", change: (text) => text.replace('  "@esbuild-kit/core-utils>esbuild": 0.25.4\n', ""), code: "FIXTURE_WORKSPACE_POLICY_INVALID" },
     ].entries()) {
       const root = await copyFixture(owner, identifier, `policy-${index}`);
       const original = await readFile(join(root, path), "utf8");
@@ -198,6 +237,8 @@ test("app Worker integration executes after OpenNext and records non-app absence
         skipped: identifier === "portfolio" ? [identifier] : [],
       });
       assert.ok(!result.checks.includes("worker-integration"), "aggregate checks cannot imply execution for every fixture");
+      assert.deepEqual(result.bindingIntegration, { executed: [], skipped: [identifier] });
+      assert.equal(commands.some((arguments_) => arguments_.at(-1) === "test:integration:bindings"), false);
     }
   } finally {
     await rm(ownerParent, { recursive: true, force: true });
@@ -270,6 +311,10 @@ test("fixture inspection accepts only the exact portable generated trees", async
         profile: "app",
         relativeRoot: "fixtures/generated/app-all-optional-integrations",
       },
+      {
+        identifier: "app-persistence", profile: "app",
+        relativeRoot: "fixtures/generated/app-persistence",
+      },
     ],
   );
 
@@ -278,10 +323,10 @@ test("fixture inspection accepts only the exact portable generated trees", async
       contract.expectedRecipeVersion,
       contract.profile === "app" ? "0.2.0" : contract.profile === "site" ? "0.12.0" : "0.11.0",
     );
-    assert.equal(contract.expectedStandardsVersion, "0.5.0");
+    assert.equal(contract.expectedStandardsVersion, contract.identifier === "app-persistence" ? "0.6.0" : "0.5.0");
     assert.equal(contract.expectedObservabilityVersion, "0.3.0");
     assert.equal(contract.expectedContentFilesVersion, "0.4.0");
-    assert.equal(contract.expectedDeploymentCloudflareVersion, "0.3.0");
+    assert.equal(contract.expectedDeploymentCloudflareVersion, contract.identifier === "app-persistence" ? "0.4.0" : "0.3.0");
     assert.equal(
       contract.expectedSiteRoutingVersion,
       contract.profile === "portfolio" ? null : "0.4.0",
@@ -313,7 +358,8 @@ test("fixture inspection accepts only the exact portable generated trees", async
             : contract.identifier === "site-multilingual"
               ? 139
               : contract.identifier === "app" ? 142
-                : contract.identifier === "app-all-optional-integrations" ? 178 : 154,
+                : contract.identifier === "app-all-optional-integrations" ? 178
+                  : contract.identifier === "app-persistence" ? 160 : 154,
     );
     assert.equal(
       contract.visualRegression,
@@ -321,6 +367,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
         "site-multilingual",
         "site-multilingual-analytics",
         "app-all-optional-integrations",
+        "app-persistence",
       ].includes(contract.identifier),
     );
     const snapshot = await inspectGeneratedFixture(
@@ -528,6 +575,8 @@ test("generated fixture text and visual baseline attributes are explicit", async
     "fixtures/generated/app/package.json: eol: lf",
     "fixtures/generated/app-all-optional-integrations/package.json: text: set",
     "fixtures/generated/app-all-optional-integrations/package.json: eol: lf",
+    "fixtures/generated/app-persistence/package.json: text: set",
+    "fixtures/generated/app-persistence/package.json: eol: lf",
   ]);
 
   const baselineDirectory =
@@ -557,7 +606,7 @@ test("generated fixture text and visual baseline attributes are explicit", async
     { cwd: repositoryRoot, encoding: "utf8" },
   );
 
-  assert.equal(baselinePaths.length, 18);
+  assert.equal(baselinePaths.length, 20);
   assert.deepEqual(
     binaryAttributes.trimEnd().split("\n"),
     baselinePaths.flatMap((path) => [
@@ -706,23 +755,22 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
       "FIXTURE_LOCKFILE_INVALID",
     );
 
-    const snapshotLocatorRoot = await copyFixture(
-      owner,
-      "portfolio",
-      "snapshot-locator",
-    );
-    const snapshotLockfilePath = join(snapshotLocatorRoot, "pnpm-lock.yaml");
-    const snapshotLockfile = await readFile(snapshotLockfilePath, "utf8");
-    const alteredSnapshotLockfile = snapshotLockfile.replace(
-      "      tslib: 2.8.1",
-      "      tslib: git+https://example.invalid/unapproved.git",
-    );
-    assert.notEqual(alteredSnapshotLockfile, snapshotLockfile);
-    await writeFile(snapshotLockfilePath, alteredSnapshotLockfile);
-    await expectFixtureError(
-      () => inspectGeneratedFixture(snapshotLocatorRoot, "portfolio"),
-      "FIXTURE_LOCKFILE_INVALID",
-    );
+    for (const [index, locator] of [
+      "file:../../private-package", "link:../../private-package", "workspace:*",
+      "git+https://example.invalid/unapproved.git", "git://example.invalid/unapproved.git",
+      "github:unapproved/package", "https://example.invalid/package.tgz", "http://example.invalid/package.tgz",
+    ].entries()) {
+      const snapshotLocatorRoot = await copyFixture(owner, "portfolio", `snapshot-locator-${index}`);
+      const snapshotLockfilePath = join(snapshotLocatorRoot, "pnpm-lock.yaml");
+      const snapshotLockfile = await readFile(snapshotLockfilePath, "utf8");
+      const alteredSnapshotLockfile = snapshotLockfile.replace("      tslib: 2.8.1", `      tslib: ${locator}`);
+      assert.notEqual(alteredSnapshotLockfile, snapshotLockfile);
+      await writeFile(snapshotLockfilePath, alteredSnapshotLockfile);
+      await expectFixtureError(
+        () => inspectGeneratedFixture(snapshotLocatorRoot, "portfolio"),
+        "FIXTURE_LOCKFILE_INVALID",
+      );
+    }
   } finally {
     await rm(owner, { recursive: true, force: true });
   }
@@ -763,6 +811,7 @@ test("single-root verification runs the exact fixed checks against caller output
       ok: true,
       fixtures: ["portfolio-calendly"],
       workerIntegration: { executed: [], skipped: ["portfolio-calendly"] },
+      bindingIntegration: { executed: [], skipped: ["portfolio-calendly"] },
       appBuildEvidence: [],
       profiles: ["portfolio"],
       checks: [
@@ -1601,7 +1650,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     });
 
     const { appBuildEvidence, ...verification } = result;
-    assert.deepEqual(appBuildEvidence.map(({ fixture }) => fixture), ["app", "app-all-optional-integrations"]);
+    assert.deepEqual(appBuildEvidence.map(({ fixture }) => fixture), ["app", "app-all-optional-integrations", "app-persistence"]);
     for (const build of appBuildEvidence) {
       assert.equal(build.effect.version, "4.0.0-rc.112");
       assert.equal(build.client.files.length, 1);
@@ -1619,11 +1668,16 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         "site-multilingual-analytics",
         "app",
         "app-all-optional-integrations",
+        "app-persistence",
       ],
       profiles: ["portfolio", "site", "app"],
       workerIntegration: {
-        executed: ["app", "app-all-optional-integrations"],
+        executed: ["app", "app-all-optional-integrations", "app-persistence"],
         skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-multilingual-analytics"],
+      },
+      bindingIntegration: {
+        executed: ["app-persistence"],
+        skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-multilingual-analytics", "app", "app-all-optional-integrations"],
       },
       checks: [
         "pnpm-version",
@@ -1653,14 +1707,10 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     }
   }
 
-  const commandsPerFixture = 16;
-  const fixtureCommands = generatedFixtureContracts.map((_, index) =>
-    commands.slice(
-      index * commandsPerFixture,
-      (index + 1) * commandsPerFixture,
-    ),
+  const fixtureCommands = generatedFixtureContracts.map(({ identifier }) =>
+    commands.filter(({ cwd }) => cwd === join(ownedPath, `${identifier}-project`)),
   );
-  assert.equal(fixtureCommands.every((entries) => entries.length === 16), true);
+  assert.deepEqual(fixtureCommands.map((entries) => entries.length), [16, 16, 16, 16, 16, 16, 16, 17]);
   const firstCommands = fixtureCommands.map(
     ([command]) => command,
   );
@@ -1700,7 +1750,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   );
   for (const arguments_ of fixtureCommands.slice(1)) {
     assert.deepEqual(
-      arguments_.map(({ arguments: current }) =>
+      arguments_.filter(({ arguments: current }) => current.at(-1) !== "test:integration:bindings").map(({ arguments: current }) =>
         current.map((argument) =>
           ownedPath !== undefined && argument.startsWith(ownedPath)
             ? "<owned-path>"

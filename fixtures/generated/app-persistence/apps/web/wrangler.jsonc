@@ -1,0 +1,50 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "acme-app-persistence-local",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "invocation_logs": false }
+  },
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  "vars": { "APPLICATION_DATABASE_ENVIRONMENT": "local" },
+  "d1_databases": [{
+    "binding": "APP_DB",
+    "database_name": "acme-app-persistence-application-local",
+    "database_id": "application-database-local",
+    "migrations_dir": "./migrations",
+    "migrations_table": "d1_migrations"
+  }],
+  "env": {
+    "staging": {
+      "name": "acme-app-persistence-staging",
+      "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
+      "vars": { "APPLICATION_DATABASE_ENVIRONMENT": "staging" },
+      "d1_databases": [{
+        "binding": "APP_DB",
+        "database_name": "acme-app-persistence-application-staging",
+        "database_id": "application-database-staging-unconfigured",
+        "migrations_dir": "./migrations",
+        "migrations_table": "d1_migrations"
+      }]
+    },
+    "production": {
+      "name": "acme-app-persistence",
+      "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+      "version_metadata": { "binding": "CF_VERSION_METADATA" },
+      "vars": { "APPLICATION_DATABASE_ENVIRONMENT": "production" },
+      "d1_databases": [{
+        "binding": "APP_DB",
+        "database_name": "acme-app-persistence-application-production",
+        "database_id": "application-database-production-unconfigured",
+        "migrations_dir": "./migrations",
+        "migrations_table": "d1_migrations"
+      }]
+    }
+  }
+}

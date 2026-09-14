@@ -1669,7 +1669,7 @@ test("the repository registry admits current subjects and reports coordinated pe
     stdout: `${JSON.stringify({
       ok: true,
       gate: "admission",
-      records: 10,
+      records: 11,
     })}\n`,
     stderr: "",
   });
@@ -1699,6 +1699,7 @@ test("the repository registry admits current subjects and reports coordinated pe
     [
       "analytics",
       "app-foundation",
+      "application-persistence",
       "booking-calendly",
       "content-files",
       "deployment-cloudflare",
@@ -1823,7 +1824,7 @@ test("ordinary admission requires a new pending task for a changed accepted subj
         stdout: `${JSON.stringify({
           ok: true,
           gate: "admission",
-          records: 10,
+          records: 11,
         })}\n`,
         stderr: "",
       },
@@ -1855,7 +1856,7 @@ test("the ordinary certification gate does not require private workflow artifact
       stdout: `${JSON.stringify({
         ok: true,
         gate: "admission",
-        records: 10,
+        records: 11,
       })}\n`,
       stderr: "",
     });

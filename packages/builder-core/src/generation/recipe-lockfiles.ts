@@ -1,4 +1,4 @@
-type RecipeLockfileVersion = "0.8.0" | "0.9.0" | "0.10.0" | "app-0.1.0" | "portfolio-0.11.0" | "site-0.12.0" | "app-0.2.0";
+type RecipeLockfileVersion = "0.8.0" | "0.9.0" | "0.10.0" | "app-0.1.0" | "portfolio-0.11.0" | "site-0.12.0" | "app-0.2.0" | "application-persistence";
 
 export type RecipeLockfileIdentity = Readonly<{
   originProfile: string;
@@ -26,6 +26,12 @@ export function resolveRecipeLockfileVersion(
   const next = dependencies.next;
   const eslintConfigNext = devDependencies["eslint-config-next"];
   const vitest = devDependencies.vitest;
+  if (dependencies["drizzle-orm"] !== undefined || devDependencies["drizzle-kit"] !== undefined) {
+    return identity.originProfile === "app" && identity.recipeVersion === "0.2.0" &&
+      next === "16.3.3" && eslintConfigNext === "16.3.3" && vitest === "5.0.0" &&
+      dependencies.effect === "4.0.0-rc.112" && dependencies["drizzle-orm"] === "0.45.2" &&
+      devDependencies["drizzle-kit"] === "0.31.10" ? "application-persistence" : undefined;
+  }
   if (vitest === "5.0.0") {
     if (identity.originProfile === "app") {
       return identity.recipeVersion === "0.2.0" && next === "16.3.3" &&
@@ -74,7 +80,7 @@ export function createRecipeLockfileUrl(
   version: RecipeLockfileVersion,
 ): URL {
   return new URL(
-    `../../lockfiles/web-recipe-${version}/pnpm-lock.yaml`,
+    version === "application-persistence" ? "../../lockfiles/web-application-persistence/pnpm-lock.yaml" : `../../lockfiles/web-recipe-${version}/pnpm-lock.yaml`,
     import.meta.url,
   );
 }

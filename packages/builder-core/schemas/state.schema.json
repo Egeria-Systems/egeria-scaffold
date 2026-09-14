@@ -285,6 +285,70 @@
                         }
                       ],
                       "type": "array"
+                    },
+                    {
+                      "items": false,
+                      "maxItems": 14,
+                      "minItems": 14,
+                      "prefixItems": [
+                        {
+                          "const": "contracts",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pre-state-inference",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lockfile",
+                          "type": "string"
+                        },
+                        {
+                          "const": "frozen-install",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lint",
+                          "type": "string"
+                        },
+                        {
+                          "const": "cloudflare-types",
+                          "type": "string"
+                        },
+                        {
+                          "const": "typecheck",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unit-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "component-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "next-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "opennext-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "worker-integration",
+                          "type": "string"
+                        },
+                        {
+                          "const": "binding-integration",
+                          "type": "string"
+                        },
+                        {
+                          "const": "post-state-inference",
+                          "type": "string"
+                        }
+                      ],
+                      "type": "array"
                     }
                   ],
                   "readOnly": true
@@ -420,6 +484,74 @@
                         }
                       ],
                       "type": "array"
+                    },
+                    {
+                      "items": false,
+                      "maxItems": 15,
+                      "minItems": 15,
+                      "prefixItems": [
+                        {
+                          "const": "contracts",
+                          "type": "string"
+                        },
+                        {
+                          "const": "plan-approval",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pre-state-inference",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lockfile",
+                          "type": "string"
+                        },
+                        {
+                          "const": "frozen-install",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lint",
+                          "type": "string"
+                        },
+                        {
+                          "const": "cloudflare-types",
+                          "type": "string"
+                        },
+                        {
+                          "const": "typecheck",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unit-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "component-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "next-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "opennext-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "worker-integration",
+                          "type": "string"
+                        },
+                        {
+                          "const": "binding-integration",
+                          "type": "string"
+                        },
+                        {
+                          "const": "post-change-inference",
+                          "type": "string"
+                        }
+                      ],
+                      "type": "array"
                     }
                   ],
                   "readOnly": true
@@ -547,6 +679,74 @@
                         },
                         {
                           "const": "worker-integration",
+                          "type": "string"
+                        },
+                        {
+                          "const": "post-change-inference",
+                          "type": "string"
+                        }
+                      ],
+                      "type": "array"
+                    },
+                    {
+                      "items": false,
+                      "maxItems": 15,
+                      "minItems": 15,
+                      "prefixItems": [
+                        {
+                          "const": "contracts",
+                          "type": "string"
+                        },
+                        {
+                          "const": "plan-approval",
+                          "type": "string"
+                        },
+                        {
+                          "const": "pre-state-inference",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lockfile",
+                          "type": "string"
+                        },
+                        {
+                          "const": "frozen-install",
+                          "type": "string"
+                        },
+                        {
+                          "const": "lint",
+                          "type": "string"
+                        },
+                        {
+                          "const": "cloudflare-types",
+                          "type": "string"
+                        },
+                        {
+                          "const": "typecheck",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unit-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "component-tests",
+                          "type": "string"
+                        },
+                        {
+                          "const": "next-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "opennext-build",
+                          "type": "string"
+                        },
+                        {
+                          "const": "worker-integration",
+                          "type": "string"
+                        },
+                        {
+                          "const": "binding-integration",
                           "type": "string"
                         },
                         {

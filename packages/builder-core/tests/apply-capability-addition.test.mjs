@@ -1101,3 +1101,84 @@ test("filesystem addition writer preserves live files across commit races and st
     "second.txt",
   ]);
 });
+
+test("application persistence addition preserves custom scripts and installs the reviewed tuple only after binding verification", async () => {
+  const repository = createRepository(await fixtureEntries("app"));
+  const manifest = JSON.parse(repository.files.get("apps/web/package.json"));
+  manifest.scripts.custom = "node custom.mjs";
+  repository.files.set("apps/web/package.json", `${JSON.stringify(manifest, null, 2)}\n`);
+  const plan = await approvedPlan(repository.reader, "application-persistence");
+  assert.ok(plan.actions.some(({ path }) => path === "pnpm-lock.yaml"));
+  const result = await core.applyCapabilityAddition({
+    root, capability: "application-persistence", approvedPlanFingerprint: plan.planFingerprint,
+    reader: repository.reader, writer: repository.writer,
+    inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }),
+    verifier: { verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: core.persistenceGenerationVerificationChecks } }) },
+    now: () => "2026-09-14T00:00:00Z",
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const state = JSON.parse(repository.files.get(".egeria/state.json"));
+  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.6.0");
+  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.4.0");
+  assert.ok(state.lastSuccessfulVerification.checks.includes("binding-integration"));
+  assert.equal(JSON.parse(repository.files.get("apps/web/package.json")).scripts.custom, "node custom.mjs");
+  assert.equal(repository.files.get("pnpm-lock.yaml"), await readFile(resolve(packageRoot, "lockfiles/web-application-persistence/pnpm-lock.yaml"), "utf8"));
+  assert.deepEqual(repository.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
+});
+
+test("application persistence addition refuses incomplete binding receipts before persisting state", async () => {
+  const repository = createRepository(await fixtureEntries("app"));
+  const state = repository.files.get(".egeria/state.json");
+  const plan = await approvedPlan(repository.reader, "application-persistence");
+  const result = await core.applyCapabilityAddition({
+    root, capability: "application-persistence", approvedPlanFingerprint: plan.planFingerprint,
+    reader: repository.reader, writer: repository.writer,
+    inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }),
+    verifier: { verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: core.appGenerationVerificationChecks } }) },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "CAPABILITY_VERIFICATION_FAILED");
+  assert.equal(repository.files.get(".egeria/state.json"), state);
+  assert.equal(repository.writes.length, 1);
+});
+
+test("persistence addition approval binds preserved package members before any write", async () => {
+  const repository = createRepository(await fixtureEntries("app"));
+  const plan = await approvedPlan(repository.reader, "application-persistence");
+  const manifest = JSON.parse(repository.files.get("apps/web/package.json"));
+  manifest.scripts.custom = "node changed-after-approval.mjs";
+  repository.files.set("apps/web/package.json", `${JSON.stringify(manifest, null, 2)}\n`);
+  const result = await core.applyCapabilityAddition({
+    root, capability: "application-persistence", approvedPlanFingerprint: plan.planFingerprint,
+    reader: repository.reader, writer: repository.writer, inspectWorktree: async () => git,
+    verifier: { verifyInIsolatedCopy: async () => { throw new Error("must not verify"); } },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "CAPABILITY_PLAN_APPROVAL_INVALID");
+  assert.deepEqual(repository.writes, []);
+});
+
+test("optional addition to a persistent app retains the binding verification lane", async () => {
+  const repository = createRepository(await fixtureEntries("app"));
+  const persistence = await approvedPlan(repository.reader, "application-persistence");
+  const adapters = {
+    root, reader: repository.reader, writer: repository.writer,
+    inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }),
+    now: () => "2026-09-14T00:00:00Z",
+  };
+  const installed = await core.applyCapabilityAddition({ ...adapters,
+    capability: "application-persistence", approvedPlanFingerprint: persistence.planFingerprint,
+    verifier: { verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: core.persistenceGenerationVerificationChecks } }) },
+  });
+  assert.equal(installed.ok, true, JSON.stringify(installed));
+  const plan = await approvedPlan(repository.reader, "multilingual");
+  const result = await core.applyCapabilityAddition({ ...adapters,
+    capability: "multilingual", approvedPlanFingerprint: plan.planFingerprint,
+    verifier: { verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: core.persistenceGenerationVerificationChecks } }) },
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const state = JSON.parse(repository.files.get(".egeria/state.json"));
+  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.6.0");
+  assert.ok(state.lastSuccessfulVerification.checks.includes("binding-integration"));
+  assert.ok(state.installedCapabilities.some(({ identifier }) => identifier === "multilingual"));
+});

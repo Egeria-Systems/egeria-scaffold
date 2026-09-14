@@ -7,6 +7,9 @@ import type {
 const templateLayers = new Set([
   "analytics",
   "app-foundation",
+  "application-persistence",
+  "deployment-cloudflare",
+  "standards",
   "booking-calendly",
   "common",
   "multilingual",
@@ -24,12 +27,19 @@ const templateTokenNames = new Set([
   "githubDeployUrlExpression",
   "githubCloudflareAccountIdExpression",
   "githubCloudflareApiTokenExpression",
+  "githubApplicationDatabaseEnvironmentExpression",
+  "githubExpectedDatabaseIdExpression",
+  "githubMigrationSetSha256Expression",
+  "githubSourceReviewReferenceExpression",
+  "githubRecoveryPointReferenceExpression",
+  "githubStagingApplicationDatabaseIdExpression",
+  "githubProductionApplicationDatabaseIdExpression",
   "calendlyDestinationJson",
   "calendlyModeJson",
   "analyticsSettingsJson",
 ]);
 const templateTokenPattern =
-  /{{(projectName|displayNameJson|workerName|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson)}}/g;
+  /{{(projectName|displayNameJson|workerName|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|githubApplicationDatabaseEnvironmentExpression|githubExpectedDatabaseIdExpression|githubMigrationSetSha256Expression|githubSourceReviewReferenceExpression|githubRecoveryPointReferenceExpression|githubStagingApplicationDatabaseIdExpression|githubProductionApplicationDatabaseIdExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson)}}/g;
 const completeTokenPattern = /{{([^{}]*)}}/g;
 const bookingCalendlySettingsSource =
   "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template";
@@ -50,6 +60,13 @@ const fixedTemplateTokens = {
     "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
   githubCloudflareApiTokenExpression:
     "${{ secrets.CLOUDFLARE_API_TOKEN }}",
+  githubApplicationDatabaseEnvironmentExpression: "${{ inputs.environment }}",
+  githubExpectedDatabaseIdExpression: "${{ inputs.expected_database_id }}",
+  githubMigrationSetSha256Expression: "${{ inputs.migration_set_sha256 }}",
+  githubSourceReviewReferenceExpression: "${{ inputs.source_review_reference }}",
+  githubRecoveryPointReferenceExpression: "${{ inputs.recovery_point_reference }}",
+  githubStagingApplicationDatabaseIdExpression: "${{ vars.STAGING_APPLICATION_DATABASE_ID }}",
+  githubProductionApplicationDatabaseIdExpression: "${{ vars.PRODUCTION_APPLICATION_DATABASE_ID }}",
 } as const;
 
 export type TemplateTokens = Readonly<{

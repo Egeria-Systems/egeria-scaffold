@@ -282,6 +282,26 @@ const productionSiteBookingHome: TemplateSource = {
 
 const commonHomeRouteSource = "common/apps/web/app/page.tsx";
 
+const persistenceTemplateSources = textTemplateSources([
+  "deployment-cloudflare/apps/web/vitest.bindings.config.ts",
+  "application-persistence/apps/web/drizzle.config.ts",
+  "application-persistence/apps/web/src/infrastructure/persistence/schema.ts",
+  "application-persistence/apps/web/tests/bindings/application-persistence.test.ts",
+  "application-persistence/apps/web/tests/bindings/fixtures/schema.ts",
+  "application-persistence/apps/web/tests/bindings/fixtures/worker.ts",
+  "application-persistence/apps/web/tests/bindings/fixtures/migrations/0000_persistence_fixture.sql",
+  "application-persistence/apps/web/tests/bindings/fixtures/migrations/0001_persistence_fixture_index.sql",
+  "application-persistence/.github/workflows/migrate-application-database.yml.template",
+  "application-persistence/docs/application-persistence.md",
+]);
+
+const persistenceSharedTemplateSources: readonly TemplateSource[] = [
+  { source: "deployment-cloudflare/application-persistence/apps/web/wrangler.jsonc.template", destinationSource: "common/apps/web/wrangler.jsonc.template", contentKind: "text" },
+  { source: "deployment-cloudflare/application-persistence/apps/web/scripts/check-application-database.mjs", destinationSource: "common/apps/web/scripts/check-application-database.mjs", contentKind: "text" },
+  { source: "deployment-cloudflare/application-persistence/.github/workflows/deploy.yml.template", destinationSource: "common/.github/workflows/deploy.yml.template", contentKind: "text" },
+  { source: "standards/application-persistence/.github/workflows/quality.yml.template", destinationSource: "common/.github/workflows/quality.yml.template", contentKind: "text" },
+];
+
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
@@ -302,6 +322,7 @@ export function createTemplateCatalog(
   recipeVersion = profile === "app" ? "0.2.0" : profile === "site" ? "0.12.0" : "0.11.0",
   includeMultilingual = false,
   includeAnalytics = false,
+  includeApplicationPersistence = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0");
   const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0"));
@@ -317,6 +338,7 @@ export function createTemplateCatalog(
       ? { ...entry, source: entry.source.replace("common/", "common/vitest-five/"), destinationSource: entry.source }
       : entry).filter(
       ({ source }) =>
+        !(includeApplicationPersistence && persistenceSharedTemplateSources.some(({ destinationSource }) => destinationSource === source)) &&
         !(
           (includeBookingCalendly || productionSite) &&
           source === commonHomeRouteSource
@@ -369,6 +391,7 @@ export function createTemplateCatalog(
       ? [...analyticsTemplateSources, analyticsLayoutSource(includeMultilingual)]
       : []),
     ...(app ? appFoundationTemplateSources : []),
+    ...(includeApplicationPersistence ? [...persistenceTemplateSources, ...persistenceSharedTemplateSources] : []),
   ];
   const destinations = new Set<string>();
   const entries: TemplateCatalogEntry[] = [];

@@ -23,3 +23,4 @@ If an ADR conflicts with implementation or another canonical document, identify 
 | [ADR-0013](0013-convergent-app-profile.md) | Convergent app profile | Accepted | 2026-09-05 |
 | [ADR-0014](0014-selective-effect-application-runtime.md) | Selective Effect application runtime | Accepted | 2026-09-05 |
 | [ADR-0015](0015-vitest-five-generation.md) | Vitest 5 generation and retained histories | Accepted | 2026-09-12 |
+| [ADR-0016](0016-optional-application-persistence.md) | Optional persistence and exact shared contracts | Accepted | 2026-09-14 |

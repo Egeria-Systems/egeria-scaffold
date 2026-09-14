@@ -62,3 +62,5 @@ export * from "./profiles/profile-recipes.js";
 export * from "./resolution/resolve-capabilities.js";
 export * from "./repository/repository-reader.js";
 export * from "./state/codecs.js";
+export * from "./contracts/persistence-removal-evidence.js";
+export * from "./lifecycle/review-persistence-removal-evidence.js";

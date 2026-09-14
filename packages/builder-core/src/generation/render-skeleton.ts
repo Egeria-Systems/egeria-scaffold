@@ -2,11 +2,13 @@ import { readFile } from "node:fs/promises";
 import { parseDocument } from "yaml";
 
 import {
-  createCapabilityCatalog,
   createCapabilityCatalogSnapshot,
+  applicationPersistenceScripts,
+  persistenceDeploymentScripts,
   type CapabilityCatalogSnapshot,
   type CapabilityPackageVersions,
 } from "../catalog/capability-catalog.js";
+import { createGenerationRenderingContext } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
   type AnalyticsSettings,
@@ -24,7 +26,6 @@ import {
   createJsonValueSurfaceDescriptor,
 } from "../contracts/surface-target.js";
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
-import { profileRecipes } from "../profiles/profile-recipes.js";
 import type { ProfileIdentifier, ProfileRecipe } from "../contracts/profile.js";
 import {
   resolveCapabilities,
@@ -47,6 +48,7 @@ export type GenerationRequest = Readonly<{
   analytics?: AnalyticsSettings;
   bookingCalendly?: CalendlyBookingSettings;
   multilingual?: true;
+  applicationPersistence?: true;
   packageVersions: CapabilityPackageVersions;
 }>;
 
@@ -200,6 +202,7 @@ function enrichApplicationManifest(
   packageVersions: CapabilityPackageVersions,
   profile: ProfileIdentifier,
   recipeVersion: string,
+  persistence: boolean,
 ): ValidationResult<readonly GeneratedFile[]> {
   const manifestIndex = files.findIndex(
     ({ path }) => path === "apps/web/package.json",
@@ -247,16 +250,19 @@ function enrichApplicationManifest(
       ...(app
         ? { "test:integration:cloudflare": "vitest run --config vitest.cloudflare.config.ts" }
         : {}),
+      ...(persistence ? { ...applicationPersistenceScripts, ...persistenceDeploymentScripts } : {}),
     },
     dependencies: {
       ...manifest.dependencies,
       "@egeria-systems/observability": packageVersions.observability,
       ...(productionSite ? { next: "16.3.3" } : {}),
       ...(app ? { effect: "4.0.0-rc.112" } : {}),
+      ...(persistence ? { "drizzle-orm": "0.45.2" } : {}),
     },
     devDependencies: {
       ...manifest.devDependencies,
       "@egeria-systems/standards": packageVersions.standards,
+      ...(persistence ? { "drizzle-kit": "0.31.10" } : {}),
       ...(app && recipeVersion === "0.1.0" ? { vitest: "4.1.11" } : {}),
       ...(productionSite
         ? { "eslint-config-next": "16.3.3" }
@@ -273,6 +279,7 @@ function enrichApplicationManifest(
     if (app && file.path === "pnpm-workspace.yaml") {
       const workspace = parseDocument(decoder.decode(file.content));
       workspace.setIn(["allowBuilds", "msgpackr-extract"], false);
+      if (persistence) workspace.setIn(["overrides", "@esbuild-kit/core-utils>esbuild"], "0.25.4");
       return { path: file.path, content: encoder.encode(workspace.toString()) };
     }
     return file;
@@ -418,13 +425,8 @@ export async function renderSkeleton(
     standards: request.packageVersions.standards,
     observability: request.packageVersions.observability,
   };
-  const catalogResult =
-    context === undefined
-      ? createCapabilityCatalog(packageVersions)
-      : createCapabilityCatalogSnapshot(
-          packageVersions,
-          context.catalogSnapshot,
-        );
+  const renderingContext = context ?? createGenerationRenderingContext(request.applicationPersistence === true);
+  const catalogResult = createCapabilityCatalogSnapshot(packageVersions, renderingContext.catalogSnapshot);
   if (!catalogResult.ok) {
     return catalogResult;
   }
@@ -435,7 +437,7 @@ export async function renderSkeleton(
       ...(
         request.analytics === undefined &&
         request.bookingCalendly === undefined &&
-        request.multilingual !== true
+        request.multilingual !== true && request.applicationPersistence !== true
           ? {}
           : {
               requestedCapabilities: [
@@ -444,12 +446,13 @@ export async function renderSkeleton(
                   ? []
                   : ["booking-calendly"]),
                 ...(request.multilingual === true ? ["multilingual"] : []),
+                ...(request.applicationPersistence === true ? ["application-persistence"] : []),
               ],
             }
       ),
     },
     catalogResult.value,
-    context?.profiles ?? profileRecipes,
+    renderingContext.profiles,
   );
   if (!resolutionResult.ok) {
     return resolutionResult;
@@ -466,6 +469,7 @@ export async function renderSkeleton(
     resolutionResult.value.recipeVersion,
     request.multilingual === true,
     request.analytics !== undefined,
+    request.applicationPersistence === true,
   );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;
@@ -510,6 +514,7 @@ export async function renderSkeleton(
     packageVersions,
     projectResult.value.originProfile,
     resolutionResult.value.recipeVersion,
+    request.applicationPersistence === true,
   );
   if (!manifestResult.ok) {
     return manifestResult;

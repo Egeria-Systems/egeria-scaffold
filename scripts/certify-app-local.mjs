@@ -7,11 +7,13 @@ import {
   certificationRegistrySchema,
   createCertificationSubject,
   createInstalledManifest,
-  createVerifiedCapabilityCatalog,
+  createCapabilityCatalogSnapshot,
   profileRecipes,
   resolveCapabilities,
   validateCertificationAdmission,
   validateContract,
+  verifiedCapabilityPackageVersions,
+  vitestFiveCapabilityCatalogSnapshot,
 } from "../packages/builder-core/dist/index.js";
 import { generatedFixtureContracts } from "./verify-generated-skeletons.mjs";
 import { certifyFreshScaffold, certifyFreshScaffoldForTesting } from "./lib/certify-fresh-scaffold.mjs";
@@ -65,7 +67,9 @@ async function requireAuthority(preflight, revision) {
 async function readSubjects(adapters) {
   try {
     const registry = validateContract(certificationRegistrySchema, await adapters.readRegistry());
-    const catalog = createVerifiedCapabilityCatalog();
+    const catalog = createCapabilityCatalogSnapshot(
+      verifiedCapabilityPackageVersions, vitestFiveCapabilityCatalogSnapshot,
+    );
     if (!registry.ok || !catalog.ok ||
       !isDeepStrictEqual(Object.keys(registry.value.records).sort(), capabilityIdentifiers) ||
       !isDeepStrictEqual(catalog.value.map(({ identifier }) => identifier).sort(), capabilityIdentifiers) ||

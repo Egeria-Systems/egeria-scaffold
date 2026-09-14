@@ -2,12 +2,16 @@ import { isAbsolute, resolve } from "node:path";
 
 import {
   createVerifiedProjectSnapshot,
+  createGenerationRenderingContext,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
+import { applicationPersistenceCatalogSnapshot, createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
+import { preparePersistenceRenderingChange } from "./prepare-persistence-rendering-change.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
   appGenerationVerificationChecks,
   ordinaryGenerationVerificationChecks,
+  persistenceGenerationVerificationChecks,
 } from "../contracts/generation-verification.js";
 import type { ProfileIdentifier } from "../contracts/profile.js";
 import {
@@ -23,6 +27,8 @@ import {
 import {
   appCapabilityAdditionPersistedVerificationChecks,
   appCapabilityAdditionVerificationChecks,
+  persistenceCapabilityAdditionPersistedVerificationChecks,
+  persistenceCapabilityAdditionVerificationChecks,
   capabilityAdditionPersistedVerificationChecks,
   capabilityAdditionVerificationChecks,
   installedStateSchema,
@@ -71,14 +77,15 @@ import {
 } from "./plan-capability-addition.js";
 
 const encoder = new TextEncoder();
-type AddableCapability = "analytics" | "booking-calendly" | "multilingual";
+type AddableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence";
 
 function additionMigrationIdentifier(
   capability: AddableCapability,
 ):
   | "add-analytics-0-1-0"
   | "add-booking-calendly-0-1-0"
-  | "add-multilingual-0-1-0" {
+  | "add-multilingual-0-1-0"
+  | "add-application-persistence-0-1-0" {
   switch (capability) {
     case "analytics":
       return "add-analytics-0-1-0";
@@ -86,6 +93,8 @@ function additionMigrationIdentifier(
       return "add-booking-calendly-0-1-0";
     case "multilingual":
       return "add-multilingual-0-1-0";
+    case "application-persistence":
+      return "add-application-persistence-0-1-0";
   }
 }
 
@@ -132,7 +141,8 @@ export type CapabilityAdditionExecutionResult =
         changedPaths: readonly string[];
         verificationChecks:
           | typeof capabilityAdditionVerificationChecks
-          | typeof appCapabilityAdditionVerificationChecks;
+          | typeof appCapabilityAdditionVerificationChecks
+          | typeof persistenceCapabilityAdditionVerificationChecks;
       }>;
     }>
   | Readonly<{
@@ -206,8 +216,11 @@ async function readExactFileBytes(
 function verificationIsExact(
   value: GeneratedProjectVerification,
   profile: ProfileIdentifier,
+  hasPersistence: boolean,
 ): boolean {
-  return sameValues(value.checks, profile === "app"
+  return sameValues(value.checks, hasPersistence
+    ? persistenceGenerationVerificationChecks
+    : profile === "app"
     ? appGenerationVerificationChecks
     : ordinaryGenerationVerificationChecks);
 }
@@ -252,10 +265,16 @@ function requirePendingInference(
   );
   if (
     evidenceByIdentifier.size !== desiredCapabilities.length ||
-    desiredCapabilities.some((identifier) =>
-      evidenceByIdentifier.get(identifier)?.category !==
-      (identifier === addedCapability ? "probable" : "confirmed"),
-    )
+    desiredCapabilities.some((identifier) => {
+      const evidence = evidenceByIdentifier.get(identifier);
+      if (addedCapability === "application-persistence" &&
+        (identifier === "standards" || identifier === "deployment-cloudflare")) {
+        return evidence?.category !== "contradictory" ||
+          evidence.code !== "CAPABILITY_METADATA_MISMATCH" ||
+          evidence.probes.some(({ status }) => status !== "present");
+      }
+      return evidence?.category !== (identifier === addedCapability ? "probable" : "confirmed");
+    })
   ) {
     return false;
   }
@@ -462,36 +481,38 @@ export async function applyCapabilityAddition(input: Readonly<{
   if (!snapshot.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
-  const desired = await renderSkeleton({
+  const renderRequest = {
     profile: controls.project.value.originProfile,
     projectName: controls.project.value.project.name,
     displayName: controls.project.value.project.displayName,
-    ...(input.capability === "analytics"
-      ? { analytics: settingsSnapshot as AnalyticsSettings }
-      : controls.project.value.capabilitySettings.analytics === undefined
-        ? {}
-        : { analytics: controls.project.value.capabilitySettings.analytics }),
-    ...(input.capability === "booking-calendly"
-      ? { bookingCalendly: settingsSnapshot as CalendlyBookingSettings }
-      : controls.project.value.capabilitySettings["booking-calendly"] === undefined
-        ? {}
-        : {
-            bookingCalendly:
-              controls.project.value.capabilitySettings["booking-calendly"],
-          }),
-    ...(input.capability === "multilingual" ||
-    controls.project.value.selectedCapabilities.includes("multilingual")
-      ? { multilingual: true as const }
-      : {}),
+    ...(controls.project.value.capabilitySettings.analytics === undefined ? {} : { analytics: controls.project.value.capabilitySettings.analytics }),
+    ...(controls.project.value.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: controls.project.value.capabilitySettings["booking-calendly"] }),
+    ...(controls.project.value.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
+    ...(controls.project.value.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
-  }, snapshot.value.renderingContext);
-  if (!desired.ok) {
-    return failure(
-      "PROJECT_INSPECTION_INVALID",
-      "precondition",
-      "not-required",
-    );
+  };
+  const targetContext = input.capability === "application-persistence"
+    ? createGenerationRenderingContext(true) : snapshot.value.renderingContext;
+  const targetCatalog = input.capability === "application-persistence"
+    ? createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, applicationPersistenceCatalogSnapshot)
+    : { ok: true as const, value: snapshot.value.catalog };
+  if (!targetCatalog.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+  let desired = await renderSkeleton({
+    ...renderRequest,
+    ...(input.capability === "analytics" ? { analytics: settingsSnapshot as AnalyticsSettings } : {}),
+    ...(input.capability === "booking-calendly" ? { bookingCalendly: settingsSnapshot as CalendlyBookingSettings } : {}),
+    ...(input.capability === "multilingual" ? { multilingual: true as const } : {}),
+    ...(input.capability === "application-persistence" ? { applicationPersistence: true as const } : {}),
+  }, targetContext);
+  if (!desired.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+  if (input.capability === "application-persistence") {
+    const current = await renderSkeleton(renderRequest, snapshot.value.renderingContext);
+    if (!current.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+    const prepared = await preparePersistenceRenderingChange({ reader, current: current.value, desired: desired.value });
+    if (!prepared.ok) return failure("PROJECT_DRIFT_DETECTED", "precondition", "not-required");
+    desired = { ok: true, value: prepared.value.desired };
   }
+  const hasPersistence = desired.value.project.selectedCapabilities.includes("application-persistence");
 
   const desiredFiles = new Map(
     desired.value.files.map(({ path, content }) => [path, content]),
@@ -554,6 +575,12 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
+  if (input.capability === "application-persistence") {
+    const freshPlan = await planCapabilityAddition({ reader, git: finalCleanGit, capability: input.capability });
+    if (!freshPlan.ok || freshPlan.value.planFingerprint !== plan.planFingerprint) {
+      return failure("CAPABILITY_PLAN_APPROVAL_INVALID", "precondition", "not-required");
+    }
+  }
   const transformed = await writer.write(changes);
   if (!transformed.ok) {
     return failure(
@@ -573,7 +600,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       "inspect-worktree",
     );
   }
-  if (!verified.ok || !verificationIsExact(verified.value, plan.profile)) {
+  if (!verified.ok || !verificationIsExact(verified.value, plan.profile, hasPersistence)) {
     return failure(
       "CAPABILITY_VERIFICATION_FAILED",
       "verify",
@@ -581,7 +608,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
-  const pendingInference = await inferRepository({ reader, catalog: snapshot.value.catalog });
+  const pendingInference = await inferRepository({ reader, catalog: targetCatalog.value });
   if (
     !requirePendingInference(
       pendingInference,
@@ -635,7 +662,9 @@ export async function applyCapabilityAddition(input: Readonly<{
     capabilities: plan.desiredCapabilities,
     persistentDataAuthorizations: [],
     remainingKnownDrift: [],
-    verificationChecks: plan.profile === "app"
+    verificationChecks: hasPersistence
+      ? persistenceCapabilityAdditionPersistedVerificationChecks
+      : plan.profile === "app"
       ? appCapabilityAdditionPersistedVerificationChecks
       : capabilityAdditionPersistedVerificationChecks,
   });
@@ -716,7 +745,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   }
   actualFiles.set(".egeria/state.json", persistedState.content);
 
-  const finalInference = await inferRepository({ reader, catalog: snapshot.value.catalog });
+  const finalInference = await inferRepository({ reader, catalog: targetCatalog.value });
   if (
     !requireFinalInference(
       finalInference,
@@ -771,7 +800,9 @@ export async function applyCapabilityAddition(input: Readonly<{
       capability: { identifier: input.capability, version: "0.1.0" },
       migration: additionMigrationIdentifier(input.capability),
       changedPaths,
-      verificationChecks: plan.profile === "app"
+      verificationChecks: hasPersistence
+        ? persistenceCapabilityAdditionVerificationChecks
+        : plan.profile === "app"
         ? appCapabilityAdditionVerificationChecks
         : capabilityAdditionVerificationChecks,
     },

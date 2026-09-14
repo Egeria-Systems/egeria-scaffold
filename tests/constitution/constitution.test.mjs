@@ -2480,7 +2480,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     capabilityModel,
-    /ten current pending certification subjects/iu,
+    /retained app-foundation certification subject set[\s\S]+parallel implementation exception/iu,
   );
   assert.match(
     capabilityModel,
@@ -2492,7 +2492,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     capabilityModel,
-    /Runtime status:[^\n]+ten[^\n]+descriptors[^\n]+three[^\n]+recipe[^\n]+App project\/state parsing[^\n]+generation are implemented[^\n]+pending fresh certification/iu,
+    /Runtime status:[^\n]+eleven admission descriptors[^\n]+three generation recipes[^\n]+exact descriptors[^\n]+Implementation and registry admission do not certify/iu,
   );
   const completedRemovalGuardStage = ["P", "3", "C"].join("");
   const appFoundationStage = ["P", "4"].join("");
@@ -2521,7 +2521,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     packageOwnership,
-    /ten capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.0[^\n]+pending fresh certification/iu,
+    /eleven admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
   );
   assert.match(
     programRoadmap,
@@ -2529,7 +2529,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     programRoadmap,
-    /\*\*Stop gate:\*\* Complete every subject's required evidence and review[^\n]+all-certified machine closure check[^\n]+explicit phase acceptance[^\n]+Local execution[^\n]+implementation closeout[^\n]+historical certification[^\n]+passing image comparisons alone cannot satisfy that gate[^\n]+separate exact-manifest human approval/iu,
+    /\*\*Stop gate:\*\* Complete every subject's required evidence and review[^\n]+all-certified machine closure check[^\n]+explicit phase acceptance[^\n]+Local execution[^\n]+implementation closeout[^\n]+historical certification[^\n]+passing image comparisons alone cannot satisfy the closure gate[^\n]+separate exact-manifest human approval/iu,
   );
   assert.match(
     convergentProfileAdr,
@@ -2851,7 +2851,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /ten-capability catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
+    /eleven-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
   );
 });
 
@@ -3048,7 +3048,7 @@ test("capability delivery requires a separately planned certification task", asy
 
   assert.match(
     enforcementMap,
-    /INV-CAPABILITY-CERTIFICATION[^\n]+actual tracked registry coverage[^\n]+ten current pending subjects[^\n]+historical evidence[^\n]+prior descriptor digests/i,
+    /INV-CAPABILITY-CERTIFICATION[^\n]+actual tracked registry coverage[^\n]+exact current subjects[^\n]+remain pending[^\n]+historical evidence[^\n]+prior descriptor digests/i,
   );
   assert.match(
     enforcementMap,
@@ -3354,7 +3354,7 @@ test("multilingual implementation and certification remain exact and claim-limit
     );
     assert.match(
       instructions,
-      /multilingual@0\.1\.0[\s\S]+certified[\s\S]+96b587a254cf6fc859867d6fc66c7e0c900c4cfd/iu,
+      /multilingual@0\.1\.0[\s\S]+certif(?:ied|ication)[\s\S]+96b587a254cf6fc859867d6fc66c7e0c900c4cfd/iu,
     );
   }
 });
@@ -3386,20 +3386,21 @@ test("executable capability certification ownership is current", async () => {
 
   for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
     assert.match(document, /certifications\/capabilities\.json/u);
-    assert.match(document, /ten[^\n]+pending/iu);
+    assert.match(document, /(?:pending|separate certification)/iu);
   }
   assert.match(
     capabilityModel,
-    /All ten current subjects[^\n]+pending[^\n]+historical[^\n]+prior descriptor digests/iu,
+    /new persistence, standards and deployment subjects[^\n]+empty evidence[^\n]+historical receipts retain their exact identities/iu,
   );
   assert.match(
     enforcementMap,
-    /ten current pending subjects[^\n]+all-certified[^\n]+ten pending subjects[^\n]+historical[^\n]+prior descriptor digests/iu,
+    /exact current subjects[^\n]+remain pending[^\n]+all-certified[^\n]+every pending subject[^\n]+historical[^\n]+prior descriptor digests/iu,
   );
   const registry = JSON.parse(registrySource);
   assert.deepEqual(Object.keys(registry.records), [
     "analytics",
     "app-foundation",
+    "application-persistence",
     "booking-calendly",
     "content-files",
     "deployment-cloudflare",
@@ -3413,8 +3414,8 @@ test("executable capability certification ownership is current", async () => {
     assert.equal(record.status, "pending");
     assert.equal(
       record.taskPlan,
-      capabilityId === "standards"
-        ? "docs/superpowers/plans/2026-09-12-vitest-five-migration.md"
+      ["application-persistence", "standards", "deployment-cloudflare"].includes(capabilityId)
+        ? "docs/superpowers/plans/2026-09-14-application-persistence-certification.md"
         : "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
     );
     assert.deepEqual(record.evidence, []);
@@ -3485,7 +3486,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /ten current pending subjects[^\n]+all-certified[^\n]+ten pending subjects[^\n]+historical[^\n]+prior descriptor digests/iu,
+    /exact current subjects[^\n]+remain pending[^\n]+all-certified[^\n]+every pending subject[^\n]+historical[^\n]+prior descriptor digests/iu,
   );
   assert.match(
     reviewProtocol,
@@ -3590,7 +3591,7 @@ test("canonical documentation records visual regression and the client-ready clo
     roadmap,
     builderInstructions,
   ]) {
-    assert.match(currentContractOwner, /\bten\b[^\n]+\bpending\b/iu);
+    assert.match(currentContractOwner, /\b(?:ten|subjects)\b[^\n]+\b(?:pending|empty evidence)\b/iu);
   }
 
   assert.match(
@@ -4179,7 +4180,7 @@ test("canonical documentation accepts profile-transition execution and records t
   ]) {
     assert.match(historicalCertificationOwner, multilingualEligibilityPattern);
   }
-  assert.match(builderCoreInstructions, /\bten\b[^\n]+\bpending\b/iu);
+  assert.match(builderCoreInstructions, /\b(?:ten|subjects)\b[^\n]+\b(?:pending|empty evidence)\b/iu);
 
   for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
     assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);
@@ -4234,7 +4235,7 @@ test("canonical documentation accepts profile-transition execution and records t
   }
   assert.match(
     enforcementMap,
-    /INV-CAPABILITY-CERTIFICATION[^\n]+ten current pending subjects[^\n]+historical evidence[^\n]+prior descriptor digests/iu,
+    /INV-CAPABILITY-CERTIFICATION[^\n]+exact current subjects[^\n]+remain pending[^\n]+historical evidence[^\n]+prior descriptor digests/iu,
   );
 
   assert.match(
@@ -4638,15 +4639,15 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     capabilityModel,
-    /ten current capability descriptors.*app-foundation@0\.1\.0.*App project\/state parsing, rendering, and state-last new-directory generation are implemented.*pending fresh certification/isu,
+    /eleven admission descriptors.*three generation recipes.*exact descriptors.*Implementation and registry admission do not certify/isu,
   );
   assert.match(
     packageOwnership,
-    /ten capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+pending fresh certification/iu,
+    /eleven admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
   );
   assert.match(
     builderCoreReadme,
-    /exact ten executable capability descriptors/iu,
+    /exact eleven executable admission capability descriptors/iu,
   );
   assert.match(
     cliReadme,

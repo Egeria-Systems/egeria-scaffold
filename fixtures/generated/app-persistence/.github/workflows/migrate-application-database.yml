@@ -1,0 +1,115 @@
+name: Migrate application database
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Explicit database environment approved for this migration
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      expected_revision:
+        description: Exact main revision containing the reviewed SQL
+        required: true
+        type: string
+      expected_database_id:
+        description: Database ID reviewed for the selected environment
+        required: true
+        type: string
+      migration_set_sha256:
+        description: Reviewed SQL migration-set SHA-256 from db:migrations:hash
+        required: true
+        type: string
+      source_review_reference:
+        description: Non-secret reference to accepted SQL and compatibility review
+        required: true
+        type: string
+      recovery_point_reference:
+        description: Non-secret reference to the reviewed recovery and write-consistency record
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: application-database-${{ inputs.environment }}
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  verify-and-migrate:
+    if: github.ref == 'refs/heads/main' && (inputs.environment == 'staging' || inputs.environment == 'production')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: ${{ inputs.environment }}
+    env:
+      APPLICATION_DATABASE_ENVIRONMENT: ${{ inputs.environment }}
+      STAGING_APPLICATION_DATABASE_ID: ${{ vars.STAGING_APPLICATION_DATABASE_ID }}
+      PRODUCTION_APPLICATION_DATABASE_ID: ${{ vars.PRODUCTION_APPLICATION_DATABASE_ID }}
+      EXPECTED_DATABASE_ID: ${{ inputs.expected_database_id }}
+      EXPECTED_REVISION: ${{ inputs.expected_revision }}
+      MIGRATION_SET_SHA256: ${{ inputs.migration_set_sha256 }}
+      SOURCE_REVIEW_REFERENCE: ${{ inputs.source_review_reference }}
+      RECOVERY_POINT_REFERENCE: ${{ inputs.recovery_point_reference }}
+    steps:
+      - name: Check out reviewed repository revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Verify reviewed database and SQL before installation
+        working-directory: apps/web
+        run: node scripts/check-application-database.mjs remote-migrate
+
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint generated project
+        run: pnpm run lint
+
+      - name: Generate application binding types
+        run: pnpm --dir apps/web run cf-typegen
+
+      - name: Typecheck generated project
+        run: pnpm run typecheck
+
+      - name: Test generated unit behavior
+        run: pnpm run test:unit
+
+      - name: Test generated components
+        run: pnpm run test:component
+
+      - name: Apply reviewed SQL to local storage
+        run: pnpm --dir apps/web run db:migrate:local
+
+      - name: Test application database binding
+        run: pnpm --dir apps/web run test:integration:bindings
+
+      - name: Recheck reviewed database and SQL
+        working-directory: apps/web
+        run: node scripts/check-application-database.mjs remote-migrate
+
+      - name: Apply reviewed database migrations
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          node scripts/check-application-database.mjs remote-migrate
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          pnpm exec wrangler d1 migrations apply APP_DB --remote --config .wrangler/application-database/wrangler.remote.json --env "$APPLICATION_DATABASE_ENVIRONMENT" --x-provision=false --x-auto-create=false

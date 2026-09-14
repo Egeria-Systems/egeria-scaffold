@@ -20,6 +20,7 @@ import { promisify } from "node:util";
 
 import {
   appGenerationVerificationChecks,
+  persistenceGenerationVerificationChecks,
   ordinaryGenerationVerificationChecks,
 } from "../contracts/generation-verification.js";
 import type { ValidationResult } from "../contracts/result.js";
@@ -40,7 +41,7 @@ import {
 } from "./source-tree-safety.js";
 
 export type GeneratedProjectVerification = Readonly<{
-  checks: typeof verificationChecks | typeof appGenerationVerificationChecks;
+  checks: typeof verificationChecks | typeof appGenerationVerificationChecks | typeof persistenceGenerationVerificationChecks;
 }>;
 
 export interface GeneratedProjectVerifier {
@@ -473,10 +474,11 @@ async function verifyInIsolatedCopy(
   }
 
   let workerIntegrationPresent: boolean;
+  let bindingIntegrationPresent: boolean;
   try {
     const manifest = JSON.parse(
       await readFile(join(fixedRoot, "apps/web/package.json"), "utf8"),
-    ) as { scripts?: Record<string, unknown> };
+    ) as { scripts?: Record<string, unknown>; dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
     const script = manifest.scripts?.["test:integration:cloudflare"];
     if (
       script !== undefined &&
@@ -485,6 +487,13 @@ async function verifyInIsolatedCopy(
       return issue("WORKER_INTEGRATION_INVALID", "script-mismatch");
     }
     workerIntegrationPresent = script !== undefined;
+    const bindingScript = manifest.scripts?.["test:integration:bindings"];
+    const orm = manifest.dependencies?.["drizzle-orm"];
+    const migrationTool = manifest.devDependencies?.["drizzle-kit"];
+    bindingIntegrationPresent = bindingScript !== undefined || orm !== undefined || migrationTool !== undefined;
+    if (bindingIntegrationPresent && (manifest.scripts?.["cf-typegen"] !== "wrangler types --env-interface CloudflareEnv --include-runtime=false cloudflare-env.d.ts" || !workerIntegrationPresent || bindingScript !== "vitest run --config vitest.bindings.config.ts" || orm !== "0.45.2" || migrationTool !== "0.31.10")) {
+      return issue("BINDING_INTEGRATION_INVALID", "binding-contract-mismatch");
+    }
   } catch {
     return issue("WORKER_INTEGRATION_INVALID", "manifest-invalid");
   }
@@ -544,6 +553,10 @@ async function verifyInIsolatedCopy(
             failureCode: "FROZEN_INSTALL_FAILED",
           },
           { arguments: ["run", "lint"], failureCode: "LINT_FAILED" },
+          ...(bindingIntegrationPresent ? [{
+            arguments: ["--dir", "apps/web", "run", "cf-typegen"],
+            failureCode: "CLOUDFLARE_TYPES_FAILED",
+          }] : []),
           {
             arguments: ["run", "typecheck"],
             failureCode: "TYPECHECK_FAILED",
@@ -578,11 +591,15 @@ async function verifyInIsolatedCopy(
             ],
             failureCode: "WORKER_INTEGRATION_FAILED",
           },
+          ...(bindingIntegrationPresent ? [{
+            arguments: ["--dir", "apps/web", "run", "test:integration:bindings"],
+            failureCode: "BINDING_INTEGRATION_FAILED",
+          }] : []),
         ] as const;
         result = {
           ok: true,
           value: {
-            checks: workerIntegrationPresent
+            checks: bindingIntegrationPresent ? persistenceGenerationVerificationChecks : workerIntegrationPresent
               ? appGenerationVerificationChecks
               : verificationChecks,
           },

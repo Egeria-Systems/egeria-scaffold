@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 
+import { applicationPersistenceCatalogSnapshot, createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
 import {
+  createGenerationRenderingContext,
   readVerifiedProjectSnapshot,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
@@ -8,6 +10,12 @@ import type {
   CapabilityDescriptor,
   ManagedSurfaceDescriptor,
 } from "../contracts/capability.js";
+import {
+  persistenceRemovalInputSchema,
+  type PersistenceRemovalInput,
+  type PersistenceRemovalMachineReport,
+  type PersistenceRemovalSubject,
+} from "../contracts/persistence-removal-evidence.js";
 import type { ContractIssue } from "../contracts/result.js";
 import type { ProfileIdentifier } from "../contracts/profile.js";
 import type { InstalledState, InstalledSurface } from "../contracts/state.js";
@@ -34,7 +42,13 @@ import {
 import {
   inspectGitRepositoryInventory,
   type GitWorktreeInspection,
+  type GitRepositoryInventoryInspection,
 } from "./git-worktree-inspection.js";
+
+import { preparePersistenceRenderingChange } from "./prepare-persistence-rendering-change.js";
+import { reviewPersistenceRemovalEvidence } from "./review-persistence-removal-evidence.js";
+
+type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence";
 
 export type CapabilityRemovalAction = Readonly<{
   kind:
@@ -46,6 +60,8 @@ export type CapabilityRemovalAction = Readonly<{
   ownership: "application-owned" | "ejected" | "managed";
   owner:
     | "analytics"
+    | "application-persistence"
+    | "deployment-cloudflare"
     | "booking-calendly"
     | "builder-kernel"
     | "multilingual"
@@ -79,9 +95,11 @@ export type CapabilityRemovalPlan = Readonly<{
   baseRevision: string;
   profile: ProfileIdentifier;
   capability: Readonly<{
-    identifier: "analytics" | "booking-calendly" | "multilingual";
+    identifier: RemovableCapability;
     version: "0.1.0";
   }>;
+  persistenceRemovalReport?: PersistenceRemovalMachineReport;
+  persistenceRemovalSubject?: Omit<PersistenceRemovalSubject, "databases">;
   currentCapabilities: readonly string[];
   desiredCapabilities: readonly string[];
   actions: readonly CapabilityRemovalAction[];
@@ -109,7 +127,9 @@ export type CapabilityRemovalPlanningFailureCode =
   | "CAPABILITY_NOT_INSTALLED"
   | "CAPABILITY_REMOVAL_INVENTORY_INVALID"
   | "CAPABILITY_REMOVAL_REFERENCE_CONFLICT"
-  | "CAPABILITY_REMOVAL_UNSUPPORTED";
+  | "CAPABILITY_REMOVAL_UNSUPPORTED"
+  | "PERSISTENCE_REMOVAL_INPUT_INVALID"
+  | "PERSISTENCE_REMOVAL_SUBJECT_UNAVAILABLE";
 
 type PlanningIssue = Omit<ContractIssue, "code"> &
   Readonly<{ code: CapabilityRemovalPlanningFailureCode }>;
@@ -141,6 +161,7 @@ type ValidInspection = ProjectInspection &
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const removalReferenceTokens = {
+  "application-persistence": "application-persistence",
   analytics: "analytics",
   "booking-calendly": "calendly",
   multilingual: "multilingual",
@@ -326,7 +347,7 @@ function isValidRemovedCapabilityState(input: Readonly<{
   descriptor: CapabilityDescriptor;
   inferred: ValidInspection["inference"]["capabilities"][number] | undefined;
   ejections: ReadonlySet<string>;
-  capability: "analytics" | "booking-calendly" | "multilingual";
+  capability: RemovableCapability;
 }>): boolean {
   const expectedByIdentifier = new Map(
     input.descriptor.managedSurfaces.map((surface) => [
@@ -425,6 +446,8 @@ function actionOwner(
 
   return [
     "analytics",
+    "application-persistence",
+    "deployment-cloudflare",
     "booking-calendly",
     "multilingual",
     "observability",
@@ -441,7 +464,7 @@ function fileSurfaceForPath(
   rendered: RenderedSkeleton,
   path: string,
 ): ManagedSurfaceDescriptor | undefined {
-  const candidates = rendered.surfaces.filter(
+  const candidates = [...rendered.surfaces, ...createBuilderStateSurfaces()].filter(
     (surface) =>
       surface.path === path && surface.fingerprintTarget.kind === "file",
   );
@@ -510,7 +533,7 @@ async function deriveActions(input: Readonly<{
   current: RenderedSkeleton;
   desired: RenderedSkeleton;
   state: InstalledState;
-  capability: "analytics" | "booking-calendly" | "multilingual";
+  capability: RemovableCapability;
 }>): Promise<PlanningResult<readonly CapabilityRemovalAction[]>> {
   const differences = changedFiles(input.current, input.desired);
 
@@ -528,6 +551,10 @@ async function deriveActions(input: Readonly<{
   ];
 
   for (const pair of differences.replaced) {
+    if (input.capability === "application-persistence" && pair.current.path === "apps/web/package.json") {
+      actions.push({ kind: "replace-file", path: pair.current.path, ownership: "managed", owner: "builder-kernel" });
+      continue;
+    }
     const descriptor = fileSurfaceForPath(input.current, pair.current.path);
     const installed = descriptor === undefined
       ? undefined
@@ -571,7 +598,7 @@ async function deriveActions(input: Readonly<{
     if (
       descriptor === undefined ||
       installed === undefined ||
-      owner !== input.capability ||
+      (owner !== input.capability && !(input.capability === "application-persistence" && owner === "deployment-cloudflare")) ||
       installed.fingerprint !== fingerprintFileContent(file.content)
     ) {
       return planningFailure("PROJECT_DRIFT_DETECTED");
@@ -644,7 +671,7 @@ async function deriveActions(input: Readonly<{
 
 function removalReviewRequirements(
   actions: readonly CapabilityRemovalAction[],
-  capability: "analytics" | "booking-calendly" | "multilingual",
+  capability: RemovableCapability,
   referenceWarnings: readonly CapabilityRemovalReferenceWarning[],
 ): readonly CapabilityRemovalReviewRequirement[] {
   const preservedPaths = actions
@@ -685,11 +712,97 @@ function removalReviewRequirements(
   ];
 }
 
+function fingerprintValue(value: unknown): `sha256:${string}` {
+  return fingerprintFileContent(encoder.encode(stringifyCanonicalJson(value)));
+}
+
+async function preparePersistenceReview(input: Readonly<{
+  reader: RepositoryReader;
+  descriptor: CapabilityDescriptor;
+  inventory: Extract<GitRepositoryInventoryInspection, { ok: true }>["value"];
+  input: PersistenceRemovalInput;
+}>): Promise<PlanningResult<Readonly<{
+  report: PersistenceRemovalMachineReport;
+  subject: Omit<PersistenceRemovalSubject, "databases">;
+}>>> {
+  const schemaRoot = "apps/web/src/infrastructure/persistence/";
+  const migrationRoot = "apps/web/migrations/";
+  const selectedPaths = [...new Set([
+    "apps/web/src/infrastructure/persistence/schema.ts",
+    ...input.inventory.entries.filter(({ path }) => path.startsWith(schemaRoot) || path.startsWith(migrationRoot)).map(({ path }) => path),
+  ])].sort(compareText);
+  if (input.inventory.truncated || input.inventory.entries.some(({ path, kind }) =>
+    selectedPaths.includes(path) && kind !== "file")) {
+    return planningFailure("PERSISTENCE_REMOVAL_SUBJECT_UNAVAILABLE");
+  }
+  const files: { path: string; fingerprint: string }[] = [];
+  for (const path of selectedPaths) {
+    const result = input.reader.readBytes === undefined
+      ? await input.reader.readText(path) : await input.reader.readBytes(path);
+    if (result.kind !== "file") return planningFailure("PERSISTENCE_REMOVAL_SUBJECT_UNAVAILABLE");
+    files.push({ path, fingerprint: fingerprintFileContent(typeof result.content === "string" ? encoder.encode(result.content) : result.content) });
+  }
+  const localArtifactDigests: { reference: string; digest: string }[] = [];
+  for (const { reference, path } of input.input.localArtifacts ?? []) {
+    const result = input.reader.readBytes === undefined
+      ? await input.reader.readText(path) : await input.reader.readBytes(path);
+    if (result.kind === "file") {
+      localArtifactDigests.push({ reference, digest: fingerprintFileContent(typeof result.content === "string" ? encoder.encode(result.content) : result.content) });
+    }
+  }
+  const subject = {
+    descriptorVersion: input.descriptor.version,
+    descriptorFingerprint: fingerprintValue(input.descriptor),
+    schemaFingerprint: fingerprintValue(files.filter(({ path }) => path.startsWith(schemaRoot))),
+    migrationsFingerprint: fingerprintValue(files.filter(({ path }) => path.startsWith(migrationRoot))),
+  };
+  return { ok: true, value: { subject, report: reviewPersistenceRemovalEvidence({
+    expectedSubject: { ...subject, databases: input.input.databases },
+    policy: input.input.policy,
+    ...(input.input.evidence === undefined ? {} : { evidence: input.input.evidence }),
+    localArtifactDigests,
+  }) } };
+}
+
+async function readPersistencePlanBindings(
+  reader: RepositoryReader,
+  current: RenderedSkeleton,
+  desired: RenderedSkeleton,
+  actions: readonly CapabilityRemovalAction[],
+  persistenceRemoval: PersistenceRemovalInput | undefined,
+  referenceWarnings: readonly CapabilityRemovalReferenceWarning[],
+  inventory: Extract<GitRepositoryInventoryInspection, { ok: true }>["value"],
+): Promise<unknown> {
+  const files = [];
+  const selectedPaths = [...new Set([
+    ".egeria/project.yaml", ".egeria/state.json", ".egeria/migrations.jsonl",
+    ...actions.map(({ path }) => path),
+    ...referenceWarnings.flatMap(({ path }) => path === undefined ? [] : [path]),
+    ...(persistenceRemoval?.localArtifacts ?? []).map(({ path }) => path),
+  ])].sort(compareText);
+  for (const path of selectedPaths) {
+    const result = reader.readBytes === undefined ? await reader.readText(path) : await reader.readBytes(path);
+    files.push({ path, evidence: result.kind === "file"
+      ? { kind: "file", fingerprint: fingerprintFileContent(typeof result.content === "string" ? encoder.encode(result.content) : result.content) }
+      : result });
+  }
+  return {
+    input: persistenceRemoval ?? null,
+    inventory,
+    files,
+    current: current.files.map(({ path, content }) => ({ path, fingerprint: fingerprintFileContent(content) })),
+    desired: desired.files.map(({ path, content }) => ({ path, fingerprint: fingerprintFileContent(content) })),
+    currentCapabilities: current.resolved.capabilities,
+    desiredCapabilities: desired.resolved.capabilities,
+  };
+}
+
 function fingerprintPlan(input: Readonly<{
   plan: CapabilityRemovalPlanBody;
   project: ValidInspection["project"]["value"];
   state: InstalledState;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
+  persistenceBindings?: unknown;
 }>): `sha256:${string}` {
   const digest = createHash("sha256")
     .update(
@@ -698,6 +811,7 @@ function fingerprintPlan(input: Readonly<{
         project: input.project,
         state: input.state,
         gitIdentity: input.git.identity,
+        ...(input.persistenceBindings === undefined ? {} : { persistenceBindings: input.persistenceBindings }),
       }),
       "utf8",
     )
@@ -709,7 +823,8 @@ function fingerprintPlan(input: Readonly<{
 export async function planCapabilityRemoval(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "analytics" | "booking-calendly" | "multilingual";
+  capability: RemovableCapability;
+  persistenceRemoval?: PersistenceRemovalInput;
   inspectRepositoryInventory?: typeof inspectGitRepositoryInventory;
 }>): Promise<PlanningResult<CapabilityRemovalPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
@@ -717,9 +832,17 @@ export async function planCapabilityRemoval(input: Readonly<{
   if (
     capabilityValue !== "analytics" &&
     capabilityValue !== "booking-calendly" &&
-    capabilityValue !== "multilingual"
+    capabilityValue !== "multilingual" &&
+    capabilityValue !== "application-persistence"
   ) {
     return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
+  }
+
+  const persistenceInput = input.persistenceRemoval === undefined
+    ? undefined : persistenceRemovalInputSchema.safeParse(input.persistenceRemoval);
+  if ((capabilityValue === "application-persistence" && persistenceInput?.success !== true) ||
+      (capabilityValue !== "application-persistence" && input.persistenceRemoval !== undefined)) {
+    return planningFailure("PERSISTENCE_REMOVAL_INPUT_INVALID");
   }
 
   const snapshot = await readVerifiedProjectSnapshot(input.reader);
@@ -728,10 +851,19 @@ export async function planCapabilityRemoval(input: Readonly<{
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
+  let inspectionCatalog = snapshot.value.catalog;
+  if (capabilityValue === "application-persistence" && !inspectionCatalog.some(({ identifier }) => identifier === capabilityValue)) {
+    const persistenceCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, applicationPersistenceCatalogSnapshot);
+    const removedDescriptor = persistenceCatalog.ok
+      ? persistenceCatalog.value.find(({ identifier }) => identifier === capabilityValue) : undefined;
+    if (removedDescriptor === undefined) return planningFailure("PROJECT_INSPECTION_INVALID");
+    inspectionCatalog = [...inspectionCatalog, removedDescriptor];
+  }
+
   const inspection = validatedInspection(
     await inspectProject({
       reader: snapshot.value.reader,
-      catalog: snapshot.value.catalog,
+      catalog: inspectionCatalog,
       profiles: snapshot.value.profiles,
     }),
     snapshot.value.profiles,
@@ -750,7 +882,7 @@ export async function planCapabilityRemoval(input: Readonly<{
   const inferred = inspection.inference.capabilities.find(
     ({ identifier }) => identifier === capabilityValue,
   );
-  const descriptor = snapshot.value.catalog.find(
+  const descriptor = inspectionCatalog.find(
     ({ identifier }) => identifier === capabilityValue,
   );
 
@@ -804,9 +936,10 @@ export async function planCapabilityRemoval(input: Readonly<{
       ? { multilingual: true as const }
       : {}),
     ...(analyticsSettings === undefined ? {} : { analytics: analyticsSettings }),
+    ...(project.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
-  const [current, desiredRender] = await Promise.all([
+  const [currentRender, desiredRender] = await Promise.all([
     renderSkeleton(renderRequest, snapshot.value.renderingContext),
     renderSkeleton({
       profile: renderRequest.profile,
@@ -823,13 +956,23 @@ export async function planCapabilityRemoval(input: Readonly<{
       ...(capabilityValue === "analytics" || analyticsSettings === undefined
         ? {}
         : { analytics: analyticsSettings }),
+      ...(capabilityValue !== "application-persistence" && renderRequest.applicationPersistence === true ? { applicationPersistence: true as const } : {}),
       packageVersions: verifiedCapabilityPackageVersions,
-    }, snapshot.value.renderingContext),
+    }, capabilityValue === "application-persistence" ? createGenerationRenderingContext(false) : snapshot.value.renderingContext),
   ]);
 
-  if (!current.ok || !desiredRender.ok) {
+  if (!currentRender.ok || !desiredRender.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
+
+  const prepared = capabilityValue === "application-persistence"
+    ? await preparePersistenceRenderingChange({ reader: input.reader, current: currentRender.value, desired: desiredRender.value })
+    : { ok: true as const, value: { current: currentRender.value, desired: desiredRender.value } };
+  if (!prepared.ok) {
+    return planningFailure("PROJECT_DRIFT_DETECTED");
+  }
+  const current = { ok: true as const, value: prepared.value.current };
+  const targetRender = prepared.value.desired;
 
   if (
     hasSurfaceInventoryDrift(
@@ -863,7 +1006,7 @@ export async function planCapabilityRemoval(input: Readonly<{
   const actions = await deriveActions({
     reader: input.reader,
     current: current.value,
-    desired: desiredRender.value,
+    desired: targetRender,
     state,
     capability: capabilityValue,
   });
@@ -873,23 +1016,26 @@ export async function planCapabilityRemoval(input: Readonly<{
   }
 
   let referenceWarnings: readonly CapabilityRemovalReferenceWarning[];
+  let inventory: Extract<GitRepositoryInventoryInspection, { ok: true }>;
   try {
-    const inventory = await (
+    const inventoryResult = await (
       input.inspectRepositoryInventory ?? inspectGitRepositoryInventory
     )({
       root: input.git.identity.root,
       identity: input.git.identity,
     });
 
-    if (!inventory.ok) {
+    if (!inventoryResult.ok) {
       return planningFailure("CAPABILITY_REMOVAL_INVENTORY_INVALID");
     }
 
+    inventory = inventoryResult;
     const guard = await guardCapabilityRemovalReferences({
       reader: input.reader,
       inventory: inventory.value,
       actions: actions.value,
-      desiredFiles: desiredRender.value.files,
+      desiredFiles: targetRender.files,
+      ...(capabilityValue === "application-persistence" ? { removedPackages: ["drizzle-orm", "drizzle-kit"] as const } : {}),
       referenceToken: removalReferenceTokens[capabilityValue],
     });
 
@@ -902,10 +1048,21 @@ export async function planCapabilityRemoval(input: Readonly<{
     return planningFailure("CAPABILITY_REMOVAL_INVENTORY_INVALID");
   }
 
+  const persistenceReview = persistenceInput?.success === true
+    ? await preparePersistenceReview({ reader: input.reader, descriptor, inventory: inventory.value, input: persistenceInput.data })
+    : undefined;
+  if (persistenceReview !== undefined && !persistenceReview.ok) {
+    return persistenceReview;
+  }
+  const persistenceBindings = project.selectedCapabilities.includes("application-persistence")
+    ? await readPersistencePlanBindings(input.reader, current.value, targetRender, actions.value,
+        persistenceInput?.success === true ? persistenceInput.data : undefined, referenceWarnings, inventory.value)
+    : undefined;
+
   const currentCapabilities = current.value.resolved.capabilities
     .map(({ identifier }) => identifier)
     .sort(compareText);
-  const desiredCapabilities = desiredRender.value.resolved.capabilities
+  const desiredCapabilities = targetRender.resolved.capabilities
     .map(({ identifier }) => identifier)
     .sort(compareText);
   const plan: CapabilityRemovalPlanBody = {
@@ -917,6 +1074,7 @@ export async function planCapabilityRemoval(input: Readonly<{
       identifier: capabilityValue,
       version: descriptor.version,
     },
+    ...(persistenceReview?.ok === true ? { persistenceRemovalReport: persistenceReview.value.report, persistenceRemovalSubject: persistenceReview.value.subject } : {}),
     currentCapabilities,
     desiredCapabilities,
     actions: actions.value,
@@ -945,6 +1103,7 @@ export async function planCapabilityRemoval(input: Readonly<{
         project,
         state,
         git: input.git,
+        ...(persistenceBindings === undefined ? {} : { persistenceBindings }),
       }),
     },
   };

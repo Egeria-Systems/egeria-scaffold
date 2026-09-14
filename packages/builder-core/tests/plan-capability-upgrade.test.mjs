@@ -456,7 +456,7 @@ test("the supported standards edge binds the accepted endpoint subjects", () => 
 
 test("catalog snapshots refuse undeclared standards versions at runtime", () => {
   for (const snapshot of [
-    { standards: "0.6.0" },
+    { standards: "0.7.0" },
     {},
     null,
     undefined,

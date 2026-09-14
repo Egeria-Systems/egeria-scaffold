@@ -20,6 +20,7 @@ export type CliCommand =
       bookingCalendly?: CalendlyBookingSettings;
       analytics?: AnalyticsSettings;
       multilingual?: true;
+      applicationPersistence?: true;
     }>
   | Readonly<{
       kind: "infer" | "doctor" | "diff";
@@ -28,13 +29,22 @@ export type CliCommand =
   | Readonly<{
       kind: "plan-add";
       directory: string;
-      capability: "analytics" | "booking-calendly" | "multilingual";
+      capability:
+        | "analytics"
+        | "booking-calendly"
+        | "multilingual"
+        | "application-persistence";
       settings?: AnalyticsSettings | CalendlyBookingSettings;
     }>
   | Readonly<{
       kind: "plan-remove";
       directory: string;
-      capability: "analytics" | "booking-calendly" | "multilingual";
+      capability:
+        | "analytics"
+        | "booking-calendly"
+        | "multilingual"
+        | "application-persistence";
+      persistenceRemovalPath?: string;
     }>
   | Readonly<{
       kind: "plan-upgrade";
@@ -50,14 +60,24 @@ export type CliCommand =
   | Readonly<{
       kind: "apply-add";
       directory: string;
-      capability: "analytics" | "booking-calendly" | "multilingual";
+      capability:
+        | "analytics"
+        | "booking-calendly"
+        | "multilingual"
+        | "application-persistence";
       settings?: AnalyticsSettings | CalendlyBookingSettings;
       approvedPlanFingerprint: string;
     }>
   | Readonly<{
       kind: "apply-remove";
       directory: string;
-      capability: "analytics" | "booking-calendly" | "multilingual";
+      capability:
+        | "analytics"
+        | "booking-calendly"
+        | "multilingual"
+        | "application-persistence";
+      persistenceRemovalPath?: string;
+      persistenceRemovalHumanReviewPath?: string;
       approvedPlanFingerprint: string;
     }>
   | Readonly<{
@@ -214,6 +234,7 @@ function parseCreate(
         "calendly-url": { type: "string" },
         "calendly-mode": { type: "string" },
         multilingual: { type: "boolean" },
+        "application-persistence": { type: "boolean" },
         ...analyticsOptionDefinitions,
       },
       strict: true,
@@ -227,6 +248,7 @@ function parseCreate(
     const calendlyUrl = values["calendly-url"];
     const calendlyMode = values["calendly-mode"];
     const multilingual = values.multilingual;
+    const applicationPersistence = values["application-persistence"];
     const parsedAnalytics = parseAnalyticsSettings(values);
     const parsedProfile = profileIdentifierSchema.safeParse(profile);
     const parsedProjectName = projectFields.name.safeParse(projectName);
@@ -252,6 +274,7 @@ function parseCreate(
           ]
         : []),
       ...(multilingual === true ? ["multilingual"] : []),
+      ...(applicationPersistence === true ? ["application-persistence"] : []),
       ...selectedAnalyticsOptions(values),
     ];
 
@@ -283,6 +306,7 @@ function parseCreate(
           ? { analytics: parsedAnalytics.data }
           : {}),
         ...(multilingual === true ? { multilingual: true } : {}),
+        ...(applicationPersistence === true ? { applicationPersistence: true } : {}),
       },
     };
   } catch {
@@ -355,6 +379,7 @@ function parseAdd(
     const calendlySelection = capability === "booking-calendly";
     const analyticsSelection = capability === "analytics";
     const multilingualSelection = capability === "multilingual";
+    const persistenceSelection = capability === "application-persistence";
     const capabilityOptions = calendlySelection
       ? ["calendly-url", "calendly-mode"]
       : analyticsSelection
@@ -370,7 +395,8 @@ function parseAdd(
     if (
       !hasExactOptions(tokens, expectedOptions) ||
       !validDirectory(directory) ||
-      (!analyticsSelection && !calendlySelection && !multilingualSelection) ||
+      (!analyticsSelection && !calendlySelection &&
+        !multilingualSelection && !persistenceSelection) ||
       (calendlySelection && !settings.success) ||
       (analyticsSelection && analyticsSettings?.success !== true)
     ) {
@@ -420,6 +446,10 @@ function parseRemove(
       options: {
         directory: { type: "string" },
         capability: { type: "string" },
+        "persistence-removal": { type: "string" },
+        ...(applying
+          ? { "persistence-human-review": { type: "string" } as const }
+          : {}),
         ...(applying ? approvedPlanOptionDefinitions : {}),
       },
       strict: true,
@@ -429,20 +459,35 @@ function parseRemove(
     const directory = values.directory;
     const capability = values.capability;
     const approvedPlanFingerprint = values["approved-plan"];
+    const persistenceSelection = capability === "application-persistence";
+    const persistenceRemovalPath = values["persistence-removal"];
+    const humanReviewOption = values["persistence-human-review"];
+    const persistenceRemovalHumanReviewPath = typeof humanReviewOption === "string"
+      ? humanReviewOption
+      : undefined;
 
     if (
       !hasExactOptions(tokens, [
         "directory",
         "capability",
+        ...(persistenceSelection ? ["persistence-removal"] : []),
+        ...(persistenceSelection && applying ? ["persistence-human-review"] : []),
         ...(applying ? ["approved-plan"] : []),
       ]) ||
       !validDirectory(directory) ||
+      (persistenceSelection && !validDirectory(persistenceRemovalPath)) ||
+      (persistenceSelection && applying && !validDirectory(persistenceRemovalHumanReviewPath)) ||
       (capability !== "analytics" &&
         capability !== "booking-calendly" &&
-        capability !== "multilingual")
+        capability !== "multilingual" &&
+        capability !== "application-persistence")
     ) {
       return invalidArguments();
     }
+
+    const persistenceInput = persistenceSelection && validDirectory(persistenceRemovalPath)
+      ? { persistenceRemovalPath }
+      : {};
 
     if (kind === "apply-remove") {
       if (!validApprovedPlanFingerprint(approvedPlanFingerprint)) {
@@ -451,13 +496,22 @@ function parseRemove(
 
       return {
         ok: true,
-        value: { kind, directory, capability, approvedPlanFingerprint },
+        value: {
+          kind,
+          directory,
+          capability,
+          approvedPlanFingerprint,
+          ...persistenceInput,
+          ...(persistenceSelection && validDirectory(persistenceRemovalHumanReviewPath)
+            ? { persistenceRemovalHumanReviewPath }
+            : {}),
+        },
       };
     }
 
     return {
       ok: true,
-      value: { kind, directory, capability },
+      value: { kind, directory, capability, ...persistenceInput },
     };
   } catch {
     return invalidArguments();

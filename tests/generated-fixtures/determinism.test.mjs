@@ -158,6 +158,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
       ...(fixture.expectedBookingCalendlyVersion ? { bookingCalendly: fixture.expectedCapabilitySettings["booking-calendly"] } : {}),
       ...(fixture.expectedAnalyticsVersion ? { analytics: fixture.expectedCapabilitySettings.analytics } : {}),
       ...(fixture.expectedMultilingualVersion ? { multilingual: true } : {}),
+      ...(fixture.expectedApplicationPersistenceVersion ? { applicationPersistence: true } : {}),
     });
     assert.equal(rendered.ok, true);
     for (const { path, content } of rendered.value.files) {
@@ -181,7 +182,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
     assert.equal(foundation.managedSurfaces.length, 17 + 2, "seventeen files and two package members");
     assert.deepEqual(foundation.managedSurfaces.filter(({ fingerprintTarget }) => fingerprintTarget.kind === "json-value")
       .map(({ fingerprintTarget }) => fingerprintTarget.pointer).sort(), ["/dependencies/effect", "/scripts/test:integration:cloudflare"]);
-    assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, "packages/builder-core/lockfiles/web-recipe-app-0.2.0/pnpm-lock.yaml")));
+    assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, fixture.expectedApplicationPersistenceVersion ? "packages/builder-core/lockfiles/web-application-persistence/pnpm-lock.yaml" : "packages/builder-core/lockfiles/web-recipe-app-0.2.0/pnpm-lock.yaml")));
     const wrangler = JSON.parse(await readFile(join(root, "apps/web/wrangler.jsonc"), "utf8"));
     assert.ok(wrangler.compatibility_flags.includes("enable_request_signal"));
     assert.equal(state.managedSurfaces.find(({ path }) => path === "apps/web/wrangler.jsonc").owner.identifier, "deployment-cloudflare");
@@ -202,7 +203,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
 });
 
 test("compiled project generation matches every committed fixture identifier", async (context) => {
-  for (const identifier of ["app", "app-all-optional-integrations"]) {
+  for (const identifier of ["app", "app-all-optional-integrations", "app-persistence"]) {
     assert.equal(
       await pathExists(resolve(repositoryRoot, "fixtures/generated", identifier)),
       true,
@@ -322,6 +323,10 @@ test("compiled project generation matches every committed fixture identifier", a
           state.installedCapabilities.find(({ identifier }) => identifier === "app-foundation")?.version ?? null,
           fixtureCase.expectedAppFoundationVersion ?? null,
         );
+        assert.equal(
+          state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence")?.version ?? null,
+          fixtureCase.expectedApplicationPersistenceVersion ?? null,
+        );
         const projectConfiguration = await readFile(
           join(destination, ".egeria/project.yaml"),
           "utf8",
@@ -338,12 +343,14 @@ test("compiled project generation matches every committed fixture identifier", a
           "lockfile",
           "frozen-install",
           "lint",
+          ...(fixtureCase.expectedApplicationPersistenceVersion ? ["cloudflare-types"] : []),
           "typecheck",
           "unit-tests",
           "component-tests",
           "next-build",
           "opennext-build",
           ...(fixtureCase.profile === "app" ? ["worker-integration"] : []),
+          ...(fixtureCase.expectedApplicationPersistenceVersion ? ["binding-integration"] : []),
           "post-state-inference",
         ]);
 
