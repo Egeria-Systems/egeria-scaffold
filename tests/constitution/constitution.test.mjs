@@ -2480,7 +2480,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     capabilityModel,
-    /ten current pending certification subjects/iu,
+    /ten exact certification subjects/iu,
   );
   assert.match(
     capabilityModel,
@@ -2492,7 +2492,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     capabilityModel,
-    /Runtime status:[^\n]+ten[^\n]+descriptors[^\n]+three[^\n]+recipe[^\n]+App project\/state parsing[^\n]+generation are implemented[^\n]+pending fresh certification/iu,
+    /Runtime status:[^\n]+ten[^\n]+descriptors[^\n]+three[^\n]+recipe[^\n]+App project\/state parsing[^\n]+generation are implemented[^\n]+four external subjects remain pending/iu,
   );
   const completedRemovalGuardStage = ["P", "3", "C"].join("");
   const appFoundationStage = ["P", "4"].join("");
@@ -2521,7 +2521,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     packageOwnership,
-    /ten capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.0[^\n]+pending fresh certification/iu,
+    /ten capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.0[^\n]+four external subjects remain pending/iu,
   );
   assert.match(
     programRoadmap,
@@ -3048,7 +3048,7 @@ test("capability delivery requires a separately planned certification task", asy
 
   assert.match(
     enforcementMap,
-    /INV-CAPABILITY-CERTIFICATION[^\n]+actual tracked registry coverage[^\n]+ten current pending subjects[^\n]+historical evidence[^\n]+prior descriptor digests/i,
+    /INV-CAPABILITY-CERTIFICATION[^\n]+actual tracked registry coverage[^\n]+ten current subjects[^\n]+six local subjects are certified[^\n]+historical evidence[^\n]+prior descriptor digests/i,
   );
   assert.match(
     enforcementMap,
@@ -3386,15 +3386,15 @@ test("executable capability certification ownership is current", async () => {
 
   for (const document of [overview, capabilityModel, enforcementMap, roadmap]) {
     assert.match(document, /certifications\/capabilities\.json/u);
-    assert.match(document, /ten[^\n]+pending/iu);
+    assert.match(document, /four[^\n]+pending/iu);
   }
   assert.match(
     capabilityModel,
-    /All ten current subjects[^\n]+pending[^\n]+historical[^\n]+prior descriptor digests/iu,
+    /Six current local subjects[^\n]+pending[^\n]+historical[^\n]+prior descriptor digests/iu,
   );
   assert.match(
     enforcementMap,
-    /ten current pending subjects[^\n]+all-certified[^\n]+ten pending subjects[^\n]+historical[^\n]+prior descriptor digests/iu,
+    /ten current subjects[^\n]+six local subjects are certified[^\n]+all-certified[^\n]+four pending external subjects[^\n]+historical[^\n]+prior descriptor digests/iu,
   );
   const registry = JSON.parse(registrySource);
   assert.deepEqual(Object.keys(registry.records), [
@@ -3409,15 +3409,22 @@ test("executable capability certification ownership is current", async () => {
     "site-routing",
     "standards",
   ]);
+  const pendingExternalSubjects = new Set([
+    "analytics", "booking-calendly", "deployment-cloudflare", "observability",
+  ]);
   for (const [capabilityId, record] of Object.entries(registry.records)) {
-    assert.equal(record.status, "pending");
+    const pending = pendingExternalSubjects.has(capabilityId);
+    assert.equal(record.status, pending ? "pending" : "certified");
     assert.equal(
       record.taskPlan,
-      capabilityId === "standards"
-        ? "docs/superpowers/plans/2026-09-12-vitest-five-migration.md"
-        : "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+      pending
+        ? "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md"
+        : "docs/superpowers/plans/2026-09-13-app-foundation-certification.md",
     );
-    assert.deepEqual(record.evidence, []);
+    assert.deepEqual(
+      record.evidence.map(({ kind }) => kind),
+      pending ? [] : record.requiredEvidence,
+    );
   }
   assert.match(
     rootReadme,
@@ -3485,7 +3492,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     enforcementMap,
-    /ten current pending subjects[^\n]+all-certified[^\n]+ten pending subjects[^\n]+historical[^\n]+prior descriptor digests/iu,
+    /ten current subjects[^\n]+six local subjects are certified[^\n]+all-certified[^\n]+four pending external subjects[^\n]+historical[^\n]+prior descriptor digests/iu,
   );
   assert.match(
     reviewProtocol,
@@ -3590,7 +3597,7 @@ test("canonical documentation records visual regression and the client-ready clo
     roadmap,
     builderInstructions,
   ]) {
-    assert.match(currentContractOwner, /\bten\b[^\n]+\bpending\b/iu);
+    assert.match(currentContractOwner, /\bfour\b[^\n]+\bpending\b/iu);
   }
 
   assert.match(
@@ -4179,7 +4186,7 @@ test("canonical documentation accepts profile-transition execution and records t
   ]) {
     assert.match(historicalCertificationOwner, multilingualEligibilityPattern);
   }
-  assert.match(builderCoreInstructions, /\bten\b[^\n]+\bpending\b/iu);
+  assert.match(builderCoreInstructions, /\bfour\b[^\n]+\bpending\b/iu);
 
   for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
     assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);
@@ -4234,7 +4241,7 @@ test("canonical documentation accepts profile-transition execution and records t
   }
   assert.match(
     enforcementMap,
-    /INV-CAPABILITY-CERTIFICATION[^\n]+ten current pending subjects[^\n]+historical evidence[^\n]+prior descriptor digests/iu,
+    /INV-CAPABILITY-CERTIFICATION[^\n]+ten current subjects[^\n]+six local subjects are certified[^\n]+historical evidence[^\n]+prior descriptor digests/iu,
   );
 
   assert.match(
@@ -4638,11 +4645,11 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     capabilityModel,
-    /ten current capability descriptors.*app-foundation@0\.1\.0.*App project\/state parsing, rendering, and state-last new-directory generation are implemented.*pending fresh certification/isu,
+    /ten current capability descriptors.*app-foundation@0\.1\.0.*App project\/state parsing, rendering, and state-last new-directory generation are implemented.*four external subjects remain pending/isu,
   );
   assert.match(
     packageOwnership,
-    /ten capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+pending fresh certification/iu,
+    /ten capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+four external subjects remain pending/iu,
   );
   assert.match(
     builderCoreReadme,

@@ -1662,7 +1662,7 @@ async function runCheck(
   }
 }
 
-test("the repository registry admits current subjects and reports coordinated pending closure", async () => {
+test("the repository registry admits current subjects and keeps external certification pending", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -1698,15 +1698,9 @@ test("the repository registry admits current subjects and reports coordinated pe
     })),
     [
       "analytics",
-      "app-foundation",
       "booking-calendly",
-      "content-files",
       "deployment-cloudflare",
-      "multilingual",
       "observability",
-      "section-composition",
-      "site-routing",
-      "standards",
     ].map((identifier) => ({
       code: "CAPABILITY_CERTIFICATION_PENDING",
       identifier,

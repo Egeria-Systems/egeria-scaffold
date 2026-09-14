@@ -4,7 +4,7 @@ import { writeFile } from "node:fs/promises";
 const subject = Object.freeze({
   descriptorVersion: "0.3.0",
   behaviorContractDigest:
-    "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99",
+    "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43",
 });
 const browserCases = Object.freeze([
   "browser-error",
