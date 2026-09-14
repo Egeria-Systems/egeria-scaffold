@@ -1094,6 +1094,7 @@ test("preview diagnostics retain process and new server evidence without raw out
   await withPortfolioVisualFixture(async ({ ownerParent, sourceRoot }) => {
     let ownerPath;
     const artifactRoot = join(ownerParent, "diagnostics");
+    const syntheticHome = ["", "Users", "PRIVATE_USER"].join("/");
     await expectFixtureError(() => verifyGeneratedProjectForTesting(sourceRoot, "portfolio", {
       async createOwner() {
         const owner = await createKnownOwner(ownerParent);
@@ -1113,10 +1114,10 @@ test("preview diagnostics retain process and new server evidence without raw out
             "Authorization: Bearer PRIVATE_TOKEN",
             "Cookie: PRIVATE_COOKIE",
             "request body: PRIVATE_REQUEST response body: PRIVATE_RESPONSE",
-            "    at file:///Users/PRIVATE_USER/project/server.js:1:2",
+            `    at file://${syntheticHome}/project/server.js:1:2`,
           ].join("\n"));
           return execFileAsync(process.execPath, ["-e", [
-            'process.stdout.write("PRIVATE_STDOUT /Users/PRIVATE_USER/server C:\\\\PRIVATE_PATH\\n");',
+            `process.stdout.write(${JSON.stringify(`PRIVATE_STDOUT ${syntheticHome}/server C:\\PRIVATE_PATH\n`)});`,
             'process.stderr.write("net::ERR_CONNECTION_REFUSED PRIVATE_STDERR\\n");',
             'process.exitCode = 7;',
           ].join("\n")], { cwd: input.cwd, env: input.environment });
