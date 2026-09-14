@@ -140,6 +140,8 @@ function requireRuntimeEvidence(result, identifier) {
   }
 }
 
+export { requireRuntimeEvidence as requireAppRuntimeEvidence };
+
 async function certifyWithAuthority(input, adapters, runJourney) {
   if (input === null || typeof input !== "object" ||
     !isDeepStrictEqual(Object.keys(input), ["revision"]) ||

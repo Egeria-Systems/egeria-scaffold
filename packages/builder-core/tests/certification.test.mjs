@@ -213,17 +213,28 @@ test("certification subjects bind the descriptor and required evidence", () => {
   );
 });
 
-test("pending certification covers every current descriptor without carrying historical evidence", () => {
+test("current certification preserves five accepted subjects and keeps changed subjects pending", () => {
   assert.deepEqual(Object.keys(committedRegistry.records), expectedIdentifiers);
   assert.deepEqual(Object.keys(requiredEvidence), expectedIdentifiers);
-  assert.deepEqual(committedRegistry, registry);
+  const acceptedLocalSubjects = new Set([
+    "app-foundation", "content-files", "multilingual",
+    "section-composition", "site-routing",
+  ]);
 
   for (const [identifier, record] of Object.entries(committedRegistry.records)) {
-    assert.equal(record.status, "pending");
-    assert.equal(record.taskPlan, ["application-persistence", "deployment-cloudflare", "standards"].includes(identifier)
-      ? persistencePlanPath
-      : coordinatedPlanPath);
-    assert.deepEqual(record.evidence, []);
+    const expected = createRecord(identifier);
+    if (acceptedLocalSubjects.has(identifier)) {
+      expected.status = "certified";
+      expected.taskPlan = "docs/superpowers/plans/2026-09-13-app-foundation-certification.md";
+      expected.evidence = expected.requiredEvidence.map((kind) => ({
+        kind,
+        path: `docs/implementation-evidence/2026-09-13-${identifier}-app-certification-receipt.md`,
+        outcome: "passed",
+        revision: "fe16ae41153f89242cdf48c0f899c3720f511557",
+        subject: structuredClone(expected.subject),
+      }));
+    }
+    assert.deepEqual(record, expected, identifier);
   }
 });
 

@@ -62,14 +62,14 @@ jobs:
           umask 077
           node scripts/certify-observability-error-diagnostics.mjs --revision "$GITHUB_SHA" > "$RUNNER_TEMP/observability-error-diagnostics-local-receipt.json"
           test "$(wc -l < "$RUNNER_TEMP/observability-error-diagnostics-local-receipt.json")" -eq 1
-          test "$(wc -c < "$RUNNER_TEMP/observability-error-diagnostics-local-receipt.json")" -le 4096
+          test "$(wc -c < "$RUNNER_TEMP/observability-error-diagnostics-local-receipt.json")" -le 32768
 
       - name: Create deployment candidate
         env:
           CERTIFICATION_ROOT: ${{ runner.temp }}/observability-error-diagnostics-certification/project
         run: |
           mkdir -p "$RUNNER_TEMP/observability-error-diagnostics-certification"
-          node apps/cli/dist/index.js create --profile portfolio --name acme-portfolio-observability-error-diagnostics --display-name "Acme Portfolio Diagnostics" --directory "$CERTIFICATION_ROOT"
+          node apps/cli/dist/index.js create --profile app --name acme-app --display-name "Acme App" --directory "$CERTIFICATION_ROOT"
 
       - name: Verify deployment candidate before certification fixtures
         env:
@@ -81,24 +81,27 @@ jobs:
           node apps/cli/dist/index.js diff --directory "$CERTIFICATION_ROOT" > "$RUNNER_TEMP/observability-error-diagnostics-candidate-diff.json"
           node --input-type=module -e '
             import { readFileSync } from "node:fs";
-            const read = (name) => JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/observability-error-diagnostics-candidate-${name}.json`, "utf8"));
-            const infer = read("infer");
-            const doctor = read("doctor");
-            const diff = read("diff");
-            const project = readFileSync(`${process.env.CERTIFICATION_ROOT}/.egeria/project.yaml`, "utf8");
-            const manifest = JSON.parse(readFileSync(`${process.env.CERTIFICATION_ROOT}/apps/web/package.json`, "utf8"));
-            const installed = infer.result?.state?.value?.installedCapabilities ?? [];
-            if (infer.ok !== true || infer.result?.state?.kind !== "valid") process.exit(1);
-            if (!installed.some(({ identifier, version }) => identifier === "observability" && version === "0.3.0")) process.exit(1);
-            if (!infer.result?.capabilities?.some(({ identifier, category }) => identifier === "observability" && category === "confirmed")) process.exit(1);
-            if (doctor.result?.healthy !== true || doctor.result?.diagnostics?.length !== 0) process.exit(1);
-            if (diff.result?.equal !== true || diff.result?.differences?.length !== 0) process.exit(1);
-            if ((project.match(/^recipeVersion: 0\.8\.0$/gmu) ?? []).length !== 1) process.exit(1);
-            if (manifest.dependencies?.["@egeria-systems/observability"] !== "0.3.0") process.exit(1);
-            process.stdout.write(`${JSON.stringify({ ok: true, capability: "observability", version: "0.3.0", recipeVersion: "0.8.0", revision: process.env.GITHUB_SHA, checks: ["compiled-cli-create", "state-inference", "healthy-diagnostics", "exact-diff"] })}\n`);
+            import { validateObservabilityDeploymentCandidate } from "./scripts/certify-observability-error-diagnostics.mjs";
+            import { requireAppRuntimeEvidence } from "./scripts/certify-app-local.mjs";
+            import { verifyGeneratedProject } from "./scripts/verify-generated-skeletons.mjs";
+            try {
+              const read = (name) => JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/observability-error-diagnostics-candidate-${name}.json`, "utf8"));
+              const candidate = validateObservabilityDeploymentCandidate({
+                revision: process.env.GITHUB_SHA,
+                infer: read("infer"), doctor: read("doctor"), diff: read("diff"),
+                projectSource: readFileSync(`${process.env.CERTIFICATION_ROOT}/.egeria/project.yaml`, "utf8"),
+                manifest: JSON.parse(readFileSync(`${process.env.CERTIFICATION_ROOT}/apps/web/package.json`, "utf8")),
+              });
+              const runtime = await verifyGeneratedProject(process.env.CERTIFICATION_ROOT, "app");
+              requireAppRuntimeEvidence(runtime, "app");
+              process.stdout.write(`${JSON.stringify({ ...candidate, pristineRuntime: { checks: runtime.checks, workerIntegration: runtime.workerIntegration } })}\n`);
+            } catch {
+              process.stderr.write("{\"ok\":false,\"code\":\"CERTIFICATION_CANDIDATE_INVALID\"}\n");
+              process.exitCode = 1;
+            }
           ' > "$RUNNER_TEMP/observability-error-diagnostics-candidate-receipt.json"
           test "$(wc -l < "$RUNNER_TEMP/observability-error-diagnostics-candidate-receipt.json")" -eq 1
-          test "$(wc -c < "$RUNNER_TEMP/observability-error-diagnostics-candidate-receipt.json")" -le 2048
+          test "$(wc -c < "$RUNNER_TEMP/observability-error-diagnostics-candidate-receipt.json")" -le 32768
           rm -f "$RUNNER_TEMP/observability-error-diagnostics-candidate-infer.json" "$RUNNER_TEMP/observability-error-diagnostics-candidate-doctor.json" "$RUNNER_TEMP/observability-error-diagnostics-candidate-diff.json"
 
       - name: Add certification fixtures
@@ -117,6 +120,33 @@ jobs:
         run: |
           pnpm --dir "$CERTIFICATION_ROOT" install --frozen-lockfile
           pnpm --dir "$CERTIFICATION_ROOT" run build:cloudflare
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:integration:cloudflare
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            import { generatedFixtureContracts } from "./scripts/verify-generated-skeletons.mjs";
+            import { inspectAppEffectBuild } from "./scripts/verify-app-transition-visuals.mjs";
+            import { requireAppRuntimeEvidence } from "./scripts/certify-app-local.mjs";
+            try {
+              const root = process.env.CERTIFICATION_ROOT;
+              const paths = [
+                ...generatedFixtureContracts.find(({ identifier }) => identifier === "app").expectedFiles,
+                "apps/web/app/certification/diagnostics/page.tsx",
+                "apps/web/app/api/certification/diagnostics/route.ts",
+              ];
+              const files = paths.map(path => ({ path, content: readFileSync(`${root}/${path}`) }));
+              const build = { fixture: "app", ...await inspectAppEffectBuild(root, files) };
+              const workerIntegration = { executed: ["app"], skipped: [] };
+              requireAppRuntimeEvidence({ workerIntegration, appBuildEvidence: [build] }, "app");
+              const receiptPath = `${process.env.RUNNER_TEMP}/observability-error-diagnostics-candidate-receipt.json`;
+              const candidate = JSON.parse(readFileSync(receiptPath, "utf8"));
+              writeFileSync(receiptPath, `${JSON.stringify({ ...candidate, deploymentWorkerIntegration: workerIntegration, appBuildEvidence: [build], checks: [...candidate.checks, "overlaid-opennext-build", "overlaid-worker-integration", "overlaid-effect-build"] })}\n`, { mode: 0o600 });
+            } catch {
+              process.stderr.write("{\"ok\":false,\"code\":\"CERTIFICATION_DEPLOYMENT_BUILD_INVALID\"}\n");
+              process.exitCode = 1;
+            }
+          '
+          test "$(wc -l < "$RUNNER_TEMP/observability-error-diagnostics-candidate-receipt.json")" -eq 1
+          test "$(wc -c < "$RUNNER_TEMP/observability-error-diagnostics-candidate-receipt.json")" -le 32768
           pnpm --dir "$CERTIFICATION_ROOT/apps/web" run browser:install:ci
 
       - name: Deploy certification Worker

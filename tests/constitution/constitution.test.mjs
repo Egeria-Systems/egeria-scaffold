@@ -3410,15 +3410,22 @@ test("executable capability certification ownership is current", async () => {
     "site-routing",
     "standards",
   ]);
+  const pendingSubjects = new Set([
+    "analytics", "application-persistence", "booking-calendly",
+    "deployment-cloudflare", "observability", "standards",
+  ]);
   for (const [capabilityId, record] of Object.entries(registry.records)) {
-    assert.equal(record.status, "pending");
+    const pending = pendingSubjects.has(capabilityId);
+    assert.equal(record.status, pending ? "pending" : "certified");
     assert.equal(
       record.taskPlan,
       ["application-persistence", "standards", "deployment-cloudflare"].includes(capabilityId)
         ? "docs/superpowers/plans/2026-09-14-application-persistence-certification.md"
-        : "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+        : pending
+          ? "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md"
+          : "docs/superpowers/plans/2026-09-13-app-foundation-certification.md",
     );
-    assert.deepEqual(record.evidence, []);
+    assert.deepEqual(record.evidence.map(({ kind }) => kind), pending ? [] : record.requiredEvidence);
   }
   assert.match(
     rootReadme,
