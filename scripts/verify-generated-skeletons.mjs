@@ -1,18 +1,21 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
+import { constants as fileConstants } from "node:fs";
 import {
   chmod,
   cp,
   lstat,
   mkdir,
   mkdtemp,
+  open,
+  opendir,
   readFile,
   readdir,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { constants as operatingSystemConstants, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { promisify } from "node:util";
+import { promisify, stripVTControlCharacters } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
@@ -1183,6 +1186,7 @@ async function captureVisualFailureArtifacts({
   validationRoot,
   artifactRoot = generatedVisualArtifactsRoot,
   maximumBytes = visualArtifactMaximumBytes,
+  previewDiagnostics,
 }) {
   await mkdir(artifactRoot, {
     recursive: true,
@@ -1199,7 +1203,11 @@ async function captureVisualFailureArtifacts({
   }
   await chmod(artifactRoot, 0o700);
 
-  let totalBytes = 0;
+  const diagnosticContent = previewDiagnostics === undefined
+    ? undefined
+    : `${JSON.stringify(previewDiagnostics)}\n`;
+  let totalBytes = Buffer.byteLength(diagnosticContent ?? "");
+  if (totalBytes > maximumBytes) fail("VISUAL_ARTIFACT_EXPORT_FAILED");
   const availableArtifacts = [];
 
   for (const artifact of visualArtifactDirectories) {
@@ -1237,6 +1245,12 @@ async function captureVisualFailureArtifacts({
     });
   }
 
+  if (diagnosticContent !== undefined) {
+    await writeFile(join(outputRoot, "preview-diagnostics.json"), diagnosticContent, {
+      flag: "wx", mode: 0o600,
+    });
+  }
+
   await writeFile(
     join(outputRoot, "failure.json"),
     `${JSON.stringify({
@@ -1250,11 +1264,119 @@ async function captureVisualFailureArtifacts({
 export const captureVisualFailureArtifactsForTesting =
   captureVisualFailureArtifacts;
 
+const previewDiagnosticIndicators = [
+  ["proxy-worker-error", /Error inside ProxyWorker/u],
+  ["network-connection-lost", /Network connection lost\./u],
+  ["connection-refused", /\b(?:ECONNREFUSED|ERR_CONNECTION_REFUSED)\b/u],
+  ["wrangler-error", /✘\s*\[ERROR\]/u],
+];
+
+function inspectPreviewOutput(value) {
+  if (value === undefined || value === null) return { status: "absent" };
+  if (typeof value !== "string" && !Buffer.isBuffer(value)) return { status: "refused" };
+  const bytes = Buffer.byteLength(value);
+  if (bytes > isolatedProcessOptions.maxBuffer) return { status: "refused" };
+  const text = stripVTControlCharacters(value.toString());
+  return {
+    status: "inspected", bytes,
+    indicators: previewDiagnosticIndicators.filter(([, pattern]) => pattern.test(text)).map(([identifier]) => identifier),
+  };
+}
+
+async function snapshotPreviewLogs(home) {
+  try {
+    const configurationParts = process.platform === "darwin"
+      ? ["Library", "Preferences"]
+      : process.platform === "win32"
+        ? ["AppData", "Roaming", "xdg.config"]
+        : [".config"];
+    let directory = home;
+    for (const part of ["", ...configurationParts, ".wrangler", "logs"]) {
+      directory = join(directory, part);
+      const stats = await lstat(directory);
+      if (!stats.isDirectory() || stats.isSymbolicLink()) throw new Error();
+    }
+    const files = new Map();
+    let entries = 0;
+    for await (const entry of await opendir(directory)) {
+      if (++entries > 32) throw new Error();
+      if (!/^wrangler-[A-Za-z0-9_.-]+\.log$/u.test(entry.name)) continue;
+      const path = join(directory, entry.name);
+      const stats = await lstat(path);
+      if (!stats.isFile() || stats.isSymbolicLink()) throw new Error();
+      files.set(entry.name, { path, size: stats.size, device: stats.dev, inode: stats.ino, modified: stats.mtimeMs });
+    }
+    return { status: "inspected", files };
+  } catch (error) {
+    return { status: error?.code === "ENOENT" ? "absent" : "refused", files: new Map() };
+  }
+}
+
+async function inspectPreviewLogs(home, before) {
+  const after = await snapshotPreviewLogs(home);
+  if (before.status === "refused" || after.status === "refused") return { status: "refused" };
+  if (after.status === "absent") return { status: "absent" };
+  const indicators = new Set();
+  let bytes = 0;
+  let logsInspected = 0;
+  try {
+    for (const [name, file] of after.files) {
+      const previous = before.files.get(name);
+      const sameFile = previous?.device === file.device && previous?.inode === file.inode;
+      if (sameFile && previous.size === file.size && previous.modified === file.modified) continue;
+      if (sameFile && file.size <= previous.size) throw new Error();
+      const offset = sameFile ? previous.size : 0;
+      const length = file.size - offset;
+      bytes += length;
+      if (bytes > isolatedProcessOptions.maxBuffer) throw new Error();
+      const handle = await open(file.path, fileConstants.O_RDONLY | fileConstants.O_NOFOLLOW);
+      try {
+        const stats = await handle.stat();
+        if (!stats.isFile() || stats.dev !== file.device || stats.ino !== file.inode || stats.size !== file.size || stats.mtimeMs !== file.modified) throw new Error();
+        const content = Buffer.alloc(length);
+        const result = await handle.read(content, 0, length, offset);
+        if (result.bytesRead !== length) throw new Error();
+        for (const indicator of inspectPreviewOutput(content).indicators) indicators.add(indicator);
+        logsInspected += 1;
+      } finally {
+        await handle.close();
+      }
+    }
+    return {
+      status: "inspected", logsInspected,
+      indicators: previewDiagnosticIndicators.map(([identifier]) => identifier).filter((identifier) => indicators.has(identifier)),
+    };
+  } catch {
+    return { status: "refused" };
+  }
+}
+
 async function runExpectedCommand(runCommand, input, failureCode) {
+  const logsBefore = failureCode === "BROWSER_PREVIEW_FAILED"
+    ? await snapshotPreviewLogs(input.environment.HOME)
+    : undefined;
   try {
     return await runCommand(input);
-  } catch {
-    fail(failureCode);
+  } catch (cause) {
+    const error = new GeneratedFixtureVerificationError(failureCode);
+    if (logsBefore !== undefined) {
+      try {
+        error.previewDiagnostics = {
+          process: {
+            exitCode: Number.isInteger(cause?.code) && cause.code >= 0 && cause.code <= 255 ? cause.code : null,
+            signal: typeof cause?.signal === "string" && Object.hasOwn(operatingSystemConstants.signals, cause.signal) ? cause.signal : null,
+            killed: cause?.killed === true,
+            outputLimitExceeded: cause?.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+          },
+          stdout: inspectPreviewOutput(cause?.stdout),
+          stderr: inspectPreviewOutput(cause?.stderr),
+          wrangler: await inspectPreviewLogs(input.environment.HOME, logsBefore),
+        };
+      } catch {
+        error.previewDiagnostics = { status: "refused" };
+      }
+    }
+    throw error;
   }
 }
 
@@ -1433,6 +1555,7 @@ async function verifySourcesWithAdapters(
                 failureCode: error.code,
                 identifier: source.contract.identifier,
                 validationRoot,
+                ...(error.previewDiagnostics === undefined ? {} : { previewDiagnostics: error.previewDiagnostics }),
               });
             } catch {
               error.artifactExportCode = "VISUAL_ARTIFACT_EXPORT_FAILED";

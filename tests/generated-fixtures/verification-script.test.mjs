@@ -1090,6 +1090,212 @@ test("preview failures export browser artifacts before owned cleanup", async () 
   });
 });
 
+test("preview diagnostics retain process and new server evidence without raw output", async () => {
+  await withPortfolioVisualFixture(async ({ ownerParent, sourceRoot }) => {
+    let ownerPath;
+    const artifactRoot = join(ownerParent, "diagnostics");
+    const syntheticHome = ["", "Users", "PRIVATE_USER"].join("/");
+    await expectFixtureError(() => verifyGeneratedProjectForTesting(sourceRoot, "portfolio", {
+      async createOwner() {
+        const owner = await createKnownOwner(ownerParent);
+        ownerPath = owner.path;
+        return owner;
+      },
+      async runCommand(input) {
+        const logs = previewLogDirectory(input.environment.HOME);
+        if (input.arguments.at(-1) === "test:e2e:dev") {
+          await mkdir(logs, { recursive: true });
+          await writeFile(join(logs, "wrangler-2026-09-13_12-00-00.log"), "ECONNREFUSED PRIVATE_OLD_LOG\n");
+        }
+        if (input.arguments.at(-1) === "test:e2e:preview") {
+          await writeFile(join(logs, "wrangler-2026-09-13_12-01-00.log"), [
+            "Error in ProxyController: Error inside ProxyWorker",
+            "  cause: { message: 'Network connection lost.' }",
+            "Authorization: Bearer PRIVATE_TOKEN",
+            "Cookie: PRIVATE_COOKIE",
+            "request body: PRIVATE_REQUEST response body: PRIVATE_RESPONSE",
+            `    at file://${syntheticHome}/project/server.js:1:2`,
+          ].join("\n"));
+          return execFileAsync(process.execPath, ["-e", [
+            `process.stdout.write(${JSON.stringify(`PRIVATE_STDOUT ${syntheticHome}/server C:\\PRIVATE_PATH\n`)});`,
+            'process.stderr.write("net::ERR_CONNECTION_REFUSED PRIVATE_STDERR\\n");',
+            'process.exitCode = 7;',
+          ].join("\n")], { cwd: input.cwd, env: input.environment });
+        }
+        return successfulCommand(input);
+      },
+      captureVisualArtifacts: (input) => captureVisualFailureArtifactsForTesting({ ...input, artifactRoot }),
+    }), "BROWSER_PREVIEW_FAILED");
+    assert.equal(await pathExists(ownerPath), false);
+    const outputs = await readdir(artifactRoot);
+    assert.equal(outputs.length, 1);
+    const outputRoot = join(artifactRoot, outputs[0]);
+    assert.ok((await readdir(outputRoot)).includes("preview-diagnostics.json"), "safe preview diagnostics survive owner cleanup");
+    const raw = await readFile(join(outputRoot, "preview-diagnostics.json"), "utf8");
+    const diagnostics = JSON.parse(raw);
+    assert.deepEqual(diagnostics.process, { exitCode: 7, signal: null, killed: false, outputLimitExceeded: false });
+    assert.equal(diagnostics.stdout.status, "inspected");
+    assert.deepEqual(diagnostics.stdout.indicators, []);
+    assert.deepEqual(diagnostics.stderr.indicators, ["connection-refused"]);
+    assert.deepEqual(diagnostics.wrangler, {
+      status: "inspected", logsInspected: 1,
+      indicators: ["proxy-worker-error", "network-connection-lost"],
+    });
+    assert.doesNotMatch(raw, /PRIVATE_|Authorization|Cookie|Bearer|file:\/\/|\/Users\/|C:\\/u);
+    assert.equal((await lstat(join(outputRoot, "preview-diagnostics.json"))).mode & 0o777, 0o600);
+    assert.deepEqual(JSON.parse(await readFile(join(outputRoot, "failure.json"), "utf8")), {
+      code: "BROWSER_PREVIEW_FAILED", fixture: "portfolio",
+    });
+  });
+});
+
+async function inspectFailedPreviewDiagnostics({ prepare = async () => {}, failPreview, maximumBytes } = {}) {
+  return withPortfolioVisualFixture(async ({ ownerParent, sourceRoot }) => {
+    let ownerPath;
+    let primaryError;
+    const artifactRoot = join(ownerParent, "diagnostics");
+    await assert.rejects(() => verifyGeneratedProjectForTesting(sourceRoot, "portfolio", {
+      async createOwner() {
+        const owner = await createKnownOwner(ownerParent);
+        ownerPath = owner.path;
+        return owner;
+      },
+      async runCommand(input) {
+        if (input.arguments.at(-1) === "test:e2e:dev") await prepare(input, ownerParent);
+        if (input.arguments.at(-1) === "test:e2e:preview") await failPreview(input, ownerParent);
+        return successfulCommand(input);
+      },
+      captureVisualArtifacts: (input) => captureVisualFailureArtifactsForTesting({ ...input, artifactRoot, maximumBytes }),
+    }), (error) => {
+      primaryError = error;
+      assert.equal(error.code, "BROWSER_PREVIEW_FAILED");
+      assert.doesNotMatch(String(error), /PRIVATE_/u);
+      return true;
+    });
+    assert.equal(await pathExists(ownerPath), false);
+    const outputs = await readdir(artifactRoot);
+    const raw = outputs.length === 0 ? undefined : await readFile(join(artifactRoot, outputs[0], "preview-diagnostics.json"), "utf8");
+    if (raw !== undefined) assert.doesNotMatch(raw, /PRIVATE_|Authorization|Cookie|Bearer|\/Users\//u);
+    return { diagnostics: raw === undefined ? undefined : JSON.parse(raw), primaryError, outputs };
+  });
+}
+
+function previewLogDirectory(home) {
+  const configuration = process.platform === "darwin" ? "Library/Preferences"
+    : process.platform === "win32" ? "AppData/Roaming/xdg.config" : ".config";
+  return join(home, configuration, ".wrangler/logs");
+}
+
+test("preview diagnostics inspect the native Wrangler log directory", async () => {
+  const result = await inspectFailedPreviewDiagnostics({
+    async failPreview(input) {
+      const logs = previewLogDirectory(input.environment.HOME);
+      await mkdir(logs, { recursive: true });
+      await writeFile(join(logs, "wrangler-preview.log"), "Network connection lost. PRIVATE_TOKEN");
+      throw new Error("PRIVATE_MESSAGE");
+    },
+  });
+  assert.deepEqual(result.diagnostics.wrangler, { status: "inspected", logsInspected: 1, indicators: ["network-connection-lost"] });
+});
+
+test("preview diagnostics inspect only appended bytes of an existing server log", async () => {
+  const oldContent = "ECONNREFUSED PRIVATE_OLD_LOG\n";
+  const result = await inspectFailedPreviewDiagnostics({
+    async prepare(input) {
+      const logs = previewLogDirectory(input.environment.HOME);
+      await mkdir(logs, { recursive: true });
+      await writeFile(join(logs, "wrangler-existing.log"), oldContent);
+    },
+    async failPreview(input) {
+      await writeFile(join(previewLogDirectory(input.environment.HOME), "wrangler-existing.log"),
+        `${oldContent}Network connection lost. PRIVATE_NEW_LOG\n`);
+      throw Object.assign(new Error("PRIVATE_MESSAGE"), {
+        code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER", signal: "SIGTERM", killed: true,
+        stdout: "PRIVATE_STDOUT", stderr: Buffer.from("\u001b[31m✘ [ERROR]\u001b[0m PRIVATE_STDERR"),
+      });
+    },
+  });
+  assert.deepEqual(result.diagnostics.wrangler, { status: "inspected", logsInspected: 1, indicators: ["network-connection-lost"] });
+  assert.deepEqual(result.diagnostics.process, { exitCode: null, signal: "SIGTERM", killed: true, outputLimitExceeded: true });
+  assert.deepEqual(result.diagnostics.stderr.indicators, ["wrangler-error"]);
+});
+
+test("preview diagnostic extraction failures preserve the original verification failure", async () => {
+  const result = await inspectFailedPreviewDiagnostics({
+    async failPreview() {
+      throw Object.defineProperty(new Error("PRIVATE_MESSAGE"), "stdout", {
+        get() { throw new Error("PRIVATE_DIAGNOSTIC_FAILURE"); },
+      });
+    },
+  });
+  assert.deepEqual(result.diagnostics, { status: "refused" });
+  assert.equal(result.primaryError.artifactExportCode, undefined);
+});
+
+test("preview diagnostics refuse unsupported or oversized command output", async () => {
+  for (const stdout of [{ toString() { throw new Error("PRIVATE_GETTER"); } }, "PRIVATE_".repeat(150000)]) {
+    const result = await inspectFailedPreviewDiagnostics({
+      async failPreview() {
+        throw Object.assign(new Error("PRIVATE_MESSAGE"), { stdout, stderr: "PRIVATE_STDERR", code: "PRIVATE_CODE", signal: "PRIVATE_SIGNAL" });
+      },
+    });
+    assert.deepEqual(result.diagnostics.stdout, { status: "refused" });
+    assert.deepEqual(result.diagnostics.stderr.indicators, []);
+    assert.deepEqual(result.diagnostics.wrangler, { status: "absent" });
+    assert.deepEqual(result.diagnostics.process, { exitCode: null, signal: null, killed: false, outputLimitExceeded: false });
+  }
+});
+
+test("preview diagnostics refuse symlinked server directories and files", async () => {
+  for (const target of ["directory", "file"]) {
+    const result = await inspectFailedPreviewDiagnostics({
+      async failPreview(input, ownerParent) {
+        const home = input.environment.HOME;
+        const outside = join(ownerParent, "unrelated");
+        await mkdir(outside);
+        await writeFile(join(outside, "wrangler-private.log"), "Network connection lost. PRIVATE_TOKEN");
+        if (target === "directory") {
+          await mkdir(dirname(previewLogDirectory(home)), { recursive: true });
+          await symlink(outside, previewLogDirectory(home));
+        } else {
+          await mkdir(previewLogDirectory(home), { recursive: true });
+          await symlink(join(outside, "wrangler-private.log"), join(previewLogDirectory(home), "wrangler-linked.log"));
+        }
+        throw new Error("PRIVATE_MESSAGE");
+      },
+    });
+    assert.deepEqual(result.diagnostics.wrangler, { status: "refused" });
+    assert.equal(result.primaryError.artifactExportCode, undefined);
+  }
+});
+
+test("preview diagnostics refuse excessive server log counts and aggregate bytes", async () => {
+  for (const variant of ["count", "bytes"]) {
+    const result = await inspectFailedPreviewDiagnostics({
+      async failPreview(input) {
+        const logs = previewLogDirectory(input.environment.HOME);
+        await mkdir(logs, { recursive: true });
+        const count = variant === "count" ? 33 : 2;
+        for (let index = 0; index < count; index += 1) {
+          await writeFile(join(logs, `wrangler-${index}.log`), variant === "bytes" ? "x".repeat(600000) : "Network connection lost. PRIVATE_TOKEN");
+        }
+        throw new Error("PRIVATE_MESSAGE");
+      },
+    });
+    assert.deepEqual(result.diagnostics.wrangler, { status: "refused" });
+  }
+});
+
+test("preview diagnostic bytes share the artifact cap without replacing the primary failure", async () => {
+  const result = await inspectFailedPreviewDiagnostics({
+    maximumBytes: 8,
+    async failPreview() { throw new Error("PRIVATE_MESSAGE"); },
+  });
+  assert.equal(result.diagnostics, undefined);
+  assert.deepEqual(result.outputs, []);
+  assert.equal(result.primaryError.artifactExportCode, "VISUAL_ARTIFACT_EXPORT_FAILED");
+});
+
 test("visual failures export artifacts before owned cleanup", async () => {
   await withPortfolioVisualFixture(async ({ ownerParent, sourceRoot }) => {
     let capturedVisualFailure;
