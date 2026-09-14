@@ -26,9 +26,30 @@
         "existing-repository-lifecycle",
         "fresh-scaffold"
       ],
-      "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
-      "evidence": []
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-09-13-app-foundation-certification.md",
+      "evidence": [
+        {
+          "kind": "existing-repository-lifecycle",
+          "path": "docs/implementation-evidence/2026-09-13-app-foundation-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "fe16ae41153f89242cdf48c0f899c3720f511557",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:6d9cf389441064a96d2b47bb309becab37358fcc2952335feffae8720eb6f497"
+          }
+        },
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-09-13-app-foundation-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "fe16ae41153f89242cdf48c0f899c3720f511557",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:6d9cf389441064a96d2b47bb309becab37358fcc2952335feffae8720eb6f497"
+          }
+        }
+      ]
     },
     "booking-calendly": {
       "subject": {
@@ -51,10 +72,23 @@
         "descriptorVersion": "0.4.0",
         "behaviorContractDigest": "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4"
       },
-      "requiredEvidence": ["fresh-scaffold"],
-      "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
-      "evidence": []
+      "requiredEvidence": [
+        "fresh-scaffold"
+      ],
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-09-13-app-foundation-certification.md",
+      "evidence": [
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-09-13-content-files-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "fe16ae41153f89242cdf48c0f899c3720f511557",
+          "subject": {
+            "descriptorVersion": "0.4.0",
+            "behaviorContractDigest": "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4"
+          }
+        }
+      ]
     },
     "deployment-cloudflare": {
       "subject": {
@@ -79,9 +113,30 @@
         "existing-repository-lifecycle",
         "fresh-scaffold"
       ],
-      "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
-      "evidence": []
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-09-13-app-foundation-certification.md",
+      "evidence": [
+        {
+          "kind": "existing-repository-lifecycle",
+          "path": "docs/implementation-evidence/2026-09-13-multilingual-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "fe16ae41153f89242cdf48c0f899c3720f511557",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891"
+          }
+        },
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-09-13-multilingual-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "fe16ae41153f89242cdf48c0f899c3720f511557",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891"
+          }
+        }
+      ]
     },
     "observability": {
       "subject": {
@@ -102,10 +157,23 @@
         "descriptorVersion": "0.3.0",
         "behaviorContractDigest": "sha256:9f9830fd6fc0674d3851e42ca6b7f3a14b2182b60a994bc470399043b98b771e"
       },
-      "requiredEvidence": ["fresh-scaffold"],
-      "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
-      "evidence": []
+      "requiredEvidence": [
+        "fresh-scaffold"
+      ],
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-09-13-app-foundation-certification.md",
+      "evidence": [
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-09-13-section-composition-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "fe16ae41153f89242cdf48c0f899c3720f511557",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:9f9830fd6fc0674d3851e42ca6b7f3a14b2182b60a994bc470399043b98b771e"
+          }
+        }
+      ]
     },
     "site-routing": {
       "subject": {
@@ -116,9 +184,30 @@
         "existing-repository-lifecycle",
         "fresh-scaffold"
       ],
-      "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
-      "evidence": []
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-09-13-app-foundation-certification.md",
+      "evidence": [
+        {
+          "kind": "existing-repository-lifecycle",
+          "path": "docs/implementation-evidence/2026-09-13-site-routing-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "fe16ae41153f89242cdf48c0f899c3720f511557",
+          "subject": {
+            "descriptorVersion": "0.4.0",
+            "behaviorContractDigest": "sha256:a8bd53e9b32546266efd3dde9dc96fc3914cb06e9e811b8bf96ebd42822e2dac"
+          }
+        },
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-09-13-site-routing-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "fe16ae41153f89242cdf48c0f899c3720f511557",
+          "subject": {
+            "descriptorVersion": "0.4.0",
+            "behaviorContractDigest": "sha256:a8bd53e9b32546266efd3dde9dc96fc3914cb06e9e811b8bf96ebd42822e2dac"
+          }
+        }
+      ]
     },
     "standards": {
       "subject": {
@@ -129,9 +218,30 @@
         "existing-repository-lifecycle",
         "fresh-scaffold"
       ],
-      "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-09-12-vitest-five-migration.md",
-      "evidence": []
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-09-13-app-foundation-certification.md",
+      "evidence": [
+        {
+          "kind": "existing-repository-lifecycle",
+          "path": "docs/implementation-evidence/2026-09-13-standards-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "fe16ae41153f89242cdf48c0f899c3720f511557",
+          "subject": {
+            "descriptorVersion": "0.5.0",
+            "behaviorContractDigest": "sha256:56a667594f2cbf43beed6e23471e4d8bf28fcbbf54d6f13530191153c84d4de9"
+          }
+        },
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-09-13-standards-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "fe16ae41153f89242cdf48c0f899c3720f511557",
+          "subject": {
+            "descriptorVersion": "0.5.0",
+            "behaviorContractDigest": "sha256:56a667594f2cbf43beed6e23471e4d8bf28fcbbf54d6f13530191153c84d4de9"
+          }
+        }
+      ]
     }
   }
 }

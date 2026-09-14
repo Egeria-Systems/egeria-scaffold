@@ -29,11 +29,27 @@ const requireFromBuilderCore = createRequire(
 );
 const { parse: parseYaml } = requireFromBuilderCore("yaml");
 
-const exactSubject = Object.freeze({
+const acceptedHistoricalSubject = Object.freeze({
   descriptorVersion: "0.3.0",
   behaviorContractDigest:
     "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99",
 });
+const exactSubject = Object.freeze({
+  descriptorVersion: "0.3.0",
+  behaviorContractDigest:
+    "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43",
+});
+const appProjectSource = await readFile(resolve(repositoryRoot, "fixtures/generated/app/.egeria/project.yaml"), "utf8");
+const appState = JSON.parse(await readFile(resolve(repositoryRoot, "fixtures/generated/app/.egeria/state.json"), "utf8"));
+const installedCapabilities = appState.installedCapabilities;
+const appBuildEvidence = [{
+  fixture: "app",
+  effect: { version: "4.0.0-rc.112", packageSha256: "a".repeat(64) },
+  client: { files: [{ path: "apps/web/.next/static/chunks/client.js", bytes: 1 }], bytes: 1, inspectedEffectMarkers: ["~effect/Effect"] },
+  server: { files: 1, bytes: 1 },
+  worker: { path: "apps/web/.open-next/server-functions/default/handler.mjs", bytes: 1, sha256: "b".repeat(64) },
+}];
+const workerIntegration = { executed: ["app"], skipped: [] };
 const exactRevision = "0123456789abcdef0123456789abcdef01234567";
 const acceptedEvidenceRevision =
   "bdcc55f1bfa6eca392ce3e36bdc35adb6f085bad";
@@ -215,14 +231,8 @@ function commandOutput(command, version = "0.3.0") {
     return {
       ok: true,
       command,
-      profile: "portfolio",
-      capabilities: [
-        "standards",
-        "content-files",
-        "section-composition",
-        "deployment-cloudflare",
-        "observability",
-      ],
+      profile: "app",
+      capabilities: installedCapabilities.map(({ identifier }) => identifier),
     };
   }
   if (command === "infer") {
@@ -233,14 +243,11 @@ function commandOutput(command, version = "0.3.0") {
         state: {
           kind: "valid",
           value: {
-            installedCapabilities: [
-              { identifier: "observability", version },
-            ],
+            installedCapabilities: installedCapabilities.map(capability => capability.identifier === "observability" ? { ...capability, version } : { ...capability }),
+            origin: { profile: "app", recipeVersion: "0.2.0" },
           },
         },
-        capabilities: [
-          { identifier: "observability", category: "confirmed" },
-        ],
+        capabilities: installedCapabilities.map(({ identifier }) => ({ identifier, category: "confirmed" })),
       },
     };
   }
@@ -261,10 +268,13 @@ function commandOutput(command, version = "0.3.0") {
   throw new Error("unexpected command");
 }
 
-async function createRunnerAdapters({ recipeVersion = "0.8.0" } = {}) {
+async function createRunnerAdapters({ recipeVersion = "0.2.0" } = {}) {
   let projectRoot;
   const commands = [];
   const adapters = {
+    async readCurrentRevision() { return exactRevision; },
+    async readRepositoryStatus() { return ""; },
+    async readRepositoryIndexEntries() { return "H package.json\0"; },
     async runCommand(input) {
       commands.push(input);
       const command = input.arguments[1];
@@ -273,7 +283,7 @@ async function createRunnerAdapters({ recipeVersion = "0.8.0" } = {}) {
         await mkdir(join(projectRoot, ".egeria"), { recursive: true });
         await writeFile(
           join(projectRoot, ".egeria/project.yaml"),
-          `originProfile: portfolio\nrecipeVersion: ${recipeVersion}\n`,
+          appProjectSource.replace("recipeVersion: 0.2.0", `recipeVersion: ${recipeVersion}`),
           "utf8",
         );
       }
@@ -281,12 +291,14 @@ async function createRunnerAdapters({ recipeVersion = "0.8.0" } = {}) {
     },
     async verifyProject(root, identifier) {
       assert.equal(root, projectRoot);
-      assert.equal(identifier, "portfolio");
+      assert.equal(identifier, "app");
       return {
         ok: true,
-        fixtures: ["portfolio"],
-        profiles: ["portfolio"],
+        fixtures: ["app"],
+        profiles: ["app"],
         checks: fixedVerificationChecks,
+        workerIntegration: structuredClone(workerIntegration),
+        appBuildEvidence: structuredClone(appBuildEvidence),
       };
     },
     async verifyFixture(input) {
@@ -388,7 +400,7 @@ function validateCompletedCertificationReceipt(receipt) {
 
   requireCondition(receipt?.schemaVersion === "1.0.0", "receipt-contract");
   requireCondition(receipt?.capability === "observability", "receipt-contract");
-  requireCondition(sameJson(receipt?.subject, exactSubject), "subject");
+  requireCondition(sameJson(receipt?.subject, acceptedHistoricalSubject), "subject");
   requireCondition(
     receipt?.evidenceRevision === acceptedEvidenceRevision &&
       outcomes.every(
@@ -426,7 +438,7 @@ function validateCompletedCertificationReceipt(receipt) {
     outcomes.every(
       (outcome) =>
         outcome.capability === "observability" &&
-        sameJson(outcome.subject, exactSubject) &&
+        sameJson(outcome.subject, acceptedHistoricalSubject) &&
         outcome.result === "passed",
     ),
     "evidence-outcomes",
@@ -600,7 +612,7 @@ test("the completed receipt rejects stale identity, evidence, provider, cleanup,
   }
 });
 
-test("the thin local runner binds exact recipe, subject, revision, fixed verification, fixture checks, and cleanup", async () => {
+test("the current app runner retains complete identity and actual Worker and Effect evidence", async () => {
   const { certifyObservabilityErrorDiagnosticsForTesting } =
     await loadModule(runnerPath);
   const { adapters, commands, readProjectRoot } = await createRunnerAdapters();
@@ -613,11 +625,14 @@ test("the thin local runner binds exact recipe, subject, revision, fixed verific
     ok: true,
     capability: "observability",
     version: "0.3.0",
-    profile: "portfolio",
+    profile: "app",
     subject: exactSubject,
-    recipeVersion: "0.8.0",
+    recipeVersion: "0.2.0",
     evidenceRevision: exactRevision,
     cleanup: "identity-checked",
+    installedCapabilities,
+    workerIntegration,
+    appBuildEvidence,
     checks: [
       "compiled-cli-create",
       "state-inference",
@@ -638,11 +653,111 @@ test("the thin local runner binds exact recipe, subject, revision, fixed verific
   );
   assert.match(
     commands[0].arguments.join(" "),
-    /--name acme-portfolio --display-name Acme Portfolio/u,
+    /--name acme-app --display-name Acme App/u,
   );
   assert.equal(await pathExists(dirname(readProjectRoot())), false);
-  assert.equal(Buffer.byteLength(JSON.stringify(result), "utf8") <= 4_096, true);
-  assert.doesNotMatch(JSON.stringify(result), /0\.2\.0/u);
+  assert.equal(Buffer.byteLength(JSON.stringify(result), "utf8") <= 32_768, true);
+  assert.doesNotMatch(JSON.stringify(result), /24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99/u);
+});
+
+test("the current app runner refuses missing or mismatched runtime evidence", async () => {
+  const { certifyObservabilityErrorDiagnosticsForTesting } = await loadModule(runnerPath);
+  for (const mutate of [
+    value => { delete value.workerIntegration; },
+    value => { value.workerIntegration = { executed: [], skipped: ["app"] }; },
+    value => { delete value.appBuildEvidence; },
+    value => { value.appBuildEvidence[0].fixture = "portfolio"; },
+    value => { value.appBuildEvidence[0].effect.version = "wrong"; },
+    value => { value.appBuildEvidence[0].client.files = []; },
+  ]) {
+    const { adapters } = await createRunnerAdapters();
+    const verify = adapters.verifyProject;
+    adapters.verifyProject = async (...arguments_) => {
+      const result = await verify(...arguments_);
+      mutate(result);
+      return result;
+    };
+    await assert.rejects(() => certifyObservabilityErrorDiagnosticsForTesting({ revision: exactRevision }, adapters),
+      error => error?.code === "CERTIFICATION_RUNTIME_EVIDENCE_INVALID");
+  }
+});
+
+test("the current app runner refuses incomplete installed identity before runtime verification", async () => {
+  const { certifyObservabilityErrorDiagnosticsForTesting } = await loadModule(runnerPath);
+  for (const mutate of [
+    value => { value.result.state.value.installedCapabilities.pop(); },
+    value => { value.result.state.value.installedCapabilities.push({ identifier: "analytics", version: "0.1.0" }); },
+    value => { value.result.state.value.installedCapabilities[0].version = "0.4.0"; },
+    value => { value.result.state.value.origin.profile = "portfolio"; },
+    value => { value.result.capabilities[0].category = "unconfirmed"; },
+  ]) {
+    const { adapters } = await createRunnerAdapters();
+    const run = adapters.runCommand;
+    let verificationCalls = 0;
+    adapters.verifyProject = async () => { verificationCalls += 1; };
+    adapters.runCommand = async input => {
+      const result = JSON.parse(await run(input));
+      if (input.arguments[1] === "infer") mutate(result);
+      return `${JSON.stringify(result)}\n`;
+    };
+    await assert.rejects(() => certifyObservabilityErrorDiagnosticsForTesting({ revision: exactRevision }, adapters),
+      error => error?.code === "FRESH_SCAFFOLD_INFERENCE_INVALID");
+    assert.equal(verificationCalls, 0);
+  }
+});
+
+test("the current app runner binds clean ordinary source before and after execution", async () => {
+  const { certifyObservabilityErrorDiagnosticsForTesting } = await loadModule(runnerPath);
+  for (const [reader, value, code] of [
+    ["readCurrentRevision", "f".repeat(40), "CERTIFICATION_REVISION_MISMATCH"],
+    ["readRepositoryStatus", " M package.json\0", "CERTIFICATION_WORKTREE_DIRTY"],
+    ["readRepositoryIndexEntries", "S package.json\0", "CERTIFICATION_INDEX_FLAGS"],
+  ]) {
+    for (const driftAfterExecution of [false, true]) {
+      const { adapters, commands } = await createRunnerAdapters();
+      const original = adapters[reader];
+      let reads = 0;
+      adapters[reader] = async () => (++reads === 1 && driftAfterExecution) ? original() : value;
+      await assert.rejects(() => certifyObservabilityErrorDiagnosticsForTesting({ revision: exactRevision }, adapters),
+        error => error?.code === code);
+      assert.equal(commands.length === 0, !driftAfterExecution);
+    }
+  }
+});
+
+test("deployment candidate validation requires the complete current app identity", async () => {
+  const { validateObservabilityDeploymentCandidate } = await loadModule(runnerPath);
+  const manifest = JSON.parse(await readFile(resolve(repositoryRoot, "fixtures/generated/app/apps/web/package.json"), "utf8"));
+  const candidate = {
+    revision: exactRevision, projectSource: appProjectSource, manifest,
+    infer: commandOutput("infer"), doctor: commandOutput("doctor"), diff: commandOutput("diff"),
+  };
+  const accepted = validateObservabilityDeploymentCandidate(candidate);
+  assert.equal(accepted.ok, true);
+  assert.equal(accepted.profile, "app");
+  assert.equal(accepted.recipeVersion, "0.2.0");
+  assert.deepEqual(accepted.subject, exactSubject);
+  assert.equal(accepted.revision, exactRevision);
+  for (const mutate of [
+    value => { value.projectSource = value.projectSource.replace("originProfile: app", "originProfile: portfolio"); },
+    value => { value.projectSource = value.projectSource.replace("recipeVersion: 0.2.0", "recipeVersion: 0.1.0"); },
+    value => { value.projectSource += "unexpected: true\n"; },
+    value => { value.infer.result.state.value.installedCapabilities.pop(); },
+    value => { value.infer.result.state.value.installedCapabilities.push({ identifier: "analytics", version: "0.1.0" }); },
+    value => { value.infer.result.state.value.installedCapabilities[0].version = "0.4.0"; },
+    value => { value.infer.result.state.value.origin.recipeVersion = "0.1.0"; },
+    value => { value.infer.result.capabilities[0].category = "unconfirmed"; },
+    value => { value.doctor.ok = false; },
+    value => { value.doctor.result.healthy = false; },
+    value => { value.diff.result.equal = false; },
+    value => { value.manifest.dependencies.effect = "4.0.0-rc.111"; },
+    value => { value.manifest.dependencies["@egeria-systems/observability"] = "0.2.0"; },
+  ]) {
+    const changed = structuredClone(candidate);
+    mutate(changed);
+    assert.throws(() => validateObservabilityDeploymentCandidate(changed),
+      error => error?.code === "CERTIFICATION_CANDIDATE_INVALID");
+  }
 });
 
 test("the local fixture receipt binds every capture case and rejects semantic or provider-claim drift", async () => {
@@ -1559,7 +1674,7 @@ test("the prepared workflow is manual, exact-revision, protected, single-attempt
   );
   assert.match(
     stepsByName["Create deployment candidate"].run,
-    /--name acme-portfolio-observability-error-diagnostics/u,
+    /--profile app --name acme-app/u,
   );
   assert.match(
     stepsByName["Verify deployment candidate before certification fixtures"].run,

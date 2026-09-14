@@ -1,4 +1,3 @@
-import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   constants,
@@ -11,30 +10,39 @@ import {
 } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { isDeepStrictEqual, promisify } from "node:util";
+import { isDeepStrictEqual } from "node:util";
 
 import {
   certifyFreshScaffold,
   certifyFreshScaffoldForTesting,
 } from "./lib/certify-fresh-scaffold.mjs";
 import { runCertificationCli } from "./lib/certification-cli.mjs";
+import {
+  createCertificationSubject,
+  createInstalledManifest,
+  createVerifiedCapabilityCatalog,
+  profileRecipes,
+  parseProjectYaml,
+  resolveCapabilities,
+} from "../packages/builder-core/dist/index.js";
+import { generatedFixtureContracts } from "./verify-generated-skeletons.mjs";
+import { requireAppRuntimeEvidence } from "./certify-app-local.mjs";
+import { createCertificationPreflight, createCertificationRepositoryReaders } from "./lib/certification-preflight.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const execFileAsync = promisify(execFile);
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
 const publicRegistry = "https://registry.npmjs.org/";
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const subject = Object.freeze({
   descriptorVersion: "0.3.0",
   behaviorContractDigest:
-    "sha256:24a3cb3361cd8f72a12a1926b512e087adb31ad120a62b70e06a68d9dcf90c99",
+    "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43",
 });
-const expectedCapabilities = Object.freeze([
-  "standards",
-  "content-files",
-  "section-composition",
-  "deployment-cloudflare",
-  "observability",
+const expectedVerificationChecks = Object.freeze([
+  "pnpm-version", "frozen-install", "peer-dependencies", "dependency-audit",
+  "registry-signatures", "lint", "cloudflare-types", "typecheck", "unit-tests",
+  "component-tests", "next-build", "opennext-build", "browser-install",
+  "browser-development", "browser-preview",
 ]);
 const expectedFixtureChecks = Object.freeze([
   "certification-fixture-overlay",
@@ -108,24 +116,61 @@ function createError(code) {
   return new ObservabilityErrorDiagnosticsCertificationError(code);
 }
 
+const isCertificationError = error => error instanceof ObservabilityErrorDiagnosticsCertificationError;
+const errorCodes = Object.freeze({
+  adapterInvalid: "CERTIFICATION_ADAPTER_INVALID",
+  revisionInvalid: "CERTIFICATION_REVISION_UNAVAILABLE",
+  revisionUnavailable: "CERTIFICATION_REVISION_UNAVAILABLE",
+  revisionMismatch: "CERTIFICATION_REVISION_MISMATCH",
+  worktreeUnavailable: "CERTIFICATION_WORKTREE_UNAVAILABLE",
+  worktreeDirty: "CERTIFICATION_WORKTREE_DIRTY",
+  indexFlags: "CERTIFICATION_INDEX_FLAGS",
+});
+const repositoryReaders = createCertificationRepositoryReaders({
+  repositoryRoot, revisionArguments: ["rev-parse", "--verify", "HEAD"],
+  exactRevisionPattern, createError, isCertificationError, errorCodes,
+});
+
+async function requireAuthority(preflight, revision) {
+  await preflight.requireRevision(revision);
+  preflight.requireCleanStatus(await preflight.readRepositoryStatus());
+  preflight.requireOrdinaryIndexEntries(await preflight.readRepositoryIndexEntries());
+}
+
 function configurationFor(revision) {
   if (typeof revision !== "string" || !exactRevisionPattern.test(revision)) {
     throw createError("CERTIFICATION_REVISION_INVALID");
   }
+  const catalog = createVerifiedCapabilityCatalog();
+  const fixture = generatedFixtureContracts.find(({ identifier }) => identifier === "app");
+  if (!catalog.ok || !fixture) throw createError("CERTIFICATION_SUBJECT_INVALID");
+  const resolved = resolveCapabilities({ profile: "app", requestedCapabilities: [] }, catalog.value, profileRecipes);
+  const descriptor = catalog.value.find(({ identifier }) => identifier === "observability");
+  if (!resolved.ok || resolved.value.recipeVersion !== "0.2.0" || !descriptor ||
+      !isDeepStrictEqual(createCertificationSubject(descriptor, ["cleanup-recovery", "deployed-application", "fresh-scaffold"]), subject)) {
+    throw createError("CERTIFICATION_SUBJECT_INVALID");
+  }
+  const installed = createInstalledManifest(resolved.value);
+  if (!isDeepStrictEqual(installed.map(({ identifier }) => identifier), fixture.expectedCapabilities)) {
+    throw createError("CERTIFICATION_SUBJECT_INVALID");
+  }
   return Object.freeze({
-    profile: "portfolio",
-    projectName: "acme-portfolio",
-    displayName: "Acme Portfolio",
+    profile: "app",
+    projectName: fixture.projectName,
+    displayName: fixture.displayName,
     createArguments: Object.freeze([]),
-    expectedCapabilities,
+    expectedCapabilities: fixture.expectedCapabilities,
+    expectedInstalledCapabilities: installed,
+    expectedCapabilitySettings: fixture.expectedCapabilitySettings,
     capabilityIdentifier: "observability",
     capabilityVersion: "0.3.0",
-    expectedRecipeVersion: "0.8.0",
-    verifierIdentifier: "portfolio",
+    expectedRecipeVersion: "0.2.0",
+    verifierIdentifier: "app",
+    expectedVerificationChecks,
     expectedFixtureChecks,
     receipt: Object.freeze({
       subject,
-      recipeVersion: "0.8.0",
+      recipeVersion: "0.2.0",
       evidenceRevision: revision,
       cleanup: "identity-checked",
     }),
@@ -133,6 +178,40 @@ function configurationFor(revision) {
     isCertificationError: (error) =>
       error instanceof ObservabilityErrorDiagnosticsCertificationError,
   });
+}
+
+export function validateObservabilityDeploymentCandidate(input) {
+  try {
+    const configuration = configurationFor(input.revision);
+    const project = parseProjectYaml(input.projectSource);
+    const state = input.infer?.result?.state;
+    const capabilities = input.infer?.result?.capabilities;
+    if (!project.ok || project.value.originProfile !== "app" || project.value.recipeVersion !== "0.2.0" ||
+        project.value.project.name !== configuration.projectName || project.value.project.displayName !== configuration.displayName ||
+        !isDeepStrictEqual(project.value.selectedCapabilities, configuration.expectedCapabilities) ||
+        !isDeepStrictEqual(project.value.capabilitySettings, configuration.expectedCapabilitySettings) ||
+        input.infer?.ok !== true || input.infer.command !== "infer" || state?.kind !== "valid" ||
+        !isDeepStrictEqual(state.value?.origin, { profile: "app", recipeVersion: "0.2.0" }) ||
+        !isDeepStrictEqual(state.value?.installedCapabilities, configuration.expectedInstalledCapabilities) ||
+        !Array.isArray(capabilities) || !isDeepStrictEqual(capabilities.map(({ identifier }) => identifier).sort(), [...configuration.expectedCapabilities].sort()) ||
+        capabilities.some(({ category }) => category !== "confirmed") ||
+        input.doctor?.ok !== true || input.doctor.command !== "doctor" || input.doctor.result?.healthy !== true ||
+        !isDeepStrictEqual(input.doctor.result?.diagnostics, []) ||
+        input.diff?.ok !== true || input.diff.command !== "diff" || input.diff.result?.equal !== true ||
+        !isDeepStrictEqual(input.diff.result?.differences, []) ||
+        input.manifest?.dependencies?.effect !== "4.0.0-rc.112" ||
+        input.manifest?.dependencies?.["@egeria-systems/observability"] !== "0.3.0") {
+      throw createError("CERTIFICATION_CANDIDATE_INVALID");
+    }
+    return {
+      ok: true, capability: "observability", version: "0.3.0", subject,
+      profile: "app", recipeVersion: "0.2.0", revision: input.revision,
+      checks: ["compiled-cli-create", "state-inference", "healthy-diagnostics", "exact-diff", "complete-installed-manifest", "current-app-subject"],
+    };
+  } catch (error) {
+    if (isCertificationError(error)) throw error;
+    throw createError("CERTIFICATION_CANDIDATE_INVALID");
+  }
 }
 
 function fingerprint(content) {
@@ -368,33 +447,42 @@ function fixtureVerifierFor(revision) {
   };
 }
 
-export function certifyObservabilityErrorDiagnostics(input) {
-  const configuration = configurationFor(input?.revision);
-  return certifyFreshScaffold(
-    configuration,
-    fixtureVerifierFor(input.revision),
-  );
+async function certifyWithAuthority(input, adapters, runJourney) {
+  if (input === null || typeof input !== "object" ||
+      !isDeepStrictEqual(Object.keys(input), ["revision"])) {
+    throw createError("CERTIFICATION_REVISION_INVALID");
+  }
+  const configuration = configurationFor(input.revision);
+  const preflight = createCertificationPreflight({
+    adapters,
+    requiredAdapterFunctions: ["readCurrentRevision", "readRepositoryStatus", "readRepositoryIndexEntries"],
+    createError, isCertificationError, errorCodes,
+  });
+  preflight.requireAdapters();
+  await requireAuthority(preflight, input.revision);
+  const result = await runJourney(configuration);
+  try {
+    requireAppRuntimeEvidence(result, "app");
+  } catch {
+    throw createError("CERTIFICATION_RUNTIME_EVIDENCE_INVALID");
+  }
+  await requireAuthority(preflight, input.revision);
+  return result;
 }
 
-export function certifyObservabilityErrorDiagnosticsForTesting(
-  input,
-  adapters,
-) {
-  return certifyFreshScaffoldForTesting(
-    configurationFor(input?.revision),
-    adapters,
-  );
+export function certifyObservabilityErrorDiagnostics(input) {
+  return certifyWithAuthority(input, repositoryReaders,
+    configuration => certifyFreshScaffold(configuration, fixtureVerifierFor(input.revision)));
+}
+
+export function certifyObservabilityErrorDiagnosticsForTesting(input, adapters) {
+  return certifyWithAuthority(input, adapters,
+    configuration => certifyFreshScaffoldForTesting(configuration, adapters));
 }
 
 async function readCurrentRevision() {
   try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["rev-parse", "--verify", "HEAD"],
-      { cwd: repositoryRoot, encoding: "utf8" },
-    );
-    const revision = stdout.trim();
-    return exactRevisionPattern.test(revision) ? revision : undefined;
+    return await repositoryReaders.readCurrentRevision();
   } catch {
     return undefined;
   }
