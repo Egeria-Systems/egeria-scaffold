@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { chmod, mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { promisify } from "node:util";
+import { isDeepStrictEqual, promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 import { verifyGeneratedProject } from "../verify-generated-skeletons.mjs";
@@ -125,6 +125,20 @@ function requireInferenceResult(configuration, value) {
   ) {
     fail(configuration, "FRESH_SCAFFOLD_INFERENCE_INVALID");
   }
+  if (configuration.expectedInstalledCapabilities !== undefined) {
+    const expectedIdentifiers = configuration.expectedInstalledCapabilities
+      .map(({ identifier }) => identifier).sort();
+    if (
+      !isDeepStrictEqual(installedCapabilities, configuration.expectedInstalledCapabilities) ||
+      !isDeepStrictEqual(state.value.origin, {
+        profile: configuration.profile, recipeVersion: configuration.expectedRecipeVersion,
+      }) ||
+      !isDeepStrictEqual(capabilities.map(({ identifier }) => identifier).sort(), expectedIdentifiers) ||
+      capabilities.some(({ category }) => category !== "confirmed")
+    ) {
+      fail(configuration, "FRESH_SCAFFOLD_INFERENCE_INVALID");
+    }
+  }
 }
 
 function requireDoctorResult(configuration, value) {
@@ -153,6 +167,19 @@ async function requireRecipeVersion(configuration, projectRoot) {
     source = await readFile(join(projectRoot, ".egeria/project.yaml"), "utf8");
   } catch {
     fail(configuration, "FRESH_SCAFFOLD_RECIPE_INVALID");
+  }
+  if (configuration.expectedInstalledCapabilities !== undefined) {
+    const { parseProjectYaml } = await import("../../packages/builder-core/dist/index.js");
+    const project = parseProjectYaml(source);
+    if (
+      !project.ok || project.value.originProfile !== configuration.profile ||
+      project.value.project.name !== configuration.projectName ||
+      project.value.project.displayName !== configuration.displayName ||
+      !isDeepStrictEqual(project.value.selectedCapabilities, configuration.expectedCapabilities) ||
+      !isDeepStrictEqual(project.value.capabilitySettings, configuration.expectedCapabilitySettings)
+    ) {
+      fail(configuration, "FRESH_SCAFFOLD_RECIPE_INVALID");
+    }
   }
   const recipeLines = source
     .split("\n")
@@ -334,6 +361,11 @@ export async function certifyFreshScaffoldForTesting(configuration, adapters) {
         ...generatedVerification.checks,
         ...(fixtureVerification?.checks ?? []),
       ],
+      ...(configuration.expectedInstalledCapabilities === undefined ? {} : {
+        installedCapabilities: infer.result.state.value.installedCapabilities,
+        workerIntegration: generatedVerification.workerIntegration,
+        appBuildEvidence: generatedVerification.appBuildEvidence,
+      }),
     };
   } catch (error) {
     pendingError = configuration.isCertificationError(error)

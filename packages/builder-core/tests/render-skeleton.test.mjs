@@ -66,60 +66,67 @@ const appFoundationPaths = [
 ].sort();
 
 test("app generation preserves production-site bytes across all optional subsets", async () => {
-  const renderSkeleton = await loadRenderSkeleton();
-  for (let subset = 0; subset < 8; subset += 1) {
-    const request = {
-      projectName: "acme-app",
-      displayName: "Acme App",
-      packageVersions: { standards: "0.1.0", observability: "0.3.0" },
-      ...(subset & 1 ? { bookingCalendly: {
-        destination: "https://calendly.com/acme/intro", mode: "popup",
-      } } : {}),
-      ...(subset & 2 ? { multilingual: true } : {}),
-      ...(subset & 4 ? { analytics: analyticsSettings } : {}),
-    };
-    const site = assertSuccess(await renderSkeleton({ ...request, profile: "site" }));
-    const app = assertSuccess(await renderSkeleton({ ...request, profile: "app" }));
-    assert.equal(app.project.originProfile, "app");
-    assert.equal(app.project.recipeVersion, "0.1.0");
-    assert.deepEqual(app.project.capabilitySettings, site.project.capabilitySettings);
-    assert.deepEqual(
-      app.resolved.capabilities.map(({ identifier }) => identifier).sort(),
-      [...site.resolved.capabilities.map(({ identifier }) => identifier), "app-foundation"].sort(),
-    );
-    const siteFiles = new Map(site.files.map(({ path, content }) => [path, content]));
-    assert.deepEqual(
-      app.files.map(({ path }) => path),
-      [...siteFiles.keys(), ...appFoundationPaths].sort(),
-    );
-    for (const { path, content } of app.files) {
-      if (siteFiles.has(path) && path !== "apps/web/package.json" && path !== "pnpm-workspace.yaml") {
-        assert.deepEqual(content, siteFiles.get(path), `${subset}: ${path}`);
+  const core = await import("../dist/index.js");
+  for (const generation of [
+    { context: retainedRenderingContext, recipe: "0.1.0", standards: "0.4.0", appVitest: "4.1.11", siteVitest: "4.1.10" },
+    { context: undefined, recipe: "0.2.0", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
+  ]) {
+    const renderSkeleton = (request) => core.renderSkeleton(request, generation.context);
+    for (let subset = 0; subset < 8; subset += 1) {
+      const request = {
+        projectName: "acme-app",
+        displayName: "Acme App",
+        packageVersions: { standards: "0.1.0", observability: "0.3.0" },
+        ...(subset & 1 ? { bookingCalendly: {
+          destination: "https://calendly.com/acme/intro", mode: "popup",
+        } } : {}),
+        ...(subset & 2 ? { multilingual: true } : {}),
+        ...(subset & 4 ? { analytics: analyticsSettings } : {}),
+      };
+      const site = assertSuccess(await renderSkeleton({ ...request, profile: "site" }));
+      const app = assertSuccess(await renderSkeleton({ ...request, profile: "app" }));
+      assert.equal(app.project.originProfile, "app");
+      assert.equal(app.project.recipeVersion, generation.recipe);
+      assert.equal(app.resolved.capabilities.find(({ identifier }) => identifier === "standards").version, generation.standards);
+      assert.deepEqual(app.project.capabilitySettings, site.project.capabilitySettings);
+      assert.deepEqual(
+        app.resolved.capabilities.map(({ identifier }) => identifier).sort(),
+        [...site.resolved.capabilities.map(({ identifier }) => identifier), "app-foundation"].sort(),
+      );
+      const siteFiles = new Map(site.files.map(({ path, content }) => [path, content]));
+      assert.deepEqual(
+        app.files.map(({ path }) => path),
+        [...siteFiles.keys(), ...appFoundationPaths].sort(),
+      );
+      for (const { path, content } of app.files) {
+        if (siteFiles.has(path) && path !== "apps/web/package.json" && path !== "pnpm-workspace.yaml") {
+          assert.deepEqual(content, siteFiles.get(path), `${subset}: ${path}`);
+        }
       }
+      const manifest = parseGeneratedJson(app.files, "apps/web/package.json");
+      const siteManifest = parseGeneratedJson(site.files, "apps/web/package.json");
+      assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
+      assert.equal(manifest.scripts["test:integration:cloudflare"],
+        "vitest run --config vitest.cloudflare.config.ts");
+      assert.equal(manifest.devDependencies.vitest, generation.appVitest);
+      assert.equal(siteManifest.devDependencies.vitest, generation.siteVitest);
+      delete manifest.dependencies.effect;
+      delete manifest.scripts["test:integration:cloudflare"];
+      delete manifest.devDependencies.vitest;
+      delete siteManifest.devDependencies.vitest;
+      assert.deepEqual(manifest, siteManifest);
+      const workspace = parseGeneratedYaml(app.files, "pnpm-workspace.yaml");
+      const siteWorkspace = parseGeneratedYaml(site.files, "pnpm-workspace.yaml");
+      assert.equal(workspace.allowBuilds["msgpackr-extract"], false);
+      delete workspace.allowBuilds["msgpackr-extract"];
+      assert.deepEqual(workspace, siteWorkspace);
+      const foundation = app.resolved.capabilities.find(({ identifier }) => identifier === "app-foundation");
+      assert.deepEqual(foundation.managedSurfaces.filter(({ fingerprintTarget }) => fingerprintTarget.kind === "file")
+        .map(({ path }) => path).sort(), appFoundationPaths);
+      assert.deepEqual(snapshotBytes(app.files), snapshotBytes(
+        assertSuccess(await renderSkeleton({ ...request, profile: "app" })).files,
+      ));
     }
-    const manifest = parseGeneratedJson(app.files, "apps/web/package.json");
-    const siteManifest = parseGeneratedJson(site.files, "apps/web/package.json");
-    assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
-    assert.equal(manifest.scripts["test:integration:cloudflare"],
-      "vitest run --config vitest.cloudflare.config.ts");
-    assert.equal(manifest.devDependencies.vitest, "4.1.11");
-    assert.equal(siteManifest.devDependencies.vitest, "4.1.10");
-    delete manifest.dependencies.effect;
-    delete manifest.scripts["test:integration:cloudflare"];
-    delete manifest.devDependencies.vitest;
-    delete siteManifest.devDependencies.vitest;
-    assert.deepEqual(manifest, siteManifest);
-    const workspace = parseGeneratedYaml(app.files, "pnpm-workspace.yaml");
-    const siteWorkspace = parseGeneratedYaml(site.files, "pnpm-workspace.yaml");
-    assert.equal(workspace.allowBuilds["msgpackr-extract"], false);
-    delete workspace.allowBuilds["msgpackr-extract"];
-    assert.deepEqual(workspace, siteWorkspace);
-    const foundation = app.resolved.capabilities.find(({ identifier }) => identifier === "app-foundation");
-    assert.deepEqual(foundation.managedSurfaces.filter(({ fingerprintTarget }) => fingerprintTarget.kind === "file")
-      .map(({ path }) => path).sort(), appFoundationPaths);
-    assert.deepEqual(snapshotBytes(app.files), snapshotBytes(
-      assertSuccess(await renderSkeleton({ ...request, profile: "app" })).files,
-    ));
   }
 });
 
