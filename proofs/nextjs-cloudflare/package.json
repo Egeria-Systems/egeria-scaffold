@@ -24,7 +24,7 @@
   "dependencies": {
     "@opennextjs/cloudflare": "1.20.6",
     "next": "16.3.4",
-    "react": "19.2.8",
+    "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
@@ -32,7 +32,7 @@
     "@axe-core/playwright": "4.13.0",
     "@playwright/test": "1.63.0",
     "@types/node": "22.20.1",
-    "@types/react": "19.2.18",
+    "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.4",
