@@ -13,3 +13,17 @@ export const appGenerationVerificationChecks = Object.freeze([
   ...ordinaryGenerationVerificationChecks,
   "worker-integration",
 ] as const);
+
+export const persistenceGenerationVerificationChecks = Object.freeze([
+  "lockfile",
+  "frozen-install",
+  "lint",
+  "cloudflare-types",
+  "typecheck",
+  "unit-tests",
+  "component-tests",
+  "next-build",
+  "opennext-build",
+  "worker-integration",
+  "binding-integration",
+] as const);

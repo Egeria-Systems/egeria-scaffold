@@ -4,6 +4,8 @@
 
 **Date:** 2026-09-12
 
+[ADR-0016](0016-optional-application-persistence.md) supersedes only the standards-version requirement for explicit application-persistence selection; this ADR continues to own default generation and retained histories.
+
 ## Context
 
 The generated test foundation must support Vitest 5 without silently changing existing materialized repositories. Existing standards upgrades retain original recipe provenance, and historical app generation and incoming transitions have two valid Vitest 4 declarations. A new default must not change the descriptors, rendered bytes, dependency locks, diagnostics, or supported lifecycle operations of those repositories.

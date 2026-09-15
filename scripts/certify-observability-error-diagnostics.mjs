@@ -20,7 +20,9 @@ import { runCertificationCli } from "./lib/certification-cli.mjs";
 import {
   createCertificationSubject,
   createInstalledManifest,
-  createVerifiedCapabilityCatalog,
+  createCapabilityCatalogSnapshot,
+  verifiedCapabilityPackageVersions,
+  vitestFiveCapabilityCatalogSnapshot,
   profileRecipes,
   parseProjectYaml,
   resolveCapabilities,
@@ -141,7 +143,9 @@ function configurationFor(revision) {
   if (typeof revision !== "string" || !exactRevisionPattern.test(revision)) {
     throw createError("CERTIFICATION_REVISION_INVALID");
   }
-  const catalog = createVerifiedCapabilityCatalog();
+  const catalog = createCapabilityCatalogSnapshot(
+    verifiedCapabilityPackageVersions, vitestFiveCapabilityCatalogSnapshot,
+  );
   const fixture = generatedFixtureContracts.find(({ identifier }) => identifier === "app");
   if (!catalog.ok || !fixture) throw createError("CERTIFICATION_SUBJECT_INVALID");
   const resolved = resolveCapabilities({ profile: "app", requestedCapabilities: [] }, catalog.value, profileRecipes);

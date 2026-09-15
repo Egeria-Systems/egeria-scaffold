@@ -20,9 +20,11 @@ export type CapabilityPackageVersions = Readonly<{
 }>;
 
 export type CapabilityCatalogSnapshot = Readonly<{
-  standards: "0.3.0" | "0.4.0" | "0.5.0";
+  standards: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0";
   siteRouting?: "0.3.0" | "0.4.0";
   appFoundation?: "0.1.0";
+  deploymentCloudflare?: "0.3.0" | "0.4.0";
+  applicationPersistence?: "0.1.0";
 }>;
 
 export const vitestFourCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
@@ -37,12 +39,30 @@ export const vitestFiveCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = Ob
   appFoundation: "0.1.0",
 });
 
-const currentCapabilityCatalogSnapshot = vitestFiveCapabilityCatalogSnapshot;
+export const applicationPersistenceCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
+  ...vitestFiveCapabilityCatalogSnapshot,
+  standards: "0.6.0",
+  deploymentCloudflare: "0.4.0",
+  applicationPersistence: "0.1.0",
+});
+
+export const applicationPersistenceScripts = Object.freeze({
+  "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+  "db:migrate:local": "node scripts/check-application-database.mjs local && wrangler d1 migrations apply APP_DB --local --config wrangler.jsonc --x-provision=false --x-auto-create=false",
+});
+
+export const persistenceDeploymentScripts = Object.freeze({
+  "db:check": "node scripts/check-application-database.mjs local",
+  "db:migrations:hash": "node scripts/check-application-database.mjs migration-hash",
+  "test:integration:bindings": "vitest run --config vitest.bindings.config.ts",
+});
+
+const currentCapabilityCatalogSnapshot = applicationPersistenceCatalogSnapshot;
 
 function isSupportedStandardsSnapshotVersion(
   value: string,
 ): value is CapabilityCatalogSnapshot["standards"] {
-  return value === "0.3.0" || value === "0.4.0" || value === "0.5.0";
+  return value === "0.3.0" || value === "0.4.0" || value === "0.5.0" || value === "0.6.0";
 }
 
 function isSupportedSiteRoutingSnapshotVersion(
@@ -216,6 +236,7 @@ function createDescriptors(
   snapshot: CapabilityCatalogSnapshot,
 ): readonly CapabilityDescriptor[] {
   const siteRoutingVersion = snapshot.siteRouting ?? "0.3.0";
+  const persistence = snapshot.applicationPersistence === "0.1.0";
   const supportsApp = snapshot.appFoundation !== undefined;
   const sharedSupportedProfiles = supportsApp
     ? (["portfolio", "site", "app"] as const)
@@ -436,7 +457,7 @@ function createDescriptors(
       "standards",
       "devDependencies",
       "vitest",
-      snapshot.standards === "0.5.0" ? "5.0.0" : "4.1.10",
+      snapshot.standards === "0.5.0" || snapshot.standards === "0.6.0" ? "5.0.0" : "4.1.10",
     ),
     createFileEvidencePoint(
       "standards-visual-regression-specification",
@@ -1217,11 +1238,13 @@ function createDescriptors(
           ? (["visual-regression"] as const)
           : []),
         "workflow-contracts",
+        ...(persistence ? ["binding-runtime-tests"] : []),
       ],
       documentationEvidenceRequirements: [
         "public-package-version-and-provenance",
         "unit-and-component-testing-claim-boundaries",
         "browser-testing-claim-boundaries",
+        ...(persistence ? ["binding-runtime-testing-claim-boundaries"] : []),
         ...(snapshot.standards !== "0.3.0"
           ? (["visual-regression-baseline-and-claim-boundaries"] as const)
           : []),
@@ -1290,7 +1313,7 @@ function createDescriptors(
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.3.0",
+      version: snapshot.deploymentCloudflare ?? "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -1298,23 +1321,32 @@ function createDescriptors(
       ...sharedCapabilityMetadata,
       supportedProfiles: sharedSupportedProfiles,
       requiredPackages: ["@opennextjs/cloudflare", "wrangler"],
-      environmentVariables: ["DEPLOY_URL"],
+      environmentVariables: ["DEPLOY_URL", ...(persistence ? ["STAGING_APPLICATION_DATABASE_ID", "PRODUCTION_APPLICATION_DATABASE_ID"] : [])],
       secrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
       platformResources: ["cloudflare-worker", "cloudflare-static-assets"],
       privilegedOperations: ["cloudflare-worker-deployment"],
       threatReviewLevel: "elevated",
-      adapterSemanticRequirements: ["node-runtime", "worker-static-assets"],
-      ...projectEvidencePoints(deploymentCloudflareEvidencePoints),
+      adapterSemanticRequirements: ["node-runtime", "worker-static-assets", ...(persistence ? ["explicit-environment-bindings", "automatic-provisioning-disabled"] : [])],
+      ...projectEvidencePoints([
+        ...deploymentCloudflareEvidencePoints,
+        ...(persistence ? [
+          createFileEvidencePoint("deployment-binding-test-configuration", "deployment-cloudflare", "apps/web/vitest.bindings.config.ts", "managed"),
+          ...Object.entries(persistenceDeploymentScripts).map(([name, command]) => createPackageJsonValueEvidencePoint(`deployment-${name.replaceAll(":", "-")}-script`, "deployment-cloudflare", `/scripts/${name}`, command)),
+          createFileEvidencePoint("deployment-database-preflight", "deployment-cloudflare", "apps/web/scripts/check-application-database.mjs", "managed"),
+        ] : []),
+      ]),
       verificationPlan: [
         "next-build",
         "opennext-build",
         "wrangler-types",
         "deployment-workflow-contracts",
         "browser-deployed",
+        ...(persistence ? ["binding-runtime-tests", "database-environment-isolation"] : []),
       ],
       documentationEvidenceRequirements: [
         "nextjs-opennext-cloudflare-compatibility",
         "deployment-authority-and-claim-boundaries",
+        ...(persistence ? ["database-environment-isolation-and-approval"] : []),
       ],
       removalAndRecoveryRequirements: [
         "review-deployment-source-and-provider-state-separately",
@@ -1665,6 +1697,44 @@ function createDescriptors(
         "verify-closed-analytics-and-multilingual-lifecycle",
       ],
     },
+    ...(persistence ? [{
+      identifier: "application-persistence",
+      version: "0.1.0",
+      deliveryMode: "hybrid",
+      stateClassifications: ["repository-stateful", "external-stateful", "persistent-data"],
+      removalPolicy: "export-and-remove",
+      dependencies: ["app-foundation"],
+      ...sharedCapabilityMetadata,
+      supportedProfiles: ["app"],
+      requiredPackages: ["drizzle-orm", "drizzle-kit", "@cloudflare/workers-types"],
+      environmentVariables: ["STAGING_APPLICATION_DATABASE_ID", "PRODUCTION_APPLICATION_DATABASE_ID"],
+      secrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
+      platformResources: ["cloudflare-d1-database"],
+      dataClassifications: ["application-owned-persistent-data"],
+      retentionAssumptions: ["operator-approved-export-and-recovery-retention"],
+      privilegedOperations: ["database-migration", "database-export", "database-restoration"],
+      threatReviewLevel: "elevated",
+      adapterSemanticRequirements: ["d1-prepared-statements", "d1-atomic-batch", "wrangler-migration-ledger"],
+      ...projectEvidencePoints([
+        createPackageEvidencePoint("persistence-orm-package", "application-persistence", "dependencies", "drizzle-orm", "0.45.2"),
+        createPackageEvidencePoint("persistence-migration-tool-package", "application-persistence", "devDependencies", "drizzle-kit", "0.31.10"),
+        createPackageEvidencePoint("persistence-worker-types-package", "application-persistence", "devDependencies", "@cloudflare/workers-types", "5.20260730.1"),
+        createFileEvidencePoint("persistence-drizzle-configuration", "application-persistence", "apps/web/drizzle.config.ts", "managed"),
+        createFileEvidencePoint("persistence-schema", "application-persistence", "apps/web/src/infrastructure/persistence/schema.ts", "application-owned"),
+        createFileEvidencePoint("persistence-binding-specification", "application-persistence", "apps/web/tests/bindings/application-persistence.test.ts", "application-owned"),
+        createFileEvidencePoint("persistence-test-schema", "application-persistence", "apps/web/tests/bindings/fixtures/schema.ts", "application-owned"),
+        createFileEvidencePoint("persistence-test-worker", "application-persistence", "apps/web/tests/bindings/fixtures/worker.ts", "application-owned"),
+        createFileEvidencePoint("persistence-test-table-migration", "application-persistence", "apps/web/tests/bindings/fixtures/migrations/0000_persistence_fixture.sql", "application-owned"),
+        createFileEvidencePoint("persistence-test-index-migration", "application-persistence", "apps/web/tests/bindings/fixtures/migrations/0001_persistence_fixture_index.sql", "application-owned"),
+        createFileEvidencePoint("persistence-migration-workflow", "application-persistence", ".github/workflows/migrate-application-database.yml", "managed"),
+        createFileEvidencePoint("persistence-operator-guide", "application-persistence", "docs/application-persistence.md", "application-owned"),
+        ...Object.entries(applicationPersistenceScripts).map(([name, command]) => createPackageJsonValueEvidencePoint(`persistence-${name.replaceAll(":", "-")}-script`, "application-persistence", `/scripts/${name}`, command)),
+      ]),
+      migrationPlanners: ["add-application-persistence-0-1-0", "remove-application-persistence-0-1-0"],
+      verificationPlan: ["binding-runtime-tests", "migration-generation", "migration-replay", "database-environment-isolation", "export-and-removal-review", "typecheck", "next-build", "opennext-build"],
+      documentationEvidenceRequirements: ["schema-and-migration-ownership", "environment-isolation-and-migration-authority", "backup-export-and-recovery-boundaries", "machine-and-human-removal-review"],
+      removalAndRecoveryRequirements: ["review-exact-export-and-recovery-evidence", "review-required-uncertainty-dispositions", "preserve-application-owned-schema-and-migrations", "refuse-surviving-package-references", "separate-source-and-persistent-data-recovery"],
+    } as const] : []),
     ...(snapshot.appFoundation === undefined
       ? []
       : [
@@ -1754,6 +1824,14 @@ export function createCapabilityCatalogSnapshot(
     typeof snapshotValue === "object" && snapshotValue !== null
       ? (Reflect.get(snapshotValue, "appFoundation") as unknown)
       : undefined;
+  const deploymentSnapshot = typeof snapshotValue === "object" && snapshotValue !== null
+    ? Reflect.get(snapshotValue, "deploymentCloudflare") as unknown : undefined;
+  const persistenceSnapshot = typeof snapshotValue === "object" && snapshotValue !== null
+    ? Reflect.get(snapshotValue, "applicationPersistence") as unknown : undefined;
+  const persistenceTupleValid = persistenceSnapshot === undefined
+    ? standardsSnapshot !== "0.6.0" && (deploymentSnapshot === undefined || deploymentSnapshot === "0.3.0")
+    : persistenceSnapshot === "0.1.0" && standardsSnapshot === "0.6.0" &&
+      deploymentSnapshot === "0.4.0" && appFoundationSnapshot === "0.1.0" && siteRoutingSnapshot === "0.4.0";
   const resolvedSiteRoutingSnapshot =
     siteRoutingSnapshot === undefined
       ? "0.3.0"
@@ -1764,7 +1842,7 @@ export function createCapabilityCatalogSnapshot(
   const supportedSnapshot =
     typeof standardsSnapshot === "string" &&
     isSupportedStandardsSnapshotVersion(standardsSnapshot) &&
-    resolvedSiteRoutingSnapshot !== undefined &&
+    resolvedSiteRoutingSnapshot !== undefined && persistenceTupleValid &&
     (appFoundationSnapshot === undefined ||
       (typeof appFoundationSnapshot === "string" &&
         isSupportedAppFoundationSnapshotVersion(appFoundationSnapshot)))
@@ -1774,6 +1852,9 @@ export function createCapabilityCatalogSnapshot(
           ...(appFoundationSnapshot === undefined
             ? {}
             : { appFoundation: appFoundationSnapshot }),
+          ...(persistenceSnapshot === "0.1.0"
+            ? { deploymentCloudflare: "0.4.0", applicationPersistence: "0.1.0" } as const
+            : {}),
         } as const)
       : undefined;
 
@@ -1781,6 +1862,9 @@ export function createCapabilityCatalogSnapshot(
     versionIssues.push(
       createPackageVersionIssue("standards", "@egeria-systems/standards"),
     );
+  }
+  if (!persistenceTupleValid) {
+    versionIssues.push({ code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID", path: ["snapshot"], context: { reason: "unsupported-persistence-tuple" } });
   }
   if (!semanticVersionSchema.safeParse(packageVersions.observability).success) {
     versionIssues.push(

@@ -160,6 +160,20 @@ const appFoundationFiles = Object.freeze([
   "apps/web/vitest.cloudflare.config.ts",
 ].sort(codePointCompare));
 
+const applicationPersistenceFiles = Object.freeze([
+  ".github/workflows/migrate-application-database.yml",
+  "apps/web/drizzle.config.ts",
+  "apps/web/scripts/check-application-database.mjs",
+  "apps/web/src/infrastructure/persistence/schema.ts",
+  "apps/web/tests/bindings/application-persistence.test.ts",
+  "apps/web/tests/bindings/fixtures/migrations/0000_persistence_fixture.sql",
+  "apps/web/tests/bindings/fixtures/migrations/0001_persistence_fixture_index.sql",
+  "apps/web/tests/bindings/fixtures/schema.ts",
+  "apps/web/tests/bindings/fixtures/worker.ts",
+  "apps/web/vitest.bindings.config.ts",
+  "docs/application-persistence.md",
+].sort(codePointCompare));
+
 const multilingualFiles = Object.freeze([
   "apps/web/app/[locale]/[[...segments]]/page.tsx",
   "apps/web/app/[locale]/layout.tsx",
@@ -266,6 +280,7 @@ const createArguments = ({
   analytics,
   bookingCalendly,
   multilingual,
+  applicationPersistence,
 }) =>
   Object.freeze([
     "--profile",
@@ -283,6 +298,7 @@ const createArguments = ({
           bookingCalendly.mode,
         ]),
     ...(multilingual === true ? ["--multilingual"] : []),
+    ...(applicationPersistence === true ? ["--application-persistence"] : []),
     ...(analytics === undefined
       ? []
       : [
@@ -596,6 +612,34 @@ export const generatedFixtureContracts = Object.freeze([
     expectedSurfaces: 178,
     visualRegression: false,
   }),
+  Object.freeze({
+    identifier: "app-persistence",
+    profile: "app",
+    projectName: "acme-app-persistence",
+    displayName: "Acme App Persistence",
+    createArguments: createArguments({ profile: "app", projectName: "acme-app-persistence", displayName: "Acme App Persistence", applicationPersistence: true }),
+    expectedCapabilitySettings: noCapabilitySettings,
+    relativeRoot: "fixtures/generated/app-persistence",
+    expectedFiles: Object.freeze([...portfolioFiles, ...siteRoutingFiles, ...appFoundationFiles, ...applicationPersistenceFiles].sort(codePointCompare)),
+    expectedCapabilities: Object.freeze([
+      "standards", "deployment-cloudflare", "content-files", "section-composition",
+      "observability", "app-foundation", "site-routing", "application-persistence",
+    ]),
+    expectedRecipeVersion: "0.2.0",
+    expectedStandardsVersion: "0.6.0",
+    expectedObservabilityVersion: "0.3.0",
+    expectedContentFilesVersion: "0.4.0",
+    expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.4.0",
+    expectedAppFoundationVersion: "0.1.0",
+    expectedApplicationPersistenceVersion: "0.1.0",
+    expectedSiteRoutingVersion: "0.4.0",
+    expectedBookingCalendlyVersion: null,
+    expectedAnalyticsVersion: null,
+    expectedMultilingualVersion: null,
+    expectedSurfaces: 161,
+    visualRegression: false,
+  }),
 ]);
 
 const verificationChecks = [
@@ -736,12 +780,13 @@ function expectedRootManifest(projectName) {
   };
 }
 
-function expectedWebManifest(projectName, nextVersion, appFoundation) {
+function expectedWebManifest(projectName, nextVersion, appFoundation, persistence) {
   return {
     dependencies: {
       "@egeria-systems/observability": "0.3.0",
       "@opennextjs/cloudflare": "1.20.2",
       ...(appFoundation ? { effect: "4.0.0-rc.112" } : {}),
+      ...(persistence ? { "drizzle-orm": "0.45.2" } : {}),
       next: nextVersion,
       react: "19.2.8",
       "react-dom": "19.2.8",
@@ -760,6 +805,7 @@ function expectedWebManifest(projectName, nextVersion, appFoundation) {
       "@types/react": "19.2.18",
       "@types/react-dom": "19.2.4",
       "@vitejs/plugin-react": "6.0.5",
+      ...(persistence ? { "@cloudflare/workers-types": "5.20260730.1", "drizzle-kit": "0.31.10" } : {}),
       eslint: "9.39.5",
       "eslint-config-next": nextVersion,
       jsdom: "30.0.1",
@@ -789,6 +835,13 @@ function expectedWebManifest(projectName, nextVersion, appFoundation) {
       "test:component:watch": "vitest --project component",
       ...(appFoundation ? {
         "test:integration:cloudflare": "vitest run --config vitest.cloudflare.config.ts",
+      } : {}),
+      ...(persistence ? {
+        "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+        "db:migrate:local": "node scripts/check-application-database.mjs local && wrangler d1 migrations apply APP_DB --local --config wrangler.jsonc --x-provision=false --x-auto-create=false",
+        "db:check": "node scripts/check-application-database.mjs local",
+        "db:migrations:hash": "node scripts/check-application-database.mjs migration-hash",
+        "test:integration:bindings": "vitest run --config vitest.bindings.config.ts",
       } : {}),
       "test:e2e:deployed":
         "playwright test --config playwright.deployed.config.ts",
@@ -1024,6 +1077,7 @@ async function inspectFixture(root, contract) {
         contract.projectName,
         contract.profile === "portfolio" ? "16.3.0" : "16.3.3",
         contract.profile === "app",
+        contract.expectedApplicationPersistenceVersion === "0.1.0",
       ),
     )
   ) {
@@ -1047,9 +1101,12 @@ async function inspectFixture(root, contract) {
   } catch {
     fail("FIXTURE_WORKSPACE_POLICY_INVALID");
   }
+  const persistence = contract.expectedApplicationPersistenceVersion === "0.1.0";
+  const workspacePolicyBase = persistence
+    ? expectedWorkspacePolicy.replace("\nallowBuilds:\n", '  "@esbuild-kit/core-utils>esbuild": 0.25.4\n\nallowBuilds:\n') : expectedWorkspacePolicy;
   const expectedPolicy = contract.profile === "app"
-    ? `${expectedWorkspacePolicy}  msgpackr-extract: false\n`
-    : expectedWorkspacePolicy;
+    ? `${workspacePolicyBase}  msgpackr-extract: false\n`
+    : workspacePolicyBase;
   if (workspacePolicy !== expectedPolicy) {
     fail("FIXTURE_WORKSPACE_POLICY_INVALID");
   }
@@ -1060,10 +1117,11 @@ async function inspectFixture(root, contract) {
   } catch {
     fail("FIXTURE_LOCKFILE_INVALID");
   }
+  const lockfilePreamble = persistence ? expectedLockfilePreamble.replace("overrides:\n", "overrides:\n  '@esbuild-kit/core-utils>esbuild': 0.25.4\n") : expectedLockfilePreamble;
   if (
-    !lockfile.startsWith(expectedLockfilePreamble) ||
+    !lockfile.startsWith(lockfilePreamble) ||
     (lockfile.match(/^overrides:/gmu) ?? []).length !== 1 ||
-    /:\s+['"]?(?:(?:file|link|workspace|git|github|https?):|git\+)/mu.test(
+    /^\s+[^:\r\n]+:\s+['"]?(?:(?:file|link|workspace|git|github|https?):|git\+)/mu.test(
       lockfile,
     ) ||
     /^\s+['"]?(?:(?:file|link|workspace|git|github|https?):|git\+)/mu.test(
@@ -1085,7 +1143,10 @@ async function inspectFixture(root, contract) {
   }
 
   if (contract.profile === "app") {
-    if (fingerprint(lockfile) !== "30b508b027b4ead219c5af2aec281b65bed7dd63ec3e338df9e5dec93597c1e4") {
+    const expectedLockFingerprint = persistence
+      ? "e780e8905c3e8a96b5c71f5d495621f63f0c655f04c438a0e3d926cb523069c1"
+      : "30b508b027b4ead219c5af2aec281b65bed7dd63ec3e338df9e5dec93597c1e4";
+    if (fingerprint(lockfile) !== expectedLockFingerprint) {
       fail("FIXTURE_LOCKFILE_INVALID");
     }
   } else if (/^\s+(?:effect:|['"]?effect@)/mu.test(lockfile)) {
@@ -1398,6 +1459,7 @@ async function verifySourcesWithAdapters(
 
   let pendingError;
   const workerIntegration = { executed: [], skipped: [] };
+  const bindingIntegration = { executed: [], skipped: [] };
   const appBuildEvidence = [];
   try {
     for (const source of sourcesBefore) {
@@ -1428,6 +1490,8 @@ async function verifySourcesWithAdapters(
         join(validationRoot, "apps/web/package.json"), "FIXTURE_MANIFEST_INVALID",
       );
       const hasWorkerIntegration = Object.hasOwn(webManifest.scripts, "test:integration:cloudflare");
+      const hasBindingIntegration = source.contract.expectedApplicationPersistenceVersion === "0.1.0";
+      if (!hasBindingIntegration) bindingIntegration.skipped.push(source.contract.identifier);
       const commandInput = (arguments_, timeout = commandTimeoutMilliseconds) => ({
         executable: "pnpm",
         arguments: arguments_,
@@ -1471,6 +1535,10 @@ async function verifySourcesWithAdapters(
           failureCode: "REGISTRY_SIGNATURE_CHECK_FAILED",
         },
         { arguments: ["run", "lint"], failureCode: "LINT_FAILED" },
+        ...(hasBindingIntegration ? [{
+          arguments: ["run", "typecheck"],
+          failureCode: "CLEAN_TYPECHECK_FAILED",
+        }] : []),
         {
           arguments: ["--dir", "apps/web", "run", "cf-typegen"],
           failureCode: "CLOUDFLARE_TYPE_GENERATION_FAILED",
@@ -1500,6 +1568,10 @@ async function verifySourcesWithAdapters(
           arguments: ["--dir", "apps/web", "run", "--if-present", "test:integration:cloudflare"],
           failureCode: "WORKER_INTEGRATION_FAILED",
         },
+        ...(hasBindingIntegration ? [{
+          arguments: ["--dir", "apps/web", "run", "test:integration:bindings"],
+          failureCode: "BINDING_INTEGRATION_FAILED",
+        }] : []),
         {
           arguments: ["--dir", "apps/web", "run", "browser:install"],
           failureCode: "BROWSER_INSTALL_FAILED",
@@ -1529,6 +1601,7 @@ async function verifySourcesWithAdapters(
             commandInput(command.arguments),
             command.failureCode,
           );
+          if (command.failureCode === "BINDING_INTEGRATION_FAILED") bindingIntegration.executed.push(source.contract.identifier);
           if (command.failureCode === "WORKER_INTEGRATION_FAILED") {
             workerIntegration[hasWorkerIntegration ? "executed" : "skipped"].push(source.contract.identifier);
             if (hasWorkerIntegration) {
@@ -1613,6 +1686,7 @@ async function verifySourcesWithAdapters(
     ok: true,
     fixtures: sourcesBefore.map(({ contract }) => contract.identifier),
     workerIntegration,
+    bindingIntegration,
     appBuildEvidence,
     profiles: [
       ...new Set(sourcesBefore.map(({ contract }) => contract.profile)),

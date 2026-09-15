@@ -1,14 +1,17 @@
 import { isAbsolute, resolve } from "node:path";
 
 import {
+  createGenerationRenderingContext,
   createVerifiedProjectSnapshot,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
   appGenerationVerificationChecks,
+  persistenceGenerationVerificationChecks,
   ordinaryGenerationVerificationChecks,
 } from "../contracts/generation-verification.js";
+import type { PersistenceRemovalInput, PersistenceRemovalHumanReview } from "../contracts/persistence-removal-evidence.js";
 import type { ProfileIdentifier } from "../contracts/profile.js";
 import { safeRelativePathSchema } from "../contracts/identifiers.js";
 import {
@@ -20,6 +23,8 @@ import {
   type ProjectConfiguration,
 } from "../contracts/project.js";
 import {
+  persistenceCapabilityRemovalPersistedVerificationChecks,
+  persistenceCapabilityRemovalVerificationChecks,
   appCapabilityRemovalPersistedVerificationChecks,
   appCapabilityRemovalVerificationChecks,
   capabilityRemovalPersistedVerificationChecks,
@@ -75,16 +80,22 @@ import {
   type CapabilityRemovalPlanningFailureCode,
 } from "./plan-capability-removal.js";
 
+import { preparePersistenceRenderingChange } from "./prepare-persistence-rendering-change.js";
+import { validatePersistenceRemovalHumanReview } from "./review-persistence-removal-evidence.js";
+
 const encoder = new TextEncoder();
-type RemovableCapability = "analytics" | "booking-calendly" | "multilingual";
+type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence";
 
 function removalMigrationIdentifier(
   capability: RemovableCapability,
 ):
   | "remove-analytics-0-1-0"
   | "remove-booking-calendly-0-1-0"
-  | "remove-multilingual-0-1-0" {
+  | "remove-multilingual-0-1-0"
+  | "remove-application-persistence-0-1-0" {
   switch (capability) {
+    case "application-persistence":
+      return "remove-application-persistence-0-1-0";
     case "analytics":
       return "remove-analytics-0-1-0";
     case "booking-calendly":
@@ -117,7 +128,11 @@ type CapabilityRemovalLocalFailureCode =
   | "CAPABILITY_STATE_CONSTRUCTION_FAILED"
   | "CAPABILITY_MIGRATION_WRITE_FAILED"
   | "CAPABILITY_STATE_WRITE_FAILED"
-  | "CAPABILITY_POST_STATE_FAILED";
+  | "CAPABILITY_POST_STATE_FAILED"
+  | "PERSISTENCE_REMOVAL_HUMAN_REVIEW_INVALID"
+  | "PERSISTENCE_REMOVAL_EVIDENCE_NOT_READY"
+  | "PERSISTENCE_REMOVAL_HUMAN_REVIEW_INCOMPLETE"
+  | "PERSISTENCE_REMOVAL_REVIEW_SNAPSHOT_CHANGED";
 
 export type CapabilityRemovalFailureCode =
   | GitWorktreeRefusalCode
@@ -139,7 +154,8 @@ export type CapabilityRemovalExecutionResult =
         preservedPaths: readonly string[];
         verificationChecks:
           | typeof capabilityRemovalVerificationChecks
-          | typeof appCapabilityRemovalVerificationChecks;
+          | typeof appCapabilityRemovalVerificationChecks
+          | typeof persistenceCapabilityRemovalVerificationChecks;
       }>;
     }>
   | Readonly<{
@@ -223,8 +239,9 @@ async function readExpectedFileStates(
 function verificationIsExact(
   value: GeneratedProjectVerification,
   profile: ProfileIdentifier,
+  persistence: boolean,
 ): boolean {
-  return sameValues(value.checks, profile === "app"
+  return sameValues(value.checks, persistence ? persistenceGenerationVerificationChecks : profile === "app"
     ? appGenerationVerificationChecks
     : ordinaryGenerationVerificationChecks);
 }
@@ -258,9 +275,15 @@ function sameSurfaceDescriptor(
 function expectedPendingSurfaceStatus(
   surface: InstalledSurface,
   action: CapabilityRemovalAction | undefined,
+  replacementFingerprints?: ReadonlyMap<string, string>,
 ): SurfaceEvidenceStatus {
   if (action?.kind === "replace-project-configuration") {
     return "drifted";
+  }
+  if ((surface.ownership === "managed" || surface.ownership === "merge-managed") &&
+      action?.kind === "replace-file" && replacementFingerprints !== undefined) {
+    const desired = replacementFingerprints.get(surface.identifier);
+    return desired === undefined ? "missing" : desired === surface.fingerprint ? "confirmed" : "drifted";
   }
   if (surface.ownership === "managed") {
     if (action?.kind === "delete-file") {
@@ -285,6 +308,7 @@ function requirePendingInference(input: Readonly<{
   desiredCapabilities: readonly string[];
   actions: readonly CapabilityRemovalAction[];
   removedCapability: RemovableCapability;
+  replacementFingerprints?: ReadonlyMap<string, string>;
 }>): boolean {
   if (
     input.inference.state.kind !== "valid" ||
@@ -303,11 +327,15 @@ function requirePendingInference(input: Readonly<{
     .sort(compareText);
   if (
     !sameValues(currentIdentifiers, inferredIdentifiers) ||
-    input.inference.capabilities.some(({ identifier, category }) =>
-      identifier === input.removedCapability
-        ? category !== "contradictory"
-        : !desired.has(identifier) || category !== "confirmed",
-    )
+    input.inference.capabilities.some((evidence) => {
+      if (evidence.identifier === input.removedCapability) return evidence.category !== "contradictory";
+      if (input.removedCapability === "application-persistence" &&
+          (evidence.identifier === "standards" || evidence.identifier === "deployment-cloudflare")) {
+        return evidence.category !== "contradictory" || evidence.code !== "CAPABILITY_METADATA_MISMATCH" ||
+          evidence.probes.some(({ status }) => status !== "present");
+      }
+      return !desired.has(evidence.identifier) || evidence.category !== "confirmed";
+    })
   ) {
     return false;
   }
@@ -336,6 +364,7 @@ function requirePendingInference(input: Readonly<{
           expectedPendingSurfaceStatus(
             surface,
             actionsByPath.get(surface.path),
+            input.replacementFingerprints,
           )
       );
     })
@@ -525,6 +554,8 @@ export async function applyCapabilityRemoval(input: Readonly<{
   root: string;
   capability: RemovableCapability;
   approvedPlanFingerprint: string;
+  persistenceRemoval?: PersistenceRemovalInput;
+  persistenceRemovalHumanReview?: PersistenceRemovalHumanReview;
   verifier: GeneratedProjectVerifier;
   reader?: RepositoryReader;
   writer?: CapabilityRemovalWriter;
@@ -568,6 +599,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       reader,
       git: initialGit,
       capability: input.capability,
+      ...(input.persistenceRemoval === undefined ? {} : { persistenceRemoval: input.persistenceRemoval }),
       ...(input.inspectRepositoryInventory === undefined
         ? {}
         : { inspectRepositoryInventory: input.inspectRepositoryInventory }),
@@ -602,6 +634,13 @@ export async function applyCapabilityRemoval(input: Readonly<{
     );
   }
 
+  if (input.capability === "application-persistence") {
+    const human = validatePersistenceRemovalHumanReview(plan.persistenceRemovalReport, input.persistenceRemovalHumanReview);
+    if (!human.ok) return failure(human.issues[0]?.code as CapabilityRemovalFailureCode, "precondition", "not-required");
+  } else if (input.persistenceRemovalHumanReview !== undefined) {
+    return failure("PERSISTENCE_REMOVAL_HUMAN_REVIEW_INVALID", "precondition", "not-required");
+  }
+
   let controls: ControlSnapshot | undefined;
   try {
     controls = await readControlSnapshot(reader);
@@ -630,7 +669,8 @@ export async function applyCapabilityRemoval(input: Readonly<{
   if (!snapshot.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
-  const desired = await renderSkeleton({
+  const retainsPersistence = input.capability !== "application-persistence" && controls.project.value.selectedCapabilities.includes("application-persistence");
+  const desiredRender = await renderSkeleton({
     profile: controls.project.value.originProfile,
     projectName: controls.project.value.project.name,
     displayName: controls.project.value.project.displayName,
@@ -650,11 +690,31 @@ export async function applyCapabilityRemoval(input: Readonly<{
       : controls.project.value.selectedCapabilities.includes("multilingual")
         ? { multilingual: true as const }
         : {}),
+    ...(retainsPersistence ? { applicationPersistence: true as const } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
-  }, snapshot.value.renderingContext);
-  if (!desired.ok) {
+  }, input.capability === "application-persistence" ? createGenerationRenderingContext(false) : snapshot.value.renderingContext);
+  if (!desiredRender.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
+  let desired = desiredRender;
+  if (input.capability === "application-persistence") {
+    const current = await renderSkeleton({
+      profile: controls.project.value.originProfile,
+      projectName: controls.project.value.project.name,
+      displayName: controls.project.value.project.displayName,
+      applicationPersistence: true,
+      ...(controls.project.value.capabilitySettings.analytics === undefined ? {} : { analytics: controls.project.value.capabilitySettings.analytics }),
+      ...(controls.project.value.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: controls.project.value.capabilitySettings["booking-calendly"] }),
+      ...(controls.project.value.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
+      packageVersions: verifiedCapabilityPackageVersions,
+    }, snapshot.value.renderingContext);
+    if (!current.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+    const prepared = await preparePersistenceRenderingChange({ reader, current: current.value, desired: desiredRender.value });
+    if (!prepared.ok) return failure("CAPABILITY_ACTION_CONFLICT", "precondition", "not-required");
+    desired = { ok: true, value: prepared.value.desired };
+  }
+  const targetCatalog = snapshot.value.catalog.map((descriptor) =>
+    desired.value.resolved.capabilities.find(({ identifier }) => identifier === descriptor.identifier) ?? descriptor);
   const desiredFiles = new Map(
     desired.value.files.map(({ path, content }) => [path, content]),
   );
@@ -724,6 +784,20 @@ export async function applyCapabilityRemoval(input: Readonly<{
     return failure("GIT_WORKTREE_CHANGED", "precondition", "not-required");
   }
 
+  if (controls.project.value.selectedCapabilities.includes("application-persistence")) {
+    const finalPlan = await planCapabilityRemoval({ reader, git: finalCleanGit, capability: input.capability,
+      ...(input.persistenceRemoval === undefined ? {} : { persistenceRemoval: input.persistenceRemoval }),
+      ...(input.inspectRepositoryInventory === undefined ? {} : { inspectRepositoryInventory: input.inspectRepositoryInventory }),
+    });
+    if (!finalPlan.ok || finalPlan.value.planFingerprint !== plan.planFingerprint) {
+      return failure("CAPABILITY_PLAN_APPROVAL_INVALID", "precondition", "not-required");
+    }
+    if (input.capability === "application-persistence" &&
+        !validatePersistenceRemovalHumanReview(finalPlan.value.persistenceRemovalReport, input.persistenceRemovalHumanReview).ok) {
+      return failure("PERSISTENCE_REMOVAL_REVIEW_SNAPSHOT_CHANGED", "precondition", "not-required");
+    }
+  }
+
   let transformed;
   try {
     transformed = await writer.write(changes);
@@ -748,7 +822,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       "inspect-worktree",
     );
   }
-  if (!verified.ok || !verificationIsExact(verified.value, plan.profile)) {
+  if (!verified.ok || !verificationIsExact(verified.value, plan.profile, retainsPersistence)) {
     return failure(
       "CAPABILITY_VERIFICATION_FAILED",
       "verify",
@@ -756,9 +830,16 @@ export async function applyCapabilityRemoval(input: Readonly<{
     );
   }
 
+  const replacedPaths = new Set(plan.actions.filter(({ kind }) => kind === "replace-file").map(({ path }) => path));
+  const replacedSurfaces = materializeInstalledSurfaces({
+    files: desiredFiles,
+    surfaces: [...desired.value.surfaces, ...createBuilderStateSurfaces()].filter(({ path }) => replacedPaths.has(path)),
+  });
+  if (!replacedSurfaces.ok) return failure("CAPABILITY_REINFERENCE_FAILED", "re-infer", "inspect-worktree");
+  const replacementFingerprints = new Map(replacedSurfaces.value.map(({ identifier, fingerprint }) => [identifier, fingerprint]));
   let pendingInference;
   try {
-    pendingInference = await inferRepository({ reader, catalog: snapshot.value.catalog });
+    pendingInference = await inferRepository({ reader, catalog: targetCatalog });
   } catch {
     return failure(
       "CAPABILITY_REINFERENCE_FAILED",
@@ -773,6 +854,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       desiredCapabilities: plan.desiredCapabilities,
       actions: plan.actions,
       removedCapability: input.capability,
+      ...(input.capability === "application-persistence" ? { replacementFingerprints } : {}),
     }) ||
     !(await readExpectedFileStates(
       reader,
@@ -808,7 +890,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
     capabilities: plan.desiredCapabilities,
     persistentDataAuthorizations: [],
     remainingKnownDrift: [],
-    verificationChecks: plan.profile === "app"
+    verificationChecks: retainsPersistence ? persistenceCapabilityRemovalPersistedVerificationChecks : plan.profile === "app"
       ? appCapabilityRemovalPersistedVerificationChecks
       : capabilityRemovalPersistedVerificationChecks,
   });
@@ -926,7 +1008,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
 
   let finalInference;
   try {
-    finalInference = await inferRepository({ reader, catalog: snapshot.value.catalog });
+    finalInference = await inferRepository({ reader, catalog: targetCatalog });
   } catch {
     return failure(
       "CAPABILITY_POST_STATE_FAILED",
@@ -995,7 +1077,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       migration: removalMigrationIdentifier(input.capability),
       changedPaths,
       preservedPaths,
-      verificationChecks: plan.profile === "app"
+      verificationChecks: retainsPersistence ? persistenceCapabilityRemovalVerificationChecks : plan.profile === "app"
         ? appCapabilityRemovalVerificationChecks
         : capabilityRemovalVerificationChecks,
     },

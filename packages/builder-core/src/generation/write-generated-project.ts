@@ -9,14 +9,15 @@ import {
 import { basename, dirname, join, parse, resolve } from "node:path";
 
 import {
-  createVerifiedCapabilityCatalog,
+  createGenerationRenderingContext,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
+import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
 import type {
   CapabilityDescriptor,
 } from "../contracts/capability.js";
 import { safeRelativePathSchema } from "../contracts/identifiers.js";
-import { appGenerationVerificationChecks } from "../contracts/generation-verification.js";
+import { appGenerationVerificationChecks, persistenceGenerationVerificationChecks } from "../contracts/generation-verification.js";
 import type {
   ContractIssue,
   ValidationResult,
@@ -79,6 +80,7 @@ const encoder = new TextEncoder();
 const requiredRequestKeys = ["displayName", "profile", "projectName"] as const;
 const allowedRequestKeys = new Set([
   "analytics",
+  "applicationPersistence",
   "bookingCalendly",
   "displayName",
   "multilingual",
@@ -128,6 +130,7 @@ function validateRequest(
   const includesAnalytics = Object.hasOwn(value, "analytics");
   const includesCalendly = Object.hasOwn(value, "bookingCalendly");
   const includesMultilingual = Object.hasOwn(value, "multilingual");
+  const includesPersistence = Object.hasOwn(value, "applicationPersistence");
   if (
     requiredRequestKeys.some((key) => !Object.hasOwn(value, key)) ||
     keys.some((key) => !allowedRequestKeys.has(key))
@@ -174,6 +177,9 @@ function validateRequest(
       "invalid-selection",
     );
   }
+  if (includesPersistence && value.applicationPersistence !== true) {
+    return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "applicationPersistence"], "invalid-selection");
+  }
 
   return {
     ok: true,
@@ -184,6 +190,7 @@ function validateRequest(
       ...(analytics === undefined ? {} : { analytics }),
       ...(bookingCalendly === undefined ? {} : { bookingCalendly }),
       ...(includesMultilingual ? { multilingual: true } : {}),
+      ...(includesPersistence ? { applicationPersistence: true } : {}),
     },
   };
 }
@@ -381,7 +388,8 @@ function verificationIsExact(
     rendered.resolved.capabilities.some(
       ({ identifier, version }) => identifier === "app-foundation" && version === "0.1.0",
     );
-  const expectedChecks = app ? appGenerationVerificationChecks : verificationChecks;
+  const persistence = rendered.resolved.capabilities.some(({ identifier, version }) => identifier === "application-persistence" && version === "0.1.0");
+  const expectedChecks = persistence ? persistenceGenerationVerificationChecks : app ? appGenerationVerificationChecks : verificationChecks;
 
   return (
     checks.length === expectedChecks.length &&
@@ -668,7 +676,8 @@ export async function generateProject(input: Readonly<{
     return request;
   }
 
-  const catalog = createVerifiedCapabilityCatalog();
+  const renderingContext = createGenerationRenderingContext(request.value.applicationPersistence === true);
+  const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, renderingContext.catalogSnapshot);
   if (!catalog.ok) {
     return issue("VERIFIED_CATALOG_INVALID", [], "catalog-invalid");
   }
@@ -681,7 +690,7 @@ export async function generateProject(input: Readonly<{
   const rendered = await renderSkeleton({
     ...request.value,
     packageVersions: verifiedCapabilityPackageVersions,
-  });
+  }, renderingContext);
   if (!rendered.ok) {
     return rendered;
   }

@@ -33,6 +33,8 @@ const exactConfigurationAndScriptExtensions = new Set([
   ".yml",
   ".zsh",
 ]);
+const processCommandNames = new Set(["exec", "execSync", "execFile", "execFileSync", "spawn", "spawnSync", "fork"]);
+const commandRunnerNames = new Set(["node", "npm", "npx", "pnpm", "yarn", "bun", "bunx"]);
 const virtualRepositoryRoot = "/repository";
 const moduleResolutionOptions: ts.CompilerOptions = {
   allowJs: true,
@@ -251,6 +253,8 @@ function analyzeParsedSource(input: Readonly<{
   path: string;
   source: string;
   deletedPaths: ReadonlySet<string>;
+  removedPackages: readonly string[];
+  packageReferences: readonly RegExp[];
   resolution: RepositoryModuleResolution;
 }>): Readonly<{ exact: boolean; dynamic: boolean }> {
   const sourceFile = ts.createSourceFile(
@@ -266,8 +270,13 @@ function analyzeParsedSource(input: Readonly<{
   function inspectSpecifier(
     value: string,
     resolveWithBundler: boolean,
+    moduleReference = true,
   ): void {
+    const packageSpecifier = value.split(/[?#]/u, 1)[0] ?? value;
     if (
+      (moduleReference && input.removedPackages.some((packageName) =>
+        packageSpecifier === packageName || packageSpecifier.startsWith(`${packageName}/`),
+      )) ||
       resolvesToDeletedPath(
         input.path,
         value,
@@ -317,6 +326,30 @@ function analyzeParsedSource(input: Readonly<{
       const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
       const isRequire = isRequireCall(node.expression);
 
+      const commandName = ts.isIdentifier(node.expression)
+        ? node.expression.text
+        : ts.isPropertyAccessExpression(node.expression) ? node.expression.name.text : undefined;
+      if (input.removedPackages.length > 0 && commandName !== undefined && processCommandNames.has(commandName)) {
+        const command = literalText(node.arguments[0]);
+        if (command === undefined) {
+          dynamic = true;
+        } else {
+          if (input.packageReferences.some((pattern) => pattern.test(command))) exact = true;
+          if (commandRunnerNames.has(posix.basename(command))) {
+            const argumentsNode = node.arguments[1];
+            if (argumentsNode === undefined || !ts.isArrayLiteralExpression(argumentsNode)) {
+              dynamic = true;
+            } else {
+              for (const argument of argumentsNode.elements) {
+                const value = literalText(argument);
+                if (value === undefined) dynamic = true;
+                else if (input.packageReferences.some((pattern) => pattern.test(value))) exact = true;
+              }
+            }
+          }
+        }
+      }
+
       if (isDynamicImport || isRequire) {
         const value = literalText(node.arguments[0]);
         if (value === undefined) {
@@ -328,7 +361,7 @@ function analyzeParsedSource(input: Readonly<{
     }
 
     if (ts.isStringLiteralLike(node)) {
-      inspectSpecifier(node.text, false);
+      inspectSpecifier(node.text, false, false);
     }
 
     ts.forEachChild(node, visit);
@@ -380,8 +413,16 @@ export async function guardCapabilityRemovalReferences(input: Readonly<{
   actions: readonly ProjectedAction[];
   desiredFiles: readonly GeneratedFile[];
   referenceToken: string;
+  removedPackages?: readonly string[];
+  contentDataPaths?: readonly string[];
 }>): Promise<CapabilityRemovalReferenceGuardResult> {
   const referenceToken = new RegExp(input.referenceToken, "iu");
+  const removedPackages = input.removedPackages ?? [];
+  const contentDataPaths = new Set(input.contentDataPaths ?? []);
+  const packageReferences = removedPackages.map((packageName) => new RegExp(
+    `(?:^|[^A-Za-z0-9_@.-])${packageName.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?=$|[^A-Za-z0-9_.-])`,
+    "u",
+  ));
   const desiredFiles = new Map(
     input.desiredFiles.map((file) => [file.path, file.content]),
   );
@@ -451,6 +492,8 @@ export async function guardCapabilityRemovalReferences(input: Readonly<{
         path: entry.path,
         source: read.content,
         deletedPaths,
+        removedPackages,
+        packageReferences,
         resolution: moduleResolution,
       });
       if (analysis.exact) {
@@ -464,16 +507,21 @@ export async function guardCapabilityRemovalReferences(input: Readonly<{
       }
     }
 
+    // The planner validates this replacement against the exact target recipe lock.
+    // Retained optional-peer metadata does not keep the removed package installed.
+    const canonicalLockReplacement = entry.path === "pnpm-lock.yaml" && projected.kind === "replacement";
     if (
       exactConfigurationAndScriptExtensions.has(
         posix.extname(entry.path).toLowerCase(),
       ) &&
-      [...deletedPaths].some((path) => read.content.includes(path))
+      ([...deletedPaths].some((path) => read.content.includes(path)) ||
+        (!contentDataPaths.has(entry.path) && !canonicalLockReplacement &&
+          packageReferences.some((pattern) => pattern.test(read.content))))
     ) {
       conflicts.add(entry.path);
     }
 
-    if (referenceToken.test(read.content) && !conflicts.has(entry.path)) {
+    if ((referenceToken.test(read.content) || packageReferences.some((pattern) => pattern.test(read.content))) && !conflicts.has(entry.path)) {
       warnings.push({
         code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
         path: entry.path,

@@ -17,6 +17,7 @@ import {
   createCapabilityCatalogSnapshot,
   vitestFourCapabilityCatalogSnapshot,
   vitestFiveCapabilityCatalogSnapshot,
+  applicationPersistenceCatalogSnapshot,
 } from "./capability-catalog.js";
 
 export const verifiedCapabilityPackageVersions = Object.freeze({
@@ -28,6 +29,13 @@ export function createVerifiedCapabilityCatalog(): ValidationResult<
   readonly CapabilityDescriptor[]
 > {
   return createCapabilityCatalog(verifiedCapabilityPackageVersions);
+}
+
+export function createGenerationRenderingContext(applicationPersistence = false): SkeletonRenderingContext {
+  return {
+    catalogSnapshot: applicationPersistence ? applicationPersistenceCatalogSnapshot : vitestFiveCapabilityCatalogSnapshot,
+    profiles: createVitestFiveProfileRecipes(),
+  };
 }
 
 function selectInstalledRenderingContext(
@@ -44,6 +52,15 @@ function selectInstalledRenderingContext(
     return undefined;
   }
 
+  const deployment = state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare");
+  const persistence = state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence");
+  if (standards?.version === "0.6.0" || deployment?.version === "0.4.0" || persistence !== undefined) {
+    return standards?.version === "0.6.0" && deployment?.version === "0.4.0" && persistence?.version === "0.1.0" &&
+      project.originProfile === "app" && project.recipeVersion === "0.2.0" &&
+      state.installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.1.0") &&
+      state.installedCapabilities.some(({ identifier, version }) => identifier === "site-routing" && version === "0.4.0")
+      ? createGenerationRenderingContext(true) : undefined;
+  }
   if (standards?.version === "0.5.0") {
     return {
       catalogSnapshot: vitestFiveCapabilityCatalogSnapshot,

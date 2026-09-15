@@ -10,9 +10,9 @@ import test from "node:test";
 import {
   createFileSystemRepositoryReader,
   createPnpmGeneratedProjectVerifier,
-  createVerifiedCapabilityCatalog,
   generateProject,
   inferRepository,
+  readVerifiedProjectSnapshot,
 } from "../dist/index.js";
 
 const execFileAsync = promisify(execFile);
@@ -149,7 +149,6 @@ test("public portfolio and site projects install, build, audit, and infer", asyn
       );
     }
 
-    const catalog = assertSuccess(createVerifiedCapabilityCatalog());
     const lockfileHashes = {};
 
     for (const profile of ["portfolio", "site"]) {
@@ -169,7 +168,7 @@ test("public portfolio and site projects install, build, audit, and infer", asyn
       );
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 101 : 103,
+        profile === "portfolio" ? 106 : 123,
       );
 
       const lockfile = await readFile(join(destination, "pnpm-lock.yaml"));
@@ -193,10 +192,10 @@ test("public portfolio and site projects install, build, audit, and infer", asyn
         await assertAbsent(join(destination, path));
       }
 
-      const inference = await inferRepository({
-        reader: createFileSystemRepositoryReader(generated.destination),
-        catalog,
-      });
+      const snapshot = assertSuccess(await readVerifiedProjectSnapshot(
+        createFileSystemRepositoryReader(generated.destination),
+      ));
+      const inference = await inferRepository({ reader: snapshot.reader, catalog: snapshot.catalog });
       assert.equal(inference.state.kind, "valid");
       assert.ok(
         inference.capabilities.every(

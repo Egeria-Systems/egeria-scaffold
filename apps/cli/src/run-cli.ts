@@ -17,6 +17,8 @@ import {
   planCapabilityRemoval,
   planCapabilityUpgrade,
   planProfileTransition as planProfileTransitionDefault,
+  persistenceRemovalHumanReviewSchema,
+  persistenceRemovalInputSchema,
   type CapabilityAdditionPlan,
   type CapabilityAdditionExecutionResult,
   type CapabilityRemovalPlan,
@@ -34,8 +36,12 @@ import {
   type GitRepositoryInventoryInspection,
   type GitWorktreeInspection,
   type PlanningFailureCode,
+  type PersistenceRemovalHumanReview,
+  type PersistenceRemovalInput,
   type RepositoryReader,
 } from "@egeria-systems/builder-core";
+import { constants } from "node:fs";
+import { open } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { parseCliArguments, type CliCommand } from "./arguments.js";
@@ -118,6 +124,8 @@ const removalPlannerRefusalCodes =
     "CAPABILITY_REMOVAL_INVENTORY_INVALID",
     "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
     "CAPABILITY_REMOVAL_UNSUPPORTED",
+    "PERSISTENCE_REMOVAL_INPUT_INVALID",
+    "PERSISTENCE_REMOVAL_SUBJECT_UNAVAILABLE",
   ]);
 
 const upgradePlannerRefusalCodes =
@@ -184,6 +192,60 @@ function writeJson(
   write(JSON.stringify(value));
 }
 
+async function readJsonInput(path: string): Promise<unknown> {
+  const maximumBytes = 256 * 1024;
+  const file = await open(
+    resolve(path),
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+  );
+  try {
+    const metadata = await file.stat();
+    if (!metadata.isFile() || metadata.size > maximumBytes) {
+      throw new TypeError("invalid-json-input");
+    }
+    const buffer = Buffer.alloc(maximumBytes + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await file.read(
+        buffer, length, buffer.length - length, length,
+      );
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    if (length > maximumBytes) throw new TypeError("invalid-json-input");
+    return JSON.parse(
+      new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, length)),
+    ) as unknown;
+  } finally {
+    await file.close();
+  }
+}
+
+async function readPersistenceRemovalInputs(
+  command: Extract<CliCommand, Readonly<{ kind: "plan-remove" | "apply-remove" }>>,
+): Promise<Readonly<{
+  persistenceRemoval?: PersistenceRemovalInput;
+  persistenceRemovalHumanReview?: PersistenceRemovalHumanReview;
+}>> {
+  return {
+    ...(command.persistenceRemovalPath === undefined ? {} : {
+      persistenceRemoval: persistenceRemovalInputSchema.parse(
+        await readJsonInput(command.persistenceRemovalPath),
+      ),
+    }),
+    ...(command.kind !== "apply-remove" || command.persistenceRemovalHumanReviewPath === undefined ? {} : {
+      persistenceRemovalHumanReview: persistenceRemovalHumanReviewSchema.parse(
+        await readJsonInput(command.persistenceRemovalHumanReviewPath),
+      ),
+    }),
+  };
+}
+
+function writeInvalidArguments(output: CliOutput): 2 {
+  writeJson(output.writeError, { ok: false, code: "CLI_ARGUMENT_INVALID" });
+  return 2;
+}
+
 function createCliRepositoryReader(root: string): RepositoryReader {
   const reader = createFileSystemRepositoryReader(root);
 
@@ -231,6 +293,7 @@ async function runCreate(
         ? {}
         : { analytics: command.analytics }),
       ...(command.multilingual === true ? { multilingual: true } : {}),
+      ...(command.applicationPersistence === true ? { applicationPersistence: true } : {}),
     },
     destination: resolve(command.directory),
     verifier: dependencies.createVerifier(),
@@ -466,7 +529,13 @@ async function runPlanRemove(
   command: Extract<CliCommand, Readonly<{ kind: "plan-remove" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
-): Promise<0 | 1> {
+): Promise<0 | 1 | 2> {
+  let persistenceInputs;
+  try {
+    persistenceInputs = await readPersistenceRemovalInputs(command);
+  } catch {
+    return writeInvalidArguments(output);
+  }
   const root = resolve(command.directory);
   const initialGit = await inspectForPlan(root, dependencies);
 
@@ -489,6 +558,7 @@ async function runPlanRemove(
         reader,
         git: initialGit,
         capability: command.capability,
+        ...persistenceInputs,
         inspectRepositoryInventory:
           dependencies.inspectGitRepositoryInventory ??
           inspectGitRepositoryInventoryDefault,
@@ -766,7 +836,13 @@ async function runApplyRemove(
   command: Extract<CliCommand, Readonly<{ kind: "apply-remove" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
-): Promise<0 | 1> {
+): Promise<0 | 1 | 2> {
+  let persistenceInputs;
+  try {
+    persistenceInputs = await readPersistenceRemovalInputs(command);
+  } catch {
+    return writeInvalidArguments(output);
+  }
   let result: CapabilityRemovalExecutionResult;
   try {
     result = await (
@@ -774,6 +850,7 @@ async function runApplyRemove(
     )({
       root: resolve(command.directory),
       capability: command.capability,
+      ...persistenceInputs,
       approvedPlanFingerprint: command.approvedPlanFingerprint,
       verifier: dependencies.createVerifier(),
     });

@@ -901,7 +901,7 @@ test("Vitest five standards refuse retained declarations and ranges even with ma
   const reader = core.createFileSystemRepositoryReader(resolve(packageRoot, "../../fixtures/generated/app"));
   const manifest = JSON.parse((await reader.readText("apps/web/package.json")).content);
   const originalState = JSON.parse((await reader.readText(".egeria/state.json")).content);
-  const catalog = core.createVerifiedCapabilityCatalog();
+  const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" });
   assert.equal(catalog.ok, true);
   for (const version of ["5.0.0", "4.1.10", "4.1.11", "^5.0.0", "5.0.1"]) {
     const state = structuredClone(originalState);

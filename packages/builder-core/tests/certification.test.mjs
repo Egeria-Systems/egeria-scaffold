@@ -7,6 +7,8 @@ import { requiredEvidence } from "./certification-contracts.mjs";
 
 const coordinatedPlanPath =
   "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md";
+const persistencePlanPath =
+  "docs/superpowers/plans/2026-09-14-application-persistence-certification.md";
 const evidencePath =
   "docs/implementation-evidence/example-certification-verification.md";
 const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
@@ -15,12 +17,14 @@ const descriptorDigests = Object.freeze({
     "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba",
   "app-foundation":
     "sha256:6d9cf389441064a96d2b47bb309becab37358fcc2952335feffae8720eb6f497",
+  "application-persistence":
+    "sha256:dcb911f024f4a0cf792396bf919e2387f0193fae6608071c6dea7aa371eb4c95",
   "booking-calendly":
     "sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca",
   "content-files":
     "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4",
   "deployment-cloudflare":
-    "sha256:fb2464553830b052428773286689dc91984d662bf999b267aefbcb66e045ed6e",
+    "sha256:67d75b2bcf84339e794daffe43eb5ac8a2430e0b48a8be42e06180c635401896",
   multilingual:
     "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891",
   observability:
@@ -30,23 +34,25 @@ const descriptorDigests = Object.freeze({
   "site-routing":
     "sha256:a8bd53e9b32546266efd3dde9dc96fc3914cb06e9e811b8bf96ebd42822e2dac",
   standards:
-    "sha256:56a667594f2cbf43beed6e23471e4d8bf28fcbbf54d6f13530191153c84d4de9",
+    "sha256:631efaeae569c27f225e9df3eeaacd28537f66a30f1533da70185e017508a4fd",
 });
 const descriptorVersions = Object.freeze({
   analytics: "0.1.0",
   "app-foundation": "0.1.0",
+  "application-persistence": "0.1.0",
   "booking-calendly": "0.1.0",
   "content-files": "0.4.0",
-  "deployment-cloudflare": "0.3.0",
+  "deployment-cloudflare": "0.4.0",
   multilingual: "0.1.0",
   observability: "0.3.0",
   "section-composition": "0.3.0",
   "site-routing": "0.4.0",
-  standards: "0.5.0",
+  standards: "0.6.0",
 });
 const expectedIdentifiers = Object.freeze([
   "analytics",
   "app-foundation",
+  "application-persistence",
   "booking-calendly",
   "content-files",
   "deployment-cloudflare",
@@ -81,7 +87,9 @@ function createRecord(identifier) {
     },
     requiredEvidence: requiredEvidence[identifier],
     status: "pending",
-    taskPlan: identifier === "standards" ? "docs/superpowers/plans/2026-09-12-vitest-five-migration.md" : coordinatedPlanPath,
+    taskPlan: ["application-persistence", "deployment-cloudflare", "standards"].includes(identifier)
+      ? persistencePlanPath
+      : coordinatedPlanPath,
     evidence: [],
   };
 }
@@ -183,6 +191,19 @@ test("certification subjects bind the descriptor and required evidence", () => {
     behaviorContractDigest: "sha256:640d95879a1e40e8fe26cf350453e01ead9fd031f30d53c4dd64552046449607",
   });
 
+  const defaultCatalog = assertSuccess(core.createCapabilityCatalogSnapshot(
+    core.verifiedCapabilityPackageVersions, core.vitestFiveCapabilityCatalogSnapshot,
+  ));
+  assert.equal(defaultCatalog.some(({ identifier }) => identifier === "application-persistence"), false);
+  assert.deepEqual(core.createCertificationSubject(defaultCatalog.find(({ identifier }) => identifier === "standards"), requiredEvidence.standards), {
+    descriptorVersion: "0.5.0",
+    behaviorContractDigest: "sha256:56a667594f2cbf43beed6e23471e4d8bf28fcbbf54d6f13530191153c84d4de9",
+  });
+  assert.deepEqual(core.createCertificationSubject(defaultCatalog.find(({ identifier }) => identifier === "deployment-cloudflare"), requiredEvidence["deployment-cloudflare"]), {
+    descriptorVersion: "0.3.0",
+    behaviorContractDigest: "sha256:fb2464553830b052428773286689dc91984d662bf999b267aefbcb66e045ed6e",
+  });
+
   const bookingDescriptor = descriptorsByIdentifier.get("booking-calendly");
   assert.notEqual(bookingDescriptor, undefined);
   assert.notEqual(
@@ -192,12 +213,12 @@ test("certification subjects bind the descriptor and required evidence", () => {
   );
 });
 
-test("current app certification accepts six local subjects and preserves four external gates", () => {
+test("current certification preserves five accepted subjects and keeps changed subjects pending", () => {
   assert.deepEqual(Object.keys(committedRegistry.records), expectedIdentifiers);
   assert.deepEqual(Object.keys(requiredEvidence), expectedIdentifiers);
   const acceptedLocalSubjects = new Set([
     "app-foundation", "content-files", "multilingual",
-    "section-composition", "site-routing", "standards",
+    "section-composition", "site-routing",
   ]);
 
   for (const [identifier, record] of Object.entries(committedRegistry.records)) {
@@ -397,7 +418,7 @@ test("repository artifacts bind evidence to its plan, subject, revision, and rev
   );
 });
 
-test("closure rejects all ten pending subjects and accepts complete certification", () => {
+test("closure rejects every pending subject and accepts complete certification", () => {
   assert.deepEqual(
     core.validateCertificationClosure({ registry }).issues,
     expectedIdentifiers.map((identifier) => ({

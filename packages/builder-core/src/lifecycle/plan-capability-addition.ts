@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 
-import { readVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
+import { createGenerationRenderingContext, readVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
+import { applicationPersistenceCatalogSnapshot, createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
+import { fingerprintFileContent, fingerprintJsonValue } from "../ownership/fingerprint.js";
+import { preparePersistenceRenderingChange } from "./prepare-persistence-rendering-change.js";
+import { readControlSnapshot } from "./lifecycle-control-snapshot.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import type { ProfileIdentifier, ProfileRecipe } from "../contracts/profile.js";
 import {
@@ -41,7 +45,7 @@ export type CapabilityAdditionPlan = Readonly<{
   baseRevision: string;
   profile: ProfileIdentifier;
   capability: Readonly<{
-    identifier: "analytics" | "booking-calendly" | "multilingual";
+    identifier: "analytics" | "booking-calendly" | "multilingual" | "application-persistence";
     version: "0.1.0";
   }>;
   settings:
@@ -156,6 +160,7 @@ function fingerprintPlan(input: Readonly<{
   plan: CapabilityAdditionPlanBody;
   settings: AnalyticsSettings | CalendlyBookingSettings | null;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
+  persistenceSnapshot?: string;
 }>): `sha256:${string}` {
   const digest = createHash("sha256")
     .update(
@@ -163,6 +168,7 @@ function fingerprintPlan(input: Readonly<{
         plan: input.plan,
         settings: input.settings,
         gitIdentity: input.git.identity,
+        ...(input.persistenceSnapshot === undefined ? {} : { persistenceSnapshot: input.persistenceSnapshot }),
       }),
       "utf8",
     )
@@ -345,6 +351,9 @@ function actionOwnership(
   rendered: RenderedSkeleton,
   path: string,
 ): Pick<CapabilityAdditionAction, "owner" | "ownership"> | undefined {
+  if (path === "apps/web/package.json" || path === "pnpm-lock.yaml") {
+    return { ownership: "managed", owner: "builder-kernel" };
+  }
   const fileSurfaces = rendered.surfaces.filter(
     (surface) =>
       surface.path === path && surface.fingerprintTarget.kind === "file",
@@ -485,7 +494,7 @@ async function deriveActions(input: Readonly<{
 async function planCapabilityAdditionUnchecked(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "analytics" | "booking-calendly" | "multilingual";
+  capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence";
   settings?: AnalyticsSettings | CalendlyBookingSettings;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
@@ -493,7 +502,8 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   if (
     capabilityValue !== "analytics" &&
     capabilityValue !== "booking-calendly" &&
-    capabilityValue !== "multilingual"
+    capabilityValue !== "multilingual" &&
+    capabilityValue !== "application-persistence"
   ) {
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
@@ -507,7 +517,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   if (
     (settingsResult !== undefined && !settingsResult.success) ||
     (analyticsSettingsResult !== undefined && !analyticsSettingsResult.success) ||
-    (capabilityValue === "multilingual" && input.settings !== undefined)
+    ((capabilityValue === "multilingual" || capabilityValue === "application-persistence") && input.settings !== undefined)
   ) {
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
@@ -542,6 +552,10 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   }
 
   const state = inspection.inference.state.value;
+  if (capabilityValue === "application-persistence" && (
+    project.originProfile !== "app" || project.recipeVersion !== "0.2.0" ||
+    snapshot.value.renderingContext?.catalogSnapshot.standards !== "0.5.0"
+  )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   const capabilityInstalled =
     project.selectedCapabilities.includes(capabilityValue) ||
     state.installedCapabilities.some(
@@ -552,6 +566,12 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("CAPABILITY_ALREADY_INSTALLED");
   }
 
+  const targetContext = capabilityValue === "application-persistence"
+    ? createGenerationRenderingContext(true) : snapshot.value.renderingContext;
+  const targetCatalog = capabilityValue === "application-persistence"
+    ? createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, applicationPersistenceCatalogSnapshot)
+    : { ok: true as const, value: snapshot.value.catalog };
+  if (!targetCatalog.ok) return planningFailure("PROJECT_INSPECTION_INVALID");
   const renderRequest = {
     profile: project.originProfile,
     projectName: project.project.name,
@@ -565,6 +585,8 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     ...(project.capabilitySettings.analytics === undefined
       ? {}
       : { analytics: project.capabilitySettings.analytics }),
+    ...(project.selectedCapabilities.includes("application-persistence")
+      ? { applicationPersistence: true as const } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
   const currentResult = await renderSkeleton(renderRequest, snapshot.value.renderingContext);
@@ -589,7 +611,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("PROJECT_DRIFT_DETECTED");
   }
 
-  const descriptor = snapshot.value.catalog.find(
+  const descriptor = targetCatalog.value.find(
     ({ identifier }) => identifier === capabilityValue,
   );
 
@@ -603,8 +625,10 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       ? { analytics: analyticsSettingsResult.data }
       : capabilityValue === "booking-calendly" && settingsResult?.success === true
         ? { bookingCalendly: settingsResult.data }
-        : { multilingual: true as const }),
-  }, snapshot.value.renderingContext);
+        : capabilityValue === "application-persistence"
+          ? { applicationPersistence: true as const }
+          : { multilingual: true as const }),
+  }, targetContext);
 
   if (!desiredResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -621,11 +645,11 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("PROJECT_DRIFT_DETECTED");
   }
 
-  const actionResult = await deriveActions({
-    reader: input.reader,
-    current: currentResult.value,
-    desired: desiredResult.value,
+  const prepared = await preparePersistenceRenderingChange({
+    reader: input.reader, current: currentResult.value, desired: desiredResult.value,
   });
+  if (!prepared.ok) return planningFailure("PROJECT_DRIFT_DETECTED");
+  const actionResult = await deriveActions({ reader: input.reader, ...prepared.value });
 
   if (!actionResult.ok) {
     return actionResult;
@@ -692,6 +716,20 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       ],
   };
 
+  let persistenceSnapshot: string | undefined;
+  if (capabilityValue === "application-persistence") {
+    const controls = await readControlSnapshot(input.reader);
+    if (controls === undefined) return planningFailure("PROJECT_INSPECTION_INVALID");
+    persistenceSnapshot = fingerprintJsonValue({
+      current: prepared.value.current.files.map(({ path, content }) => ({ path, fingerprint: fingerprintFileContent(content) })),
+      desired: prepared.value.desired.files.map(({ path, content }) => ({ path, fingerprint: fingerprintFileContent(content) })),
+      sourceCatalog: snapshot.value.catalog,
+      targetCatalog: targetCatalog.value,
+      project: controls.projectSource,
+      state: controls.stateSource,
+      migrations: controls.migrationSource,
+    });
+  }
   return {
     ok: true,
     value: {
@@ -705,6 +743,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
               ? settingsResult.data
               : null,
         git: input.git,
+        ...(persistenceSnapshot === undefined ? {} : { persistenceSnapshot }),
       }),
     },
   };
@@ -713,7 +752,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 export async function planCapabilityAddition(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "analytics" | "booking-calendly" | "multilingual";
+  capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence";
   settings?: AnalyticsSettings | CalendlyBookingSettings;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   return planCapabilityAdditionUnchecked(input);

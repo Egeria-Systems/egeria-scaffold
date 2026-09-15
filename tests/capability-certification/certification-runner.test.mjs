@@ -1669,7 +1669,7 @@ test("the repository registry admits current subjects and keeps external certifi
     stdout: `${JSON.stringify({
       ok: true,
       gate: "admission",
-      records: 10,
+      records: 11,
     })}\n`,
     stderr: "",
   });
@@ -1698,9 +1698,11 @@ test("the repository registry admits current subjects and keeps external certifi
     })),
     [
       "analytics",
+      "application-persistence",
       "booking-calendly",
       "deployment-cloudflare",
       "observability",
+      "standards",
     ].map((identifier) => ({
       code: "CAPABILITY_CERTIFICATION_PENDING",
       identifier,
@@ -1817,7 +1819,7 @@ test("ordinary admission requires a new pending task for a changed accepted subj
         stdout: `${JSON.stringify({
           ok: true,
           gate: "admission",
-          records: 10,
+          records: 11,
         })}\n`,
         stderr: "",
       },
@@ -1849,7 +1851,7 @@ test("the ordinary certification gate does not require private workflow artifact
       stdout: `${JSON.stringify({
         ok: true,
         gate: "admission",
-        records: 10,
+        records: 11,
       })}\n`,
       stderr: "",
     });

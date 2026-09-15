@@ -147,6 +147,83 @@ test("app generation requires its complete verification vector before state or d
     });
   }
 });
+
+test("persistence binding verification refuses missing or substituted commands and records actual command success", async () => {
+  for (const scenario of ["present", "missing", "invalid", "failed", "missing-foundation", "typegen-failed", "missing-typegen"]) {
+    await withTestRoot(async (owner) => {
+      const fake = await createFakePnpmExecutable(owner);
+      const source = await createVerifierSource(owner);
+      const manifestPath = join(source, "apps/web/package.json");
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+      manifest.dependencies["drizzle-orm"] = "0.45.2";
+      manifest.devDependencies["drizzle-kit"] = "0.31.10";
+      manifest.scripts = { "test:integration:cloudflare": "vitest run --config vitest.cloudflare.config.ts", "cf-typegen": "wrangler types --env-interface CloudflareEnv --include-runtime=false cloudflare-env.d.ts" };
+      if (scenario !== "missing") manifest.scripts["test:integration:bindings"] = scenario === "invalid" ? "echo skipped" : "vitest run --config vitest.bindings.config.ts";
+      if (scenario === "missing-foundation") delete manifest.scripts["test:integration:cloudflare"];
+      if (scenario === "missing-typegen") delete manifest.scripts["cf-typegen"];
+      await writeFile(manifestPath, JSON.stringify(manifest));
+      const command = "--dir apps/web run test:integration:bindings";
+      if (scenario === "failed") await fake.configure({ failureOperation: command });
+      if (scenario === "typegen-failed") await fake.configure({ failureOperation: "--dir apps/web run cf-typegen" });
+      const verifier = core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: fake.executable });
+      const before = await snapshotFileBytes(source);
+      const result = await verifier.verifyInIsolatedCopy(source);
+      assert.deepEqual(await snapshotFileBytes(source), before);
+      const calls = await fake.readCalls();
+      if (["missing", "invalid", "missing-foundation", "missing-typegen"].includes(scenario)) {
+        assert.equal(result.ok, false);
+        assert.equal(result.issues[0].code, "BINDING_INTEGRATION_INVALID");
+        assert.deepEqual(calls, []);
+      } else if (scenario === "typegen-failed") {
+        assert.equal(result.ok, false);
+        assert.equal(result.issues[0].code, "CLOUDFLARE_TYPES_FAILED");
+        assert.equal(calls.at(-1).arguments.join(" "), "--dir apps/web run cf-typegen");
+        assert.equal(calls.some(({ arguments: values }) => values.join(" ") === "run typecheck"), false);
+      } else {
+        const operations = calls.map(({ arguments: values }) => values.join(" "));
+        assert.ok(operations.indexOf("--dir apps/web run cf-typegen") > operations.indexOf("run lint"));
+        assert.ok(operations.indexOf("--dir apps/web run cf-typegen") < operations.indexOf("run typecheck"));
+        assert.equal(calls.at(-1).arguments.join(" "), command);
+        if (scenario === "failed") {
+          assert.equal(result.ok, false);
+          assert.equal(result.issues[0].code, "BINDING_INTEGRATION_FAILED");
+        } else assert.deepEqual(assertSuccess(result).checks, [...generatedChecks.slice(0, 3), "cloudflare-types", ...generatedChecks.slice(3), "worker-integration", "binding-integration"]);
+      }
+    });
+  }
+});
+
+test("persistence lock selection requires the exact compatible optional packages", () => {
+  const identity = { originProfile: "app", recipeVersion: "0.2.0" };
+  const manifest = { dependencies: { next: "16.3.3", effect: "4.0.0-rc.112", "drizzle-orm": "0.45.2" }, devDependencies: { "eslint-config-next": "16.3.3", vitest: "5.0.0", "drizzle-kit": "0.31.10", "@cloudflare/workers-types": "5.20260730.1" } };
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), "application-persistence");
+  for (const [section, key] of [["dependencies", "drizzle-orm"], ["devDependencies", "drizzle-kit"], ["devDependencies", "@cloudflare/workers-types"]]) {
+    for (const version of [undefined, "latest", "0.1.0"]) {
+      assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...manifest, [section]: { ...manifest[section], [key]: version } }), undefined);
+    }
+  }
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ ...identity, recipeVersion: "0.1.0" }, manifest), undefined);
+  assert.equal(recipeLockfiles.createRecipeLockfileUrl("application-persistence").pathname, resolve(packageRoot, "lockfiles/web-application-persistence/pnpm-lock.yaml"));
+});
+
+test("persistence generation requires binding checks before state or destination persistence", async () => {
+  for (const checks of [[...generatedChecks, "worker-integration"], [...generatedChecks, "worker-integration", "binding-integration"], [...generatedChecks.slice(0, 3), "cloudflare-types", ...generatedChecks.slice(3), "worker-integration", "binding-integration"]]) {
+    await withTestRoot(async (owner) => {
+      const fake = createFakeVerifier({ verify: async () => ({ ok: true, value: { checks } }) });
+      const destination = join(owner, "persistent-app");
+      const result = await core.generateProject({ request: { profile: "app", projectName: "persistent-app", displayName: "Persistent app", applicationPersistence: true }, destination, verifier: fake.verifier });
+      if (!checks.includes("binding-integration") || !checks.includes("cloudflare-types")) {
+        assert.equal(result.ok, false);
+        assert.equal(result.issues[0].code, "GENERATED_VERIFICATION_INVALID");
+        assert.equal(await exists(destination), false);
+      } else {
+        const generated = assertSuccess(result);
+        assert.deepEqual(generated.state.lastSuccessfulVerification.checks, ["contracts", "pre-state-inference", ...checks, "post-state-inference"]);
+        assert.equal(generated.state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.1.0");
+      }
+    });
+  }
+});
 const portfolioRenderedPaths = [
   ".github/workflows/deploy.yml",
   ".github/workflows/quality.yml",
@@ -572,7 +649,7 @@ async function listFiles(root) {
 async function infer(root) {
   return core.inferRepository({
     reader: core.createFileSystemRepositoryReader(root),
-    catalog: assertSuccess(core.createVerifiedCapabilityCatalog()),
+    catalog: assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" })),
   });
 }
 
@@ -1200,7 +1277,7 @@ test("portfolio and site generation writes exact state-last repositories", async
         profile === "site" ? "0.4.0" : undefined,
       );
 
-      const catalog = assertSuccess(core.createVerifiedCapabilityCatalog());
+      const catalog = assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }));
       const resolved = assertSuccess(
         core.resolveCapabilities({ profile }, catalog, core.profileRecipes),
       );
@@ -1426,7 +1503,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
     });
     assert.equal(project.selectedCapabilities.at(-1), "booking-calendly");
 
-    const catalog = assertSuccess(core.createVerifiedCapabilityCatalog());
+    const catalog = assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }));
     const resolved = assertSuccess(
       core.resolveCapabilities(
         {

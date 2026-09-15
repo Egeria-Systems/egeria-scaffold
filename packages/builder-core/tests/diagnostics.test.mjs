@@ -495,7 +495,7 @@ test("doctor and diff report a healthy minimal repository", async () => {
 });
 
 test("doctor and diff agree across the rendered portfolio composition", async () => {
-  const catalogResult = core.createVerifiedCapabilityCatalog();
+  const catalogResult = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" });
   assert.equal(catalogResult.ok, true);
   const renderedResult = await core.renderSkeleton({
     profile: "portfolio",

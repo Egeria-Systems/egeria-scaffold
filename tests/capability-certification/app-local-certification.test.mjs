@@ -11,7 +11,29 @@ import { certifyFreshScaffoldForTesting } from "../../scripts/lib/certify-fresh-
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const revision = "4da1ad1e48c12567d4e477c4ecbc3b9d4e097922";
-const registry = JSON.parse(await readFile(join(repositoryRoot, "certifications/capabilities.json"), "utf8"));
+const currentRegistry = JSON.parse(await readFile(join(repositoryRoot, "certifications/capabilities.json"), "utf8"));
+const registry = structuredClone(currentRegistry);
+delete registry.records["application-persistence"];
+registry.records.standards = {
+  subject: {
+    descriptorVersion: "0.5.0",
+    behaviorContractDigest: "sha256:56a667594f2cbf43beed6e23471e4d8bf28fcbbf54d6f13530191153c84d4de9",
+  },
+  requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
+  status: "pending",
+  taskPlan: "docs/superpowers/plans/2026-09-12-vitest-five-migration.md",
+  evidence: [],
+};
+registry.records["deployment-cloudflare"] = {
+  subject: {
+    descriptorVersion: "0.3.0",
+    behaviorContractDigest: "sha256:fb2464553830b052428773286689dc91984d662bf999b267aefbcb66e045ed6e",
+  },
+  requiredEvidence: ["cleanup-recovery", "deployed-application", "fresh-scaffold"],
+  status: "pending",
+  taskPlan: "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
+  evidence: [],
+};
 const fixedChecks = [
   "pnpm-version", "frozen-install", "peer-dependencies", "dependency-audit",
   "registry-signatures", "lint", "cloudflare-types", "typecheck", "unit-tests",
@@ -139,7 +161,7 @@ function runLocal(adapters = adaptersFor(), input = { revision }) {
   return certifyAppLocalForTesting(input, adapters);
 }
 
-test("local runner contracts attribute two fresh app journeys to exactly ten current subjects", async () => {
+test("local runner contracts attribute default app journeys only to the retained app subjects", async () => {
   const adapters = adaptersFor();
   const result = await runLocal(adapters);
   assert.equal(result.ok, true);
@@ -160,6 +182,28 @@ test("local runner contracts attribute two fresh app journeys to exactly ten cur
   }
   assert.deepEqual(adapters.calls, ["create", "infer", "doctor", "diff", "verify", "create", "infer", "doctor", "diff", "verify"]);
   assert.doesNotMatch(JSON.stringify(result), /certified|accepted|calendly\.com|clarity123|0123456789abcdef0123456789abcdef/);
+});
+
+test("local app certification refuses persistence and renewed shared subjects before generation", async () => {
+  for (const changed of [
+    currentRegistry.records,
+    { ...registry.records, "application-persistence": {
+      ...registry.records["app-foundation"],
+      subject: { descriptorVersion: "0.1.0", behaviorContractDigest: `sha256:${"c".repeat(64)}` },
+    } },
+    { ...registry.records, standards: {
+      ...registry.records.standards,
+      subject: { descriptorVersion: "0.6.0", behaviorContractDigest: `sha256:${"d".repeat(64)}` },
+    } },
+    { ...registry.records, "deployment-cloudflare": {
+      ...registry.records["deployment-cloudflare"],
+      subject: { descriptorVersion: "0.4.0", behaviorContractDigest: `sha256:${"e".repeat(64)}` },
+    } },
+  ]) {
+    const adapters = adaptersFor({ readRegistry: () => ({ ...registry, records: changed }) });
+    await assert.rejects(runLocal(adapters), { code: "CERTIFICATION_SUBJECT_INVALID" });
+    assert.deepEqual(adapters.calls, []);
+  }
 });
 
 test("local runner contracts refuse missing extra or mismatched registry subjects before generation", async () => {

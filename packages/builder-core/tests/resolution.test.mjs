@@ -28,7 +28,7 @@ function assertIssues(result, expectedIssues) {
 }
 
 function createCatalog() {
-  return assertOk(core.createCapabilityCatalog(packageVersions));
+  return assertOk(core.createCapabilityCatalogSnapshot(packageVersions, { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }));
 }
 
 function resolveRequest(
@@ -1713,7 +1713,7 @@ test("capability package versions must be exact stable releases and issues do no
   );
 });
 
-test("the verified generation catalog pins exact public package releases", () => {
+test("the verified admission catalog pins exact public package releases", () => {
   assert.deepEqual(core.verifiedCapabilityPackageVersions, {
     standards: "0.1.0",
     observability: "0.3.0",
@@ -1725,7 +1725,7 @@ test("the verified generation catalog pins exact public package releases", () =>
   assert.equal(core.verifiedCapabilityPackageVersions.standards, "0.1.0");
 
   const catalog = assertOk(core.createVerifiedCapabilityCatalog());
-  assert.equal(catalog.length, 10);
+  assert.equal(catalog.length, 11);
   assert.deepEqual(
     catalog.map(({ identifier }) => identifier),
     [
@@ -1738,6 +1738,7 @@ test("the verified generation catalog pins exact public package releases", () =>
       "booking-calendly",
       "multilingual",
       "analytics",
+      "application-persistence",
       "app-foundation",
     ],
   );
@@ -2040,7 +2041,7 @@ test("resolution traverses dependency identifiers lexically rather than trusting
   );
 });
 
-test("resolution rejects unknown profiles and capability identifiers without implementations", () => {
+test("resolution rejects unknown profiles and capability identifiers outside its selected view", () => {
   for (const identifier of ["authenticated-app"]) {
     assertIssues(resolveRequest({ profile: identifier }), [
       {

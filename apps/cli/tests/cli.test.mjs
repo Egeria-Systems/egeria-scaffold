@@ -15,7 +15,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join, resolve, sep } from "node:path";
+import { delimiter, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
@@ -995,6 +995,310 @@ function appCreateArguments(directory, allOptionals = false) {
     ] : []),
   ];
 }
+
+function persistenceRemovalArguments(directory, inputPath, approval) {
+  return [
+    approval === undefined ? "plan-remove" : "apply-remove",
+    "--directory", directory,
+    "--capability", "application-persistence",
+    "--persistence-removal", inputPath,
+    ...(approval === undefined ? [] : [
+      "--persistence-human-review", approval.humanReviewPath,
+      "--approved-plan", approval.planFingerprint,
+    ]),
+  ];
+}
+
+test("application persistence arguments select only explicit create and capability operations", () => {
+  const directory = "/private/tmp/persistence-app";
+  const create = assertSuccess(cliArguments.parseCliArguments([
+    ...appCreateArguments(directory), "--application-persistence",
+  ]));
+  assert.equal(create.applicationPersistence, true);
+  assert.equal(create.multilingual, undefined);
+  assert.equal(assertSuccess(cliArguments.parseCliArguments(
+    appCreateArguments(directory),
+  )).applicationPersistence, undefined);
+  for (const kind of ["plan-add", "apply-add"]) {
+    const fingerprint = `sha256:${"a".repeat(64)}`;
+    assert.deepEqual(assertSuccess(cliArguments.parseCliArguments([
+      kind, "--directory", directory, "--capability", "application-persistence",
+      ...(kind === "apply-add" ? ["--approved-plan", fingerprint] : []),
+    ])), {
+      kind, directory, capability: "application-persistence",
+      ...(kind === "apply-add" ? { approvedPlanFingerprint: fingerprint } : {}),
+    });
+  }
+  const inputPath = "/private/tmp/removal.json";
+  const humanReviewPath = "/private/tmp/review.json";
+  const planFingerprint = `sha256:${"b".repeat(64)}`;
+  assert.deepEqual(assertSuccess(cliArguments.parseCliArguments(
+    persistenceRemovalArguments(directory, inputPath),
+  )), {
+    kind: "plan-remove", directory, capability: "application-persistence",
+    persistenceRemovalPath: inputPath,
+  });
+  assert.deepEqual(assertSuccess(cliArguments.parseCliArguments(
+    persistenceRemovalArguments(directory, inputPath, { humanReviewPath, planFingerprint }),
+  )), {
+    kind: "apply-remove", directory, capability: "application-persistence",
+    persistenceRemovalPath: inputPath, persistenceRemovalHumanReviewPath: humanReviewPath,
+    approvedPlanFingerprint: planFingerprint,
+  });
+});
+
+test("application persistence rejects malformed selection and cross-capability review flags before builder calls", async () => {
+  const forbidden = () => assert.fail("invalid arguments invoked builder dependency");
+  const runner = cli.createCliRunner({
+    createVerifier: forbidden, createReader: forbidden, inspectGitWorktree: forbidden,
+    applyCapabilityAddition: forbidden, applyCapabilityRemoval: forbidden,
+  });
+  const directory = "/private/tmp/persistence-app";
+  const create = appCreateArguments(directory);
+  const plan = persistenceRemovalArguments(directory, "/private/removal.json");
+  const apply = persistenceRemovalArguments(directory, "/private/removal.json", {
+    humanReviewPath: "/private/review.json", planFingerprint: `sha256:${"b".repeat(64)}`,
+  });
+  const cases = [
+    [...create, "--application-persistence", "--application-persistence"],
+    [...create, "--application-persistence=false"],
+    [...create, "--application-persistence", "true"],
+    [...create, "--persistence-removal", "/private/removal.json"],
+    plan.slice(0, -2), [...plan, "--persistence-human-review", "/private/review.json"],
+    [...plan, "--persistence-removal", "/private/other.json"],
+    [...plan, "--approved-plan", `sha256:${"b".repeat(64)}`],
+    [...plan, "--local-artifact-digests", "/private/digests.json"],
+    [...plan, "--persistence-removal-report", "/private/report.json"],
+    apply.filter((value, index) => index !== 7 && index !== 8),
+    apply.slice(0, -2),
+    ...["", "bad\0path"].map((path) => persistenceRemovalArguments(directory, path)),
+    ...["analytics", "booking-calendly", "multilingual"].flatMap((capability) => [
+      plan.map((value) => value === "application-persistence" ? capability : value),
+      apply.map((value) => value === "application-persistence" ? capability : value),
+    ]),
+    ...["plan-add", "apply-add"].flatMap((kind) => {
+      const base = [kind, "--directory", directory, "--capability", "application-persistence",
+        ...(kind === "apply-add" ? ["--approved-plan", `sha256:${"a".repeat(64)}`] : [])];
+      return [
+        [...base, "--google-analytics-id", "G-ABCDEF1234"],
+        [...base, "--calendly-url", planSettings.destination, "--calendly-mode", "popup"],
+        [...base, "--persistence-removal", "/private/removal.json"],
+      ];
+    }),
+  ];
+  for (const arguments_ of cases) {
+    const captured = captureOutput();
+    assert.equal(await runner(arguments_, captured.output), 2, JSON.stringify(arguments_));
+    assert.deepEqual(captured.standard, []);
+    assert.deepEqual(captured.error, [JSON.stringify({ ok: false, code: "CLI_ARGUMENT_INVALID" })]);
+  }
+});
+
+function localPersistenceRemovalInput() {
+  return {
+    databases: [
+      { environment: "local", databaseId: "local-application" },
+      { environment: "staging", databaseId: "staging-application" },
+      { environment: "production", databaseId: "production-application" },
+    ],
+    policy: {
+      exportNotBefore: "2026-09-14T00:00:00Z",
+      retainUntil: "2026-10-14T00:00:00Z",
+      recoveryRequirements: [
+        { environment: "local", scope: "local" },
+        { environment: "staging", scope: "deployed" },
+        { environment: "production", scope: "deployed" },
+      ],
+      writeConsistency: "writes-paused",
+    },
+  };
+}
+
+test("application persistence creation reaches installed state through the generation boundary", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-cli-persistence-create-"));
+  try {
+    const destination = join(owner, "application");
+    let verificationCalls = 0;
+    const runner = cli.createCliRunner({
+      createVerifier: () => ({
+        ...core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
+        async verifyInIsolatedCopy(root) {
+          verificationCalls += 1;
+          const manifest = JSON.parse(await readFile(join(root, "apps/web/package.json"), "utf8"));
+          assert.equal(manifest.dependencies["drizzle-orm"], "0.45.2");
+          assert.equal(manifest.devDependencies["drizzle-kit"], "0.31.10");
+          await assert.rejects(readFile(join(root, ".egeria/state.json")), { code: "ENOENT" });
+          return { ok: true, value: { checks: core.persistenceGenerationVerificationChecks } };
+        },
+      }),
+    });
+    const captured = captureOutput();
+    assert.equal(await runner([
+      ...appCreateArguments(destination), "--application-persistence",
+    ], captured.output), 0, captured.error.join("\n"));
+    assert.equal(verificationCalls, 1);
+    assert.deepEqual(captured.error, []);
+    assert.equal(captured.standard.length, 1);
+    const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8")));
+    const state = assertSuccess(core.parseStateJson(await readFile(join(destination, ".egeria/state.json"), "utf8")));
+    assert.equal(project.selectedCapabilities.includes("application-persistence"), true);
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence")?.version, "0.1.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards")?.version, "0.6.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version, "0.4.0");
+  } finally {
+    await rm(owner, { recursive: true, force: false });
+  }
+});
+
+test("application persistence removal validates bounded JSON before builder calls without leaking paths or content", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-private-removal-input-"));
+  try {
+    const validPath = join(owner, "valid.json");
+    const invalidPath = join(owner, "private-input.json");
+    const symlinkPath = join(owner, "private-symlink.json");
+    const input = localPersistenceRemovalInput();
+    await writeFile(validPath, JSON.stringify(input));
+    await symlink(validPath, symlinkPath);
+    const forbidden = () => assert.fail("invalid input invoked builder dependency");
+    const runner = cli.createCliRunner({
+      createVerifier: forbidden, createReader: forbidden,
+      inspectGitWorktree: forbidden, applyCapabilityRemoval: forbidden,
+    });
+    for (const content of [
+      "private malformed JSON", "null", "[]", "{}",
+      JSON.stringify({ ...input, localArtifactDigests: [{ reference: "private-export", digest: `sha256:${"a".repeat(64)}` }] }),
+      JSON.stringify({ ...input, machineReport: { privateExport: "private data" } }),
+      JSON.stringify({ ...input, databases: [{ environment: "local", databaseId: "same" }, { environment: "staging", databaseId: "same" }] }),
+      JSON.stringify({ ...input, localArtifacts: [{ reference: "private-export", path: "bad\0path" }] }),
+      JSON.stringify({ ...input, localArtifacts: [{ reference: "private-export", path: join(owner, "private.sql") }] }),
+      `${JSON.stringify(input)}${" ".repeat(256 * 1024)}`,
+    ]) {
+      await writeFile(invalidPath, content);
+      const captured = captureOutput();
+      assert.equal(await runner(persistenceRemovalArguments(owner, invalidPath), captured.output), 2);
+      assert.deepEqual(captured.standard, []);
+      assert.deepEqual(captured.error, [JSON.stringify({ ok: false, code: "CLI_ARGUMENT_INVALID" })]);
+    }
+    for (const path of [owner, symlinkPath, join(owner, "private-missing.json")]) {
+      const captured = captureOutput();
+      assert.equal(await runner(persistenceRemovalArguments(owner, path), captured.output), 2);
+      assert.deepEqual(captured.standard, []);
+      assert.deepEqual(captured.error, [JSON.stringify({ ok: false, code: "CLI_ARGUMENT_INVALID" })]);
+    }
+    for (const content of [
+      "private human review error", JSON.stringify({ reportFingerprint: `sha256:${"a".repeat(64)}`, dispositions: [] }),
+      JSON.stringify({ reportFingerprint: `sha256:${"a".repeat(64)}`, dispositions: [{ identifier: "source-removal", disposition: "accepted" }], force: true }),
+    ]) {
+      await writeFile(invalidPath, content);
+      const captured = captureOutput();
+      assert.equal(await runner(persistenceRemovalArguments(owner, validPath, {
+        humanReviewPath: invalidPath, planFingerprint: `sha256:${"b".repeat(64)}`,
+      }), captured.output), 2);
+      assert.deepEqual(captured.standard, []);
+      assert.deepEqual(captured.error, [JSON.stringify({ ok: false, code: "CLI_ARGUMENT_INVALID" })]);
+    }
+  } finally {
+    await rm(owner, { recursive: true, force: false });
+  }
+});
+
+test("application persistence removal forwards validated files and exact approval while sanitizing executor failure", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-private-removal-review-"));
+  try {
+    const inputPath = join(owner, "private-removal.json");
+    const humanReviewPath = join(owner, "private-human-review.json");
+    const input = { ...localPersistenceRemovalInput(), localArtifacts: [{ reference: "export-local", path: "private/export.sql" }] };
+    const humanReview = { reportFingerprint: `sha256:${"a".repeat(64)}`, dispositions: [{ identifier: "source-removal", disposition: "accepted" }] };
+    await writeFile(inputPath, JSON.stringify(input));
+    await writeFile(humanReviewPath, JSON.stringify(humanReview));
+    const planFingerprint = `sha256:${"b".repeat(64)}`;
+    let calls = 0;
+    const runner = cli.createCliRunner({
+      createVerifier: createFakeVerifier,
+      async applyCapabilityRemoval(request) {
+        calls += 1;
+        assert.deepEqual(Object.keys(request).sort(), [
+          "approvedPlanFingerprint", "capability", "persistenceRemoval", "persistenceRemovalHumanReview", "root", "verifier",
+        ]);
+        assert.equal(request.root, owner);
+        assert.equal(request.capability, "application-persistence");
+        assert.equal(request.approvedPlanFingerprint, planFingerprint);
+        assert.deepEqual(request.persistenceRemoval, input);
+        assert.deepEqual(request.persistenceRemovalHumanReview, humanReview);
+        return { ok: false, code: "PERSISTENCE_REMOVAL_EVIDENCE_NOT_READY", phase: "precondition", recovery: "not-required", privateDetails: input };
+      },
+    });
+    const captured = captureOutput();
+    assert.equal(await runner(persistenceRemovalArguments(owner, relative(process.cwd(), inputPath), {
+      humanReviewPath: relative(process.cwd(), humanReviewPath), planFingerprint,
+    }), captured.output), 1);
+    assert.equal(calls, 1);
+    assert.deepEqual(captured.standard, []);
+    assert.deepEqual(captured.error, [JSON.stringify({
+      ok: false, command: "apply-remove", code: "PERSISTENCE_REMOVAL_EVIDENCE_NOT_READY", phase: "precondition", recovery: "not-required",
+    })]);
+  } finally {
+    await rm(owner, { recursive: true, force: false });
+  }
+});
+
+test("compiled application persistence addition planning and approval refusals preserve repository bytes", { timeout: 120_000 }, async () => {
+  await withGitFixture("app", async ({ linked }) => {
+    const before = await gitRepositorySnapshot(linked);
+    const arguments_ = ["--directory", linked, "--capability", "application-persistence"];
+    const planResult = await executeBuilt(["plan-add", ...arguments_]);
+    assert.equal(planResult.exitCode, 0, planResult.stderr);
+    const plan = JSON.parse(planResult.stdout).result;
+    assert.deepEqual(plan.capability, { identifier: "application-persistence", version: "0.1.0" });
+    const refused = await executeBuilt(["apply-add", ...arguments_, "--approved-plan", `sha256:${"a".repeat(64)}`]);
+    assert.equal(refused.exitCode, 1, refused.stdout);
+    assert.equal(JSON.parse(refused.stderr).code, "CAPABILITY_PLAN_APPROVAL_INVALID");
+    assert.deepEqual(await gitRepositorySnapshot(linked), before);
+  }, { generation: "vitest-five" });
+
+  await withGitFixture("app", async ({ linked }) => {
+    const before = await gitRepositorySnapshot(linked);
+    const refused = await executeBuilt(["plan-add", "--directory", linked, "--capability", "application-persistence"]);
+    assert.equal(refused.exitCode, 1, refused.stdout);
+    assert.equal(JSON.parse(refused.stderr).code, "CAPABILITY_ADDITION_UNSUPPORTED");
+    assert.deepEqual(await gitRepositorySnapshot(linked), before);
+  });
+});
+
+test("compiled application persistence removal reviews evidence and refuses unready approval without writes", { timeout: 120_000 }, async () => {
+  await withGitFixture("app", async ({ linked }) => {
+    const inputPath = join(dirname(linked), "private-removal.json");
+    const humanReviewPath = join(dirname(linked), "private-review.json");
+    await writeFile(inputPath, JSON.stringify(localPersistenceRemovalInput()));
+    const before = await gitRepositorySnapshot(linked);
+    const planResult = await executeBuilt(persistenceRemovalArguments(linked, inputPath));
+    assert.equal(planResult.exitCode, 0, planResult.stderr);
+    assert.equal(planResult.stderr, "");
+    const plan = JSON.parse(planResult.stdout).plan;
+    assert.deepEqual(plan.capability, { identifier: "application-persistence", version: "0.1.0" });
+    assert.equal(plan.persistenceRemovalReport.recommendation, "obtain-more-evidence");
+    assert.doesNotMatch(planResult.stdout, /private-removal|production-application|staging-application/u);
+    await writeFile(humanReviewPath, JSON.stringify({
+      reportFingerprint: plan.persistenceRemovalReport.reportFingerprint,
+      dispositions: plan.persistenceRemovalReport.requiredReviewItems.map(({ identifier }) => ({ identifier, disposition: "accepted" })),
+    }));
+    const refused = await executeBuilt(persistenceRemovalArguments(linked, inputPath, {
+      humanReviewPath, planFingerprint: plan.planFingerprint,
+    }));
+    assert.equal(refused.exitCode, 1, refused.stdout);
+    assert.equal(JSON.parse(refused.stderr).code, "PERSISTENCE_REMOVAL_EVIDENCE_NOT_READY");
+    assert.deepEqual(await gitRepositorySnapshot(linked), before);
+  }, {
+    generation: "vitest-five",
+    generationRequest: { applicationPersistence: true },
+    verifier: {
+      ...core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
+      async verifyInIsolatedCopy() {
+        return { ok: true, value: { checks: core.persistenceGenerationVerificationChecks } };
+      },
+    },
+  });
+});
 
 test("app profile creation parses existing options independently and delegates generation", async () => {
   const owner = await mkdtemp(join(tmpdir(), "egeria-app-create-cli-"));
