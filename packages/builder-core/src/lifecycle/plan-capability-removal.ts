@@ -1035,6 +1035,11 @@ export async function planCapabilityRemoval(input: Readonly<{
       inventory: inventory.value,
       actions: actions.value,
       desiredFiles: targetRender.files,
+      contentDataPaths: current.value.surfaces
+        .filter((surface) => surface.ownership === "application-owned" &&
+          surface.fingerprintTarget.kind === "file" &&
+          surface.path.startsWith("apps/web/content/") && /\.(?:ya?ml|json)$/u.test(surface.path))
+        .map(({ path }) => path),
       ...(capabilityValue === "application-persistence" ? { removedPackages: ["drizzle-orm", "drizzle-kit"] as const } : {}),
       referenceToken: removalReferenceTokens[capabilityValue],
     });

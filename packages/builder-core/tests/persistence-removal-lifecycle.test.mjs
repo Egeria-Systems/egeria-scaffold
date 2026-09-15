@@ -159,6 +159,25 @@ test("machine-ready persistence removal never writes without complete human disp
   }
 });
 
+test("persistence removal preserves customized content mentioning removed packages for human review", async () => {
+  for (const packageName of ["drizzle-orm", "drizzle-kit"]) {
+    const repo = await repository();
+    const path = "apps/web/content/en-CA/work-featured.yaml";
+    const content = encoder.encode(decoder.decode(repo.files.get(path)).replace("title: Featured work", `title: Replacing ${packageName}`));
+    repo.files.set(path, content);
+    const evidence = removalEvidence(repo);
+    const planned = await plan(repo, evidence);
+    assert.equal(planned.ok, true, JSON.stringify(planned));
+    assert.equal(planned.value.persistenceRemovalReport.recommendation, "ready-for-human-review");
+    const review = planned.value.reviewRequirements.find(({ code }) => code === "review-capability-removal-reference-warnings");
+    assert.ok(review.warnings.some((warning) => warning.path === path && warning.code === "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE"));
+    assert.deepEqual(repo.writes, []);
+    const result = await apply(repo, planned.value, evidence);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.deepEqual(repo.files.get(path), content);
+  }
+});
+
 test("changed export bytes after approval refuse before the first write", async () => {
   const repo = await repository();
   const evidence = removalEvidence(repo);

@@ -414,9 +414,11 @@ export async function guardCapabilityRemovalReferences(input: Readonly<{
   desiredFiles: readonly GeneratedFile[];
   referenceToken: string;
   removedPackages?: readonly string[];
+  contentDataPaths?: readonly string[];
 }>): Promise<CapabilityRemovalReferenceGuardResult> {
   const referenceToken = new RegExp(input.referenceToken, "iu");
   const removedPackages = input.removedPackages ?? [];
+  const contentDataPaths = new Set(input.contentDataPaths ?? []);
   const packageReferences = removedPackages.map((packageName) => new RegExp(
     `(?:^|[^A-Za-z0-9_@.-])${packageName.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}(?=$|[^A-Za-z0-9_.-])`,
     "u",
@@ -510,7 +512,8 @@ export async function guardCapabilityRemovalReferences(input: Readonly<{
         posix.extname(entry.path).toLowerCase(),
       ) &&
       ([...deletedPaths].some((path) => read.content.includes(path)) ||
-        packageReferences.some((pattern) => pattern.test(read.content)))
+        (!contentDataPaths.has(entry.path) &&
+          packageReferences.some((pattern) => pattern.test(read.content))))
     ) {
       conflicts.add(entry.path);
     }

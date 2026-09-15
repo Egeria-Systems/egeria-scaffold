@@ -46,11 +46,30 @@ test("persistence removal refuses surviving tooling and package configuration re
     ["apps/web/package.json", '{"scripts":{"custom:migrate":"drizzle-kit migrate"}}'],
     ["scripts/check.sh", "pnpm exec drizzle-kit check"],
     ["apps/other/package.json", '{"dependencies":{"drizzle-orm":"0.45.2"}}'],
+    ["apps/web/content/package.json", '{"scripts":{"migrate":"drizzle-kit migrate"}}'],
+    [".github/workflows/custom.yml", 'jobs:\n  migrate:\n    steps:\n      - run: pnpm exec drizzle-kit migrate\n'],
   ]);
   assert.deepEqual(result, {
     ok: false,
-    conflicts: ["apps/other/package.json", "apps/web/package.json", "scripts/check.sh"],
+    conflicts: [".github/workflows/custom.yml", "apps/other/package.json", "apps/web/content/package.json", "apps/web/package.json", "scripts/check.sh"],
   });
+});
+
+test("declared application content package mentions warn while deleted-path references still refuse", async () => {
+  for (const [path, content] of [
+    ["apps/web/content/en-CA/work-featured.yaml", "title: Replacing drizzle-orm"],
+    ["apps/web/content/en-CA/guide.json", '{"title":"Replacing drizzle-kit"}'],
+  ]) {
+    const result = await inspect([[path, content]], { contentDataPaths: [path] });
+    assert.deepEqual(result, { ok: true, warnings: [
+      { code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE", path },
+    ] });
+    const deletedPath = "apps/web/src/infrastructure/persistence/schema.ts";
+    const conflict = await inspect([[path, `"${deletedPath}"`]], {
+      contentDataPaths: [path], actions: [{ kind: "delete-file", path: deletedPath }],
+    });
+    assert.deepEqual(conflict, { ok: false, conflicts: [path] });
+  }
 });
 
 test("persistence removal inspects the projected source and manifest after owned replacements", async () => {
