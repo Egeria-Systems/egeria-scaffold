@@ -507,12 +507,15 @@ export async function guardCapabilityRemovalReferences(input: Readonly<{
       }
     }
 
+    // The planner validates this replacement against the exact target recipe lock.
+    // Retained optional-peer metadata does not keep the removed package installed.
+    const canonicalLockReplacement = entry.path === "pnpm-lock.yaml" && projected.kind === "replacement";
     if (
       exactConfigurationAndScriptExtensions.has(
         posix.extname(entry.path).toLowerCase(),
       ) &&
       ([...deletedPaths].some((path) => read.content.includes(path)) ||
-        (!contentDataPaths.has(entry.path) &&
+        (!contentDataPaths.has(entry.path) && !canonicalLockReplacement &&
           packageReferences.some((pattern) => pattern.test(read.content))))
     ) {
       conflicts.add(entry.path);

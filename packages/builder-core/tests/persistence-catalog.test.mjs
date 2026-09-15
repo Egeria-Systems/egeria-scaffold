@@ -27,7 +27,7 @@ test("explicit application persistence resolves the complete optional tuple with
   assert.deepEqual(persistence.dependencies, ["app-foundation"]);
   assert.equal(persistence.removalPolicy, "export-and-remove");
   assert.deepEqual(persistence.stateClassifications, ["repository-stateful", "external-stateful", "persistent-data"]);
-  assert.deepEqual(persistence.requiredPackages, ["drizzle-orm", "drizzle-kit"]);
+  assert.deepEqual(persistence.requiredPackages, ["drizzle-orm", "drizzle-kit", "@cloudflare/workers-types"]);
   assert.equal(result.value.find(({ identifier }) => identifier === "standards").inferenceProbes.find(({ packageName }) => packageName === "vitest").version, "5.0.0");
 });
 

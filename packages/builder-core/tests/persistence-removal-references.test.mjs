@@ -86,6 +86,27 @@ test("persistence removal inspects the projected source and manifest after owned
   assert.deepEqual(result, { ok: true, warnings: [] });
 });
 
+test("only the canonical projected lock treats optional peer metadata as a review warning", async () => {
+  const path = "pnpm-lock.yaml";
+  const content = "peerDependencies:\n  '@cloudflare/workers-types': '>=4'\n";
+  const options = { removedPackages: ["@cloudflare/workers-types"] };
+  assert.deepEqual(await inspect([[path, content]], options), { ok: false, conflicts: [path] });
+  const projected = {
+    ...options,
+    actions: [{ kind: "replace-file", path }],
+    desiredFiles: [{ path, content: encoder.encode(content) }],
+  };
+  assert.deepEqual(await inspect([[path, content]], projected), { ok: true, warnings: [
+    { code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE", path },
+  ] });
+  const deletedPath = "apps/web/src/infrastructure/persistence/schema.ts";
+  assert.deepEqual(await inspect([[path, content]], {
+    ...projected,
+    actions: [...projected.actions, { kind: "delete-file", path: deletedPath }],
+    desiredFiles: [{ path, content: encoder.encode(`${content}source: ${deletedPath}\n`) }],
+  }), { ok: false, conflicts: [path] });
+});
+
 test("persistence package names in prose and dynamic loading remain explicit review warnings", async () => {
   const result = await inspect([
     ["docs/migration.md", "Previously used drizzle-orm/d1."],

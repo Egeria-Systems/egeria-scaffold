@@ -262,7 +262,7 @@ function enrichApplicationManifest(
     devDependencies: {
       ...manifest.devDependencies,
       "@egeria-systems/standards": packageVersions.standards,
-      ...(persistence ? { "drizzle-kit": "0.31.10" } : {}),
+      ...(persistence ? { "@cloudflare/workers-types": "5.20260730.1", "drizzle-kit": "0.31.10" } : {}),
       ...(app && recipeVersion === "0.1.0" ? { vitest: "4.1.11" } : {}),
       ...(productionSite
         ? { "eslint-config-next": "16.3.3" }

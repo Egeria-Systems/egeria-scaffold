@@ -193,11 +193,11 @@ test("persistence binding verification refuses missing or substituted commands a
   }
 });
 
-test("persistence lock selection requires the exact compatible optional package pair", () => {
+test("persistence lock selection requires the exact compatible optional packages", () => {
   const identity = { originProfile: "app", recipeVersion: "0.2.0" };
-  const manifest = { dependencies: { next: "16.3.3", effect: "4.0.0-rc.112", "drizzle-orm": "0.45.2" }, devDependencies: { "eslint-config-next": "16.3.3", vitest: "5.0.0", "drizzle-kit": "0.31.10" } };
+  const manifest = { dependencies: { next: "16.3.3", effect: "4.0.0-rc.112", "drizzle-orm": "0.45.2" }, devDependencies: { "eslint-config-next": "16.3.3", vitest: "5.0.0", "drizzle-kit": "0.31.10", "@cloudflare/workers-types": "5.20260730.1" } };
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), "application-persistence");
-  for (const [section, key] of [["dependencies", "drizzle-orm"], ["devDependencies", "drizzle-kit"]]) {
+  for (const [section, key] of [["dependencies", "drizzle-orm"], ["devDependencies", "drizzle-kit"], ["devDependencies", "@cloudflare/workers-types"]]) {
     for (const version of [undefined, "latest", "0.1.0"]) {
       assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...manifest, [section]: { ...manifest[section], [key]: version } }), undefined);
     }

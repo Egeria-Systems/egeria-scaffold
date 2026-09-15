@@ -142,6 +142,7 @@ test("persistence removal requires evidence review and restores the default app 
   assert.equal(finalManifest.scripts.custom, "node scripts/custom.mjs");
   assert.equal(finalManifest.dependencies["drizzle-orm"], undefined);
   assert.equal(finalManifest.devDependencies["drizzle-kit"], undefined);
+  assert.equal(finalManifest.devDependencies["@cloudflare/workers-types"], undefined);
   assert.equal(repo.files.has("apps/web/vitest.bindings.config.ts"), false);
   assert.deepEqual(repo.files.get("pnpm-lock.yaml"), new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.2.0/pnpm-lock.yaml", import.meta.url))));
 });
@@ -239,6 +240,7 @@ test("surviving Drizzle consumers refuse persistence removal without erasing cus
     ["apps/web/src/custom.ts", 'import { sql } from "drizzle-orm"; export { sql };\n'],
     ["apps/web/src/custom.ts", 'export { sqliteTable } from "drizzle-orm/sqlite-core";\n'],
     ["apps/web/custom.config.ts", 'import { defineConfig } from "drizzle-kit"; export default defineConfig({});\n'],
+    ["apps/web/src/custom.ts", 'import type { D1Database } from "@cloudflare/workers-types"; export type Database = D1Database;\n'],
   ]) {
     const repo = await repository();
     repo.files.set(path, encoder.encode(content));

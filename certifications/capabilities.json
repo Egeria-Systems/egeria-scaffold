@@ -54,7 +54,7 @@
     "application-persistence": {
       "subject": {
         "descriptorVersion": "0.1.0",
-        "behaviorContractDigest": "sha256:6a3966990d62fbe2297687030ea29f7c2b6e6f30e1ea82b777ce5f3606a7a86c"
+        "behaviorContractDigest": "sha256:dcb911f024f4a0cf792396bf919e2387f0193fae6608071c6dea7aa371eb4c95"
       },
       "requiredEvidence": [
         "cleanup-recovery",

@@ -374,7 +374,7 @@
       "path": "apps/web/tests/integration/health-worker.test.ts"
     },
     {
-      "fingerprint": "sha256:2417d07a47a63845559399b07a955e03800f7ee669285923b2adc30852d7fdd3",
+      "fingerprint": "sha256:e780e8905c3e8a96b5c71f5d495621f63f0c655f04c438a0e3d926cb523069c1",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1294,7 +1294,7 @@
       "path": "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx"
     },
     {
-      "fingerprint": "sha256:50ad82124e0004b2ab28c1c511ff11a79cf8c2fa1aad32a4d0029357c9be773a",
+      "fingerprint": "sha256:cd3805e8c96557bedbb61fb89141f24434913fd00d3d8c2fdd4c83411215cab6",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1478,6 +1478,21 @@
       },
       "ownership": "application-owned",
       "path": "apps/web/tests/bindings/fixtures/worker.ts"
+    },
+    {
+      "fingerprint": "sha256:c5da2865e604198c384a56c2025b883fe9814a65812663c3db3f7654bf5bc49f",
+      "fingerprintTarget": {
+        "kind": "json-value",
+        "pointer": "/devDependencies/@cloudflare~1workers-types"
+      },
+      "identifier": "persistence-worker-types-package",
+      "mergeStrategy": "json-property",
+      "owner": {
+        "identifier": "application-persistence",
+        "kind": "capability"
+      },
+      "ownership": "merge-managed",
+      "path": "apps/web/package.json"
     },
     {
       "fingerprint": "sha256:f01825fbb5aa782f14f9c24ee6934fc8dcc9b6c1aab96864d651cc001ba28be2",

@@ -637,7 +637,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 160,
+    expectedSurfaces: 161,
     visualRegression: false,
   }),
 ]);
@@ -805,7 +805,7 @@ function expectedWebManifest(projectName, nextVersion, appFoundation, persistenc
       "@types/react": "19.2.18",
       "@types/react-dom": "19.2.4",
       "@vitejs/plugin-react": "6.0.5",
-      ...(persistence ? { "drizzle-kit": "0.31.10" } : {}),
+      ...(persistence ? { "@cloudflare/workers-types": "5.20260730.1", "drizzle-kit": "0.31.10" } : {}),
       eslint: "9.39.5",
       "eslint-config-next": nextVersion,
       jsdom: "30.0.1",
@@ -1144,7 +1144,7 @@ async function inspectFixture(root, contract) {
 
   if (contract.profile === "app") {
     const expectedLockFingerprint = persistence
-      ? "2417d07a47a63845559399b07a955e03800f7ee669285923b2adc30852d7fdd3"
+      ? "e780e8905c3e8a96b5c71f5d495621f63f0c655f04c438a0e3d926cb523069c1"
       : "30b508b027b4ead219c5af2aec281b65bed7dd63ec3e338df9e5dec93597c1e4";
     if (fingerprint(lockfile) !== expectedLockFingerprint) {
       fail("FIXTURE_LOCKFILE_INVALID");
@@ -1535,6 +1535,10 @@ async function verifySourcesWithAdapters(
           failureCode: "REGISTRY_SIGNATURE_CHECK_FAILED",
         },
         { arguments: ["run", "lint"], failureCode: "LINT_FAILED" },
+        ...(hasBindingIntegration ? [{
+          arguments: ["run", "typecheck"],
+          failureCode: "CLEAN_TYPECHECK_FAILED",
+        }] : []),
         {
           arguments: ["--dir", "apps/web", "run", "cf-typegen"],
           failureCode: "CLOUDFLARE_TYPE_GENERATION_FAILED",

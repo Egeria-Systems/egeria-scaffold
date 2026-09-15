@@ -1040,7 +1040,7 @@ export async function planCapabilityRemoval(input: Readonly<{
           surface.fingerprintTarget.kind === "file" &&
           surface.path.startsWith("apps/web/content/") && /\.(?:ya?ml|json)$/u.test(surface.path))
         .map(({ path }) => path),
-      ...(capabilityValue === "application-persistence" ? { removedPackages: ["drizzle-orm", "drizzle-kit"] as const } : {}),
+      ...(capabilityValue === "application-persistence" ? { removedPackages: descriptor.requiredPackages } : {}),
       referenceToken: removalReferenceTokens[capabilityValue],
     });
 

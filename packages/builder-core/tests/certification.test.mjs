@@ -18,7 +18,7 @@ const descriptorDigests = Object.freeze({
   "app-foundation":
     "sha256:6d9cf389441064a96d2b47bb309becab37358fcc2952335feffae8720eb6f497",
   "application-persistence":
-    "sha256:6a3966990d62fbe2297687030ea29f7c2b6e6f30e1ea82b777ce5f3606a7a86c",
+    "sha256:dcb911f024f4a0cf792396bf919e2387f0193fae6608071c6dea7aa371eb4c95",
   "booking-calendly":
     "sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca",
   "content-files":

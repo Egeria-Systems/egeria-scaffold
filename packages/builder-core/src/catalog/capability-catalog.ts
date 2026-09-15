@@ -1706,7 +1706,7 @@ function createDescriptors(
       dependencies: ["app-foundation"],
       ...sharedCapabilityMetadata,
       supportedProfiles: ["app"],
-      requiredPackages: ["drizzle-orm", "drizzle-kit"],
+      requiredPackages: ["drizzle-orm", "drizzle-kit", "@cloudflare/workers-types"],
       environmentVariables: ["STAGING_APPLICATION_DATABASE_ID", "PRODUCTION_APPLICATION_DATABASE_ID"],
       secrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
       platformResources: ["cloudflare-d1-database"],
@@ -1718,6 +1718,7 @@ function createDescriptors(
       ...projectEvidencePoints([
         createPackageEvidencePoint("persistence-orm-package", "application-persistence", "dependencies", "drizzle-orm", "0.45.2"),
         createPackageEvidencePoint("persistence-migration-tool-package", "application-persistence", "devDependencies", "drizzle-kit", "0.31.10"),
+        createPackageEvidencePoint("persistence-worker-types-package", "application-persistence", "devDependencies", "@cloudflare/workers-types", "5.20260730.1"),
         createFileEvidencePoint("persistence-drizzle-configuration", "application-persistence", "apps/web/drizzle.config.ts", "managed"),
         createFileEvidencePoint("persistence-schema", "application-persistence", "apps/web/src/infrastructure/persistence/schema.ts", "application-owned"),
         createFileEvidencePoint("persistence-binding-specification", "application-persistence", "apps/web/tests/bindings/application-persistence.test.ts", "application-owned"),

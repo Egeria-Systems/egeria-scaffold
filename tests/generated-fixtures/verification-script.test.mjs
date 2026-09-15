@@ -152,6 +152,30 @@ test("persistence fixture binding verification executes separately and a failed 
   } finally { await rm(ownerParent, { recursive: true, force: true }); }
 });
 
+test("persistence fixture must typecheck before application binding types are generated", async () => {
+  const ownerParent = await mkdtemp(join(tmpdir(), "egeria-clean-typecheck-"));
+  const commands = [];
+  try {
+    await expectFixtureError(() => verifyGeneratedProjectForTesting(
+      resolve(repositoryRoot, "fixtures/generated/app-persistence"), "app-persistence",
+      {
+        async createOwner() { return createKnownOwner(ownerParent); },
+        async runCommand(input) {
+          commands.push(input.arguments);
+          if (input.arguments.at(-1) === "typecheck") {
+            assert.equal(await pathExists(join(input.cwd, "apps/web/cloudflare-env.d.ts")), false);
+            throw new Error("PRIVATE_VALUE");
+          }
+          return successfulCommand(input);
+        },
+      },
+    ), "CLEAN_TYPECHECK_FAILED");
+    assert.equal(commands.some((arguments_) => arguments_.at(-1) === "cf-typegen"), false);
+  } finally {
+    await rm(ownerParent, { recursive: true, force: true });
+  }
+});
+
 test("fixture Effect source imports cannot enter domain, content, presentation or client modules", async () => {
   const owner = await mkdtemp(join(tmpdir(), "egeria-effect-sources-"));
   try {
@@ -359,7 +383,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
               ? 139
               : contract.identifier === "app" ? 142
                 : contract.identifier === "app-all-optional-integrations" ? 178
-                  : contract.identifier === "app-persistence" ? 160 : 154,
+                  : contract.identifier === "app-persistence" ? 161 : 154,
     );
     assert.equal(
       contract.visualRegression,
@@ -1710,7 +1734,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   const fixtureCommands = generatedFixtureContracts.map(({ identifier }) =>
     commands.filter(({ cwd }) => cwd === join(ownedPath, `${identifier}-project`)),
   );
-  assert.deepEqual(fixtureCommands.map((entries) => entries.length), [16, 16, 16, 16, 16, 16, 16, 17]);
+  assert.deepEqual(fixtureCommands.map((entries) => entries.length), [16, 16, 16, 16, 16, 16, 16, 18]);
   const firstCommands = fixtureCommands.map(
     ([command]) => command,
   );
@@ -1748,7 +1772,10 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         : argument,
     ),
   );
-  for (const arguments_ of fixtureCommands.slice(1)) {
+  for (const [fixtureIndex, arguments_] of fixtureCommands.entries()) {
+    const expected = generatedFixtureContracts[fixtureIndex].expectedApplicationPersistenceVersion === "0.1.0"
+      ? [...perFixture.slice(0, 6), ["run", "typecheck"], ...perFixture.slice(6)]
+      : perFixture;
     assert.deepEqual(
       arguments_.filter(({ arguments: current }) => current.at(-1) !== "test:integration:bindings").map(({ arguments: current }) =>
         current.map((argument) =>
@@ -1757,7 +1784,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
             : argument,
         ),
       ),
-      perFixture,
+      expected,
     );
   }
   assert.deepEqual(perFixture, [

@@ -1,3 +1,4 @@
+import type { D1Database } from "@cloudflare/workers-types";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { afterEach, beforeEach, expect, it } from "vitest";
@@ -22,7 +23,7 @@ const server = createTestHarness({
     }],
   } }],
 });
-const worker = server.getWorker<Pick<CloudflareEnv, "APP_DB">>();
+const worker = server.getWorker<{ APP_DB: D1Database }>();
 
 beforeEach(async () => { await server.listen(); });
 afterEach(async ({ task }) => {
