@@ -179,6 +179,59 @@ test("persistence removal preserves customized content mentioning removed packag
   }
 });
 
+test("persistence removal preserves author-added content package mentions for human review", async () => {
+  for (const [path, source] of [
+    ["apps/web/content/en-CA/work-added.yaml", "title: Replacing drizzle-orm\n"],
+    ["apps/web/content/fr-CA/work-added.yml", "title: Replacing drizzle-kit\n"],
+    ["apps/web/content/en-CA/guides/persistence.json", '{"title":"Replacing @cloudflare/workers-types"}\n'],
+  ]) {
+    const repo = await repository();
+    const content = encoder.encode(source);
+    assert.equal(repo.rendered.surfaces.some((surface) => surface.path === path), false);
+    repo.files.set(path, content);
+    const evidence = removalEvidence(repo);
+    const planned = await plan(repo, evidence);
+    assert.equal(planned.ok, true, JSON.stringify(planned));
+    const review = planned.value.reviewRequirements.find(({ code }) => code === "review-capability-removal-reference-warnings");
+    assert.ok(review.warnings.some((warning) => warning.path === path && warning.code === "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE"));
+    assert.equal(planned.value.persistenceRemovalReport.recommendation, "ready-for-human-review");
+    const result = await apply(repo, planned.value, evidence);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.deepEqual(repo.files.get(path), content);
+  }
+});
+
+test("changed author-added content invalidates persistence removal approval before writes", async () => {
+  const repo = await repository();
+  const path = "apps/web/content/en-CA/work-added.yaml";
+  repo.files.set(path, encoder.encode("title: Replacing drizzle-orm\n"));
+  const evidence = removalEvidence(repo);
+  const planned = await plan(repo, evidence);
+  assert.equal(planned.ok, true, JSON.stringify(planned));
+  repo.files.set(path, encoder.encode("title: Replacing drizzle-kit\n"));
+  const result = await apply(repo, planned.value, evidence);
+  assert.equal(result.ok, false);
+  assert.equal(result.phase, "precondition");
+  assert.deepEqual(repo.writes, []);
+});
+
+test("author-added content directories retain package, source and deleted-path removal conflicts", async () => {
+  for (const [path, content] of [
+    ["apps/web/content/package.json", '{"scripts":{"migrate":"drizzle-kit migrate"}}\n'],
+    ["apps/web/content/en-CA/package.json", '{"dependencies":{"drizzle-orm":"0.45.2"}}\n'],
+    ["apps/web/content/en-CA/consumer.ts", 'export { sql } from "drizzle-orm";\n'],
+    ["apps/web/content/en-CA/work-added.yaml", "source: apps/web/src/infrastructure/persistence/schema.ts\n"],
+  ]) {
+    const repo = await repository();
+    repo.files.set(path, encoder.encode(content));
+    const planned = await plan(repo, removalEvidence(repo));
+    assert.equal(planned.ok, false);
+    assert.equal(planned.issues[0].code, "CAPABILITY_REMOVAL_REFERENCE_CONFLICT");
+    assert.deepEqual(repo.writes, []);
+    assert.equal(decoder.decode(repo.files.get(path)), content);
+  }
+});
+
 test("changed export bytes after approval refuse before the first write", async () => {
   const repo = await repository();
   const evidence = removalEvidence(repo);

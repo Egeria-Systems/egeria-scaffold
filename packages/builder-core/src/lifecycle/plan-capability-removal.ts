@@ -1035,10 +1035,12 @@ export async function planCapabilityRemoval(input: Readonly<{
       inventory: inventory.value,
       actions: actions.value,
       desiredFiles: targetRender.files,
-      contentDataPaths: current.value.surfaces
-        .filter((surface) => surface.ownership === "application-owned" &&
-          surface.fingerprintTarget.kind === "file" &&
-          surface.path.startsWith("apps/web/content/") && /\.(?:ya?ml|json)$/u.test(surface.path))
+      contentDataPaths: inventory.value.entries
+        .filter(({ path, kind }) => kind === "file" &&
+          path.startsWith("apps/web/content/") && /\.(?:ya?ml|json)$/u.test(path) &&
+          !/\/package\.json$/iu.test(path) &&
+          current.value.surfaces.every((surface) => surface.path !== path ||
+            (surface.ownership === "application-owned" && surface.fingerprintTarget.kind === "file")))
         .map(({ path }) => path),
       ...(capabilityValue === "application-persistence" ? { removedPackages: descriptor.requiredPackages } : {}),
       referenceToken: removalReferenceTokens[capabilityValue],

@@ -3598,8 +3598,10 @@ test("canonical documentation records visual regression and the client-ready clo
     roadmap,
     builderInstructions,
   ]) {
-    assert.match(currentContractOwner, /\b(?:ten|subjects)\b[^\n]+\b(?:pending|empty evidence)\b/iu);
+    assert.match(currentContractOwner, /\bsubjects\b[^\n]+\b(?:pending|empty evidence)\b/iu);
   }
+  assert.match(capabilityModel, /\bCurrent admission passes for all eleven records\b/iu);
+  assert.match(capabilityModel, /\bfive certified and six pending admission subjects\b/iu);
 
   assert.match(
     capabilityModel,
@@ -4187,7 +4189,7 @@ test("canonical documentation accepts profile-transition execution and records t
   ]) {
     assert.match(historicalCertificationOwner, multilingualEligibilityPattern);
   }
-  assert.match(builderCoreInstructions, /\b(?:ten|subjects)\b[^\n]+\b(?:pending|empty evidence)\b/iu);
+  assert.match(builderCoreInstructions, /\bfive unchanged subjects remain certified; six subjects remain pending\b/iu);
 
   for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
     assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);
@@ -4958,7 +4960,7 @@ test("accepted removal-reference hardening closes before app foundation eligibil
   );
   assert.match(
     removalReferenceGuardColumns[2],
-    /package-backed analysis remains deferred until a concrete removable package exists/iu,
+    /current \[application-persistence\].+removal additionally analyzes its removed package references/iu,
   );
   assert.match(
     removalReferenceGuardColumns[2],
@@ -4966,7 +4968,7 @@ test("accepted removal-reference hardening closes before app foundation eligibil
   );
   assert.match(
     removalReferenceGuardColumns[3],
-    /actual.+planner.+executor.+CLI.+all three capabilities/iu,
+    /actual.+planner.+executor.+CLI.+three accepted capabilities.+persistence-removal-references[.]test[.]mjs.+persistence-removal-lifecycle[.]test[.]mjs/iu,
   );
   assert.equal(removalReferenceGuardColumns[4], referenceHardeningPhase);
 });
