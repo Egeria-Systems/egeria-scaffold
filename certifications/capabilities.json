@@ -164,9 +164,40 @@
         "deployed-application",
         "fresh-scaffold"
       ],
-      "status": "pending",
+      "status": "certified",
       "taskPlan": "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
-      "evidence": []
+      "evidence": [
+        {
+          "kind": "cleanup-recovery",
+          "path": "docs/implementation-evidence/2026-09-15-observability-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "9ea5dce328a9a065f71e168cb2c82ea515f54ae1",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43"
+          }
+        },
+        {
+          "kind": "deployed-application",
+          "path": "docs/implementation-evidence/2026-09-15-observability-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "9ea5dce328a9a065f71e168cb2c82ea515f54ae1",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43"
+          }
+        },
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-09-15-observability-app-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "9ea5dce328a9a065f71e168cb2c82ea515f54ae1",
+          "subject": {
+            "descriptorVersion": "0.3.0",
+            "behaviorContractDigest": "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43"
+          }
+        }
+      ]
     },
     "section-composition": {
       "subject": {
