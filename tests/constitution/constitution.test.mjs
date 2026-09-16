@@ -2085,7 +2085,7 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   const job = workflow.jobs["verify-and-deploy"];
   assert.equal(job.if, "github.ref == 'refs/heads/main'");
   assert.equal(job["runs-on"], "ubuntu-24.04");
-  assert.equal(job["timeout-minutes"], 45);
+  assert.equal(job["timeout-minutes"], 60);
   assert.deepEqual(job.environment, {
     name: "test-deploy",
     url: "${{ vars.DEPLOY_URL }}",
