@@ -859,6 +859,8 @@ Payload becomes the sole authority for client-editable editorial content only af
 
 `authenticated-app` begins with a deployed Better Auth/Next.js/OpenNext/D1/Drizzle compatibility and security spike.
 
+The [program roadmap](program-roadmap.md#initial-authenticated-composition-staging) owns its approved first-delivery sequence; the [review protocol](../governance/review-and-contribution.md#initial-authenticated-composition-exception) owns the bounded implementation/certification ordering exception. Capability identifiers, dependencies, security outcomes and separate certification obligations below remain unchanged.
+
 Identity capabilities:
 
 - `identity-core`: verified email/password, recovery, sessions;
@@ -1081,7 +1083,7 @@ Deployed journeys run through GitHub Actions under protected staging environment
 
 Every new or materially changed executable capability is delivered through two independently reviewable tasks: its capability implementation task followed by a separate capability-certification task. The certification task is not a checklist hidden inside implementation and does not inherit the implementation task's approval, comparison, evidence, or external-action authority.
 
-Implementation approval does not imply certification. The capability and its owning phase cannot close, and the capability must not be advertised as certified, until the separate task has established the required local fresh-project evidence and any conditionally required lifecycle, protected-staging, provider, persistent-data, security, cleanup, and recovery evidence. A dependent capability may begin only after the preceding certification gate unless the approved roadmap explicitly establishes that the work is independent.
+Implementation approval does not imply certification. The capability and its owning phase cannot close, and the capability must not be advertised as certified, until the separate task has established the required local fresh-project evidence and any conditionally required lifecycle, protected-staging, provider, persistent-data, security, cleanup, and recovery evidence. A dependent capability may begin only after the preceding certification gate unless the approved roadmap explicitly establishes that the work is independent, or the delivery is within the narrowly named [initial authenticated-composition staging](program-roadmap.md#initial-authenticated-composition-staging) under the [review protocol](../governance/review-and-contribution.md#initial-authenticated-composition-exception).
 
 Each capability-certification task begins with Gate 1 preparation and an exact-file Gate 2 plan under the [review and contribution protocol](../governance/review-and-contribution.md). That planning derives current provider setup and exact executable scenarios within existing canonical outcome boundaries and gives the user step-by-step human prerequisites, or explicitly demonstrates that none are required. The roadmap records the durable planning contract rather than freezing account, credential, provider, cost, or setup instructions that may drift before the task begins.
 
@@ -1432,7 +1434,7 @@ The accepted app-fixture predecessor supplies default app and app with Calendly,
 
 #### P5C–P5F — Remaining independent backend capabilities
 
-P5A `multilingual` and P5B `analytics` retain their identifiers as requirements relocated intact to P3B; they are not deleted or renumbered. Implement application persistence, Resend email, Cloudflare job delivery, and durable contact submissions through the existing P5C–P5F capability prompts.
+P5A `multilingual` and P5B `analytics` retain their identifiers as requirements relocated intact to P3B; they are not deleted or renumbered. Preserve the accepted P5C application-persistence implementation and its separate certification handoff. The [remaining-program delivery plan](2026-09-16-remaining-program-delivery-plan.md) supplies the P5D–P5F email, job-delivery and durable-contact sequence and the later program increments; it does not restart P5C or replace predecessor acceptance gates.
 
 P5C introduces the approved Wrangler harness binding lane with shared Cloudflare deployment test configuration and application-persistence-owned D1 specifications. Future Queue, D1/R2 and persistence-backed identity capabilities select their compatible runner at their own gates. Each capability retains ownership of its own tests and does not treat a shared runner as evidence for another capability.
 

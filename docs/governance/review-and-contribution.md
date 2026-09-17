@@ -28,6 +28,16 @@ A bounded independent-work exception may change one plan's direct predecessor on
 
 Gate 1 evidence is not permission to edit implementation files or take external action.
 
+### Initial authenticated-composition exception
+
+For only the first complete authenticated-app delivery named in the [program roadmap](../roadmaps/program-roadmap.md#initial-authenticated-composition-staging), dependent implementation within that named composition may precede the other composition members' certification. This is a bounded composition exception, not a claim that those capabilities are independent.
+
+Before using it, Gate 2 must freeze the accepted compatibility-spike predecessor and artifact, exact accepted base and isolated worktree, certified existing prerequisite subjects, the named capability implementation tasks, essential shared-contract changes, protected existing state and the later certification/reconciliation boundary. The canonical source plan and roadmap must record this same named exception before implementation. Internal work packages retain focused RED/GREEN checks and inspectable ownership; only the complete fresh recipe is exposed.
+
+The exception ends at implementation acceptance. Certification tasks then follow the declared dependency graph: any changed shared prerequisite subject is accepted before a dependent identity subject. A complete generated recipe may contain other pending composition members while a task certifies its own subject; co-installation is not a declared dependency or evidence of another member's certification. Every subject retains its own task, causal assertions, comparison, review and accepted outcomes. The final composed-baseline checkpoint requires all its required subjects to be certified.
+
+No incomplete profile, temporary selectable identity combination, inferred certificate, weakened admission/closure check or early migration/downstream implementation is authorized. Existing-repository migration, work consuming this authenticated baseline and phase closure remain gated on the complete accepted certification set; migration changes receive separate lifecycle renewal. All other Gate 1/2/3, review, security, privacy, data-safety, Git and external-action rules remain unchanged. Later deliveries do not inherit this exception.
+
 ## Gate 2: implementation-plan approval
 
 Write an exact-file, test-driven plan under the Git-ignored private local `docs/superpowers/plans/` directory. It must define interfaces, RED/GREEN checks, focused commit boundaries, the frozen comparison, bounded `@ponytail-review` scope and rerun condition, reviewers, final verification, review-packet contents, deferred work, and recovery.
