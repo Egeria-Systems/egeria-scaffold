@@ -24,7 +24,7 @@ jobs:
   verify-and-deploy:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     environment:
       name: test-deploy
       url: ${{ vars.DEPLOY_URL }}
@@ -66,6 +66,7 @@ jobs:
           CALENDLY_URL: ${{ inputs.calendly_url }}
           CERTIFICATION_OWNER: ${{ runner.temp }}/booking-calendly-certification
         run: |
+          umask 077
           test -n "$CALENDLY_URL"
           node scripts/certify-booking-calendly.mjs --calendly-url "$CALENDLY_URL" --output-root "$CERTIFICATION_OWNER" > "$RUNNER_TEMP/booking-calendly-local-receipt.json"
           test "$(wc -l < "$RUNNER_TEMP/booking-calendly-local-receipt.json")" -eq 1
@@ -90,6 +91,32 @@ jobs:
           CERTIFICATION_ROOT: ${{ runner.temp }}/booking-calendly-certification/project
         run: |
           pnpm --dir "$CERTIFICATION_ROOT" run build:cloudflare
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:integration:cloudflare
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            import { isDeepStrictEqual } from "node:util";
+            import { contractForGeneratedProject } from "./scripts/verify-generated-skeletons.mjs";
+            import { inspectAppEffectBuild } from "./scripts/verify-app-transition-visuals.mjs";
+            import { requireAppRuntimeEvidence } from "./scripts/certify-app-local.mjs";
+            try {
+              const root = process.env.CERTIFICATION_ROOT;
+              const receiptPath = `${process.env.RUNNER_TEMP}/booking-calendly-local-receipt.json`;
+              const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+              const registry = JSON.parse(readFileSync("certifications/capabilities.json", "utf8"));
+              if (receipt.ok !== true || receipt.profile !== "app" || !isDeepStrictEqual(receipt.subject, registry.records["booking-calendly"].subject)) throw new Error();
+              requireAppRuntimeEvidence(receipt, "app-calendly");
+              const files = contractForGeneratedProject("app-calendly").expectedFiles.map(path => ({ path, content: readFileSync(`${root}/${path}`) }));
+              const build = { fixture: "app-calendly", ...await inspectAppEffectBuild(root, files) };
+              const workerIntegration = { executed: ["app-calendly"], skipped: [] };
+              requireAppRuntimeEvidence({ workerIntegration, appBuildEvidence: [build] }, "app-calendly");
+              writeFileSync(receiptPath, `${JSON.stringify({ ...receipt, evidenceRevision: process.env.GITHUB_SHA, deploymentWorkerIntegration: workerIntegration, deploymentAppBuildEvidence: [build] })}\n`, { mode: 0o600 });
+            } catch {
+              process.stderr.write("{\"ok\":false,\"code\":\"CERTIFICATION_DEPLOYMENT_BUILD_INVALID\"}\n");
+              process.exitCode = 1;
+            }
+          '
+          test "$(wc -l < "$RUNNER_TEMP/booking-calendly-local-receipt.json")" -eq 1
+          test "$(wc -c < "$RUNNER_TEMP/booking-calendly-local-receipt.json")" -le 65536
           pnpm --dir "$CERTIFICATION_ROOT/apps/web" run browser:install:ci
 
       - name: Deploy certification Worker

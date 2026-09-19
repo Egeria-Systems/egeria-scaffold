@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
 import { verifyGeneratedProject } from "./verify-generated-skeletons.mjs";
+import { requireAppRuntimeEvidence } from "./certify-app-local.mjs";
 import { runCertificationCli } from "./lib/certification-cli.mjs";
 import {
   cleanupOwnedDirectory,
@@ -20,13 +21,15 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cliEntry = resolve(repositoryRoot, "apps/cli/dist/index.js");
 const defaultCalendlyUrl = "https://calendly.com/example/intro";
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
-const projectName = "acme-portfolio-calendly";
+const projectName = "acme-app-calendly";
 const expectedBaseCapabilities = Object.freeze([
   "standards",
+  "deployment-cloudflare",
   "content-files",
   "section-composition",
-  "deployment-cloudflare",
   "observability",
+  "app-foundation",
+  "site-routing",
 ]);
 const certificationChecks = Object.freeze([
   "compiled-cli-create-baseline",
@@ -176,7 +179,7 @@ async function createOwnedDirectory(outputRoot) {
 
 function requireCreate(value) {
   if (
-    value.profile !== "portfolio" ||
+    value.profile !== "app" ||
     !arraysEqual(value.capabilities, expectedBaseCapabilities)
   ) {
     fail("BASELINE_CREATE_INVALID");
@@ -190,7 +193,7 @@ function requireAdditionPlan(value) {
     plan.status !== "approval-required" ||
     typeof plan.planFingerprint !== "string" ||
     !/^sha256:[a-f0-9]{64}$/u.test(plan.planFingerprint) ||
-    plan.profile !== "portfolio" ||
+    plan.profile !== "app" ||
     plan.capability?.identifier !== "booking-calendly" ||
     plan.capability.version !== "0.1.0"
   ) {
@@ -216,6 +219,8 @@ function requireInference(value) {
   const inferredCapabilities = value.result?.capabilities;
   if (
     value.result?.state?.kind !== "valid" ||
+    value.result?.state?.value?.origin?.profile !== "app" ||
+    value.result?.state?.value?.origin?.recipeVersion !== "0.2.0" ||
     !Array.isArray(installedCapabilities) ||
     !installedCapabilities.some(
       ({ identifier, version }) =>
@@ -252,11 +257,16 @@ function requireDiff(value) {
 function requireGeneratedVerification(value) {
   if (
     value?.ok !== true ||
-    !arraysEqual(value.fixtures, ["portfolio-calendly"]) ||
-    !arraysEqual(value.profiles, ["portfolio"]) ||
+    !arraysEqual(value.fixtures, ["app-calendly"]) ||
+    !arraysEqual(value.profiles, ["app"]) ||
     !Array.isArray(value.checks)
   ) {
     fail("GENERATED_PROJECT_VERIFICATION_INVALID");
+  }
+  try {
+    requireAppRuntimeEvidence(value, "app-calendly");
+  } catch {
+    fail("CERTIFICATION_RUNTIME_EVIDENCE_INVALID");
   }
 }
 
@@ -269,11 +279,11 @@ async function createFreshAddedProject(input, adapters, owner) {
     [
       "create",
       "--profile",
-      "portfolio",
+      "app",
       "--name",
       projectName,
       "--display-name",
-      "Acme Portfolio Booking",
+      "Acme App Booking",
       "--directory",
       primaryRoot,
     ],
@@ -385,15 +395,16 @@ async function createFreshAddedProject(input, adapters, owner) {
     });
     generatedVerification = await adapters.verifyProject(
       verificationRoot,
-      "portfolio-calendly",
+      "app-calendly",
       projectName,
+      { includeVisual: false },
     );
   } catch {
     fail("GENERATED_PROJECT_VERIFICATION_FAILED");
   }
   requireGeneratedVerification(generatedVerification);
 
-  return generatedVerification.checks;
+  return generatedVerification;
 }
 
 export function certifyBookingCalendly(input = {}) {
@@ -410,7 +421,7 @@ export async function certifyBookingCalendlyForTesting(input = {}, adapters) {
   try {
     owner = await createOwnedDirectory(outputRoot);
     if (!(await pathIdentityMatches(owner))) fail("CERTIFICATION_SETUP_FAILED");
-    const generatedChecks = await createFreshAddedProject(
+    const verification = await createFreshAddedProject(
       { calendlyUrl },
       adapters,
       owner,
@@ -420,10 +431,16 @@ export async function certifyBookingCalendlyForTesting(input = {}, adapters) {
       ok: true,
       capability: "booking-calendly",
       version: "0.1.0",
-      profile: "portfolio",
+      profile: "app",
       mode: "popup",
+      subject: {
+        descriptorVersion: "0.1.0",
+        behaviorContractDigest: "sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca",
+      },
+      workerIntegration: verification.workerIntegration,
+      appBuildEvidence: verification.appBuildEvidence,
       ...(outputRoot === undefined ? {} : { retained: true }),
-      checks: [...certificationChecks, ...generatedChecks],
+      checks: [...certificationChecks, ...verification.checks],
     };
   } finally {
     if (owner !== undefined && (!succeeded || outputRoot === undefined)) {

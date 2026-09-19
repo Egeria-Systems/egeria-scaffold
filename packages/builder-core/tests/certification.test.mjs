@@ -213,7 +213,7 @@ test("certification subjects bind the descriptor and required evidence", () => {
   );
 });
 
-test("current certification preserves five accepted subjects and keeps changed subjects pending", () => {
+test("current certification preserves six accepted subjects and keeps changed subjects pending", () => {
   assert.deepEqual(Object.keys(committedRegistry.records), expectedIdentifiers);
   assert.deepEqual(Object.keys(requiredEvidence), expectedIdentifiers);
   const acceptedLocalSubjects = new Set([
@@ -231,6 +231,15 @@ test("current certification preserves five accepted subjects and keeps changed s
         path: `docs/implementation-evidence/2026-09-13-${identifier}-app-certification-receipt.md`,
         outcome: "passed",
         revision: "fe16ae41153f89242cdf48c0f899c3720f511557",
+        subject: structuredClone(expected.subject),
+      }));
+    } else if (identifier === "observability") {
+      expected.status = "certified";
+      expected.evidence = expected.requiredEvidence.map((kind) => ({
+        kind,
+        path: "docs/implementation-evidence/2026-09-15-observability-app-certification-receipt.md",
+        outcome: "passed",
+        revision: "9ea5dce328a9a065f71e168cb2c82ea515f54ae1",
         subject: structuredClone(expected.subject),
       }));
     }

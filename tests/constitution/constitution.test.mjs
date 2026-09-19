@@ -2085,7 +2085,7 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   const job = workflow.jobs["verify-and-deploy"];
   assert.equal(job.if, "github.ref == 'refs/heads/main'");
   assert.equal(job["runs-on"], "ubuntu-24.04");
-  assert.equal(job["timeout-minutes"], 45);
+  assert.equal(job["timeout-minutes"], 60);
   assert.deepEqual(job.environment, {
     name: "test-deploy",
     url: "${{ vars.DEPLOY_URL }}",
@@ -3412,7 +3412,7 @@ test("executable capability certification ownership is current", async () => {
   ]);
   const pendingSubjects = new Set([
     "analytics", "application-persistence", "booking-calendly",
-    "deployment-cloudflare", "observability", "standards",
+    "deployment-cloudflare", "standards",
   ]);
   for (const [capabilityId, record] of Object.entries(registry.records)) {
     const pending = pendingSubjects.has(capabilityId);
@@ -3421,7 +3421,7 @@ test("executable capability certification ownership is current", async () => {
       record.taskPlan,
       ["application-persistence", "standards", "deployment-cloudflare"].includes(capabilityId)
         ? "docs/superpowers/plans/2026-09-14-application-persistence-certification.md"
-        : pending
+        : pending || capabilityId === "observability"
           ? "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md"
           : "docs/superpowers/plans/2026-09-13-app-foundation-certification.md",
     );
@@ -3601,7 +3601,7 @@ test("canonical documentation records visual regression and the client-ready clo
     assert.match(currentContractOwner, /\bsubjects\b[^\n]+\b(?:pending|empty evidence)\b/iu);
   }
   assert.match(capabilityModel, /\bCurrent admission passes for all eleven records\b/iu);
-  assert.match(capabilityModel, /\bfive certified and six pending admission subjects\b/iu);
+  assert.match(capabilityModel, /\bsix certified and five pending admission subjects\b/iu);
 
   assert.match(
     capabilityModel,
@@ -4189,7 +4189,7 @@ test("canonical documentation accepts profile-transition execution and records t
   ]) {
     assert.match(historicalCertificationOwner, multilingualEligibilityPattern);
   }
-  assert.match(builderCoreInstructions, /\bfive unchanged subjects remain certified; six subjects remain pending\b/iu);
+  assert.match(builderCoreInstructions, /\bsix exact subjects are certified; five subjects remain pending\b/iu);
 
   for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
     assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);

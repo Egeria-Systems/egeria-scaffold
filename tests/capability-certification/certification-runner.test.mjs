@@ -1662,7 +1662,7 @@ async function runCheck(
   }
 }
 
-test("the repository registry admits current subjects and keeps external certification pending", async () => {
+test("the repository registry admits accepted subjects and refuses closure for remaining certification", async () => {
   const admission = await runCheck([]);
   assert.deepEqual(admission, {
     exitCode: 0,
@@ -1701,7 +1701,6 @@ test("the repository registry admits current subjects and keeps external certifi
       "application-persistence",
       "booking-calendly",
       "deployment-cloudflare",
-      "observability",
       "standards",
     ].map((identifier) => ({
       code: "CAPABILITY_CERTIFICATION_PENDING",
@@ -3773,7 +3772,7 @@ test("the registry command rejects unknown arguments without registry content", 
   assert.doesNotMatch(`${result.stdout}${result.stderr}`, /private-value/u);
 });
 
-test("Calendly production mutation keeps real owner identity while testing mocks commands and verification", async () => {
+test("Calendly app addition requires actual Worker evidence and preserves owned-directory isolation", async () => {
   const commands = [];
   let ownedPath;
   let projectRoot;
@@ -3782,223 +3781,250 @@ test("Calendly production mutation keeps real owner identity while testing mocks
   const previousToken = process.env.CLOUDFLARE_API_TOKEN;
   process.env.CLOUDFLARE_API_TOKEN = "PRIVATE_VALUE";
 
+  const runtime = {
+    workerIntegration: { executed: ["app-calendly"], skipped: [] },
+    appBuildEvidence: [{
+      fixture: "app-calendly",
+      effect: { version: "4.0.0-rc.112", packageSha256: "a".repeat(64) },
+      client: { files: ["apps/web/.next/static/chunks/app.js"], bytes: 25, inspectedEffectMarkers: ["~effect/Effect"] },
+      server: { files: 1, bytes: 100 },
+      worker: { path: "apps/web/.open-next/server-functions/default/handler.mjs", bytes: 50, sha256: "b".repeat(64) },
+    }],
+  };
   try {
-    const result = await certifyBookingCalendlyForTesting(
-      { calendlyUrl: "https://calendly.com/example/intro" },
-      {
-        async runCommand(input) {
-          commands.push(input);
-          assert.equal(input.environment.CLOUDFLARE_API_TOKEN, undefined);
-          assert.equal(input.environment.NPM_TOKEN, undefined);
-          assert.equal(input.environment.NODE_OPTIONS, undefined);
-          if (input.executable === "git") {
-            const worktreeIndex = input.arguments.indexOf("worktree");
-            if (worktreeIndex !== -1) {
-              projectRoot = input.arguments.at(-1);
-              await mkdir(projectRoot);
-              await writeFile(join(projectRoot, ".git"), "gitdir: private\n");
+    for (const invalidRuntime of [false, true]) {
+      commands.length = 0;
+      const execution = certifyBookingCalendlyForTesting(
+        { calendlyUrl: "https://calendly.com/example/intro" },
+        {
+          async runCommand(input) {
+            commands.push(input);
+            assert.equal(input.environment.CLOUDFLARE_API_TOKEN, undefined);
+            assert.equal(input.environment.NPM_TOKEN, undefined);
+            assert.equal(input.environment.NODE_OPTIONS, undefined);
+            if (input.executable === "git") {
+              const worktreeIndex = input.arguments.indexOf("worktree");
+              if (worktreeIndex !== -1) {
+                projectRoot = input.arguments.at(-1);
+                await mkdir(projectRoot);
+                await writeFile(join(projectRoot, ".git"), "gitdir: private\n");
+              }
+              return "";
             }
-            return "";
-          }
 
-          assert.equal(input.executable, process.execPath);
-          const command = input.arguments[1];
+            assert.equal(input.executable, process.execPath);
+            const command = input.arguments[1];
 
-          if (command === "create") {
-            primaryRoot = input.arguments[
-              input.arguments.indexOf("--directory") + 1
-            ];
-            ownedPath = dirname(primaryRoot);
-            assert.equal((await lstat(ownedPath)).mode & 0o777, 0o700);
-            await mkdir(primaryRoot);
-            return `${JSON.stringify({
-              ok: true,
-              command: "create",
-              destination: projectRoot,
-              profile: "portfolio",
-              capabilities: [
-                "standards",
-                "content-files",
-                "section-composition",
-                "deployment-cloudflare",
-                "observability",
-              ],
-            })}\n`;
-          }
-          if (command === "plan-add") {
-            return `${JSON.stringify({
-              ok: true,
-              command: "plan-add",
-              result: {
-                operation: "add-capability",
-                status: "approval-required",
-                planFingerprint: `sha256:${"a".repeat(64)}`,
-                profile: "portfolio",
-                capability: {
-                  identifier: "booking-calendly",
-                  version: "0.1.0",
-                },
-              },
-            })}\n`;
-          }
-          if (command === "apply-add") {
-            return `${JSON.stringify({
-              ok: true,
-              command: "apply-add",
-              result: {
-                status: "verified-final-diff-approval-required",
-                capability: {
-                  identifier: "booking-calendly",
-                  version: "0.1.0",
-                },
-                migration: "add-booking-calendly-0-1-0",
-              },
-            })}\n`;
-          }
-          if (command === "infer") {
-            return `${JSON.stringify({
-              ok: true,
-              command: "infer",
-              result: {
-                state: {
-                  kind: "valid",
-                  value: {
-                    installedCapabilities: [
-                      { identifier: "booking-calendly", version: "0.1.0" },
-                    ],
+            if (command === "create") {
+              primaryRoot = input.arguments[
+                input.arguments.indexOf("--directory") + 1
+              ];
+              ownedPath = dirname(primaryRoot);
+              assert.equal((await lstat(ownedPath)).mode & 0o777, 0o700);
+              await mkdir(primaryRoot);
+              return `${JSON.stringify({
+                ok: true,
+                command: "create",
+                destination: projectRoot,
+                profile: "app",
+                capabilities: [
+                  "standards", "deployment-cloudflare", "content-files", "section-composition",
+                  "observability", "app-foundation", "site-routing",
+                ],
+              })}\n`;
+            }
+            if (command === "plan-add") {
+              return `${JSON.stringify({
+                ok: true,
+                command: "plan-add",
+                result: {
+                  operation: "add-capability",
+                  status: "approval-required",
+                  planFingerprint: `sha256:${"a".repeat(64)}`,
+                  profile: "app",
+                  capability: {
+                    identifier: "booking-calendly",
+                    version: "0.1.0",
                   },
                 },
-                capabilities: [
-                  { identifier: "booking-calendly", category: "confirmed" },
-                ],
-              },
-            })}\n`;
-          }
-          if (command === "doctor") {
-            return `${JSON.stringify({
+              })}\n`;
+            }
+            if (command === "apply-add") {
+              return `${JSON.stringify({
+                ok: true,
+                command: "apply-add",
+                result: {
+                  status: "verified-final-diff-approval-required",
+                  capability: {
+                    identifier: "booking-calendly",
+                    version: "0.1.0",
+                  },
+                  migration: "add-booking-calendly-0-1-0",
+                },
+              })}\n`;
+            }
+            if (command === "infer") {
+              return `${JSON.stringify({
+                ok: true,
+                command: "infer",
+                result: {
+                  state: {
+                    kind: "valid",
+                    value: {
+                      origin: { profile: "app", recipeVersion: "0.2.0" },
+                      installedCapabilities: [
+                        { identifier: "standards", version: "0.5.0" },
+                        { identifier: "deployment-cloudflare", version: "0.3.0" },
+                        { identifier: "content-files", version: "0.4.0" },
+                        { identifier: "section-composition", version: "0.3.0" },
+                        { identifier: "observability", version: "0.3.0" },
+                        { identifier: "app-foundation", version: "0.1.0" },
+                        { identifier: "site-routing", version: "0.4.0" },
+                        { identifier: "booking-calendly", version: "0.1.0" },
+                      ],
+                    },
+                  },
+                  capabilities: [
+                    { identifier: "booking-calendly", category: "confirmed" },
+                  ],
+                },
+              })}\n`;
+            }
+            if (command === "doctor") {
+              return `${JSON.stringify({
+                ok: true,
+                command: "doctor",
+                result: { healthy: true, diagnostics: [] },
+              })}\n`;
+            }
+            if (command === "diff") {
+              return `${JSON.stringify({
+                ok: true,
+                command: "diff",
+                result: { equal: true, differences: [] },
+              })}\n`;
+            }
+            throw new Error("unexpected command");
+          },
+          async verifyProject(root, identifier) {
+            verifiedRoot = root;
+            assert.equal(identifier, "app-calendly");
+            assert.notEqual(root, projectRoot);
+            assert.equal(dirname(root), ownedPath);
+            assert.equal(await pathExists(join(root, ".git")), false);
+            return {
               ok: true,
-              command: "doctor",
-              result: { healthy: true, diagnostics: [] },
-            })}\n`;
-          }
-          if (command === "diff") {
-            return `${JSON.stringify({
-              ok: true,
-              command: "diff",
-              result: { equal: true, differences: [] },
-            })}\n`;
-          }
-          throw new Error("unexpected command");
+              fixtures: ["app-calendly"],
+              profiles: ["app"],
+              checks: fixedChecks,
+              ...(invalidRuntime ? { workerIntegration: { executed: [], skipped: ["app-calendly"] } } : runtime),
+            };
+          },
         },
-        async verifyProject(root, identifier) {
-          verifiedRoot = root;
-          assert.equal(identifier, "portfolio-calendly");
-          assert.notEqual(root, projectRoot);
-          assert.equal(dirname(root), ownedPath);
-          assert.equal(await pathExists(join(root, ".git")), false);
-          return {
-            ok: true,
-            fixtures: ["portfolio-calendly"],
-            profiles: ["portfolio"],
-            checks: fixedChecks,
-          };
-        },
-      },
-    );
+      );
 
-    assert.deepEqual(result, {
-      ok: true,
-      capability: "booking-calendly",
-      version: "0.1.0",
-      profile: "portfolio",
-      mode: "popup",
-      checks: [
-        "compiled-cli-create-baseline",
-        "clean-linked-worktree",
-        "compiled-cli-plan-add",
-        "compiled-cli-apply-add",
-        "state-inference",
-        "healthy-diagnostics",
-        "exact-diff",
-        ...fixedChecks,
-      ],
-    });
-    assert.equal(commands.length, 12);
-    assert.deepEqual(
-      commands
-        .filter(({ executable }) => executable === process.execPath)
-        .map(({ arguments: arguments_ }) => arguments_.slice(1)),
-      [
-        [
-          "create",
-          "--profile",
-          "portfolio",
-          "--name",
-          "acme-portfolio-calendly",
-          "--display-name",
-          "Acme Portfolio Booking",
-          "--directory",
-          primaryRoot,
+      if (invalidRuntime) {
+        await assert.rejects(execution, error => error?.code === "CERTIFICATION_RUNTIME_EVIDENCE_INVALID");
+        assert.equal(await pathExists(ownedPath), false);
+        continue;
+      }
+      const result = await execution;
+      assert.deepEqual(result, {
+        ok: true,
+        capability: "booking-calendly",
+        version: "0.1.0",
+        profile: "app",
+        mode: "popup",
+        subject: { descriptorVersion: "0.1.0", behaviorContractDigest: "sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca" },
+        ...runtime,
+        checks: [
+          "compiled-cli-create-baseline",
+          "clean-linked-worktree",
+          "compiled-cli-plan-add",
+          "compiled-cli-apply-add",
+          "state-inference",
+          "healthy-diagnostics",
+          "exact-diff",
+          ...fixedChecks,
         ],
+      });
+      assert.equal(commands.length, 12);
+      assert.deepEqual(
+        commands
+          .filter(({ executable }) => executable === process.execPath)
+          .map(({ arguments: arguments_ }) => arguments_.slice(1)),
         [
-          "plan-add",
-          "--directory",
-          projectRoot,
-          "--capability",
-          "booking-calendly",
-          "--calendly-url",
-          "https://calendly.com/example/intro",
-          "--calendly-mode",
-          "popup",
+          [
+            "create",
+            "--profile",
+            "app",
+            "--name",
+            "acme-app-calendly",
+            "--display-name",
+            "Acme App Booking",
+            "--directory",
+            primaryRoot,
+          ],
+          [
+            "plan-add",
+            "--directory",
+            projectRoot,
+            "--capability",
+            "booking-calendly",
+            "--calendly-url",
+            "https://calendly.com/example/intro",
+            "--calendly-mode",
+            "popup",
+          ],
+          [
+            "apply-add",
+            "--directory",
+            projectRoot,
+            "--capability",
+            "booking-calendly",
+            "--calendly-url",
+            "https://calendly.com/example/intro",
+            "--calendly-mode",
+            "popup",
+            "--approved-plan",
+            `sha256:${"a".repeat(64)}`,
+          ],
+          ["infer", "--directory", projectRoot],
+          ["doctor", "--directory", projectRoot],
+          ["diff", "--directory", projectRoot],
         ],
+      );
+      assert.deepEqual(
+        commands
+          .filter(({ executable }) => executable === "git")
+          .map(({ arguments: arguments_ }) => arguments_),
         [
-          "apply-add",
-          "--directory",
-          projectRoot,
-          "--capability",
-          "booking-calendly",
-          "--calendly-url",
-          "https://calendly.com/example/intro",
-          "--calendly-mode",
-          "popup",
-          "--approved-plan",
-          `sha256:${"a".repeat(64)}`,
+          ["-C", primaryRoot, "init", "--initial-branch", "main"],
+          ["-C", primaryRoot, "config", "user.name", "Egeria Certification"],
+          [
+            "-C",
+            primaryRoot,
+            "config",
+            "user.email",
+            "certification@example.invalid",
+          ],
+          ["-C", primaryRoot, "add", "--all"],
+          ["-C", primaryRoot, "commit", "-m", "Create certification baseline"],
+          [
+            "-C",
+            primaryRoot,
+            "worktree",
+            "add",
+            "-b",
+            "booking-calendly-certification-worktree",
+            projectRoot,
+          ],
         ],
-        ["infer", "--directory", projectRoot],
-        ["doctor", "--directory", projectRoot],
-        ["diff", "--directory", projectRoot],
-      ],
-    );
-    assert.deepEqual(
-      commands
-        .filter(({ executable }) => executable === "git")
-        .map(({ arguments: arguments_ }) => arguments_),
-      [
-        ["-C", primaryRoot, "init", "--initial-branch", "main"],
-        ["-C", primaryRoot, "config", "user.name", "Egeria Certification"],
-        [
-          "-C",
-          primaryRoot,
-          "config",
-          "user.email",
-          "certification@example.invalid",
-        ],
-        ["-C", primaryRoot, "add", "--all"],
-        ["-C", primaryRoot, "commit", "-m", "Create certification baseline"],
-        [
-          "-C",
-          primaryRoot,
-          "worktree",
-          "add",
-          "-b",
-          "booking-calendly-certification-worktree",
-          projectRoot,
-        ],
-      ],
-    );
-    assert.notEqual(verifiedRoot, projectRoot);
-    assert.equal(await pathExists(ownedPath), false);
-    assert.doesNotMatch(JSON.stringify(result), /calendly\.com|PRIVATE_VALUE/u);
+      );
+      assert.notEqual(verifiedRoot, projectRoot);
+      assert.equal(await pathExists(ownedPath), false);
+      assert.doesNotMatch(JSON.stringify(result), /calendly\.com|PRIVATE_VALUE/u);
+    }
   } finally {
     if (previousToken === undefined) {
       delete process.env.CLOUDFLARE_API_TOKEN;

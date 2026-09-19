@@ -269,6 +269,38 @@ test("app Worker integration executes after OpenNext and records non-app absence
   }
 });
 
+test("a freshly rendered Calendly app is verified without adding an immutable fixture", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-calendly-app-verifier-"));
+  try {
+    const root = await copyFixture(owner, "app", "calendly");
+    const { renderSkeleton } = await import("../../packages/builder-core/dist/index.js");
+    const rendered = await renderSkeleton({
+      profile: "app", projectName: "acme-app", displayName: "Acme App",
+      packageVersions: { standards: "0.1.0", observability: "0.3.0" },
+      bookingCalendly: { destination: "https://calendly.com/example/intro", mode: "popup" },
+    });
+    assert.equal(rendered.ok, true);
+    for (const { path, content } of rendered.value.files) {
+      await mkdir(dirname(join(root, path)), { recursive: true });
+      await writeFile(join(root, path), content);
+    }
+    const result = await verifyGeneratedProjectForTesting(root, "app-calendly", {
+      createOwner: () => createKnownOwner(owner),
+      runCommand: successfulCommand,
+    }, "acme-app", { includeVisual: false });
+    assert.deepEqual(result.profiles, ["app"]);
+    assert.deepEqual(result.workerIntegration, { executed: ["app-calendly"], skipped: [] });
+    assert.equal(result.appBuildEvidence[0].effect.version, "4.0.0-rc.112");
+    assert.equal(generatedFixtureContracts.some(({ identifier }) => identifier === "app-calendly"), false);
+    await writeFile(join(root, "unmanaged.txt"), "must be rejected");
+    await expectFixtureError(() => verifyGeneratedProjectForTesting(root, "app-calendly", {
+      createOwner: () => createKnownOwner(owner), runCommand: successfulCommand,
+    }, "acme-app", { includeVisual: false }), "GENERATED_FIXTURE_FORBIDDEN_ARTIFACT");
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+});
+
 test("a failing present Worker script refuses success and still cleans its temporary copy", async () => {
   const ownerParent = await mkdtemp(join(tmpdir(), "egeria-worker-failure-"));
   let ownedPath;

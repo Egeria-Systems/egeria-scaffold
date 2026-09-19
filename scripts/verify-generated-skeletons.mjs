@@ -1177,8 +1177,23 @@ function contractForIdentifier(identifier) {
   return contract;
 }
 
-function contractForGeneratedProject(identifier, expectedProjectName) {
-  const contract = contractForIdentifier(identifier);
+export function contractForGeneratedProject(identifier, expectedProjectName) {
+  const app = identifier === "app-calendly" ? contractForIdentifier("app") : undefined;
+  const contract = app === undefined ? contractForIdentifier(identifier) : Object.freeze({
+    ...app,
+    identifier,
+    projectName: "acme-app-calendly",
+    displayName: "Acme App Booking",
+    expectedFiles: Object.freeze([
+      ...app.expectedFiles.filter(path => !bookingCalendlyFiles.includes(path)),
+      ...bookingCalendlyFiles,
+    ].sort(codePointCompare)),
+    expectedCapabilities: Object.freeze([...app.expectedCapabilities, "booking-calendly"]),
+    expectedCapabilitySettings: portfolioCalendlySettings,
+    expectedBookingCalendlyVersion: "0.1.0",
+    expectedSurfaces: app.expectedSurfaces + 5,
+    visualRegression: false,
+  });
   if (expectedProjectName === undefined) return contract;
   return Object.freeze({ ...contract, projectName: expectedProjectName });
 }
