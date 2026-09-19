@@ -1,8 +1,17 @@
 name: Analytics certification
 
 on:
-  pull_request:
-    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      expected_revision:
+        description: Exact reviewed main revision approved for certification
+        required: true
+        type: string
+      mode:
+        description: Exercise or remove the exact task resources
+        required: true
+        type: choice
+        options: [exercise, cleanup]
 
 permissions:
   actions: read
@@ -15,12 +24,7 @@ concurrency:
 
 jobs:
   certify:
-    if: >-
-      github.event.pull_request.base.repo.full_name == 'Egeria-Systems/egeria-scaffold' &&
-      github.event.pull_request.head.repo.full_name == 'Egeria-Systems/egeria-scaffold' &&
-      github.event.pull_request.head.ref == 'analytics-capability-certification' &&
-      (github.event.label.name == 'analytics-certification-exercise' ||
-      github.event.label.name == 'analytics-certification-cleanup')
+    if: github.repository == 'Egeria-Systems/egeria-scaffold' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     environment:
@@ -29,29 +33,21 @@ jobs:
     steps:
       - name: Validate trusted request
         env:
-          BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
-          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          EVENT_ACTION: ${{ github.event.action }}
-          EVENT_LABEL: ${{ github.event.label.name }}
+          CERTIFICATION_MODE: ${{ inputs.mode }}
         run: |
-          test "$BASE_REPOSITORY" = "Egeria-Systems/egeria-scaffold"
-          test "$HEAD_REPOSITORY" = "Egeria-Systems/egeria-scaffold"
-          test "$HEAD_REF" = "analytics-capability-certification"
-          test "$EVENT_ACTION" = "labeled"
-          printf '%s' "$HEAD_SHA" | grep -Eq '^[0-9a-f]{40}$'
-          case "$EVENT_LABEL" in
-            analytics-certification-exercise) printf 'CERTIFICATION_MODE=exercise\n' >> "$GITHUB_ENV" ;;
-            analytics-certification-cleanup) printf 'CERTIFICATION_MODE=cleanup\n' >> "$GITHUB_ENV" ;;
+          test "$GITHUB_REPOSITORY" = "Egeria-Systems/egeria-scaffold"
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          case "$CERTIFICATION_MODE" in
+            exercise|cleanup) printf 'CERTIFICATION_MODE=%s\n' "$CERTIFICATION_MODE" >> "$GITHUB_ENV" ;;
             *) exit 1 ;;
           esac
 
-      - name: Check out exact pull request head
+      - name: Check out approved main revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Set up pnpm and Node.js
@@ -64,16 +60,15 @@ jobs:
 
       - name: Verify checked out subject
         env:
-          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_REVISION: ${{ inputs.expected_revision }}
         run: |
-          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
-          git merge-base --is-ancestor aa0bcd7e315b11f07e0f4207d11e230ce911b2f4 "$EXPECTED_HEAD_SHA"
+          node scripts/verify-approved-revision.mjs
           node --input-type=module -e '
             import { readFileSync } from "node:fs";
             const registry = JSON.parse(readFileSync("certifications/capabilities.json", "utf8"));
             const analytics = registry.records.analytics.subject;
             if (analytics?.descriptorVersion !== "0.1.0") process.exit(1);
-            if (analytics?.behaviorContractDigest !== "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378") process.exit(1);
+            if (analytics?.behaviorContractDigest !== "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba") process.exit(1);
           '
 
       - name: Install and build trusted source
@@ -84,12 +79,7 @@ jobs:
 
       - name: Prepare private measurement context
         env:
-          BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
-          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          EVENT_ACTION: ${{ github.event.action }}
-          EVENT_LABEL: ${{ github.event.label.name }}
+          EXPECTED_REVISION: ${{ inputs.expected_revision }}
           DEPLOY_URL: ${{ vars.DEPLOY_URL }}
           EVIDENCE_DIRECTORY: ${{ runner.temp }}/analytics-certification-evidence
         run: |
@@ -102,11 +92,11 @@ jobs:
             const hostnamePattern = /^analytics-certification\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.workers\.dev$/u;
             if (!hostnamePattern.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
             const context = {
-              schemaVersion: "1.0.0",
+              schemaVersion: "2.0.0",
               mode: process.env.CERTIFICATION_MODE,
-              event: { name: "pull_request", action: process.env.EVENT_ACTION, label: process.env.EVENT_LABEL },
-              pullRequest: { baseRepository: process.env.BASE_REPOSITORY, headRepository: process.env.HEAD_REPOSITORY, headRef: process.env.HEAD_REF, headSha: process.env.HEAD_SHA, checkedOutSha: process.env.HEAD_SHA },
-              subject: { identifier: "analytics", version: "0.1.0", behaviorContractDigest: "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378" },
+              event: { name: process.env.GITHUB_EVENT_NAME },
+              source: { repository: process.env.GITHUB_REPOSITORY, ref: process.env.GITHUB_REF, revision: process.env.GITHUB_SHA, expectedRevision: process.env.EXPECTED_REVISION, checkedOutRevision: process.env.GITHUB_SHA },
+              subject: { identifier: "analytics", version: "0.1.0", behaviorContractDigest: "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba" },
               environment: "analytics-certification",
               resources: { worker: "analytics-certification", target: "dedicated-non-production-workers-dev", hostname: target.hostname, production: false },
             };
@@ -116,7 +106,7 @@ jobs:
       - name: Prepare private identity envelopes
         if: env.CERTIFICATION_MODE == 'exercise'
         env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.sha }}
           DEPLOY_URL: ${{ vars.DEPLOY_URL }}
           EVIDENCE_DIRECTORY: ${{ runner.temp }}/analytics-certification-evidence
         run: |
@@ -133,7 +123,7 @@ jobs:
       - name: Create and read back Web Analytics site
         if: env.CERTIFICATION_MODE == 'exercise'
         env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.sha }}
           DEPLOY_URL: ${{ vars.DEPLOY_URL }}
           EVIDENCE_DIRECTORY: ${{ runner.temp }}/analytics-certification-evidence
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -181,7 +171,7 @@ jobs:
         if: always() && env.CERTIFICATION_MODE == 'exercise'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: analytics-certification-site-identity-${{ github.event.pull_request.head.sha }}
+          name: analytics-certification-site-identity-${{ github.sha }}
           path: ${{ runner.temp }}/analytics-certification-evidence/site-identity.json
           if-no-files-found: error
           retention-days: 7
@@ -200,7 +190,7 @@ jobs:
           CLOUDFLARE_SITE_TOKEN="$(cat "$RUNNER_TEMP/analytics-certification-site-token")"
           test -n "$CLOUDFLARE_SITE_TOKEN"
           mkdir -p "$(dirname "$CERTIFICATION_ROOT")"
-          node apps/cli/dist/index.js create --profile site --name analytics-certification --display-name "Analytics Certification" --directory "$CERTIFICATION_ROOT" --multilingual --cloudflare-web-analytics-token "$CLOUDFLARE_SITE_TOKEN" --google-analytics-id "$GOOGLE_ANALYTICS_MEASUREMENT_ID" --microsoft-clarity-id "$MICROSOFT_CLARITY_PROJECT_ID" --microsoft-clarity-audience not-directed-to-minors --search-console-verification "$GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN" --looker-studio
+          node apps/cli/dist/index.js create --profile app --name analytics-certification --display-name "Analytics Certification" --directory "$CERTIFICATION_ROOT" --multilingual --cloudflare-web-analytics-token "$CLOUDFLARE_SITE_TOKEN" --google-analytics-id "$GOOGLE_ANALYTICS_MEASUREMENT_ID" --microsoft-clarity-id "$MICROSOFT_CLARITY_PROJECT_ID" --microsoft-clarity-audience not-directed-to-minors --search-console-verification "$GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN" --looker-studio
 
       - name: Verify and prepare analytics candidate
         if: env.CERTIFICATION_MODE == 'exercise'
@@ -209,6 +199,7 @@ jobs:
           GOOGLE_ANALYTICS_MEASUREMENT_ID: ${{ vars.GOOGLE_ANALYTICS_MEASUREMENT_ID }}
           MICROSOFT_CLARITY_PROJECT_ID: ${{ vars.MICROSOFT_CLARITY_PROJECT_ID }}
           GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN: ${{ vars.GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN }}
+          EVIDENCE_DIRECTORY: ${{ runner.temp }}/analytics-certification-evidence
         run: |
           node apps/cli/dist/index.js infer --directory "$CERTIFICATION_ROOT" > "$RUNNER_TEMP/analytics-certification-infer.json"
           node apps/cli/dist/index.js doctor --directory "$CERTIFICATION_ROOT" > "$RUNNER_TEMP/analytics-certification-doctor.json"
@@ -220,7 +211,10 @@ jobs:
             const infer = read("infer");
             const doctor = read("doctor");
             const difference = read("diff");
-            const installedCapabilities = infer.result?.state?.value?.installedCapabilities ?? [];
+            const state = infer.result?.state?.value;
+            if (state?.origin?.profile !== "app" || state?.origin?.recipeVersion !== "0.2.0") process.exit(1);
+            const installedCapabilities = state.installedCapabilities ?? [];
+            if (!installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.1.0")) process.exit(1);
             if (infer.result?.state?.kind !== "valid" || !installedCapabilities.some(({ identifier, version }) => identifier === "analytics" && version === "0.1.0") || !installedCapabilities.some(({ identifier, version }) => identifier === "multilingual" && version === "0.1.0")) process.exit(1);
             if (doctor.result?.healthy !== true || doctor.result?.diagnostics?.length !== 0 || difference.result?.equal !== true || difference.result?.differences?.length !== 0) process.exit(1);
             const settingsPath = `${process.env.CERTIFICATION_ROOT}/apps/web/src/integrations/analytics/analytics-settings.ts`;
@@ -235,6 +229,28 @@ jobs:
           pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:unit
           pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:component
           pnpm --dir "$CERTIFICATION_ROOT" run build:cloudflare
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:integration:cloudflare
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            import { inspectAppEffectBuild } from "./scripts/verify-app-transition-visuals.mjs";
+            import { requireAppRuntimeEvidence } from "./scripts/certify-app-local.mjs";
+            try {
+              const root = process.env.CERTIFICATION_ROOT;
+              const state = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/analytics-certification-infer.json`, "utf8")).result.state.value;
+              const files = [...new Set(state.managedSurfaces.map(({ path }) => path))].map(path => ({ path, content: readFileSync(`${root}/${path}`) }));
+              const runtime = {
+                workerIntegration: { executed: ["app-analytics"], skipped: [] },
+                appBuildEvidence: [{ fixture: "app-analytics", ...await inspectAppEffectBuild(root, files) }],
+              };
+              requireAppRuntimeEvidence(runtime, "app-analytics");
+              const measurement = { schemaVersion: "1.0.0", headSha: process.env.GITHUB_SHA, profile: state.origin.profile, recipeVersion: state.origin.recipeVersion, ...runtime };
+              writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/app-build.json`, JSON.stringify(measurement), { mode: 0o600, flag: "wx" });
+            } catch {
+              process.stderr.write("{\"ok\":false,\"code\":\"CERTIFICATION_DEPLOYMENT_BUILD_INVALID\"}\n");
+              process.exitCode = 1;
+            }
+          '
+          test "$(wc -c < "$EVIDENCE_DIRECTORY/app-build.json")" -le 32768
           pnpm --dir "$CERTIFICATION_ROOT/apps/web" run browser:install:ci
           rm -f "$RUNNER_TEMP/analytics-certification-infer.json" "$RUNNER_TEMP/analytics-certification-doctor.json" "$RUNNER_TEMP/analytics-certification-diff.json"
 
@@ -259,7 +275,7 @@ jobs:
       - name: Read back dedicated Worker deployment
         if: env.CERTIFICATION_MODE == 'exercise'
         env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.sha }}
           DEPLOY_URL: ${{ vars.DEPLOY_URL }}
           EVIDENCE_DIRECTORY: ${{ runner.temp }}/analytics-certification-evidence
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -301,7 +317,7 @@ jobs:
         if: always() && env.CERTIFICATION_MODE == 'exercise'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: analytics-certification-worker-identity-${{ github.event.pull_request.head.sha }}
+          name: analytics-certification-worker-identity-${{ github.sha }}
           path: ${{ runner.temp }}/analytics-certification-evidence/worker-identity.json
           if-no-files-found: error
           retention-days: 7
@@ -309,7 +325,7 @@ jobs:
       - name: Wait for dedicated Worker readiness
         if: env.CERTIFICATION_MODE == 'exercise'
         env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.sha }}
           DEPLOY_URL: ${{ vars.DEPLOY_URL }}
           EVIDENCE_DIRECTORY: ${{ runner.temp }}/analytics-certification-evidence
           MAXIMUM_ATTEMPTS: "20"
@@ -371,7 +387,7 @@ jobs:
         if: env.CERTIFICATION_MODE == 'cleanup'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.sha }}
           GITHUB_API_URL: ${{ github.api_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
@@ -386,7 +402,7 @@ jobs:
               const endpoint = `${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100`;
               const response = await controlPlaneFetch(endpoint, { headers });
               const payload = await response.json();
-              const matches = (payload?.artifacts ?? []).filter((artifact) => artifact.name === name && artifact.expired === false && artifact.workflow_run?.head_sha === process.env.HEAD_SHA && artifact.workflow_run?.head_branch === "analytics-capability-certification");
+              const matches = (payload?.artifacts ?? []).filter((artifact) => artifact.name === name && artifact.expired === false && artifact.workflow_run?.head_sha === process.env.HEAD_SHA && artifact.workflow_run?.head_branch === "main");
               if (!response.ok || matches.length !== 1 || !Number.isSafeInteger(matches[0].id)) process.exit(1);
               return matches[0].id;
             };
@@ -447,7 +463,7 @@ jobs:
             import { planAnalyticsCertificationCleanup } from "./scripts/analytics-certification-provider-receipt.mjs";
             const read = (name) => JSON.parse(readFileSync(`${process.env.EVIDENCE_DIRECTORY}/${name}.json`, "utf8"));
             const contextFile = read("context");
-            const context = { headSha: contextFile.pullRequest.headSha, environment: contextFile.environment, hostname: contextFile.resources.hostname, worker: contextFile.resources.worker };
+            const context = { headSha: contextFile.source.revision, environment: contextFile.environment, hostname: contextFile.resources.hostname, worker: contextFile.resources.worker };
             const siteIdentity = read("site-identity");
             const workerIdentity = read("worker-identity");
             const target = new URL(process.env.DEPLOY_URL);
@@ -521,6 +537,15 @@ jobs:
           test "$(wc -c < "$RUNNER_TEMP/analytics-certification-receipt.json")" -le 4096
           test "$(stat -c "%a" "$RUNNER_TEMP/analytics-certification-receipt.json")" = "600"
           rm -f "$RUNNER_TEMP/analytics-certification-site-token"
+
+      - name: Upload app build evidence
+        if: env.CERTIFICATION_MODE == 'exercise'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: analytics-certification-app-build-${{ github.sha }}
+          path: ${{ runner.temp }}/analytics-certification-evidence/app-build.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload redacted receipt
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

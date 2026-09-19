@@ -30,7 +30,7 @@ const browserFixturePath = resolve(
 );
 const exactRevision = "0123456789abcdef0123456789abcdef01234567";
 const exactDigest =
-  "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378";
+  "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba";
 const exactHostname = "analytics-certification.example-account.workers.dev";
 const exactSiteTag = "site-tag-0123456789abcdef";
 const exactSiteTokenDigest = "a".repeat(64);
@@ -39,19 +39,15 @@ const exactVersionId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 
 function measuredEvidence(mode = "exercise") {
   const context = {
-    schemaVersion: "1.0.0",
+    schemaVersion: "2.0.0",
     mode,
-    event: {
-      name: "pull_request",
-      action: "labeled",
-      label: `analytics-certification-${mode}`,
-    },
-    pullRequest: {
-      baseRepository: "Egeria-Systems/egeria-scaffold",
-      headRepository: "Egeria-Systems/egeria-scaffold",
-      headRef: "analytics-capability-certification",
-      headSha: exactRevision,
-      checkedOutSha: exactRevision,
+    event: { name: "workflow_dispatch" },
+    source: {
+      repository: "Egeria-Systems/egeria-scaffold",
+      ref: "refs/heads/main",
+      revision: exactRevision,
+      expectedRevision: exactRevision,
+      checkedOutRevision: exactRevision,
     },
     subject: {
       identifier: "analytics",
@@ -93,6 +89,7 @@ function measuredEvidence(mode = "exercise") {
       context,
       siteIdentity,
       workerIdentity,
+      appBuild: null,
       siteReadback: null,
       deploymentReadback: null,
       readiness: null,
@@ -124,6 +121,20 @@ function measuredEvidence(mode = "exercise") {
     context,
     siteIdentity,
     workerIdentity,
+    appBuild: {
+      schemaVersion: "1.0.0",
+      headSha: exactRevision,
+      profile: "app",
+      recipeVersion: "0.2.0",
+      workerIntegration: { executed: ["app-analytics"], skipped: [] },
+      appBuildEvidence: [{
+        fixture: "app-analytics",
+        effect: { version: "4.0.0-rc.112", packageSha256: "a".repeat(64) },
+        client: { files: ["apps/web/.next/static/chunks/app.js"], bytes: 25, inspectedEffectMarkers: ["~effect/Effect"] },
+        server: { files: 1, bytes: 100 },
+        worker: { path: "apps/web/.open-next/server-functions/default/handler.mjs", bytes: 50, sha256: "b".repeat(64) },
+      }],
+    },
     siteReadback: {
       schemaVersion: "1.0.0",
       headSha: exactRevision,
@@ -292,13 +303,17 @@ test("control-plane requests use exact per-request deadlines without retries", a
   );
 });
 
-test("the label workflow is protected, pinned, non-cancelling, and step-secret-isolated", async () => {
+test("the manual workflow is main-only, revision-bound, pinned, and step-secret-isolated", async () => {
   const [workflowSource, browserFixture] = await Promise.all([
     readFile(workflowPath, "utf8"),
     readFile(browserFixturePath, "utf8"),
   ]);
   const workflow = parseYaml(workflowSource);
-  assert.deepEqual(workflow.on, { pull_request: { types: ["labeled"] } });
+  assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
+  assert.deepEqual(workflow.on.workflow_dispatch.inputs, {
+    expected_revision: { description: "Exact reviewed main revision approved for certification", required: true, type: "string" },
+    mode: { description: "Exercise or remove the exact task resources", required: true, type: "choice", options: ["exercise", "cleanup"] },
+  });
   assert.deepEqual(workflow.permissions, { actions: "read", contents: "read" });
   assert.deepEqual(workflow.concurrency, {
     group: "analytics-certification",
@@ -307,6 +322,7 @@ test("the label workflow is protected, pinned, non-cancelling, and step-secret-i
   });
   assert.deepEqual(Object.keys(workflow.jobs), ["certify"]);
   const job = workflow.jobs.certify;
+  assert.equal(job.if, "github.repository == 'Egeria-Systems/egeria-scaffold' && github.ref == 'refs/heads/main'");
   assert.equal(job.environment.name, "analytics-certification");
   assert.equal(job.environment.url, "${{ vars.DEPLOY_URL }}");
   assert.equal(job["timeout-minutes"], 90);
@@ -314,9 +330,9 @@ test("the label workflow is protected, pinned, non-cancelling, and step-secret-i
   assert.equal("strategy" in job, false);
 
   const steps = Object.fromEntries(job.steps.map((step) => [step.name, step]));
-  assert.deepEqual(steps["Check out exact pull request head"].with, {
+  assert.deepEqual(steps["Check out approved main revision"].with, {
     "fetch-depth": 0,
-    ref: "${{ github.event.pull_request.head.sha }}",
+    ref: "${{ github.sha }}",
     "persist-credentials": false,
   });
   for (const step of job.steps.filter(({ uses }) => uses !== undefined)) {
@@ -324,10 +340,10 @@ test("the label workflow is protected, pinned, non-cancelling, and step-secret-i
     assert.equal(isPinnedGitHubActionReference(step.uses, action), true);
   }
   assert.match(steps["Validate trusted request"].run, /Egeria-Systems\/egeria-scaffold/u);
-  assert.match(steps["Validate trusted request"].run, /analytics-capability-certification/u);
-  assert.match(steps["Validate trusted request"].run, /analytics-certification-exercise/u);
-  assert.match(steps["Validate trusted request"].run, /analytics-certification-cleanup/u);
-  assert.match(steps["Verify checked out subject"].run, /git rev-parse HEAD/u);
+  assert.match(steps["Validate trusted request"].run, /refs\/heads\/main/u);
+  assert.match(steps["Validate trusted request"].run, /workflow_dispatch/u);
+  assert.deepEqual(steps["Verify checked out subject"].env, { EXPECTED_REVISION: "${{ inputs.expected_revision }}" });
+  assert.match(steps["Verify checked out subject"].run, /node scripts\/verify-approved-revision\.mjs/u);
   assert.match(
     steps["Verify checked out subject"].run,
     /registry\.records\.analytics\.subject/u,
@@ -341,6 +357,13 @@ test("the label workflow is protected, pinned, non-cancelling, and step-secret-i
     steps["Verify and prepare analytics candidate"].run,
     /analytics-settings\.ts/u,
   );
+  assert.match(steps["Generate exact analytics candidate"].run, /create --profile app /u);
+  const preparation = steps["Verify and prepare analytics candidate"].run;
+  assert.match(preparation, /run test:integration:cloudflare/u);
+  assert.match(preparation, /inspectAppEffectBuild/u);
+  assert.match(preparation, /requireAppRuntimeEvidence/u);
+  assert.match(preparation, /app-build\.json/u);
+  assert.ok(job.steps.indexOf(steps["Verify and prepare analytics candidate"]) < job.steps.indexOf(steps["Deploy dedicated certification Worker"]));
   assert.match(steps["Exercise deployed consent behavior"].run, /--retries=0/u);
   assert.match(steps["Exercise deployed consent behavior"].run, /synthetic/iu);
   assert.match(steps["Exercise deployed consent behavior"].run, /analytics-provider\.spec\.ts/u);
@@ -372,7 +395,7 @@ test("the label workflow is protected, pinned, non-cancelling, and step-secret-i
   ]) {
     assert.match(String(steps[name].if), /always\(\)/u);
     assert.equal(steps[name].with["retention-days"], 7);
-    assert.match(steps[name].with.name, /pull_request\.head\.sha/u);
+    assert.match(steps[name].with.name, /github\.sha/u);
   }
   assert.match(
     steps["Resolve exact exercise identity artifacts"].run,
@@ -496,7 +519,7 @@ test("the label workflow is protected, pinned, non-cancelling, and step-secret-i
   }
   assert.doesNotMatch(
     workflowSource,
-    /workflow_dispatch|push:|schedule:|pull_request_target|continue-on-error|cancel-in-progress:\s*true|--retries=[1-9]|provider-confirmed|verify:compatibility-proof|compatibilityBaseline|cleanup-recovery/iu,
+    /pull_request|push:|schedule:|continue-on-error|cancel-in-progress:\s*true|--retries=[1-9]|provider-confirmed|verify:compatibility-proof|compatibilityBaseline|cleanup-recovery/iu,
   );
   assert.match(browserFixture, /ANALYTICS_PROVIDER_BROWSER_RECEIPT_PATH/u);
   assert.match(browserFixture, /data-analytics-consent-action/u);
@@ -681,12 +704,12 @@ test("the redacted receipt is derived only from reconciled private measurements"
   const exerciseReceipt =
     createAnalyticsCertificationProviderReceiptForTesting(measuredEvidence());
   assert.deepEqual(exerciseReceipt, {
-    schemaVersion: "1.0.0",
+    schemaVersion: "2.0.0",
     ok: true,
     mode: "exercise",
     subject: measuredEvidence().context.subject,
     repository: "Egeria-Systems/egeria-scaffold",
-    headRef: "analytics-capability-certification",
+    headRef: "refs/heads/main",
     headSha: exactRevision,
     environment: "analytics-certification",
     worker: "analytics-certification",
@@ -705,8 +728,10 @@ test("the redacted receipt is derived only from reconciled private measurements"
       sourceBoundaryUnexpectedExternalRequests: 0,
     },
     checks: [
-      "trusted-pull-request-head",
+      "approved-main-revision",
       "exact-subject",
+      "app-whole-worker-integration",
+      "app-effect-build-inspection",
       "dedicated-worker-identity",
       "manual-web-analytics-readback",
       "bounded-readiness",
@@ -766,11 +791,19 @@ test("the redacted receipt is derived only from reconciled private measurements"
   }
 
   const failures = [
-    ["wrong repository", (value) => { value.context.pullRequest.baseRepository = "other/repository"; }],
-    ["fork", (value) => { value.context.pullRequest.headRepository = "fork/repository"; }],
-    ["wrong ref", (value) => { value.context.pullRequest.headRef = "main"; }],
-    ["wrong checked out SHA", (value) => { value.context.pullRequest.checkedOutSha = "f".repeat(40); }],
-    ["changed label", (value) => { value.context.event.label = "analytics-certification"; }],
+    ["wrong repository", (value) => { value.context.source.repository = "other/repository"; }],
+    ["unapproved revision", (value) => { value.context.source.expectedRevision = "f".repeat(40); }],
+    ["wrong ref", (value) => { value.context.source.ref = "refs/heads/other"; }],
+    ["wrong checked out SHA", (value) => { value.context.source.checkedOutRevision = "f".repeat(40); }],
+    ["wrong event", (value) => { value.context.event.name = "pull_request"; }],
+    ["legacy context", (value) => { value.context.schemaVersion = "1.0.0"; }],
+    ["prior subject", (value) => { value.context.subject.behaviorContractDigest = "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378"; }],
+    ["missing app build", (value) => { value.appBuild = null; }],
+    ["site build", (value) => { value.appBuild.profile = "site"; }],
+    ["different build revision", (value) => { value.appBuild.headSha = "f".repeat(40); }],
+    ["skipped Worker integration", (value) => { value.appBuild.workerIntegration = { executed: [], skipped: ["app-analytics"] }; }],
+    ["wrong Effect version", (value) => { value.appBuild.appBuildEvidence[0].effect.version = "0.0.0"; }],
+    ["missing client inspection", (value) => { value.appBuild.appBuildEvidence[0].client.inspectedEffectMarkers = []; }],
     ["production target", (value) => { value.context.resources.production = true; }],
     ["wrong Worker", (value) => { value.context.resources.worker = "production"; }],
     ["hardcoded top-level polling", (value) => { value.polling = { attempts: 1, elapsedMilliseconds: 0 }; }],
@@ -819,6 +852,7 @@ test("the executable builder parses exact owner-only measurement files", async (
   const evidence = measuredEvidence();
   const files = {
     "context.json": evidence.context,
+    "app-build.json": evidence.appBuild,
     "site-identity.json": evidence.siteIdentity,
     "worker-identity.json": evidence.workerIdentity,
     "site-readback.json": evidence.siteReadback,

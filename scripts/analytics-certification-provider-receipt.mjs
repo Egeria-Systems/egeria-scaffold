@@ -2,12 +2,14 @@ import { lstat, readFile, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { requireAppRuntimeEvidence } from "./certify-app-local.mjs";
+
 const exactRepository = "Egeria-Systems/egeria-scaffold";
-const exactHeadRef = "analytics-capability-certification";
+const exactHeadRef = "refs/heads/main";
 const exactEnvironment = "analytics-certification";
 const exactWorker = "analytics-certification";
 const exactDigest =
-  "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378";
+  "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba";
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
 const exactDedicatedHostnamePattern =
   /^analytics-certification\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.workers\.dev$/u;
@@ -195,29 +197,23 @@ function requireMeasuredContext(context) {
       "schemaVersion",
       "mode",
       "event",
-      "pullRequest",
+      "source",
       "subject",
       "environment",
       "resources",
     ]) ||
-    context.schemaVersion !== "1.0.0" ||
+    context.schemaVersion !== "2.0.0" ||
     !["exercise", "cleanup"].includes(context.mode) ||
-    !hasExactKeys(context.event, ["name", "action", "label"]) ||
-    context.event.name !== "pull_request" ||
-    context.event.action !== "labeled" ||
-    context.event.label !== `analytics-certification-${context.mode}` ||
-    !hasExactKeys(context.pullRequest, [
-      "baseRepository",
-      "headRepository",
-      "headRef",
-      "headSha",
-      "checkedOutSha",
+    !hasExactKeys(context.event, ["name"]) ||
+    context.event.name !== "workflow_dispatch" ||
+    !hasExactKeys(context.source, [
+      "repository", "ref", "revision", "expectedRevision", "checkedOutRevision",
     ]) ||
-    context.pullRequest.baseRepository !== exactRepository ||
-    context.pullRequest.headRepository !== exactRepository ||
-    context.pullRequest.headRef !== exactHeadRef ||
-    !exactRevisionPattern.test(context.pullRequest.headSha) ||
-    context.pullRequest.checkedOutSha !== context.pullRequest.headSha ||
+    context.source.repository !== exactRepository ||
+    context.source.ref !== exactHeadRef ||
+    !exactRevisionPattern.test(context.source.revision) ||
+    context.source.expectedRevision !== context.source.revision ||
+    context.source.checkedOutRevision !== context.source.revision ||
     !hasExactKeys(context.subject, [
       "identifier",
       "version",
@@ -245,11 +241,29 @@ function requireMeasuredContext(context) {
 
 function cleanupContextFromMeasuredContext(context) {
   return {
-    headSha: context.pullRequest.headSha,
+    headSha: context.source.revision,
     environment: context.environment,
     hostname: context.resources.hostname,
     worker: context.resources.worker,
   };
+}
+
+function requireAppBuild(measurement, context) {
+  if (
+    !hasExactKeys(measurement, [
+      "schemaVersion", "headSha", "profile", "recipeVersion",
+      "workerIntegration", "appBuildEvidence",
+    ]) ||
+    measurement.schemaVersion !== "1.0.0" ||
+    measurement.headSha !== context.source.revision ||
+    measurement.profile !== "app" ||
+    measurement.recipeVersion !== "0.2.0"
+  ) reject();
+  try {
+    requireAppRuntimeEvidence(measurement, "app-analytics");
+  } catch {
+    reject();
+  }
 }
 
 function requireSiteReadback(measurement, context, identity) {
@@ -267,7 +281,7 @@ function requireSiteReadback(measurement, context, identity) {
       "autoInstall",
     ]) ||
     measurement.schemaVersion !== "1.0.0" ||
-    measurement.headSha !== context.pullRequest.headSha ||
+    measurement.headSha !== context.source.revision ||
     measurement.environment !== context.environment ||
     measurement.hostname !== context.resources.hostname ||
     identity.identityKnown !== true ||
@@ -297,7 +311,7 @@ function requireDeploymentReadback(measurement, context, identity) {
       "singleVersionAt100Percent",
     ]) ||
     measurement.schemaVersion !== "1.0.0" ||
-    measurement.headSha !== context.pullRequest.headSha ||
+    measurement.headSha !== context.source.revision ||
     measurement.environment !== context.environment ||
     measurement.hostname !== context.resources.hostname ||
     measurement.worker !== exactWorker ||
@@ -328,7 +342,7 @@ function requireReadiness(measurement, context) {
       "status",
     ]) ||
     measurement.schemaVersion !== "1.0.0" ||
-    measurement.headSha !== context.pullRequest.headSha ||
+    measurement.headSha !== context.source.revision ||
     measurement.hostname !== context.resources.hostname ||
     measurement.maximumAttempts !== 20 ||
     measurement.intervalMilliseconds !== 15_000 ||
@@ -556,7 +570,7 @@ function requireCleanupMeasurement(measurement, context, siteIdentity, workerIde
       "operatorCleanupPending",
     ]) ||
     measurement.schemaVersion !== "1.0.0" ||
-    measurement.headSha !== context.pullRequest.headSha ||
+    measurement.headSha !== context.source.revision ||
     measurement.environment !== context.environment ||
     measurement.hostname !== context.resources.hostname ||
     measurement.worker !== exactWorker ||
@@ -575,6 +589,7 @@ function createMeasuredReceipt(input) {
       "context",
       "siteIdentity",
       "workerIdentity",
+      "appBuild",
       "siteReadback",
       "deploymentReadback",
       "readiness",
@@ -597,6 +612,7 @@ function createMeasuredReceipt(input) {
   let checks;
   if (context.mode === "exercise") {
     if (input.cleanup !== null) reject();
+    requireAppBuild(input.appBuild, context);
     requireSiteReadback(input.siteReadback, context, input.siteIdentity);
     requireDeploymentReadback(
       input.deploymentReadback,
@@ -622,8 +638,10 @@ function createMeasuredReceipt(input) {
         input.browserJourney.providerSourceBoundary.unexpectedExternalRequests,
     };
     checks = [
-      "trusted-pull-request-head",
+      "approved-main-revision",
       "exact-subject",
+      "app-whole-worker-integration",
+      "app-effect-build-inspection",
       "dedicated-worker-identity",
       "manual-web-analytics-readback",
       "bounded-readiness",
@@ -636,6 +654,7 @@ function createMeasuredReceipt(input) {
     ];
   } else {
     if (
+      input.appBuild !== null ||
       input.siteReadback !== null ||
       input.deploymentReadback !== null ||
       input.readiness !== null ||
@@ -656,7 +675,7 @@ function createMeasuredReceipt(input) {
       workerInitialState: input.cleanup.workerResource.initialState,
     };
     checks = [
-      "trusted-pull-request-head",
+      "approved-main-revision",
       "exact-subject",
       "exercise-identity-reconciled",
       "dedicated-worker-absence",
@@ -666,13 +685,13 @@ function createMeasuredReceipt(input) {
   }
 
   return Object.freeze({
-    schemaVersion: "1.0.0",
+    schemaVersion: "2.0.0",
     ok: true,
     mode: context.mode,
     subject: Object.freeze({ ...context.subject }),
     repository: exactRepository,
     headRef: exactHeadRef,
-    headSha: context.pullRequest.headSha,
+    headSha: context.source.revision,
     environment: exactEnvironment,
     worker: exactWorker,
     outcomes: Object.freeze(outcomes),
@@ -733,6 +752,7 @@ async function readMeasuredEvidence(directoryPath) {
   const context = await readEvidence(join(directory, "context.json"));
   requireMeasuredContext(context);
   const exerciseFiles = [
+    "app-build.json",
     "browser-journey.json",
     "context.json",
     "deployment-readback.json",
@@ -761,8 +781,9 @@ async function readMeasuredEvidence(directoryPath) {
     readEvidence(join(directory, "worker-identity.json")),
   ]);
   if (context.mode === "exercise") {
-    const [siteReadback, deploymentReadback, readiness, browserJourney] =
+    const [appBuild, siteReadback, deploymentReadback, readiness, browserJourney] =
       await Promise.all([
+        readEvidence(join(directory, "app-build.json")),
         readEvidence(join(directory, "site-readback.json")),
         readEvidence(join(directory, "deployment-readback.json")),
         readEvidence(join(directory, "readiness.json")),
@@ -772,6 +793,7 @@ async function readMeasuredEvidence(directoryPath) {
       context,
       siteIdentity,
       workerIdentity,
+      appBuild,
       siteReadback,
       deploymentReadback,
       readiness,
@@ -783,6 +805,7 @@ async function readMeasuredEvidence(directoryPath) {
     context,
     siteIdentity,
     workerIdentity,
+    appBuild: null,
     siteReadback: null,
     deploymentReadback: null,
     readiness: null,
