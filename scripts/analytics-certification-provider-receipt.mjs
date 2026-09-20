@@ -207,13 +207,15 @@ function requireMeasuredContext(context) {
     !hasExactKeys(context.event, ["name"]) ||
     context.event.name !== "workflow_dispatch" ||
     !hasExactKeys(context.source, [
-      "repository", "ref", "revision", "expectedRevision", "checkedOutRevision",
+      "repository", "ref", "revision", "expectedRevision", "checkedOutRevision", "exerciseRevision",
     ]) ||
     context.source.repository !== exactRepository ||
     context.source.ref !== exactHeadRef ||
     !exactRevisionPattern.test(context.source.revision) ||
     context.source.expectedRevision !== context.source.revision ||
     context.source.checkedOutRevision !== context.source.revision ||
+    !exactRevisionPattern.test(context.source.exerciseRevision) ||
+    (context.mode === "exercise" && context.source.exerciseRevision !== context.source.revision) ||
     !hasExactKeys(context.subject, [
       "identifier",
       "version",
@@ -241,7 +243,7 @@ function requireMeasuredContext(context) {
 
 function cleanupContextFromMeasuredContext(context) {
   return {
-    headSha: context.source.revision,
+    headSha: context.source.exerciseRevision,
     environment: context.environment,
     hostname: context.resources.hostname,
     worker: context.resources.worker,
@@ -570,7 +572,7 @@ function requireCleanupMeasurement(measurement, context, siteIdentity, workerIde
       "operatorCleanupPending",
     ]) ||
     measurement.schemaVersion !== "1.0.0" ||
-    measurement.headSha !== context.source.revision ||
+    measurement.headSha !== context.source.exerciseRevision ||
     measurement.environment !== context.environment ||
     measurement.hostname !== context.resources.hostname ||
     measurement.worker !== exactWorker ||
@@ -692,6 +694,7 @@ function createMeasuredReceipt(input) {
     repository: exactRepository,
     headRef: exactHeadRef,
     headSha: context.source.revision,
+    exerciseRevision: context.source.exerciseRevision,
     environment: exactEnvironment,
     worker: exactWorker,
     outcomes: Object.freeze(outcomes),
