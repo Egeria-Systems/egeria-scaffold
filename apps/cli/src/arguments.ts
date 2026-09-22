@@ -21,6 +21,7 @@ export type CliCommand =
       analytics?: AnalyticsSettings;
       multilingual?: true;
       applicationPersistence?: true;
+      transactionalEmailResend?: true;
     }>
   | Readonly<{
       kind: "infer" | "doctor" | "diff";
@@ -33,7 +34,8 @@ export type CliCommand =
         | "analytics"
         | "booking-calendly"
         | "multilingual"
-        | "application-persistence";
+        | "application-persistence"
+        | "transactional-email-resend";
       settings?: AnalyticsSettings | CalendlyBookingSettings;
     }>
   | Readonly<{
@@ -43,7 +45,8 @@ export type CliCommand =
         | "analytics"
         | "booking-calendly"
         | "multilingual"
-        | "application-persistence";
+        | "application-persistence"
+        | "transactional-email-resend";
       persistenceRemovalPath?: string;
     }>
   | Readonly<{
@@ -64,7 +67,8 @@ export type CliCommand =
         | "analytics"
         | "booking-calendly"
         | "multilingual"
-        | "application-persistence";
+        | "application-persistence"
+        | "transactional-email-resend";
       settings?: AnalyticsSettings | CalendlyBookingSettings;
       approvedPlanFingerprint: string;
     }>
@@ -75,7 +79,8 @@ export type CliCommand =
         | "analytics"
         | "booking-calendly"
         | "multilingual"
-        | "application-persistence";
+        | "application-persistence"
+        | "transactional-email-resend";
       persistenceRemovalPath?: string;
       persistenceRemovalHumanReviewPath?: string;
       approvedPlanFingerprint: string;
@@ -235,6 +240,7 @@ function parseCreate(
         "calendly-mode": { type: "string" },
         multilingual: { type: "boolean" },
         "application-persistence": { type: "boolean" },
+        "transactional-email-resend": { type: "boolean" },
         ...analyticsOptionDefinitions,
       },
       strict: true,
@@ -249,6 +255,7 @@ function parseCreate(
     const calendlyMode = values["calendly-mode"];
     const multilingual = values.multilingual;
     const applicationPersistence = values["application-persistence"];
+    const transactionalEmailResend = values["transactional-email-resend"];
     const parsedAnalytics = parseAnalyticsSettings(values);
     const parsedProfile = profileIdentifierSchema.safeParse(profile);
     const parsedProjectName = projectFields.name.safeParse(projectName);
@@ -275,6 +282,7 @@ function parseCreate(
         : []),
       ...(multilingual === true ? ["multilingual"] : []),
       ...(applicationPersistence === true ? ["application-persistence"] : []),
+      ...(transactionalEmailResend === true ? ["transactional-email-resend"] : []),
       ...selectedAnalyticsOptions(values),
     ];
 
@@ -307,6 +315,7 @@ function parseCreate(
           : {}),
         ...(multilingual === true ? { multilingual: true } : {}),
         ...(applicationPersistence === true ? { applicationPersistence: true } : {}),
+        ...(transactionalEmailResend === true ? { transactionalEmailResend: true } : {}),
       },
     };
   } catch {
@@ -396,7 +405,7 @@ function parseAdd(
       !hasExactOptions(tokens, expectedOptions) ||
       !validDirectory(directory) ||
       (!analyticsSelection && !calendlySelection &&
-        !multilingualSelection && !persistenceSelection) ||
+        !multilingualSelection && !persistenceSelection && capability !== "transactional-email-resend") ||
       (calendlySelection && !settings.success) ||
       (analyticsSelection && analyticsSettings?.success !== true)
     ) {
@@ -480,7 +489,7 @@ function parseRemove(
       (capability !== "analytics" &&
         capability !== "booking-calendly" &&
         capability !== "multilingual" &&
-        capability !== "application-persistence")
+        capability !== "application-persistence" && capability !== "transactional-email-resend")
     ) {
       return invalidArguments();
     }

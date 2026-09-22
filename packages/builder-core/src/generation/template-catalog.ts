@@ -282,6 +282,18 @@ const productionSiteBookingHome: TemplateSource = {
 
 const commonHomeRouteSource = "common/apps/web/app/page.tsx";
 
+const transactionalEmailTemplateSources = textTemplateSources([
+  "transactional-email-resend/apps/web/src/application/transactional-email-sender.ts",
+  "transactional-email-resend/apps/web/src/infrastructure/resend/transactional-email-sender.ts",
+  "transactional-email-resend/apps/web/src/composition/server-transactional-email.ts",
+  "transactional-email-resend/apps/web/src/infrastructure/cloudflare/transactional-email-configuration.ts",
+  "transactional-email-resend/apps/web/src/infrastructure/observability/transactional-email-events.ts",
+  "transactional-email-resend/apps/web/tests/unit/resend-transactional-email-sender.test.ts",
+  "transactional-email-resend/apps/web/tests/unit/server-transactional-email.test.ts",
+  "transactional-email-resend/apps/web/tests/unit/transactional-email-events.test.ts",
+  "transactional-email-resend/docs/transactional-email.md",
+]);
+
 const persistenceTemplateSources = textTemplateSources([
   "deployment-cloudflare/apps/web/vitest.bindings.config.ts",
   "application-persistence/apps/web/drizzle.config.ts",
@@ -323,6 +335,8 @@ export function createTemplateCatalog(
   includeMultilingual = false,
   includeAnalytics = false,
   includeApplicationPersistence = false,
+  includeFoundation = false,
+  includeTransactionalEmail = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0");
   const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0"));
@@ -390,7 +404,8 @@ export function createTemplateCatalog(
     ...(includeAnalytics
       ? [...analyticsTemplateSources, analyticsLayoutSource(includeMultilingual)]
       : []),
-    ...(app ? appFoundationTemplateSources : []),
+    ...((app || includeFoundation) ? appFoundationTemplateSources : []),
+    ...(includeTransactionalEmail ? transactionalEmailTemplateSources : []),
     ...(includeApplicationPersistence ? [...persistenceTemplateSources, ...persistenceSharedTemplateSources] : []),
   ];
   const destinations = new Set<string>();

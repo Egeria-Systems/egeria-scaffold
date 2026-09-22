@@ -1047,6 +1047,24 @@ test("application persistence arguments select only explicit create and capabili
   });
 });
 
+test("transactional email selects generation and reviewed lifecycle without accepting credential arguments", () => {
+  const directory = "/private/tmp/email-example";
+  const created = assertSuccess(cliArguments.parseCliArguments([...appCreateArguments(directory), "--transactional-email-resend"]));
+  assert.equal(created.transactionalEmailResend, true);
+  assert.equal(created.applicationPersistence, undefined);
+  const fingerprint = `sha256:${"a".repeat(64)}`;
+  for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
+    const arguments_ = [kind, "--directory", directory, "--capability", "transactional-email-resend", ...(kind.startsWith("apply") ? ["--approved-plan", fingerprint] : [])];
+    const parsed = assertSuccess(cliArguments.parseCliArguments(arguments_));
+    assert.equal(parsed.capability, "transactional-email-resend");
+    assert.equal(parsed.kind, kind);
+    for (const privateOption of ["--resend-api-key", "--email-from", "--persistence-removal"]) {
+      assert.equal(cliArguments.parseCliArguments([...arguments_, privateOption, "private-value"]).ok, false);
+    }
+  }
+  assert.equal(cliArguments.parseCliArguments([...appCreateArguments(directory), "--transactional-email-resend=false"]).ok, false);
+});
+
 test("application persistence rejects malformed selection and cross-capability review flags before builder calls", async () => {
   const forbidden = () => assert.fail("invalid arguments invoked builder dependency");
   const runner = cli.createCliRunner({
@@ -7230,5 +7248,76 @@ for (const generation of [
       preparePrimary: generation.preparePrimary,
       branch: `${generation.name}-app-optional-lifecycle-test`,
     });
+  });
+}
+
+
+for (const profile of ["portfolio", "site"]) {
+  test(`compiled email lifecycle on ${profile} verifies and retains its foundation`, { timeout: 600_000 }, async () => {
+    await withGitFixture(profile, async ({ linked, primary }) => {
+      const primaryBefore = await gitRepositorySnapshot(primary);
+      const initialProject = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
+      const { createGenerationRenderingContext } = await import(pathToFileURL(resolve(
+        repositoryRoot, "packages/builder-core/dist/catalog/verified-package-versions.js",
+      )));
+      const renderingContext = createGenerationRenderingContext(false, true);
+      const capability = "transactional-email-resend";
+      const migrations = [];
+      for (const operation of ["add", "remove"]) {
+        const before = await gitRepositorySnapshot(linked);
+        const arguments_ = ["--directory", linked, "--capability", capability];
+        const planning = await executeBuilt([`plan-${operation}`, ...arguments_]);
+        assert.equal(planning.exitCode, 0, planning.stderr);
+        assert.equal(planning.stderr, "");
+        assert.deepEqual(await gitRepositorySnapshot(linked), before);
+        const envelope = JSON.parse(planning.stdout);
+        const plan = operation === "add" ? envelope.result : envelope.plan;
+        if (operation === "remove") {
+          assert.ok(plan.reviewRequirements.some(({ code }) => code === "review-email-provider-credential-and-retention-disposition"));
+        }
+        const execution = await executeBuilt([`apply-${operation}`, ...arguments_, "--approved-plan", plan.planFingerprint]);
+        assert.equal(execution.exitCode, 0, execution.stderr);
+        assert.equal(execution.stderr, "");
+        const result = JSON.parse(execution.stdout).result;
+        assert.equal(result.status, "verified-final-diff-approval-required");
+        assert.deepEqual(result.verificationChecks, operation === "add"
+          ? core.appCapabilityAdditionVerificationChecks : core.appCapabilityRemovalVerificationChecks);
+        const project = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
+        const state = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8")));
+        assert.deepEqual(state.origin, { profile, recipeVersion: initialProject.recipeVersion });
+        assert.equal(project.originProfile, profile);
+        assert.equal(project.selectedCapabilities.includes("site-routing"), profile === "site");
+        assert.equal(project.selectedCapabilities.includes("application-persistence"), false);
+        assert.equal(project.selectedCapabilities.includes(capability), operation === "add");
+        assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.2.0");
+        assert.deepEqual(state.lastSuccessfulVerification.checks, operation === "add"
+          ? core.appCapabilityAdditionPersistedVerificationChecks : core.appCapabilityRemovalPersistedVerificationChecks);
+        migrations.push(`${operation}-${capability}-0-1-0`);
+        assert.deepEqual(state.appliedMigrations, migrations);
+        assert.deepEqual(assertSuccess(core.parseMigrationLog(await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8"))).map(({ identifier }) => identifier), migrations);
+        await assertExactInstalledAgreement(linked, { catalogSnapshot: renderingContext.catalogSnapshot });
+        const rendered = assertSuccess(await core.renderSkeleton({
+          profile, projectName: initialProject.project.name, displayName: initialProject.project.displayName,
+          packageVersions: core.verifiedCapabilityPackageVersions,
+          ...(operation === "add" ? { transactionalEmailResend: true } : {}),
+        }, renderingContext));
+        for (const file of rendered.files) {
+          const actual = await readFile(join(linked, file.path));
+          if (file.path === "apps/web/package.json") {
+            assert.deepEqual(JSON.parse(actual.toString("utf8")), JSON.parse(Buffer.from(file.content).toString("utf8")), file.path);
+          } else {
+            assert.deepEqual(actual, Buffer.from(file.content), file.path);
+          }
+        }
+        assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), await readFile(resolve(
+          repositoryRoot, `packages/builder-core/lockfiles/web-recipe-${profile === "portfolio" ? "portfolio-foundation" : "app-0.2.0"}/pnpm-lock.yaml`,
+        )));
+        await commitAll(linked, `${operation} transactional email`);
+        const diagnosis = await executeBuilt(["doctor", "--directory", linked]);
+        assert.equal(diagnosis.exitCode, 0, diagnosis.stderr);
+        assert.deepEqual(JSON.parse(diagnosis.stdout).result, { healthy: true, diagnostics: [] });
+      }
+      assert.deepEqual(withoutSharedRefs(await gitRepositorySnapshot(primary)), withoutSharedRefs(primaryBefore));
+    }, { generation: "vitest-five", branch: `${profile}-email-lifecycle-test` });
   });
 }

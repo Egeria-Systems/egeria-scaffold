@@ -51,13 +51,14 @@ function projectManifestMembers(
   return result;
 }
 
-export async function preparePersistenceRenderingChange(input: Readonly<{
+export async function prepareCapabilityDependencyChange(input: Readonly<{
   reader: RepositoryReader;
   current: RenderedSkeleton;
   desired: RenderedSkeleton;
 }>): Promise<ValidationResult<Readonly<{ current: RenderedSkeleton; desired: RenderedSkeleton }>>> {
   const hasPersistence = (rendered: RenderedSkeleton) => rendered.project.selectedCapabilities.includes("application-persistence");
-  if (hasPersistence(input.current) === hasPersistence(input.desired)) {
+  const hasFoundation = (rendered: RenderedSkeleton) => rendered.project.selectedCapabilities.includes("app-foundation");
+  if (hasPersistence(input.current) === hasPersistence(input.desired) && hasFoundation(input.current) === hasFoundation(input.desired)) {
     return { ok: true, value: { current: input.current, desired: input.desired } };
   }
   try {
@@ -102,6 +103,6 @@ export async function preparePersistenceRenderingChange(input: Readonly<{
       desired: withFiles(input.desired, `${JSON.stringify(projected, null, 2)}\n`, targetLock),
     } };
   } catch {
-    return { ok: false, issues: [{ code: "PERSISTENCE_RENDERING_CHANGE_UNSUPPORTED", path: [], context: { reason: "precondition-refused" } }] };
+    return { ok: false, issues: [{ code: "CAPABILITY_DEPENDENCY_CHANGE_UNSUPPORTED", path: [], context: { reason: "precondition-refused" } }] };
   }
 }

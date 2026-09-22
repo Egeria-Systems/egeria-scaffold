@@ -5,15 +5,14 @@ import {
   createGenerationRenderingContext,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
-import { applicationPersistenceCatalogSnapshot, createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
-import { preparePersistenceRenderingChange } from "./prepare-persistence-rendering-change.js";
+import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
+import { prepareCapabilityDependencyChange } from "./prepare-capability-dependency-change.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
   appGenerationVerificationChecks,
   ordinaryGenerationVerificationChecks,
   persistenceGenerationVerificationChecks,
 } from "../contracts/generation-verification.js";
-import type { ProfileIdentifier } from "../contracts/profile.js";
 import {
   migrationRecordSchema,
   type MigrationRecord,
@@ -77,7 +76,7 @@ import {
 } from "./plan-capability-addition.js";
 
 const encoder = new TextEncoder();
-type AddableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence";
+type AddableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend";
 
 function additionMigrationIdentifier(
   capability: AddableCapability,
@@ -85,7 +84,8 @@ function additionMigrationIdentifier(
   | "add-analytics-0-1-0"
   | "add-booking-calendly-0-1-0"
   | "add-multilingual-0-1-0"
-  | "add-application-persistence-0-1-0" {
+  | "add-application-persistence-0-1-0"
+  | "add-transactional-email-resend-0-1-0" {
   switch (capability) {
     case "analytics":
       return "add-analytics-0-1-0";
@@ -93,6 +93,8 @@ function additionMigrationIdentifier(
       return "add-booking-calendly-0-1-0";
     case "multilingual":
       return "add-multilingual-0-1-0";
+    case "transactional-email-resend":
+      return "add-transactional-email-resend-0-1-0";
     case "application-persistence":
       return "add-application-persistence-0-1-0";
   }
@@ -215,12 +217,12 @@ async function readExactFileBytes(
 
 function verificationIsExact(
   value: GeneratedProjectVerification,
-  profile: ProfileIdentifier,
+  foundation: boolean,
   hasPersistence: boolean,
 ): boolean {
   return sameValues(value.checks, hasPersistence
     ? persistenceGenerationVerificationChecks
-    : profile === "app"
+    : foundation
     ? appGenerationVerificationChecks
     : ordinaryGenerationVerificationChecks);
 }
@@ -272,6 +274,12 @@ function requirePendingInference(
         return evidence?.category !== "contradictory" ||
           evidence.code !== "CAPABILITY_METADATA_MISMATCH" ||
           evidence.probes.some(({ status }) => status !== "present");
+      }
+      if (addedCapability === "transactional-email-resend" && identifier === "app-foundation") {
+        const installed = currentState.installedCapabilities.find(({ identifier }) => identifier === "app-foundation");
+        if (installed === undefined) return evidence?.category !== "probable";
+        if (installed.version === "0.1.0") return evidence?.category !== "contradictory" ||
+          evidence.code !== "CAPABILITY_METADATA_MISMATCH" || evidence.probes.some(({ status }) => status !== "present");
       }
       return evidence?.category !== (identifier === addedCapability ? "probable" : "confirmed");
     })
@@ -489,13 +497,16 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...(controls.project.value.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: controls.project.value.capabilitySettings["booking-calendly"] }),
     ...(controls.project.value.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
     ...(controls.project.value.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
+    ...(controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   };
-  const targetContext = input.capability === "application-persistence"
-    ? createGenerationRenderingContext(true) : snapshot.value.renderingContext;
-  const targetCatalog = input.capability === "application-persistence"
-    ? createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, applicationPersistenceCatalogSnapshot)
-    : { ok: true as const, value: snapshot.value.catalog };
+  const targetContext = input.capability === "application-persistence" || input.capability === "transactional-email-resend"
+    ? createGenerationRenderingContext(
+        input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"),
+        input.capability === "transactional-email-resend" || snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0",
+      ) : snapshot.value.renderingContext;
+  const targetCatalog = targetContext === undefined ? { ok: true as const, value: snapshot.value.catalog }
+    : createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, targetContext.catalogSnapshot);
   if (!targetCatalog.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   let desired = await renderSkeleton({
     ...renderRequest,
@@ -503,16 +514,18 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...(input.capability === "booking-calendly" ? { bookingCalendly: settingsSnapshot as CalendlyBookingSettings } : {}),
     ...(input.capability === "multilingual" ? { multilingual: true as const } : {}),
     ...(input.capability === "application-persistence" ? { applicationPersistence: true as const } : {}),
+    ...(input.capability === "transactional-email-resend" ? { transactionalEmailResend: true as const } : {}),
   }, targetContext);
   if (!desired.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-  if (input.capability === "application-persistence") {
+  if (input.capability === "application-persistence" || input.capability === "transactional-email-resend") {
     const current = await renderSkeleton(renderRequest, snapshot.value.renderingContext);
     if (!current.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-    const prepared = await preparePersistenceRenderingChange({ reader, current: current.value, desired: desired.value });
+    const prepared = await prepareCapabilityDependencyChange({ reader, current: current.value, desired: desired.value });
     if (!prepared.ok) return failure("PROJECT_DRIFT_DETECTED", "precondition", "not-required");
     desired = { ok: true, value: prepared.value.desired };
   }
   const hasPersistence = desired.value.project.selectedCapabilities.includes("application-persistence");
+  const hasFoundation = desired.value.project.selectedCapabilities.includes("app-foundation");
 
   const desiredFiles = new Map(
     desired.value.files.map(({ path, content }) => [path, content]),
@@ -575,7 +588,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
-  if (input.capability === "application-persistence") {
+  if (input.capability === "application-persistence" || input.capability === "transactional-email-resend") {
     const freshPlan = await planCapabilityAddition({ reader, git: finalCleanGit, capability: input.capability });
     if (!freshPlan.ok || freshPlan.value.planFingerprint !== plan.planFingerprint) {
       return failure("CAPABILITY_PLAN_APPROVAL_INVALID", "precondition", "not-required");
@@ -600,7 +613,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       "inspect-worktree",
     );
   }
-  if (!verified.ok || !verificationIsExact(verified.value, plan.profile, hasPersistence)) {
+  if (!verified.ok || !verificationIsExact(verified.value, hasFoundation, hasPersistence)) {
     return failure(
       "CAPABILITY_VERIFICATION_FAILED",
       "verify",
@@ -664,7 +677,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     remainingKnownDrift: [],
     verificationChecks: hasPersistence
       ? persistenceCapabilityAdditionPersistedVerificationChecks
-      : plan.profile === "app"
+      : hasFoundation
       ? appCapabilityAdditionPersistedVerificationChecks
       : capabilityAdditionPersistedVerificationChecks,
   });
@@ -802,7 +815,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       changedPaths,
       verificationChecks: hasPersistence
         ? persistenceCapabilityAdditionVerificationChecks
-        : plan.profile === "app"
+        : hasFoundation
         ? appCapabilityAdditionVerificationChecks
         : capabilityAdditionVerificationChecks,
     },

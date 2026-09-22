@@ -1,0 +1,19 @@
+builderCompatibility: 0.0.0
+capabilitySettings: {}
+ejectedAreas: []
+originProfile: portfolio
+platformAdapter: cloudflare-workers
+project:
+  defaultLocale: en-CA
+  displayName: Acme Portfolio Email
+  name: acme-portfolio-email
+recipeVersion: 0.11.0
+schemaVersion: 1.0.0
+selectedCapabilities:
+  - standards
+  - content-files
+  - section-composition
+  - deployment-cloudflare
+  - observability
+  - app-foundation
+  - transactional-email-resend

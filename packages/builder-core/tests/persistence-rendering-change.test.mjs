@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { preparePersistenceRenderingChange } from "../dist/lifecycle/prepare-persistence-rendering-change.js";
+import { prepareCapabilityDependencyChange } from "../dist/lifecycle/prepare-capability-dependency-change.js";
 import { renderSkeleton } from "../dist/generation/render-skeleton.js";
 import { verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
 import { createInMemoryRepositoryReader } from "../dist/repository/repository-reader.js";
@@ -20,7 +20,7 @@ async function reader(rendered, modify = (value) => value, lockSource) {
 }
 test("persistence switches exact locks and package members while retaining custom scripts and metadata", async () => {
   for (const [current, desired] of [[ordinary, persistent], [persistent, ordinary]]) {
-    const result = await preparePersistenceRenderingChange({ current, desired, reader: await reader(current, (value) => ({ ...value, description: "Custom app", scripts: { ...value.scripts, custom: "node custom.mjs" } })) });
+    const result = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, (value) => ({ ...value, description: "Custom app", scripts: { ...value.scripts, custom: "node custom.mjs" } })) });
     assert.equal(result.ok, true, JSON.stringify(result));
     const actual = manifest(result.value.desired);
     assert.equal(actual.scripts.custom, "node custom.mjs");
@@ -39,20 +39,20 @@ test("persistence refuses custom dependency graphs, changed owned scripts, colli
     [persistent, ordinary, (value) => ({ ...value, scripts: { ...value.scripts, "db:check": "custom" } })],
     [ordinary, persistent, undefined, "changed"],
   ]) {
-    const result = await preparePersistenceRenderingChange({ current, desired, reader: await reader(current, modify, lockSource) });
+    const result = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, modify, lockSource) });
     assert.equal(result.ok, false);
   }
 });
 test("persistence refuses duplicate package members without mutating either rendering", async () => {
   const source = JSON.stringify(manifest(ordinary)).replace('"private":true', '"private":true,"private":false');
-  const result = await preparePersistenceRenderingChange({ current: ordinary, desired: persistent, reader: createInMemoryRepositoryReader({ "apps/web/package.json": source, "pnpm-lock.yaml": await lock(false) }) });
+  const result = await prepareCapabilityDependencyChange({ current: ordinary, desired: persistent, reader: createInMemoryRepositoryReader({ "apps/web/package.json": source, "pnpm-lock.yaml": await lock(false) }) });
   assert.equal(result.ok, false);
 });
 
 test("persistence refuses a changed root dependency graph before replacing its lock", async () => {
   const base = await reader(ordinary);
   const root = JSON.parse((await base.readText("package.json")).content);
-  const result = await preparePersistenceRenderingChange({ current: ordinary, desired: persistent, reader: {
+  const result = await prepareCapabilityDependencyChange({ current: ordinary, desired: persistent, reader: {
     readText: async (path) => path === "package.json" ? { kind: "file", content: JSON.stringify({ ...root, devDependencies: { custom: "1.0.0" } }) } : base.readText(path),
   } });
   assert.equal(result.ok, false);

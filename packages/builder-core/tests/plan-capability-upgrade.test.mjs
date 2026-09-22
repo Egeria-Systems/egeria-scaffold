@@ -488,7 +488,7 @@ test("catalog snapshot validation attributes an unsupported app foundation versi
     {
       standards: "0.4.0",
       siteRouting: "0.4.0",
-      appFoundation: "0.2.0",
+      appFoundation: "0.3.0",
     },
   );
 

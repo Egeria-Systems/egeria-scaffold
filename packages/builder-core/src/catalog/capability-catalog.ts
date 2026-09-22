@@ -22,9 +22,10 @@ export type CapabilityPackageVersions = Readonly<{
 export type CapabilityCatalogSnapshot = Readonly<{
   standards: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0";
   siteRouting?: "0.3.0" | "0.4.0";
-  appFoundation?: "0.1.0";
+  appFoundation?: "0.1.0" | "0.2.0";
   deploymentCloudflare?: "0.3.0" | "0.4.0";
   applicationPersistence?: "0.1.0";
+  transactionalEmailResend?: "0.1.0";
 }>;
 
 export const vitestFourCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
@@ -57,7 +58,11 @@ export const persistenceDeploymentScripts = Object.freeze({
   "test:integration:bindings": "vitest run --config vitest.bindings.config.ts",
 });
 
-const currentCapabilityCatalogSnapshot = applicationPersistenceCatalogSnapshot;
+const currentCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = {
+  ...applicationPersistenceCatalogSnapshot,
+  appFoundation: "0.2.0",
+  transactionalEmailResend: "0.1.0",
+};
 
 function isSupportedStandardsSnapshotVersion(
   value: string,
@@ -74,7 +79,7 @@ function isSupportedSiteRoutingSnapshotVersion(
 function isSupportedAppFoundationSnapshotVersion(
   value: string,
 ): value is NonNullable<CapabilityCatalogSnapshot["appFoundation"]> {
-  return value === "0.1.0";
+  return value === "0.1.0" || value === "0.2.0";
 }
 
 const sharedCapabilityMetadata = {
@@ -1735,6 +1740,41 @@ function createDescriptors(
       documentationEvidenceRequirements: ["schema-and-migration-ownership", "environment-isolation-and-migration-authority", "backup-export-and-recovery-boundaries", "machine-and-human-removal-review"],
       removalAndRecoveryRequirements: ["review-exact-export-and-recovery-evidence", "review-required-uncertainty-dispositions", "preserve-application-owned-schema-and-migrations", "refuse-surviving-package-references", "separate-source-and-persistent-data-recovery"],
     } as const] : []),
+    ...(snapshot.transactionalEmailResend === undefined ? [] : [{
+      identifier: "transactional-email-resend",
+      version: "0.1.0",
+      deliveryMode: "hybrid",
+      stateClassifications: ["repository-stateful", "external-stateful"],
+      removalPolicy: "reviewed",
+      dependencies: ["app-foundation"],
+      ...sharedCapabilityMetadata,
+      supportedProfiles: ["portfolio", "site", "app"],
+      requiredPackages: [],
+      platformResources: [],
+      environmentVariables: ["TRANSACTIONAL_EMAIL_FROM", "TRANSACTIONAL_EMAIL_DOMAIN"],
+      secrets: ["RESEND_API_KEY"],
+      externalDomains: ["api.resend.com"],
+      dataClassifications: ["email-addresses", "transactional-message-content"],
+      retentionAssumptions: ["provider-idempotency-window-24-hours", "operator-reviewed-provider-message-retention"],
+      privilegedOperations: ["send-transactional-email"],
+      threatReviewLevel: "elevated",
+      adapterSemanticRequirements: ["provider-acceptance-is-not-delivery", "caller-idempotency-key", "single-attempt-deadline-and-cancellation", "ambiguous-acceptance-is-unknown"],
+      ...projectEvidencePoints([
+        createFileEvidencePoint("transactional-email-sender-port", "transactional-email-resend", "apps/web/src/application/transactional-email-sender.ts", "managed"),
+        createFileEvidencePoint("transactional-email-resend-adapter", "transactional-email-resend", "apps/web/src/infrastructure/resend/transactional-email-sender.ts", "managed"),
+        createFileEvidencePoint("transactional-email-runtime-configuration", "transactional-email-resend", "apps/web/src/infrastructure/cloudflare/transactional-email-configuration.ts", "managed"),
+        createFileEvidencePoint("transactional-email-server-composition", "transactional-email-resend", "apps/web/src/composition/server-transactional-email.ts", "managed"),
+        createFileEvidencePoint("transactional-email-safe-events", "transactional-email-resend", "apps/web/src/infrastructure/observability/transactional-email-events.ts", "managed"),
+        createFileEvidencePoint("transactional-email-provider-contract-tests", "transactional-email-resend", "apps/web/tests/unit/resend-transactional-email-sender.test.ts", "managed"),
+        createFileEvidencePoint("transactional-email-composition-tests", "transactional-email-resend", "apps/web/tests/unit/server-transactional-email.test.ts", "managed"),
+        createFileEvidencePoint("transactional-email-event-tests", "transactional-email-resend", "apps/web/tests/unit/transactional-email-events.test.ts", "managed"),
+        createFileEvidencePoint("transactional-email-operator-guide", "transactional-email-resend", "docs/transactional-email.md", "application-owned"),
+      ]),
+      migrationPlanners: ["add-transactional-email-resend-0-1-0", "remove-transactional-email-resend-0-1-0"],
+      verificationPlan: ["controlled-provider-contracts", "configuration-validation", "idempotency-timeout-cancellation", "privacy-safe-delivery-events", "source-removal-and-foundation-retention", "typecheck", "next-build", "opennext-build"],
+      documentationEvidenceRequirements: ["acceptance-and-idempotency-limitations", "sender-domain-and-scoped-credential-handoff", "privacy-and-provider-retention", "reviewed-source-removal"],
+      removalAndRecoveryRequirements: ["review-provider-credential-and-retention-dispositions", "refuse-surviving-email-references", "preserve-application-owned-operator-guide", "retain-required-app-foundation", "separate-source-and-provider-recovery"],
+    } as const]),
     ...(snapshot.appFoundation === undefined
       ? []
       : [
@@ -1756,7 +1796,7 @@ function createDescriptors(
               "multilingual",
               "site-routing",
             ],
-            supportedProfiles: ["app"],
+            supportedProfiles: snapshot.appFoundation === "0.2.0" ? ["portfolio", "site", "app"] : ["app"],
             requiredPackages: ["effect"],
             platformResources: [],
             adapterSemanticRequirements: [
@@ -1764,7 +1804,7 @@ function createDescriptors(
               "cloudflare-request-signal",
             ],
             ...projectEvidencePoints(appFoundationEvidencePoints),
-            migrationPlanners: [
+            migrationPlanners: snapshot.appFoundation === "0.2.0" ? ["add-transactional-email-resend-0-1-0"] : [
               "transition-portfolio-0-10-0-to-app-0-1-0",
               "transition-site-0-11-0-to-app-0-1-0",
             ],
@@ -1831,7 +1871,14 @@ export function createCapabilityCatalogSnapshot(
   const persistenceTupleValid = persistenceSnapshot === undefined
     ? standardsSnapshot !== "0.6.0" && (deploymentSnapshot === undefined || deploymentSnapshot === "0.3.0")
     : persistenceSnapshot === "0.1.0" && standardsSnapshot === "0.6.0" &&
-      deploymentSnapshot === "0.4.0" && appFoundationSnapshot === "0.1.0" && siteRoutingSnapshot === "0.4.0";
+      deploymentSnapshot === "0.4.0" && (appFoundationSnapshot === "0.1.0" || appFoundationSnapshot === "0.2.0") && siteRoutingSnapshot === "0.4.0";
+  const emailSnapshot = typeof snapshotValue === "object" && snapshotValue !== null
+    ? Reflect.get(snapshotValue, "transactionalEmailResend") as unknown : undefined;
+  if ((emailSnapshot !== undefined || appFoundationSnapshot === "0.2.0") &&
+      !(emailSnapshot === "0.1.0" && appFoundationSnapshot === "0.2.0" &&
+        (standardsSnapshot === "0.5.0" || standardsSnapshot === "0.6.0") && siteRoutingSnapshot === "0.4.0")) {
+    versionIssues.push({ code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID", path: ["snapshot", "transactionalEmailResend"], context: { reason: "unsupported-version" } });
+  }
   const resolvedSiteRoutingSnapshot =
     siteRoutingSnapshot === undefined
       ? "0.3.0"
@@ -1847,6 +1894,7 @@ export function createCapabilityCatalogSnapshot(
       (typeof appFoundationSnapshot === "string" &&
         isSupportedAppFoundationSnapshotVersion(appFoundationSnapshot)))
       ? ({
+          ...(emailSnapshot === "0.1.0" ? { transactionalEmailResend: "0.1.0" } as const : {}),
           standards: standardsSnapshot,
           siteRouting: resolvedSiteRoutingSnapshot,
           ...(appFoundationSnapshot === undefined

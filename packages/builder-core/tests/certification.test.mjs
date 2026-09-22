@@ -16,7 +16,7 @@ const descriptorDigests = Object.freeze({
   analytics:
     "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba",
   "app-foundation":
-    "sha256:6d9cf389441064a96d2b47bb309becab37358fcc2952335feffae8720eb6f497",
+    "sha256:16eb4a047176fead1fbada2f8b6b0ca3cda8e7faa57ca228763ee3392c14d47a",
   "application-persistence":
     "sha256:dcb911f024f4a0cf792396bf919e2387f0193fae6608071c6dea7aa371eb4c95",
   "booking-calendly":
@@ -35,10 +35,11 @@ const descriptorDigests = Object.freeze({
     "sha256:a8bd53e9b32546266efd3dde9dc96fc3914cb06e9e811b8bf96ebd42822e2dac",
   standards:
     "sha256:631efaeae569c27f225e9df3eeaacd28537f66a30f1533da70185e017508a4fd",
+  "transactional-email-resend": "sha256:558ff80dacef968fecf3e8a34e52ecd6672f0619a8fee1b73dcbb9d094a04ff3",
 });
 const descriptorVersions = Object.freeze({
   analytics: "0.1.0",
-  "app-foundation": "0.1.0",
+  "app-foundation": "0.2.0",
   "application-persistence": "0.1.0",
   "booking-calendly": "0.1.0",
   "content-files": "0.4.0",
@@ -48,6 +49,7 @@ const descriptorVersions = Object.freeze({
   "section-composition": "0.3.0",
   "site-routing": "0.4.0",
   standards: "0.6.0",
+  "transactional-email-resend": "0.1.0",
 });
 const expectedIdentifiers = Object.freeze([
   "analytics",
@@ -61,6 +63,7 @@ const expectedIdentifiers = Object.freeze([
   "section-composition",
   "site-routing",
   "standards",
+  "transactional-email-resend",
 ]);
 const committedRegistry = JSON.parse(
   readFileSync(
@@ -87,7 +90,9 @@ function createRecord(identifier) {
     },
     requiredEvidence: requiredEvidence[identifier],
     status: "pending",
-    taskPlan: ["application-persistence", "deployment-cloudflare", "standards"].includes(identifier)
+    taskPlan: ["app-foundation", "transactional-email-resend"].includes(identifier)
+      ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
+      : ["application-persistence", "deployment-cloudflare", "standards"].includes(identifier)
       ? persistencePlanPath
       : coordinatedPlanPath,
     evidence: [],
@@ -213,11 +218,11 @@ test("certification subjects bind the descriptor and required evidence", () => {
   );
 });
 
-test("current certification preserves six accepted subjects and keeps changed subjects pending", () => {
+test("current certification preserves five unchanged accepted subjects and keeps changed subjects pending", () => {
   assert.deepEqual(Object.keys(committedRegistry.records), expectedIdentifiers);
   assert.deepEqual(Object.keys(requiredEvidence), expectedIdentifiers);
   const acceptedLocalSubjects = new Set([
-    "app-foundation", "content-files", "multilingual",
+    "content-files", "multilingual",
     "section-composition", "site-routing",
   ]);
 
@@ -304,6 +309,7 @@ test("repository artifacts bind evidence to its plan, subject, revision, and rev
   const artifacts = {
     [coordinatedPlanPath]: "# approved plan",
     [registry.records.standards.taskPlan]: "# approved standards migration plan",
+    [registry.records["transactional-email-resend"].taskPlan]: "# separate email certification plan",
     [evidencePath]: createEvidenceDocument(),
   };
 

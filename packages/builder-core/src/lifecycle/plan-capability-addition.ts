@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 
 import { createGenerationRenderingContext, readVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
-import { applicationPersistenceCatalogSnapshot, createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
+import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
 import { fingerprintFileContent, fingerprintJsonValue } from "../ownership/fingerprint.js";
-import { preparePersistenceRenderingChange } from "./prepare-persistence-rendering-change.js";
+import { prepareCapabilityDependencyChange } from "./prepare-capability-dependency-change.js";
 import { readControlSnapshot } from "./lifecycle-control-snapshot.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import type { ProfileIdentifier, ProfileRecipe } from "../contracts/profile.js";
@@ -45,7 +45,7 @@ export type CapabilityAdditionPlan = Readonly<{
   baseRevision: string;
   profile: ProfileIdentifier;
   capability: Readonly<{
-    identifier: "analytics" | "booking-calendly" | "multilingual" | "application-persistence";
+    identifier: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend";
     version: "0.1.0";
   }>;
   settings:
@@ -494,7 +494,7 @@ async function deriveActions(input: Readonly<{
 async function planCapabilityAdditionUnchecked(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence";
+  capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend";
   settings?: AnalyticsSettings | CalendlyBookingSettings;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
@@ -503,7 +503,8 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     capabilityValue !== "analytics" &&
     capabilityValue !== "booking-calendly" &&
     capabilityValue !== "multilingual" &&
-    capabilityValue !== "application-persistence"
+    capabilityValue !== "application-persistence" &&
+    capabilityValue !== "transactional-email-resend"
   ) {
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
@@ -517,7 +518,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   if (
     (settingsResult !== undefined && !settingsResult.success) ||
     (analyticsSettingsResult !== undefined && !analyticsSettingsResult.success) ||
-    ((capabilityValue === "multilingual" || capabilityValue === "application-persistence") && input.settings !== undefined)
+    ((capabilityValue === "multilingual" || capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend") && input.settings !== undefined)
   ) {
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
@@ -556,6 +557,11 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     project.originProfile !== "app" || project.recipeVersion !== "0.2.0" ||
     snapshot.value.renderingContext?.catalogSnapshot.standards !== "0.5.0"
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
+  if (capabilityValue === "transactional-email-resend" && !(
+    (project.originProfile === "portfolio" && project.recipeVersion === "0.11.0") ||
+    (project.originProfile === "site" && project.recipeVersion === "0.12.0") ||
+    (project.originProfile === "app" && project.recipeVersion === "0.2.0")
+  )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   const capabilityInstalled =
     project.selectedCapabilities.includes(capabilityValue) ||
     state.installedCapabilities.some(
@@ -566,11 +572,13 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("CAPABILITY_ALREADY_INSTALLED");
   }
 
-  const targetContext = capabilityValue === "application-persistence"
-    ? createGenerationRenderingContext(true) : snapshot.value.renderingContext;
-  const targetCatalog = capabilityValue === "application-persistence"
-    ? createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, applicationPersistenceCatalogSnapshot)
-    : { ok: true as const, value: snapshot.value.catalog };
+  const targetContext = capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend"
+    ? createGenerationRenderingContext(
+        capabilityValue === "application-persistence" || project.selectedCapabilities.includes("application-persistence"),
+        capabilityValue === "transactional-email-resend" || snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0",
+      ) : snapshot.value.renderingContext;
+  const targetCatalog = targetContext === undefined ? { ok: true as const, value: snapshot.value.catalog }
+    : createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, targetContext.catalogSnapshot);
   if (!targetCatalog.ok) return planningFailure("PROJECT_INSPECTION_INVALID");
   const renderRequest = {
     profile: project.originProfile,
@@ -587,6 +595,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       : { analytics: project.capabilitySettings.analytics }),
     ...(project.selectedCapabilities.includes("application-persistence")
       ? { applicationPersistence: true as const } : {}),
+    ...(project.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
   const currentResult = await renderSkeleton(renderRequest, snapshot.value.renderingContext);
@@ -625,6 +634,8 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       ? { analytics: analyticsSettingsResult.data }
       : capabilityValue === "booking-calendly" && settingsResult?.success === true
         ? { bookingCalendly: settingsResult.data }
+        : capabilityValue === "transactional-email-resend"
+          ? { transactionalEmailResend: true as const }
         : capabilityValue === "application-persistence"
           ? { applicationPersistence: true as const }
           : { multilingual: true as const }),
@@ -645,7 +656,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("PROJECT_DRIFT_DETECTED");
   }
 
-  const prepared = await preparePersistenceRenderingChange({
+  const prepared = await prepareCapabilityDependencyChange({
     reader: input.reader, current: currentResult.value, desired: desiredResult.value,
   });
   if (!prepared.ok) return planningFailure("PROJECT_DRIFT_DETECTED");
@@ -717,7 +728,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   };
 
   let persistenceSnapshot: string | undefined;
-  if (capabilityValue === "application-persistence") {
+  if (capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend") {
     const controls = await readControlSnapshot(input.reader);
     if (controls === undefined) return planningFailure("PROJECT_INSPECTION_INVALID");
     persistenceSnapshot = fingerprintJsonValue({
@@ -752,7 +763,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 export async function planCapabilityAddition(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence";
+  capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend";
   settings?: AnalyticsSettings | CalendlyBookingSettings;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   return planCapabilityAdditionUnchecked(input);

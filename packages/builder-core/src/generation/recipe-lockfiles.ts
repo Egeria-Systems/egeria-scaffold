@@ -1,4 +1,4 @@
-type RecipeLockfileVersion = "0.8.0" | "0.9.0" | "0.10.0" | "app-0.1.0" | "portfolio-0.11.0" | "site-0.12.0" | "app-0.2.0" | "application-persistence";
+type RecipeLockfileVersion = "0.8.0" | "0.9.0" | "0.10.0" | "app-0.1.0" | "portfolio-0.11.0" | "site-0.12.0" | "app-0.2.0" | "application-persistence" | "portfolio-foundation";
 
 export type RecipeLockfileIdentity = Readonly<{
   originProfile: string;
@@ -39,7 +39,11 @@ export function resolveRecipeLockfileVersion(
         eslintConfigNext === "16.3.3" && dependencies.effect === "4.0.0-rc.112"
         ? "app-0.2.0" : undefined;
     }
-    if (dependencies.effect !== undefined) return undefined;
+    if (dependencies.effect !== undefined) {
+      if (dependencies.effect !== "4.0.0-rc.112") return undefined;
+      if (identity.originProfile === "portfolio" && identity.recipeVersion === "0.11.0" && next === "16.3.0" && eslintConfigNext === "16.3.0") return "portfolio-foundation";
+      return identity.originProfile === "site" && identity.recipeVersion === "0.12.0" && next === "16.3.3" && eslintConfigNext === "16.3.3" ? "app-0.2.0" : undefined;
+    }
     if (identity.originProfile === "portfolio") {
       return identity.recipeVersion === "0.11.0" && next === "16.3.0" &&
         eslintConfigNext === "16.3.0" ? "portfolio-0.11.0" : undefined;

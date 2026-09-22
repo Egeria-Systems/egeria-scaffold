@@ -340,8 +340,11 @@ export const installedStateSchema = z
       .readonly(),
   })
   .superRefine((state, context) => {
-    const isSupportedApp = state.origin.profile === "app" &&
-      (state.origin.recipeVersion === "0.1.0" || state.origin.recipeVersion === "0.2.0");
+    const hasFoundation = (state.origin.profile === "app" &&
+      (state.origin.recipeVersion === "0.1.0" || state.origin.recipeVersion === "0.2.0")) ||
+      (((state.origin.profile === "portfolio" && state.origin.recipeVersion === "0.11.0") ||
+        (state.origin.profile === "site" && state.origin.recipeVersion === "0.12.0")) &&
+        state.installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.2.0"));
     const hasPersistence = state.installedCapabilities.some(
       ({ identifier }) => identifier === "application-persistence",
     );
@@ -351,24 +354,24 @@ export const installedStateSchema = z
       "capability-addition"
       ? hasPersistence
         ? persistenceCapabilityAdditionPersistedVerificationChecks
-        : isSupportedApp
+        : hasFoundation
         ? appCapabilityAdditionPersistedVerificationChecks
         : capabilityAdditionPersistedVerificationChecks
       : state.lastSuccessfulVerification.kind === "capability-removal"
         ? hasPersistence
           ? persistenceCapabilityRemovalPersistedVerificationChecks
-          : isSupportedApp
+          : hasFoundation
           ? appCapabilityRemovalPersistedVerificationChecks
           : capabilityRemovalPersistedVerificationChecks
         : state.lastSuccessfulVerification.kind === "capability-upgrade"
           ? capabilityUpgradePersistedVerificationChecks
           : state.lastSuccessfulVerification.kind === "profile-transition"
-            ? isSupportedApp
+            ? hasFoundation
               ? appProfileTransitionPersistedVerificationChecks
               : profileTransitionPersistedVerificationChecks
             : hasPersistence
               ? persistenceVerificationChecks
-              : isSupportedApp
+              : hasFoundation
               ? appVerificationChecks
               : state.origin.recipeVersion === "0.7.0" ||
                 state.origin.recipeVersion === "0.8.0" ||

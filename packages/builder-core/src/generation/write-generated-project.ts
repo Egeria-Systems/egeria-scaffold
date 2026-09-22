@@ -81,6 +81,7 @@ const requiredRequestKeys = ["displayName", "profile", "projectName"] as const;
 const allowedRequestKeys = new Set([
   "analytics",
   "applicationPersistence",
+  "transactionalEmailResend",
   "bookingCalendly",
   "displayName",
   "multilingual",
@@ -131,6 +132,7 @@ function validateRequest(
   const includesCalendly = Object.hasOwn(value, "bookingCalendly");
   const includesMultilingual = Object.hasOwn(value, "multilingual");
   const includesPersistence = Object.hasOwn(value, "applicationPersistence");
+  const includesEmail = Object.hasOwn(value, "transactionalEmailResend");
   if (
     requiredRequestKeys.some((key) => !Object.hasOwn(value, key)) ||
     keys.some((key) => !allowedRequestKeys.has(key))
@@ -177,6 +179,9 @@ function validateRequest(
       "invalid-selection",
     );
   }
+  if (includesEmail && value.transactionalEmailResend !== true) {
+    return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "transactionalEmailResend"], "invalid-selection");
+  }
   if (includesPersistence && value.applicationPersistence !== true) {
     return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "applicationPersistence"], "invalid-selection");
   }
@@ -191,6 +196,7 @@ function validateRequest(
       ...(bookingCalendly === undefined ? {} : { bookingCalendly }),
       ...(includesMultilingual ? { multilingual: true } : {}),
       ...(includesPersistence ? { applicationPersistence: true } : {}),
+      ...(includesEmail ? { transactionalEmailResend: true } : {}),
     },
   };
 }
@@ -383,11 +389,7 @@ function verificationIsExact(
   }
 
   const checks = value.checks;
-  const app = rendered.project.originProfile === "app" &&
-    (rendered.project.recipeVersion === "0.1.0" || rendered.project.recipeVersion === "0.2.0") &&
-    rendered.resolved.capabilities.some(
-      ({ identifier, version }) => identifier === "app-foundation" && version === "0.1.0",
-    );
+  const app = rendered.resolved.capabilities.some(({ identifier }) => identifier === "app-foundation");
   const persistence = rendered.resolved.capabilities.some(({ identifier, version }) => identifier === "application-persistence" && version === "0.1.0");
   const expectedChecks = persistence ? persistenceGenerationVerificationChecks : app ? appGenerationVerificationChecks : verificationChecks;
 
@@ -676,7 +678,7 @@ export async function generateProject(input: Readonly<{
     return request;
   }
 
-  const renderingContext = createGenerationRenderingContext(request.value.applicationPersistence === true);
+  const renderingContext = createGenerationRenderingContext(request.value.applicationPersistence === true, request.value.transactionalEmailResend === true);
   const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, renderingContext.catalogSnapshot);
   if (!catalog.ok) {
     return issue("VERIFIED_CATALOG_INVALID", [], "catalog-invalid");
