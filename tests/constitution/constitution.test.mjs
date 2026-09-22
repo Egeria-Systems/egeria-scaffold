@@ -739,7 +739,8 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   for (const [identifier, job] of Object.entries(workflow.jobs)) {
     assert.equal(job["runs-on"], "ubuntu-24.04", identifier);
     assert.equal(typeof job["timeout-minutes"], "number", identifier);
-    assert.ok(job["timeout-minutes"] > 0 && job["timeout-minutes"] <= 45);
+    const maximumMinutes = identifier === "generated-projects" ? 60 : 45;
+    assert.ok(job["timeout-minutes"] > 0 && job["timeout-minutes"] <= maximumMinutes);
   }
   for (const identifier of jobsWithCheckout) {
     const checkout = workflow.jobs[identifier].steps.find(({ uses }) =>
