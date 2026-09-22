@@ -257,7 +257,7 @@ function enrichApplicationManifest(
     dependencies: {
       ...manifest.dependencies,
       "@egeria-systems/observability": packageVersions.observability,
-      ...(productionSite ? { next: "16.3.3" } : {}),
+      ...((productionSite || foundation) ? { next: "16.3.3" } : {}),
       ...(foundation ? { effect: "4.0.0-rc.112" } : {}),
       ...(persistence ? { "drizzle-orm": "0.45.2" } : {}),
     },

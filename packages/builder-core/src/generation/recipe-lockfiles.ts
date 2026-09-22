@@ -41,7 +41,7 @@ export function resolveRecipeLockfileVersion(
     }
     if (dependencies.effect !== undefined) {
       if (dependencies.effect !== "4.0.0-rc.112") return undefined;
-      if (identity.originProfile === "portfolio" && identity.recipeVersion === "0.11.0" && next === "16.3.0" && eslintConfigNext === "16.3.0") return "portfolio-foundation";
+      if (identity.originProfile === "portfolio" && identity.recipeVersion === "0.11.0" && next === "16.3.3" && eslintConfigNext === "16.3.0") return "portfolio-foundation";
       return identity.originProfile === "site" && identity.recipeVersion === "0.12.0" && next === "16.3.3" && eslintConfigNext === "16.3.3" ? "app-0.2.0" : undefined;
     }
     if (identity.originProfile === "portfolio") {

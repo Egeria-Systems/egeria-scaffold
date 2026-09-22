@@ -25,7 +25,7 @@ test("email selection adds the server foundation to each current profile without
     const manifest = JSON.parse(new TextDecoder().decode(files.find(({ path }) => path === "apps/web/package.json").content));
     assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
     assert.equal(manifest.dependencies.resend, undefined);
-    assert.equal(manifest.dependencies.next, profile === "portfolio" ? "16.3.0" : "16.3.3");
+    assert.equal(manifest.dependencies.next, "16.3.3");
     assert.ok(manifest.scripts["test:integration:cloudflare"]);
     assert.ok(resolveRecipeLockfileVersion(project, manifest));
   }
@@ -43,6 +43,8 @@ test("email leaves default and unrelated descriptor contracts unchanged", async 
     const rendered = await renderSkeleton(request(profile));
     assert.equal(rendered.ok, true);
     assert.equal(rendered.value.project.selectedCapabilities.includes("transactional-email-resend"), false);
+    const manifest = JSON.parse(new TextDecoder().decode(rendered.value.files.find(({ path }) => path === "apps/web/package.json").content));
+    assert.equal(manifest.dependencies.next, profile === "portfolio" ? "16.3.0" : "16.3.3");
     assert.equal(rendered.value.resolved.capabilities.find(({ identifier }) => identifier === "app-foundation")?.version, profile === "app" ? "0.1.0" : undefined);
   }
 });

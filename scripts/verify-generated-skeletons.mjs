@@ -829,7 +829,7 @@ function expectedWebManifest(projectName, nextVersion, appFoundation, persistenc
       "@opennextjs/cloudflare": "1.20.2",
       ...(appFoundation ? { effect: "4.0.0-rc.112" } : {}),
       ...(persistence ? { "drizzle-orm": "0.45.2" } : {}),
-      next: nextVersion,
+      next: appFoundation ? "16.3.3" : nextVersion,
       react: "19.2.8",
       "react-dom": "19.2.8",
       yaml: "2.9.0",
