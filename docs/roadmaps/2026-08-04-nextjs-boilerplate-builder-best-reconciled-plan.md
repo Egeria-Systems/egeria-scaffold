@@ -1437,7 +1437,7 @@ P5A `multilingual` and P5B `analytics` retain their identifiers as requirements 
 
 P5C introduces the approved Wrangler harness binding lane with shared Cloudflare deployment test configuration and application-persistence-owned D1 specifications. Future Queue, D1/R2 and persistence-backed identity capabilities select their compatible runner at their own gates. Each capability retains ownership of its own tests and does not treat a shared runner as evidence for another capability.
 
-Each capability implementation is followed by its separately planned and approved capability-certification task. Each capability completes its base fresh-project certification journey. Capabilities with provider, persistent-data, privileged, or security-sensitive behavior also complete a separately approved deployed certification plan before their phase is accepted.
+The [certification-only sequencing amendment](program-roadmap.md#one-time-2026-09-17-persistence-certification-sequencing-amendment) owns the limited reconciliation for already-merged persistence before formal P4 closure. Each capability implementation is followed by its separately planned and approved capability-certification task. Each capability completes its base fresh-project certification journey. Capabilities with provider, persistent-data, privileged, or security-sensitive behavior also complete a separately approved deployed certification plan before their phase is accepted.
 
 #### P6 — Payload CMS
 

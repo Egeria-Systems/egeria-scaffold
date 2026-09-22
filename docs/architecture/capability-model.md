@@ -246,7 +246,7 @@ Removal takes a strict `--persistence-removal` JSON envelope containing operator
 
 Removal preserves user schema/SQL and modified or ejected application-owned files; the package-aware reference guard refuses surviving Drizzle imports or tool dependencies. Source removal neither exports nor restores nor deletes provider data. Export completeness, real target identity, write consistency, retention, recovery/readback, source disposition and provider cleanup require actual human review and separately authorized operations. The generated [operator guide](../../packages/builder-core/templates/application-persistence/docs/application-persistence.md) owns concrete operational instructions.
 
-The new persistence, standards and deployment subjects need separate certification plans and empty evidence. Unaffected subjects and historical receipts retain their exact identities. The [parallel implementation exception](../roadmaps/program-roadmap.md#one-time-2026-09-14-persistence-implementation-exception) gates integration on accepted P4 closure and reconciliation; local implementation is not closure or deployed persistence certification.
+The new persistence, standards and deployment subjects need separate certification plans and empty evidence. Unaffected subjects and historical receipts retain their exact identities. The [certification-only sequencing amendment](../roadmaps/program-roadmap.md#one-time-2026-09-17-persistence-certification-sequencing-amendment) permits certification of the already-merged persistence subjects after acceptance of the original app-foundation outcomes, while preserving full closure and separate resource approvals; local implementation is not closure or deployed persistence certification.
 
 ## Independent and conditional behavior
 
