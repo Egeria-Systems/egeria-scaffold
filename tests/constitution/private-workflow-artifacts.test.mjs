@@ -32,6 +32,7 @@ const trackedAcceptedReceipts = Object.freeze([
   "docs/implementation-evidence/2026-09-13-standards-app-certification-receipt.md",
   "docs/implementation-evidence/2026-09-15-deployment-cloudflare-app-certification-receipt.md",
   "docs/implementation-evidence/2026-09-15-observability-app-certification-receipt.md",
+  "docs/implementation-evidence/2026-09-23-web3forms-certification-receipt.md",
 ]);
 const syntheticMacHome = (...segments) =>
   ["", "Users", ...segments, ""].join("/");
