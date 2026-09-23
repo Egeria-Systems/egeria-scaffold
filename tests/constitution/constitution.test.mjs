@@ -3607,7 +3607,7 @@ test("canonical documentation records visual regression and the client-ready clo
     assert.match(currentContractOwner, /\bsubjects\b[^\n]+\b(?:pending|empty evidence)\b/iu);
   }
   assert.match(capabilityModel, /\bCurrent admission passes for all thirteen records\b/iu);
-  assert.match(capabilityModel, /\bfive certified and seven pending subjects\b/iu);
+  assert.match(capabilityModel, /\bfive certified and eight pending subjects\b/iu);
 
   assert.match(
     capabilityModel,
@@ -4195,7 +4195,7 @@ test("canonical documentation accepts profile-transition execution and records t
   ]) {
     assert.match(historicalCertificationOwner, multilingualEligibilityPattern);
   }
-  assert.match(builderCoreInstructions, /\bfive exact subjects are certified; seven subjects remain pending\b/iu);
+  assert.match(builderCoreInstructions, /\bfive exact subjects are certified; eight subjects remain pending\b/iu);
 
   for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
     assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);

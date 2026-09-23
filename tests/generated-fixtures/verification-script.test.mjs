@@ -379,7 +379,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
         identifier: "app-persistence-email", profile: "app",
         relativeRoot: "fixtures/generated/app-persistence-email",
       },
-      { identifier: "portfolio-contact-form", profile: "portfolio", relativeRoot: "fixtures/generated/portfolio-contact-form" },
+      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form" },
     ],
   );
 
@@ -426,7 +426,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
                 : contract.identifier === "app-all-optional-integrations" ? 178
                   : contract.identifier === "app-persistence" ? 161
                     : contract.identifier === "portfolio-email" ? 134
-                      : contract.identifier === "app-persistence-email" ? 170 : contract.identifier === "portfolio-contact-form" ? 120 : 154,
+                      : contract.identifier === "app-persistence-email" ? 170 : contract.identifier === "site-contact-form" ? 137 : 154,
     );
     assert.equal(
       contract.visualRegression,
@@ -437,7 +437,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
         "app-persistence",
         "portfolio-email",
         "app-persistence-email",
-        "portfolio-contact-form",
+        "site-contact-form",
       ].includes(contract.identifier),
     );
     const snapshot = await inspectGeneratedFixture(
@@ -651,8 +651,8 @@ test("generated fixture text and visual baseline attributes are explicit", async
     "fixtures/generated/portfolio-email/package.json: eol: lf",
     "fixtures/generated/app-persistence-email/package.json: text: set",
     "fixtures/generated/app-persistence-email/package.json: eol: lf",
-    "fixtures/generated/portfolio-contact-form/package.json: text: set",
-    "fixtures/generated/portfolio-contact-form/package.json: eol: lf",
+    "fixtures/generated/site-contact-form/package.json: text: set",
+    "fixtures/generated/site-contact-form/package.json: eol: lf",
   ]);
 
   const baselineDirectory =
@@ -1747,16 +1747,16 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         "app-persistence",
         "portfolio-email",
         "app-persistence-email",
-        "portfolio-contact-form",
+        "site-contact-form",
       ],
       profiles: ["portfolio", "site", "app"],
       workerIntegration: {
         executed: ["app", "app-all-optional-integrations", "app-persistence", "portfolio-email", "app-persistence-email"],
-        skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-multilingual-analytics", "portfolio-contact-form"],
+        skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-multilingual-analytics", "site-contact-form"],
       },
       bindingIntegration: {
         executed: ["app-persistence", "app-persistence-email"],
-        skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-multilingual-analytics", "app", "app-all-optional-integrations", "portfolio-email", "portfolio-contact-form"],
+        skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-multilingual-analytics", "app", "app-all-optional-integrations", "portfolio-email", "site-contact-form"],
       },
       checks: [
         "pnpm-version",
