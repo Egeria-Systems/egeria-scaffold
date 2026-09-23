@@ -28,13 +28,13 @@ Starting comparison base: `3f62d61e869358ec59eb3e3ea898e222b4d0054b` (PR #144). 
 From the repository root:
 
 ```sh
-rtk pnpm install --frozen-lockfile
-rtk pnpm --filter @egeria-systems/nextjs-cloudflare-proof run build
-rtk pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec opennextjs-cloudflare build --skipNextBuild
-rtk pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:integration:cloudflare
+pnpm install --frozen-lockfile
+pnpm --filter @egeria-systems/nextjs-cloudflare-proof run build
+pnpm --filter @egeria-systems/nextjs-cloudflare-proof exec opennextjs-cloudflare build --skipNextBuild
+pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:integration:cloudflare
 ```
 
-The existing integration command runs the original HTTP test and 20 Queue topology cases. Its normal repository-quality job already builds OpenNext first and runs this command. No workflow dispatch, deployment, new runner, dependency or generated-client test configuration is introduced. `rtk pnpm run verify:compatibility-proof` exercises the complete existing lint/types/unit/build/typegen/integration/development-browser/preview-browser boundary; install the manifest-pinned Playwright Chromium when it is not already available.
+The existing integration command runs the original HTTP test and 20 Queue topology cases. Its normal repository-quality job already builds OpenNext first and runs this command. No workflow dispatch, deployment, new runner, dependency or generated-client test configuration is introduced. `pnpm run verify:compatibility-proof` exercises the complete existing lint/types/unit/build/typegen/integration/development-browser/preview-browser boundary; install the manifest-pinned Playwright Chromium when it is not already available.
 
 The [host tests](../../proofs/nextjs-cloudflare/tests/integration/queue-topology.test.ts) use Wrangler `createTestHarness()` from the existing Vitest Node host. Queue bindings and handlers execute in workerd. Three [synthetic fixture modules](../../proofs/nextjs-cloudflare/tests/fixtures/queue-topology/) separate HTTP production of test messages, Queue handling, and shared composition. The shared entry point forwards ordinary fetches and named exports from `.open-next/worker.js`; the accepted deployable Wrangler entry point remains unchanged.
 
