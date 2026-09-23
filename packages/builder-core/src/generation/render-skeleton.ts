@@ -49,6 +49,7 @@ export type GenerationRequest = Readonly<{
   bookingCalendly?: CalendlyBookingSettings;
   multilingual?: true;
   applicationPersistence?: true;
+  transactionalEmailResend?: true;
   packageVersions: CapabilityPackageVersions;
 }>;
 
@@ -203,6 +204,7 @@ function enrichApplicationManifest(
   profile: ProfileIdentifier,
   recipeVersion: string,
   persistence: boolean,
+  foundation: boolean,
 ): ValidationResult<readonly GeneratedFile[]> {
   const manifestIndex = files.findIndex(
     ({ path }) => path === "apps/web/package.json",
@@ -247,7 +249,7 @@ function enrichApplicationManifest(
     ...manifest,
     scripts: {
       ...manifest.scripts,
-      ...(app
+      ...(foundation
         ? { "test:integration:cloudflare": "vitest run --config vitest.cloudflare.config.ts" }
         : {}),
       ...(persistence ? { ...applicationPersistenceScripts, ...persistenceDeploymentScripts } : {}),
@@ -255,8 +257,8 @@ function enrichApplicationManifest(
     dependencies: {
       ...manifest.dependencies,
       "@egeria-systems/observability": packageVersions.observability,
-      ...(productionSite ? { next: "16.3.3" } : {}),
-      ...(app ? { effect: "4.0.0-rc.112" } : {}),
+      ...((productionSite || foundation) ? { next: "16.3.3" } : {}),
+      ...(foundation ? { effect: "4.0.0-rc.112" } : {}),
       ...(persistence ? { "drizzle-orm": "0.45.2" } : {}),
     },
     devDependencies: {
@@ -276,7 +278,7 @@ function enrichApplicationManifest(
         content: encoder.encode(`${stringifyCanonicalJson(enrichedManifest)}\n`),
       };
     }
-    if (app && file.path === "pnpm-workspace.yaml") {
+    if (foundation && file.path === "pnpm-workspace.yaml") {
       const workspace = parseDocument(decoder.decode(file.content));
       workspace.setIn(["allowBuilds", "msgpackr-extract"], false);
       if (persistence) workspace.setIn(["overrides", "@esbuild-kit/core-utils>esbuild"], "0.25.4");
@@ -425,7 +427,8 @@ export async function renderSkeleton(
     standards: request.packageVersions.standards,
     observability: request.packageVersions.observability,
   };
-  const renderingContext = context ?? createGenerationRenderingContext(request.applicationPersistence === true);
+  const renderingContext = context ?? createGenerationRenderingContext(request.applicationPersistence === true, request.transactionalEmailResend === true);
+  const retainedFoundation = renderingContext.catalogSnapshot.appFoundation === "0.2.0";
   const catalogResult = createCapabilityCatalogSnapshot(packageVersions, renderingContext.catalogSnapshot);
   if (!catalogResult.ok) {
     return catalogResult;
@@ -437,7 +440,7 @@ export async function renderSkeleton(
       ...(
         request.analytics === undefined &&
         request.bookingCalendly === undefined &&
-        request.multilingual !== true && request.applicationPersistence !== true
+        request.multilingual !== true && request.applicationPersistence !== true && request.transactionalEmailResend !== true && !retainedFoundation
           ? {}
           : {
               requestedCapabilities: [
@@ -447,6 +450,8 @@ export async function renderSkeleton(
                   : ["booking-calendly"]),
                 ...(request.multilingual === true ? ["multilingual"] : []),
                 ...(request.applicationPersistence === true ? ["application-persistence"] : []),
+                ...(request.transactionalEmailResend === true ? ["transactional-email-resend"] : []),
+                ...(retainedFoundation ? ["app-foundation"] : []),
               ],
             }
       ),
@@ -470,6 +475,8 @@ export async function renderSkeleton(
     request.multilingual === true,
     request.analytics !== undefined,
     request.applicationPersistence === true,
+    resolutionResult.value.capabilities.some(({ identifier }) => identifier === "app-foundation"),
+    request.transactionalEmailResend === true,
   );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;
@@ -515,6 +522,7 @@ export async function renderSkeleton(
     projectResult.value.originProfile,
     resolutionResult.value.recipeVersion,
     request.applicationPersistence === true,
+    resolutionResult.value.capabilities.some(({ identifier }) => identifier === "app-foundation"),
   );
   if (!manifestResult.ok) {
     return manifestResult;

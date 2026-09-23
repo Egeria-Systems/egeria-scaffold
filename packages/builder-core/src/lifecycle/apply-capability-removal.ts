@@ -12,7 +12,6 @@ import {
   ordinaryGenerationVerificationChecks,
 } from "../contracts/generation-verification.js";
 import type { PersistenceRemovalInput, PersistenceRemovalHumanReview } from "../contracts/persistence-removal-evidence.js";
-import type { ProfileIdentifier } from "../contracts/profile.js";
 import { safeRelativePathSchema } from "../contracts/identifiers.js";
 import {
   migrationRecordSchema,
@@ -80,11 +79,11 @@ import {
   type CapabilityRemovalPlanningFailureCode,
 } from "./plan-capability-removal.js";
 
-import { preparePersistenceRenderingChange } from "./prepare-persistence-rendering-change.js";
+import { prepareCapabilityDependencyChange } from "./prepare-capability-dependency-change.js";
 import { validatePersistenceRemovalHumanReview } from "./review-persistence-removal-evidence.js";
 
 const encoder = new TextEncoder();
-type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence";
+type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend";
 
 function removalMigrationIdentifier(
   capability: RemovableCapability,
@@ -92,8 +91,11 @@ function removalMigrationIdentifier(
   | "remove-analytics-0-1-0"
   | "remove-booking-calendly-0-1-0"
   | "remove-multilingual-0-1-0"
-  | "remove-application-persistence-0-1-0" {
+  | "remove-application-persistence-0-1-0"
+  | "remove-transactional-email-resend-0-1-0" {
   switch (capability) {
+    case "transactional-email-resend":
+      return "remove-transactional-email-resend-0-1-0";
     case "application-persistence":
       return "remove-application-persistence-0-1-0";
     case "analytics":
@@ -238,10 +240,10 @@ async function readExpectedFileStates(
 
 function verificationIsExact(
   value: GeneratedProjectVerification,
-  profile: ProfileIdentifier,
+  foundation: boolean,
   persistence: boolean,
 ): boolean {
-  return sameValues(value.checks, persistence ? persistenceGenerationVerificationChecks : profile === "app"
+  return sameValues(value.checks, persistence ? persistenceGenerationVerificationChecks : foundation
     ? appGenerationVerificationChecks
     : ordinaryGenerationVerificationChecks);
 }
@@ -691,11 +693,13 @@ export async function applyCapabilityRemoval(input: Readonly<{
         ? { multilingual: true as const }
         : {}),
     ...(retainsPersistence ? { applicationPersistence: true as const } : {}),
+    ...(input.capability !== "transactional-email-resend" && controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
-  }, input.capability === "application-persistence" ? createGenerationRenderingContext(false) : snapshot.value.renderingContext);
+  }, input.capability === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext);
   if (!desiredRender.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
+  const hasFoundation = desiredRender.value.project.selectedCapabilities.includes("app-foundation");
   let desired = desiredRender;
   if (input.capability === "application-persistence") {
     const current = await renderSkeleton({
@@ -703,13 +707,14 @@ export async function applyCapabilityRemoval(input: Readonly<{
       projectName: controls.project.value.project.name,
       displayName: controls.project.value.project.displayName,
       applicationPersistence: true,
+      ...(controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
       ...(controls.project.value.capabilitySettings.analytics === undefined ? {} : { analytics: controls.project.value.capabilitySettings.analytics }),
       ...(controls.project.value.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: controls.project.value.capabilitySettings["booking-calendly"] }),
       ...(controls.project.value.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
       packageVersions: verifiedCapabilityPackageVersions,
     }, snapshot.value.renderingContext);
     if (!current.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-    const prepared = await preparePersistenceRenderingChange({ reader, current: current.value, desired: desiredRender.value });
+    const prepared = await prepareCapabilityDependencyChange({ reader, current: current.value, desired: desiredRender.value });
     if (!prepared.ok) return failure("CAPABILITY_ACTION_CONFLICT", "precondition", "not-required");
     desired = { ok: true, value: prepared.value.desired };
   }
@@ -784,7 +789,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
     return failure("GIT_WORKTREE_CHANGED", "precondition", "not-required");
   }
 
-  if (controls.project.value.selectedCapabilities.includes("application-persistence")) {
+  if (controls.project.value.selectedCapabilities.includes("application-persistence") || controls.project.value.selectedCapabilities.includes("transactional-email-resend")) {
     const finalPlan = await planCapabilityRemoval({ reader, git: finalCleanGit, capability: input.capability,
       ...(input.persistenceRemoval === undefined ? {} : { persistenceRemoval: input.persistenceRemoval }),
       ...(input.inspectRepositoryInventory === undefined ? {} : { inspectRepositoryInventory: input.inspectRepositoryInventory }),
@@ -822,7 +827,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       "inspect-worktree",
     );
   }
-  if (!verified.ok || !verificationIsExact(verified.value, plan.profile, retainsPersistence)) {
+  if (!verified.ok || !verificationIsExact(verified.value, hasFoundation, retainsPersistence)) {
     return failure(
       "CAPABILITY_VERIFICATION_FAILED",
       "verify",
@@ -890,7 +895,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
     capabilities: plan.desiredCapabilities,
     persistentDataAuthorizations: [],
     remainingKnownDrift: [],
-    verificationChecks: retainsPersistence ? persistenceCapabilityRemovalPersistedVerificationChecks : plan.profile === "app"
+    verificationChecks: retainsPersistence ? persistenceCapabilityRemovalPersistedVerificationChecks : hasFoundation
       ? appCapabilityRemovalPersistedVerificationChecks
       : capabilityRemovalPersistedVerificationChecks,
   });
@@ -1077,7 +1082,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       migration: removalMigrationIdentifier(input.capability),
       changedPaths,
       preservedPaths,
-      verificationChecks: retainsPersistence ? persistenceCapabilityRemovalVerificationChecks : plan.profile === "app"
+      verificationChecks: retainsPersistence ? persistenceCapabilityRemovalVerificationChecks : hasFoundation
         ? appCapabilityRemovalVerificationChecks
         : capabilityRemovalVerificationChecks,
     },

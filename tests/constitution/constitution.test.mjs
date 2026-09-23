@@ -739,7 +739,8 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   for (const [identifier, job] of Object.entries(workflow.jobs)) {
     assert.equal(job["runs-on"], "ubuntu-24.04", identifier);
     assert.equal(typeof job["timeout-minutes"], "number", identifier);
-    assert.ok(job["timeout-minutes"] > 0 && job["timeout-minutes"] <= 45);
+    const maximumMinutes = identifier === "generated-projects" ? 60 : 45;
+    assert.ok(job["timeout-minutes"] > 0 && job["timeout-minutes"] <= maximumMinutes);
   }
   for (const identifier of jobsWithCheckout) {
     const checkout = workflow.jobs[identifier].steps.find(({ uses }) =>
@@ -2492,7 +2493,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     capabilityModel,
-    /Runtime status:[^\n]+eleven admission descriptors[^\n]+three generation recipes[^\n]+exact descriptors[^\n]+Implementation and registry admission do not certify/iu,
+    /Runtime status:[^\n]+twelve admission descriptors[^\n]+three generation recipes[^\n]+exact descriptors[^\n]+Implementation and registry admission do not certify/iu,
   );
   const completedRemovalGuardStage = ["P", "3", "C"].join("");
   const appFoundationStage = ["P", "4"].join("");
@@ -2521,7 +2522,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     packageOwnership,
-    /eleven admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
+    /twelve admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
   );
   assert.match(
     programRoadmap,
@@ -2851,7 +2852,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /eleven-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
+    /twelve-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
   );
 });
 
@@ -3409,17 +3410,20 @@ test("executable capability certification ownership is current", async () => {
     "section-composition",
     "site-routing",
     "standards",
+    "transactional-email-resend",
   ]);
   const pendingSubjects = new Set([
-    "analytics", "application-persistence", "booking-calendly",
-    "deployment-cloudflare", "standards",
+    "analytics", "app-foundation", "application-persistence", "booking-calendly",
+    "deployment-cloudflare", "standards", "transactional-email-resend",
   ]);
   for (const [capabilityId, record] of Object.entries(registry.records)) {
     const pending = pendingSubjects.has(capabilityId);
     assert.equal(record.status, pending ? "pending" : "certified");
     assert.equal(
       record.taskPlan,
-      ["application-persistence", "standards", "deployment-cloudflare"].includes(capabilityId)
+      ["app-foundation", "transactional-email-resend"].includes(capabilityId)
+        ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
+        : ["application-persistence", "standards", "deployment-cloudflare"].includes(capabilityId)
         ? "docs/superpowers/plans/2026-09-14-application-persistence-certification.md"
         : pending || capabilityId === "observability"
           ? "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md"
@@ -3600,8 +3604,8 @@ test("canonical documentation records visual regression and the client-ready clo
   ]) {
     assert.match(currentContractOwner, /\bsubjects\b[^\n]+\b(?:pending|empty evidence)\b/iu);
   }
-  assert.match(capabilityModel, /\bCurrent admission passes for all eleven records\b/iu);
-  assert.match(capabilityModel, /\bsix certified and five pending admission subjects\b/iu);
+  assert.match(capabilityModel, /\bCurrent admission passes for all twelve records\b/iu);
+  assert.match(capabilityModel, /\bfive certified and seven pending subjects\b/iu);
 
   assert.match(
     capabilityModel,
@@ -4189,7 +4193,7 @@ test("canonical documentation accepts profile-transition execution and records t
   ]) {
     assert.match(historicalCertificationOwner, multilingualEligibilityPattern);
   }
-  assert.match(builderCoreInstructions, /\bsix exact subjects are certified; five subjects remain pending\b/iu);
+  assert.match(builderCoreInstructions, /\bfive exact subjects are certified; seven subjects remain pending\b/iu);
 
   for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
     assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);
@@ -4648,15 +4652,15 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     capabilityModel,
-    /eleven admission descriptors.*three generation recipes.*exact descriptors.*Implementation and registry admission do not certify/isu,
+    /twelve admission descriptors.*three generation recipes.*exact descriptors.*Implementation and registry admission do not certify/isu,
   );
   assert.match(
     packageOwnership,
-    /eleven admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
+    /twelve admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
   );
   assert.match(
     builderCoreReadme,
-    /exact eleven executable admission capability descriptors/iu,
+    /exact twelve executable admission capability descriptors/iu,
   );
   assert.match(
     cliReadme,

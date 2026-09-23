@@ -25,6 +25,7 @@ async function repository(options = {}) {
   const rendered = await core.renderSkeleton({
     profile: "app", projectName: "persistence-removal", displayName: "Persistence removal",
     applicationPersistence: true, ...(options.multilingual ? { multilingual: true } : {}),
+    ...(options.transactionalEmailResend ? { transactionalEmailResend: true } : {}),
     packageVersions: core.verifiedCapabilityPackageVersions,
   });
   assert.equal(rendered.ok, true, JSON.stringify(rendered));
@@ -102,6 +103,22 @@ async function plan(repository, persistenceRemoval, capability = "application-pe
 function humanReview(plan) {
   return { reportFingerprint: plan.persistenceRemovalReport.reportFingerprint, dispositions: plan.persistenceRemovalReport.requiredReviewItems.map(({ identifier }) => ({ identifier, disposition: "accepted" })) };
 }
+
+test("removing persistence preserves independently installed email and its foundation", async () => {
+  const repo = await repository({ transactionalEmailResend: true });
+  const evidence = removalEvidence(repo);
+  const planned = await plan(repo, evidence);
+  assert.equal(planned.ok, true, JSON.stringify(planned));
+  assert.ok(planned.value.desiredCapabilities.includes("transactional-email-resend"));
+  const result = await apply(repo, planned.value, evidence);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
+  assert.equal(state.ok, true, JSON.stringify(state));
+  assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.2.0");
+  assert.ok(state.value.installedCapabilities.some(({ identifier }) => identifier === "transactional-email-resend"));
+  assert.equal(state.value.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"), false);
+  assert.ok(repo.files.has("apps/web/src/infrastructure/resend/transactional-email-sender.ts"));
+});
 
 async function apply(repository, planned, evidence, overrides = {}) {
   return applyCapabilityRemoval({

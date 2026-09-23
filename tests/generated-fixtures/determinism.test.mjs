@@ -159,6 +159,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
       ...(fixture.expectedAnalyticsVersion ? { analytics: fixture.expectedCapabilitySettings.analytics } : {}),
       ...(fixture.expectedMultilingualVersion ? { multilingual: true } : {}),
       ...(fixture.expectedApplicationPersistenceVersion ? { applicationPersistence: true } : {}),
+      ...(fixture.expectedTransactionalEmailVersion ? { transactionalEmailResend: true } : {}),
     });
     assert.equal(rendered.ok, true);
     for (const { path, content } of rendered.value.files) {
@@ -327,6 +328,7 @@ test("compiled project generation matches every committed fixture identifier", a
           state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence")?.version ?? null,
           fixtureCase.expectedApplicationPersistenceVersion ?? null,
         );
+        assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "transactional-email-resend")?.version ?? null, fixtureCase.expectedTransactionalEmailVersion ?? null);
         const projectConfiguration = await readFile(
           join(destination, ".egeria/project.yaml"),
           "utf8",
@@ -349,7 +351,7 @@ test("compiled project generation matches every committed fixture identifier", a
           "component-tests",
           "next-build",
           "opennext-build",
-          ...(fixtureCase.profile === "app" ? ["worker-integration"] : []),
+          ...(fixtureCase.expectedAppFoundationVersion ? ["worker-integration"] : []),
           ...(fixtureCase.expectedApplicationPersistenceVersion ? ["binding-integration"] : []),
           "post-state-inference",
         ]);

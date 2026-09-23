@@ -294,6 +294,7 @@ async function runCreate(
         : { analytics: command.analytics }),
       ...(command.multilingual === true ? { multilingual: true } : {}),
       ...(command.applicationPersistence === true ? { applicationPersistence: true } : {}),
+      ...(command.transactionalEmailResend === true ? { transactionalEmailResend: true } : {}),
     },
     destination: resolve(command.directory),
     verifier: dependencies.createVerifier(),

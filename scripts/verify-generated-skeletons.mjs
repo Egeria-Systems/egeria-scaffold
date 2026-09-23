@@ -160,6 +160,18 @@ const appFoundationFiles = Object.freeze([
   "apps/web/vitest.cloudflare.config.ts",
 ].sort(codePointCompare));
 
+const transactionalEmailFiles = Object.freeze([
+  "apps/web/src/application/transactional-email-sender.ts",
+  "apps/web/src/infrastructure/resend/transactional-email-sender.ts",
+  "apps/web/src/infrastructure/cloudflare/transactional-email-configuration.ts",
+  "apps/web/src/composition/server-transactional-email.ts",
+  "apps/web/src/infrastructure/observability/transactional-email-events.ts",
+  "apps/web/tests/unit/resend-transactional-email-sender.test.ts",
+  "apps/web/tests/unit/server-transactional-email.test.ts",
+  "apps/web/tests/unit/transactional-email-events.test.ts",
+  "docs/transactional-email.md",
+].sort(codePointCompare));
+
 const applicationPersistenceFiles = Object.freeze([
   ".github/workflows/migrate-application-database.yml",
   "apps/web/drizzle.config.ts",
@@ -281,6 +293,7 @@ const createArguments = ({
   bookingCalendly,
   multilingual,
   applicationPersistence,
+  transactionalEmailResend,
 }) =>
   Object.freeze([
     "--profile",
@@ -299,6 +312,7 @@ const createArguments = ({
         ]),
     ...(multilingual === true ? ["--multilingual"] : []),
     ...(applicationPersistence === true ? ["--application-persistence"] : []),
+    ...(transactionalEmailResend === true ? ["--transactional-email-resend"] : []),
     ...(analytics === undefined
       ? []
       : [
@@ -640,6 +654,34 @@ export const generatedFixtureContracts = Object.freeze([
     expectedSurfaces: 161,
     visualRegression: false,
   }),
+  Object.freeze({
+    identifier: "portfolio-email", profile: "portfolio", projectName: "acme-portfolio-email", displayName: "Acme Portfolio Email",
+    createArguments: createArguments({ profile: "portfolio", projectName: "acme-portfolio-email", displayName: "Acme Portfolio Email", transactionalEmailResend: true }),
+    expectedCapabilitySettings: noCapabilitySettings,
+    relativeRoot: "fixtures/generated/portfolio-email",
+    expectedFiles: Object.freeze([...portfolioFiles, ...appFoundationFiles, ...transactionalEmailFiles].sort(codePointCompare)),
+    expectedCapabilities: Object.freeze(["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "app-foundation", "transactional-email-resend"]),
+    expectedRecipeVersion: "0.11.0", expectedStandardsVersion: "0.5.0",
+    expectedObservabilityVersion: "0.3.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.3.0", expectedAppFoundationVersion: "0.2.0",
+    expectedTransactionalEmailVersion: "0.1.0", expectedApplicationPersistenceVersion: null,
+    expectedSiteRoutingVersion: null, expectedBookingCalendlyVersion: null,
+    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 134, visualRegression: false,
+  }),
+  Object.freeze({
+    identifier: "app-persistence-email", profile: "app", projectName: "acme-app-persistence-email", displayName: "Acme App Persistence Email",
+    createArguments: createArguments({ profile: "app", projectName: "acme-app-persistence-email", displayName: "Acme App Persistence Email", transactionalEmailResend: true, applicationPersistence: true }),
+    expectedCapabilitySettings: noCapabilitySettings,
+    relativeRoot: "fixtures/generated/app-persistence-email",
+    expectedFiles: Object.freeze([...portfolioFiles, ...appFoundationFiles, ...siteRoutingFiles, ...applicationPersistenceFiles, ...transactionalEmailFiles].sort(codePointCompare)),
+    expectedCapabilities: Object.freeze(["standards", "deployment-cloudflare", "content-files", "section-composition", "observability", "app-foundation", "site-routing", "application-persistence", "transactional-email-resend"]),
+    expectedRecipeVersion: "0.2.0", expectedStandardsVersion: "0.6.0",
+    expectedObservabilityVersion: "0.3.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.4.0", expectedAppFoundationVersion: "0.2.0",
+    expectedTransactionalEmailVersion: "0.1.0", expectedApplicationPersistenceVersion: "0.1.0",
+    expectedSiteRoutingVersion: "0.4.0", expectedBookingCalendlyVersion: null,
+    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 170, visualRegression: false,
+  }),
 ]);
 
 const verificationChecks = [
@@ -787,7 +829,7 @@ function expectedWebManifest(projectName, nextVersion, appFoundation, persistenc
       "@opennextjs/cloudflare": "1.20.2",
       ...(appFoundation ? { effect: "4.0.0-rc.112" } : {}),
       ...(persistence ? { "drizzle-orm": "0.45.2" } : {}),
-      next: nextVersion,
+      next: appFoundation ? "16.3.3" : nextVersion,
       react: "19.2.8",
       "react-dom": "19.2.8",
       yaml: "2.9.0",
@@ -1076,7 +1118,7 @@ async function inspectFixture(root, contract) {
       expectedWebManifest(
         contract.projectName,
         contract.profile === "portfolio" ? "16.3.0" : "16.3.3",
-        contract.profile === "app",
+        contract.expectedAppFoundationVersion !== undefined,
         contract.expectedApplicationPersistenceVersion === "0.1.0",
       ),
     )
@@ -1104,7 +1146,7 @@ async function inspectFixture(root, contract) {
   const persistence = contract.expectedApplicationPersistenceVersion === "0.1.0";
   const workspacePolicyBase = persistence
     ? expectedWorkspacePolicy.replace("\nallowBuilds:\n", '  "@esbuild-kit/core-utils>esbuild": 0.25.4\n\nallowBuilds:\n') : expectedWorkspacePolicy;
-  const expectedPolicy = contract.profile === "app"
+  const expectedPolicy = contract.expectedAppFoundationVersion !== undefined
     ? `${workspacePolicyBase}  msgpackr-extract: false\n`
     : workspacePolicyBase;
   if (workspacePolicy !== expectedPolicy) {
@@ -1142,8 +1184,10 @@ async function inspectFixture(root, contract) {
     }
   }
 
-  if (contract.profile === "app") {
-    const expectedLockFingerprint = persistence
+  if (contract.expectedAppFoundationVersion !== undefined) {
+    const expectedLockFingerprint = contract.profile === "portfolio"
+      ? "7619986cacbc0420cc7b1bfd1cbc821c2f2aedfbdb64da2911292d4c902d220b"
+      : persistence
       ? "e780e8905c3e8a96b5c71f5d495621f63f0c655f04c438a0e3d926cb523069c1"
       : "30b508b027b4ead219c5af2aec281b65bed7dd63ec3e338df9e5dec93597c1e4";
     if (fingerprint(lockfile) !== expectedLockFingerprint) {
@@ -1154,7 +1198,7 @@ async function inspectFixture(root, contract) {
   }
 
   try {
-    inspectEffectSourceBoundary(await readFixtureSources(root, snapshot), contract.profile === "app");
+    inspectEffectSourceBoundary(await readFixtureSources(root, snapshot), contract.expectedAppFoundationVersion !== undefined);
   } catch {
     fail("FIXTURE_EFFECT_BOUNDARY_INVALID");
   }

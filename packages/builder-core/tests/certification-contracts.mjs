@@ -48,4 +48,7 @@ export const requiredEvidence = Object.freeze({
     "existing-repository-lifecycle",
     "fresh-scaffold",
   ]),
+  "transactional-email-resend": Object.freeze([
+    "cleanup-recovery", "deployed-application", "existing-repository-lifecycle", "fresh-scaffold", "provider-confirmed",
+  ]),
 });

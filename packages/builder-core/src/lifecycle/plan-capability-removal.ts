@@ -45,10 +45,10 @@ import {
   type GitRepositoryInventoryInspection,
 } from "./git-worktree-inspection.js";
 
-import { preparePersistenceRenderingChange } from "./prepare-persistence-rendering-change.js";
+import { prepareCapabilityDependencyChange } from "./prepare-capability-dependency-change.js";
 import { reviewPersistenceRemovalEvidence } from "./review-persistence-removal-evidence.js";
 
-type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence";
+type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend";
 
 export type CapabilityRemovalAction = Readonly<{
   kind:
@@ -61,6 +61,7 @@ export type CapabilityRemovalAction = Readonly<{
   owner:
     | "analytics"
     | "application-persistence"
+    | "transactional-email-resend"
     | "deployment-cloudflare"
     | "booking-calendly"
     | "builder-kernel"
@@ -78,6 +79,11 @@ export type CapabilityRemovalReviewRequirement =
   | Readonly<{
       code: "reconcile-preserved-capability-surfaces";
       paths: readonly string[];
+    }>
+  | Readonly<{
+      code: "review-email-provider-credential-and-retention-disposition";
+      scope: "source-only-removal-provider-credentials-and-retained-data-separate";
+      retainedCapabilities: readonly ["app-foundation"];
     }>
   | Readonly<{
       code: "review-analytics-provider-and-client-storage-disposition";
@@ -162,6 +168,7 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const removalReferenceTokens = {
   "application-persistence": "application-persistence",
+  "transactional-email-resend": "transactional-email",
   analytics: "analytics",
   "booking-calendly": "calendly",
   multilingual: "multilingual",
@@ -447,6 +454,7 @@ function actionOwner(
   return [
     "analytics",
     "application-persistence",
+    "transactional-email-resend",
     "deployment-cloudflare",
     "booking-calendly",
     "multilingual",
@@ -693,6 +701,11 @@ function removalReviewRequirements(
             warnings: referenceWarnings,
           },
         ]),
+    ...(capability === "transactional-email-resend" ? [{
+      code: "review-email-provider-credential-and-retention-disposition" as const,
+      scope: "source-only-removal-provider-credentials-and-retained-data-separate" as const,
+      retainedCapabilities: ["app-foundation"] as const,
+    }] : []),
     ...(capability === "analytics"
       ? [
           {
@@ -764,7 +777,7 @@ async function preparePersistenceReview(input: Readonly<{
   }) } };
 }
 
-async function readPersistencePlanBindings(
+async function readRemovalPlanBindings(
   reader: RepositoryReader,
   current: RenderedSkeleton,
   desired: RenderedSkeleton,
@@ -833,7 +846,8 @@ export async function planCapabilityRemoval(input: Readonly<{
     capabilityValue !== "analytics" &&
     capabilityValue !== "booking-calendly" &&
     capabilityValue !== "multilingual" &&
-    capabilityValue !== "application-persistence"
+    capabilityValue !== "application-persistence" &&
+    capabilityValue !== "transactional-email-resend"
   ) {
     return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
   }
@@ -852,8 +866,8 @@ export async function planCapabilityRemoval(input: Readonly<{
   }
 
   let inspectionCatalog = snapshot.value.catalog;
-  if (capabilityValue === "application-persistence" && !inspectionCatalog.some(({ identifier }) => identifier === capabilityValue)) {
-    const persistenceCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, applicationPersistenceCatalogSnapshot);
+  if ((capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend") && !inspectionCatalog.some(({ identifier }) => identifier === capabilityValue)) {
+    const persistenceCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, capabilityValue === "application-persistence" ? applicationPersistenceCatalogSnapshot : createGenerationRenderingContext(false, true).catalogSnapshot);
     const removedDescriptor = persistenceCatalog.ok
       ? persistenceCatalog.value.find(({ identifier }) => identifier === capabilityValue) : undefined;
     if (removedDescriptor === undefined) return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -937,6 +951,7 @@ export async function planCapabilityRemoval(input: Readonly<{
       : {}),
     ...(analyticsSettings === undefined ? {} : { analytics: analyticsSettings }),
     ...(project.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
+    ...(project.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
   const [currentRender, desiredRender] = await Promise.all([
@@ -957,8 +972,9 @@ export async function planCapabilityRemoval(input: Readonly<{
         ? {}
         : { analytics: analyticsSettings }),
       ...(capabilityValue !== "application-persistence" && renderRequest.applicationPersistence === true ? { applicationPersistence: true as const } : {}),
+      ...(capabilityValue !== "transactional-email-resend" && renderRequest.transactionalEmailResend === true ? { transactionalEmailResend: true as const } : {}),
       packageVersions: verifiedCapabilityPackageVersions,
-    }, capabilityValue === "application-persistence" ? createGenerationRenderingContext(false) : snapshot.value.renderingContext),
+    }, capabilityValue === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext),
   ]);
 
   if (!currentRender.ok || !desiredRender.ok) {
@@ -966,7 +982,7 @@ export async function planCapabilityRemoval(input: Readonly<{
   }
 
   const prepared = capabilityValue === "application-persistence"
-    ? await preparePersistenceRenderingChange({ reader: input.reader, current: currentRender.value, desired: desiredRender.value })
+    ? await prepareCapabilityDependencyChange({ reader: input.reader, current: currentRender.value, desired: desiredRender.value })
     : { ok: true as const, value: { current: currentRender.value, desired: desiredRender.value } };
   if (!prepared.ok) {
     return planningFailure("PROJECT_DRIFT_DETECTED");
@@ -1061,8 +1077,8 @@ export async function planCapabilityRemoval(input: Readonly<{
   if (persistenceReview !== undefined && !persistenceReview.ok) {
     return persistenceReview;
   }
-  const persistenceBindings = project.selectedCapabilities.includes("application-persistence")
-    ? await readPersistencePlanBindings(input.reader, current.value, targetRender, actions.value,
+  const persistenceBindings = project.selectedCapabilities.includes("application-persistence") || project.selectedCapabilities.includes("transactional-email-resend")
+    ? await readRemovalPlanBindings(input.reader, current.value, targetRender, actions.value,
         persistenceInput?.success === true ? persistenceInput.data : undefined, referenceWarnings, inventory.value)
     : undefined;
 

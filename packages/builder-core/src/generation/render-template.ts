@@ -8,6 +8,7 @@ const templateLayers = new Set([
   "analytics",
   "app-foundation",
   "application-persistence",
+  "transactional-email-resend",
   "deployment-cloudflare",
   "standards",
   "booking-calendly",

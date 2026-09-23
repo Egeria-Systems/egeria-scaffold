@@ -1725,7 +1725,7 @@ test("the verified admission catalog pins exact public package releases", () => 
   assert.equal(core.verifiedCapabilityPackageVersions.standards, "0.1.0");
 
   const catalog = assertOk(core.createVerifiedCapabilityCatalog());
-  assert.equal(catalog.length, 11);
+  assert.equal(catalog.length, 12);
   assert.deepEqual(
     catalog.map(({ identifier }) => identifier),
     [
@@ -1739,6 +1739,7 @@ test("the verified admission catalog pins exact public package releases", () => 
       "multilingual",
       "analytics",
       "application-persistence",
+      "transactional-email-resend",
       "app-foundation",
     ],
   );

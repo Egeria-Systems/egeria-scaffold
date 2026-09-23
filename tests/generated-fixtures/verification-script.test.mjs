@@ -371,6 +371,14 @@ test("fixture inspection accepts only the exact portable generated trees", async
         identifier: "app-persistence", profile: "app",
         relativeRoot: "fixtures/generated/app-persistence",
       },
+      {
+        identifier: "portfolio-email", profile: "portfolio",
+        relativeRoot: "fixtures/generated/portfolio-email",
+      },
+      {
+        identifier: "app-persistence-email", profile: "app",
+        relativeRoot: "fixtures/generated/app-persistence-email",
+      },
     ],
   );
 
@@ -379,10 +387,10 @@ test("fixture inspection accepts only the exact portable generated trees", async
       contract.expectedRecipeVersion,
       contract.profile === "app" ? "0.2.0" : contract.profile === "site" ? "0.12.0" : "0.11.0",
     );
-    assert.equal(contract.expectedStandardsVersion, contract.identifier === "app-persistence" ? "0.6.0" : "0.5.0");
+    assert.equal(contract.expectedStandardsVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.6.0" : "0.5.0");
     assert.equal(contract.expectedObservabilityVersion, "0.3.0");
     assert.equal(contract.expectedContentFilesVersion, "0.4.0");
-    assert.equal(contract.expectedDeploymentCloudflareVersion, contract.identifier === "app-persistence" ? "0.4.0" : "0.3.0");
+    assert.equal(contract.expectedDeploymentCloudflareVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.4.0" : "0.3.0");
     assert.equal(
       contract.expectedSiteRoutingVersion,
       contract.profile === "portfolio" ? null : "0.4.0",
@@ -415,7 +423,9 @@ test("fixture inspection accepts only the exact portable generated trees", async
               ? 139
               : contract.identifier === "app" ? 142
                 : contract.identifier === "app-all-optional-integrations" ? 178
-                  : contract.identifier === "app-persistence" ? 161 : 154,
+                  : contract.identifier === "app-persistence" ? 161
+                    : contract.identifier === "portfolio-email" ? 134
+                      : contract.identifier === "app-persistence-email" ? 170 : 154,
     );
     assert.equal(
       contract.visualRegression,
@@ -424,6 +434,8 @@ test("fixture inspection accepts only the exact portable generated trees", async
         "site-multilingual-analytics",
         "app-all-optional-integrations",
         "app-persistence",
+        "portfolio-email",
+        "app-persistence-email",
       ].includes(contract.identifier),
     );
     const snapshot = await inspectGeneratedFixture(
@@ -633,6 +645,10 @@ test("generated fixture text and visual baseline attributes are explicit", async
     "fixtures/generated/app-all-optional-integrations/package.json: eol: lf",
     "fixtures/generated/app-persistence/package.json: text: set",
     "fixtures/generated/app-persistence/package.json: eol: lf",
+    "fixtures/generated/portfolio-email/package.json: text: set",
+    "fixtures/generated/portfolio-email/package.json: eol: lf",
+    "fixtures/generated/app-persistence-email/package.json: text: set",
+    "fixtures/generated/app-persistence-email/package.json: eol: lf",
   ]);
 
   const baselineDirectory =
@@ -662,7 +678,7 @@ test("generated fixture text and visual baseline attributes are explicit", async
     { cwd: repositoryRoot, encoding: "utf8" },
   );
 
-  assert.equal(baselinePaths.length, 20);
+  assert.equal(baselinePaths.length, 24);
   assert.deepEqual(
     binaryAttributes.trimEnd().split("\n"),
     baselinePaths.flatMap((path) => [
@@ -1706,7 +1722,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     });
 
     const { appBuildEvidence, ...verification } = result;
-    assert.deepEqual(appBuildEvidence.map(({ fixture }) => fixture), ["app", "app-all-optional-integrations", "app-persistence"]);
+    assert.deepEqual(appBuildEvidence.map(({ fixture }) => fixture), ["app", "app-all-optional-integrations", "app-persistence", "portfolio-email", "app-persistence-email"]);
     for (const build of appBuildEvidence) {
       assert.equal(build.effect.version, "4.0.0-rc.112");
       assert.equal(build.client.files.length, 1);
@@ -1725,15 +1741,17 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         "app",
         "app-all-optional-integrations",
         "app-persistence",
+        "portfolio-email",
+        "app-persistence-email",
       ],
       profiles: ["portfolio", "site", "app"],
       workerIntegration: {
-        executed: ["app", "app-all-optional-integrations", "app-persistence"],
+        executed: ["app", "app-all-optional-integrations", "app-persistence", "portfolio-email", "app-persistence-email"],
         skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-multilingual-analytics"],
       },
       bindingIntegration: {
-        executed: ["app-persistence"],
-        skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-multilingual-analytics", "app", "app-all-optional-integrations"],
+        executed: ["app-persistence", "app-persistence-email"],
+        skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-multilingual-analytics", "app", "app-all-optional-integrations", "portfolio-email"],
       },
       checks: [
         "pnpm-version",
@@ -1766,7 +1784,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   const fixtureCommands = generatedFixtureContracts.map(({ identifier }) =>
     commands.filter(({ cwd }) => cwd === join(ownedPath, `${identifier}-project`)),
   );
-  assert.deepEqual(fixtureCommands.map((entries) => entries.length), [16, 16, 16, 16, 16, 16, 16, 18]);
+  assert.deepEqual(fixtureCommands.map((entries) => entries.length), [16, 16, 16, 16, 16, 16, 16, 18, 16, 18]);
   const firstCommands = fixtureCommands.map(
     ([command]) => command,
   );

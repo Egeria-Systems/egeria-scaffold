@@ -14,6 +14,12 @@ const revision = "4da1ad1e48c12567d4e477c4ecbc3b9d4e097922";
 const currentRegistry = JSON.parse(await readFile(join(repositoryRoot, "certifications/capabilities.json"), "utf8"));
 const registry = structuredClone(currentRegistry);
 delete registry.records["application-persistence"];
+delete registry.records["transactional-email-resend"];
+registry.records["app-foundation"] = {
+  subject: { descriptorVersion: "0.1.0", behaviorContractDigest: "sha256:6d9cf389441064a96d2b47bb309becab37358fcc2952335feffae8720eb6f497" },
+  requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
+  status: "pending", taskPlan: "docs/superpowers/plans/2026-09-13-app-foundation-certification.md", evidence: [],
+};
 registry.records.standards = {
   subject: {
     descriptorVersion: "0.5.0",
