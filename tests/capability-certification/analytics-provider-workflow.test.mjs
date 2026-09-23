@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
+import { inspect, promisify } from "node:util";
 
 import { isPinnedGitHubActionReference } from "../helpers/github-actions.mjs";
 
@@ -275,6 +275,44 @@ function assertBoundedControlPlaneRequests(source) {
     /\b(?:retry|retries|maximumAttempts|setTimeout)\b/iu,
   );
 }
+
+test("site-list refusals expose bounded diagnostics without provider content", async () => {
+  const { readAnalyticsCertificationSite } = await import(receiptBuilderPath);
+  const privateValue = "private-provider-value-must-not-appear";
+  for (const scenario of [
+    {
+      status: 403,
+      payload: { success: false, errors: [{ code: 10000, message: privateValue }, { code: privateValue }] },
+      expected: { httpStatus: 403, apiSuccess: false, apiErrorCodes: [10000], resultCount: null, page: null, totalCount: null, totalPages: null },
+    },
+    {
+      status: 200,
+      payload: { success: true, result: [{ host: privateValue, site_token: privateValue }], result_info: { page: 1, total_count: 2, total_pages: 2 } },
+      expected: { httpStatus: 200, apiSuccess: true, apiErrorCodes: [], resultCount: 1, page: 1, totalCount: 2, totalPages: 2 },
+    },
+    {
+      status: 200,
+      payload: { success: privateValue, errors: Array.from({ length: 20 }, () => ({ code: 10000, message: privateValue })), result: privateValue, result_info: { page: privateValue, total_count: -1, total_pages: Number.MAX_SAFE_INTEGER + 1 } },
+      expected: { httpStatus: 200, apiSuccess: false, apiErrorCodes: Array(10).fill(10000), resultCount: null, page: null, totalCount: null, totalPages: null },
+    },
+  ]) {
+    let requests = 0;
+    const fetchResponse = async () => {
+      requests += 1;
+      return new Response(JSON.stringify(scenario.payload), { status: scenario.status });
+    };
+    await assert.rejects(
+      readAnalyticsCertificationSite(fetchResponse, "https://api.example.test/sites", {}, exactHostname),
+      (error) => {
+        assert.equal(error.code, "ANALYTICS_PROVIDER_EVIDENCE_INVALID");
+        assert.deepEqual(error.diagnostics, scenario.expected);
+        assert.doesNotMatch(inspect(error), new RegExp(privateValue, "u"));
+        return true;
+      },
+    );
+    assert.equal(requests, 1);
+  }
+});
 
 test("control-plane requests use exact per-request deadlines without retries", async () => {
   const workflow = parseYaml(await readFile(workflowPath, "utf8"));

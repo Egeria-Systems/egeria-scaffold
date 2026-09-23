@@ -159,7 +159,24 @@ export async function readAnalyticsCertificationSite(controlPlaneFetch, endpoint
   if (!response.ok || payload?.success !== true || !Array.isArray(payload.result) ||
     payload.result.length > 100 || payload.result_info?.page !== 1 ||
     payload.result_info?.total_count !== payload.result.length ||
-    (payload.result_info?.total_pages !== undefined && ![0, 1].includes(payload.result_info.total_pages))) reject();
+    (payload.result_info?.total_pages !== undefined && ![0, 1].includes(payload.result_info.total_pages))) {
+    const boundedInteger = (value) =>
+      Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000 ? value : null;
+    const error = new AnalyticsProviderReceiptError();
+    // Uncaught workflow errors may expose diagnostics, never provider text or identifiers.
+    error.diagnostics = {
+      httpStatus: boundedInteger(response.status),
+      apiSuccess: payload?.success === true,
+      apiErrorCodes: Array.isArray(payload?.errors)
+        ? payload.errors.slice(0, 10).map((entry) => boundedInteger(entry?.code)).filter((code) => code !== null)
+        : [],
+      resultCount: Array.isArray(payload?.result) ? boundedInteger(payload.result.length) : null,
+      page: boundedInteger(payload?.result_info?.page),
+      totalCount: boundedInteger(payload?.result_info?.total_count),
+      totalPages: boundedInteger(payload?.result_info?.total_pages),
+    };
+    throw error;
+  }
   const matches = payload.result.filter((site) => site?.host === hostname);
   if (matches.length > 1 || (matches.length === 1 && typeof matches[0].site_token !== "string")) reject();
   return matches[0] ?? null;
