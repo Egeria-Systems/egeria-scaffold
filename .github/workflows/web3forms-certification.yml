@@ -1,0 +1,125 @@
+name: Web3Forms certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_revision:
+        description: Exact reviewed revision approved for certification
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-deploy
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  verify-and-deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment:
+      name: test-deploy
+      url: ${{ vars.DEPLOY_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Verify approved revision
+        env:
+          EXPECTED_REVISION: ${{ inputs.expected_revision }}
+        run: node scripts/verify-approved-revision.mjs
+
+      - name: Install builder dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check capability admission
+        run: pnpm run check:capability-certification
+
+      - name: Build builder
+        run: pnpm run build:builder
+
+      - name: Prepare exact deployment candidate
+        env:
+          EXPECTED_REVISION: ${{ inputs.expected_revision }}
+          CERTIFICATION_OWNER: ${{ runner.temp }}/web3forms-certification
+          WEB3FORMS_ACCESS_KEY: ${{ secrets.WEB3FORMS_ACCESS_KEY }}
+        run: |
+          umask 077
+          node scripts/prepare-web3forms-certification.mjs > "$RUNNER_TEMP/web3forms-preparation-receipt.json"
+          test "$(wc -l < "$RUNNER_TEMP/web3forms-preparation-receipt.json")" -eq 1
+          test "$(wc -c < "$RUNNER_TEMP/web3forms-preparation-receipt.json")" -le 65536
+
+      - name: Verify deployment candidate dependencies
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/web3forms-certification/project
+        run: |
+          pnpm --dir "$CERTIFICATION_ROOT" install --frozen-lockfile
+          pnpm --dir "$CERTIFICATION_ROOT" peers check
+          pnpm --dir "$CERTIFICATION_ROOT" audit --audit-level moderate
+          pnpm --dir "$CERTIFICATION_ROOT" audit signatures
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const names = ["next", "@opennextjs/cloudflare", "react", "vitest", "@playwright/test", "wrangler"];
+            const versions = Object.fromEntries(names.map(name => [name, JSON.parse(readFileSync(`${process.env.CERTIFICATION_ROOT}/apps/web/node_modules/${name}/package.json`, "utf8")).version]));
+            process.stdout.write(`${JSON.stringify({ installedPackageVersions: versions })}\n`);
+          '
+
+      - name: Check deployment candidate
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/web3forms-certification/project
+        run: |
+          pnpm --dir "$CERTIFICATION_ROOT" run lint
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" run cf-typegen
+          pnpm --dir "$CERTIFICATION_ROOT" run typecheck
+          pnpm --dir "$CERTIFICATION_ROOT" run test:unit
+          pnpm --dir "$CERTIFICATION_ROOT" run test:component
+          pnpm --dir "$CERTIFICATION_ROOT" run build:cloudflare
+
+      - name: Check controlled contact behavior in workerd
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/web3forms-certification/project
+        run: |
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" run browser:install:ci
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec playwright test --config playwright.preview.config.ts --project chromium --retries 0 tests/e2e/web3forms-contact.spec.ts
+
+      - name: Deploy certification Worker
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/web3forms-certification/project
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec opennextjs-cloudflare deploy --name test-deploy
+
+      - name: Check deployed site quality and routing
+        env:
+          CERTIFICATION_ROOT: ${{ runner.temp }}/web3forms-certification/project
+          PLAYWRIGHT_DEPLOYED_URL: ${{ vars.DEPLOY_URL }}
+        run: |
+          test -n "$PLAYWRIGHT_DEPLOYED_URL"
+          pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec playwright test --config playwright.deployed.config.ts --project chromium --retries 0 tests/e2e/site-quality.spec.ts tests/e2e/site-routing.spec.ts
+
+      - name: Upload preparation receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: web3forms-preparation-receipt
+          path: ${{ runner.temp }}/web3forms-preparation-receipt.json
+          if-no-files-found: error
+          retention-days: 7
