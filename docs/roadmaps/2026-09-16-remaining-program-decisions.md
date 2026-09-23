@@ -77,6 +77,8 @@ OpenNext documents a custom Worker entry point that reuses its generated fetch h
 
 A separate Worker adds another build/configuration, environment/secret map, local orchestration and deployment/recovery target. It can isolate permissions and releases; it does not by itself solve duplicate delivery, distributed state, ordering or lost enqueue. Those controls remain mandatory in both designs.
 
+The [local Queue topology comparison](../compatibility/queue-consumer-topology.md) now supplies evidence and a recommendation for this decision; the preference and production decision remain distinct.
+
 **Planning disposition:** Your separate-Worker preference remains recorded. P5E-1 compares one minimal candidate per viable topology against the same tests and shows the concrete operational differences. Recommend the main Worker if separation offers only source-code neatness; recommend a separate Worker if one of the above benefits is demonstrated. Do not build both as supported product modes or create an empty `apps/jobs` now. Present the resulting design for the topology checkpoint, without re-asking the abstract preference.
 
 ## 5. Configurability boundary for D5–D10
@@ -117,7 +119,7 @@ The registry at that preparation baseline had **five certified and six pending a
 
 **Dated acceptance-record conflict:** persistence was merged while the inspected roadmap still required P4 acceptance before integration. Preserve that conflict for the owning closeout; the later email and Web3Forms merges do not themselves establish P4 closure or resolve another stream's evidence.
 
-The [integrated delivery status](program-roadmap.md#hosted-contact-form--next-two-increments) now governs scheduling. D1/D2 are implemented in Resend; do not repeat P5D-1 planning or its runtime slices. Web3Forms certification is the immediate next increment, and Resend certification remains required separate later work. Both retain their own exact-subject evidence and approval gates; the P7-only staging decision is unchanged.
+The [integrated delivery status](program-roadmap.md#hosted-contact-form--next-two-increments) now governs scheduling. D1/D2 are implemented in Resend; do not repeat P5D-1 planning or its runtime slices. Web3Forms certification integrated through PR #144. Only test-only P5E-1 now proceeds under the [bounded Queue topology proof exception](program-roadmap.md#one-time-2026-09-23-queue-topology-proof-exception); Resend certification remains required separate later work. Both retain their own exact-subject evidence and approval gates; the P7-only staging decision is unchanged.
 
 ## 7. Verification and preservation
 

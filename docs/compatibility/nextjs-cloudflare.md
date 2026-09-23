@@ -66,7 +66,7 @@ The following values summarize separately accepted workflow and deployment evide
 - `build` proves that Next.js can compile and type-check the App Router page and route and emit standalone output traced from the workspace root. It is not runtime evidence.
 - `test:e2e:dev` runs the page, route, keyboard focus, 320 CSS-pixel reflow, reduced-motion, and axe smoke checks against `next dev` on Node.js.
 - `build:cloudflare` remains the standalone convenience command proving that OpenNext can produce `.open-next/worker.js`. In combined verification, the preceding standalone Next output is transformed with `opennextjs-cloudflare build --skipNextBuild` so Next is not rebuilt. A successful build alone does not prove Worker execution.
-- `test:integration:cloudflare` sends an HTTP request through Wrangler's production-Worker harness and verifies the provider-neutral runtime-report response under workerd.
+- `test:integration:cloudflare` retains the HTTP runtime-report check and adds the separate [synthetic Queue topology comparison](queue-consumer-topology.md) through the same Wrangler harness. The Queue record owns its exact graph, local results, emulator discrepancy and unproved deployed boundary; it does not renew the historical acceptance snapshot above.
 - `test:e2e:preview` starts OpenNext preview directly from already prepared `.open-next` output and runs the same browser and automated accessibility checks under workerd.
 - `test:e2e:deployed` runs the shared smoke suite against `COMPATIBILITY_URL`. It first polls the typed runtime-report condition to tolerate edge propagation, then applies the same bounded browser and accessibility checks. The final workflow and an independent rerun both passed 4/4.
 
@@ -86,7 +86,7 @@ The `/api/compatibility` response is a target-boundary report. It reads the conf
 - Cloudflare's Workers Vitest pool remains open beta and has known coverage, timer, module, and storage limitations. P0.2 deliberately uses ordinary Vitest plus Wrangler's production-Worker harness instead.
 - The deployment log warned that Workers preview URLs defaulted on because `preview_urls` is not explicit in `wrangler.jsonc`; P0.2 did not require or verify a separate preview-URL policy.
 - Browser smoke coverage is Chromium-only. It does not establish cross-browser compatibility.
-- The proof contains one page and one API route. It implements no production profile, builder application, data store, queue, email, identity, payments, analytics, observability, or CRUD behavior.
+- The deployed web proof contains one page and one API route. Separate local-only [Queue test fixtures](queue-consumer-topology.md) add no deployed consumer, production profile, builder application, data store, email, identity, payments, analytics, observability, or CRUD behavior.
 
 ## Accessibility evidence and claim boundary
 
