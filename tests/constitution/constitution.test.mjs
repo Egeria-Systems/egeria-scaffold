@@ -3416,14 +3416,14 @@ test("executable capability certification ownership is current", async () => {
   ]);
   const pendingSubjects = new Set([
     "analytics", "app-foundation", "application-persistence", "booking-calendly",
-    "deployment-cloudflare", "standards", "transactional-email-resend", "contact-form-web3forms",
+    "deployment-cloudflare", "standards", "transactional-email-resend",
   ]);
   for (const [capabilityId, record] of Object.entries(registry.records)) {
     const pending = pendingSubjects.has(capabilityId);
     assert.equal(record.status, pending ? "pending" : "certified");
     assert.equal(
       record.taskPlan,
-      capabilityId === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-22-contact-delivery-certification-amendment.md" : ["app-foundation", "transactional-email-resend"].includes(capabilityId)
+      capabilityId === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md" : ["app-foundation", "transactional-email-resend"].includes(capabilityId)
         ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
         : ["application-persistence", "standards", "deployment-cloudflare"].includes(capabilityId)
         ? "docs/superpowers/plans/2026-09-14-application-persistence-certification.md"
@@ -3607,7 +3607,7 @@ test("canonical documentation records visual regression and the client-ready clo
     assert.match(currentContractOwner, /\bsubjects\b[^\n]+\b(?:pending|empty evidence)\b/iu);
   }
   assert.match(capabilityModel, /\bCurrent admission passes for all thirteen records\b/iu);
-  assert.match(capabilityModel, /\bfive certified and eight pending subjects\b/iu);
+  assert.match(capabilityModel, /\bsix certified and seven pending subjects\b/iu);
 
   assert.match(
     capabilityModel,
@@ -4195,7 +4195,7 @@ test("canonical documentation accepts profile-transition execution and records t
   ]) {
     assert.match(historicalCertificationOwner, multilingualEligibilityPattern);
   }
-  assert.match(builderCoreInstructions, /\bfive exact subjects are certified; eight subjects remain pending\b/iu);
+  assert.match(builderCoreInstructions, /\bsix exact subjects are certified; seven subjects remain pending\b/iu);
 
   for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
     assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);
