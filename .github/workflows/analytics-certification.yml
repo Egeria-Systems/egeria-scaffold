@@ -11,8 +11,12 @@ on:
         description: Exact earlier exercise revision to clean up; required only for cleanup
         required: false
         type: string
+      reuse_revision:
+        description: Exact earlier exercise revision whose retained identities should be reused
+        required: false
+        type: string
       mode:
-        description: Exercise or remove the exact task resources
+        description: Exercise or retain and disable the exact task resources
         required: true
         type: choice
         options: [exercise, cleanup]
@@ -66,6 +70,7 @@ jobs:
         env:
           EXPECTED_REVISION: ${{ inputs.expected_revision }}
           EXERCISE_REVISION: ${{ inputs.exercise_revision }}
+          REUSE_REVISION: ${{ inputs.reuse_revision }}
         run: |
           node scripts/verify-approved-revision.mjs
           node --input-type=module -e '
@@ -75,15 +80,22 @@ jobs:
             const analytics = registry.records.analytics.subject;
             if (analytics?.descriptorVersion !== "0.1.0") process.exit(1);
             if (analytics?.behaviorContractDigest !== "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba") process.exit(1);
+            const reuseRevision = process.env.REUSE_REVISION ?? "";
             let exerciseRevision = process.env.GITHUB_SHA;
+            let resourceRevision = reuseRevision;
             if (process.env.CERTIFICATION_MODE === "cleanup") {
+              if (reuseRevision) process.exit(1);
               exerciseRevision = process.env.EXERCISE_REVISION;
               if (!/^[0-9a-f]{40}$/u.test(exerciseRevision ?? "")) process.exit(1);
-              try {
-                execFileSync("git", ["merge-base", "--is-ancestor", exerciseRevision, process.env.GITHUB_SHA], { stdio: "ignore" });
-              } catch { process.exit(1); }
+              resourceRevision = exerciseRevision;
             } else if (process.env.CERTIFICATION_MODE !== "exercise" || process.env.EXERCISE_REVISION) process.exit(1);
-            appendFileSync(process.env.GITHUB_ENV, `EXERCISE_REVISION=${exerciseRevision}\n`);
+            if (resourceRevision) {
+              if (!/^[0-9a-f]{40}$/u.test(resourceRevision) || (reuseRevision && reuseRevision === process.env.GITHUB_SHA)) process.exit(1);
+              try {
+                execFileSync("git", ["merge-base", "--is-ancestor", resourceRevision, process.env.GITHUB_SHA], { stdio: "ignore" });
+              } catch { process.exit(1); }
+            }
+            appendFileSync(process.env.GITHUB_ENV, `EXERCISE_REVISION=${exerciseRevision}\nREUSE_REVISION=${reuseRevision}\nRESOURCE_REVISION=${resourceRevision}\n`);
           '
 
       - name: Install and build trusted source
@@ -118,6 +130,70 @@ jobs:
             writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/context.json`, JSON.stringify(context), { mode: 0o600, flag: "wx" });
           '
 
+      - name: Resolve exact exercise identity artifacts
+        if: env.RESOURCE_REVISION != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXERCISE_REVISION: ${{ env.RESOURCE_REVISION }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          umask 077
+          node --input-type=module -e '
+            import { appendFileSync } from "node:fs";
+            const headers = { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json" };
+            const controlPlaneFetch = (input, init = {}) =>
+              fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
+            const resolveArtifact = async (kind) => {
+              const name = `analytics-certification-${kind}-identity-${process.env.EXERCISE_REVISION}`;
+              const endpoint = `${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100`;
+              const response = await controlPlaneFetch(endpoint, { headers });
+              const payload = await response.json();
+              const matches = (payload?.artifacts ?? []).filter((artifact) => artifact.name === name && artifact.expired === false && artifact.workflow_run?.head_sha === process.env.EXERCISE_REVISION && artifact.workflow_run?.head_branch === "main");
+              if (!response.ok || matches.length !== 1 || !Number.isSafeInteger(matches[0].id)) process.exit(1);
+              return matches[0].id;
+            };
+            const siteId = await resolveArtifact("site");
+            const workerId = await resolveArtifact("worker");
+            appendFileSync(process.env.GITHUB_ENV, `SITE_IDENTITY_ARTIFACT_ID=${siteId}\nWORKER_IDENTITY_ARTIFACT_ID=${workerId}\n`, { mode: 0o600 });
+          '
+
+      - name: Download exact exercise identity artifacts
+        if: env.RESOURCE_REVISION != ''
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_API_URL: ${{ github.api_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          EVIDENCE_DIRECTORY: ${{ runner.temp }}/analytics-certification-evidence
+        run: |
+          umask 077
+          node --input-type=module -e '
+            import { writeFileSync } from "node:fs";
+            const artifact_ids = [
+              ["site", process.env.SITE_IDENTITY_ARTIFACT_ID],
+              ["worker", process.env.WORKER_IDENTITY_ARTIFACT_ID],
+            ];
+            const headers = { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json" };
+            const controlPlaneFetch = (input, init = {}) =>
+              fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
+            for (const [kind, id] of artifact_ids) {
+              if (!/^[1-9][0-9]*$/u.test(id ?? "")) process.exit(1);
+              const response = await controlPlaneFetch(`${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/actions/artifacts/${id}/zip`, { headers });
+              if (!response.ok) process.exit(1);
+              const contentLength = Number(response.headers.get("content-length"));
+              if (!Number.isInteger(contentLength) || contentLength < 22 || contentLength > 65_536) process.exit(1);
+              const archive = Buffer.from(await response.arrayBuffer());
+              if (archive.byteLength !== contentLength || archive.byteLength > 65_536) process.exit(1);
+              writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/${kind}-identity.zip`, archive, { mode: 0o600, flag: "wx" });
+            }
+          '
+          test "$(unzip -Z1 "$EVIDENCE_DIRECTORY/site-identity.zip")" = "site-identity.json"
+          test "$(unzip -Z1 "$EVIDENCE_DIRECTORY/worker-identity.zip")" = "worker-identity.json"
+          unzip -q "$EVIDENCE_DIRECTORY/site-identity.zip" -d "$EVIDENCE_DIRECTORY"
+          unzip -q "$EVIDENCE_DIRECTORY/worker-identity.zip" -d "$EVIDENCE_DIRECTORY"
+          rm -f "$EVIDENCE_DIRECTORY/site-identity.zip" "$EVIDENCE_DIRECTORY/worker-identity.zip"
+          chmod 600 "$EVIDENCE_DIRECTORY/site-identity.json" "$EVIDENCE_DIRECTORY/worker-identity.json"
+
       - name: Prepare private identity envelopes
         if: env.CERTIFICATION_MODE == 'exercise'
         env:
@@ -127,12 +203,19 @@ jobs:
         run: |
           umask 077
           node --input-type=module -e '
-            import { writeFileSync } from "node:fs";
+            import { readFileSync, writeFileSync } from "node:fs";
+            import { prepareAnalyticsCertificationReuse } from "./scripts/analytics-certification-provider-receipt.mjs";
             const target = new URL(process.env.DEPLOY_URL);
             if (!/^analytics-certification\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
             const shared = { headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, identityKnown: false };
-            writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/site-identity.json`, JSON.stringify({ ...shared, site: null }), { mode: 0o600, flag: "wx" });
-            writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/worker-identity.json`, JSON.stringify({ ...shared, worker: null }), { mode: 0o600, flag: "wx" });
+            let identities = { siteIdentity: { ...shared, site: null }, workerIdentity: { ...shared, worker: null } };
+            if (process.env.REUSE_REVISION) {
+              const read = (name) => JSON.parse(readFileSync(`${process.env.EVIDENCE_DIRECTORY}/${name}-identity.json`, "utf8"));
+              identities = prepareAnalyticsCertificationReuse({ context: { headSha: process.env.REUSE_REVISION, environment: shared.environment, hostname: shared.hostname, worker: "analytics-certification" }, siteIdentity: read("site"), workerIdentity: read("worker"), headSha: process.env.HEAD_SHA });
+            }
+            const options = { mode: 0o600, flag: process.env.REUSE_REVISION ? "w" : "wx" };
+            writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/site-identity.json`, JSON.stringify(identities.siteIdentity), options);
+            writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/worker-identity.json`, JSON.stringify(identities.workerIdentity), options);
           '
 
       - name: Create and read back Web Analytics site
@@ -147,25 +230,34 @@ jobs:
           umask 077
           node --input-type=module -e '
             import { createHash } from "node:crypto";
-            import { renameSync, writeFileSync } from "node:fs";
+            import { readFileSync, renameSync, writeFileSync } from "node:fs";
+            import { planAnalyticsCertificationCleanup, readAnalyticsCertificationSite } from "./scripts/analytics-certification-provider-receipt.mjs";
             const target = new URL(process.env.DEPLOY_URL);
             if (!/^analytics-certification\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
             const account = process.env.CLOUDFLARE_ACCOUNT_ID;
             const credential = process.env.CLOUDFLARE_WEB_ANALYTICS_API_TOKEN;
             if (!account || !credential) process.exit(1);
             const endpoint = `https://api.cloudflare.com/client/v4/accounts/${account}/rum/site_info`;
-            const listEndpoint = `${endpoint}/list`;
             const headers = { Authorization: `Bearer ${credential}`, "Content-Type": "application/json" };
             const controlPlaneFetch = (input, init = {}) =>
               fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
-            const existingResponse = await controlPlaneFetch(listEndpoint, { headers });
-            const existing = await existingResponse.json();
-            const existingMatches = (existing?.result ?? []).filter(({ host }) => host === target.hostname);
-            if (!existingResponse.ok || existing?.success !== true || existingMatches.length !== 0) process.exit(1);
-            const createdResponse = await controlPlaneFetch(endpoint, { method: "POST", headers, body: JSON.stringify({ host: target.hostname, auto_install: false }) });
-            const created = await createdResponse.json();
-            const site = created?.result;
-            if (!createdResponse.ok || created?.success !== true || site?.auto_install !== false || site?.host !== target.hostname) process.exit(1);
+            const readIdentity = (kind) => JSON.parse(readFileSync(`${process.env.EVIDENCE_DIRECTORY}/${kind}-identity.json`, "utf8"));
+            const previousIdentity = readIdentity("site");
+            const existingSite = await readAnalyticsCertificationSite(controlPlaneFetch, endpoint, headers, target.hostname, process.env.REUSE_REVISION && previousIdentity.identityKnown === true ? previousIdentity.site.siteTag : null);
+            let site;
+            let createdByRun = false;
+            if (process.env.REUSE_REVISION && previousIdentity.identityKnown === true) {
+              if (existingSite === null) process.exit(1);
+              site = existingSite;
+              planAnalyticsCertificationCleanup({ context: { headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, worker: "analytics-certification" }, siteIdentity: previousIdentity, workerIdentity: readIdentity("worker"), currentWorker: null, currentSite: { hostname: site.host, siteTag: site.site_tag, siteTokenSha256: createHash("sha256").update(site.site_token).digest("hex"), autoInstall: site.auto_install } });
+            } else {
+              if (existingSite !== null || previousIdentity.identityKnown !== false) process.exit(1);
+              const createdResponse = await controlPlaneFetch(endpoint, { method: "POST", headers, body: JSON.stringify({ host: target.hostname, auto_install: false }) });
+              const created = await createdResponse.json();
+              site = created?.result;
+              if (!createdResponse.ok || created?.success !== true || site?.auto_install !== false || site?.host !== target.hostname) process.exit(1);
+              createdByRun = true;
+            }
             if (typeof site.site_tag !== "string" || !/^[A-Za-z0-9_-]{8,128}$/u.test(site.site_tag) || typeof site.site_token !== "string" || site.site_token.length === 0) process.exit(1);
             const tokenDigest = createHash("sha256").update(site.site_token).digest("hex");
             const identity = { headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, identityKnown: true, site: { siteTag: site.site_tag, siteTokenSha256: tokenDigest, autoInstall: false } };
@@ -178,7 +270,7 @@ jobs:
             const value = readback?.result;
             if (!readbackResponse.ok || readback?.success !== true || value?.site_tag !== site.site_tag || value?.site_token !== site.site_token || value?.auto_install !== false || value?.host !== target.hostname) process.exit(1);
             if (typeof value?.snippet !== "string" || !value.snippet.includes(site.site_token)) process.exit(1);
-            const measurement = { schemaVersion: "1.0.0", headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, createdByRun: true, readbackVerified: true, siteTagMatchesIdentity: value.site_tag === identity.site.siteTag, siteTokenMatchesIdentity: createHash("sha256").update(value.site_token).digest("hex") === identity.site.siteTokenSha256, scriptTokenMatchesIdentity: value.snippet.includes(site.site_token), autoInstall: value.auto_install };
+            const measurement = { schemaVersion: "2.0.0", headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, createdByRun, reusedFromRevision: createdByRun ? null : process.env.REUSE_REVISION, readbackVerified: true, siteTagMatchesIdentity: value.site_tag === identity.site.siteTag, siteTokenMatchesIdentity: createHash("sha256").update(value.site_token).digest("hex") === identity.site.siteTokenSha256, scriptTokenMatchesIdentity: value.snippet.includes(site.site_token), autoInstall: value.auto_install };
             writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/site-readback.json`, JSON.stringify(measurement), { mode: 0o600, flag: "wx" });
           '
 
@@ -189,7 +281,7 @@ jobs:
           name: analytics-certification-site-identity-${{ github.sha }}
           path: ${{ runner.temp }}/analytics-certification-evidence/site-identity.json
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 90
 
       - name: Generate exact analytics candidate
         if: env.CERTIFICATION_MODE == 'exercise'
@@ -272,6 +364,9 @@ jobs:
       - name: Deploy dedicated certification Worker
         if: env.CERTIFICATION_MODE == 'exercise'
         env:
+          HEAD_SHA: ${{ github.sha }}
+          DEPLOY_URL: ${{ vars.DEPLOY_URL }}
+          EVIDENCE_DIRECTORY: ${{ runner.temp }}/analytics-certification-evidence
           CERTIFICATION_ROOT: ${{ runner.temp }}/analytics-certification/project
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_DEPLOY_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_API_TOKEN }}
@@ -279,11 +374,25 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$CLOUDFLARE_DEPLOY_API_TOKEN"
           node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import { planAnalyticsCertificationCleanup, readAnalyticsCertificationWorker } from "./scripts/analytics-certification-provider-receipt.mjs";
             const endpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/analytics-certification`;
+            const headers = { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` };
             const controlPlaneFetch = (input, init = {}) =>
               fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
-            const response = await controlPlaneFetch(endpoint, { headers: { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` } });
-            if (response.status !== 404) process.exit(1);
+            const currentWorker = await readAnalyticsCertificationWorker(controlPlaneFetch, endpoint, headers);
+            const read = (kind) => JSON.parse(readFileSync(`${process.env.EVIDENCE_DIRECTORY}/${kind}-identity.json`, "utf8"));
+            const workerIdentity = read("worker");
+            if (currentWorker === null) {
+              if (workerIdentity.identityKnown !== false) process.exit(1);
+            } else {
+              if (!process.env.REUSE_REVISION) process.exit(1);
+              const target = new URL(process.env.DEPLOY_URL);
+              planAnalyticsCertificationCleanup({ context: { headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, worker: "analytics-certification" }, siteIdentity: read("site"), workerIdentity, currentSite: null, currentWorker });
+              const response = await controlPlaneFetch(`${endpoint}/subdomain`, { headers });
+              const payload = await response.json();
+              if (!response.ok || payload?.success !== true || payload.result?.enabled !== false || payload.result?.previews_enabled !== false) process.exit(1);
+            }
           '
           CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec opennextjs-cloudflare deploy --name analytics-certification
 
@@ -299,27 +408,16 @@ jobs:
           umask 077
           node --input-type=module -e '
             import { renameSync, writeFileSync } from "node:fs";
+            import { readAnalyticsCertificationWorker } from "./scripts/analytics-certification-provider-receipt.mjs";
             const target = new URL(process.env.DEPLOY_URL);
             if (!/^analytics-certification\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
             const headers = { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` };
             const endpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/analytics-certification`;
             const controlPlaneFetch = (input, init = {}) =>
               fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
-            const scriptReadback = await controlPlaneFetch(endpoint, { headers });
-            if (!scriptReadback.ok) process.exit(1);
-            const deploymentsResponse = await controlPlaneFetch(`${endpoint}/deployments`, { headers });
-            const payload = await deploymentsResponse.json();
-            const deployments = Array.isArray(payload?.result) ? payload.result : payload?.result?.deployments;
-            if (!deploymentsResponse.ok || payload?.success !== true || !Array.isArray(deployments) || deployments.length < 1 || deployments.length > 100) process.exit(1);
-            const timestamp = (deployment) => Date.parse(deployment?.created_on);
-            if (deployments.some((deployment) => !Number.isFinite(timestamp(deployment)))) process.exit(1);
-            const latestTime = Math.max(...deployments.map(timestamp));
-            const latest = deployments.filter((deployment) => timestamp(deployment) === latestTime);
-            if (latest.length !== 1 || !Array.isArray(latest[0].versions) || latest[0].versions.length !== 1 || latest[0].versions[0]?.percentage !== 100) process.exit(1);
-            const deploymentId = latest[0].id;
-            const versionId = latest[0].versions[0].version_id;
-            const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
-            if (!uuid.test(deploymentId) || !uuid.test(versionId)) process.exit(1);
+            const worker = await readAnalyticsCertificationWorker(controlPlaneFetch, endpoint, headers);
+            if (worker === null) process.exit(1);
+            const { deploymentId, versionId } = worker;
             const identity = { headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, identityKnown: true, worker: { name: "analytics-certification", deploymentId, versionId } };
             const identityPath = `${process.env.EVIDENCE_DIRECTORY}/worker-identity.json`;
             writeFileSync(`${identityPath}.next`, JSON.stringify(identity), { mode: 0o600, flag: "wx" });
@@ -335,7 +433,7 @@ jobs:
           name: analytics-certification-worker-identity-${{ github.sha }}
           path: ${{ runner.temp }}/analytics-certification-evidence/worker-identity.json
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 90
 
       - name: Wait for dedicated Worker readiness
         if: env.CERTIFICATION_MODE == 'exercise'
@@ -398,71 +496,7 @@ jobs:
           test "$(wc -c < "$ANALYTICS_PROVIDER_BROWSER_RECEIPT_PATH")" -le 4096
           test "$(stat -c "%a" "$ANALYTICS_PROVIDER_BROWSER_RECEIPT_PATH")" = "600"
 
-      - name: Resolve exact exercise identity artifacts
-        if: env.CERTIFICATION_MODE == 'cleanup'
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          EXERCISE_REVISION: ${{ env.EXERCISE_REVISION }}
-          GITHUB_API_URL: ${{ github.api_url }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          umask 077
-          node --input-type=module -e '
-            import { appendFileSync } from "node:fs";
-            const headers = { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json" };
-            const controlPlaneFetch = (input, init = {}) =>
-              fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
-            const resolveArtifact = async (kind) => {
-              const name = `analytics-certification-${kind}-identity-${process.env.EXERCISE_REVISION}`;
-              const endpoint = `${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100`;
-              const response = await controlPlaneFetch(endpoint, { headers });
-              const payload = await response.json();
-              const matches = (payload?.artifacts ?? []).filter((artifact) => artifact.name === name && artifact.expired === false && artifact.workflow_run?.head_sha === process.env.EXERCISE_REVISION && artifact.workflow_run?.head_branch === "main");
-              if (!response.ok || matches.length !== 1 || !Number.isSafeInteger(matches[0].id)) process.exit(1);
-              return matches[0].id;
-            };
-            const siteId = await resolveArtifact("site");
-            const workerId = await resolveArtifact("worker");
-            appendFileSync(process.env.GITHUB_ENV, `SITE_IDENTITY_ARTIFACT_ID=${siteId}\nWORKER_IDENTITY_ARTIFACT_ID=${workerId}\n`, { mode: 0o600 });
-          '
-
-      - name: Download exact exercise identity artifacts
-        if: env.CERTIFICATION_MODE == 'cleanup'
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_API_URL: ${{ github.api_url }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          EVIDENCE_DIRECTORY: ${{ runner.temp }}/analytics-certification-evidence
-        run: |
-          umask 077
-          node --input-type=module -e '
-            import { writeFileSync } from "node:fs";
-            const artifact_ids = [
-              ["site", process.env.SITE_IDENTITY_ARTIFACT_ID],
-              ["worker", process.env.WORKER_IDENTITY_ARTIFACT_ID],
-            ];
-            const headers = { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json" };
-            const controlPlaneFetch = (input, init = {}) =>
-              fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
-            for (const [kind, id] of artifact_ids) {
-              if (!/^[1-9][0-9]*$/u.test(id ?? "")) process.exit(1);
-              const response = await controlPlaneFetch(`${process.env.GITHUB_API_URL}/repos/${process.env.GITHUB_REPOSITORY}/actions/artifacts/${id}/zip`, { headers });
-              if (!response.ok) process.exit(1);
-              const contentLength = Number(response.headers.get("content-length"));
-              if (!Number.isInteger(contentLength) || contentLength < 22 || contentLength > 65_536) process.exit(1);
-              const archive = Buffer.from(await response.arrayBuffer());
-              if (archive.byteLength !== contentLength || archive.byteLength > 65_536) process.exit(1);
-              writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/${kind}-identity.zip`, archive, { mode: 0o600, flag: "wx" });
-            }
-          '
-          test "$(unzip -Z1 "$EVIDENCE_DIRECTORY/site-identity.zip")" = "site-identity.json"
-          test "$(unzip -Z1 "$EVIDENCE_DIRECTORY/worker-identity.zip")" = "worker-identity.json"
-          unzip -q "$EVIDENCE_DIRECTORY/site-identity.zip" -d "$EVIDENCE_DIRECTORY"
-          unzip -q "$EVIDENCE_DIRECTORY/worker-identity.zip" -d "$EVIDENCE_DIRECTORY"
-          rm -f "$EVIDENCE_DIRECTORY/site-identity.zip" "$EVIDENCE_DIRECTORY/worker-identity.zip"
-          chmod 600 "$EVIDENCE_DIRECTORY/site-identity.json" "$EVIDENCE_DIRECTORY/worker-identity.json"
-
-      - name: Delete and verify task resources
+      - name: Retain and disable task resources
         if: env.CERTIFICATION_MODE == 'cleanup'
         env:
           DEPLOY_URL: ${{ vars.DEPLOY_URL }}
@@ -475,7 +509,7 @@ jobs:
           node --input-type=module -e '
             import { createHash } from "node:crypto";
             import { readFileSync, writeFileSync } from "node:fs";
-            import { planAnalyticsCertificationCleanup } from "./scripts/analytics-certification-provider-receipt.mjs";
+            import { planAnalyticsCertificationCleanup, readAnalyticsCertificationSite, readAnalyticsCertificationWorker } from "./scripts/analytics-certification-provider-receipt.mjs";
             const read = (name) => JSON.parse(readFileSync(`${process.env.EVIDENCE_DIRECTORY}/${name}.json`, "utf8"));
             const contextFile = read("context");
             const context = { headSha: contextFile.source.exerciseRevision, environment: contextFile.environment, hostname: contextFile.resources.hostname, worker: contextFile.resources.worker };
@@ -486,59 +520,33 @@ jobs:
             const analyticsHeaders = { Authorization: `Bearer ${process.env.CLOUDFLARE_WEB_ANALYTICS_API_TOKEN}` };
             const deployHeaders = { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` };
             const analyticsEndpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/rum/site_info`;
-            const analyticsListEndpoint = `${analyticsEndpoint}/list`;
             const workerEndpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/analytics-certification`;
             const controlPlaneFetch = (input, init = {}) =>
               fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
-            let currentSite = null;
-            if (siteIdentity.identityKnown === true) {
-              const response = await controlPlaneFetch(`${analyticsEndpoint}/${encodeURIComponent(siteIdentity.site.siteTag)}`, { headers: analyticsHeaders });
-              if (response.status !== 404) {
-                const payload = await response.json();
-                if (!response.ok || payload?.success !== true || typeof payload.result?.site_token !== "string") process.exit(1);
-                currentSite = { hostname: payload.result.host, siteTag: payload.result.site_tag, siteTokenSha256: createHash("sha256").update(payload.result.site_token).digest("hex"), autoInstall: payload.result.auto_install };
-              }
-            } else {
-              const response = await controlPlaneFetch(analyticsListEndpoint, { headers: analyticsHeaders });
+            const readSite = async () => {
+              const site = await readAnalyticsCertificationSite(controlPlaneFetch, analyticsEndpoint, analyticsHeaders, context.hostname, siteIdentity.identityKnown === true ? siteIdentity.site.siteTag : null);
+              if (site === null) return null;
+              return { hostname: site.host, siteTag: site.site_tag, siteTokenSha256: createHash("sha256").update(site.site_token).digest("hex"), autoInstall: site.auto_install };
+            };
+            const readWorker = () => readAnalyticsCertificationWorker(controlPlaneFetch, workerEndpoint, deployHeaders);
+            const inspect = async () => planAnalyticsCertificationCleanup({ context, siteIdentity, workerIdentity, currentSite: await readSite(), currentWorker: await readWorker() });
+            const plan = await inspect();
+            if (plan.disableWorker) {
+              const response = await controlPlaneFetch(`${workerEndpoint}/subdomain`, { method: "POST", headers: { ...deployHeaders, "Content-Type": "application/json" }, body: JSON.stringify({ enabled: false, previews_enabled: false }) });
+              if (!response.ok || (await response.json())?.success !== true) process.exit(1);
+            }
+            // Reconcile unchanged identities after the mutation; absence is not retention.
+            const after = await inspect();
+            if (after.siteInitialState !== plan.siteInitialState || after.workerInitialState !== plan.workerInitialState) process.exit(1);
+            let subdomain = null;
+            if (plan.disableWorker) {
+              const response = await controlPlaneFetch(`${workerEndpoint}/subdomain`, { headers: deployHeaders });
               const payload = await response.json();
-              if (!response.ok || payload?.success !== true) process.exit(1);
-              const matches = (payload.result ?? []).filter(({ host }) => host === context.hostname);
-              if (matches.length > 0) currentSite = { present: true };
+              if (!response.ok || payload?.success !== true || payload.result?.enabled !== false || payload.result?.previews_enabled !== false) process.exit(1);
+              subdomain = payload.result;
             }
-            const workerResponse = await controlPlaneFetch(workerEndpoint, { headers: deployHeaders });
-            let currentWorker = null;
-            if (workerResponse.status !== 404) {
-              if (!workerResponse.ok) process.exit(1);
-              if (workerIdentity.identityKnown !== true) currentWorker = { present: true };
-              else {
-                const deploymentsResponse = await controlPlaneFetch(`${workerEndpoint}/deployments`, { headers: deployHeaders });
-                const payload = await deploymentsResponse.json();
-                const deployments = Array.isArray(payload?.result) ? payload.result : payload?.result?.deployments;
-                if (!deploymentsResponse.ok || payload?.success !== true || !Array.isArray(deployments) || deployments.length < 1 || deployments.length > 100) process.exit(1);
-                const timestamp = (deployment) => Date.parse(deployment?.created_on);
-                if (deployments.some((deployment) => !Number.isFinite(timestamp(deployment)))) process.exit(1);
-                const latestTime = Math.max(...deployments.map(timestamp));
-                const latest = deployments.filter((deployment) => timestamp(deployment) === latestTime);
-                if (latest.length !== 1 || latest[0].versions?.length !== 1 || latest[0].versions[0]?.percentage !== 100) process.exit(1);
-                currentWorker = { name: "analytics-certification", deploymentId: latest[0].id, versionId: latest[0].versions[0].version_id };
-              }
-            }
-            const plan = planAnalyticsCertificationCleanup({ context, siteIdentity, workerIdentity, currentSite, currentWorker });
-            if (plan.deleteSite) {
-              const response = await controlPlaneFetch(`${analyticsEndpoint}/${encodeURIComponent(siteIdentity.site.siteTag)}`, { method: "DELETE", headers: analyticsHeaders });
-              if (!response.ok) process.exit(1);
-            }
-            if (plan.deleteWorker) {
-              const response = await controlPlaneFetch(workerEndpoint, { method: "DELETE", headers: deployHeaders });
-              if (!response.ok) process.exit(1);
-            }
-            const sitesAfterResponse = await controlPlaneFetch(analyticsListEndpoint, { headers: analyticsHeaders });
-            const sitesAfter = await sitesAfterResponse.json();
-            const siteAbsent = sitesAfterResponse.ok && sitesAfter?.success === true && !(sitesAfter.result ?? []).some(({ host }) => host === context.hostname);
-            const workerAfter = await controlPlaneFetch(workerEndpoint, { headers: deployHeaders });
-            const workerAbsent = workerAfter.status === 404;
-            if (!siteAbsent || !workerAbsent) process.exit(1);
-            const measurement = { schemaVersion: "1.0.0", headSha: context.headSha, environment: context.environment, hostname: context.hostname, worker: context.worker, site: { initialState: plan.siteInitialState, identityDisposition: plan.siteInitialState === "present" ? "matched" : "not-present", deletionAttempted: plan.deleteSite, absenceVerified: siteAbsent }, workerResource: { initialState: plan.workerInitialState, identityDisposition: plan.workerInitialState === "present" ? "matched" : "not-present", deletionAttempted: plan.deleteWorker, absenceVerified: workerAbsent }, dedicatedRecovery: "exact-deletion-and-absence", operatorCleanupPending: true };
+            const resource = (initialState) => ({ initialState, identityDisposition: initialState === "present" ? "matched" : "not-present", disposition: initialState === "present" ? "retained" : "absent", verified: true });
+            const measurement = { schemaVersion: "2.0.0", headSha: context.headSha, environment: context.environment, hostname: context.hostname, worker: context.worker, site: resource(plan.siteInitialState), workerResource: { ...resource(plan.workerInitialState), workersDevEnabled: subdomain?.enabled ?? null, previewsEnabled: subdomain?.previews_enabled ?? null }, dedicatedRecovery: "retained-with-workers-dev-disabled", operatorCleanupPending: true };
             writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/cleanup.json`, JSON.stringify(measurement), { mode: 0o600, flag: "wx" });
           '
 

@@ -96,7 +96,7 @@ function measuredEvidence(mode = "exercise") {
       readiness: null,
       browserJourney: null,
       cleanup: {
-        schemaVersion: "1.0.0",
+        schemaVersion: "2.0.0",
         headSha: exactRevision,
         environment: "analytics-certification",
         hostname: exactHostname,
@@ -104,16 +104,18 @@ function measuredEvidence(mode = "exercise") {
         site: {
           initialState: "present",
           identityDisposition: "matched",
-          deletionAttempted: true,
-          absenceVerified: true,
+          disposition: "retained",
+          verified: true,
         },
         workerResource: {
           initialState: "absent",
           identityDisposition: "not-present",
-          deletionAttempted: false,
-          absenceVerified: true,
+          disposition: "absent",
+          verified: true,
+          workersDevEnabled: null,
+          previewsEnabled: null,
         },
-        dedicatedRecovery: "exact-deletion-and-absence",
+        dedicatedRecovery: "retained-with-workers-dev-disabled",
         operatorCleanupPending: true,
       },
     };
@@ -137,11 +139,12 @@ function measuredEvidence(mode = "exercise") {
       }],
     },
     siteReadback: {
-      schemaVersion: "1.0.0",
+      schemaVersion: "2.0.0",
       headSha: exactRevision,
       environment: "analytics-certification",
       hostname: exactHostname,
       createdByRun: true,
+      reusedFromRevision: null,
       readbackVerified: true,
       siteTagMatchesIdentity: true,
       siteTokenMatchesIdentity: true,
@@ -258,7 +261,7 @@ const controlPlaneStepNames = [
   "Read back dedicated Worker deployment",
   "Resolve exact exercise identity artifacts",
   "Download exact exercise identity artifacts",
-  "Delete and verify task resources",
+  "Retain and disable task resources",
 ];
 
 function assertBoundedControlPlaneRequests(source) {
@@ -267,7 +270,6 @@ function assertBoundedControlPlaneRequests(source) {
     /const controlPlaneFetch = \(input, init = \{\}\) =>\s*fetch\(input, \{ \.\.\.init, signal: AbortSignal\.timeout\(10_000\) \}\);/u,
   );
   assert.equal((source.match(/\bfetch\b/gu) ?? []).length, 1);
-  assert.ok((source.match(/\bcontrolPlaneFetch\(/gu) ?? []).length > 0);
   assert.doesNotMatch(
     source,
     /\b(?:retry|retries|maximumAttempts|setTimeout)\b/iu,
@@ -290,7 +292,7 @@ test("control-plane requests use exact per-request deadlines without retries", a
     );
     assert.throws(() =>
       assertBoundedControlPlaneRequests(
-        source.replace(/await controlPlaneFetch\(/u, "await fetch("),
+        `${source}\nawait fetch("https://provider.invalid");`,
       ),
     );
     assert.throws(() =>
@@ -313,8 +315,9 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
   assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
   assert.deepEqual(workflow.on.workflow_dispatch.inputs, {
     expected_revision: { description: "Exact reviewed main revision approved for certification", required: true, type: "string" },
+    reuse_revision: { description: "Exact earlier exercise revision whose retained identities should be reused", required: false, type: "string" },
     exercise_revision: { description: "Exact earlier exercise revision to clean up; required only for cleanup", required: false, type: "string" },
-    mode: { description: "Exercise or remove the exact task resources", required: true, type: "choice", options: ["exercise", "cleanup"] },
+    mode: { description: "Exercise or retain and disable the exact task resources", required: true, type: "choice", options: ["exercise", "cleanup"] },
   });
   assert.deepEqual(workflow.permissions, { actions: "read", contents: "read" });
   assert.deepEqual(workflow.concurrency, {
@@ -347,6 +350,7 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
   assert.deepEqual(steps["Verify checked out subject"].env, {
     EXPECTED_REVISION: "${{ inputs.expected_revision }}",
     EXERCISE_REVISION: "${{ inputs.exercise_revision }}",
+    REUSE_REVISION: "${{ inputs.reuse_revision }}",
   });
   assert.match(steps["Verify checked out subject"].run, /node scripts\/verify-approved-revision\.mjs/u);
   assert.match(
@@ -375,18 +379,6 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
   assert.match(steps["Create and read back Web Analytics site"].run, /auto_install/u);
   assert.match(steps["Create and read back Web Analytics site"].run, /false/u);
   assert.match(
-    steps["Create and read back Web Analytics site"].run,
-    /const endpoint = `https:\/\/api\.cloudflare\.com\/client\/v4\/accounts\/\$\{account\}\/rum\/site_info`;\s*const listEndpoint = `\$\{endpoint\}\/list`;/u,
-  );
-  assert.match(
-    steps["Create and read back Web Analytics site"].run,
-    /existing[\s\S]+length !== 0/u,
-  );
-  assert.match(
-    steps["Deploy dedicated certification Worker"].run,
-    /response[\s\S]+status !== 404/u,
-  );
-  assert.match(
     steps["Prepare private identity envelopes"].run,
     /analytics-certification\\\.[\s\S]+workers\\\.dev[\s\S]+target\.href !== `https:\/\/\$\{target\.hostname\}\//u,
   );
@@ -399,7 +391,7 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
     "Upload Worker identity",
   ]) {
     assert.match(String(steps[name].if), /always\(\)/u);
-    assert.equal(steps[name].with["retention-days"], 7);
+    assert.equal(steps[name].with["retention-days"], 90);
     assert.match(steps[name].with.name, /github\.sha/u);
   }
   assert.match(
@@ -425,10 +417,6 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
   assert.match(
     steps["Download exact exercise identity artifacts"].run,
     /unzip -Z1[\s\S]+site-identity\.json[\s\S]+worker-identity\.json/u,
-  );
-  assert.match(
-    steps["Read back dedicated Worker deployment"].run,
-    /workers\/scripts\/analytics-certification[\s\S]+\$\{endpoint\}\/deployments/u,
   );
   assert.match(
     steps["Read back dedicated Worker deployment"].run,
@@ -474,17 +462,12 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
     job.steps.indexOf(steps["Wait for dedicated Worker readiness"]) <
       job.steps.indexOf(steps["Exercise deployed consent behavior"]),
   );
-  assert.match(steps["Delete and verify task resources"].run, /analytics-certification/u);
+  assert.match(steps["Retain and disable task resources"].run, /analytics-certification/u);
   assert.match(
-    steps["Delete and verify task resources"].run,
-    /const analyticsEndpoint = `https:\/\/api\.cloudflare\.com\/client\/v4\/accounts\/\$\{process\.env\.CLOUDFLARE_ACCOUNT_ID\}\/rum\/site_info`;\s*const analyticsListEndpoint = `\$\{analyticsEndpoint\}\/list`;/u,
-  );
-  assert.match(
-    steps["Delete and verify task resources"].run,
+    steps["Retain and disable task resources"].run,
     /planAnalyticsCertificationCleanup/u,
   );
-  assert.match(steps["Delete and verify task resources"].run, /cleanup\.json/u);
-  assert.match(steps["Delete and verify task resources"].run, /status === 404/u);
+  assert.match(steps["Retain and disable task resources"].run, /cleanup\.json/u);
   assert.match(
     steps["Build redacted receipt"].run,
     /--input-directory/u,
@@ -606,10 +589,13 @@ test("cleanup admission separates the approved executor from an ancestral exerci
     };
     const accepted = await run();
     assert.equal(accepted.status, 0, accepted.stderr);
-    assert.equal(await readFile(environmentPath, "utf8"), `EXERCISE_REVISION=${earlierRevision}\n`);
+    assert.equal(await readFile(environmentPath, "utf8"), `EXERCISE_REVISION=${earlierRevision}\nREUSE_REVISION=\nRESOURCE_REVISION=${earlierRevision}\n`);
     const exercise = await run({ CERTIFICATION_MODE: "exercise", EXERCISE_REVISION: "" });
     assert.equal(exercise.status, 0, exercise.stderr);
-    assert.equal(await readFile(environmentPath, "utf8"), `EXERCISE_REVISION=${executorRevision}\n`);
+    assert.equal(await readFile(environmentPath, "utf8"), `EXERCISE_REVISION=${executorRevision}\nREUSE_REVISION=\nRESOURCE_REVISION=\n`);
+    const reused = await run({ CERTIFICATION_MODE: "exercise", EXERCISE_REVISION: "", REUSE_REVISION: earlierRevision });
+    assert.equal(reused.status, 0, reused.stderr);
+    assert.equal(await readFile(environmentPath, "utf8"), `EXERCISE_REVISION=${executorRevision}\nREUSE_REVISION=${earlierRevision}\nRESOURCE_REVISION=${earlierRevision}\n`);
     for (const [name, overrides] of [
       ["missing exercise", { EXERCISE_REVISION: "" }],
       ["malformed exercise", { EXERCISE_REVISION: "main" }],
@@ -618,6 +604,10 @@ test("cleanup admission separates the approved executor from an ancestral exerci
       ["unapproved executor", { EXPECTED_REVISION: earlierRevision }],
       ["wrong ref", { GITHUB_REF: "refs/heads/other" }],
       ["exercise override", { CERTIFICATION_MODE: "exercise" }],
+      ["cleanup reuse input", { REUSE_REVISION: earlierRevision }],
+      ["unrelated reuse", { CERTIFICATION_MODE: "exercise", EXERCISE_REVISION: "", REUSE_REVISION: unrelatedRevision }],
+      ["malformed reuse", { CERTIFICATION_MODE: "exercise", EXERCISE_REVISION: "", REUSE_REVISION: "main" }],
+      ["same revision reuse", { CERTIFICATION_MODE: "exercise", EXERCISE_REVISION: "", REUSE_REVISION: executorRevision }],
     ]) {
       assert.notEqual((await run(overrides)).status, 0, name);
       assert.equal(await readFile(environmentPath, "utf8"), "", name);
@@ -638,7 +628,7 @@ test("cleanup resolves only the selected exercise artifacts after main advances"
   const executorRevision = "b".repeat(40);
   const expressions = {
     "${{ github.sha }}": executorRevision,
-    "${{ env.EXERCISE_REVISION }}": exactRevision,
+    "${{ env.RESOURCE_REVISION }}": exactRevision,
     "${{ github.token }}": "synthetic-github-token",
     "${{ github.api_url }}": "https://github.invalid",
     "${{ github.repository }}": "Egeria-Systems/egeria-scaffold",
@@ -710,67 +700,180 @@ test("cleanup receipts bind earlier exercise identities separately from their ex
   assert.throws(() => createReceipt(exercise), { code: "ANALYTICS_PROVIDER_EVIDENCE_INVALID" });
 });
 
-test("the cleanup workflow deletes earlier exercise resources only while their identities still match", async () => {
+test("reuse envelopes preserve resource identities and refuse mixed provenance", async () => {
+  const { prepareAnalyticsCertificationReuse } = await import(receiptBuilderPath);
+  const evidence = measuredEvidence();
+  const context = { headSha: exactRevision, environment: "analytics-certification", hostname: exactHostname, worker: "analytics-certification" };
+  const input = { context, siteIdentity: evidence.siteIdentity, workerIdentity: evidence.workerIdentity, headSha: "b".repeat(40) };
+  assert.deepEqual(prepareAnalyticsCertificationReuse(input), {
+    siteIdentity: { ...evidence.siteIdentity, headSha: "b".repeat(40) },
+    workerIdentity: { ...evidence.workerIdentity, headSha: "b".repeat(40) },
+  });
+  assert.equal(evidence.siteIdentity.headSha, exactRevision);
+  for (const mutate of [
+    (value) => { value.siteIdentity.headSha = "c".repeat(40); },
+    (value) => { value.workerIdentity.hostname = "other.example.workers.dev"; },
+    (value) => { value.headSha = exactRevision; },
+    (value) => { value.siteIdentity.site.autoInstall = true; },
+  ]) {
+    const invalid = structuredClone(input);
+    mutate(invalid);
+    assert.throws(() => prepareAnalyticsCertificationReuse(invalid), { code: "ANALYTICS_PROVIDER_EVIDENCE_INVALID" });
+  }
+});
+
+test("exercise reuses only the recorded manual site and disabled Worker deployment", async () => {
+  const { createHash } = await import("node:crypto");
   const workflow = parseYaml(await readFile(workflowPath, "utf8"));
   const steps = Object.fromEntries(workflow.jobs.certify.steps.map((step) => [step.name, step]));
   const program = (name) => /node --input-type=module -e '\n([\s\S]*?)\n\s*'/u.exec(steps[name].run)[1];
-  const directory = await mkdtemp(join(tmpdir(), "analytics-cleanup-execution-"));
-  const executorRevision = "b".repeat(40);
-  const environment = {
-    EVIDENCE_DIRECTORY: directory, DEPLOY_URL: `https://${exactHostname}/`,
-    CERTIFICATION_MODE: "cleanup", GITHUB_EVENT_NAME: "workflow_dispatch",
-    GITHUB_REPOSITORY: "Egeria-Systems/egeria-scaffold", GITHUB_REF: "refs/heads/main",
-    GITHUB_SHA: executorRevision, EXPECTED_REVISION: executorRevision, EXERCISE_REVISION: exactRevision,
-    CLOUDFLARE_ACCOUNT_ID: "synthetic-account",
-    CLOUDFLARE_DEPLOY_API_TOKEN: "synthetic-deploy-token",
-    CLOUDFLARE_WEB_ANALYTICS_API_TOKEN: "synthetic-analytics-token",
-  };
-  const execute = (source) => spawnSync(process.execPath, ["--input-type=module", "--eval", source], {
-    cwd: repositoryRoot, encoding: "utf8", env: environment,
-  });
-  try {
-    const context = execute(program("Prepare private measurement context"));
-    assert.equal(context.status, 0, context.stderr);
-    const evidence = measuredEvidence("cleanup");
-    // The site is absent; the retained Worker still needs identity-bound deletion.
-    await writeFile(join(directory, "site-identity.json"), JSON.stringify({ ...evidence.siteIdentity, identityKnown: false, site: null }), { mode: 0o600 });
-    await writeFile(join(directory, "worker-identity.json"), JSON.stringify(evidence.workerIdentity), { mode: 0o600 });
-    for (const replacement of [true, false]) {
-      const mockedFetch = `
-        import { writeFileSync as recordDeletes } from "node:fs";
-        const deletes = [];
-        process.on("exit", () => recordDeletes(process.env.EVIDENCE_DIRECTORY + "/deletes.json", JSON.stringify(deletes)));
-        let workerPresent = true;
+  for (const scenario of ["fresh", "partial", "matching", "site-replaced", "worker-replaced", "worker-active", "missing-site", "missing-worker", "fresh-refuses-existing", "incomplete-fresh-list"]) {
+    const directory = await mkdtemp(join(tmpdir(), "analytics-reuse-"));
+    try {
+      const evidence = measuredEvidence();
+      evidence.siteIdentity.site.siteTokenSha256 = createHash("sha256").update("synthetic-public-site-token").digest("hex");
+      if (["fresh", "incomplete-fresh-list"].includes(scenario)) Object.assign(evidence.siteIdentity, { identityKnown: false, site: null });
+      if (["fresh", "partial", "incomplete-fresh-list"].includes(scenario)) Object.assign(evidence.workerIdentity, { identityKnown: false, worker: null });
+      await writeFile(join(directory, "site-identity.json"), JSON.stringify(evidence.siteIdentity), { mode: 0o600 });
+      await writeFile(join(directory, "worker-identity.json"), JSON.stringify(evidence.workerIdentity), { mode: 0o600 });
+      const provider = `
+        import { writeFileSync as recordCalls } from "node:fs";
+        const calls = [];
+        const scenario = ${JSON.stringify(scenario)};
+        process.on("exit", () => recordCalls(process.env.EVIDENCE_DIRECTORY + "/calls.json", JSON.stringify(calls)));
+        const json = (result) => ({ ok: true, status: 200, json: async () => ({ success: true, result }) });
         globalThis.fetch = async (url, options = {}) => {
+          if (!(options.signal instanceof AbortSignal)) throw new Error("Missing request deadline");
+          if (options.method && options.method !== "GET") {
+            calls.push(options.method);
+            if (scenario === "fresh" && options.method === "POST" && new URL(url).pathname.endsWith("/rum/site_info") && options.body === JSON.stringify({ host: ${JSON.stringify(exactHostname)}, auto_install: false })) return json({ host: ${JSON.stringify(exactHostname)}, site_tag: ${JSON.stringify(exactSiteTag)}, site_token: "synthetic-public-site-token", auto_install: false });
+            throw new Error("Unexpected resource mutation");
+          }
           const path = new URL(url).pathname;
-          if (options.method === "DELETE") { deletes.push(path); workerPresent = false; return { ok: true }; }
-          if (path.endsWith("/rum/site_info/list")) return { ok: true, json: async () => ({ success: true, result: [] }) };
-          if (path.endsWith("/deployments")) return { ok: true, json: async () => ({ success: true, result: [{
-            id: ${JSON.stringify(replacement ? exactVersionId : exactDeploymentId)}, created_on: "2026-09-19T00:00:00Z",
-            versions: [{ version_id: ${JSON.stringify(exactVersionId)}, percentage: 100 }],
-          }] }) };
-          if (path.endsWith("/workers/scripts/analytics-certification")) return { ok: workerPresent, status: workerPresent ? 200 : 404 };
+          const site = { host: ${JSON.stringify(exactHostname)}, site_tag: scenario === "site-replaced" ? "replacement-site-tag" : ${JSON.stringify(exactSiteTag)}, site_token: "synthetic-public-site-token", auto_install: false, snippet: "synthetic-public-site-token" };
+          if (path.endsWith("/rum/site_info/list")) {
+            const result = ["fresh", "missing-site", "incomplete-fresh-list"].includes(scenario) ? [] : [site];
+            return { ok: true, json: async () => ({ success: true, result, result_info: { page: 1, total_pages: scenario === "incomplete-fresh-list" ? 2 : 1, total_count: scenario === "incomplete-fresh-list" ? 1 : result.length } }) };
+          }
+          if (path.includes("/rum/site_info/")) return scenario === "missing-site" ? { ok: false, status: 404 } : json(site);
+          if (path.endsWith("/deployments")) return json([{ id: scenario === "worker-replaced" ? ${JSON.stringify(exactVersionId)} : ${JSON.stringify(exactDeploymentId)}, created_on: "2026-09-23T00:00:00Z", versions: [{ version_id: ${JSON.stringify(exactVersionId)}, percentage: 100 }] }]);
+          if (path.endsWith("/subdomain")) return json({ enabled: scenario === "worker-active", previews_enabled: false });
+          if (path.endsWith("/workers/scripts/analytics-certification")) return { ok: !["fresh", "partial", "missing-worker"].includes(scenario), status: ["fresh", "partial", "missing-worker"].includes(scenario) ? 404 : 200 };
           throw new Error("Unexpected provider request");
         };
       `;
-      const result = execute(mockedFetch + program("Delete and verify task resources"));
-      const deletes = JSON.parse(await readFile(join(directory, "deletes.json"), "utf8"));
-      if (replacement) {
-        assert.notEqual(result.status, 0);
-        assert.deepEqual(deletes, []);
+      const environment = {
+        HEAD_SHA: exactRevision, REUSE_REVISION: ["fresh", "fresh-refuses-existing", "incomplete-fresh-list"].includes(scenario) ? "" : "b".repeat(40),
+        EVIDENCE_DIRECTORY: directory, RUNNER_TEMP: directory, DEPLOY_URL: `https://${exactHostname}/`,
+        CLOUDFLARE_ACCOUNT_ID: "synthetic-account", CLOUDFLARE_DEPLOY_API_TOKEN: "synthetic-deploy-token", CLOUDFLARE_WEB_ANALYTICS_API_TOKEN: "synthetic-analytics-token",
+      };
+      const site = spawnSync(process.execPath, ["--input-type=module", "--eval", provider + program("Create and read back Web Analytics site")], { cwd: repositoryRoot, encoding: "utf8", env: environment });
+      if (["site-replaced", "missing-site", "fresh-refuses-existing", "incomplete-fresh-list"].includes(scenario)) {
+        assert.notEqual(site.status, 0, scenario);
       } else {
+        assert.equal(site.status, 0, site.stderr);
+        const readback = JSON.parse(await readFile(join(directory, "site-readback.json"), "utf8"));
+        assert.equal(readback.createdByRun, scenario === "fresh");
+        assert.equal(readback.reusedFromRevision, scenario === "fresh" ? null : "b".repeat(40));
+        assert.deepEqual(JSON.parse(await readFile(join(directory, "calls.json"), "utf8")), scenario === "fresh" ? ["POST"] : [], scenario);
+        const worker = spawnSync(process.execPath, ["--input-type=module", "--eval", provider + program("Deploy dedicated certification Worker")], { cwd: repositoryRoot, encoding: "utf8", env: environment });
+        assert.equal(worker.status === 0, ["fresh", "partial", "matching"].includes(scenario), worker.stderr || scenario);
+      }
+      assert.deepEqual(JSON.parse(await readFile(join(directory, "calls.json"), "utf8")), [], scenario);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+});
+
+test("recovery retains exact resources and verifies both Worker URL controls without deleting", async () => {
+  const { createHash } = await import("node:crypto");
+  const workflow = parseYaml(await readFile(workflowPath, "utf8"));
+  const steps = Object.fromEntries(workflow.jobs.certify.steps.map((step) => [step.name, step]));
+  const program = (name) => /node --input-type=module -e '\n([\s\S]*?)\n\s*'/u.exec(steps[name].run)[1];
+  const executorRevision = "b".repeat(40);
+  for (const scenario of ["retained", "absent", "replacement-worker", "replacement-site", "unknown-worker", "unknown-site", "post-change-worker", "post-change-site", "still-enabled", "preview-enabled", "write-failure", "read-failure", "incomplete-known-list", "incomplete-unknown-list"]) {
+    const directory = await mkdtemp(join(tmpdir(), "analytics-recovery-execution-"));
+    const environment = {
+      EVIDENCE_DIRECTORY: directory, DEPLOY_URL: `https://${exactHostname}/`,
+      CERTIFICATION_MODE: "cleanup", GITHUB_EVENT_NAME: "workflow_dispatch",
+      GITHUB_REPOSITORY: "Egeria-Systems/egeria-scaffold", GITHUB_REF: "refs/heads/main",
+      GITHUB_SHA: executorRevision, EXPECTED_REVISION: executorRevision, EXERCISE_REVISION: exactRevision,
+      CLOUDFLARE_ACCOUNT_ID: "synthetic-account",
+      CLOUDFLARE_DEPLOY_API_TOKEN: "synthetic-deploy-token",
+      CLOUDFLARE_WEB_ANALYTICS_API_TOKEN: "synthetic-analytics-token",
+    };
+    const execute = (source) => spawnSync(process.execPath, ["--input-type=module", "--eval", source], {
+      cwd: repositoryRoot, encoding: "utf8", env: environment,
+    });
+    try {
+      const context = execute(program("Prepare private measurement context"));
+      assert.equal(context.status, 0, context.stderr);
+      const evidence = measuredEvidence("cleanup");
+      evidence.siteIdentity.site.siteTokenSha256 = createHash("sha256").update("synthetic-public-site-token").digest("hex");
+      if (["unknown-site", "incomplete-unknown-list"].includes(scenario)) Object.assign(evidence.siteIdentity, { identityKnown: false, site: null });
+      if (scenario === "unknown-worker") Object.assign(evidence.workerIdentity, { identityKnown: false, worker: null });
+      await writeFile(join(directory, "site-identity.json"), JSON.stringify(evidence.siteIdentity), { mode: 0o600 });
+      await writeFile(join(directory, "worker-identity.json"), JSON.stringify(evidence.workerIdentity), { mode: 0o600 });
+      const provider = `
+        import { writeFileSync as recordCalls } from "node:fs";
+        const scenario = ${JSON.stringify(scenario)};
+        const mutations = [];
+        process.on("exit", () => recordCalls(process.env.EVIDENCE_DIRECTORY + "/mutations.json", JSON.stringify(mutations)));
+        let disabled = false;
+        const json = (result) => ({ ok: true, status: 200, json: async () => ({ success: true, result }) });
+        globalThis.fetch = async (url, options = {}) => {
+          if (!(options.signal instanceof AbortSignal)) throw new Error("Missing request deadline");
+          const path = new URL(url).pathname;
+          if (options.method && options.method !== "GET") {
+            mutations.push({ path, method: options.method, body: options.body && JSON.parse(options.body) });
+            if (options.method !== "POST" || !path.endsWith("/subdomain")) throw new Error("Unexpected mutation");
+            if (scenario === "write-failure") return { ok: false, status: 403 };
+            disabled = true;
+            return json({ enabled: false, previews_enabled: false });
+          }
+          if (path.includes("/rum/site_info")) {
+            const site = { host: ${JSON.stringify(exactHostname)}, site_tag: ["replacement-site", "incomplete-known-list"].includes(scenario) || (disabled && scenario === "post-change-site") ? "replacement-site-tag" : ${JSON.stringify(exactSiteTag)}, site_token: "synthetic-public-site-token", auto_install: false };
+            if (path.endsWith("/list")) {
+              const incomplete = scenario.startsWith("incomplete-");
+              const result = scenario === "absent" || incomplete ? [] : [site];
+              return { ok: true, json: async () => ({ success: true, result, result_info: { page: 1, total_pages: incomplete ? 2 : 1, total_count: incomplete ? 1 : result.length } }) };
+            }
+            return scenario === "absent" ? { ok: false, status: 404 } : json(site);
+          }
+          if (path.endsWith("/deployments")) return json([{
+            id: scenario === "replacement-worker" || (disabled && scenario === "post-change-worker") ? ${JSON.stringify(exactVersionId)} : ${JSON.stringify(exactDeploymentId)}, created_on: "2026-09-19T00:00:00Z",
+            versions: [{ version_id: ${JSON.stringify(exactVersionId)}, percentage: 100 }],
+          }]);
+          if (path.endsWith("/subdomain")) {
+            if (scenario === "read-failure") return { ok: false, status: 503 };
+            return json({ enabled: !disabled || scenario === "still-enabled", previews_enabled: !disabled || scenario === "preview-enabled" });
+          }
+          if (path.endsWith("/workers/scripts/analytics-certification")) return { ok: scenario !== "absent", status: scenario === "absent" ? 404 : 200 };
+          throw new Error("Unexpected provider request");
+        };
+      `;
+      const result = execute(provider + program("Retain and disable task resources"));
+      const mutations = JSON.parse(await readFile(join(directory, "mutations.json"), "utf8"));
+      assert.equal(mutations.some(({ method }) => method === "DELETE"), false, scenario);
+      if (["retained", "absent"].includes(scenario)) {
         assert.equal(result.status, 0, result.stderr);
-        assert.deepEqual(deletes, ["/client/v4/accounts/synthetic-account/workers/scripts/analytics-certification"]);
-        await rm(join(directory, "deletes.json"));
+        assert.deepEqual(mutations, scenario === "absent" ? [] : [{ path: "/client/v4/accounts/synthetic-account/workers/scripts/analytics-certification/subdomain", method: "POST", body: { enabled: false, previews_enabled: false } }]);
+        await rm(join(directory, "mutations.json"));
         const { stdout } = await execFileAsync(process.execPath, [receiptBuilderPath, "--input-directory", directory]);
         const receipt = JSON.parse(stdout);
         assert.equal(receipt.headSha, executorRevision);
         assert.equal(receipt.exerciseRevision, exactRevision);
-        assert.equal(receipt.resourceDisposition, "cloudflare-only-removed-and-absence-verified");
+        assert.equal(receipt.resourceDisposition, "cloudflare-retained-or-absent-workers-dev-disabled");
+        assert.deepEqual(receipt.outcomes, []);
+      } else {
+        assert.notEqual(result.status, 0, scenario);
+        await assert.rejects(readFile(join(directory, "cleanup.json")), { code: "ENOENT" });
+        if (scenario.startsWith("replacement-") || scenario.startsWith("unknown-") || scenario.startsWith("incomplete-")) assert.deepEqual(mutations, [], scenario);
       }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
     }
-  } finally {
-    await rm(directory, { recursive: true, force: true });
   }
 });
 
@@ -832,8 +935,7 @@ test("cleanup planning converges every partial prefix and refuses replacement id
         currentWorker: workerPresent ? currentWorker : null,
       }),
       {
-        deleteSite: sitePresent,
-        deleteWorker: workerPresent,
+        disableWorker: workerPresent,
         siteInitialState: sitePresent ? "present" : "absent",
         workerInitialState: workerPresent ? "present" : "absent",
       },
@@ -892,8 +994,7 @@ test("cleanup planning converges every partial prefix and refuses replacement id
       currentWorker: null,
     }),
     {
-      deleteSite: false,
-      deleteWorker: false,
+      disableWorker: false,
       siteInitialState: "absent",
       workerInitialState: "absent",
     },
@@ -919,7 +1020,7 @@ test("the redacted receipt is derived only from reconciled private measurements"
   const exerciseReceipt =
     createAnalyticsCertificationProviderReceiptForTesting(measuredEvidence());
   assert.deepEqual(exerciseReceipt, {
-    schemaVersion: "2.0.0",
+    schemaVersion: "3.0.0",
     ok: true,
     mode: "exercise",
     subject: measuredEvidence().context.subject,
@@ -942,6 +1043,7 @@ test("the redacted receipt is derived only from reconciled private measurements"
       partialGrantProviderRequests: 2,
       providerCookiesAfterWithdrawal: 0,
       sourceBoundaryUnexpectedExternalRequests: 0,
+      reusedFromRevision: null,
     },
     checks: [
       "approved-main-revision",
@@ -960,6 +1062,20 @@ test("the redacted receipt is derived only from reconciled private measurements"
     ],
   });
 
+  const reused = measuredEvidence();
+  reused.siteReadback.createdByRun = false;
+  reused.siteReadback.reusedFromRevision = "b".repeat(40);
+  assert.equal(createAnalyticsCertificationProviderReceiptForTesting(reused).measurements.reusedFromRevision, "b".repeat(40));
+  for (const mutate of [
+    (value) => { value.siteReadback.reusedFromRevision = null; },
+    (value) => { value.siteReadback.reusedFromRevision = exactRevision; },
+    (value) => { value.siteReadback.createdByRun = true; },
+  ]) {
+    const invalid = structuredClone(reused);
+    mutate(invalid);
+    assert.throws(() => createAnalyticsCertificationProviderReceiptForTesting(invalid), { code: "ANALYTICS_PROVIDER_EVIDENCE_INVALID" });
+  }
+
   const cleanupReceipt =
     createAnalyticsCertificationProviderReceiptForTesting(
       measuredEvidence("cleanup"),
@@ -967,7 +1083,7 @@ test("the redacted receipt is derived only from reconciled private measurements"
   assert.deepEqual(cleanupReceipt.outcomes, []);
   assert.equal(
     cleanupReceipt.resourceDisposition,
-    "cloudflare-only-removed-and-absence-verified",
+    "cloudflare-retained-or-absent-workers-dev-disabled",
   );
   assert.deepEqual(cleanupReceipt.measurements, {
     siteInitialState: "present",
@@ -988,14 +1104,16 @@ test("the redacted receipt is derived only from reconciled private measurements"
     evidence.cleanup.site = {
       initialState: sitePresent ? "present" : "absent",
       identityDisposition: sitePresent ? "matched" : "not-present",
-      deletionAttempted: sitePresent,
-      absenceVerified: true,
+      disposition: sitePresent ? "retained" : "absent",
+      verified: true,
     };
     evidence.cleanup.workerResource = {
       initialState: workerPresent ? "present" : "absent",
       identityDisposition: workerPresent ? "matched" : "not-present",
-      deletionAttempted: workerPresent,
-      absenceVerified: true,
+      disposition: workerPresent ? "retained" : "absent",
+      verified: true,
+      workersDevEnabled: workerPresent ? false : null,
+      previewsEnabled: workerPresent ? false : null,
     };
     const receipt =
       createAnalyticsCertificationProviderReceiptForTesting(evidence);
@@ -1051,7 +1169,11 @@ test("the redacted receipt is derived only from reconciled private measurements"
   for (const [name, mutate] of [
     ["cleanup outcome overclaim", (value) => { value.outcomes = ["cleanup-recovery"]; }],
     ["false compatibility recovery", (value) => { value.cleanup.compatibilityBaselineRecovered = true; }],
-    ["missing absence proof", (value) => { value.cleanup.site.absenceVerified = false; }],
+    ["missing retained identity proof", (value) => { value.cleanup.site.verified = false; }],
+    ["deleted reusable site", (value) => { value.cleanup.site.disposition = "absent"; }],
+    ["legacy deletion receipt", (value) => { value.cleanup.schemaVersion = "1.0.0"; }],
+    ["Worker still exposed", (value) => { value.cleanup.workerResource.workersDevEnabled = true; }],
+    ["preview still exposed", (value) => { value.cleanup.workerResource.previewsEnabled = true; }],
   ]) {
     const evidence = structuredClone(measuredEvidence("cleanup"));
     mutate(evidence);

@@ -133,6 +133,56 @@ function requireWorkerIdentity(identity, context) {
   }
 }
 
+export function prepareAnalyticsCertificationReuse({ context, siteIdentity, workerIdentity, headSha }) {
+  requireCleanupContext(context);
+  requireSiteIdentity(siteIdentity, context);
+  requireWorkerIdentity(workerIdentity, context);
+  if (!exactRevisionPattern.test(headSha) || headSha === context.headSha) reject();
+  return {
+    siteIdentity: { ...siteIdentity, headSha },
+    workerIdentity: { ...workerIdentity, headSha },
+  };
+}
+
+export async function readAnalyticsCertificationSite(controlPlaneFetch, endpoint, headers, hostname, siteTag = null) {
+  if (siteTag !== null) {
+    const response = await controlPlaneFetch(`${endpoint}/${encodeURIComponent(siteTag)}`, { headers });
+    if (response.status !== 404) {
+      const payload = await response.json();
+      if (!response.ok || payload?.success !== true || typeof payload.result?.site_token !== "string") reject();
+      return payload.result;
+    }
+  }
+  const response = await controlPlaneFetch(`${endpoint}/list?page=1&per_page=100`, { headers });
+  const payload = await response.json();
+  // Absence requires a complete listing. A bounded incomplete page is not evidence.
+  if (!response.ok || payload?.success !== true || !Array.isArray(payload.result) ||
+    payload.result.length > 100 || payload.result_info?.page !== 1 ||
+    payload.result_info?.total_count !== payload.result.length ||
+    (payload.result_info?.total_pages !== undefined && ![0, 1].includes(payload.result_info.total_pages))) reject();
+  const matches = payload.result.filter((site) => site?.host === hostname);
+  if (matches.length > 1 || (matches.length === 1 && typeof matches[0].site_token !== "string")) reject();
+  return matches[0] ?? null;
+}
+
+export async function readAnalyticsCertificationWorker(controlPlaneFetch, endpoint, headers) {
+  const response = await controlPlaneFetch(endpoint, { headers });
+  if (response.status === 404) return null;
+  if (!response.ok) reject();
+  const deploymentsResponse = await controlPlaneFetch(`${endpoint}/deployments`, { headers });
+  const payload = await deploymentsResponse.json();
+  const deployments = Array.isArray(payload?.result) ? payload.result : payload?.result?.deployments;
+  if (!deploymentsResponse.ok || payload?.success !== true || !Array.isArray(deployments) || deployments.length < 1 || deployments.length > 100) reject();
+  const timestamp = (deployment) => Date.parse(deployment?.created_on);
+  if (deployments.some((deployment) => !Number.isFinite(timestamp(deployment)))) reject();
+  const latestTime = Math.max(...deployments.map(timestamp));
+  const latest = deployments.filter((deployment) => timestamp(deployment) === latestTime);
+  if (latest.length !== 1 || latest[0].versions?.length !== 1 || latest[0].versions[0]?.percentage !== 100) reject();
+  const { id: deploymentId, versions: [{ version_id: versionId }] } = latest[0];
+  if (!uuidPattern.test(deploymentId) || !uuidPattern.test(versionId)) reject();
+  return { name: exactWorker, deploymentId, versionId };
+}
+
 export function planAnalyticsCertificationCleanup({
   context,
   siteIdentity,
@@ -175,8 +225,7 @@ export function planAnalyticsCertificationCleanup({
   }
 
   return Object.freeze({
-    deleteSite: currentSite !== null,
-    deleteWorker: currentWorker !== null,
+    disableWorker: currentWorker !== null,
     siteInitialState: currentSite === null ? "absent" : "present",
     workerInitialState: currentWorker === null ? "absent" : "present",
   });
@@ -276,18 +325,22 @@ function requireSiteReadback(measurement, context, identity) {
       "environment",
       "hostname",
       "createdByRun",
+      "reusedFromRevision",
       "readbackVerified",
       "siteTagMatchesIdentity",
       "siteTokenMatchesIdentity",
       "scriptTokenMatchesIdentity",
       "autoInstall",
     ]) ||
-    measurement.schemaVersion !== "1.0.0" ||
+    measurement.schemaVersion !== "2.0.0" ||
     measurement.headSha !== context.source.revision ||
     measurement.environment !== context.environment ||
     measurement.hostname !== context.resources.hostname ||
     identity.identityKnown !== true ||
-    measurement.createdByRun !== true ||
+    typeof measurement.createdByRun !== "boolean" ||
+    (measurement.createdByRun
+      ? measurement.reusedFromRevision !== null
+      : (!exactRevisionPattern.test(measurement.reusedFromRevision) || measurement.reusedFromRevision === context.source.revision)) ||
     measurement.readbackVerified !== true ||
     measurement.siteTagMatchesIdentity !== true ||
     measurement.siteTokenMatchesIdentity !== true ||
@@ -529,33 +582,22 @@ function requireBrowserJourney(measurement) {
   }
 }
 
-function requireCleanupResourceMeasurement(measurement, identity) {
+function requireCleanupResourceMeasurement(measurement, identity, worker = false) {
+  const keys = ["initialState", "identityDisposition", "disposition", "verified"];
+  if (worker) keys.push("workersDevEnabled", "previewsEnabled");
   if (
-    !hasExactKeys(measurement, [
-      "initialState",
-      "identityDisposition",
-      "deletionAttempted",
-      "absenceVerified",
-    ]) ||
+    !hasExactKeys(measurement, keys) ||
     !["present", "absent"].includes(measurement.initialState) ||
-    measurement.absenceVerified !== true
-  ) {
-    reject();
-  }
-  if (measurement.initialState === "present") {
-    if (
-      identity.identityKnown !== true ||
-      measurement.identityDisposition !== "matched" ||
-      measurement.deletionAttempted !== true
-    ) {
-      reject();
-    }
-  } else if (
-    measurement.identityDisposition !== "not-present" ||
-    measurement.deletionAttempted !== false
-  ) {
-    reject();
-  }
+    measurement.verified !== true
+  ) reject();
+  const present = measurement.initialState === "present";
+  if (
+    (present && identity.identityKnown !== true) ||
+    measurement.identityDisposition !== (present ? "matched" : "not-present") ||
+    measurement.disposition !== (present ? "retained" : "absent") ||
+    (worker && (measurement.workersDevEnabled !== (present ? false : null) ||
+      measurement.previewsEnabled !== (present ? false : null)))
+  ) reject();
 }
 
 function requireCleanupMeasurement(measurement, context, siteIdentity, workerIdentity) {
@@ -571,18 +613,18 @@ function requireCleanupMeasurement(measurement, context, siteIdentity, workerIde
       "dedicatedRecovery",
       "operatorCleanupPending",
     ]) ||
-    measurement.schemaVersion !== "1.0.0" ||
+    measurement.schemaVersion !== "2.0.0" ||
     measurement.headSha !== context.source.exerciseRevision ||
     measurement.environment !== context.environment ||
     measurement.hostname !== context.resources.hostname ||
     measurement.worker !== exactWorker ||
-    measurement.dedicatedRecovery !== "exact-deletion-and-absence" ||
+    measurement.dedicatedRecovery !== "retained-with-workers-dev-disabled" ||
     measurement.operatorCleanupPending !== true
   ) {
     reject();
   }
   requireCleanupResourceMeasurement(measurement.site, siteIdentity);
-  requireCleanupResourceMeasurement(measurement.workerResource, workerIdentity);
+  requireCleanupResourceMeasurement(measurement.workerResource, workerIdentity, true);
 }
 
 function createMeasuredReceipt(input) {
@@ -626,6 +668,7 @@ function createMeasuredReceipt(input) {
     outcomes = ["deployed-application"];
     resourceDisposition = "retained-for-human-provider-confirmation";
     measurements = {
+      reusedFromRevision: input.siteReadback.reusedFromRevision,
       readinessAttempts: input.readiness.attempts,
       readinessElapsedMilliseconds: input.readiness.elapsedMilliseconds,
       externalRequestEnvelopes: input.browserJourney.totalExternalRequests,
@@ -671,7 +714,7 @@ function createMeasuredReceipt(input) {
       input.workerIdentity,
     );
     outcomes = [];
-    resourceDisposition = "cloudflare-only-removed-and-absence-verified";
+    resourceDisposition = "cloudflare-retained-or-absent-workers-dev-disabled";
     measurements = {
       siteInitialState: input.cleanup.site.initialState,
       workerInitialState: input.cleanup.workerResource.initialState,
@@ -680,14 +723,14 @@ function createMeasuredReceipt(input) {
       "approved-main-revision",
       "exact-subject",
       "exercise-identity-reconciled",
-      "dedicated-worker-absence",
-      "web-analytics-site-absence",
+      "dedicated-worker-retained-disabled-or-absent",
+      "web-analytics-site-retained-manual-or-absent",
       "operator-cleanup-pending",
     ];
   }
 
   return Object.freeze({
-    schemaVersion: "2.0.0",
+    schemaVersion: "3.0.0",
     ok: true,
     mode: context.mode,
     subject: Object.freeze({ ...context.subject }),
