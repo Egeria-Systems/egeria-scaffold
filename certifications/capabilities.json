@@ -74,9 +74,60 @@
         "fresh-scaffold",
         "provider-confirmed"
       ],
-      "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-09-22-contact-delivery-certification-amendment.md",
-      "evidence": []
+      "status": "certified",
+      "taskPlan": "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md",
+      "evidence": [
+        {
+          "kind": "cleanup-recovery",
+          "path": "docs/implementation-evidence/2026-09-23-web3forms-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "94c28901fb4388f771df53cc18cf2eec24b76215",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9"
+          }
+        },
+        {
+          "kind": "deployed-application",
+          "path": "docs/implementation-evidence/2026-09-23-web3forms-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "94c28901fb4388f771df53cc18cf2eec24b76215",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9"
+          }
+        },
+        {
+          "kind": "existing-repository-lifecycle",
+          "path": "docs/implementation-evidence/2026-09-23-web3forms-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "94c28901fb4388f771df53cc18cf2eec24b76215",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9"
+          }
+        },
+        {
+          "kind": "fresh-scaffold",
+          "path": "docs/implementation-evidence/2026-09-23-web3forms-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "94c28901fb4388f771df53cc18cf2eec24b76215",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9"
+          }
+        },
+        {
+          "kind": "provider-confirmed",
+          "path": "docs/implementation-evidence/2026-09-23-web3forms-certification-receipt.md",
+          "outcome": "passed",
+          "revision": "94c28901fb4388f771df53cc18cf2eec24b76215",
+          "subject": {
+            "descriptorVersion": "0.1.0",
+            "behaviorContractDigest": "sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9"
+          }
+        }
+      ]
     },
     "content-files": {
       "subject": {
