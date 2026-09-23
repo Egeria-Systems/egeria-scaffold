@@ -15,6 +15,7 @@ const currentRegistry = JSON.parse(await readFile(join(repositoryRoot, "certific
 const registry = structuredClone(currentRegistry);
 delete registry.records["application-persistence"];
 delete registry.records["transactional-email-resend"];
+delete registry.records["contact-form-web3forms"];
 registry.records["app-foundation"] = {
   subject: { descriptorVersion: "0.1.0", behaviorContractDigest: "sha256:6d9cf389441064a96d2b47bb309becab37358fcc2952335feffae8720eb6f497" },
   requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],

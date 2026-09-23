@@ -13,6 +13,7 @@ import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
   type AnalyticsSettings,
   type CalendlyBookingSettings,
+  type Web3FormsContactSettings,
   projectConfigurationSchema,
   type ProjectConfiguration,
 } from "../contracts/project.js";
@@ -47,6 +48,7 @@ export type GenerationRequest = Readonly<{
   displayName: string;
   analytics?: AnalyticsSettings;
   bookingCalendly?: CalendlyBookingSettings;
+  contactFormWeb3Forms?: Web3FormsContactSettings;
   multilingual?: true;
   applicationPersistence?: true;
   transactionalEmailResend?: true;
@@ -107,6 +109,7 @@ function createProject(
       ({ identifier }) => identifier,
     ),
     capabilitySettings: {
+      ...(request.contactFormWeb3Forms === undefined ? {} : { "contact-form-web3forms": request.contactFormWeb3Forms }),
       ...(request.analytics === undefined
         ? {}
         : { analytics: request.analytics }),
@@ -438,12 +441,14 @@ export async function renderSkeleton(
     {
       profile: request.profile,
       ...(
+        request.contactFormWeb3Forms === undefined &&
         request.analytics === undefined &&
         request.bookingCalendly === undefined &&
         request.multilingual !== true && request.applicationPersistence !== true && request.transactionalEmailResend !== true && !retainedFoundation
           ? {}
           : {
               requestedCapabilities: [
+                ...(request.contactFormWeb3Forms === undefined ? [] : ["contact-form-web3forms"]),
                 ...(request.analytics === undefined ? [] : ["analytics"]),
                 ...(request.bookingCalendly === undefined
                   ? []
@@ -477,6 +482,7 @@ export async function renderSkeleton(
     request.applicationPersistence === true,
     resolutionResult.value.capabilities.some(({ identifier }) => identifier === "app-foundation"),
     request.transactionalEmailResend === true,
+    request.contactFormWeb3Forms !== undefined,
   );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;
@@ -486,6 +492,7 @@ export async function renderSkeleton(
     projectName: projectResult.value.project.name,
     displayNameJson: JSON.stringify(projectResult.value.project.displayName),
     workerName: projectResult.value.project.name,
+    ...(request.contactFormWeb3Forms === undefined ? {} : { web3FormsAccessKeyJson: JSON.stringify(request.contactFormWeb3Forms.accessKey) }),
     ...(request.analytics === undefined
       ? {}
       : {

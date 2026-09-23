@@ -294,6 +294,7 @@ const createArguments = ({
   multilingual,
   applicationPersistence,
   transactionalEmailResend,
+  contactFormWeb3Forms,
 }) =>
   Object.freeze([
     "--profile",
@@ -313,6 +314,7 @@ const createArguments = ({
     ...(multilingual === true ? ["--multilingual"] : []),
     ...(applicationPersistence === true ? ["--application-persistence"] : []),
     ...(transactionalEmailResend === true ? ["--transactional-email-resend"] : []),
+    ...(contactFormWeb3Forms === undefined ? [] : ["--web3forms-access-key", contactFormWeb3Forms.accessKey]),
     ...(analytics === undefined
       ? []
       : [
@@ -330,6 +332,24 @@ const createArguments = ({
           "--looker-studio",
         ]),
   ]);
+
+const contactSettings = Object.freeze({ accessKey: "00000000-0000-4000-8000-000000000001" });
+const contactFiles = Object.freeze([
+  "apps/web/content/en-CA/contact-form-web3forms.yaml",
+  "apps/web/content/fr-CA/contact-form-web3forms.yaml",
+  "apps/web/src/integrations/contact-form-web3forms/contact-content-source.d.ts",
+  "apps/web/src/integrations/contact-form-web3forms/contact-content.ts",
+  "apps/web/src/integrations/contact-form-web3forms/contact-form-placement.tsx",
+  "apps/web/src/integrations/contact-form-web3forms/contact-form.tsx",
+  "apps/web/src/integrations/contact-form-web3forms/contact-settings.ts",
+  "apps/web/src/integrations/contact-form-web3forms/hcaptcha.tsx",
+  "apps/web/src/integrations/contact-form-web3forms/submit-contact.ts",
+  "apps/web/src/integrations/contact-form-web3forms/web3forms-contact.tsx",
+  "apps/web/tests/component/web3forms-contact.test.tsx",
+  "apps/web/tests/e2e/web3forms-contact.spec.ts",
+  "apps/web/tests/unit/web3forms-contact.test.ts",
+  "docs/contact-form-web3forms.md",
+].sort(codePointCompare));
 
 const noCapabilitySettings = Object.freeze({});
 const portfolioCalendlySettings = Object.freeze({
@@ -681,6 +701,30 @@ export const generatedFixtureContracts = Object.freeze([
     expectedTransactionalEmailVersion: "0.1.0", expectedApplicationPersistenceVersion: "0.1.0",
     expectedSiteRoutingVersion: "0.4.0", expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 170, visualRegression: false,
+  }),
+  Object.freeze({
+    identifier: "site-contact-form",
+    profile: "site",
+    projectName: "acme-site-contact-form",
+    displayName: "Acme Site Contact",
+    createArguments: createArguments({ profile: "site", projectName: "acme-site-contact-form", displayName: "Acme Site Contact", contactFormWeb3Forms: contactSettings }),
+    expectedCapabilitySettings: Object.freeze({ "contact-form-web3forms": contactSettings }),
+    relativeRoot: "fixtures/generated/site-contact-form",
+    expectedFiles: Object.freeze([...portfolioFiles, ...siteRoutingFiles, ...contactFiles].sort(codePointCompare)),
+    expectedCapabilities: Object.freeze(["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "site-routing", "contact-form-web3forms"]),
+    expectedRecipeVersion: "0.12.0",
+    expectedStandardsVersion: "0.5.0",
+    expectedObservabilityVersion: "0.3.0",
+    expectedContentFilesVersion: "0.4.0",
+    expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.3.0",
+    expectedSiteRoutingVersion: "0.4.0",
+    expectedBookingCalendlyVersion: null,
+    expectedAnalyticsVersion: null,
+    expectedMultilingualVersion: null,
+    expectedContactFormVersion: "0.1.0",
+    expectedSurfaces: 137,
+    visualRegression: false,
   }),
 ]);
 

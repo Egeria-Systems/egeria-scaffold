@@ -5,7 +5,7 @@ import { fingerprintFileContent, fingerprintJsonValue } from "../ownership/finge
 import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
 import type { AppTransitionContentValidators } from "./app-transition-content-validation.js";
 import { resolveSupportedProfileTransition } from "./supported-profile-transitions.js";
-export type AppTransitionFailureCode = "PROFILE_TRANSITION_CONTENT_INVALID" | "PROFILE_TRANSITION_ACTION_CONFLICT" | "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED" | "PROJECT_DRIFT_DETECTED" | "PROJECT_INSPECTION_INVALID";
+export type AppTransitionFailureCode = "PROFILE_TRANSITION_UNSUPPORTED" | "PROFILE_TRANSITION_CONTENT_INVALID" | "PROFILE_TRANSITION_ACTION_CONFLICT" | "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED" | "PROJECT_DRIFT_DETECTED" | "PROJECT_INSPECTION_INVALID";
 export type AppTransitionResult<T> = Readonly<{
   ok: true;
   value: T;
@@ -300,6 +300,7 @@ export function prepareAppProfileTransition(input: Readonly<{
   validators: AppTransitionContentValidators;
 }>): AppTransitionResult<AppTransitionPreparation> {
   try {
+    if (input.source.project.selectedCapabilities.includes("contact-form-web3forms")) return appTransitionFailure("PROFILE_TRANSITION_UNSUPPORTED");
     const profile = input.source.project.originProfile;
     const edge = resolveSupportedProfileTransition({
       fromProfile: profile, fromRecipeVersion: input.source.project.recipeVersion, toProfile: input.target.project.originProfile, toRecipeVersion: input.target.project.recipeVersion
@@ -406,6 +407,7 @@ export function selectAppTransitionVisuals(input: Readonly<{
   source: RenderedSkeleton;
   evidence: AppTransitionVisualEvidence | undefined;
 }>): AppTransitionResult<AppTransitionPreparation> {
+  if (input.source.project.selectedCapabilities.includes("contact-form-web3forms")) return appTransitionFailure("PROFILE_TRANSITION_UNSUPPORTED");
   if (input.source.project.originProfile === "site") {
     return { ok: true, value: input.prepared };
   }

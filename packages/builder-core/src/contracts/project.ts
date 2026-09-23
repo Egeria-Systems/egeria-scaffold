@@ -159,9 +159,16 @@ export const analyticsSettingsSchema = z
 
 export type AnalyticsSettings = z.infer<typeof analyticsSettingsSchema>;
 
+export const web3FormsContactSettingsSchema = z.strictObject({
+  accessKey: z.string().regex(/^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$/u),
+}).readonly();
+
+export type Web3FormsContactSettings = z.infer<typeof web3FormsContactSettingsSchema>;
+
 const capabilitySettingsSchema = z
   .strictObject({
     analytics: analyticsSettingsSchema.optional(),
+    "contact-form-web3forms": web3FormsContactSettingsSchema.optional(),
     "booking-calendly": calendlyBookingSettingsSchema.optional(),
   })
   .readonly();
@@ -185,6 +192,11 @@ export const projectConfigurationSchema = z
     ejectedAreas: ejectedAreaListSchema,
   })
   .superRefine((project, context) => {
+    const contactSelected = project.selectedCapabilities.includes("contact-form-web3forms");
+    const contactConfigured = project.capabilitySettings["contact-form-web3forms"] !== undefined;
+    if (contactSelected !== contactConfigured) {
+      context.addIssue({ code: "custom", message: "contact selection and settings must agree", path: ["capabilitySettings", "contact-form-web3forms"] });
+    }
     const bookingSelected =
       project.selectedCapabilities.includes("booking-calendly");
     const bookingConfigured =

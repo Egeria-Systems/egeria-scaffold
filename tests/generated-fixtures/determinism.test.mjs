@@ -160,6 +160,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
       ...(fixture.expectedMultilingualVersion ? { multilingual: true } : {}),
       ...(fixture.expectedApplicationPersistenceVersion ? { applicationPersistence: true } : {}),
       ...(fixture.expectedTransactionalEmailVersion ? { transactionalEmailResend: true } : {}),
+      ...(fixture.expectedContactFormVersion ? { contactFormWeb3Forms: fixture.expectedCapabilitySettings["contact-form-web3forms"] } : {}),
     });
     assert.equal(rendered.ok, true);
     for (const { path, content } of rendered.value.files) {
@@ -329,6 +330,7 @@ test("compiled project generation matches every committed fixture identifier", a
           fixtureCase.expectedApplicationPersistenceVersion ?? null,
         );
         assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "transactional-email-resend")?.version ?? null, fixtureCase.expectedTransactionalEmailVersion ?? null);
+        assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "contact-form-web3forms")?.version ?? null, fixtureCase.expectedContactFormVersion ?? null);
         const projectConfiguration = await readFile(
           join(destination, ".egeria/project.yaml"),
           "utf8",

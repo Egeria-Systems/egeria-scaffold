@@ -26,3 +26,5 @@ If an ADR conflicts with implementation or another canonical document, identify 
 | [ADR-0016](0016-optional-application-persistence.md) | Optional persistence and exact shared contracts | Accepted | 2026-09-14 |
 
 - [ADR-0017: Independently selectable transactional email](0017-transactional-email-resend.md)
+
+- [ADR-0018: Browser-hosted contact form](0018-hosted-contact-form.md)

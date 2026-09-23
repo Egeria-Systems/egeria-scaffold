@@ -26,6 +26,8 @@ import {
   analyticsSettingsSchema,
   type AnalyticsSettings,
   calendlyBookingSettingsSchema,
+  web3FormsContactSettingsSchema,
+  type Web3FormsContactSettings,
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
 import { validateContract } from "../contracts/result.js";
@@ -83,6 +85,7 @@ const allowedRequestKeys = new Set([
   "applicationPersistence",
   "transactionalEmailResend",
   "bookingCalendly",
+  "contactFormWeb3Forms",
   "displayName",
   "multilingual",
   "profile",
@@ -129,6 +132,7 @@ function validateRequest(
 
   const keys = Object.keys(value).sort();
   const includesAnalytics = Object.hasOwn(value, "analytics");
+  const includesContact = Object.hasOwn(value, "contactFormWeb3Forms");
   const includesCalendly = Object.hasOwn(value, "bookingCalendly");
   const includesMultilingual = Object.hasOwn(value, "multilingual");
   const includesPersistence = Object.hasOwn(value, "applicationPersistence");
@@ -144,6 +148,12 @@ function validateRequest(
     );
   }
 
+  let contactFormWeb3Forms: Web3FormsContactSettings | undefined;
+  if (includesContact) {
+    const parsed = web3FormsContactSettingsSchema.safeParse(value.contactFormWeb3Forms);
+    if (!parsed.success) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "contactFormWeb3Forms"], "invalid-settings");
+    contactFormWeb3Forms = parsed.data;
+  }
   let analytics: AnalyticsSettings | undefined;
   if (includesAnalytics) {
     const parsed = analyticsSettingsSchema.safeParse(value.analytics);
@@ -192,6 +202,7 @@ function validateRequest(
       profile: value.profile as ProjectGenerationRequest["profile"],
       projectName: value.projectName as string,
       displayName: value.displayName as string,
+      ...(contactFormWeb3Forms === undefined ? {} : { contactFormWeb3Forms }),
       ...(analytics === undefined ? {} : { analytics }),
       ...(bookingCalendly === undefined ? {} : { bookingCalendly }),
       ...(includesMultilingual ? { multilingual: true } : {}),

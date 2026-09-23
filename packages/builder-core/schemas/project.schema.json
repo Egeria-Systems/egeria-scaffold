@@ -149,6 +149,20 @@
                 "mode"
               ],
               "type": "object"
+            },
+            "contact-form-web3forms": {
+              "additionalProperties": false,
+              "properties": {
+                "accessKey": {
+                  "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
+                  "type": "string"
+                }
+              },
+              "readOnly": true,
+              "required": [
+                "accessKey"
+              ],
+              "type": "object"
             }
           },
           "readOnly": true,

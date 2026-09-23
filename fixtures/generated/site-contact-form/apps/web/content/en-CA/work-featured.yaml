@@ -1,0 +1,18 @@
+metadata:
+  title: Featured work
+  description: A closer look at selected work and its outcomes.
+sections:
+  - id: featured-work
+    type: hero
+    variant: default
+    enabled: true
+    content:
+      heading: Featured work
+      summary: A closer look at selected work and its outcomes.
+  - id: project-context
+    type: text
+    variant: default
+    enabled: true
+    content:
+      heading: From problem to outcome
+      body: Replace this example with the context, decisions, and measurable results that matter to your audience.

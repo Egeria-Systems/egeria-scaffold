@@ -48,7 +48,7 @@ import {
 import { prepareCapabilityDependencyChange } from "./prepare-capability-dependency-change.js";
 import { reviewPersistenceRemovalEvidence } from "./review-persistence-removal-evidence.js";
 
-type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend";
+type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms";
 
 export type CapabilityRemovalAction = Readonly<{
   kind:
@@ -62,6 +62,7 @@ export type CapabilityRemovalAction = Readonly<{
     | "analytics"
     | "application-persistence"
     | "transactional-email-resend"
+    | "contact-form-web3forms"
     | "deployment-cloudflare"
     | "booking-calendly"
     | "builder-kernel"
@@ -72,6 +73,10 @@ export type CapabilityRemovalAction = Readonly<{
 }>;
 
 export type CapabilityRemovalReviewRequirement =
+  | Readonly<{
+      code: "review-contact-provider-and-retained-data-disposition";
+      scope: "source-only-removal-public-form-identifier-provider-submissions-and-inbox-retention-separate";
+    }>
   | Readonly<{
       code: "review-surviving-references-to-removed-surfaces";
       scope: "repository";
@@ -167,6 +172,7 @@ type ValidInspection = ProjectInspection &
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const removalReferenceTokens = {
+  "contact-form-web3forms": "web3forms",
   "application-persistence": "application-persistence",
   "transactional-email-resend": "transactional-email",
   analytics: "analytics",
@@ -455,6 +461,7 @@ function actionOwner(
     "analytics",
     "application-persistence",
     "transactional-email-resend",
+    "contact-form-web3forms",
     "deployment-cloudflare",
     "booking-calendly",
     "multilingual",
@@ -701,6 +708,10 @@ function removalReviewRequirements(
             warnings: referenceWarnings,
           },
         ]),
+    ...(capability === "contact-form-web3forms" ? [{
+      code: "review-contact-provider-and-retained-data-disposition" as const,
+      scope: "source-only-removal-public-form-identifier-provider-submissions-and-inbox-retention-separate" as const,
+    }] : []),
     ...(capability === "transactional-email-resend" ? [{
       code: "review-email-provider-credential-and-retention-disposition" as const,
       scope: "source-only-removal-provider-credentials-and-retained-data-separate" as const,
@@ -847,7 +858,8 @@ export async function planCapabilityRemoval(input: Readonly<{
     capabilityValue !== "booking-calendly" &&
     capabilityValue !== "multilingual" &&
     capabilityValue !== "application-persistence" &&
-    capabilityValue !== "transactional-email-resend"
+    capabilityValue !== "transactional-email-resend" &&
+    capabilityValue !== "contact-form-web3forms"
   ) {
     return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
   }
@@ -952,6 +964,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     ...(analyticsSettings === undefined ? {} : { analytics: analyticsSettings }),
     ...(project.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
     ...(project.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
+    ...(project.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: project.capabilitySettings["contact-form-web3forms"] }),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
   const [currentRender, desiredRender] = await Promise.all([
@@ -973,6 +986,7 @@ export async function planCapabilityRemoval(input: Readonly<{
         : { analytics: analyticsSettings }),
       ...(capabilityValue !== "application-persistence" && renderRequest.applicationPersistence === true ? { applicationPersistence: true as const } : {}),
       ...(capabilityValue !== "transactional-email-resend" && renderRequest.transactionalEmailResend === true ? { transactionalEmailResend: true as const } : {}),
+      ...(capabilityValue !== "contact-form-web3forms" && renderRequest.contactFormWeb3Forms !== undefined ? { contactFormWeb3Forms: renderRequest.contactFormWeb3Forms } : {}),
       packageVersions: verifiedCapabilityPackageVersions,
     }, capabilityValue === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext),
   ]);

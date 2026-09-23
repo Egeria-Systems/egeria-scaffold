@@ -20,6 +20,8 @@ import {
 import {
   analyticsSettingsSchema,
   calendlyBookingSettingsSchema,
+  web3FormsContactSettingsSchema,
+  type Web3FormsContactSettings,
   type AnalyticsSettings,
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
@@ -76,7 +78,7 @@ import {
 } from "./plan-capability-addition.js";
 
 const encoder = new TextEncoder();
-type AddableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend";
+type AddableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms";
 
 function additionMigrationIdentifier(
   capability: AddableCapability,
@@ -85,8 +87,11 @@ function additionMigrationIdentifier(
   | "add-booking-calendly-0-1-0"
   | "add-multilingual-0-1-0"
   | "add-application-persistence-0-1-0"
-  | "add-transactional-email-resend-0-1-0" {
+  | "add-transactional-email-resend-0-1-0"
+  | "add-contact-form-web3forms-0-1-0" {
   switch (capability) {
+    case "contact-form-web3forms":
+      return "add-contact-form-web3forms-0-1-0";
     case "analytics":
       return "add-analytics-0-1-0";
     case "booking-calendly":
@@ -387,7 +392,7 @@ function createNextState(input: Readonly<{
 export async function applyCapabilityAddition(input: Readonly<{
   root: string;
   capability: AddableCapability;
-  settings?: AnalyticsSettings | CalendlyBookingSettings;
+  settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
   approvedPlanFingerprint: string;
   verifier: GeneratedProjectVerifier;
   reader?: RepositoryReader;
@@ -433,6 +438,8 @@ export async function applyCapabilityAddition(input: Readonly<{
       ? analyticsSettingsSchema.safeParse(input.settings)
       : input.capability === "booking-calendly"
         ? calendlyBookingSettingsSchema.safeParse(input.settings)
+        : input.capability === "contact-form-web3forms"
+          ? web3FormsContactSettingsSchema.safeParse(input.settings)
         : input.settings === undefined
           ? { success: true as const, data: undefined }
           : { success: false as const };
@@ -498,6 +505,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...(controls.project.value.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
     ...(controls.project.value.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
     ...(controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
+    ...(controls.project.value.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: controls.project.value.capabilitySettings["contact-form-web3forms"] }),
     packageVersions: verifiedCapabilityPackageVersions,
   };
   const targetContext = input.capability === "application-persistence" || input.capability === "transactional-email-resend"
@@ -510,6 +518,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   if (!targetCatalog.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   let desired = await renderSkeleton({
     ...renderRequest,
+    ...(input.capability === "contact-form-web3forms" ? { contactFormWeb3Forms: settingsSnapshot as Web3FormsContactSettings } : {}),
     ...(input.capability === "analytics" ? { analytics: settingsSnapshot as AnalyticsSettings } : {}),
     ...(input.capability === "booking-calendly" ? { bookingCalendly: settingsSnapshot as CalendlyBookingSettings } : {}),
     ...(input.capability === "multilingual" ? { multilingual: true as const } : {}),

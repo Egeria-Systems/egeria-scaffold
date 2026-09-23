@@ -1,0 +1,5 @@
+export type Web3FormsContactSettings = Readonly<{ accessKey: string }>;
+
+export const contactSettings: Web3FormsContactSettings = Object.freeze({
+  accessKey: {{web3FormsAccessKeyJson}},
+});

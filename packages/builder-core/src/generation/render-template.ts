@@ -12,6 +12,7 @@ const templateLayers = new Set([
   "deployment-cloudflare",
   "standards",
   "booking-calendly",
+  "contact-form-web3forms",
   "common",
   "multilingual",
   "portfolio",
@@ -38,9 +39,10 @@ const templateTokenNames = new Set([
   "calendlyDestinationJson",
   "calendlyModeJson",
   "analyticsSettingsJson",
+  "web3FormsAccessKeyJson",
 ]);
 const templateTokenPattern =
-  /{{(projectName|displayNameJson|workerName|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|githubApplicationDatabaseEnvironmentExpression|githubExpectedDatabaseIdExpression|githubMigrationSetSha256Expression|githubSourceReviewReferenceExpression|githubRecoveryPointReferenceExpression|githubStagingApplicationDatabaseIdExpression|githubProductionApplicationDatabaseIdExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson)}}/g;
+  /{{(projectName|displayNameJson|workerName|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|githubApplicationDatabaseEnvironmentExpression|githubExpectedDatabaseIdExpression|githubMigrationSetSha256Expression|githubSourceReviewReferenceExpression|githubRecoveryPointReferenceExpression|githubStagingApplicationDatabaseIdExpression|githubProductionApplicationDatabaseIdExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson|web3FormsAccessKeyJson)}}/g;
 const completeTokenPattern = /{{([^{}]*)}}/g;
 const bookingCalendlySettingsSource =
   "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template";
@@ -77,6 +79,7 @@ export type TemplateTokens = Readonly<{
   calendlyDestinationJson?: string;
   calendlyModeJson?: string;
   analyticsSettingsJson?: string;
+  web3FormsAccessKeyJson?: string;
 }>;
 
 type TemplateTokenName = keyof TemplateTokens | keyof typeof fixedTemplateTokens;
@@ -144,7 +147,8 @@ function validateTemplateSyntax(
         templateTokenNames.has(token) &&
         (!bookingCalendlyTokenNames.has(token) ||
           source === bookingCalendlySettingsSource) &&
-        (!analyticsTokenNames.has(token) || source === analyticsSettingsSource)
+        (!analyticsTokenNames.has(token) || source === analyticsSettingsSource) &&
+        (token !== "web3FormsAccessKeyJson" || source === "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-settings.ts.template")
       ) {
         if (
           !(token in fixedTemplateTokens) &&

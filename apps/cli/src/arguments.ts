@@ -1,6 +1,8 @@
 import {
   analyticsSettingsSchema,
   calendlyBookingSettingsSchema,
+  web3FormsContactSettingsSchema,
+  type Web3FormsContactSettings,
   profileIdentifierSchema,
   projectConfigurationSchema,
   type AnalyticsSettings,
@@ -22,6 +24,7 @@ export type CliCommand =
       multilingual?: true;
       applicationPersistence?: true;
       transactionalEmailResend?: true;
+      contactFormWeb3Forms?: Web3FormsContactSettings;
     }>
   | Readonly<{
       kind: "infer" | "doctor" | "diff";
@@ -35,8 +38,9 @@ export type CliCommand =
         | "booking-calendly"
         | "multilingual"
         | "application-persistence"
-        | "transactional-email-resend";
-      settings?: AnalyticsSettings | CalendlyBookingSettings;
+        | "transactional-email-resend"
+        | "contact-form-web3forms";
+      settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
     }>
   | Readonly<{
       kind: "plan-remove";
@@ -46,7 +50,8 @@ export type CliCommand =
         | "booking-calendly"
         | "multilingual"
         | "application-persistence"
-        | "transactional-email-resend";
+        | "transactional-email-resend"
+        | "contact-form-web3forms";
       persistenceRemovalPath?: string;
     }>
   | Readonly<{
@@ -68,8 +73,9 @@ export type CliCommand =
         | "booking-calendly"
         | "multilingual"
         | "application-persistence"
-        | "transactional-email-resend";
-      settings?: AnalyticsSettings | CalendlyBookingSettings;
+        | "transactional-email-resend"
+        | "contact-form-web3forms";
+      settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
       approvedPlanFingerprint: string;
     }>
   | Readonly<{
@@ -80,7 +86,8 @@ export type CliCommand =
         | "booking-calendly"
         | "multilingual"
         | "application-persistence"
-        | "transactional-email-resend";
+        | "transactional-email-resend"
+        | "contact-form-web3forms";
       persistenceRemovalPath?: string;
       persistenceRemovalHumanReviewPath?: string;
       approvedPlanFingerprint: string;
@@ -237,6 +244,7 @@ function parseCreate(
         "display-name": { type: "string" },
         directory: { type: "string" },
         "calendly-url": { type: "string" },
+        "web3forms-access-key": { type: "string" },
         "calendly-mode": { type: "string" },
         multilingual: { type: "boolean" },
         "application-persistence": { type: "boolean" },
@@ -256,6 +264,8 @@ function parseCreate(
     const multilingual = values.multilingual;
     const applicationPersistence = values["application-persistence"];
     const transactionalEmailResend = values["transactional-email-resend"];
+    const parsedContact = values["web3forms-access-key"] === undefined ? undefined
+      : web3FormsContactSettingsSchema.safeParse({ accessKey: values["web3forms-access-key"] });
     const parsedAnalytics = parseAnalyticsSettings(values);
     const parsedProfile = profileIdentifierSchema.safeParse(profile);
     const parsedProjectName = projectFields.name.safeParse(projectName);
@@ -283,6 +293,7 @@ function parseCreate(
       ...(multilingual === true ? ["multilingual"] : []),
       ...(applicationPersistence === true ? ["application-persistence"] : []),
       ...(transactionalEmailResend === true ? ["transactional-email-resend"] : []),
+      ...(parsedContact === undefined ? [] : ["web3forms-access-key"]),
       ...selectedAnalyticsOptions(values),
     ];
 
@@ -294,6 +305,7 @@ function parseCreate(
       hasCalendlyUrl !== hasCalendlyMode ||
       (parsedCalendly !== undefined && !parsedCalendly.success) ||
       (parsedAnalytics !== undefined && !parsedAnalytics.success) ||
+      (parsedContact !== undefined && !parsedContact.success) ||
       !validDirectory(directory)
     ) {
       return invalidArguments();
@@ -313,6 +325,7 @@ function parseCreate(
         ...(parsedAnalytics?.success === true
           ? { analytics: parsedAnalytics.data }
           : {}),
+        ...(parsedContact?.success === true ? { contactFormWeb3Forms: parsedContact.data } : {}),
         ...(multilingual === true ? { multilingual: true } : {}),
         ...(applicationPersistence === true ? { applicationPersistence: true } : {}),
         ...(transactionalEmailResend === true ? { transactionalEmailResend: true } : {}),
@@ -369,6 +382,7 @@ function parseAdd(
         directory: { type: "string" },
         capability: { type: "string" },
         "calendly-url": { type: "string" },
+        "web3forms-access-key": { type: "string" },
         "calendly-mode": { type: "string" },
         ...analyticsOptionDefinitions,
         ...(applying ? approvedPlanOptionDefinitions : {}),
@@ -387,13 +401,15 @@ function parseAdd(
     const analyticsSettings = parseAnalyticsSettings(values);
     const calendlySelection = capability === "booking-calendly";
     const analyticsSelection = capability === "analytics";
+    const contactSelection = capability === "contact-form-web3forms";
+    const contactSettings = web3FormsContactSettingsSchema.safeParse({ accessKey: values["web3forms-access-key"] });
     const multilingualSelection = capability === "multilingual";
     const persistenceSelection = capability === "application-persistence";
     const capabilityOptions = calendlySelection
       ? ["calendly-url", "calendly-mode"]
       : analyticsSelection
         ? selectedAnalyticsOptions(values)
-        : [];
+        : contactSelection ? ["web3forms-access-key"] : [];
     const expectedOptions = [
       "directory",
       "capability",
@@ -405,8 +421,9 @@ function parseAdd(
       !hasExactOptions(tokens, expectedOptions) ||
       !validDirectory(directory) ||
       (!analyticsSelection && !calendlySelection &&
-        !multilingualSelection && !persistenceSelection && capability !== "transactional-email-resend") ||
+        !multilingualSelection && !persistenceSelection && !contactSelection && capability !== "transactional-email-resend") ||
       (calendlySelection && !settings.success) ||
+      (contactSelection && !contactSettings.success) ||
       (analyticsSelection && analyticsSettings?.success !== true)
     ) {
       return invalidArguments();
@@ -416,7 +433,7 @@ function parseAdd(
       ? { settings: settings.data }
       : analyticsSelection && analyticsSettings?.success === true
         ? { settings: analyticsSettings.data }
-        : {};
+        : contactSelection && contactSettings.success ? { settings: contactSettings.data } : {};
 
     if (kind === "apply-add") {
       if (!validApprovedPlanFingerprint(approvedPlanFingerprint)) {
@@ -489,7 +506,7 @@ function parseRemove(
       (capability !== "analytics" &&
         capability !== "booking-calendly" &&
         capability !== "multilingual" &&
-        capability !== "application-persistence" && capability !== "transactional-email-resend")
+        capability !== "application-persistence" && capability !== "transactional-email-resend" && capability !== "contact-form-web3forms")
     ) {
       return invalidArguments();
     }
