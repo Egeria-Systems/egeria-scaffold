@@ -295,6 +295,7 @@ async function runCreate(
       ...(command.multilingual === true ? { multilingual: true } : {}),
       ...(command.applicationPersistence === true ? { applicationPersistence: true } : {}),
       ...(command.transactionalEmailResend === true ? { transactionalEmailResend: true } : {}),
+      ...(command.contactFormWeb3Forms === undefined ? {} : { contactFormWeb3Forms: command.contactFormWeb3Forms }),
     },
     destination: resolve(command.directory),
     verifier: dependencies.createVerifier(),

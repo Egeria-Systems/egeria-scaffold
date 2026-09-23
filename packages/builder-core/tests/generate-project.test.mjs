@@ -2033,3 +2033,28 @@ test("Vitest five lock selection separates exact generations and rejects declara
   }
   for (const vitest of ["4.1.10", "4.1.11"]) assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: "0.1.0" }, { dependencies: { next: "16.3.3", effect: "4.0.0-rc.112" }, devDependencies: { "eslint-config-next": "16.3.3", vitest } }), "app-0.1.0");
 });
+
+
+test("public generation validates and projects contact settings before writes", async () => {
+  const settings = { accessKey: "00000000-0000-4000-8000-000000000001" };
+  await withTestRoot(async owner => {
+    const destination = join(owner, "contact-valid");
+    const fake = createFakeVerifier();
+    const generated = await core.generateProject({ request: { ...request(), contactFormWeb3Forms: settings }, destination, verifier: fake.verifier });
+    assertSuccess(generated);
+    const project = core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8"));
+    assertSuccess(project);
+    assert.deepEqual(project.value.capabilitySettings["contact-form-web3forms"], settings);
+  });
+  for (const settings of [undefined, {accessKey: "invalid-form-identifier"}, {accessKey: "00000000-0000-4000-8000-000000000001", endpoint: "private-endpoint"}]) {
+    await withTestRoot(async owner => {
+      const destination = join(owner, "contact-invalid");
+      const fake = createFakeVerifier();
+      const result = await core.generateProject({ request: { ...request(), contactFormWeb3Forms: settings }, destination, verifier: fake.verifier });
+      assertFailure(result, "PROJECT_GENERATION_REQUEST_INVALID");
+      assert.deepEqual(fake.calls, []);
+      assert.equal(await exists(destination), false);
+      assert.doesNotMatch(JSON.stringify(result.issues), /invalid-form-identifier|private-endpoint/);
+    });
+  }
+});

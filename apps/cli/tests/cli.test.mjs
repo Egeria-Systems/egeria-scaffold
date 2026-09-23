@@ -7321,3 +7321,78 @@ for (const profile of ["portfolio", "site"]) {
     }, { generation: "vitest-five", branch: `${profile}-email-lifecycle-test` });
   });
 }
+
+
+test("Web3Forms options strictly select contact and keep settings out of errors", () => {
+  const directory = "/private/tmp/contact-example";
+  const key = "00000000-0000-4000-8000-000000000001";
+  const fingerprint = `sha256:${"a".repeat(64)}`;
+  const create = [...appCreateArguments(directory), "--web3forms-access-key", key];
+  assert.deepEqual(assertSuccess(cliArguments.parseCliArguments(create)).contactFormWeb3Forms, { accessKey: key });
+  for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
+    const args = [kind, "--directory", directory, "--capability", "contact-form-web3forms", ...(kind.startsWith("apply") ? ["--approved-plan", fingerprint] : [])];
+    const selected = kind.endsWith("add") ? [...args, "--web3forms-access-key", key] : args;
+    const parsed = assertSuccess(cliArguments.parseCliArguments(selected));
+    assert.equal(parsed.capability, "contact-form-web3forms");
+    assert.deepEqual(parsed.settings, kind.endsWith("add") ? { accessKey: key } : undefined);
+    for (const option of ["--endpoint", "--captcha-secret", "--resend-api-key", "--persistence-removal"])
+      assert.equal(cliArguments.parseCliArguments([...selected, option, "private-value"]).ok, false);
+    if (kind.endsWith("remove")) assert.equal(cliArguments.parseCliArguments([...args, "--web3forms-access-key", key]).ok, false);
+    else assert.equal(cliArguments.parseCliArguments(args).ok, false);
+  }
+  for (const value of ["", "private-value", ` ${key}`, `${key} `]) {
+    const result = cliArguments.parseCliArguments([...appCreateArguments(directory), "--web3forms-access-key", value]);
+    assert.equal(result.ok, false);
+    assert.doesNotMatch(JSON.stringify(result), /private-value/);
+  }
+  assert.equal(cliArguments.parseCliArguments([...create, "--web3forms-access-key", key]).ok, false);
+  assert.equal(cliArguments.parseCliArguments([...appCreateArguments(directory), "--web3forms-access-key"]).ok, false);
+  assert.equal(cliArguments.parseCliArguments(["plan-add", "--directory", directory, "--capability", "multilingual", "--web3forms-access-key", key]).ok, false);
+});
+
+for (const profile of ["portfolio", "app"]) {
+  test(`compiled Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`, { timeout: 900_000 }, async () => {
+    await withGitFixture(profile === "app" ? "app-persistence-email" : profile, async ({ linked, primary }) => {
+      const primaryBefore = await gitRepositorySnapshot(primary);
+      const key = "00000000-0000-4000-8000-000000000001";
+      const capability = "contact-form-web3forms";
+      const originalLayout = await readFile(join(linked, "apps/web/app/layout.tsx"));
+      const lockfile = await readFile(join(linked, "pnpm-lock.yaml"));
+      for (const operation of ["add", "remove", "add"]) {
+        const args = ["--directory", linked, "--capability", capability, ...(operation === "add" ? ["--web3forms-access-key", key] : [])];
+        const before = await gitRepositorySnapshot(linked);
+        const planning = await executeBuilt([`plan-${operation}`, ...args]);
+        assert.equal(planning.exitCode, 0, planning.stderr);
+        assert.deepEqual(await gitRepositorySnapshot(linked), before);
+        assert.doesNotMatch(planning.stdout, new RegExp(key));
+        const envelope = JSON.parse(planning.stdout);
+        const plan = operation === "add" ? envelope.result : envelope.plan;
+        const wrong = await executeBuilt([`apply-${operation}`, ...args, "--approved-plan", `sha256:${"0".repeat(64)}`]);
+        assert.equal(wrong.exitCode, 1);assert.deepEqual(await gitRepositorySnapshot(linked), before);
+        const execution = await executeBuilt([`apply-${operation}`, ...args, "--approved-plan", plan.planFingerprint]);
+        assert.equal(execution.exitCode, 0, execution.stderr);assert.equal(execution.stderr, "");
+        assert.doesNotMatch(execution.stdout, new RegExp(key));
+        const result = JSON.parse(execution.stdout).result;
+        assert.equal(result.status, "verified-final-diff-approval-required");
+        const expectedChecks = profile === "app"
+          ? operation === "add" ? core.persistenceCapabilityAdditionVerificationChecks : core.persistenceCapabilityRemovalVerificationChecks
+          : operation === "add" ? core.capabilityAdditionVerificationChecks : core.capabilityRemovalVerificationChecks;
+        assert.deepEqual(result.verificationChecks, expectedChecks);
+        const project = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
+        const state = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8")));
+        assert.equal(project.originProfile, profile);
+        assert.deepEqual(project.capabilitySettings[capability], operation === "add" ? {accessKey:key} : undefined);
+        assert.equal(project.selectedCapabilities.includes("transactional-email-resend"), profile === "app");
+        assert.equal(project.selectedCapabilities.includes("application-persistence"), profile === "app");
+        assert.equal(state.installedCapabilities.some(entry => entry.identifier === "app-foundation"), profile === "app");
+        assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), lockfile);
+        if (operation === "remove") assert.deepEqual(await readFile(join(linked, "apps/web/app/layout.tsx")), originalLayout);
+        await commitAll(linked, `${operation} hosted contact`);
+        const diagnosis = await executeBuilt(["doctor", "--directory", linked]);
+        assert.equal(diagnosis.exitCode, 0, diagnosis.stderr);
+        assert.deepEqual(JSON.parse(diagnosis.stdout).result, {healthy:true,diagnostics:[]});
+      }
+      assert.deepEqual(withoutSharedRefs(await gitRepositorySnapshot(primary)), withoutSharedRefs(primaryBefore));
+    }, { generation:"vitest-five" });
+  });
+}

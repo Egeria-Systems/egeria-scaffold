@@ -83,7 +83,7 @@ import { prepareCapabilityDependencyChange } from "./prepare-capability-dependen
 import { validatePersistenceRemovalHumanReview } from "./review-persistence-removal-evidence.js";
 
 const encoder = new TextEncoder();
-type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend";
+type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms";
 
 function removalMigrationIdentifier(
   capability: RemovableCapability,
@@ -92,8 +92,11 @@ function removalMigrationIdentifier(
   | "remove-booking-calendly-0-1-0"
   | "remove-multilingual-0-1-0"
   | "remove-application-persistence-0-1-0"
-  | "remove-transactional-email-resend-0-1-0" {
+  | "remove-transactional-email-resend-0-1-0"
+  | "remove-contact-form-web3forms-0-1-0" {
   switch (capability) {
+    case "contact-form-web3forms":
+      return "remove-contact-form-web3forms-0-1-0";
     case "transactional-email-resend":
       return "remove-transactional-email-resend-0-1-0";
     case "application-persistence":
@@ -454,6 +457,9 @@ function createNextProject(
   if (capability === "booking-calendly") {
     delete remainingCapabilitySettings["booking-calendly"];
   }
+  if (capability === "contact-form-web3forms") {
+    delete remainingCapabilitySettings["contact-form-web3forms"];
+  }
   const parsed = projectConfigurationSchema.safeParse({
     ...current,
     selectedCapabilities: current.selectedCapabilities.filter(
@@ -694,6 +700,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
         : {}),
     ...(retainsPersistence ? { applicationPersistence: true as const } : {}),
     ...(input.capability !== "transactional-email-resend" && controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
+    ...(input.capability !== "contact-form-web3forms" && controls.project.value.capabilitySettings["contact-form-web3forms"] !== undefined ? { contactFormWeb3Forms: controls.project.value.capabilitySettings["contact-form-web3forms"] } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   }, input.capability === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext);
   if (!desiredRender.ok) {
@@ -711,6 +718,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       ...(controls.project.value.capabilitySettings.analytics === undefined ? {} : { analytics: controls.project.value.capabilitySettings.analytics }),
       ...(controls.project.value.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: controls.project.value.capabilitySettings["booking-calendly"] }),
       ...(controls.project.value.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
+      ...(controls.project.value.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: controls.project.value.capabilitySettings["contact-form-web3forms"] }),
       packageVersions: verifiedCapabilityPackageVersions,
     }, snapshot.value.renderingContext);
     if (!current.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");

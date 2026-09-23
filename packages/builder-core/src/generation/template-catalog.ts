@@ -182,6 +182,23 @@ const bookingCalendlyTemplateSources = textTemplateSources([
   "booking-calendly/apps/web/tests/e2e/calendly-booking.spec.ts",
 ] as const);
 
+const web3FormsTemplateSources = textTemplateSources([
+  "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-content-source.d.ts",
+  "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-settings.ts.template",
+  "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-content.ts",
+  "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-form.tsx",
+  "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/web3forms-contact.tsx",
+  "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-form-placement.tsx",
+  "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/submit-contact.ts",
+  "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/hcaptcha.tsx",
+  "contact-form-web3forms/apps/web/content/en-CA/contact-form-web3forms.yaml",
+  "contact-form-web3forms/apps/web/content/fr-CA/contact-form-web3forms.yaml",
+  "contact-form-web3forms/apps/web/tests/unit/web3forms-contact.test.ts",
+  "contact-form-web3forms/apps/web/tests/component/web3forms-contact.test.tsx",
+  "contact-form-web3forms/apps/web/tests/e2e/web3forms-contact.spec.ts",
+  "contact-form-web3forms/docs/contact-form-web3forms.md",
+]);
+
 const analyticsTemplateSources = textTemplateSources([
   "analytics/apps/web/content/en-CA/analytics.yaml",
   "analytics/apps/web/content/fr-CA/analytics.yaml",
@@ -337,6 +354,7 @@ export function createTemplateCatalog(
   includeApplicationPersistence = false,
   includeFoundation = false,
   includeTransactionalEmail = false,
+  includeWeb3Forms = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0");
   const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0"));
@@ -358,7 +376,7 @@ export function createTemplateCatalog(
           source === commonHomeRouteSource
         ) &&
         !(
-          (includeMultilingual || includeAnalytics) &&
+          (includeMultilingual || includeAnalytics || includeWeb3Forms) &&
           source === "common/apps/web/app/layout.tsx"
         ) &&
         !(includeMultilingual && source === "common/apps/web/app/error.tsx") &&
@@ -393,7 +411,7 @@ export function createTemplateCatalog(
           ...multilingualCommonTemplateSources.filter(
             ({ source }) =>
               !(
-                includeAnalytics &&
+                (includeAnalytics || includeWeb3Forms) &&
                 source === "multilingual/apps/web/app/layout.tsx"
               ),
           ),
@@ -402,10 +420,15 @@ export function createTemplateCatalog(
         ]
       : []),
     ...(includeAnalytics
-      ? [...analyticsTemplateSources, analyticsLayoutSource(includeMultilingual)]
+      ? [...analyticsTemplateSources, ...(includeWeb3Forms ? [] : [analyticsLayoutSource(includeMultilingual)])]
       : []),
     ...((app || includeFoundation) ? appFoundationTemplateSources : []),
     ...(includeTransactionalEmail ? transactionalEmailTemplateSources : []),
+    ...(includeWeb3Forms ? [...web3FormsTemplateSources, {
+      source: `contact-form-web3forms/apps/web/app/layout${includeMultilingual ? ".multilingual" : ""}${includeAnalytics ? (includeMultilingual ? "-analytics" : ".analytics") : ""}.tsx`,
+      destinationSource: "common/apps/web/app/layout.tsx",
+      contentKind: "text" as const,
+    }] : []),
     ...(includeApplicationPersistence ? [...persistenceTemplateSources, ...persistenceSharedTemplateSources] : []),
   ];
   const destinations = new Set<string>();

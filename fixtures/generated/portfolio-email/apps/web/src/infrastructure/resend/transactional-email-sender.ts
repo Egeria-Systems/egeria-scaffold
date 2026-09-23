@@ -161,7 +161,7 @@ async function requestAcceptance(
   const body = await readResponse(response, signal);
   if (!response.ok) throw responseFailure(response.status, body, response.headers);
   if (typeof body !== "object" || body === null || Array.isArray(body) ||
-    Object.keys(body).length !== 1 || !("id" in body) ||
+    "name" in body || !("id" in body) ||
     typeof body.id !== "string" || !opaqueTokenPattern.test(body.id)) throw unknownAcceptance();
   return Object.freeze({ status: "accepted", messageReference: body.id });
 }

@@ -21,6 +21,7 @@ const descriptorDigests = Object.freeze({
     "sha256:dcb911f024f4a0cf792396bf919e2387f0193fae6608071c6dea7aa371eb4c95",
   "booking-calendly":
     "sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca",
+  "contact-form-web3forms": "sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9",
   "content-files":
     "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4",
   "deployment-cloudflare":
@@ -42,6 +43,7 @@ const descriptorVersions = Object.freeze({
   "app-foundation": "0.2.0",
   "application-persistence": "0.1.0",
   "booking-calendly": "0.1.0",
+  "contact-form-web3forms": "0.1.0",
   "content-files": "0.4.0",
   "deployment-cloudflare": "0.4.0",
   multilingual: "0.1.0",
@@ -56,6 +58,7 @@ const expectedIdentifiers = Object.freeze([
   "app-foundation",
   "application-persistence",
   "booking-calendly",
+  "contact-form-web3forms",
   "content-files",
   "deployment-cloudflare",
   "multilingual",
@@ -90,7 +93,7 @@ function createRecord(identifier) {
     },
     requiredEvidence: requiredEvidence[identifier],
     status: "pending",
-    taskPlan: ["app-foundation", "transactional-email-resend"].includes(identifier)
+    taskPlan: identifier === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-22-contact-delivery-certification-amendment.md" : ["app-foundation", "transactional-email-resend"].includes(identifier)
       ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
       : ["application-persistence", "deployment-cloudflare", "standards"].includes(identifier)
       ? persistencePlanPath
@@ -310,6 +313,7 @@ test("repository artifacts bind evidence to its plan, subject, revision, and rev
     [coordinatedPlanPath]: "# approved plan",
     [registry.records.standards.taskPlan]: "# approved standards migration plan",
     [registry.records["transactional-email-resend"].taskPlan]: "# separate email certification plan",
+    [registry.records["contact-form-web3forms"].taskPlan]: "# separate hosted contact certification plan",
     [evidencePath]: createEvidenceDocument(),
   };
 
@@ -456,4 +460,19 @@ test("closure rejects every pending subject and accepts complete certification",
     ok: true,
     value: undefined,
   });
+});
+
+test("hosted contact cannot borrow email evidence or omit provider and cleanup outcomes", () => {
+  const contact = createRecord("contact-form-web3forms");
+  const email = createRecord("transactional-email-resend");
+  for (const omitted of ["provider-confirmed", "cleanup-recovery"]) {
+    const invalid = {...contact, status:"certified", evidence:evidenceFor(contact).filter(entry=>entry.kind!==omitted)};
+    assert.equal(core.certificationRegistrySchema.safeParse({schemaVersion:"1.0.0",records:{"contact-form-web3forms":invalid}}).success,false);
+  }
+  const borrowed = {...contact, status:"certified", evidence:evidenceFor(email)};
+  assert.equal(core.certificationRegistrySchema.safeParse({schemaVersion:"1.0.0",records:{"contact-form-web3forms":borrowed}}).success,false);
+  const changed = structuredClone(contact);changed.subject.behaviorContractDigest=`sha256:${"0".repeat(64)}`;
+  const candidates = cloneRegistry();candidates.records["contact-form-web3forms"]=changed;
+  assert.equal(core.validateCertificationAdmission({catalog,registry:candidates}).ok,false);
+  assert.equal(core.validateCertificationClosure({catalog,registry:committedRegistry}).ok,false);
 });

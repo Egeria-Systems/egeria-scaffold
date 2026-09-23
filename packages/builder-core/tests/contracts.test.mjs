@@ -1422,7 +1422,7 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
       generatedRoots["project.schema.json"].properties.capabilitySettings
         .properties,
     ),
-    ["analytics", "booking-calendly"],
+    ["analytics", "booking-calendly", "contact-form-web3forms"],
   );
   assert.equal(
     generatedRoots["project.schema.json"].properties.capabilitySettings

@@ -24,6 +24,9 @@ export const requiredEvidence = Object.freeze({
     "fresh-scaffold",
     "provider-confirmed",
   ]),
+  "contact-form-web3forms": Object.freeze([
+    "cleanup-recovery", "deployed-application", "existing-repository-lifecycle", "fresh-scaffold", "provider-confirmed",
+  ]),
   "content-files": Object.freeze(["fresh-scaffold"]),
   "deployment-cloudflare": Object.freeze([
     "cleanup-recovery",

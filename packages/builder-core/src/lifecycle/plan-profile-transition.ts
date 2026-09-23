@@ -635,6 +635,9 @@ async function planProfileTransitionInternal(input: Readonly<{
   }
 
   const project = controls.project.value;
+  if (project.selectedCapabilities.includes("contact-form-web3forms")) {
+    return planningFailure("PROFILE_TRANSITION_UNSUPPORTED");
+  }
   if (
     project.originProfile !== controls.state.value.origin.profile ||
     project.recipeVersion !== controls.state.value.origin.recipeVersion
@@ -907,6 +910,9 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
   }
   const project = controls.project.value;
+  if (project.selectedCapabilities.includes("contact-form-web3forms")) {
+    return planningFailure("PROFILE_TRANSITION_UNSUPPORTED");
+  }
   if (project.ejectedAreas.length > 0 || controls.state.value.ejections.length > 0) {
     return planningFailure("PROJECT_EJECTION_UNSUPPORTED");
   }

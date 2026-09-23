@@ -70,18 +70,20 @@ async function readSubjects(adapters) {
     const catalog = createCapabilityCatalogSnapshot(
       verifiedCapabilityPackageVersions, vitestFiveCapabilityCatalogSnapshot,
     );
-    if (!registry.ok || !catalog.ok ||
+    // This historical executor cannot certify the separately introduced contact subject.
+    const retainedCatalog = catalog.ok ? catalog.value.filter(({ identifier }) => identifier !== "contact-form-web3forms") : undefined;
+    if (!registry.ok || retainedCatalog === undefined ||
       !isDeepStrictEqual(Object.keys(registry.value.records).sort(), capabilityIdentifiers) ||
-      !isDeepStrictEqual(catalog.value.map(({ identifier }) => identifier).sort(), capabilityIdentifiers) ||
-      !validateCertificationAdmission({ catalog: catalog.value, registry: registry.value }).ok) {
+      !isDeepStrictEqual(retainedCatalog.map(({ identifier }) => identifier).sort(), capabilityIdentifiers) ||
+      !validateCertificationAdmission({ catalog: retainedCatalog, registry: registry.value }).ok) {
       throw createError("CERTIFICATION_SUBJECT_INVALID");
     }
     return {
-      catalog: catalog.value,
+      catalog: retainedCatalog,
       subjects: capabilityIdentifiers.map(capability => ({
         capability,
         subject: createCertificationSubject(
-          catalog.value.find(({ identifier }) => identifier === capability),
+          retainedCatalog.find(({ identifier }) => identifier === capability),
           registry.value.records[capability].requiredEvidence,
         ),
       })),

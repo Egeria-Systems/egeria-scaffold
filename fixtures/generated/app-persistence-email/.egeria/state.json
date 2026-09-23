@@ -2454,7 +2454,7 @@
       "path": "apps/web/tests/unit/resend-transactional-email-sender.test.ts"
     },
     {
-      "fingerprint": "sha256:7b4af3c1b727937fd1881a6f1838faadd11e423395a3fcbec804dd4541bff867",
+      "fingerprint": "sha256:69cc127fb11eef64bd325fcfe05cffa591b74bf2116018301cfce6e2cc4a648e",
       "fingerprintTarget": {
         "kind": "file"
       },

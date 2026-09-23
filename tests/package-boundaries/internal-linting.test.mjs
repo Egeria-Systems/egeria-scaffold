@@ -160,6 +160,46 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       },
       {
         filePath:
+          "packages/builder-core/templates/contact-form-web3forms/apps/web/app/layout.analytics.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/contact-form-web3forms/apps/web/app/layout.multilingual-analytics.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/contact-form-web3forms/apps/web/app/layout.multilingual.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/contact-form-web3forms/apps/web/app/layout.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-form-placement.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-form.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/hcaptcha.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/web3forms-contact.tsx",
+        messages: [],
+      },
+      {
+        filePath:
           "packages/builder-core/templates/multilingual/apps/web/app/[locale]/[[...segments]]/page.tsx",
         messages: [],
       },
