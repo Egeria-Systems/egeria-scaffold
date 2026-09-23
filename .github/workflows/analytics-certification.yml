@@ -26,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: analytics-certification
+  group: integration-test-deploy
   cancel-in-progress: false
   queue: max
 
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     environment:
-      name: analytics-certification
+      name: integration-test-deploy
       url: ${{ vars.DEPLOY_URL }}
     steps:
       - name: Validate trusted request
@@ -116,7 +116,7 @@ jobs:
           node --input-type=module -e '
             import { writeFileSync } from "node:fs";
             const target = new URL(process.env.DEPLOY_URL);
-            const hostnamePattern = /^analytics-certification\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.workers\.dev$/u;
+            const hostnamePattern = /^integration-test-deploy\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.workers\.dev$/u;
             if (!hostnamePattern.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
             const context = {
               schemaVersion: "2.0.0",
@@ -124,8 +124,8 @@ jobs:
               event: { name: process.env.GITHUB_EVENT_NAME },
               source: { repository: process.env.GITHUB_REPOSITORY, ref: process.env.GITHUB_REF, revision: process.env.GITHUB_SHA, expectedRevision: process.env.EXPECTED_REVISION, checkedOutRevision: process.env.GITHUB_SHA, exerciseRevision: process.env.EXERCISE_REVISION },
               subject: { identifier: "analytics", version: "0.1.0", behaviorContractDigest: "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba" },
-              environment: "analytics-certification",
-              resources: { worker: "analytics-certification", target: "dedicated-non-production-workers-dev", hostname: target.hostname, production: false },
+              environment: "integration-test-deploy",
+              resources: { worker: "integration-test-deploy", target: "dedicated-non-production-workers-dev", hostname: target.hostname, production: false },
             };
             writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/context.json`, JSON.stringify(context), { mode: 0o600, flag: "wx" });
           '
@@ -206,12 +206,12 @@ jobs:
             import { readFileSync, writeFileSync } from "node:fs";
             import { prepareAnalyticsCertificationReuse } from "./scripts/analytics-certification-provider-receipt.mjs";
             const target = new URL(process.env.DEPLOY_URL);
-            if (!/^analytics-certification\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
-            const shared = { headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, identityKnown: false };
+            if (!/^integration-test-deploy\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
+            const shared = { headSha: process.env.HEAD_SHA, environment: "integration-test-deploy", hostname: target.hostname, identityKnown: false };
             let identities = { siteIdentity: { ...shared, site: null }, workerIdentity: { ...shared, worker: null } };
             if (process.env.REUSE_REVISION) {
               const read = (name) => JSON.parse(readFileSync(`${process.env.EVIDENCE_DIRECTORY}/${name}-identity.json`, "utf8"));
-              identities = prepareAnalyticsCertificationReuse({ context: { headSha: process.env.REUSE_REVISION, environment: shared.environment, hostname: shared.hostname, worker: "analytics-certification" }, siteIdentity: read("site"), workerIdentity: read("worker"), headSha: process.env.HEAD_SHA });
+              identities = prepareAnalyticsCertificationReuse({ context: { headSha: process.env.REUSE_REVISION, environment: shared.environment, hostname: shared.hostname, worker: "integration-test-deploy" }, siteIdentity: read("site"), workerIdentity: read("worker"), headSha: process.env.HEAD_SHA });
             }
             const options = { mode: 0o600, flag: process.env.REUSE_REVISION ? "w" : "wx" };
             writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/site-identity.json`, JSON.stringify(identities.siteIdentity), options);
@@ -233,7 +233,7 @@ jobs:
             import { readFileSync, renameSync, writeFileSync } from "node:fs";
             import { planAnalyticsCertificationCleanup, readAnalyticsCertificationSite } from "./scripts/analytics-certification-provider-receipt.mjs";
             const target = new URL(process.env.DEPLOY_URL);
-            if (!/^analytics-certification\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
+            if (!/^integration-test-deploy\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
             const account = process.env.CLOUDFLARE_ACCOUNT_ID;
             const credential = process.env.CLOUDFLARE_WEB_ANALYTICS_API_TOKEN;
             if (!account || !credential) process.exit(1);
@@ -249,7 +249,7 @@ jobs:
             if (process.env.REUSE_REVISION && previousIdentity.identityKnown === true) {
               if (existingSite === null) process.exit(1);
               site = existingSite;
-              planAnalyticsCertificationCleanup({ context: { headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, worker: "analytics-certification" }, siteIdentity: previousIdentity, workerIdentity: readIdentity("worker"), currentWorker: null, currentSite: { hostname: site.host, siteTag: site.site_tag, siteTokenSha256: createHash("sha256").update(site.site_token).digest("hex"), autoInstall: site.auto_install } });
+              planAnalyticsCertificationCleanup({ context: { headSha: process.env.HEAD_SHA, environment: "integration-test-deploy", hostname: target.hostname, worker: "integration-test-deploy" }, siteIdentity: previousIdentity, workerIdentity: readIdentity("worker"), currentWorker: null, currentSite: { hostname: site.host, siteTag: site.site_tag, siteTokenSha256: createHash("sha256").update(site.site_token).digest("hex"), autoInstall: site.auto_install } });
             } else {
               if (existingSite !== null || previousIdentity.identityKnown !== false) process.exit(1);
               const createdResponse = await controlPlaneFetch(endpoint, { method: "POST", headers, body: JSON.stringify({ host: target.hostname, auto_install: false }) });
@@ -260,7 +260,7 @@ jobs:
             }
             if (typeof site.site_tag !== "string" || !/^[A-Za-z0-9_-]{8,128}$/u.test(site.site_tag) || typeof site.site_token !== "string" || site.site_token.length === 0) process.exit(1);
             const tokenDigest = createHash("sha256").update(site.site_token).digest("hex");
-            const identity = { headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, identityKnown: true, site: { siteTag: site.site_tag, siteTokenSha256: tokenDigest, autoInstall: false } };
+            const identity = { headSha: process.env.HEAD_SHA, environment: "integration-test-deploy", hostname: target.hostname, identityKnown: true, site: { siteTag: site.site_tag, siteTokenSha256: tokenDigest, autoInstall: false } };
             const identityPath = `${process.env.EVIDENCE_DIRECTORY}/site-identity.json`;
             writeFileSync(`${identityPath}.next`, JSON.stringify(identity), { mode: 0o600, flag: "wx" });
             renameSync(`${identityPath}.next`, identityPath);
@@ -270,7 +270,7 @@ jobs:
             const value = readback?.result;
             if (!readbackResponse.ok || readback?.success !== true || value?.site_tag !== site.site_tag || value?.site_token !== site.site_token || value?.auto_install !== false || value?.host !== target.hostname) process.exit(1);
             if (typeof value?.snippet !== "string" || !value.snippet.includes(site.site_token)) process.exit(1);
-            const measurement = { schemaVersion: "2.0.0", headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, createdByRun, reusedFromRevision: createdByRun ? null : process.env.REUSE_REVISION, readbackVerified: true, siteTagMatchesIdentity: value.site_tag === identity.site.siteTag, siteTokenMatchesIdentity: createHash("sha256").update(value.site_token).digest("hex") === identity.site.siteTokenSha256, scriptTokenMatchesIdentity: value.snippet.includes(site.site_token), autoInstall: value.auto_install };
+            const measurement = { schemaVersion: "2.0.0", headSha: process.env.HEAD_SHA, environment: "integration-test-deploy", hostname: target.hostname, createdByRun, reusedFromRevision: createdByRun ? null : process.env.REUSE_REVISION, readbackVerified: true, siteTagMatchesIdentity: value.site_tag === identity.site.siteTag, siteTokenMatchesIdentity: createHash("sha256").update(value.site_token).digest("hex") === identity.site.siteTokenSha256, scriptTokenMatchesIdentity: value.snippet.includes(site.site_token), autoInstall: value.auto_install };
             writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/site-readback.json`, JSON.stringify(measurement), { mode: 0o600, flag: "wx" });
           '
 
@@ -376,7 +376,7 @@ jobs:
           node --input-type=module -e '
             import { readFileSync } from "node:fs";
             import { planAnalyticsCertificationCleanup, readAnalyticsCertificationWorker } from "./scripts/analytics-certification-provider-receipt.mjs";
-            const endpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/analytics-certification`;
+            const endpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/integration-test-deploy`;
             const headers = { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` };
             const controlPlaneFetch = (input, init = {}) =>
               fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
@@ -388,13 +388,13 @@ jobs:
             } else {
               if (!process.env.REUSE_REVISION) process.exit(1);
               const target = new URL(process.env.DEPLOY_URL);
-              planAnalyticsCertificationCleanup({ context: { headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, worker: "analytics-certification" }, siteIdentity: read("site"), workerIdentity, currentSite: null, currentWorker });
+              planAnalyticsCertificationCleanup({ context: { headSha: process.env.HEAD_SHA, environment: "integration-test-deploy", hostname: target.hostname, worker: "integration-test-deploy" }, siteIdentity: read("site"), workerIdentity, currentSite: null, currentWorker });
               const response = await controlPlaneFetch(`${endpoint}/subdomain`, { headers });
               const payload = await response.json();
               if (!response.ok || payload?.success !== true || payload.result?.enabled !== false || payload.result?.previews_enabled !== false) process.exit(1);
             }
           '
-          CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec opennextjs-cloudflare deploy --name analytics-certification
+          CLOUDFLARE_API_TOKEN="$CLOUDFLARE_DEPLOY_API_TOKEN" pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec opennextjs-cloudflare deploy --name integration-test-deploy
 
       - name: Read back dedicated Worker deployment
         if: env.CERTIFICATION_MODE == 'exercise'
@@ -410,19 +410,19 @@ jobs:
             import { renameSync, writeFileSync } from "node:fs";
             import { readAnalyticsCertificationWorker } from "./scripts/analytics-certification-provider-receipt.mjs";
             const target = new URL(process.env.DEPLOY_URL);
-            if (!/^analytics-certification\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
+            if (!/^integration-test-deploy\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
             const headers = { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` };
-            const endpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/analytics-certification`;
+            const endpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/integration-test-deploy`;
             const controlPlaneFetch = (input, init = {}) =>
               fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
             const worker = await readAnalyticsCertificationWorker(controlPlaneFetch, endpoint, headers);
             if (worker === null) process.exit(1);
             const { deploymentId, versionId } = worker;
-            const identity = { headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, identityKnown: true, worker: { name: "analytics-certification", deploymentId, versionId } };
+            const identity = { headSha: process.env.HEAD_SHA, environment: "integration-test-deploy", hostname: target.hostname, identityKnown: true, worker: { name: "integration-test-deploy", deploymentId, versionId } };
             const identityPath = `${process.env.EVIDENCE_DIRECTORY}/worker-identity.json`;
             writeFileSync(`${identityPath}.next`, JSON.stringify(identity), { mode: 0o600, flag: "wx" });
             renameSync(`${identityPath}.next`, identityPath);
-            const measurement = { schemaVersion: "1.0.0", headSha: process.env.HEAD_SHA, environment: "analytics-certification", hostname: target.hostname, worker: "analytics-certification", scriptReadbackVerified: true, deploymentReadbackVerified: true, deploymentId, versionId, singleVersionAt100Percent: true };
+            const measurement = { schemaVersion: "1.0.0", headSha: process.env.HEAD_SHA, environment: "integration-test-deploy", hostname: target.hostname, worker: "integration-test-deploy", scriptReadbackVerified: true, deploymentReadbackVerified: true, deploymentId, versionId, singleVersionAt100Percent: true };
             writeFileSync(`${process.env.EVIDENCE_DIRECTORY}/deployment-readback.json`, JSON.stringify(measurement), { mode: 0o600, flag: "wx" });
           '
 
@@ -451,7 +451,7 @@ jobs:
             import { writeFileSync } from "node:fs";
             import { performance } from "node:perf_hooks";
             const target = new URL(process.env.DEPLOY_URL);
-            if (!/^analytics-certification\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
+            if (!/^integration-test-deploy\.[a-z0-9-]+\.workers\.dev$/u.test(target.hostname) || target.href !== `https://${target.hostname}/`) process.exit(1);
             const readinessTarget = new URL("/en-CA", target);
             const maximumAttempts = Number(process.env.MAXIMUM_ATTEMPTS);
             const intervalMilliseconds = Number(process.env.INTERVAL_MILLISECONDS);
@@ -520,7 +520,7 @@ jobs:
             const analyticsHeaders = { Authorization: `Bearer ${process.env.CLOUDFLARE_WEB_ANALYTICS_API_TOKEN}` };
             const deployHeaders = { Authorization: `Bearer ${process.env.CLOUDFLARE_DEPLOY_API_TOKEN}` };
             const analyticsEndpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/rum/site_info`;
-            const workerEndpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/analytics-certification`;
+            const workerEndpoint = `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/scripts/integration-test-deploy`;
             const controlPlaneFetch = (input, init = {}) =>
               fetch(input, { ...init, signal: AbortSignal.timeout(10_000) });
             const readSite = async () => {

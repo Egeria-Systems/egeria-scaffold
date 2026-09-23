@@ -31,7 +31,7 @@ const browserFixturePath = resolve(
 const exactRevision = "0123456789abcdef0123456789abcdef01234567";
 const exactDigest =
   "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba";
-const exactHostname = "analytics-certification.example-account.workers.dev";
+const exactHostname = "integration-test-deploy.example-account.workers.dev";
 const exactSiteTag = "site-tag-0123456789abcdef";
 const exactSiteTokenDigest = "a".repeat(64);
 const exactDeploymentId = "11111111-2222-4333-8444-555555555555";
@@ -55,9 +55,9 @@ function measuredEvidence(mode = "exercise") {
       version: "0.1.0",
       behaviorContractDigest: exactDigest,
     },
-    environment: "analytics-certification",
+    environment: "integration-test-deploy",
     resources: {
-      worker: "analytics-certification",
+      worker: "integration-test-deploy",
       target: "dedicated-non-production-workers-dev",
       hostname: exactHostname,
       production: false,
@@ -65,7 +65,7 @@ function measuredEvidence(mode = "exercise") {
   };
   const siteIdentity = {
     headSha: exactRevision,
-    environment: "analytics-certification",
+    environment: "integration-test-deploy",
     hostname: exactHostname,
     identityKnown: true,
     site: {
@@ -76,11 +76,11 @@ function measuredEvidence(mode = "exercise") {
   };
   const workerIdentity = {
     headSha: exactRevision,
-    environment: "analytics-certification",
+    environment: "integration-test-deploy",
     hostname: exactHostname,
     identityKnown: true,
     worker: {
-      name: "analytics-certification",
+      name: "integration-test-deploy",
       deploymentId: exactDeploymentId,
       versionId: exactVersionId,
     },
@@ -98,9 +98,9 @@ function measuredEvidence(mode = "exercise") {
       cleanup: {
         schemaVersion: "2.0.0",
         headSha: exactRevision,
-        environment: "analytics-certification",
+        environment: "integration-test-deploy",
         hostname: exactHostname,
-        worker: "analytics-certification",
+        worker: "integration-test-deploy",
         site: {
           initialState: "present",
           identityDisposition: "matched",
@@ -141,7 +141,7 @@ function measuredEvidence(mode = "exercise") {
     siteReadback: {
       schemaVersion: "2.0.0",
       headSha: exactRevision,
-      environment: "analytics-certification",
+      environment: "integration-test-deploy",
       hostname: exactHostname,
       createdByRun: true,
       reusedFromRevision: null,
@@ -154,9 +154,9 @@ function measuredEvidence(mode = "exercise") {
     deploymentReadback: {
       schemaVersion: "1.0.0",
       headSha: exactRevision,
-      environment: "analytics-certification",
+      environment: "integration-test-deploy",
       hostname: exactHostname,
-      worker: "analytics-certification",
+      worker: "integration-test-deploy",
       scriptReadbackVerified: true,
       deploymentReadbackVerified: true,
       deploymentId: exactDeploymentId,
@@ -321,14 +321,14 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
   });
   assert.deepEqual(workflow.permissions, { actions: "read", contents: "read" });
   assert.deepEqual(workflow.concurrency, {
-    group: "analytics-certification",
+    group: "integration-test-deploy",
     "cancel-in-progress": false,
     queue: "max",
   });
   assert.deepEqual(Object.keys(workflow.jobs), ["certify"]);
   const job = workflow.jobs.certify;
   assert.equal(job.if, "github.repository == 'Egeria-Systems/egeria-scaffold' && github.ref == 'refs/heads/main'");
-  assert.equal(job.environment.name, "analytics-certification");
+  assert.equal(job.environment.name, "integration-test-deploy");
   assert.equal(job.environment.url, "${{ vars.DEPLOY_URL }}");
   assert.equal(job["timeout-minutes"], 90);
   assert.equal("continue-on-error" in job, false);
@@ -380,7 +380,7 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
   assert.match(steps["Create and read back Web Analytics site"].run, /false/u);
   assert.match(
     steps["Prepare private identity envelopes"].run,
-    /analytics-certification\\\.[\s\S]+workers\\\.dev[\s\S]+target\.href !== `https:\/\/\$\{target\.hostname\}\//u,
+    /integration-test-deploy\\\.[\s\S]+workers\\\.dev[\s\S]+target\.href !== `https:\/\/\$\{target\.hostname\}\//u,
   );
   assert.match(
     steps["Create and read back Web Analytics site"].run,
@@ -462,7 +462,7 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
     job.steps.indexOf(steps["Wait for dedicated Worker readiness"]) <
       job.steps.indexOf(steps["Exercise deployed consent behavior"]),
   );
-  assert.match(steps["Retain and disable task resources"].run, /analytics-certification/u);
+  assert.match(steps["Retain and disable task resources"].run, /integration-test-deploy/u);
   assert.match(
     steps["Retain and disable task resources"].run,
     /planAnalyticsCertificationCleanup/u,
@@ -703,7 +703,7 @@ test("cleanup receipts bind earlier exercise identities separately from their ex
 test("reuse envelopes preserve resource identities and refuse mixed provenance", async () => {
   const { prepareAnalyticsCertificationReuse } = await import(receiptBuilderPath);
   const evidence = measuredEvidence();
-  const context = { headSha: exactRevision, environment: "analytics-certification", hostname: exactHostname, worker: "analytics-certification" };
+  const context = { headSha: exactRevision, environment: "integration-test-deploy", hostname: exactHostname, worker: "integration-test-deploy" };
   const input = { context, siteIdentity: evidence.siteIdentity, workerIdentity: evidence.workerIdentity, headSha: "b".repeat(40) };
   assert.deepEqual(prepareAnalyticsCertificationReuse(input), {
     siteIdentity: { ...evidence.siteIdentity, headSha: "b".repeat(40) },
@@ -711,6 +711,9 @@ test("reuse envelopes preserve resource identities and refuse mixed provenance",
   });
   assert.equal(evidence.siteIdentity.headSha, exactRevision);
   for (const mutate of [
+    (value) => { value.context.environment = "analytics-certification"; },
+    (value) => { value.context.worker = "analytics-certification"; },
+    (value) => { value.context.hostname = "analytics-certification.example-account.workers.dev"; },
     (value) => { value.siteIdentity.headSha = "c".repeat(40); },
     (value) => { value.workerIdentity.hostname = "other.example.workers.dev"; },
     (value) => { value.headSha = exactRevision; },
@@ -758,7 +761,7 @@ test("exercise reuses only the recorded manual site and disabled Worker deployme
           if (path.includes("/rum/site_info/")) return scenario === "missing-site" ? { ok: false, status: 404 } : json(site);
           if (path.endsWith("/deployments")) return json([{ id: scenario === "worker-replaced" ? ${JSON.stringify(exactVersionId)} : ${JSON.stringify(exactDeploymentId)}, created_on: "2026-09-23T00:00:00Z", versions: [{ version_id: ${JSON.stringify(exactVersionId)}, percentage: 100 }] }]);
           if (path.endsWith("/subdomain")) return json({ enabled: scenario === "worker-active", previews_enabled: false });
-          if (path.endsWith("/workers/scripts/analytics-certification")) return { ok: !["fresh", "partial", "missing-worker"].includes(scenario), status: ["fresh", "partial", "missing-worker"].includes(scenario) ? 404 : 200 };
+          if (path.endsWith("/workers/scripts/integration-test-deploy")) return { ok: !["fresh", "partial", "missing-worker"].includes(scenario), status: ["fresh", "partial", "missing-worker"].includes(scenario) ? 404 : 200 };
           throw new Error("Unexpected provider request");
         };
       `;
@@ -849,7 +852,7 @@ test("recovery retains exact resources and verifies both Worker URL controls wit
             if (scenario === "read-failure") return { ok: false, status: 503 };
             return json({ enabled: !disabled || scenario === "still-enabled", previews_enabled: !disabled || scenario === "preview-enabled" });
           }
-          if (path.endsWith("/workers/scripts/analytics-certification")) return { ok: scenario !== "absent", status: scenario === "absent" ? 404 : 200 };
+          if (path.endsWith("/workers/scripts/integration-test-deploy")) return { ok: scenario !== "absent", status: scenario === "absent" ? 404 : 200 };
           throw new Error("Unexpected provider request");
         };
       `;
@@ -858,7 +861,7 @@ test("recovery retains exact resources and verifies both Worker URL controls wit
       assert.equal(mutations.some(({ method }) => method === "DELETE"), false, scenario);
       if (["retained", "absent"].includes(scenario)) {
         assert.equal(result.status, 0, result.stderr);
-        assert.deepEqual(mutations, scenario === "absent" ? [] : [{ path: "/client/v4/accounts/synthetic-account/workers/scripts/analytics-certification/subdomain", method: "POST", body: { enabled: false, previews_enabled: false } }]);
+        assert.deepEqual(mutations, scenario === "absent" ? [] : [{ path: "/client/v4/accounts/synthetic-account/workers/scripts/integration-test-deploy/subdomain", method: "POST", body: { enabled: false, previews_enabled: false } }]);
         await rm(join(directory, "mutations.json"));
         const { stdout } = await execFileAsync(process.execPath, [receiptBuilderPath, "--input-directory", directory]);
         const receipt = JSON.parse(stdout);
@@ -882,13 +885,13 @@ test("cleanup planning converges every partial prefix and refuses replacement id
     await import(`${receiptBuilderPath}?cleanup-plan=${Date.now()}`);
   const context = {
     headSha: exactRevision,
-    environment: "analytics-certification",
+    environment: "integration-test-deploy",
     hostname: exactHostname,
-    worker: "analytics-certification",
+    worker: "integration-test-deploy",
   };
   const siteIdentity = {
     headSha: exactRevision,
-    environment: "analytics-certification",
+    environment: "integration-test-deploy",
     hostname: exactHostname,
     identityKnown: true,
     site: {
@@ -899,11 +902,11 @@ test("cleanup planning converges every partial prefix and refuses replacement id
   };
   const workerIdentity = {
     headSha: exactRevision,
-    environment: "analytics-certification",
+    environment: "integration-test-deploy",
     hostname: exactHostname,
     identityKnown: true,
     worker: {
-      name: "analytics-certification",
+      name: "integration-test-deploy",
       deploymentId: exactDeploymentId,
       versionId: exactVersionId,
     },
@@ -915,7 +918,7 @@ test("cleanup planning converges every partial prefix and refuses replacement id
     autoInstall: false,
   };
   const currentWorker = {
-    name: "analytics-certification",
+    name: "integration-test-deploy",
     deploymentId: exactDeploymentId,
     versionId: exactVersionId,
   };
@@ -1028,8 +1031,8 @@ test("the redacted receipt is derived only from reconciled private measurements"
     headRef: "refs/heads/main",
     headSha: exactRevision,
     exerciseRevision: exactRevision,
-    environment: "analytics-certification",
-    worker: "analytics-certification",
+    environment: "integration-test-deploy",
+    worker: "integration-test-deploy",
     outcomes: ["deployed-application"],
     providerRecordsClaimed: false,
     providerConfirmation: "pending-human-evidence",

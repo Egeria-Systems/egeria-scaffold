@@ -6,13 +6,13 @@ import { requireAppRuntimeEvidence } from "./certify-app-local.mjs";
 
 const exactRepository = "Egeria-Systems/egeria-scaffold";
 const exactHeadRef = "refs/heads/main";
-const exactEnvironment = "analytics-certification";
-const exactWorker = "analytics-certification";
+const exactEnvironment = "integration-test-deploy";
+const exactWorker = "integration-test-deploy";
 const exactDigest =
   "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba";
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
 const exactDedicatedHostnamePattern =
-  /^analytics-certification\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.workers\.dev$/u;
+  /^integration-test-deploy\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.workers\.dev$/u;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const sha256HexPattern = /^[0-9a-f]{64}$/u;
