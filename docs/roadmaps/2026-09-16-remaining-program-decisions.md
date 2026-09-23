@@ -1,6 +1,6 @@
 # Remaining program: recorded user decisions
 
-**Date:** 2026-09-15; updated 2026-09-16
+**Date:** 2026-09-15; updated 2026-09-16; delivery status reconciled 2026-09-23
 **Status:** All program-level direction questions are answered. On 2026-09-16 the user explicitly approved the bounded P7 initial-composition recommendation. Exact canonical diffs, implementation plans, certification and external actions retain their own gates.
 
 This decision record owns the interpretation of the user's D1–D12 answers for the [delivery proposal](2026-09-16-remaining-program-delivery-plan.md) and [email planning handoff](2026-09-16-email-delivery-contract-plan.md). The P7 start-order exception is owned by the review protocol; this record explains the approved direction without defining a second lifecycle policy. It changes no executable behavior. Do not re-ask these direction questions. Return with a concrete choice only if evidence exposes a material unresolved tradeoff.
@@ -9,8 +9,8 @@ This decision record owns the interpretation of the user's D1–D12 answers for 
 
 | Decision | User answer | Recorded disposition |
 | --- | --- | --- |
-| **D1** | Yes. | Accept capability-driven backend support for supported portfolio/site generations, preserving profile/content, defaults and historical behavior. The exact installed snapshots and canonical amendment still require preparation. |
-| **D2** | Yes. | Accept one server-only send attempt, stable logical-send identity, provider-acceptance/rejection/uncertainty outcomes and consumer-owned retry policy. No automatic standalone retry or inbox-delivery claim. |
+| **D1** | Yes. | Accept capability-driven backend support for supported portfolio/site generations, preserving profile/content, defaults and historical behavior. The email-specific installed snapshots and canonical contract are implemented under [ADR-0017](../adr/0017-transactional-email-resend.md); separate certification remains required. |
+| **D2** | Yes. | Implemented under [ADR-0017](../adr/0017-transactional-email-resend.md): one server-only attempt, stable logical-send identity, provider-acceptance/rejection/uncertainty outcomes and consumer-owned retry policy. No automatic standalone retry or inbox-delivery claim. |
 | **D3** | Most resilient and future-proof approach within reasonable scope; explain pushback and why a smaller solution meets testing needs. | Engineering selection criteria accepted. Prefer durable behavioral coverage and compatible maintained tools; demonstrate any benefit before adding another runner or migrating the existing lane. Section 3 gives the current recommendation. |
 | **D4** | Preference for a separate Worker for separation of concerns; invites pushback if the main Worker is sufficient. | Preserve this preference as a candidate, not a settled deployment decision. Section 4 explains why clean modules can share a Worker and what would justify separation. P5E-1 must return concrete topology evidence. |
 | **D5** | Recommended approach plus best practice. | Minimal durable contact with abuse/privacy controls and optional notifications. Use bounded, documented policy settings; no attachments or arbitrary form engine. Concrete policy defaults are prepared at P5F's gate. |
@@ -109,15 +109,15 @@ Payload provides configuration for collections, globals, localization and admin/
 
 The account plan should apply current authentication guidance for sensitive changes, recovery, abuse resistance and sessions, with an explicit threat model. Framework defaults alone do not establish those properties. [OWASP authentication guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html)
 
-## 6. Updated baseline and unresolved gate evidence
+## 6. Dated baseline and current delivery position
 
-Read-only remote verification now identifies main as `991ab80bf071d9671bd9c465c01f2ca83d253234`, whose commit integrates optional persistence through PR #129. ADR-0016 is accepted-main architecture. Preserve earlier work and reconcile these dated observations with current accepted canonical content at each entry gate.
+Read-only verification on 2026-09-16 identified main as `991ab80bf071d9671bd9c465c01f2ca83d253234`, integrating persistence through PR #129 and ADR-0016. Preserve that historical evidence; it is not the current execution baseline.
 
-The current registry has **five certified and six pending admission subjects**: standards, deployment-cloudflare, application-persistence, analytics, booking-calendly and observability are pending. The default app baseline's six historical/current-exact local receipts are preserved separately. No certification was run or promoted here.
+The registry at that preparation baseline had **five certified and six pending admission subjects**: standards, deployment-cloudflare, application-persistence, analytics, booking-calendly and observability. The default app baseline's six historical/current-exact local receipts were preserved separately. These dated counts do not replace the current registry, and this reconciliation runs or promotes no certification.
 
-**Material status conflict:** persistence is merged, while accepted-main roadmap text still says P4 is open and that P4 acceptance must precede persistence integration. This task records both facts; it does not infer a waiver or repair another stream's history, evidence or canonical status. The owning closeout must reconcile that acceptance evidence before this proposal is used to authorize downstream runtime work.
+**Dated acceptance-record conflict:** persistence was merged while the inspected roadmap still required P4 acceptance before integration. Preserve that conflict for the owning closeout; the later email and Web3Forms merges do not themselves establish P4 closure or resolve another stream's evidence.
 
-The first remaining action here is preparing the exact P5D-1 documentary amendment and P5D-2 plan using the already answered D1/D2. Questions about those directions are closed. Runtime entry still requires reconciled accepted predecessor evidence and the exact implementation gate.
+The [integrated delivery status](program-roadmap.md#hosted-contact-form--next-two-increments) now governs scheduling. D1/D2 are implemented in Resend; do not repeat P5D-1 planning or its runtime slices. Web3Forms certification is the immediate next increment, and Resend certification remains required separate later work. Both retain their own exact-subject evidence and approval gates; the P7-only staging decision is unchanged.
 
 ## 7. Verification and preservation
 

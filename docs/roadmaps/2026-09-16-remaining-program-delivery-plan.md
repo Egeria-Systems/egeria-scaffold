@@ -1,6 +1,6 @@
 # Remaining program incremental delivery plan
 
-**Status:** Approved program direction, published as a delivery plan on 2026-09-16. All 28 increments retain their outcome, ownership, RED/GREEN, review and acceptance structure. Exact implementation plans, final diffs, certification and external actions retain their separate gates.
+**Status:** Approved program direction from 2026-09-16, reconciled with integrated delivery on 2026-09-23. All 28 original increment cards retain their outcome, ownership, RED/GREEN, review and acceptance structure; the P5D implementation cards are historical requirements for the integrated Resend delivery. Remaining exact plans, final diffs, certification and external actions retain their separate gates.
 
 **Goal:** Deliver the remaining accepted program as usable, reviewable increments while preserving capability identities, dependencies, historical compatibility, certification and human gates.
 
@@ -10,7 +10,7 @@
 
 **Execution:** Use the repository's [review and contribution protocol](../governance/review-and-contribution.md). This delivery plan defines the sequence; it does not start implementation or authorize commits, provider actions or deployment. The historical P4 plan supplies structure, not restart instructions or transferred approvals.
 
-**Companion:** [First eligible planning increment and execution prompt](2026-09-16-email-delivery-contract-plan.md). [Recorded decisions and engineering rationale](2026-09-16-remaining-program-decisions.md) own the user's answers and their bounded interpretation.
+**Companion:** [Historical email planning handoff](2026-09-16-email-delivery-contract-plan.md). [Recorded decisions and engineering rationale](2026-09-16-remaining-program-decisions.md) own the user's answers and their bounded interpretation.
 
 ## 1. Bound baseline and preserved work
 
@@ -22,11 +22,11 @@ Accepted ADR-0016 owns local-first D1, finite persistence-specific standards/dep
 
 **Existing acceptance-record conflict:** persistence is integrated, while the roadmap still records P4 as open and requires its acceptance before persistence integration. The owning closeout must reconcile those facts before downstream runtime admission. This planning publication infers no waiver and changes no historical status or evidence.
 
-### Eligibility now
+### Current delivery position
 
-D1/D2 are answered. First remaining work: **P5D-1, the exact email contract amendment and P5D-2 implementation plan**. No in-scope runtime increment is currently admitted by the inspected acceptance record. P4 closure/reconciliation, exact predecessors and the approved implementation plan remain entry conditions. D12's initial-composition staging exception is explicitly approved as a planning direction on 2026-09-16; its bounded rule is recorded in the [review protocol](../governance/review-and-contribution.md#initial-authenticated-composition-exception) and named in the roadmap. P7-2 still requires acceptance of those canonical changes and its exact Gate 2 plan.
+The [integrated delivery status and hosted-contact sequencing amendment](program-roadmap.md#hosted-contact-form--next-two-increments) own the current position: Resend and Web3Forms implementations are integrated, Web3Forms certification is the immediate next increment, and Resend certification remains required separate later work. Do not restart P5D-1, P5D-2 or P5D-3 from this older plan. [ADR-0017](../adr/0017-transactional-email-resend.md) and the [transactional-email boundary](../architecture/capability-model.md#transactional-email-boundary) own the implemented email contract; [ADR-0018](../adr/0018-hosted-contact-form.md) owns the independent browser contact form.
 
-The [decision record](2026-09-16-remaining-program-decisions.md) supplies current answers and rationale. Refresh these dated observations against current accepted main at the owning preparation gate.
+The [decision record](2026-09-16-remaining-program-decisions.md) preserves the accepted directions. At the next preparation gate, bind the accepted implementation receipt, exact subject, current main revision and applicable terminal hosted checks; integration alone does not certify a provider or close P4. The P7-only staging exception and every unrelated predecessor or evidence obligation remain unchanged.
 
 ## 2. Source and plan maturity inventory
 
@@ -121,8 +121,8 @@ The source paths below are canonical. This map is a traceability index, not a se
 
 This is a scheduling order. It does not add capability dependencies. Existing explicit independent tracks remain available after their real prerequisites, with one shared-contract mutation stream and sequential merges.
 
-1. Use the recorded answers to finish P5D-1's exact planning artifact. Existing owners reconcile P4 acceptance and complete P5C certification; persistence integration already exists. This task does not perform their closeout.
-2. P5D-2 → P5D-3 → P5D-C. P5D needs accepted P4, not D1. Serialize against P5C's standards/deployment/catalog changes if their scopes overlap.
+1. Follow the [hosted-contact sequencing amendment](program-roadmap.md#hosted-contact-form--next-two-increments): certify the integrated Web3Forms capability next. Preserve the integrated P5D-1–P5D-3 delivery and P5C work; their implementation is not a new assignment. Existing owners retain P4 acceptance reconciliation and P5C certification.
+2. Retain P5D-C as required separate later Resend certification under its own predecessor, subject and external-action gates. It does not precede or interrupt Web3Forms certification. Serialize shared-subject changes against P5C where scopes overlap; this scheduling update supplies no phase-closure or provider evidence.
 3. P5E-1 → P5E-2 → P5E-3 → P5E-C. Reuse the accepted binding lane only after its ownership/runner decision is reconciled.
 4. P5F-1 → P5F-C0 → P5F-2 → P5F-CP → P5F-3 → P5F-4 → P5F-C. First deliver and separately certify complete app-only contact on certified P5C. Then extend those already-accepted contact/persistence implementations together to public profiles and separately certify the new subjects. Only then add optional notifications. This avoids an unused dependency-only persistence baseline with no selectable consumer.
 5. P6-1 → P6-2 → P6-3 → P6-C.
@@ -137,7 +137,8 @@ If an optional integration is not selected in a generated project, it stays abse
 
 ```mermaid
 flowchart TD
-  P4[P4 explicit closure and all-certified gate] --> D[P5D email implementation]
+  P4[P4 explicit closure and all-certified gate] -- historical integration requirement --> D[P5D email implementation integrated in PR 138]
+  WEB3[Web3Forms implementation integrated in PR 139] --> WEB3C[Immediate Web3Forms certification]
   P4 --> PC[Preserved P5C acceptance reconciliation and certification]
   P4 --> E[P5E topology and job implementation]
   PC -. accepted shared binding lane; no D1 descriptor dependency .-> E
@@ -190,6 +191,8 @@ flowchart TD
   FLEET --> DOC[Final documentation hardening and acceptance]
 ```
 
+Integrated implementation nodes are historical inputs, not assignments to repeat. The historical P4-to-email requirement remains a separate acceptance-record reconciliation; this diagram does not infer that it was satisfied. Web3Forms certification has no Resend certification dependency.
+
 P6 is not an architectural dependency of P7. P7 requires persistence and email, not jobs or contact. TOTP and passkeys have no dependency on each other or Stripe. One-time billing does not require customer identity; subscriptions require the stable billing-subject contract. Booking webhooks do not require identity, CMS, payments or the front-end Calendly embed. Dotted edges are delivery/test-lane or optional-composition constraints, never new descriptor dependencies.
 
 The [catalog](../architecture/capability-model.md#initial-catalog) remains the support/dependency authority. P7-2/3 must implement and separately renew authenticated-app support for already delivered optional capabilities only where that catalog declares it; they stay unselected by default. In particular, do not accidentally add protected-area as an account-profile descriptor dependency, or widen booking-webhooks from its declared app/authenticated-app scope to public profiles. P7 certification follows the real declared graph under the accepted D12 staging direction. P7-CF is an existing coordination reference: its prerequisite shared-subject outcomes occur before dependent identity certification, and its final composed-baseline checkpoint follows the five identity outcomes. It is never a composite certificate.
@@ -199,6 +202,8 @@ Accepted main now allows future binding capabilities to choose compatible runner
 ## 6. Delivery increment cards
 
 ### P5D — `transactional-email-resend`
+
+**Implementation status:** The original three cards below record the planning, generation and lifecycle breakdown delivered by the integrated Resend implementation. Their intermediate-state instructions and unchecked planning checkpoints are retained as history, not a fresh execution plan or inferred acceptance receipts. Use the [current status owner](program-roadmap.md#hosted-contact-form--next-two-increments), [ADR-0017](../adr/0017-transactional-email-resend.md) and implemented capability boundary for further work. P5D-C remains a separate certification obligation.
 
 #### P5D-1 — Settle the email contract and acceptance boundary
 
@@ -731,6 +736,8 @@ These are behavioral boundaries, not a maximum diff size. Coherent internal comm
 
 ## 9. Canonical owners and remaining documentary amendments
 
+The P5D-1 amendment entries below are the original ownership map; its email decisions and implementation are now materialized under [ADR-0017](../adr/0017-transactional-email-resend.md). Preserve those owners without reapplying the historical proposal. Entries for later capabilities still guide their own exact plans.
+
 Keep this delivery plan as sequencing detail. Canonical documents receive only durable approved outcomes, boundaries and references; never link a tracked document to a private local-only path required for CI.
 
 | Canonical owner | Proposed amendment | Keep elsewhere |
@@ -749,15 +756,15 @@ The [P7 staging rule](../governance/review-and-contribution.md#initial-authentic
 
 P5C amendments are integrated and are not reapplied here. Reconcile first-increment assumptions against inspected main through read-only comparison; do not rewrite Git history.
 
-### Concrete first amendment text reflecting accepted D1/D2 directions
+### Historical first amendment text reflecting accepted D1/D2 directions
 
-The following is proposed text for the single detailed owner, `docs/architecture/capability-model.md`; it is not an accepted architecture statement:
+The following is the historical proposal for the single detailed owner, `docs/architecture/capability-model.md`. It is superseded as an execution handoff by [ADR-0017](../adr/0017-transactional-email-resend.md) and the [implemented email boundary](../architecture/capability-model.md#transactional-email-boundary); do not reapply it or treat its former intermediate steps as missing implementation.
 
 > Transactional email remains independently selectable on supported portfolio, site and app generations. Selection supplies the required app foundation without changing the origin profile or its public content behavior. New exact installed snapshots own any widened backend/runtime verification; default and retained historical generations remain unchanged. Unsupported historical or mixed selections refuse before repository mutation. Authenticated-app default inclusion remains a later delivery boundary.
 >
 > The standalone sender performs one lazy server-only attempt using caller-owned stable logical-send identity. Its outcomes distinguish provider acceptance, definite rejection and uncertainty; acceptance is not inbox delivery. Sender/environment/domain and secret validation precede transport. Provider error bodies, recipients, message content and credentials do not enter diagnostics. The initial sender performs no automatic retry and installs no persistence or queue; an actual consumer owns any later approved durable retry/reconciliation policy and must account for provider idempotency limits.
 
-After approval, the source plan's email entry should retain its original outcome list and point to that owner for the resolved semantics. The roadmap should record the three outcome boundaries—contract approval, complete fresh sender, existing-repository lifecycle—followed by separate certification, retaining P4 acceptance as entry gate. The enforcement map should identify those future checks as planned. Any required accepted-ADR extension receives its own exact diff and explicit supersession link. No other owner repeats the sender policy above, and no runtime availability or certification status changes during this amendment.
+The original proposal called for the source-plan outcome list, roadmap sequence and enforcement map to follow that owner. Those email implementation amendments were integrated; preserve their actual accepted form rather than reapplying this draft. Separate certification, P4 acceptance reconciliation and unrelated later amendments remain at their own gates.
 
 ## 10. Recorded material decisions
 
@@ -765,8 +772,8 @@ The user has answered the direction questions. The [decision record](2026-09-16-
 
 | Decision | Current disposition | Next concrete obligation |
 | --- | --- | --- |
-| **D1 — public-profile backend support** | Yes; recommended direction accepted. | Exact installed-snapshot and canonical admission changes. |
-| **D2 — email outcome/retry boundary** | Yes; recommended direction accepted. | Exact sender/configuration contract and consumer-owned retry boundary. |
+| **D1 — public-profile backend support** | Implemented under ADR-0017. | Preserve the installed-snapshot contract; separately certify the exact affected subjects. |
+| **D2 — email outcome/retry boundary** | Implemented under ADR-0017. | Preserve the sender/configuration contract and consumer-owned retry boundary; complete separate Resend certification. |
 | **D3 — testing** | Most resilient maintained approach within reasonable scope. | Prove real capability coverage and explain any additional runner's benefit/cost. |
 | **D4 — topology** | Separate Worker preferred; reasoned pushback invited. | P5E-1 proves whether deployment separation earns its operational cost. |
 | **D5 — contact** | Recommended minimal scope plus reasonable practice. | Concrete bounded abuse/privacy/retention settings. |
@@ -798,6 +805,6 @@ These checks inform the proposal; they do not override accepted repository decis
 
 The approved planning sequence received independent requirements, architecture/security and evidence-consistency review. Material findings concerning the contact event, a usable public-profile persistence consumer and initial identity staging were resolved. Private review packets preserve candidate-specific comparisons and dispositions; they are not repository or CI inputs.
 
-Every increment retains the seven requested contract fields and explicit evidence-gap/RED, minimum-change and GREEN checkpoints. This document's publication establishes a plan, not completed implementation or certification. The [first eligible planning increment](2026-09-16-email-delivery-contract-plan.md) supplies its own bounded handoff.
+Every increment retains the seven requested contract fields and explicit evidence-gap/RED, minimum-change and GREEN checkpoints. This document's publication establishes a plan, not completed implementation or certification. The [historical email handoff](2026-09-16-email-delivery-contract-plan.md) retains the original planning record; current work follows the [integrated delivery status](program-roadmap.md#hosted-contact-form--next-two-increments).
 
 No program-level material direction question remains unanswered. Later compatibility proofs, concrete business policies, provider prerequisites and exact file plans remain at their stated gates. Obtain each required exact-plan and final-diff approval, preserve separate certification tasks, and stop on missing predecessor acceptance. No runtime, security, deployment, production-readiness or performance claim follows from this plan.
