@@ -88,7 +88,7 @@ Each backfill increment may map unchanged valid accepted evidence, but its curre
 
 ## Capability delivery task pair
 
-Every new or materially changed executable capability is delivered through a capability implementation task followed by a separate capability certification task. Implementation approval does not imply certification; the capability and owning phase cannot close, and the capability cannot be advertised as certified, until its certification task passes. The actual admission gate requires a pending record linked to that certification task and binds coverage to the descriptor version or behavior-contract digest; a material change replaces stale active coverage with a new task-linked pending record. The actual phase/release closure rejects records that remain pending. The one-time pre-foundation backfill transition is complete; every current record is either task-linked pending or exact-subject certified. Every capability entry from P3B onward expands into this implementation-task then certification-task sequence before dependent work begins, subject only to an explicitly approved independent-work exception.
+Every new or materially changed executable capability is delivered through a capability implementation task followed by a separate capability certification task. Implementation approval does not imply certification; the capability and owning phase cannot close, and the capability cannot be advertised as certified, until its certification task passes. The actual admission gate requires a pending record linked to that certification task and binds coverage to the descriptor version or behavior-contract digest; a material change replaces stale active coverage with a new task-linked pending record. The actual phase/release closure rejects records that remain pending. The one-time pre-foundation backfill transition is complete; every current record is either task-linked pending or exact-subject certified. Every capability entry from P3B onward expands into this implementation-task then certification-task sequence before dependent work begins, subject only to an explicitly approved independent-work exception or the [initial authenticated-composition staging](#initial-authenticated-composition-staging) governed by the review protocol.
 
 Each certification task begins with current planning under the [review and contribution protocol](../governance/review-and-contribution.md). The plan supplies step-by-step human prerequisites or explicitly states that none exist, then defines the fresh-scaffold, lifecycle, local runtime, protected-staging, provider, cleanup, and recovery evidence required for that capability. Local runtime evidence remains separate from protected-staging and provider outcomes, and every external action requires separate authorization. No implementation plan or certification task inherits authority to create an account, configure a provider, use a credential, spend money, deploy, or mutate external or persistent state.
 
@@ -202,6 +202,8 @@ This bounded exception allows the pair to proceed through ordinary implementatio
 
 ## P5 — Remaining independent backend capabilities
 
+The [remaining-program delivery plan](2026-09-16-remaining-program-delivery-plan.md) decomposes P5D through P10 into outcome increments, dependency and requirement coverage, and separate certification tasks. Its [email contract handoff](2026-09-16-email-delivery-contract-plan.md) is the first eligible planning increment; [recorded decisions](2026-09-16-remaining-program-decisions.md) explain the approved directions. These plans do not change current phase acceptance or authorize runtime work.
+
 P5A and P5B are relocated intact to P3B; they are not deleted and not renumbered. P5C through P5F remain here with their existing ordering and requirements:
 
 - P5C: `application-persistence`
@@ -261,7 +263,17 @@ Add separate CMS D1/R2, explicit Payload adapters, file import and parity, draft
 
 ## P7 — Authenticated app
 
-After P5C and P5D, run a deployed Better Auth/Next.js/OpenNext/D1/Drizzle compatibility and security spike. Implement individual accounts, verified email/password, Google sign-in, sessions, protected use cases, account profile, export/delete hooks, roles, audit events, abuse controls, and the narrow support console. P7 does not require jobs or durable contact submissions.
+After accepted certification of P5C, P5D and the required existing shared subjects, run the separately authorized deployed Better Auth/Next.js/OpenNext/D1/Drizzle compatibility and security spike. Implement individual accounts, verified email/password, Google sign-in, sessions, protected use cases, account profile, export/delete hooks, roles, audit events, abuse controls, and the narrow support console. P7 does not require jobs or durable contact submissions.
+
+### Initial authenticated-composition staging
+
+The user approved this bounded first-delivery sequence on 2026-09-16. The [review protocol](../governance/review-and-contribution.md#initial-authenticated-composition-exception) owns its implementation/certification start-order exception and unchanged approval controls.
+
+The named composition consists only of `identity-core`, `identity-google`, `protected-area`, `account-profile` and `support-console`, plus the shared changes essential to their first complete authenticated-app recipe. The capability model continues to own identifiers, dependencies, support and removal policies. Existing shared capability implementations remain predecessors; this does not restart them.
+
+Deliver the accepted compatibility/security proof, then the complete fresh recipe through focused internal work packages. Separately certify changed shared prerequisite subjects first, identity-core next, protected-area/identity-google/account-profile after their declared dependencies, and support-console after its declared dependencies. Conclude with the complete fresh-baseline checkpoint. Shared generated scenarios may supply causal assertions for several subjects, but there is no composite certificate.
+
+Only after that checkpoint, deliver the exact supported app-to-authenticated-app migration and applicable capability lifecycle, followed by separate renewal of every materially changed subject. P7 closes at its existing stop gate. TOTP, passkeys, payments and broader product scope remain later work.
 
 **Stop gate:** Security, privacy, migration, authorization, deployment, and recovery evidence is approved.
 
