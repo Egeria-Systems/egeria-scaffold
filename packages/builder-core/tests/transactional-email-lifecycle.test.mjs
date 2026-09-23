@@ -105,11 +105,14 @@ test("email addition refuses historical recipes and modified dependency locks be
   repo.files.set("pnpm-lock.yaml", encoder.encode("changed-lock"));
   const planned = await core.planCapabilityAddition({ reader: repo.reader, git, capability });
   assert.equal(planned.ok, false);
+  assert.equal(planned.issues[0].code, "PROJECT_DRIFT_DETECTED");
   assert.deepEqual(repo.writes, []);
   const context = createGenerationRenderingContext();
   const historical = await repository("portfolio", { context: { ...context, catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: createVitestFourProfileRecipes() } });
   const result = await core.planCapabilityAddition({ reader: historical.reader, git, capability });
   assert.equal(result.ok, false);
+  assert.equal(result.issues[0].code, "CAPABILITY_ADDITION_UNSUPPORTED");
+  assert.deepEqual(historical.writes, []);
 });
 
 test("foundation installation preserves custom manifest members and rejects a missing Worker receipt", async () => {
