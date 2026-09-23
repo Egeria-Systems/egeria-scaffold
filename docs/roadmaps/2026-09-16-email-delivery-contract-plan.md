@@ -1,10 +1,10 @@
 # Email delivery contract and first runtime handoff
 
-> **For the executor:** Use `superpowers:writing-plans` for this planning increment. A later approved implementation uses `superpowers:executing-plans` and the repository's canonical review protocol. No implementation starts from this document while the decisions and predecessors below are pending.
+> **Historical handoff:** Resend planning and implementation are integrated. Do not execute this document as a new P5D-1 or P5D-2 assignment. Use [ADR-0017](../adr/0017-transactional-email-resend.md), the [implemented email boundary](../architecture/capability-model.md#transactional-email-boundary) and the [current delivery status](program-roadmap.md#hosted-contact-form--next-two-increments).
 
-**Status:** P5D-1 planning handoff updated with accepted D1/D2 directions. Exact documentary and runtime candidates retain their own approvals.
+**Status:** Historical planning record, reconciled 2026-09-23. The original contract, generation and lifecycle breakdown is covered by the integrated Resend delivery; certification remains separate. The original restart prompt is retired.
 
-**Goal:** Resolve the concrete email delivery and public-profile admission contract, amend only its canonical planning owners after approval, and produce the exact P5D-2 implementation plan against its then-accepted baseline.
+**Original goal:** Resolve the concrete email delivery and public-profile admission contract, amend only its canonical planning owners after approval, and produce the exact P5D-2 implementation plan against its then-accepted baseline.
 
 **Architecture:** `transactional-email-resend` remains a hybrid capability with repository/external state and reviewed removal, depending on `app-foundation`. Its sender port belongs to the generated email application boundary; Resend and memory adapters implement that contract. Delivery results express what was observed, and no standalone database, queue, send endpoint or wrapper package is introduced.
 
@@ -12,11 +12,11 @@
 
 **Controlling sources:** [Source plan](2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md), [roadmap](program-roadmap.md), [capability model](../architecture/capability-model.md), [review protocol](../governance/review-and-contribution.md), [ADR index](../adr/README.md), and [remaining-program delivery plan](2026-09-16-remaining-program-delivery-plan.md), and [recorded D1–D12 decisions](2026-09-16-remaining-program-decisions.md).
 
-## 1. Why this is the first eligible increment
+## 1. Historical eligibility at preparation
 
-Preparation on 2026-09-16 verified accepted main at `991ab80bf071d9671bd9c465c01f2ca83d253234`, including persistence and accepted ADR-0016. Current admission has five certified and six pending subjects. P4's default-baseline closure still lacks its four external outcomes. The roadmap's P4-before-persistence integration rule also needs reconciliation with the actual merge. This planning task infers no waiver; runtime entry remains gated.
+Preparation on 2026-09-16 verified accepted main `991ab80bf071d9671bd9c465c01f2ca83d253234`, including persistence and ADR-0016. Admission then had five certified and six pending subjects, and the inspected P4/default-baseline and persistence integration records had unresolved gates. These are dated observations, not current counts or a claim that the later merges resolved those gates.
 
-P5D-1 is a real planning deliverable: settle the first blocked contract and its owner/acceptance map. It may be prepared during P4 without altering runtime or borrowing P5C's special exception. P5D-2, the first runtime slice, still requires explicit accepted P4 closure, applicable machine checks, accepted ancestry and a separately approved exact implementation plan. This document does not replace those conditions with a preparatory task number.
+The original P5D-1 handoff prepared the email contract and the P5D-2 runtime plan. Subsequent email-specific approvals, ADR-0017 and integrated delivery superseded this start instruction. Sections 2–6 preserve the original planning scope and intermediate checkpoints; they are not a current file allowlist, new implementation assignment or proof of acceptance. The [roadmap](program-roadmap.md#hosted-contact-form--next-two-increments) owns the current Web3Forms-first certification priority and separate later Resend task.
 
 ### Existing work that must survive
 
@@ -25,7 +25,7 @@ P5D-1 is a real planning deliverable: settle the first blocked contract and its 
 - Preserve the historical P4 plan and evidence. Its old restart instructions and recipe versions do not authorize this increment.
 - Keep P5A/P5B identifiers and their P3B relocation; do not create new tasks for them.
 
-## 2. Preconditions and decision inputs
+## 2. Original preconditions and decision inputs
 
 **D1 and D2 are answered yes.** Use the linked decision record; do not ask them again. Prepare the exact documentary candidate and runtime plan from those directions. Canonical changes, material new tradeoffs and runtime admission still require the applicable concrete checkpoint.
 
@@ -196,39 +196,8 @@ The next plan chooses the smallest relevant checks from current owning scripts, 
 - **Planning recovery:** revise only the proposed documentary candidate and retain its isolated worktree and evidence; preserve prior work.
 - **Recovery during later implementation:** retain exact failed repository prefixes; separately review dependency/lock reversal and provider/credential/message disposition. Source rollback cannot recall an accepted email.
 
-## 7. Copy-ready execution prompt — first eligible planning increment
+## 7. Retired execution prompt
 
-```text
-Continue only P5D-1, the email delivery contract and exact next-increment planning task, for Egeria Scaffold.
+The former copy-ready P5D-1 prompt is retired because its planning, generation and lifecycle work has been integrated. It must not restart email implementation, reopen D1/D2, allocate another email ADR, or replace the actual accepted contract with this older proposal. Git history retains the original prompt for provenance.
 
-Repository: Egeria-Systems/egeria-scaffold
-Workspace: use a dedicated clean worktree from the current accepted planning baseline; preserve all existing worktrees.
-
-Read:
-- docs/roadmaps/2026-09-16-remaining-program-delivery-plan.md
-- docs/roadmaps/2026-09-16-email-delivery-contract-plan.md
-- docs/roadmaps/2026-09-16-remaining-program-decisions.md
-Read these tracked handoffs, then create the current exact-file plan and evidence in the repository's ignored workflow-artifact directories.
-
-This is planning, not runtime implementation. Preserve implementation, commits, PRs, certification artifacts, default/historical fixtures and every prior worktree. Do not restart P5C, reuse its one-time exception for email, or recreate/renumber relocated P5A/P5B.
-
-Verify the actual worktree/status and read current accepted main, applicable AGENTS.md, applicable local tool instructions, approved source plan, roadmap, accepted ADRs, capability model and review protocol. This handoff was prepared against accepted main 991ab80bf071d9671bd9c465c01f2ca83d253234. Reconcile it with current accepted canonical content before making a candidate. Check ancestry and relevant changes; preserve the primary checkout and prior branches; perform this preparation in isolation.
-
-D1 (public-profile backend admission) and D2 (email outcome/retry policy) were answered yes. Read the decision record and apply those directions without asking again. D3 delegates proportionate resilient testing, D4 records a separate-Worker preference subject to evidence, D5–D10 request useful configurability with reasonable practice, D11 retains performance deferral, and D12 now explicitly approves the bounded first-authenticated-composition staging exception recorded on 2026-09-16. That exception supplies no email permission or certification bypass. No concrete implementation or external approval is implied.
-
-Inspect P4's actual closure state and integrated P5C/PR #129. ADR-0016 and its harness decisions are accepted main. The inspected roadmap still requires P4 acceptance before persistence integration, despite the actual merge: preserve that evidence conflict for the owning closeout and infer no waiver. Do not reopen P5C decisions or modify its worktree/evidence.
-
-Using confirmed D1/D2 answers, produce one owner-consistent documentary amendment in the exact scope of the companion's planning-file table. If that exact amendment has not been approved for writing, keep it as a private proposed diff and present it for approval. Do not number a new ADR before checking the current ADR index and the preserved P5C decision; do not mark an unapproved decision Accepted.
-
-Resolve and document the observable sender outcomes, configuration and secret boundary, idempotency/uncertainty behavior, public-profile admission, historical refusal policy, lifecycle split and exact certification implications. Use official current provider/runtime sources, not inferred framework guarantees. Add no unused port implementation, package, endpoint, schema, template, workflow, fixture, dependency or certification record during this task.
-
-Trace the actual first-runtime owners listed in the companion. Once the material decisions and accepted baseline are settled, prepare the complete exact-file RED/GREEN P5D-2 plan, with coherent commit/PR scope, safe intermediate behavior, failure/recovery tests, independent review, subject changes and separate P5D-C certification. Do not invent future versions or use a generic capability/settings framework.
-
-Validate the private proposal and any separately authorized documentary candidate with appropriate existing checks and exact diff inspection. Do not install dependencies or run costly runtime/provider suites merely to write a private plan. State unavailable checks accurately. Include ignored files in the candidate content fingerprint because Git diff alone does not include them.
-
-Follow the canonical approval/review gates for any authorized canonical amendment. No runtime change starts until P4's explicit accepted closure, exact predecessor ancestry, applicable admission/closure checks and a separate approved P5D-2 Gate 2 plan all exist. If those gates remain open, report the specific blocker; do not start P5D-2, restart P5C, poll indefinitely or create an automation.
-
-Return the private exact amendment/plan, coverage and subject delta, validation results, unresolved decisions and approval checkpoint. Stop before code implementation, commits, push, PR creation/comments, merge, publication, deployment, credentials, provider actions, messages, spending or persistent-data mutation.
-```
-
-The prompt continues the first eligible **planning** increment. D1/D2 are closed; once P4's acceptance record is reconciled and the exact P5D-2 plan is approved, that plan supplies its own bounded implementation prompt.
+For subsequent work, use the [current roadmap](program-roadmap.md#hosted-contact-form--next-two-increments) and the [certification registry](../../certifications/capabilities.json) to resolve the exact subject and its current task plan. Web3Forms certification is next; Resend certification remains required separately later. Each certification task needs its own preparation, human-prerequisite runbook, exact plan, evidence and external-action authority under the [review protocol](../governance/review-and-contribution.md#capability-certification-planning). This historical handoff authorizes none of those actions.
