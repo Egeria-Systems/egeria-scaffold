@@ -221,7 +221,7 @@ test("certification subjects bind the descriptor and required evidence", () => {
   );
 });
 
-test("current certification preserves five unchanged accepted subjects and keeps changed subjects pending", () => {
+test("current certification preserves accepted evidence and keeps other subjects pending", () => {
   assert.deepEqual(Object.keys(committedRegistry.records), expectedIdentifiers);
   assert.deepEqual(Object.keys(requiredEvidence), expectedIdentifiers);
   const acceptedLocalSubjects = new Set([
@@ -239,6 +239,16 @@ test("current certification preserves five unchanged accepted subjects and keeps
         path: `docs/implementation-evidence/2026-09-13-${identifier}-app-certification-receipt.md`,
         outcome: "passed",
         revision: "fe16ae41153f89242cdf48c0f899c3720f511557",
+        subject: structuredClone(expected.subject),
+      }));
+    } else if (identifier === "contact-form-web3forms") {
+      expected.status = "certified";
+      expected.taskPlan = "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md";
+      expected.evidence = expected.requiredEvidence.map((kind) => ({
+        kind,
+        path: "docs/implementation-evidence/2026-09-23-web3forms-certification-receipt.md",
+        outcome: "passed",
+        revision: "94c28901fb4388f771df53cc18cf2eec24b76215",
         subject: structuredClone(expected.subject),
       }));
     } else if (identifier === "observability") {

@@ -1701,7 +1701,7 @@ test("the repository registry admits accepted subjects and refuses closure for r
       "app-foundation",
       "application-persistence",
       "booking-calendly",
-      "contact-form-web3forms",      "deployment-cloudflare",
+      "deployment-cloudflare",
       "standards",
       "transactional-email-resend",
     ].map((identifier) => ({
