@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import * as core from "../dist/index.js";
+import { inspectProject } from "../dist/diagnostics/project-inspection.js";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
 import { createVitestFourProfileRecipes } from "../dist/profiles/profile-recipes.js";
-import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
+import { createGenerationRenderingContext, readVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -302,4 +303,40 @@ test("contact refuses transitions and preserves controls after an interrupted wr
   });
   assert.equal(outcome.result.ok,false);assert.equal(outcome.result.recovery,"inspect-worktree");
   assert.deepEqual(repo.files.get(".egeria/state.json"),state);assert.equal(decoder.decode(repo.files.get(".egeria/migrations.jsonl")),"");
+});
+
+
+test("jobs-bearing repositories refuse incidental addition and removal without changing source or state", async () => {
+  const repo = await repository("portfolio", { backgroundJobDelivery: true, transactionalEmailResend: true });
+  const before = new Map(repo.files);
+  const snapshot = await readVerifiedProjectSnapshot(repo.reader);
+  assert.equal(snapshot.ok, true, JSON.stringify(snapshot));
+  const inspection = await inspectProject({ reader: repo.reader, catalog: snapshot.value.catalog, profiles: snapshot.value.profiles });
+  assert.equal(inspection.project.kind, "valid", JSON.stringify(inspection.project));
+  assert.equal(inspection.inference.state.kind, "valid", JSON.stringify(inspection.inference.state));
+  assert.equal(inspection.resolution?.ok, true, JSON.stringify(inspection.resolution));
+  const add = await core.planCapabilityAddition({ reader: repo.reader, git, capability: "multilingual" });
+  assert.equal(add.ok, false);
+  assert.equal(add.issues[0].code, "CAPABILITY_ADDITION_UNSUPPORTED");
+  const remove = await core.planCapabilityRemoval({ reader: repo.reader, git, capability, inspectRepositoryInventory: repo.inventory });
+  assert.equal(remove.ok, false);
+  assert.equal(remove.issues[0].code, "CAPABILITY_REMOVAL_UNSUPPORTED");
+  assert.deepEqual(repo.files, before);
+  assert.deepEqual(repo.writes, []);
+});
+
+
+test("jobs repositories refuse profile transitions and unsupported upgrades before writes", async () => {
+  const repo = await repository("portfolio", { backgroundJobDelivery: true });
+  const before = new Map(repo.files);
+  for (const toProfile of ["site", "app"]) {
+    const result = await core.planProfileTransition({ reader: repo.reader, git, toProfile });
+    assert.equal(result.ok, false, JSON.stringify(result));
+  }
+  for (const selectedCapability of ["background-job-delivery", "standards"]) {
+    const result = await core.planCapabilityUpgrade({ reader: repo.reader, git, capability: selectedCapability, toVersion: "0.4.0" });
+    assert.equal(result.ok, false, JSON.stringify(result));
+  }
+  assert.deepEqual(repo.files, before);
+  assert.deepEqual(repo.writes, []);
 });

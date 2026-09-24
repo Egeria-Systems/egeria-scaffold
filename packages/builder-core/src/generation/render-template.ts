@@ -8,6 +8,7 @@ const templateLayers = new Set([
   "analytics",
   "app-foundation",
   "application-persistence",
+  "background-job-delivery",
   "transactional-email-resend",
   "deployment-cloudflare",
   "standards",
@@ -22,10 +23,12 @@ const templateTokenNames = new Set([
   "projectName",
   "displayNameJson",
   "workerName",
+  "workerEntryJson",
   "githubWorkflowExpression",
   "githubRefExpression",
   "githubShaExpression",
   "githubExpectedRevisionExpression",
+  "githubJobRetentionReviewedExpression",
   "githubDeployUrlExpression",
   "githubCloudflareAccountIdExpression",
   "githubCloudflareApiTokenExpression",
@@ -42,7 +45,7 @@ const templateTokenNames = new Set([
   "web3FormsAccessKeyJson",
 ]);
 const templateTokenPattern =
-  /{{(projectName|displayNameJson|workerName|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|githubApplicationDatabaseEnvironmentExpression|githubExpectedDatabaseIdExpression|githubMigrationSetSha256Expression|githubSourceReviewReferenceExpression|githubRecoveryPointReferenceExpression|githubStagingApplicationDatabaseIdExpression|githubProductionApplicationDatabaseIdExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson|web3FormsAccessKeyJson)}}/g;
+  /{{(projectName|displayNameJson|workerName|workerEntryJson|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubJobRetentionReviewedExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|githubApplicationDatabaseEnvironmentExpression|githubExpectedDatabaseIdExpression|githubMigrationSetSha256Expression|githubSourceReviewReferenceExpression|githubRecoveryPointReferenceExpression|githubStagingApplicationDatabaseIdExpression|githubProductionApplicationDatabaseIdExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson|web3FormsAccessKeyJson)}}/g;
 const completeTokenPattern = /{{([^{}]*)}}/g;
 const bookingCalendlySettingsSource =
   "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template";
@@ -58,6 +61,7 @@ const fixedTemplateTokens = {
   githubRefExpression: "${{ github.ref }}",
   githubShaExpression: "${{ github.sha }}",
   githubExpectedRevisionExpression: "${{ inputs.expected_revision }}",
+  githubJobRetentionReviewedExpression: "${{ inputs.job_retention_reviewed }}",
   githubDeployUrlExpression: "${{ vars.DEPLOY_URL }}",
   githubCloudflareAccountIdExpression:
     "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
@@ -76,6 +80,7 @@ export type TemplateTokens = Readonly<{
   projectName: string;
   displayNameJson: string;
   workerName: string;
+  workerEntryJson?: string;
   calendlyDestinationJson?: string;
   calendlyModeJson?: string;
   analyticsSettingsJson?: string;

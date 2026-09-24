@@ -1,0 +1,127 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "{{workerName}}-local",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-08-04",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "enable_request_signal"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "invocation_logs": false
+    }
+  },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
+  "env": {
+    "staging": {
+      "name": "{{workerName}}-staging",
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
+      "version_metadata": {
+        "binding": "CF_VERSION_METADATA"
+      },
+      "vars": {
+        "JOB_ENVIRONMENT": "staging",
+        "JOB_QUEUE_NAME": "{{workerName}}-jobs-staging",
+        "JOB_DEAD_LETTER_QUEUE_NAME": "{{workerName}}-jobs-staging-dead"
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "JOB_QUEUE",
+            "queue": "{{workerName}}-jobs-staging"
+          },
+          {
+            "binding": "JOB_DEAD_LETTER_QUEUE",
+            "queue": "{{workerName}}-jobs-staging-dead"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "{{workerName}}-jobs-staging",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "retry_delay": 5,
+            "dead_letter_queue": "{{workerName}}-jobs-staging-dead"
+          }
+        ]
+      }
+    },
+    "production": {
+      "name": "{{workerName}}",
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      },
+      "version_metadata": {
+        "binding": "CF_VERSION_METADATA"
+      },
+      "vars": {
+        "JOB_ENVIRONMENT": "production",
+        "JOB_QUEUE_NAME": "{{workerName}}-jobs-production",
+        "JOB_DEAD_LETTER_QUEUE_NAME": "{{workerName}}-jobs-production-dead"
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "JOB_QUEUE",
+            "queue": "{{workerName}}-jobs-production"
+          },
+          {
+            "binding": "JOB_DEAD_LETTER_QUEUE",
+            "queue": "{{workerName}}-jobs-production-dead"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "{{workerName}}-jobs-production",
+            "max_batch_size": 10,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "retry_delay": 5,
+            "dead_letter_queue": "{{workerName}}-jobs-production-dead"
+          }
+        ]
+      }
+    }
+  },
+  "vars": {
+    "JOB_ENVIRONMENT": "local",
+    "JOB_QUEUE_NAME": "{{workerName}}-jobs-local",
+    "JOB_DEAD_LETTER_QUEUE_NAME": "{{workerName}}-jobs-local-dead"
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "JOB_QUEUE",
+        "queue": "{{workerName}}-jobs-local"
+      },
+      {
+        "binding": "JOB_DEAD_LETTER_QUEUE",
+        "queue": "{{workerName}}-jobs-local-dead"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "{{workerName}}-jobs-local",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "retry_delay": 5,
+        "dead_letter_queue": "{{workerName}}-jobs-local-dead"
+      }
+    ]
+  }
+}

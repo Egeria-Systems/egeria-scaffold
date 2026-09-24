@@ -900,6 +900,7 @@ export async function planCapabilityRemoval(input: Readonly<{
   }
 
   const project = inspection.project.value;
+  if (project.selectedCapabilities.includes("background-job-delivery")) return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
   const state = inspection.inference.state.value;
   const desired = project.selectedCapabilities.includes(capabilityValue);
   const installedCapability = state.installedCapabilities.find(

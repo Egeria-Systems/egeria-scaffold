@@ -17,6 +17,7 @@ export const requiredEvidence = Object.freeze({
     "fresh-scaffold",
     "provider-confirmed",
   ]),
+  "background-job-delivery": ["cleanup-recovery", "deployed-application", "existing-repository-lifecycle", "fresh-scaffold", "provider-confirmed"],
   "booking-calendly": Object.freeze([
     "cleanup-recovery",
     "deployed-application",

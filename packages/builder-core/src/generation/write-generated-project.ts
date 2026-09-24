@@ -84,6 +84,7 @@ const allowedRequestKeys = new Set([
   "analytics",
   "applicationPersistence",
   "transactionalEmailResend",
+  "backgroundJobDelivery",
   "bookingCalendly",
   "contactFormWeb3Forms",
   "displayName",
@@ -137,6 +138,7 @@ function validateRequest(
   const includesMultilingual = Object.hasOwn(value, "multilingual");
   const includesPersistence = Object.hasOwn(value, "applicationPersistence");
   const includesEmail = Object.hasOwn(value, "transactionalEmailResend");
+  const includesJobs = Object.hasOwn(value, "backgroundJobDelivery");
   if (
     requiredRequestKeys.some((key) => !Object.hasOwn(value, key)) ||
     keys.some((key) => !allowedRequestKeys.has(key))
@@ -189,6 +191,9 @@ function validateRequest(
       "invalid-selection",
     );
   }
+  if (includesJobs && value.backgroundJobDelivery !== true) {
+    return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "backgroundJobDelivery"], "invalid-selection");
+  }
   if (includesEmail && value.transactionalEmailResend !== true) {
     return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "transactionalEmailResend"], "invalid-selection");
   }
@@ -207,6 +212,7 @@ function validateRequest(
       ...(bookingCalendly === undefined ? {} : { bookingCalendly }),
       ...(includesMultilingual ? { multilingual: true } : {}),
       ...(includesPersistence ? { applicationPersistence: true } : {}),
+      ...(includesJobs ? { backgroundJobDelivery: true } : {}),
       ...(includesEmail ? { transactionalEmailResend: true } : {}),
     },
   };
@@ -689,7 +695,7 @@ export async function generateProject(input: Readonly<{
     return request;
   }
 
-  const renderingContext = createGenerationRenderingContext(request.value.applicationPersistence === true, request.value.transactionalEmailResend === true);
+  const renderingContext = createGenerationRenderingContext(request.value.applicationPersistence === true, request.value.transactionalEmailResend === true, request.value.backgroundJobDelivery === true);
   const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, renderingContext.catalogSnapshot);
   if (!catalog.ok) {
     return issue("VERIFIED_CATALOG_INVALID", [], "catalog-invalid");

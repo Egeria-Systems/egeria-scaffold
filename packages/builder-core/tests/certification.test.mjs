@@ -13,6 +13,7 @@ const evidencePath =
   "docs/implementation-evidence/example-certification-verification.md";
 const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
 const descriptorDigests = Object.freeze({
+  "background-job-delivery": "sha256:97c9aa94d8c489ec6eaca1a61258546aa511105c5f3a565509da01e752f0883b",
   analytics:
     "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba",
   "app-foundation":
@@ -25,7 +26,7 @@ const descriptorDigests = Object.freeze({
   "content-files":
     "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4",
   "deployment-cloudflare":
-    "sha256:67d75b2bcf84339e794daffe43eb5ac8a2430e0b48a8be42e06180c635401896",
+    "sha256:55c727c3636b4405e489d6e65d5b435228f50b1ef6ede51293d44556137576fd",
   multilingual:
     "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891",
   observability:
@@ -39,13 +40,14 @@ const descriptorDigests = Object.freeze({
   "transactional-email-resend": "sha256:558ff80dacef968fecf3e8a34e52ecd6672f0619a8fee1b73dcbb9d094a04ff3",
 });
 const descriptorVersions = Object.freeze({
+  "background-job-delivery": "0.1.0",
   analytics: "0.1.0",
   "app-foundation": "0.2.0",
   "application-persistence": "0.1.0",
   "booking-calendly": "0.1.0",
   "contact-form-web3forms": "0.1.0",
   "content-files": "0.4.0",
-  "deployment-cloudflare": "0.4.0",
+  "deployment-cloudflare": "0.6.0",
   multilingual: "0.1.0",
   observability: "0.3.0",
   "section-composition": "0.3.0",
@@ -57,6 +59,7 @@ const expectedIdentifiers = Object.freeze([
   "analytics",
   "app-foundation",
   "application-persistence",
+  "background-job-delivery",
   "booking-calendly",
   "contact-form-web3forms",
   "content-files",
@@ -93,7 +96,7 @@ function createRecord(identifier) {
     },
     requiredEvidence: requiredEvidence[identifier],
     status: "pending",
-    taskPlan: identifier === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-22-contact-delivery-certification-amendment.md" : ["app-foundation", "transactional-email-resend"].includes(identifier)
+    taskPlan: ["background-job-delivery", "deployment-cloudflare"].includes(identifier) ? "docs/superpowers/plans/2026-09-23-background-job-delivery-certification.md" : identifier === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-22-contact-delivery-certification-amendment.md" : ["app-foundation", "transactional-email-resend"].includes(identifier)
       ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
       : ["application-persistence", "deployment-cloudflare", "standards"].includes(identifier)
       ? persistencePlanPath
@@ -324,6 +327,7 @@ test("repository artifacts bind evidence to its plan, subject, revision, and rev
     [registry.records.standards.taskPlan]: "# approved standards migration plan",
     [registry.records["transactional-email-resend"].taskPlan]: "# separate email certification plan",
     [registry.records["contact-form-web3forms"].taskPlan]: "# separate hosted contact certification plan",
+    [registry.records["background-job-delivery"].taskPlan]: "# separate background job certification plan",
     [evidencePath]: createEvidenceDocument(),
   };
 

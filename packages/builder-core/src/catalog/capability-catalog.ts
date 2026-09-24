@@ -23,7 +23,8 @@ export type CapabilityCatalogSnapshot = Readonly<{
   standards: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0";
   siteRouting?: "0.3.0" | "0.4.0";
   appFoundation?: "0.1.0" | "0.2.0";
-  deploymentCloudflare?: "0.3.0" | "0.4.0";
+  deploymentCloudflare?: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0";
+  backgroundJobDelivery?: "0.1.0";
   applicationPersistence?: "0.1.0";
   transactionalEmailResend?: "0.1.0";
 }>;
@@ -58,8 +59,22 @@ export const persistenceDeploymentScripts = Object.freeze({
   "test:integration:bindings": "vitest run --config vitest.bindings.config.ts",
 });
 
+export const backgroundJobFiles = Object.freeze([
+  { identifier: "job-delivery-contract", path: "apps/web/src/application/job-delivery.ts", ownership: "managed" },
+  { identifier: "job-handler-registration", path: "apps/web/src/application/job-handlers.ts", ownership: "application-owned" },
+  { identifier: "job-queue-adapter", path: "apps/web/src/infrastructure/cloudflare/job-delivery.ts", ownership: "managed" },
+  { identifier: "job-memory-adapter", path: "apps/web/src/infrastructure/memory/job-delivery.ts", ownership: "managed" },
+  { identifier: "job-server-composition", path: "apps/web/src/composition/server-jobs.ts", ownership: "managed" },
+  { identifier: "job-delivery-contract-tests", path: "apps/web/tests/unit/job-delivery.test.ts", ownership: "managed" },
+  { identifier: "job-worker-tests", path: "apps/web/tests/integration/job-worker.test.ts", ownership: "managed" },
+  { identifier: "job-worker-fixture", path: "apps/web/tests/integration/fixtures/job-worker.mjs", ownership: "managed" },
+  { identifier: "job-operator-guide", path: "docs/background-job-delivery.md", ownership: "application-owned" },
+] as const);
+
 const currentCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = {
   ...applicationPersistenceCatalogSnapshot,
+  deploymentCloudflare: "0.6.0",
+  backgroundJobDelivery: "0.1.0",
   appFoundation: "0.2.0",
   transactionalEmailResend: "0.1.0",
 };
@@ -242,6 +257,7 @@ function createDescriptors(
 ): readonly CapabilityDescriptor[] {
   const siteRoutingVersion = snapshot.siteRouting ?? "0.3.0";
   const persistence = snapshot.applicationPersistence === "0.1.0";
+  const jobs = snapshot.backgroundJobDelivery === "0.1.0";
   const supportsApp = snapshot.appFoundation !== undefined;
   const sharedSupportedProfiles = supportsApp
     ? (["portfolio", "site", "app"] as const)
@@ -1326,14 +1342,18 @@ function createDescriptors(
       ...sharedCapabilityMetadata,
       supportedProfiles: sharedSupportedProfiles,
       requiredPackages: ["@opennextjs/cloudflare", "wrangler"],
-      environmentVariables: ["DEPLOY_URL", ...(persistence ? ["STAGING_APPLICATION_DATABASE_ID", "PRODUCTION_APPLICATION_DATABASE_ID"] : [])],
+      environmentVariables: ["DEPLOY_URL", ...(jobs ? ["JOB_ENVIRONMENT", "JOB_QUEUE_NAME", "JOB_DEAD_LETTER_QUEUE_NAME", "JOB_RETENTION_REVIEWED"] : []), ...(persistence ? ["STAGING_APPLICATION_DATABASE_ID", "PRODUCTION_APPLICATION_DATABASE_ID"] : [])],
       secrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
       platformResources: ["cloudflare-worker", "cloudflare-static-assets"],
       privilegedOperations: ["cloudflare-worker-deployment"],
       threatReviewLevel: "elevated",
-      adapterSemanticRequirements: ["node-runtime", "worker-static-assets", ...(persistence ? ["explicit-environment-bindings", "automatic-provisioning-disabled"] : [])],
+      adapterSemanticRequirements: ["node-runtime", "worker-static-assets", ...(jobs ? ["shared-worker-queue-composition", "required-dead-letter-target", "explicit-queue-environments", "automatic-provisioning-disabled"] : []), ...(persistence ? ["explicit-environment-bindings", "automatic-provisioning-disabled"] : [])],
       ...projectEvidencePoints([
         ...deploymentCloudflareEvidencePoints,
+        ...(jobs ? [
+          createFileEvidencePoint("deployment-job-worker-entry", "deployment-cloudflare", "apps/web/worker.mjs", "managed"),
+          createFileEvidencePoint("deployment-job-preflight", "deployment-cloudflare", "apps/web/scripts/check-job-delivery.mjs", "managed"),
+        ] : []),
         ...(persistence ? [
           createFileEvidencePoint("deployment-binding-test-configuration", "deployment-cloudflare", "apps/web/vitest.bindings.config.ts", "managed"),
           ...Object.entries(persistenceDeploymentScripts).map(([name, command]) => createPackageJsonValueEvidencePoint(`deployment-${name.replaceAll(":", "-")}-script`, "deployment-cloudflare", `/scripts/${name}`, command)),
@@ -1345,12 +1365,14 @@ function createDescriptors(
         "opennext-build",
         "wrangler-types",
         "deployment-workflow-contracts",
+        ...(jobs ? ["queue-environment-and-terminal-configuration", "built-worker-queue-and-http"] : []),
         "browser-deployed",
         ...(persistence ? ["binding-runtime-tests", "database-environment-isolation"] : []),
       ],
       documentationEvidenceRequirements: [
         "nextjs-opennext-cloudflare-compatibility",
         "deployment-authority-and-claim-boundaries",
+        ...(jobs ? ["queue-retention-and-recovery-handoff"] : []),
         ...(persistence ? ["database-environment-isolation-and-approval"] : []),
       ],
       removalAndRecoveryRequirements: [
@@ -1781,6 +1803,28 @@ function createDescriptors(
       documentationEvidenceRequirements: ["public-key-and-provider-enforcement-handoff", "privacy-retention-and-fallback", "acknowledgement-and-uncertain-outcomes"],
       removalAndRecoveryRequirements: ["review-public-form-identifier-and-provider-disposition", "review-submission-and-inbox-retention", "preserve-edited-application-surfaces", "refuse-surviving-contact-references", "separate-source-deployment-provider-and-data-recovery"],
     } as const] : []),
+    ...(jobs ? [{
+      identifier: "background-job-delivery",
+      version: "0.1.0",
+      deliveryMode: "hybrid",
+      stateClassifications: ["repository-stateful", "external-stateful"],
+      removalPolicy: "reviewed",
+      dependencies: ["app-foundation"],
+      ...sharedCapabilityMetadata,
+      supportedProfiles: ["portfolio", "site", "app"],
+      requiredPackages: [],
+      platformResources: ["cloudflare-queue", "cloudflare-dead-letter-queue"],
+      dataClassifications: ["opaque-operation-identifiers", "allowlisted-job-payloads"],
+      retentionAssumptions: ["cloudflare-free-queue-retention-24-hours", "inspect-terminal-work-before-expiry"],
+      privilegedOperations: ["dispatch-background-job", "consume-background-job"],
+      threatReviewLevel: "elevated",
+      adapterSemanticRequirements: ["dispatch-acceptance-is-not-completion", "stable-operation-identity", "repeat-safe-handlers", "bounded-native-retries", "inspectable-terminal-disposition", "side-effect-acknowledgement-ambiguity"],
+      ...projectEvidencePoints(backgroundJobFiles.map(({ identifier, path, ownership }) =>
+        createFileEvidencePoint(identifier, "background-job-delivery", path, ownership))),
+      verificationPlan: ["job-contracts", "native-queue-delivery", "retry-exhaustion-and-terminal-inspection", "duplicate-and-out-of-order-safety", "timeout-cancellation-and-private-diagnostics", "whole-worker-execution", "fresh-generation-and-lifecycle-refusal"],
+      documentationEvidenceRequirements: ["handler-repeat-safety-and-payload-policy", "retention-inspection-and-identity-preserving-recovery", "emulator-acknowledgement-limitation"],
+      removalAndRecoveryRequirements: ["unsupported-lifecycle-refusal", "retain-queued-and-terminal-work", "operator-authorized-recovery", "separate-source-provider-and-queued-data-recovery"],
+    } as const] : []),
     ...(snapshot.transactionalEmailResend === undefined ? [] : [{
       identifier: "transactional-email-resend",
       version: "0.1.0",
@@ -1909,10 +1953,14 @@ export function createCapabilityCatalogSnapshot(
     ? Reflect.get(snapshotValue, "deploymentCloudflare") as unknown : undefined;
   const persistenceSnapshot = typeof snapshotValue === "object" && snapshotValue !== null
     ? Reflect.get(snapshotValue, "applicationPersistence") as unknown : undefined;
+  const jobsSnapshot = typeof snapshotValue === "object" && snapshotValue !== null
+    ? Reflect.get(snapshotValue, "backgroundJobDelivery") as unknown : undefined;
+  const jobsTupleValid = jobsSnapshot === undefined || (jobsSnapshot === "0.1.0" && appFoundationSnapshot === "0.2.0" &&
+    siteRoutingSnapshot === "0.4.0" && (standardsSnapshot === "0.5.0" || standardsSnapshot === "0.6.0"));
   const persistenceTupleValid = persistenceSnapshot === undefined
-    ? standardsSnapshot !== "0.6.0" && (deploymentSnapshot === undefined || deploymentSnapshot === "0.3.0")
+    ? standardsSnapshot !== "0.6.0" && (jobsSnapshot === "0.1.0" ? deploymentSnapshot === "0.5.0" : deploymentSnapshot === undefined || deploymentSnapshot === "0.3.0")
     : persistenceSnapshot === "0.1.0" && standardsSnapshot === "0.6.0" &&
-      deploymentSnapshot === "0.4.0" && (appFoundationSnapshot === "0.1.0" || appFoundationSnapshot === "0.2.0") && siteRoutingSnapshot === "0.4.0";
+      (jobsSnapshot === "0.1.0" ? deploymentSnapshot === "0.6.0" : deploymentSnapshot === "0.4.0") && (appFoundationSnapshot === "0.1.0" || appFoundationSnapshot === "0.2.0") && siteRoutingSnapshot === "0.4.0";
   const emailSnapshot = typeof snapshotValue === "object" && snapshotValue !== null
     ? Reflect.get(snapshotValue, "transactionalEmailResend") as unknown : undefined;
   if ((emailSnapshot !== undefined || appFoundationSnapshot === "0.2.0") &&
@@ -1930,19 +1978,20 @@ export function createCapabilityCatalogSnapshot(
   const supportedSnapshot =
     typeof standardsSnapshot === "string" &&
     isSupportedStandardsSnapshotVersion(standardsSnapshot) &&
-    resolvedSiteRoutingSnapshot !== undefined && persistenceTupleValid &&
+    resolvedSiteRoutingSnapshot !== undefined && persistenceTupleValid && jobsTupleValid &&
     (appFoundationSnapshot === undefined ||
       (typeof appFoundationSnapshot === "string" &&
         isSupportedAppFoundationSnapshotVersion(appFoundationSnapshot)))
       ? ({
           ...(emailSnapshot === "0.1.0" ? { transactionalEmailResend: "0.1.0" } as const : {}),
+          ...(jobsSnapshot === "0.1.0" ? { backgroundJobDelivery: "0.1.0", deploymentCloudflare: persistenceSnapshot === "0.1.0" ? "0.6.0" : "0.5.0" } as const : {}),
           standards: standardsSnapshot,
           siteRouting: resolvedSiteRoutingSnapshot,
           ...(appFoundationSnapshot === undefined
             ? {}
             : { appFoundation: appFoundationSnapshot }),
           ...(persistenceSnapshot === "0.1.0"
-            ? { deploymentCloudflare: "0.4.0", applicationPersistence: "0.1.0" } as const
+            ? { ...(jobsSnapshot === undefined ? { deploymentCloudflare: "0.4.0" } as const : {}), applicationPersistence: "0.1.0" } as const
             : {}),
         } as const)
       : undefined;
@@ -1952,6 +2001,7 @@ export function createCapabilityCatalogSnapshot(
       createPackageVersionIssue("standards", "@egeria-systems/standards"),
     );
   }
+  if (!jobsTupleValid) versionIssues.push({ code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID", path: ["snapshot", "backgroundJobDelivery"], context: { reason: "unsupported-job-tuple" } });
   if (!persistenceTupleValid) {
     versionIssues.push({ code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID", path: ["snapshot"], context: { reason: "unsupported-persistence-tuple" } });
   }

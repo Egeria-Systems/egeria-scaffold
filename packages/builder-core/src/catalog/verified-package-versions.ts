@@ -31,10 +31,12 @@ export function createVerifiedCapabilityCatalog(): ValidationResult<
   return createCapabilityCatalog(verifiedCapabilityPackageVersions);
 }
 
-export function createGenerationRenderingContext(applicationPersistence = false, emailFoundation = false): SkeletonRenderingContext {
+export function createGenerationRenderingContext(applicationPersistence = false, emailFoundation = false, backgroundJobs = false): SkeletonRenderingContext {
   const base = applicationPersistence ? applicationPersistenceCatalogSnapshot : vitestFiveCapabilityCatalogSnapshot;
   return {
-    catalogSnapshot: emailFoundation ? { ...base, appFoundation: "0.2.0", transactionalEmailResend: "0.1.0" } : base,
+    catalogSnapshot: { ...((emailFoundation || backgroundJobs) ? { ...base, appFoundation: "0.2.0", transactionalEmailResend: "0.1.0" } as const : base),
+      ...(backgroundJobs ? { backgroundJobDelivery: "0.1.0", deploymentCloudflare: applicationPersistence ? "0.6.0" : "0.5.0" } as const : {}),
+    },
     profiles: createVitestFiveProfileRecipes(),
   };
 }
@@ -57,6 +59,20 @@ function selectInstalledRenderingContext(
   const persistence = state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence");
   const foundation = state.installedCapabilities.find(({ identifier }) => identifier === "app-foundation");
   const email = state.installedCapabilities.find(({ identifier }) => identifier === "transactional-email-resend");
+  const jobs = state.installedCapabilities.find(({ identifier }) => identifier === "background-job-delivery");
+  if (jobs !== undefined || deployment?.version === "0.5.0" || deployment?.version === "0.6.0") {
+    const currentRecipe = (project.originProfile === "portfolio" && project.recipeVersion === "0.11.0") ||
+      (project.originProfile === "site" && project.recipeVersion === "0.12.0") ||
+      (project.originProfile === "app" && project.recipeVersion === "0.2.0");
+    const routing = state.installedCapabilities.find(({ identifier }) => identifier === "site-routing");
+    const sharedTuple = persistence === undefined
+      ? standards?.version === "0.5.0" && deployment?.version === "0.5.0"
+      : project.originProfile === "app" && persistence.version === "0.1.0" && standards?.version === "0.6.0" && deployment?.version === "0.6.0";
+    return currentRecipe && sharedTuple && jobs?.version === "0.1.0" && foundation?.version === "0.2.0" &&
+      (email === undefined || email.version === "0.1.0") &&
+      (project.originProfile === "portfolio" ? routing === undefined : routing?.version === "0.4.0")
+      ? createGenerationRenderingContext(persistence !== undefined, true, true) : undefined;
+  }
   if (foundation?.version === "0.2.0" || email !== undefined) {
     const currentRecipe = (project.originProfile === "portfolio" && project.recipeVersion === "0.11.0") ||
       (project.originProfile === "site" && project.recipeVersion === "0.12.0") ||
