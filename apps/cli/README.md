@@ -36,4 +36,4 @@ The CLI has no prompt, overwrite mode, generic existing-repository mutation, und
 
 The canonical API and lifecycle owner is [package ownership](../../docs/architecture/package-ownership.md).
 
-Optional `create --background-job-delivery` supports current portfolio, site and app recipes independently of persistence and email. It adds no existing-repository jobs lifecycle commands; see the [jobs boundary](../../docs/architecture/capability-model.md#background-job-delivery-boundary) for support and operator limits.
+Optional `create --background-job-delivery` supports current portfolio, site and app recipes independently of persistence and email. Exact `plan-add`/`apply-add` support jobs `0.2.0`; `plan-remove`/`apply-remove` derive installed `0.1.0` or `0.2.0` and require fresh `--job-removal` plus exact `--job-human-review` before application; see the [jobs boundary](../../docs/architecture/capability-model.md#background-job-delivery-boundary) for support and operator limits.

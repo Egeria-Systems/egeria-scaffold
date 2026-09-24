@@ -16,7 +16,7 @@ Optional `transactional-email-resend@0.1.0` is selected with `create --transacti
 
 The exact default recipe is `app@0.2.0 = app-foundation@0.1.0 + site-routing@0.4.0`, preserving the complete production-site experience defined by [ADR-0013](docs/adr/0013-convergent-app-profile.md) and versioned by ADR-0015. [ADR-0014](docs/adr/0014-selective-effect-application-runtime.md) confines direct Effect use to generated application, infrastructure, composition, and delivery server modules. Builder-core, CLI, domain, presentation, client, and content remain Effect-free; there is no public Effect wrapper or facade package. The foundation introduces no database, queue, email provider, identity, payments, storage, or invented CRUD.
 
-Optional `--background-job-delivery` adds bounded dispatch, Queue consumption and terminal-failure contracts to current portfolio/site/app generation through the shared primary Worker. It selects foundation without implicit persistence. See the [jobs boundary](docs/architecture/capability-model.md#background-job-delivery-boundary) for handler obligations, pending certification and unsupported existing-repository lifecycle/replay operations.
+Optional `--background-job-delivery` adds bounded dispatch, Queue consumption and terminal-failure contracts to current portfolio/site/app generation through the shared primary Worker. It selects foundation without implicit persistence. See the [jobs boundary](docs/architecture/capability-model.md#background-job-delivery-boundary) for handler obligations, pending certification and exact reviewed lifecycle and bounded operator replay/drain tooling.
 
 ## App lifecycle and verification
 

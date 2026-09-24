@@ -96,4 +96,4 @@ The current P0.3 builder boundaries have more-specific instructions for [`apps/c
 
 Optional hosted contact follows [ADR-0018](docs/adr/0018-hosted-contact-form.md) and the [contact boundary](docs/architecture/capability-model.md#hosted-contact-form-boundary). Preserve independent Resend behavior and installed foundation/persistence verification. No live provider certification or external data disposition is implied by local implementation.
 
-Optional fresh-generation jobs follows the [background job delivery boundary](docs/architecture/capability-model.md#background-job-delivery-boundary). Preserve exact default/installed views and refuse unsupported jobs lifecycle; no provider, replay, drain or deployment authority is implied.
+Optional jobs generation, exact source lifecycle and bounded operator tooling follow the [background job delivery boundary](docs/architecture/capability-model.md#background-job-delivery-boundary). Preserve exact default/installed views and the closed lifecycle allowlist; no provider, replay, drain or deployment authority is implied.

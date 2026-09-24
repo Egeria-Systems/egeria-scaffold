@@ -64,3 +64,6 @@ export * from "./repository/repository-reader.js";
 export * from "./state/codecs.js";
 export * from "./contracts/persistence-removal-evidence.js";
 export * from "./lifecycle/review-persistence-removal-evidence.js";
+
+export * from "./contracts/job-removal-evidence.js";
+export * from "./lifecycle/review-job-removal-evidence.js";

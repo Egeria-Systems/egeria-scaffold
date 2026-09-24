@@ -13,7 +13,7 @@ const evidencePath =
   "docs/implementation-evidence/example-certification-verification.md";
 const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
 const descriptorDigests = Object.freeze({
-  "background-job-delivery": "sha256:97c9aa94d8c489ec6eaca1a61258546aa511105c5f3a565509da01e752f0883b",
+  "background-job-delivery": "sha256:3f32ead42124def6fb624efd276d42231dba2d1424a18635a7d6081fbe449e1c",
   analytics:
     "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba",
   "app-foundation":
@@ -40,7 +40,7 @@ const descriptorDigests = Object.freeze({
   "transactional-email-resend": "sha256:558ff80dacef968fecf3e8a34e52ecd6672f0619a8fee1b73dcbb9d094a04ff3",
 });
 const descriptorVersions = Object.freeze({
-  "background-job-delivery": "0.1.0",
+  "background-job-delivery": "0.2.0",
   analytics: "0.1.0",
   "app-foundation": "0.2.0",
   "application-persistence": "0.1.0",
@@ -96,7 +96,7 @@ function createRecord(identifier) {
     },
     requiredEvidence: requiredEvidence[identifier],
     status: "pending",
-    taskPlan: ["background-job-delivery", "deployment-cloudflare"].includes(identifier) ? "docs/superpowers/plans/2026-09-23-background-job-delivery-certification.md" : identifier === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-22-contact-delivery-certification-amendment.md" : ["app-foundation", "transactional-email-resend"].includes(identifier)
+    taskPlan: ["background-job-delivery", "deployment-cloudflare"].includes(identifier) ? "docs/superpowers/plans/2026-09-24-job-lifecycle-operator-certification.md" : identifier === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-22-contact-delivery-certification-amendment.md" : ["app-foundation", "transactional-email-resend"].includes(identifier)
       ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
       : ["application-persistence", "deployment-cloudflare", "standards"].includes(identifier)
       ? persistencePlanPath

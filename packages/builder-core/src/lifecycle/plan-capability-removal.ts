@@ -48,7 +48,10 @@ import {
 import { prepareCapabilityDependencyChange } from "./prepare-capability-dependency-change.js";
 import { reviewPersistenceRemovalEvidence } from "./review-persistence-removal-evidence.js";
 
-type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms";
+import { jobRemovalInputSchema, type JobRemovalInput, type JobRemovalMachineReport, type JobRemovalSubject } from "../contracts/job-removal-evidence.js";
+import { reviewJobRemovalEvidence } from "./review-job-removal-evidence.js";
+
+type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
 
 export type CapabilityRemovalAction = Readonly<{
   kind:
@@ -63,6 +66,7 @@ export type CapabilityRemovalAction = Readonly<{
     | "application-persistence"
     | "transactional-email-resend"
     | "contact-form-web3forms"
+    | "background-job-delivery"
     | "deployment-cloudflare"
     | "booking-calendly"
     | "builder-kernel"
@@ -107,8 +111,10 @@ export type CapabilityRemovalPlan = Readonly<{
   profile: ProfileIdentifier;
   capability: Readonly<{
     identifier: RemovableCapability;
-    version: "0.1.0";
+    version: "0.1.0" | "0.2.0";
   }>;
+  jobRemovalReport?: JobRemovalMachineReport;
+  jobRemovalSubject?: Omit<JobRemovalSubject, "resources">;
   persistenceRemovalReport?: PersistenceRemovalMachineReport;
   persistenceRemovalSubject?: Omit<PersistenceRemovalSubject, "databases">;
   currentCapabilities: readonly string[];
@@ -139,6 +145,8 @@ export type CapabilityRemovalPlanningFailureCode =
   | "CAPABILITY_REMOVAL_INVENTORY_INVALID"
   | "CAPABILITY_REMOVAL_REFERENCE_CONFLICT"
   | "CAPABILITY_REMOVAL_UNSUPPORTED"
+  | "JOB_REMOVAL_INPUT_INVALID"
+  | "JOB_REMOVAL_SUBJECT_UNAVAILABLE"
   | "PERSISTENCE_REMOVAL_INPUT_INVALID"
   | "PERSISTENCE_REMOVAL_SUBJECT_UNAVAILABLE";
 
@@ -172,6 +180,7 @@ type ValidInspection = ProjectInspection &
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const removalReferenceTokens = {
+  "background-job-delivery": "job-delivery|server-jobs|job-handlers|job-operator|job-operations|JOB_(?:QUEUE|DEAD_LETTER_QUEUE|ENVIRONMENT)",
   "contact-form-web3forms": "web3forms",
   "application-persistence": "application-persistence",
   "transactional-email-resend": "transactional-email",
@@ -462,6 +471,7 @@ function actionOwner(
     "application-persistence",
     "transactional-email-resend",
     "contact-form-web3forms",
+    "background-job-delivery",
     "deployment-cloudflare",
     "booking-calendly",
     "multilingual",
@@ -613,7 +623,8 @@ async function deriveActions(input: Readonly<{
     if (
       descriptor === undefined ||
       installed === undefined ||
-      (owner !== input.capability && !(input.capability === "application-persistence" && owner === "deployment-cloudflare")) ||
+      (owner !== input.capability && !(owner === "deployment-cloudflare" && (input.capability === "application-persistence" ||
+        (input.capability === "background-job-delivery" && ["apps/web/worker.mjs", "apps/web/scripts/check-job-delivery.mjs"].includes(file.path))))) ||
       installed.fingerprint !== fingerprintFileContent(file.content)
     ) {
       return planningFailure("PROJECT_DRIFT_DETECTED");
@@ -788,12 +799,47 @@ async function preparePersistenceReview(input: Readonly<{
   }) } };
 }
 
+async function prepareJobReview(input: Readonly<{
+  reader: RepositoryReader;
+  descriptor: CapabilityDescriptor;
+  inventory: Extract<GitRepositoryInventoryInspection, {ok: true}>["value"];
+  input: JobRemovalInput;
+  revision: string;
+  now?: () => string;
+}>): Promise<PlanningResult<Readonly<{report: JobRemovalMachineReport; subject: Omit<JobRemovalSubject, "resources">}>>> {
+  const configurationPaths = ["apps/web/wrangler.jsonc", "apps/web/worker.mjs"];
+  const handlerPaths = [...new Set(["apps/web/src/application/job-handlers.ts", "apps/web/src/application/job-delivery.ts", "apps/web/src/composition/server-jobs.ts",
+    ...input.inventory.entries.filter(({path}) => path.startsWith("apps/web/src/application/")).map(({path}) => path),
+  ])].sort(compareText);
+  const selectedPaths = [...configurationPaths, ...handlerPaths];
+  if (input.inventory.truncated || input.inventory.entries.some(({path,kind}) => selectedPaths.includes(path) && kind !== "file")) return planningFailure("JOB_REMOVAL_SUBJECT_UNAVAILABLE");
+  const files: {path: string; fingerprint: string}[] = [];
+  for (const path of selectedPaths) {
+    const result = input.reader.readBytes === undefined ? await input.reader.readText(path) : await input.reader.readBytes(path);
+    if (result.kind !== "file") return planningFailure("JOB_REMOVAL_SUBJECT_UNAVAILABLE");
+    files.push({path, fingerprint:fingerprintFileContent(typeof result.content === "string" ? encoder.encode(result.content) : result.content)});
+  }
+  const localArtifactDigests: {reference:string; digest:string}[] = [];
+  for (const {reference,path} of input.input.localArtifacts ?? []) {
+    const result = input.reader.readBytes === undefined ? await input.reader.readText(path) : await input.reader.readBytes(path);
+    if (result.kind === "file") localArtifactDigests.push({reference, digest:fingerprintFileContent(typeof result.content === "string" ? encoder.encode(result.content) : result.content)});
+  }
+  const subject = {
+    descriptorVersion:input.descriptor.version as "0.1.0" | "0.2.0",
+    descriptorFingerprint:fingerprintValue(input.descriptor),
+    configurationFingerprint:fingerprintValue(files.filter(({path}) => configurationPaths.includes(path))),
+    handlerFingerprint:fingerprintValue(files.filter(({path}) => handlerPaths.includes(path))),
+    sourceRevision:input.revision,
+  };
+  return {ok:true,value:{subject,report:reviewJobRemovalEvidence({expectedSubject:{...subject,resources:input.input.resources}, ...(input.input.evidence === undefined ? {} : {evidence:input.input.evidence}), localArtifactDigests, requiredLocalArtifactReferences:(input.input.localArtifacts ?? []).map(({reference}) => reference)}, input.now)}};
+}
+
 async function readRemovalPlanBindings(
   reader: RepositoryReader,
   current: RenderedSkeleton,
   desired: RenderedSkeleton,
   actions: readonly CapabilityRemovalAction[],
-  persistenceRemoval: PersistenceRemovalInput | undefined,
+  persistenceRemoval: PersistenceRemovalInput | JobRemovalInput | undefined,
   referenceWarnings: readonly CapabilityRemovalReferenceWarning[],
   inventory: Extract<GitRepositoryInventoryInspection, { ok: true }>["value"],
 ): Promise<unknown> {
@@ -849,6 +895,8 @@ export async function planCapabilityRemoval(input: Readonly<{
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: RemovableCapability;
   persistenceRemoval?: PersistenceRemovalInput;
+  jobRemoval?: JobRemovalInput;
+  now?: () => string;
   inspectRepositoryInventory?: typeof inspectGitRepositoryInventory;
 }>): Promise<PlanningResult<CapabilityRemovalPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
@@ -859,7 +907,8 @@ export async function planCapabilityRemoval(input: Readonly<{
     capabilityValue !== "multilingual" &&
     capabilityValue !== "application-persistence" &&
     capabilityValue !== "transactional-email-resend" &&
-    capabilityValue !== "contact-form-web3forms"
+    capabilityValue !== "contact-form-web3forms" &&
+    capabilityValue !== "background-job-delivery"
   ) {
     return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
   }
@@ -871,6 +920,10 @@ export async function planCapabilityRemoval(input: Readonly<{
     return planningFailure("PERSISTENCE_REMOVAL_INPUT_INVALID");
   }
 
+  const jobInput = input.jobRemoval === undefined ? undefined : jobRemovalInputSchema.safeParse(input.jobRemoval);
+  if ((capabilityValue === "background-job-delivery" && jobInput?.success !== true) ||
+      (capabilityValue !== "background-job-delivery" && input.jobRemoval !== undefined)) return planningFailure("JOB_REMOVAL_INPUT_INVALID");
+
   const snapshot = await readVerifiedProjectSnapshot(input.reader);
 
   if (!snapshot.ok) {
@@ -878,8 +931,8 @@ export async function planCapabilityRemoval(input: Readonly<{
   }
 
   let inspectionCatalog = snapshot.value.catalog;
-  if ((capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend") && !inspectionCatalog.some(({ identifier }) => identifier === capabilityValue)) {
-    const persistenceCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, capabilityValue === "application-persistence" ? applicationPersistenceCatalogSnapshot : createGenerationRenderingContext(false, true).catalogSnapshot);
+  if ((capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery") && !inspectionCatalog.some(({ identifier }) => identifier === capabilityValue)) {
+    const persistenceCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, capabilityValue === "application-persistence" ? applicationPersistenceCatalogSnapshot : createGenerationRenderingContext(false, true, capabilityValue === "background-job-delivery").catalogSnapshot);
     const removedDescriptor = persistenceCatalog.ok
       ? persistenceCatalog.value.find(({ identifier }) => identifier === capabilityValue) : undefined;
     if (removedDescriptor === undefined) return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -900,7 +953,7 @@ export async function planCapabilityRemoval(input: Readonly<{
   }
 
   const project = inspection.project.value;
-  if (project.selectedCapabilities.includes("background-job-delivery")) return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
+  if (project.selectedCapabilities.includes("background-job-delivery") && capabilityValue !== "background-job-delivery") return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
   const state = inspection.inference.state.value;
   const desired = project.selectedCapabilities.includes(capabilityValue);
   const installedCapability = state.installedCapabilities.find(
@@ -913,7 +966,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     ({ identifier }) => identifier === capabilityValue,
   );
 
-  if (descriptor?.version !== "0.1.0") {
+  if (descriptor === undefined || (capabilityValue === "background-job-delivery" ? !["0.1.0", "0.2.0"].includes(descriptor.version) : descriptor.version !== "0.1.0")) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
@@ -935,7 +988,7 @@ export async function planCapabilityRemoval(input: Readonly<{
 
   if (
     !desired ||
-    installedCapability?.version !== "0.1.0" ||
+    installedCapability?.version !== descriptor.version ||
     inferred?.category !== "confirmed"
   ) {
     return planningFailure("PROJECT_DRIFT_DETECTED");
@@ -965,6 +1018,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     ...(analyticsSettings === undefined ? {} : { analytics: analyticsSettings }),
     ...(project.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
     ...(project.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
+    ...(project.selectedCapabilities.includes("background-job-delivery") ? { backgroundJobDelivery: true as const } : {}),
     ...(project.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: project.capabilitySettings["contact-form-web3forms"] }),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
@@ -989,7 +1043,9 @@ export async function planCapabilityRemoval(input: Readonly<{
       ...(capabilityValue !== "transactional-email-resend" && renderRequest.transactionalEmailResend === true ? { transactionalEmailResend: true as const } : {}),
       ...(capabilityValue !== "contact-form-web3forms" && renderRequest.contactFormWeb3Forms !== undefined ? { contactFormWeb3Forms: renderRequest.contactFormWeb3Forms } : {}),
       packageVersions: verifiedCapabilityPackageVersions,
-    }, capabilityValue === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext),
+    }, capabilityValue === "background-job-delivery"
+      ? createGenerationRenderingContext(project.selectedCapabilities.includes("application-persistence"), true, false)
+      : capabilityValue === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext),
   ]);
 
   if (!currentRender.ok || !desiredRender.ok) {
@@ -1081,6 +1137,19 @@ export async function planCapabilityRemoval(input: Readonly<{
       return referenceConflict(guard.conflicts);
     }
 
+    if (capabilityValue === "background-job-delivery") {
+      const unresolved: string[] = [];
+      for (const warning of guard.warnings) {
+        if (warning.path === undefined) return planningFailure("CAPABILITY_REMOVAL_INVENTORY_INVALID");
+        // Exact retained PNG visual baselines are passive binary assets, not unscanned code.
+        const image = warning.code === "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE" && warning.path.endsWith(".png")
+          ? current.value.files.find(({path}) => path === warning.path) : undefined;
+        const actual = image === undefined ? undefined : await input.reader.readBytes?.(warning.path);
+        if (image !== undefined && actual?.kind === "file" && fingerprintFileContent(actual.content) === fingerprintFileContent(image.content)) continue;
+        unresolved.push(warning.path);
+      }
+      if (unresolved.length > 0) return referenceConflict([...new Set(unresolved)].sort(compareText));
+    }
     referenceWarnings = guard.warnings;
   } catch {
     return planningFailure("CAPABILITY_REMOVAL_INVENTORY_INVALID");
@@ -1092,9 +1161,12 @@ export async function planCapabilityRemoval(input: Readonly<{
   if (persistenceReview !== undefined && !persistenceReview.ok) {
     return persistenceReview;
   }
-  const persistenceBindings = project.selectedCapabilities.includes("application-persistence") || project.selectedCapabilities.includes("transactional-email-resend")
+  const jobReview = jobInput?.success === true
+    ? await prepareJobReview({reader: input.reader, descriptor, inventory: inventory.value, input: jobInput.data, revision: input.git.identity.revision, ...(input.now === undefined ? {} : {now: input.now})}) : undefined;
+  if (jobReview !== undefined && !jobReview.ok) return jobReview;
+  const persistenceBindings = project.selectedCapabilities.includes("application-persistence") || project.selectedCapabilities.includes("transactional-email-resend") || capabilityValue === "background-job-delivery"
     ? await readRemovalPlanBindings(input.reader, current.value, targetRender, actions.value,
-        persistenceInput?.success === true ? persistenceInput.data : undefined, referenceWarnings, inventory.value)
+        persistenceInput?.success === true ? persistenceInput.data : jobInput?.success === true ? jobInput.data : undefined, referenceWarnings, inventory.value)
     : undefined;
 
   const currentCapabilities = current.value.resolved.capabilities
@@ -1110,8 +1182,9 @@ export async function planCapabilityRemoval(input: Readonly<{
     profile: project.originProfile,
     capability: {
       identifier: capabilityValue,
-      version: descriptor.version,
+      version: descriptor.version as "0.1.0" | "0.2.0",
     },
+    ...(jobReview?.ok === true ? {jobRemovalReport: jobReview.value.report, jobRemovalSubject: jobReview.value.subject} : {}),
     ...(persistenceReview?.ok === true ? { persistenceRemovalReport: persistenceReview.value.report, persistenceRemovalSubject: persistenceReview.value.subject } : {}),
     currentCapabilities,
     desiredCapabilities,

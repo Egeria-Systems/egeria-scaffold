@@ -144,4 +144,4 @@ Optional transactional email follows [ADR-0017](../adr/0017-transactional-email-
 
 Optional hosted contact follows [ADR-0018](../adr/0018-hosted-contact-form.md) and the [contact boundary](capability-model.md#hosted-contact-form-boundary). It adds a browser-only home form to current profiles without requiring foundation, Resend or persistence. Existing email and durable-contact responsibilities stay independent.
 
-Optional fresh-generation background jobs uses the shared primary OpenNext Worker selected by [ADR-0019](../adr/0019-background-job-delivery.md), with separate HTTP and Queue delivery modules. The [jobs boundary](capability-model.md#background-job-delivery-boundary) owns support, finite descriptor tuples, lifecycle refusal and certification limits.
+Optional background jobs uses the shared primary OpenNext Worker selected by [ADR-0019](../adr/0019-background-job-delivery.md), with separate HTTP and Queue delivery modules. The [jobs boundary](capability-model.md#background-job-delivery-boundary) owns support, finite descriptor tuples, exact lifecycle, operator recovery, unsupported-operation refusal and certification limits.

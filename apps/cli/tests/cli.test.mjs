@@ -7398,7 +7398,7 @@ for (const profile of ["portfolio", "app"]) {
 }
 
 
-test("jobs create selection remains independent and lifecycle requests refuse", () => {
+test("jobs create selection remains independent and removal requires evidence", () => {
   const directory = resolve("/private/generated-jobs-example");
   const arguments_ = [...appCreateArguments(directory), "--background-job-delivery"];
   const selected = assertSuccess(cliArguments.parseCliArguments(arguments_));
@@ -7409,6 +7409,83 @@ test("jobs create selection remains independent and lifecycle requests refuse", 
   assert.equal(cliArguments.parseCliArguments([...appCreateArguments(directory), "--background-job-delivery=false"]).ok, false);
   for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
     assert.equal(cliArguments.parseCliArguments([kind, "--directory", directory, "--capability", "background-job-delivery",
-      ...(kind.startsWith("apply") ? ["--approved-plan", `sha256:${"a".repeat(64)}`] : [])]).ok, false);
+      ...(kind.startsWith("apply") ? ["--approved-plan", `sha256:${"a".repeat(64)}`] : [])]).ok, kind.endsWith("add"));
   }
 });
+
+test("jobs lifecycle CLI requires exact removal evidence and human review flags", () => {
+  const base = ["--directory", "/generated/jobs", "--capability", "background-job-delivery"];
+  const approved = ["--approved-plan", `sha256:${"a".repeat(64)}`];
+  assert.equal(cliArguments.parseCliArguments(["plan-add", ...base]).ok, true);
+  assert.equal(cliArguments.parseCliArguments(["apply-add", ...base, ...approved]).ok, true);
+  assert.equal(cliArguments.parseCliArguments(["plan-remove", ...base]).ok, false);
+  const evidence = ["--job-removal", "/private/jobs.json"];
+  assert.equal(cliArguments.parseCliArguments(["plan-remove", ...base, ...evidence]).ok, true);
+  assert.equal(cliArguments.parseCliArguments(["apply-remove", ...base, ...evidence, ...approved]).ok, false);
+  const accepted = cliArguments.parseCliArguments(["apply-remove", ...base, ...evidence, "--job-human-review", "/private/review.json", ...approved]);
+  assert.equal(accepted.ok, true);
+  assert.equal(accepted.value.jobRemovalHumanReviewPath, "/private/review.json");
+  for (const extra of [["--to-version", "0.2.0"], ["--job-removal", "/private/other.json"], ["--persistence-removal", "/private/persistence.json"]]) {
+    assert.equal(cliArguments.parseCliArguments(["plan-remove", ...base, ...evidence, ...extra]).ok, false);
+  }
+  assert.equal(cliArguments.parseCliArguments(["plan-upgrade", ...base, "--to-version", "0.2.0"]).ok, false);
+});
+
+for (const fixture of ["portfolio", "app-persistence-email"]) {
+  test(`compiled jobs lifecycle on ${fixture} completes production verification`, {timeout:1_800_000}, async () => {
+    await withGitFixture(fixture,async({linked,primary})=>{
+      const primaryBefore=await gitRepositorySnapshot(primary);
+      const capability="background-job-delivery";
+      const evidencePath=join(dirname(linked),"job-removal.json");
+      const reviewPath=join(dirname(linked),"job-human-review.json");
+      const resources=[{environment:"staging",accountId:"private-operator-account",primaryQueueId:"private-primary-queue",deadLetterQueueId:"private-dead-letter-queue"}];
+      const migrations=[];
+      for(const operation of fixture==="portfolio"?["add","remove","add"]:["add","remove"]) {
+        const args=["--directory",linked,"--capability",capability];
+        let humanReviewArguments=[];
+        if(operation==="remove") {
+          await writeFile(evidencePath,JSON.stringify({resources}));
+          args.push("--job-removal",evidencePath);
+          const discover=await executeBuilt(["plan-remove",...args]);
+          assert.equal(discover.exitCode,0,discover.stderr);
+          const subject=JSON.parse(discover.stdout).plan.jobRemovalSubject;
+          const now=Date.now();
+          const disposition={disposition:"drain",outcome:"passed",workRemaining:false};
+          const evidence={schemaVersion:"1.0.0",subject:{...subject,resources},deploymentInventory:{local:"not-provisioned",staging:"present",production:"not-provisioned"},observedAt:new Date(now-1000).toISOString(),expiresAt:new Date(now+3_600_000).toISOString(),resources:resources.map(identity=>({identity,producerStop:"passed",primary:disposition,inFlight:disposition,delayed:disposition,deadLetter:disposition,retentionSeconds:86400,operationLimits:{maxMessages:100,maxDurationSeconds:300}}))};
+          await writeFile(evidencePath,JSON.stringify({resources,evidence}));
+          humanReviewArguments=["--job-human-review",reviewPath];
+        }
+        const before=await gitRepositorySnapshot(linked);
+        const planning=await executeBuilt([`plan-${operation}`,...args]);
+        assert.equal(planning.exitCode,0,planning.stderr);assert.equal(planning.stderr,"");
+        assert.deepEqual(await gitRepositorySnapshot(linked),before);
+        const envelope=JSON.parse(planning.stdout);const plan=operation==="add"?envelope.result:envelope.plan;
+        assert.equal(plan.capability.version,"0.2.0");
+        if(operation==="remove") {
+          const report=plan.jobRemovalReport;assert.equal(report.recommendation,"ready-for-human-review");
+          await writeFile(reviewPath,JSON.stringify({reportFingerprint:report.reportFingerprint,dispositions:report.requiredReviewItems.map(({identifier})=>({identifier,disposition:"accepted"}))}));
+        }
+        const wrong=await executeBuilt([`apply-${operation}`,...args,...humanReviewArguments,"--approved-plan",`sha256:${"0".repeat(64)}`]);
+        assert.equal(wrong.exitCode,1);assert.deepEqual(await gitRepositorySnapshot(linked),before);
+        const execution=await executeBuilt([`apply-${operation}`,...args,...humanReviewArguments,"--approved-plan",plan.planFingerprint]);
+        assert.equal(execution.exitCode,0,execution.stderr);assert.equal(execution.stderr,"");
+        assert.doesNotMatch(planning.stdout+execution.stdout,/private-operator-account|private-primary-queue|private-dead-letter-queue|refs\/heads|\.git\/worktrees/u);
+        const result=JSON.parse(execution.stdout).result;
+        const persistent=fixture==="app-persistence-email";
+        assert.deepEqual(result.verificationChecks,persistent?(operation==="add"?core.persistenceCapabilityAdditionVerificationChecks:core.persistenceCapabilityRemovalVerificationChecks):(operation==="add"?core.appCapabilityAdditionVerificationChecks:core.appCapabilityRemovalVerificationChecks));
+        const state=assertSuccess(core.parseStateJson(await readFile(join(linked,".egeria/state.json"),"utf8")));
+        const project=assertSuccess(core.parseProjectYaml(await readFile(join(linked,".egeria/project.yaml"),"utf8")));
+        assert.equal(project.selectedCapabilities.includes(capability),operation==="add");
+        assert.equal(project.selectedCapabilities.includes("application-persistence"),persistent);
+        assert.equal(project.selectedCapabilities.includes("transactional-email-resend"),persistent);
+        assert.equal(state.installedCapabilities.find(({identifier})=>identifier==="app-foundation").version,"0.2.0");
+        migrations.push(`${operation}-background-job-delivery-0-2-0`);
+        assert.deepEqual(state.appliedMigrations,migrations);
+        await commitAll(linked,`${operation} background jobs`);
+        const diagnosis=await executeBuilt(["doctor","--directory",linked]);
+        assert.equal(diagnosis.exitCode,0,diagnosis.stderr);assert.deepEqual(JSON.parse(diagnosis.stdout).result,{healthy:true,diagnostics:[]});
+      }
+      assert.deepEqual(withoutSharedRefs(await gitRepositorySnapshot(primary)),withoutSharedRefs(primaryBefore));
+    },{generation:"vitest-five",branch:`${fixture}-jobs-lifecycle-test`});
+  });
+}

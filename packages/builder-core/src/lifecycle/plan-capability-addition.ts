@@ -47,8 +47,8 @@ export type CapabilityAdditionPlan = Readonly<{
   baseRevision: string;
   profile: ProfileIdentifier;
   capability: Readonly<{
-    identifier: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms";
-    version: "0.1.0";
+    identifier: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
+    version: "0.1.0" | "0.2.0";
   }>;
   settings:
     | Readonly<{
@@ -499,7 +499,7 @@ async function deriveActions(input: Readonly<{
 async function planCapabilityAdditionUnchecked(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms";
+  capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
   settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
@@ -510,7 +510,8 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     capabilityValue !== "multilingual" &&
     capabilityValue !== "application-persistence" &&
     capabilityValue !== "transactional-email-resend" &&
-    capabilityValue !== "contact-form-web3forms"
+    capabilityValue !== "contact-form-web3forms" &&
+    capabilityValue !== "background-job-delivery"
   ) {
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
@@ -527,7 +528,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     (settingsResult !== undefined && !settingsResult.success) ||
     (contactSettingsResult !== undefined && !contactSettingsResult.success) ||
     (analyticsSettingsResult !== undefined && !analyticsSettingsResult.success) ||
-    ((capabilityValue === "multilingual" || capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend") && input.settings !== undefined)
+    ((capabilityValue === "multilingual" || capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery") && input.settings !== undefined)
   ) {
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
@@ -567,7 +568,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     project.originProfile !== "app" || project.recipeVersion !== "0.2.0" ||
     snapshot.value.renderingContext?.catalogSnapshot.standards !== "0.5.0"
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
-  if ((capabilityValue === "transactional-email-resend" || capabilityValue === "contact-form-web3forms") && !(
+  if ((capabilityValue === "transactional-email-resend" || capabilityValue === "contact-form-web3forms" || capabilityValue === "background-job-delivery") && !(
     (project.originProfile === "portfolio" && project.recipeVersion === "0.11.0") ||
     (project.originProfile === "site" && project.recipeVersion === "0.12.0") ||
     (project.originProfile === "app" && project.recipeVersion === "0.2.0")
@@ -582,10 +583,11 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("CAPABILITY_ALREADY_INSTALLED");
   }
 
-  const targetContext = capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend"
+  const targetContext = capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery"
     ? createGenerationRenderingContext(
         capabilityValue === "application-persistence" || project.selectedCapabilities.includes("application-persistence"),
-        capabilityValue === "transactional-email-resend" || snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0",
+        capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery" || snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0",
+        capabilityValue === "background-job-delivery",
       ) : snapshot.value.renderingContext;
   const targetCatalog = targetContext === undefined ? { ok: true as const, value: snapshot.value.catalog }
     : createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, targetContext.catalogSnapshot);
@@ -635,7 +637,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     ({ identifier }) => identifier === capabilityValue,
   );
 
-  if (descriptor?.version !== "0.1.0") {
+  if (descriptor?.version !== (capabilityValue === "background-job-delivery" ? "0.2.0" : "0.1.0")) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
@@ -647,6 +649,8 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
         ? { bookingCalendly: settingsResult.data }
         : capabilityValue === "contact-form-web3forms" && contactSettingsResult?.success === true
           ? { contactFormWeb3Forms: contactSettingsResult.data }
+        : capabilityValue === "background-job-delivery"
+          ? { backgroundJobDelivery: true as const }
         : capabilityValue === "transactional-email-resend"
           ? { transactionalEmailResend: true as const }
         : capabilityValue === "application-persistence"
@@ -741,7 +745,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   };
 
   let persistenceSnapshot: string | undefined;
-  if (capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend") {
+  if (capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery") {
     const controls = await readControlSnapshot(input.reader);
     if (controls === undefined) return planningFailure("PROJECT_INSPECTION_INVALID");
     persistenceSnapshot = fingerprintJsonValue({
@@ -776,7 +780,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 export async function planCapabilityAddition(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
-  capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms";
+  capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
   settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   return planCapabilityAdditionUnchecked(input);

@@ -83,18 +83,26 @@ import { prepareCapabilityDependencyChange } from "./prepare-capability-dependen
 import { validatePersistenceRemovalHumanReview } from "./review-persistence-removal-evidence.js";
 
 const encoder = new TextEncoder();
-type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms";
+import type { JobRemovalInput, JobRemovalHumanReview } from "../contracts/job-removal-evidence.js";
+import { validateJobRemovalHumanReview } from "./review-job-removal-evidence.js";
+
+type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
 
 function removalMigrationIdentifier(
   capability: RemovableCapability,
+  version: "0.1.0" | "0.2.0",
 ):
   | "remove-analytics-0-1-0"
   | "remove-booking-calendly-0-1-0"
   | "remove-multilingual-0-1-0"
   | "remove-application-persistence-0-1-0"
   | "remove-transactional-email-resend-0-1-0"
-  | "remove-contact-form-web3forms-0-1-0" {
+  | "remove-contact-form-web3forms-0-1-0"
+  | "remove-background-job-delivery-0-1-0"
+  | "remove-background-job-delivery-0-2-0" {
   switch (capability) {
+    case "background-job-delivery":
+      return version === "0.1.0" ? "remove-background-job-delivery-0-1-0" : "remove-background-job-delivery-0-2-0";
     case "contact-form-web3forms":
       return "remove-contact-form-web3forms-0-1-0";
     case "transactional-email-resend":
@@ -134,6 +142,10 @@ type CapabilityRemovalLocalFailureCode =
   | "CAPABILITY_MIGRATION_WRITE_FAILED"
   | "CAPABILITY_STATE_WRITE_FAILED"
   | "CAPABILITY_POST_STATE_FAILED"
+  | "JOB_REMOVAL_HUMAN_REVIEW_INVALID"
+  | "JOB_REMOVAL_EVIDENCE_NOT_READY"
+  | "JOB_REMOVAL_HUMAN_REVIEW_INCOMPLETE"
+  | "JOB_REMOVAL_REVIEW_SNAPSHOT_CHANGED"
   | "PERSISTENCE_REMOVAL_HUMAN_REVIEW_INVALID"
   | "PERSISTENCE_REMOVAL_EVIDENCE_NOT_READY"
   | "PERSISTENCE_REMOVAL_HUMAN_REVIEW_INCOMPLETE"
@@ -152,7 +164,7 @@ export type CapabilityRemovalExecutionResult =
         baseRevision: string;
         capability: Readonly<{
           identifier: RemovableCapability;
-          version: "0.1.0";
+          version: "0.1.0" | "0.2.0";
         }>;
         migration: ReturnType<typeof removalMigrationIdentifier>;
         changedPaths: readonly string[];
@@ -334,8 +346,9 @@ function requirePendingInference(input: Readonly<{
     !sameValues(currentIdentifiers, inferredIdentifiers) ||
     input.inference.capabilities.some((evidence) => {
       if (evidence.identifier === input.removedCapability) return evidence.category !== "contradictory";
-      if (input.removedCapability === "application-persistence" &&
-          (evidence.identifier === "standards" || evidence.identifier === "deployment-cloudflare")) {
+      if ((input.removedCapability === "application-persistence" &&
+          (evidence.identifier === "standards" || evidence.identifier === "deployment-cloudflare")) ||
+          (input.removedCapability === "background-job-delivery" && evidence.identifier === "deployment-cloudflare")) {
         return evidence.category !== "contradictory" || evidence.code !== "CAPABILITY_METADATA_MISMATCH" ||
           evidence.probes.some(({ status }) => status !== "present");
       }
@@ -564,6 +577,8 @@ export async function applyCapabilityRemoval(input: Readonly<{
   approvedPlanFingerprint: string;
   persistenceRemoval?: PersistenceRemovalInput;
   persistenceRemovalHumanReview?: PersistenceRemovalHumanReview;
+  jobRemoval?: JobRemovalInput;
+  jobRemovalHumanReview?: JobRemovalHumanReview;
   verifier: GeneratedProjectVerifier;
   reader?: RepositoryReader;
   writer?: CapabilityRemovalWriter;
@@ -608,6 +623,8 @@ export async function applyCapabilityRemoval(input: Readonly<{
       git: initialGit,
       capability: input.capability,
       ...(input.persistenceRemoval === undefined ? {} : { persistenceRemoval: input.persistenceRemoval }),
+      ...(input.jobRemoval === undefined ? {} : { jobRemoval: input.jobRemoval }),
+      ...(input.now === undefined ? {} : { now: input.now }),
       ...(input.inspectRepositoryInventory === undefined
         ? {}
         : { inspectRepositoryInventory: input.inspectRepositoryInventory }),
@@ -647,6 +664,13 @@ export async function applyCapabilityRemoval(input: Readonly<{
     if (!human.ok) return failure(human.issues[0]?.code as CapabilityRemovalFailureCode, "precondition", "not-required");
   } else if (input.persistenceRemovalHumanReview !== undefined) {
     return failure("PERSISTENCE_REMOVAL_HUMAN_REVIEW_INVALID", "precondition", "not-required");
+  }
+
+  if (input.capability === "background-job-delivery") {
+    const human = validateJobRemovalHumanReview(plan.jobRemovalReport, input.jobRemovalHumanReview);
+    if (!human.ok) return failure(human.issues[0]?.code as CapabilityRemovalFailureCode, "precondition", "not-required");
+  } else if (input.jobRemovalHumanReview !== undefined) {
+    return failure("JOB_REMOVAL_HUMAN_REVIEW_INVALID", "precondition", "not-required");
   }
 
   let controls: ControlSnapshot | undefined;
@@ -702,7 +726,8 @@ export async function applyCapabilityRemoval(input: Readonly<{
     ...(input.capability !== "transactional-email-resend" && controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
     ...(input.capability !== "contact-form-web3forms" && controls.project.value.capabilitySettings["contact-form-web3forms"] !== undefined ? { contactFormWeb3Forms: controls.project.value.capabilitySettings["contact-form-web3forms"] } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
-  }, input.capability === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext);
+  }, input.capability === "background-job-delivery" ? createGenerationRenderingContext(retainsPersistence, true, false)
+    : input.capability === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext);
   if (!desiredRender.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
@@ -797,13 +822,19 @@ export async function applyCapabilityRemoval(input: Readonly<{
     return failure("GIT_WORKTREE_CHANGED", "precondition", "not-required");
   }
 
-  if (controls.project.value.selectedCapabilities.includes("application-persistence") || controls.project.value.selectedCapabilities.includes("transactional-email-resend")) {
+  if (controls.project.value.selectedCapabilities.includes("application-persistence") || controls.project.value.selectedCapabilities.includes("transactional-email-resend") || input.capability === "background-job-delivery") {
     const finalPlan = await planCapabilityRemoval({ reader, git: finalCleanGit, capability: input.capability,
       ...(input.persistenceRemoval === undefined ? {} : { persistenceRemoval: input.persistenceRemoval }),
+      ...(input.jobRemoval === undefined ? {} : { jobRemoval: input.jobRemoval }),
+      ...(input.now === undefined ? {} : { now: input.now }),
       ...(input.inspectRepositoryInventory === undefined ? {} : { inspectRepositoryInventory: input.inspectRepositoryInventory }),
     });
     if (!finalPlan.ok || finalPlan.value.planFingerprint !== plan.planFingerprint) {
       return failure("CAPABILITY_PLAN_APPROVAL_INVALID", "precondition", "not-required");
+    }
+    if (input.capability === "background-job-delivery" &&
+        !validateJobRemovalHumanReview(finalPlan.value.jobRemovalReport, input.jobRemovalHumanReview).ok) {
+      return failure("JOB_REMOVAL_REVIEW_SNAPSHOT_CHANGED", "precondition", "not-required");
     }
     if (input.capability === "application-persistence" &&
         !validatePersistenceRemovalHumanReview(finalPlan.value.persistenceRemovalReport, input.persistenceRemovalHumanReview).ok) {
@@ -867,7 +898,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       desiredCapabilities: plan.desiredCapabilities,
       actions: plan.actions,
       removedCapability: input.capability,
-      ...(input.capability === "application-persistence" ? { replacementFingerprints } : {}),
+      ...((input.capability === "application-persistence" || input.capability === "background-job-delivery") ? { replacementFingerprints } : {}),
     }) ||
     !(await readExpectedFileStates(
       reader,
@@ -894,7 +925,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
   }
   const migration = migrationRecordSchema.safeParse({
     schemaVersion: "1.0.0",
-    identifier: removalMigrationIdentifier(input.capability),
+    identifier: removalMigrationIdentifier(input.capability, plan.capability.version),
     kind: "migration",
     outcome: "succeeded",
     completedAt,
@@ -1086,8 +1117,8 @@ export async function applyCapabilityRemoval(input: Readonly<{
     value: {
       status: "verified-final-diff-approval-required",
       baseRevision: initialGit.identity.revision,
-      capability: { identifier: input.capability, version: "0.1.0" },
-      migration: removalMigrationIdentifier(input.capability),
+      capability: plan.capability,
+      migration: removalMigrationIdentifier(input.capability, plan.capability.version),
       changedPaths,
       preservedPaths,
       verificationChecks: retainsPersistence ? persistenceCapabilityRemovalVerificationChecks : hasFoundation

@@ -1,4 +1,4 @@
-import { backgroundJobFiles } from "../catalog/capability-catalog.js";
+import { backgroundJobFiles, backgroundJobOperationFiles } from "../catalog/capability-catalog.js";
 import type { ContractIssue, ValidationResult } from "../contracts/result.js";
 import type { ProfileIdentifier } from "../contracts/profile.js";
 import { deriveTemplateDestination } from "./render-template.js";
@@ -357,6 +357,7 @@ export function createTemplateCatalog(
   includeTransactionalEmail = false,
   includeWeb3Forms = false,
   includeBackgroundJobs = false,
+  backgroundJobVersion: "0.1.0" | "0.2.0" = "0.2.0",
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0");
   const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0"));
@@ -435,7 +436,16 @@ export function createTemplateCatalog(
     ...(includeApplicationPersistence ? [...persistenceTemplateSources, ...persistenceSharedTemplateSources.filter(({ destinationSource }) =>
       !includeBackgroundJobs || destinationSource === undefined || !["common/apps/web/wrangler.jsonc.template", "common/.github/workflows/deploy.yml.template"].includes(destinationSource))] : []),
     ...(includeBackgroundJobs ? [
-      ...textTemplateSources(backgroundJobFiles.map(({ path }) => `background-job-delivery/${path}`)),
+      ...backgroundJobFiles.map(({ path }) => ({
+        source: `background-job-delivery/${backgroundJobVersion === "0.2.0" && ["docs/background-job-delivery.md", "apps/web/tests/integration/job-worker.test.ts", "apps/web/tests/integration/fixtures/job-worker.mjs"].includes(path) ? "operations/" : ""}${path}`,
+        destinationSource: `background-job-delivery/${path}`,
+        contentKind: "text" as const,
+      })),
+      ...(backgroundJobVersion === "0.2.0" ? backgroundJobOperationFiles.map(({ path }) => ({
+        source: `background-job-delivery/operations/${path}`,
+        destinationSource: `background-job-delivery/${path}`,
+        contentKind: "text" as const,
+      })) : []),
       { source: "deployment-cloudflare/background-job-delivery/apps/web/worker.mjs", destinationSource: "common/apps/web/worker.mjs", contentKind: "text" as const },
       { source: "deployment-cloudflare/background-job-delivery/apps/web/scripts/check-job-delivery.mjs", destinationSource: "common/apps/web/scripts/check-job-delivery.mjs", contentKind: "text" as const },
       { source: `deployment-cloudflare/background-job-delivery/apps/web/wrangler${includeApplicationPersistence ? ".persistence" : ""}.jsonc.template`, destinationSource: "common/apps/web/wrangler.jsonc.template", contentKind: "text" as const },

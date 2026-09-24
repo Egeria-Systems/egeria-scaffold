@@ -5,6 +5,8 @@
 
 This decision record owns the interpretation of the user's D1–D12 answers for the [delivery proposal](2026-09-16-remaining-program-delivery-plan.md) and [email planning handoff](2026-09-16-email-delivery-contract-plan.md). The P7 start-order exception is owned by the review protocol; this record explains the approved direction without defining a second lifecycle policy. It changes no executable behavior. Do not re-ask these direction questions. Return with a concrete choice only if evidence exposes a material unresolved tradeoff.
 
+**Current jobs delivery (2026-09-24):** MR #146 is merged at `fb16c9128d8e461f52a8ad6a2bb4b1e7a368d566`; the user accepts its exact candidate and limitations as the P5E-3 predecessor. The new [lifecycle/operator exception](program-roadmap.md#one-time-2026-09-24-job-lifecycle-and-operator-safety-exception) prospectively authorizes only that isolated candidate through an open MR. Earlier runtime-only authorization statements below remain historical; P4 closure, integration and P5E-C remain separate.
+
 ## 1. Decisions and remaining work
 
 | Decision | User answer | Recorded disposition |
