@@ -2421,3 +2421,115 @@ test("Vitest five optional lifecycle preserves its generation across every suppo
     }
   }
 });
+
+async function environmentContactEntries(profile = "portfolio", options = {}) {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const owner = await mkdtemp(join(tmpdir(), "egeria-contact-lifecycle-"));
+  try {
+    const destination = join(owner, "project");
+    const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
+    const generated = await core.generateProject({
+      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
+      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(),
+      verifier: {
+        async prepareLockfile(root) {
+          const version = profile === "portfolio" ? "portfolio-0.11.0" : profile === "site" ? "site-0.12.0" : "app-0.2.0";
+          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}/pnpm-lock.yaml`)));
+          return { ok: true, value: undefined };
+        },
+        async verifyInIsolatedCopy() { return { ok: true, value: { checks } }; },
+      },
+    });
+    assert.equal(generated.ok, true, JSON.stringify(generated.issues));
+    return await loadTextEntries(destination);
+  } finally { await rm(owner, { recursive: true, force: true }); }
+}
+
+test("environment contact lifecycle preserves all profile and multilingual neighbors across re-add", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (const multilingual of [false, true]) {
+      const repository = createRepository(await environmentContactEntries(profile, { multilingual }));
+      const initialLayout = repository.files.get("apps/web/app/layout.tsx");
+      const initialLock = repository.files.get("pnpm-lock.yaml");
+      const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
+      for (const operation of ["add", "remove", "add"]) {
+        const common = { reader: repository.reader, git, capability: "contact-form-web3forms", renderingContext, inspectRepositoryInventory: inventoryInspectorForFiles(repository.files) };
+        const planned = await (operation === "remove" ? core.planCapabilityRemoval(common) : core.planCapabilityAddition(common));
+        assert.equal(planned.ok, true, JSON.stringify(planned.issues));
+        const calls = [];
+        const input = { ...common, root, writer: repository.writer, approvedPlanFingerprint: planned.value.planFingerprint,
+          verifier: successfulVerifier(calls, checks), inspectWorktree: async () => git,
+          inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }),
+        };
+        const result = await (operation === "remove" ? core.applyCapabilityRemoval(input) : core.applyCapabilityAddition(input));
+        assert.equal(result.ok, true, JSON.stringify(result));
+        assert.equal(calls.length, 1);
+        assert.equal(repository.files.get("pnpm-lock.yaml"), initialLock);
+        const state = core.parseStateJson(repository.files.get(".egeria/state.json"), "2.0.0");
+        assert.equal(state.ok, true, JSON.stringify(state));
+        assert.equal(state.value.installedCapabilities.some(value => value.identifier === "multilingual"), multilingual);
+        assert.equal(state.value.installedCapabilities.some(value => value.identifier === "app-foundation"), profile === "app");
+        assert.equal(state.value.installedCapabilities.find(value => value.identifier === "contact-form-web3forms")?.version, operation === "remove" ? undefined : "0.2.0");
+        if (operation === "remove") assert.equal(repository.files.get("apps/web/app/layout.tsx"), initialLayout);
+        const snapshot = await core.readVerifiedProjectSnapshot(repository.reader, renderingContext);
+        assert.equal(snapshot.ok, true, JSON.stringify(snapshot));
+        assert.deepEqual(await core.doctorRepository({ reader: repository.reader, catalog: snapshot.value.catalog, profiles: snapshot.value.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
+      }
+      const state = JSON.parse(repository.files.get(".egeria/state.json"));
+      assert.deepEqual(state.appliedMigrations, ["add-contact-form-web3forms-0-2-0", "remove-contact-form-web3forms-0-2-0", "add-contact-form-web3forms-0-2-0"]);
+    }
+  }
+});
+
+
+test("environment contact removal preserves edited source and refuses re-add over ejections", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const repository = createRepository(await environmentContactEntries("site", { contact: true, multilingual: true }));
+  const path = "docs/contact-form-web3forms.md";
+  const customSource = repository.files.get(path) + "\nApplication-owned operator note.\n";
+  repository.files.set(path, customSource);
+  const common = { reader: repository.reader, git, capability: "contact-form-web3forms", renderingContext, inspectRepositoryInventory: inventoryInspectorForFiles(repository.files) };
+  const planned = await core.planCapabilityRemoval(common);
+  assert.equal(planned.ok, true, JSON.stringify(planned));
+  assert.ok(planned.value.actions.some(action => action.path === path && action.kind === "preserve-file-and-eject"));
+  const result = await core.applyCapabilityRemoval({ ...common, root, writer: repository.writer, approvedPlanFingerprint: planned.value.planFingerprint,
+    verifier: successfulVerifier([]), inspectWorktree: async () => git, inspectExpectedChanges: async () => ({ ok: true }),
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(repository.files.get(path), customSource);
+  const project = core.parseProjectYaml(repository.files.get(".egeria/project.yaml"), "2.0.0");
+  const state = core.parseStateJson(repository.files.get(".egeria/state.json"), "2.0.0");
+  assert.equal(project.ok, true); assert.equal(state.ok, true);
+  assert.deepEqual(project.value.ejectedAreas, [path]);
+  assert.deepEqual(state.value.ejections, [path]);
+  const readdition = await core.planCapabilityAddition(common);
+  assert.equal(readdition.ok, false);
+  assert.equal(readdition.issues[0].code, "PROJECT_EJECTION_UNSUPPORTED");
+});
+
+test("environment contact removal rechecks controls before transform and keeps state on verifier failure", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const entries = await environmentContactEntries("portfolio", { contact: true });
+  for (const lateChange of [true, false]) {
+    const repository = createRepository(entries);
+    const common = { reader: repository.reader, git, capability: "contact-form-web3forms", renderingContext, inspectRepositoryInventory: inventoryInspectorForFiles(repository.files) };
+    const plan = await core.planCapabilityRemoval(common);
+    assert.equal(plan.ok, true, JSON.stringify(plan));
+    const originalState = repository.files.get(".egeria/state.json");
+    let inspections = 0;
+    let verifications = 0;
+    const result = await core.applyCapabilityRemoval({ ...common, root, writer: repository.writer, approvedPlanFingerprint: plan.value.planFingerprint,
+      inspectWorktree: async () => { if (++inspections === 2 && lateChange) repository.files.set(".egeria/state.json", originalState + "\n"); return git; },
+      inspectExpectedChanges: async () => ({ ok: true }),
+      verifier: { async verifyInIsolatedCopy() { verifications++; return { ok: false, issues: [] }; } },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, lateChange ? "CAPABILITY_PLAN_APPROVAL_INVALID" : "CAPABILITY_VERIFICATION_FAILED");
+    assert.equal(repository.writes.length, lateChange ? 0 : 1);
+    assert.equal(verifications, lateChange ? 0 : 1);
+    assert.equal(repository.files.get(".egeria/migrations.jsonl"), "");
+    assert.equal(repository.files.get(".egeria/state.json"), originalState + (lateChange ? "\n" : ""));
+  }
+});

@@ -6174,7 +6174,7 @@ test("application environment generated preflight rejects unsafe targets without
 });
 
 test("application environment rendering refuses incomplete selections and mixed contexts", async () => {
-  for (const selection of [{ contactFormWeb3Forms: true }, { bookingCalendly: { mode: "link" } }, { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } }, { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true }]) {
+  for (const selection of [{ bookingCalendly: { mode: "link" } }, { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } }, { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true }]) {
     const result = await renderApplicationEnvironment("app", selection);
     assert.equal(result.ok, false);
     assert.equal(result.issues[0].code, "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");

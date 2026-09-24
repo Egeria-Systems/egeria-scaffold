@@ -2,6 +2,8 @@ import { isAbsolute, resolve } from "node:path";
 
 import {
   createGenerationRenderingContext,
+  readVerifiedProjectSnapshot,
+  isApplicationEnvironmentRenderingContext,
   createVerifiedProjectSnapshot,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
@@ -20,6 +22,8 @@ import {
 import {
   projectConfigurationSchema,
   type ProjectConfiguration,
+  type ApplicationEnvironmentProjectConfiguration,
+  applicationEnvironmentProjectConfigurationSchema,
 } from "../contracts/project.js";
 import {
   persistenceCapabilityRemovalPersistedVerificationChecks,
@@ -30,10 +34,12 @@ import {
   capabilityRemovalVerificationChecks,
   installedStateSchema,
   type InstalledState,
+  type ApplicationEnvironmentInstalledState,
+  applicationEnvironmentInstalledStateSchema,
   type InstalledSurface,
 } from "../contracts/state.js";
 import { createBuilderStateSurfaces } from "../generation/builder-state-surfaces.js";
-import { renderSkeleton } from "../generation/render-skeleton.js";
+import { renderSkeleton, type RenderedSkeleton, type ApplicationEnvironmentRenderingContext } from "../generation/render-skeleton.js";
 import type {
   GeneratedProjectVerification,
   GeneratedProjectVerifier,
@@ -41,6 +47,7 @@ import type {
 import {
   inferRepository,
   type SurfaceEvidenceStatus,
+  type RepositoryInference,
 } from "../inference/infer-repository.js";
 import { createInstalledManifest } from "../manifest/create-installed-manifest.js";
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
@@ -76,11 +83,15 @@ import {
 import {
   planCapabilityRemoval,
   type CapabilityRemovalAction,
+  type CapabilityRemovalPlan,
   type CapabilityRemovalPlanningFailureCode,
 } from "./plan-capability-removal.js";
 
 import { prepareCapabilityDependencyChange } from "./prepare-capability-dependency-change.js";
 import { validatePersistenceRemovalHumanReview } from "./review-persistence-removal-evidence.js";
+
+type LifecycleProject = ProjectConfiguration | ApplicationEnvironmentProjectConfiguration;
+type LifecycleState = InstalledState | ApplicationEnvironmentInstalledState;
 
 const encoder = new TextEncoder();
 import type { JobRemovalInput, JobRemovalHumanReview } from "../contracts/job-removal-evidence.js";
@@ -98,13 +109,14 @@ function removalMigrationIdentifier(
   | "remove-application-persistence-0-1-0"
   | "remove-transactional-email-resend-0-1-0"
   | "remove-contact-form-web3forms-0-1-0"
+  | "remove-contact-form-web3forms-0-2-0"
   | "remove-background-job-delivery-0-1-0"
   | "remove-background-job-delivery-0-2-0" {
   switch (capability) {
     case "background-job-delivery":
       return version === "0.1.0" ? "remove-background-job-delivery-0-1-0" : "remove-background-job-delivery-0-2-0";
     case "contact-form-web3forms":
-      return "remove-contact-form-web3forms-0-1-0";
+      return version === "0.2.0" ? "remove-contact-form-web3forms-0-2-0" : "remove-contact-form-web3forms-0-1-0";
     case "transactional-email-resend":
       return "remove-transactional-email-resend-0-1-0";
     case "application-persistence":
@@ -162,10 +174,7 @@ export type CapabilityRemovalExecutionResult =
       value: Readonly<{
         status: "verified-final-diff-approval-required";
         baseRevision: string;
-        capability: Readonly<{
-          identifier: RemovableCapability;
-          version: "0.1.0" | "0.2.0";
-        }>;
+        capability: CapabilityRemovalPlan["capability"];
         migration: ReturnType<typeof removalMigrationIdentifier>;
         changedPaths: readonly string[];
         preservedPaths: readonly string[];
@@ -320,8 +329,8 @@ function expectedPendingSurfaceStatus(
 }
 
 function requirePendingInference(input: Readonly<{
-  inference: Awaited<ReturnType<typeof inferRepository>>;
-  currentState: InstalledState;
+  inference: RepositoryInference<LifecycleState>;
+  currentState: LifecycleState;
   desiredCapabilities: readonly string[];
   actions: readonly CapabilityRemovalAction[];
   removedCapability: RemovableCapability;
@@ -390,8 +399,8 @@ function requirePendingInference(input: Readonly<{
 }
 
 function requireFinalInference(input: Readonly<{
-  inference: Awaited<ReturnType<typeof inferRepository>>;
-  expectedState: InstalledState;
+  inference: RepositoryInference<LifecycleState>;
+  expectedState: LifecycleState;
   desiredCapabilities: readonly string[];
   preservedPaths: readonly string[];
   removedCapability: RemovableCapability;
@@ -459,10 +468,10 @@ function requireFinalInference(input: Readonly<{
 }
 
 function createNextProject(
-  current: ProjectConfiguration,
+  current: LifecycleProject,
   preservedPaths: readonly string[],
   capability: RemovableCapability,
-): ProjectConfiguration | undefined {
+): LifecycleProject | undefined {
   const remainingCapabilitySettings = { ...current.capabilitySettings };
   if (capability === "analytics") {
     delete remainingCapabilitySettings.analytics;
@@ -470,10 +479,10 @@ function createNextProject(
   if (capability === "booking-calendly") {
     delete remainingCapabilitySettings["booking-calendly"];
   }
-  if (capability === "contact-form-web3forms") {
+  if (capability === "contact-form-web3forms" && "contact-form-web3forms" in remainingCapabilitySettings) {
     delete remainingCapabilitySettings["contact-form-web3forms"];
   }
-  const parsed = projectConfigurationSchema.safeParse({
+  const parsed = (current.schemaVersion === "2.0.0" ? applicationEnvironmentProjectConfigurationSchema : projectConfigurationSchema).safeParse({
     ...current,
     selectedCapabilities: current.selectedCapabilities.filter(
       (identifier) => identifier !== capability,
@@ -487,15 +496,15 @@ function createNextProject(
 }
 
 function createNextState(input: Readonly<{
-  current: InstalledState;
-  desired: Awaited<ReturnType<typeof renderSkeleton>> & Readonly<{ ok: true }>;
+  current: LifecycleState;
+  desired: Readonly<{ ok: true; value: RenderedSkeleton<LifecycleProject> }>;
   changedPaths: readonly string[];
   preservedPaths: readonly string[];
   files: ReadonlyMap<string, Uint8Array>;
   migration: MigrationRecord;
   ejections: readonly string[];
   removedCapability: RemovableCapability;
-}>): InstalledState | undefined {
+}>): LifecycleState | undefined {
   const descriptors = [
     ...input.desired.value.surfaces,
     ...createBuilderStateSurfaces(),
@@ -554,7 +563,7 @@ function createNextState(input: Readonly<{
     compareText(left.identifier, right.identifier),
   );
 
-  const parsed = installedStateSchema.safeParse({
+  const parsed = (input.current.schemaVersion === "2.0.0" ? applicationEnvironmentInstalledStateSchema : installedStateSchema).safeParse({
     ...input.current,
     installedCapabilities: createInstalledManifest(input.desired.value.resolved),
     appliedMigrations: [
@@ -574,6 +583,7 @@ function createNextState(input: Readonly<{
 export async function applyCapabilityRemoval(input: Readonly<{
   root: string;
   capability: RemovableCapability;
+  renderingContext?: ApplicationEnvironmentRenderingContext;
   approvedPlanFingerprint: string;
   persistenceRemoval?: PersistenceRemovalInput;
   persistenceRemovalHumanReview?: PersistenceRemovalHumanReview;
@@ -587,6 +597,10 @@ export async function applyCapabilityRemoval(input: Readonly<{
   inspectRepositoryInventory?: typeof inspectGitRepositoryInventory;
   now?: () => string;
 }>): Promise<CapabilityRemovalExecutionResult> {
+  if (input.renderingContext !== undefined && (
+    !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
+    input.capability !== "contact-form-web3forms" || input.persistenceRemoval !== undefined || input.persistenceRemovalHumanReview !== undefined
+  )) return failure("CAPABILITY_REMOVAL_UNSUPPORTED", "precondition", "not-required");
   const root = resolve(input.root);
   if (!isAbsolute(input.root) || root !== input.root) {
     return failure(
@@ -622,6 +636,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       reader,
       git: initialGit,
       capability: input.capability,
+      ...(input.renderingContext === undefined ? {} : { renderingContext: input.renderingContext }),
       ...(input.persistenceRemoval === undefined ? {} : { persistenceRemoval: input.persistenceRemoval }),
       ...(input.jobRemoval === undefined ? {} : { jobRemoval: input.jobRemoval }),
       ...(input.now === undefined ? {} : { now: input.now }),
@@ -673,9 +688,9 @@ export async function applyCapabilityRemoval(input: Readonly<{
     return failure("JOB_REMOVAL_HUMAN_REVIEW_INVALID", "precondition", "not-required");
   }
 
-  let controls: ControlSnapshot | undefined;
+  let controls: ControlSnapshot<LifecycleProject, LifecycleState> | undefined;
   try {
-    controls = await readControlSnapshot(reader);
+    controls = input.renderingContext === undefined ? await readControlSnapshot(reader) : await readControlSnapshot(reader, "2.0.0");
   } catch {
     controls = undefined;
   }
@@ -697,25 +712,40 @@ export async function applyCapabilityRemoval(input: Readonly<{
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
 
-  const snapshot = createVerifiedProjectSnapshot(controls.project.value, controls.state.value);
-  if (!snapshot.ok) {
+  if (input.renderingContext === undefined && (controls.project.value.schemaVersion !== "1.0.0" || controls.state.value.schemaVersion !== "1.0.0")) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
+  const snapshot = input.renderingContext !== undefined
+    ? await readVerifiedProjectSnapshot(reader, input.renderingContext)
+    : controls.project.value.schemaVersion === "1.0.0" && controls.state.value.schemaVersion === "1.0.0"
+      ? createVerifiedProjectSnapshot(controls.project.value, controls.state.value)
+      : undefined;
+  if (snapshot?.ok !== true) {
+    return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+  }
+  const legacyProject = controls.project.value.schemaVersion === "1.0.0" ? controls.project.value : undefined;
+  const commonRenderRequest = {
+    profile: controls.project.value.originProfile,
+    projectName: controls.project.value.project.name,
+    displayName: controls.project.value.project.displayName,
+    ...(controls.project.value.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
+    packageVersions: verifiedCapabilityPackageVersions,
+  };
   const retainsPersistence = input.capability !== "application-persistence" && controls.project.value.selectedCapabilities.includes("application-persistence");
-  const desiredRender = await renderSkeleton({
+  const desiredRender = input.renderingContext === undefined ? await renderSkeleton({
     profile: controls.project.value.originProfile,
     projectName: controls.project.value.project.name,
     displayName: controls.project.value.project.displayName,
     ...(input.capability === "analytics" ||
-    controls.project.value.capabilitySettings.analytics === undefined
+    legacyProject?.capabilitySettings.analytics === undefined
       ? {}
-      : { analytics: controls.project.value.capabilitySettings.analytics }),
+      : { analytics: legacyProject.capabilitySettings.analytics }),
     ...(input.capability === "booking-calendly" ||
-    controls.project.value.capabilitySettings["booking-calendly"] === undefined
+    legacyProject?.capabilitySettings["booking-calendly"] === undefined
       ? {}
       : {
           bookingCalendly:
-            controls.project.value.capabilitySettings["booking-calendly"],
+            legacyProject.capabilitySettings["booking-calendly"],
         }),
     ...(input.capability === "multilingual"
       ? {}
@@ -724,15 +754,15 @@ export async function applyCapabilityRemoval(input: Readonly<{
         : {}),
     ...(retainsPersistence ? { applicationPersistence: true as const } : {}),
     ...(input.capability !== "transactional-email-resend" && controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
-    ...(input.capability !== "contact-form-web3forms" && controls.project.value.capabilitySettings["contact-form-web3forms"] !== undefined ? { contactFormWeb3Forms: controls.project.value.capabilitySettings["contact-form-web3forms"] } : {}),
+    ...(input.capability !== "contact-form-web3forms" && legacyProject?.capabilitySettings["contact-form-web3forms"] !== undefined ? { contactFormWeb3Forms: legacyProject.capabilitySettings["contact-form-web3forms"] } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   }, input.capability === "background-job-delivery" ? createGenerationRenderingContext(retainsPersistence, true, false)
-    : input.capability === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext);
+    : input.capability === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext) : await renderSkeleton(commonRenderRequest, input.renderingContext);
   if (!desiredRender.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
   const hasFoundation = desiredRender.value.project.selectedCapabilities.includes("app-foundation");
-  let desired = desiredRender;
+  let desired: Readonly<{ ok: true; value: RenderedSkeleton<LifecycleProject> }> = desiredRender;
   if (input.capability === "application-persistence") {
     const current = await renderSkeleton({
       profile: controls.project.value.originProfile,
@@ -740,14 +770,14 @@ export async function applyCapabilityRemoval(input: Readonly<{
       displayName: controls.project.value.project.displayName,
       applicationPersistence: true,
       ...(controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
-      ...(controls.project.value.capabilitySettings.analytics === undefined ? {} : { analytics: controls.project.value.capabilitySettings.analytics }),
-      ...(controls.project.value.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: controls.project.value.capabilitySettings["booking-calendly"] }),
+      ...(legacyProject?.capabilitySettings.analytics === undefined ? {} : { analytics: legacyProject.capabilitySettings.analytics }),
+      ...(legacyProject?.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: legacyProject.capabilitySettings["booking-calendly"] }),
       ...(controls.project.value.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
-      ...(controls.project.value.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: controls.project.value.capabilitySettings["contact-form-web3forms"] }),
+      ...(legacyProject?.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: legacyProject.capabilitySettings["contact-form-web3forms"] }),
       packageVersions: verifiedCapabilityPackageVersions,
     }, snapshot.value.renderingContext);
     if (!current.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-    const prepared = await prepareCapabilityDependencyChange({ reader, current: current.value, desired: desiredRender.value });
+    const prepared = await prepareCapabilityDependencyChange<LifecycleProject>({ reader, current: current.value, desired: desiredRender.value });
     if (!prepared.ok) return failure("CAPABILITY_ACTION_CONFLICT", "precondition", "not-required");
     desired = { ok: true, value: prepared.value.desired };
   }
@@ -822,8 +852,9 @@ export async function applyCapabilityRemoval(input: Readonly<{
     return failure("GIT_WORKTREE_CHANGED", "precondition", "not-required");
   }
 
-  if (controls.project.value.selectedCapabilities.includes("application-persistence") || controls.project.value.selectedCapabilities.includes("transactional-email-resend") || input.capability === "background-job-delivery") {
+  if (input.renderingContext !== undefined || controls.project.value.selectedCapabilities.includes("application-persistence") || controls.project.value.selectedCapabilities.includes("transactional-email-resend") || input.capability === "background-job-delivery") {
     const finalPlan = await planCapabilityRemoval({ reader, git: finalCleanGit, capability: input.capability,
+      ...(input.renderingContext === undefined ? {} : { renderingContext: input.renderingContext }),
       ...(input.persistenceRemoval === undefined ? {} : { persistenceRemoval: input.persistenceRemoval }),
       ...(input.jobRemoval === undefined ? {} : { jobRemoval: input.jobRemoval }),
       ...(input.now === undefined ? {} : { now: input.now }),
@@ -883,7 +914,9 @@ export async function applyCapabilityRemoval(input: Readonly<{
   const replacementFingerprints = new Map(replacedSurfaces.value.map(({ identifier, fingerprint }) => [identifier, fingerprint]));
   let pendingInference;
   try {
-    pendingInference = await inferRepository({ reader, catalog: targetCatalog });
+    pendingInference = input.renderingContext === undefined
+      ? await inferRepository({ reader, catalog: targetCatalog })
+      : await inferRepository({ reader, catalog: targetCatalog, projectSchemaVersion: "2.0.0" });
   } catch {
     return failure(
       "CAPABILITY_REINFERENCE_FAILED",
@@ -1052,7 +1085,9 @@ export async function applyCapabilityRemoval(input: Readonly<{
 
   let finalInference;
   try {
-    finalInference = await inferRepository({ reader, catalog: targetCatalog });
+    finalInference = input.renderingContext === undefined
+      ? await inferRepository({ reader, catalog: targetCatalog })
+      : await inferRepository({ reader, catalog: targetCatalog, projectSchemaVersion: "2.0.0" });
   } catch {
     return failure(
       "CAPABILITY_POST_STATE_FAILED",

@@ -1182,3 +1182,101 @@ test("optional addition to a persistent app retains the binding verification lan
   assert.ok(state.lastSuccessfulVerification.checks.includes("binding-integration"));
   assert.ok(state.installedCapabilities.some(({ identifier }) => identifier === "multilingual"));
 });
+
+async function environmentContactEntries(profile = "portfolio", options = {}) {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const owner = await mkdtemp(join(tmpdir(), "egeria-contact-lifecycle-"));
+  try {
+    const destination = join(owner, "project");
+    const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
+    const generated = await core.generateProject({
+      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
+      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(),
+      verifier: {
+        async prepareLockfile(root) {
+          const version = profile === "portfolio" ? "portfolio-0.11.0" : profile === "site" ? "site-0.12.0" : "app-0.2.0";
+          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}/pnpm-lock.yaml`)));
+          return { ok: true, value: undefined };
+        },
+        async verifyInIsolatedCopy() { return { ok: true, value: { checks } }; },
+      },
+    });
+    assert.equal(generated.ok, true, JSON.stringify(generated.issues));
+    return await loadTextEntries(destination);
+  } finally { await rm(owner, { recursive: true, force: true }); }
+}
+
+test("environment contact addition persists schema two only after verification", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const repository = createRepository(await environmentContactEntries());
+  const beforeState = repository.files.get(".egeria/state.json");
+  const plan = await core.planCapabilityAddition({ reader: repository.reader, git, capability: "contact-form-web3forms", renderingContext });
+  assert.equal(plan.ok, true, JSON.stringify(plan.issues));
+  const result = await core.applyCapabilityAddition({
+    root, capability: "contact-form-web3forms", renderingContext, approvedPlanFingerprint: plan.value.planFingerprint,
+    reader: repository.reader, writer: repository.writer,
+    verifier: { prepareLockfile() { throw new Error("contact does not change dependencies"); }, async verifyInIsolatedCopy() {
+      assert.equal(repository.files.get(".egeria/state.json"), beforeState);
+      assert.equal(repository.files.get(".egeria/migrations.jsonl"), "");
+      assert.ok(repository.files.has("apps/web/src/integrations/contact-form-web3forms/contact-settings.ts"));
+      return { ok: true, value: { checks: core.ordinaryGenerationVerificationChecks } };
+    } },
+    inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }),
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const state = core.parseStateJson(repository.files.get(".egeria/state.json"), "2.0.0");
+  assert.equal(state.ok, true);
+  assert.deepEqual(state.value.appliedMigrations, ["add-contact-form-web3forms-0-2-0"]);
+  assert.deepEqual(repository.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
+});
+
+
+test("environment contact addition rejects stale approval before writes and retains controls on verifier failure", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const entries = await environmentContactEntries();
+  for (const scenario of ["stale-controls", "late-controls", "shared-source", "verification-failure"]) {
+    const repository = createRepository(entries);
+    const plan = await core.planCapabilityAddition({ reader: repository.reader, git, capability: "contact-form-web3forms", renderingContext });
+    assert.equal(plan.ok, true, JSON.stringify(plan));
+    const stateBefore = repository.files.get(".egeria/state.json");
+    if (scenario === "stale-controls") repository.files.set(".egeria/state.json", stateBefore + "\n");
+    if (scenario === "shared-source") repository.files.set("apps/web/next.config.ts", repository.files.get("apps/web/next.config.ts") + "\n// local change\n");
+    let inspections = 0;
+    let verifications = 0;
+    const result = await core.applyCapabilityAddition({ root, capability: "contact-form-web3forms", renderingContext,
+      approvedPlanFingerprint: plan.value.planFingerprint, reader: repository.reader, writer: repository.writer,
+      inspectWorktree: async () => {
+        if (++inspections === 2 && scenario === "late-controls") repository.files.set(".egeria/state.json", stateBefore + "\n");
+        return git;
+      },
+      inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }),
+      verifier: { async verifyInIsolatedCopy() { verifications++; return { ok: false, issues: [] }; } },
+    });
+    assert.equal(result.ok, false, scenario);
+    assert.equal(result.code, scenario === "verification-failure" ? "CAPABILITY_VERIFICATION_FAILED" : scenario === "shared-source" ? "PROJECT_DRIFT_DETECTED" : "CAPABILITY_PLAN_APPROVAL_INVALID");
+    assert.equal(repository.writes.length, scenario === "verification-failure" ? 1 : 0);
+    assert.equal(verifications, scenario === "verification-failure" ? 1 : 0);
+    assert.equal(repository.files.get(".egeria/migrations.jsonl"), "");
+    assert.equal(repository.files.get(".egeria/state.json"), stateBefore + (["stale-controls", "late-controls"].includes(scenario) ? "\n" : ""));
+  }
+});
+
+test("environment contact apply refuses forged or unsupported input before adapters", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const forbidden = () => { throw new Error("adapter must not run"); };
+  for (const operation of ["add", "remove"]) {
+    for (const invalid of [
+      { renderingContext: { ...renderingContext, profiles: [] } },
+      { capability: "multilingual" },
+      operation === "add" ? { settings: { accessKey: "private-sentinel" } } : { persistenceRemoval: {} },
+    ]) {
+      const result = await (operation === "add" ? core.applyCapabilityAddition : core.applyCapabilityRemoval)({
+        root, capability: "contact-form-web3forms", renderingContext, ...invalid,
+        approvedPlanFingerprint: `sha256:${"a".repeat(64)}`, inspectWorktree: forbidden,
+        reader: { readText: forbidden }, writer: { write: forbidden }, verifier: { verifyInIsolatedCopy: forbidden },
+      });
+      assert.deepEqual(result, { ok: false, code: operation === "add" ? "CAPABILITY_ADDITION_UNSUPPORTED" : "CAPABILITY_REMOVAL_UNSUPPORTED", phase: "precondition", recovery: "not-required" });
+    }
+  }
+});

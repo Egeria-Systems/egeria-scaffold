@@ -1795,14 +1795,15 @@ function createDescriptors(
       documentationEvidenceRequirements: ["schema-and-migration-ownership", "environment-isolation-and-migration-authority", "backup-export-and-recovery-boundaries", "machine-and-human-removal-review"],
       removalAndRecoveryRequirements: ["review-exact-export-and-recovery-evidence", "review-required-uncertainty-dispositions", "preserve-application-owned-schema-and-migrations", "refuse-surviving-package-references", "separate-source-and-persistent-data-recovery"],
     } as const] : []),
-    ...((snapshot.standards === "0.5.0" || snapshot.standards === "0.6.0") ? [{
+    ...((snapshot.standards === "0.5.0" || snapshot.standards === "0.6.0" || applicationEnvironments) ? [{
       identifier: "contact-form-web3forms",
-      version: "0.1.0",
+      version: applicationEnvironments ? "0.2.0" : "0.1.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful", "external-stateful", "persistent-data"],
       removalPolicy: "reviewed",
       dependencies: ["content-files", "section-composition"],
       ...sharedCapabilityMetadata,
+      ...(applicationEnvironments ? { environmentVariables: ["NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY"] } : {}),
       optionalIntegrations: ["analytics", "booking-calendly", "multilingual", "transactional-email-resend"],
       supportedProfiles: ["portfolio", "site", "app"],
       requiredPackages: [],
@@ -1828,10 +1829,16 @@ function createDescriptors(
         createFileEvidencePoint("contact-content-french", "contact-form-web3forms", "apps/web/content/fr-CA/contact-form-web3forms.yaml", "application-owned"),
         createFileEvidencePoint("contact-unit-tests", "contact-form-web3forms", "apps/web/tests/unit/web3forms-contact.test.ts", "application-owned"),
         createFileEvidencePoint("contact-component-tests", "contact-form-web3forms", "apps/web/tests/component/web3forms-contact.test.tsx", "application-owned"),
+        ...(applicationEnvironments ? [
+          createFileEvidencePoint("contact-configuration-tests", "contact-form-web3forms", "apps/web/tests/unit/contact-configuration.test.ts", "application-owned"),
+          createFileEvidencePoint("contact-availability-tests", "contact-form-web3forms", "apps/web/tests/component/contact-availability.test.tsx", "application-owned"),
+        ] : []),
         createFileEvidencePoint("contact-browser-tests", "contact-form-web3forms", "apps/web/tests/e2e/web3forms-contact.spec.ts", "application-owned"),
         createFileEvidencePoint("contact-operator-guide", "contact-form-web3forms", "docs/contact-form-web3forms.md", "application-owned")
       ]),
-      migrationPlanners: ["add-contact-form-web3forms-0-1-0", "remove-contact-form-web3forms-0-1-0"],
+      migrationPlanners: applicationEnvironments
+        ? ["add-contact-form-web3forms-0-2-0", "remove-contact-form-web3forms-0-2-0"]
+        : ["add-contact-form-web3forms-0-1-0", "remove-contact-form-web3forms-0-1-0"],
       verificationPlan: ["controlled-provider-contracts", "localized-form-and-captcha-lifecycle", "source-removal-and-coexistence", "typecheck", "next-build", "browser-development", "browser-preview"],
       documentationEvidenceRequirements: ["public-key-and-provider-enforcement-handoff", "privacy-retention-and-fallback", "acknowledgement-and-uncertain-outcomes"],
       removalAndRecoveryRequirements: ["review-public-form-identifier-and-provider-disposition", "review-submission-and-inbox-retention", "preserve-edited-application-surfaces", "refuse-surviving-contact-references", "separate-source-deployment-provider-and-data-recovery"],
@@ -2103,7 +2110,7 @@ export function createCapabilityCatalogSnapshot(
   const catalogIssues: ContractIssue[] = [];
 
   const descriptors = createDescriptors(packageVersions, supportedSnapshot).filter((descriptor) =>
-    !applicationEnvironments || !["analytics", "booking-calendly", "contact-form-web3forms", "application-persistence", "transactional-email-resend", "background-job-delivery"].includes(descriptor.identifier),
+    !applicationEnvironments || !["analytics", "booking-calendly", "application-persistence", "transactional-email-resend", "background-job-delivery"].includes(descriptor.identifier),
   );
   for (const [index, descriptor] of descriptors.entries()) {
     const parsed = capabilityDescriptorSchema.safeParse(descriptor);

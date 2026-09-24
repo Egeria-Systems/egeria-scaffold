@@ -4543,7 +4543,16 @@ async function withGitFixture(name, run, options = {}) {
   const linked = join(owner, "linked");
 
   try {
-    if (
+    if (options.renderingContext !== undefined) {
+      assert.deepEqual(options.renderingContext, core.createApplicationEnvironmentRenderingContext());
+      const created = await executeEnvironmentBuilt([
+        "create", "--profile", name, "--name", `acme-${name}`,
+        "--display-name", `Acme ${name}`, "--directory", primary,
+        ...(options.multilingual === true ? ["--multilingual"] : []),
+      ]);
+      assert.equal(created.exitCode, 0, created.stderr);
+      assert.equal(JSON.parse(created.stdout).profile, name);
+    } else if (
       options.generationRequest === undefined &&
       options.analytics === undefined &&
       options.bookingCalendly === undefined &&
@@ -7447,7 +7456,7 @@ test("application environment compiled CLI refuses inputs before dependencies an
       assert.equal(result.exitCode, 2, JSON.stringify(result));
       assert.equal(JSON.parse(result.stderr).code, "CLI_ARGUMENT_INVALID");
     }
-    for (const suffix of [["--contact-form-web3forms"], ["--google-analytics-4"], ["--booking-calendly", "--calendly-mode", "link"], ["--application-persistence"], ["--transactional-email-resend"], ["--background-job-delivery"]]) {
+    for (const suffix of [["--google-analytics-4"], ["--booking-calendly", "--calendly-mode", "link"], ["--application-persistence"], ["--transactional-email-resend"], ["--background-job-delivery"]]) {
       const result = await runEnvironmentCliProcess([...base, ...suffix], true);
       assert.equal(result.exitCode, 1, JSON.stringify(result));
       assert.equal(JSON.parse(result.stderr).issues[0].code, "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
@@ -7537,6 +7546,90 @@ test("application environment CLI refuses obsolete and malformed inputs and unav
   assert.equal(cliArguments.parseCliArguments(["diff", "--directory", "/private/environment-app"], "2.0.0").ok, false);
   assert.equal(cliArguments.parseCliArguments(["diff", "--directory", "/private/environment-app"]).ok, true);
 });
+
+test("environment contact CLI admits selection-only lifecycle and forwards exact context", async () => {
+  const directory = "/private/generated-worktree";
+  const approvedPlanFingerprint = `sha256:${"a".repeat(64)}`;
+  for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
+    const arguments_ = [kind, "--directory", directory, "--capability", "contact-form-web3forms", ...(kind.startsWith("apply") ? ["--approved-plan", approvedPlanFingerprint] : [])];
+    const parsed = cliArguments.parseCliArguments(arguments_, "2.0.0");
+    assert.equal(parsed.ok, true, JSON.stringify(parsed));
+    assert.equal(parsed.value.settings, undefined);
+    for (const suffix of [["--web3forms-access-key", "private-sentinel"], ["--contact-form-web3forms"], ["--capability", "contact-form-web3forms"], ["--persistence-removal", "/private/sentinel"]]) {
+      const refused = await runEnvironmentCliProcess([...arguments_, ...suffix], true);
+      assert.equal(refused.exitCode, 2, JSON.stringify(refused));
+      assert.deepEqual(JSON.parse(refused.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
+    }
+    for (const capability of ["analytics", "booking-calendly", "multilingual", "application-persistence", "transactional-email-resend", "background-job-delivery"]) {
+      const refused = await runEnvironmentCliProcess(arguments_.map(value => value === "contact-form-web3forms" ? capability : value), true);
+      assert.equal(refused.exitCode, 2, JSON.stringify(refused));
+    }
+    if (kind.startsWith("apply")) {
+      const observed = [];
+      const output = captureOutput();
+      const run = cli.createCliRunner({ createVerifier: createFakeVerifier,
+        [kind === "apply-add" ? "applyCapabilityAddition" : "applyCapabilityRemoval"]: async input => {
+          observed.push(input);
+          return { ok: false, code: "CAPABILITY_PLAN_APPROVAL_INVALID", phase: "precondition", recovery: "not-required" };
+        },
+      }, "2.0.0");
+      assert.equal(await run(arguments_, output.output), 1);
+      assert.equal(observed.length, 1);
+      assert.deepEqual(observed[0].renderingContext, core.createApplicationEnvironmentRenderingContext());
+      assert.equal(observed[0].settings, undefined);
+    }
+  }
+});
+
+
+async function executeEnvironmentBuilt(arguments_) {
+  return executeNode(["--input-type=module", "-e", `
+    import { createCliRunner } from ${JSON.stringify(pathToFileURL(resolve(packageRoot, "dist/run-cli.js")).href)};
+    import { createPnpmGeneratedProjectVerifier } from ${JSON.stringify(pathToFileURL(resolve(repositoryRoot, "packages/builder-core/dist/index.js")).href)};
+    const run = createCliRunner({ createVerifier: () => createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }) }, "2.0.0");
+    process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => process.stdout.write(value), writeError: value => process.stderr.write(value) });
+  `], { CI: "true", NEXT_TELEMETRY_DISABLED: "1", WRANGLER_SEND_METRICS: "false" });
+}
+
+for (const [profile, multilingual] of [["portfolio", false], ["site", true], ["app", false]]) {
+  test(`compiled environment contact lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 900_000 }, async () => {
+    const renderingContext = core.createApplicationEnvironmentRenderingContext();
+    await withGitFixture(profile, async ({ linked, primary }) => {
+      const primaryBefore = withoutSharedRefs(await gitRepositorySnapshot(primary));
+      const layout = await readFile(join(linked, "apps/web/app/layout.tsx"));
+      const lockfile = await readFile(join(linked, "pnpm-lock.yaml"));
+      for (const operation of ["add", "remove", "add"]) {
+        const arguments_ = ["--directory", linked, "--capability", "contact-form-web3forms"];
+        const before = await gitRepositorySnapshot(linked);
+        const planning = await executeEnvironmentBuilt([`plan-${operation}`, ...arguments_]);
+        assert.equal(planning.exitCode, 0, planning.stderr);
+        assert.deepEqual(await gitRepositorySnapshot(linked), before);
+        const envelope = JSON.parse(planning.stdout);
+        const plan = operation === "add" ? envelope.result : envelope.plan;
+        assert.deepEqual(plan.capability, { identifier: "contact-form-web3forms", version: "0.2.0" });
+        const refused = await executeEnvironmentBuilt([`apply-${operation}`, ...arguments_, "--approved-plan", `sha256:${"0".repeat(64)}`]);
+        assert.equal(refused.exitCode, 1, refused.stderr);
+        assert.deepEqual(await gitRepositorySnapshot(linked), before);
+        const execution = await executeEnvironmentBuilt([`apply-${operation}`, ...arguments_, "--approved-plan", plan.planFingerprint]);
+        assert.equal(execution.exitCode, 0, execution.stderr);
+        assert.equal(JSON.parse(execution.stdout).result.status, "verified-final-diff-approval-required");
+        const project = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8"), "2.0.0"));
+        const state = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8"), "2.0.0"));
+        assert.equal(project.capabilitySettings["contact-form-web3forms"], undefined);
+        assert.equal(project.selectedCapabilities.includes("multilingual"), multilingual);
+        assert.equal(project.selectedCapabilities.includes("app-foundation"), profile === "app");
+        assert.equal(state.installedCapabilities.find(value => value.identifier === "contact-form-web3forms")?.version, operation === "remove" ? undefined : "0.2.0");
+        assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), lockfile);
+        if (operation === "remove") assert.deepEqual(await readFile(join(linked, "apps/web/app/layout.tsx")), layout);
+        await commitAll(linked, `${operation} environment contact`);
+        const diagnosis = await executeEnvironmentBuilt(["doctor", "--directory", linked]);
+        assert.equal(diagnosis.exitCode, 0, diagnosis.stderr);
+        assert.deepEqual(JSON.parse(diagnosis.stdout).result, { healthy: true, diagnostics: [] });
+      }
+      assert.deepEqual(withoutSharedRefs(await gitRepositorySnapshot(primary)), primaryBefore);
+    }, { generation: "vitest-five", multilingual, renderingContext });
+  });
+}
 
 test("jobs lifecycle CLI requires exact removal evidence and human review flags", () => {
   const base = ["--directory", "/generated/jobs", "--capability", "background-job-delivery"];

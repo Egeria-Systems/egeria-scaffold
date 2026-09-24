@@ -116,11 +116,36 @@ test("application environment generation rejects noncandidate contexts before de
   }
 });
 
+test("environment contact generation preserves exact installed state for every profile and locale", async () => {
+  const context = core.createApplicationEnvironmentRenderingContext();
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (const multilingual of [false, true]) {
+      await withTestRoot(async owner => {
+        const checks = profile === "app" ? [...generatedChecks, "worker-integration"] : generatedChecks;
+        const verifier = createFakeVerifier({ verify: async () => ({ ok: true, value: { checks } }) });
+        const result = assertSuccess(await core.generateProject({
+          request: { profile, projectName: "contact-environment", displayName: "Contact Environment", contactFormWeb3Forms: true, ...(multilingual ? { multilingual: true } : {}) },
+          destination: join(owner, profile), verifier: verifier.verifier, renderingContext: context,
+        }));
+        assert.equal(result.state.schemaVersion, "2.0.0");
+        assert.equal(result.state.installedCapabilities.find(value => value.identifier === "contact-form-web3forms").version, "0.2.0");
+        assert.deepEqual(result.state.lastSuccessfulVerification.checks, ["contracts", "pre-state-inference", ...checks, "post-state-inference"]);
+        assert.deepEqual(verifier.calls, ["prepare-lockfile", "verify-isolated-copy"]);
+        const reader = core.createFileSystemRepositoryReader(result.destination);
+        const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(reader, context));
+        const project = assertSuccess(core.parseProjectYaml((await reader.readText(".egeria/project.yaml")).content, "2.0.0"));
+        assert.equal(project.capabilitySettings["contact-form-web3forms"], undefined);
+        assert.deepEqual(await core.doctorRepository({ reader, catalog: snapshot.catalog, profiles: snapshot.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
+      });
+    }
+  }
+});
+
 test("application environment generation rejects incomplete and malformed selections before destination inspection", async () => {
   await withTestRoot(async (owner) => {
     const before = await snapshotFileBytes(owner);
     for (const selection of [
-      { contactFormWeb3Forms: true }, { bookingCalendly: { mode: "link" } },
+      { bookingCalendly: { mode: "link" } },
       { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } },
       { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true },
       { contactFormWeb3Forms: { accessKey: "secret-sentinel" } },

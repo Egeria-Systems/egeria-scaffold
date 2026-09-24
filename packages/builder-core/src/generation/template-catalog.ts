@@ -466,8 +466,34 @@ export function createTemplateCatalog(
       contentKind: "text",
     });
   }
+  if (applicationEnvironments && includeWeb3Forms) {
+    for (const path of ["apps/web/tests/unit/contact-configuration.test.ts", "apps/web/tests/component/contact-availability.test.tsx"]) {
+      sources.push({
+        source: `contact-form-web3forms/application-environments/${path}`,
+        destinationSource: `contact-form-web3forms/${path}`,
+        contentKind: "text",
+      });
+    }
+  }
   const selectedSources = sources.map((entry) => {
     if (!applicationEnvironments) return entry;
+    if (includeWeb3Forms) {
+      if (["common/apps/web/next.config.ts", "common/apps/web/scripts/check-application-environment.mjs"].includes(entry.source)) {
+        return { ...entry, source: entry.source.replace("common/", "contact-form-web3forms/application-environments/"), destinationSource: entry.source };
+      }
+      if ([
+        "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-settings.ts.template",
+        "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-form-placement.tsx",
+        "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-content.ts",
+        "contact-form-web3forms/apps/web/content/en-CA/contact-form-web3forms.yaml",
+        "contact-form-web3forms/apps/web/content/fr-CA/contact-form-web3forms.yaml",
+        "contact-form-web3forms/apps/web/tests/component/web3forms-contact.test.tsx",
+        "contact-form-web3forms/apps/web/tests/e2e/web3forms-contact.spec.ts",
+        "contact-form-web3forms/docs/contact-form-web3forms.md",
+      ].includes(entry.source)) {
+        return { ...entry, source: entry.source.replace("contact-form-web3forms/", "contact-form-web3forms/application-environments/").replace(/\.template$/u, ""), destinationSource: entry.source };
+      }
+    }
     const common = ["common/apps/web/next.config.ts", "common/apps/web/wrangler.jsonc.template"].includes(entry.source);
     const foundation = [
       "app-foundation/apps/web/src/composition/server-health.ts",
