@@ -9,6 +9,8 @@
 Accepted ADRs own individual architecture decisions. The [capability model](../architecture/capability-model.md) owns descriptor vocabulary and the initial catalog. The [review and contribution protocol](../governance/review-and-contribution.md) owns the implementation lifecycle, approvals, and action authority. The [program roadmap](program-roadmap.md) owns current implementation and certification status. This source plan owns durable product outcomes, sequencing, and gaps not yet materialized in those canonical owners.
 
 ## 1. Authoritative decisions
+**2026-09-24 environment amendment:** [ADR-0020](../adr/0020-application-environments.md) owns application-target/configuration and the narrow future retirement of related unused generation support; it qualifies conflicting literal-settings, retained-generation and deployment assumptions below without rewriting historical evidence. The [roadmap](program-roadmap.md#lean-application-environments) owns actual admission and complete candidate activation; the [protocol exception](../governance/review-and-contribution.md#lean-application-environments-delivery-exception) owns this stream’s delegated checkpoints and reviewed unmerged predecessors. P4 and separate certification remain open where already recorded.
+
 
 The following decisions supersede conflicting wording in earlier plans:
 
@@ -765,6 +767,8 @@ Analytics certification completed as a separate successor for exact `analytics@0
 The analytics implementation lane may proceed from accepted multilingual implementation `main@2033048c79a777af7e7d2725784bac6e9be3433f` while the separate multilingual certification lane works in its own isolated worktree. The certification lane exclusively owns multilingual certification planning, scripts, evidence, registry transition, review, and receipt; the analytics lane owns no such artifact and must preserve the exact accepted `multilingual@0.1.0` descriptor and behavior-contract digest. Multilingual certification merges first; analytics must then rebase onto certified accepted main, reconcile without modifying multilingual certification artifacts, revalidate the multilingual subject, rerun affected verification, and obtain an incremental final CodeRabbit review before it may merge. Any analytics change that would alter the multilingual descriptor, digest, or certified behavior stops for an explicit pending/recertification decision. This exception is not precedent and permits no concurrent merge; it does not waive either final-diff gate and authorizes no provider mutation, deployment, publication, or combined real-client work.
 
 ## 13. Application persistence, jobs, email, and contact
+Apply the [application environment acceptance clauses](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) and their owning delivery/certification cards to this section. [ADR-0020](../adr/0020-application-environments.md) owns shared rules; service-specific target, guide/example, negative-case and recovery obligations arrive with first executable delivery, not final hardening.
+
 
 ### `application-persistence`
 
@@ -829,6 +833,8 @@ If `transactional-email-resend` is installed, the project may send a notificatio
 Removal requires a reviewed export-and-remove migration.
 
 ## 14. CMS transition
+Apply the [application environment acceptance clauses](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) and their owning delivery/certification cards to this section. [ADR-0020](../adr/0020-application-environments.md) owns shared rules; service-specific target, guide/example, negative-case and recovery obligations arrive with first executable delivery, not final hardening.
+
 
 Before CMS:
 
@@ -856,6 +862,8 @@ ContentRepository -> PayloadContentAdapter
 Payload becomes the sole authority for client-editable editorial content only after staging import, parity verification, approval, and authority cutover. Payload staff identities remain separate from application-customer identities.
 
 ## 15. Identity and support console
+Apply the [application environment acceptance clauses](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) and their owning delivery/certification cards to this section. [ADR-0020](../adr/0020-application-environments.md) owns shared rules; service-specific target, guide/example, negative-case and recovery obligations arrive with first executable delivery, not final hardening.
+
 
 `authenticated-app` begins with a deployed Better Auth/Next.js/OpenNext/D1/Drizzle compatibility and security spike.
 
@@ -909,6 +917,8 @@ It is not:
 - a generic business-domain admin framework.
 
 ## 16. Stripe payments
+Apply the [application environment acceptance clauses](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) and their owning delivery/certification cards to this section. [ADR-0020](../adr/0020-application-environments.md) owns shared rules; service-specific target, guide/example, negative-case and recovery obligations arrive with first executable delivery, not final hardening.
+
 
 `payments-stripe` is independent of profiles.
 
@@ -998,6 +1008,8 @@ A versioned human-review checklist is generated and recommended. It becomes mand
 The first client launch is not blocked by a mandatory manual review under the default program decision.
 
 ## 18. Testing strategy
+Apply the [application environment acceptance clauses](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) and their owning delivery/certification cards to this section. [ADR-0020](../adr/0020-application-environments.md) owns shared rules; service-specific target, guide/example, negative-case and recovery obligations arrive with first executable delivery, not final hardening.
+
 
 ### Test-tool and evidence ownership
 
@@ -1140,6 +1152,8 @@ CMS -> multilingual
 The matrix remains risk-based rather than Cartesian.
 
 ## 19. CI/CD and deployment
+Apply the [application environment acceptance clauses](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) and their owning delivery/certification cards to this section. [ADR-0020](../adr/0020-application-environments.md) owns shared rules; service-specific target, guide/example, negative-case and recovery obligations arrive with first executable delivery, not final hardening.
+
 
 GitHub Actions is the sole deployment authority.
 
@@ -1228,6 +1242,8 @@ Reviewer scopes:
 Authority follows the [review and contribution protocol](../governance/review-and-contribution.md). An approved local implementation plan may authorize branches, focused commits, and private reports within its exact scope. Pull-request creation requires a separate explicit request; merge and deployment remain separate gates. Agents may not approve their own work.
 
 ## 21. Gradual implementation roadmap
+Apply the [application environment acceptance clauses](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) and their owning delivery/certification cards to this section. [ADR-0020](../adr/0020-application-environments.md) owns shared rules; service-specific target, guide/example, negative-case and recovery obligations arrive with first executable delivery, not final hardening.
+
 
 **Immediate next pair (user-directed amendment, 2026-09-22):** Implement `contact-form-web3forms`, then run its separate **Web3Forms-only certification** increment directly afterward. This pair precedes further Resend certification work and may pass its ordinary integration and certification gates before formal P4 closure. Resend implementation was observed integrated during plan review; local coexistence is therefore part of Web3Forms implementation, while live Resend certification remains separate. The [hosted contact form sequencing amendment](program-roadmap.md#hosted-contact-form--next-two-increments) owns the accepted earlier predecessor, exact planning base, isolated worktree, preserved streams and reconciliation boundary. Both increments follow the complete [review and contribution protocol](../governance/review-and-contribution.md), including their own preparation, plan approval, tests, bounded review, independent reviewers, final packet and final-diff approval. Certification adds the human-prerequisite runbook, separately authorized live actions, provider/mailbox and cleanup evidence, and exact-subject acceptance. Both providers require certification. Web3Forms receives immediate certification for the user's upcoming use; Resend certification remains a required distinct later increment with the same quality gates, without an immediate-after-implementation scheduling requirement. Neither Resend certification nor P4 closure is a predecessor for this pair. Existing phase identifiers, P4 closure requirements and all external-action gates remain unchanged. The same canonical amendment records the subsequent 2026-09-23 implementation-specific design, delivery and procedural-pause authorization; it changes no global governance or certification gate.
 

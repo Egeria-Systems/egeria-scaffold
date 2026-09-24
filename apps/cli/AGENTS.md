@@ -1,5 +1,7 @@
 # Builder CLI boundary
 
+The [application environment boundary](../../docs/architecture/capability-model.md#application-environments) qualifies only the related target/settings and unused-generation preservation rules below. Assemble the finite candidate internally; public CLI/defaults change only with its complete consumers. Selection-only inputs and unknown/obsolete/mixed installed-state refusal must precede writes; preserve operation-specific safeguards and unsupported jobs lifecycle. [ADR-0020](../../docs/adr/0020-application-environments.md#generation-and-precise-supersessions) owns the precise retirement boundary. Routine stream approval uses only the [scoped governance exception](../../docs/governance/review-and-contribution.md#lean-application-environments-delivery-exception).
+
 Read the repository [`AGENTS.md`](../../AGENTS.md), the canonical [package ownership](../../docs/architecture/package-ownership.md), and the [review and contribution protocol](../../docs/governance/review-and-contribution.md) before editing this surface.
 
 `apps/cli` is the private executable adapter for the builder kernel.

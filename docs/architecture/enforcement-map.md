@@ -61,3 +61,20 @@ When a planned gate is implemented, update this table in the same focused change
 ## Background jobs runtime verification
 
 The [jobs boundary](capability-model.md#background-job-delivery-boundary) maps to builder catalog/installed-state/refusal tests, compiled CLI selection tests, generated unit contracts, native Queue and built-Worker integration, and `pnpm run test:generated-jobs` for actual state-last fresh generation on all current profiles. Native retry/DLQ evidence is local; deployed retention, provider behavior and authorized replay remain separate pending certification.
+
+## Application environment enforcement
+
+[ADR-0020](../adr/0020-application-environments.md) owns the contract; the [capability boundary](capability-model.md#application-environments) owns candidate activation and lifecycle limits. Existing actual rows above continue to describe the current public generation and exact historical evidence. Their retained-generation, consent/settings, browser-credential and production-workflow rules are qualified only by ADR-0020's precise future boundary. No new runtime gate is established by this table.
+
+| Rule | Status | Owning implementation and observable check |
+| --- | --- | --- |
+| Common target, fixed build inputs, selected-only examples, runtime agreement, obsolete/unknown/mixed zero-write refusal | Planned | Common configuration card: builder/CLI contracts and generated foundation Worker checks; complete-generation card: coherent public switch and actual supported lifecycle |
+| Hosted contact and booking tolerate local absence, reject malformed configuration and select intended destinations | Planned | Their capability cards: generated component/controlled browser tests, no-provider-request negatives and worked examples |
+| Exact analytics build activation plus existing consent, context changes, provider/cookie isolation and localized disabled controls | Planned | Analytics card: provider/consent contracts and controlled real-browser cases; separate authorized real provider evidence |
+| Persistence, email and jobs preserve target, recipient, binding/envelope, retention and before-effect refusal | Planned | Persistence/email cards and deployment/jobs reconciliation: generated adapter/Worker/binding checks, preserved unsupported jobs lifecycle, composed synthetic consumers and operator guides |
+| Exact-origin staging diagnostic cookies with all other contexts credential-free; bounded privacy-safe telemetry | Planned | Observability card: browser transport and controlled adapter assertions; human-session Access behavior requires separate hosted evidence |
+| Separate artifacts from one reviewed revision, pre-credential verification, staging-before-native-production-approval, protected alternate routes and secret-safe Access transport | Planned | Deployment card: real-shell/workflow contracts, prepared-artifact local preview/browser checks; actual GitHub/Access configuration and hosted behavior require separately authorized evidence |
+| Configured origin, nonproduction noindex, production-only verification metadata | Planned | Deployment/site-URL card: generated route/metadata/browser assertions and complete-generation fixture checks |
+| Named current and future composed flows, guides/examples and causal subject renewal | Planned | Current consuming capability cards and [future delivery/certification rows](../roadmaps/2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance): success, optional absence, required-dependency refusal and concrete failure/recovery; separate exact-subject certification |
+
+When a row becomes executable, update its actual gate and command in the same owning implementation. Documentary checks prove structure and ownership, not runtime, provider, security, visual or accessibility outcomes.

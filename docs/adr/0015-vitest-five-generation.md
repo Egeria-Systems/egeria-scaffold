@@ -6,6 +6,8 @@
 
 [ADR-0016](0016-optional-application-persistence.md) supersedes only the standards-version requirement for explicit application-persistence selection; this ADR continues to own default generation and retained histories.
 
+[ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) narrowly permits retiring related unused executable recipes, installed snapshots and historical edges when the complete environment generation activates. This decision remains the historical owner of the exact Vitest generations below. Preserve public generation until activation, historical receipts afterward, installed-manifest authority and zero-write refusal for unsupported or mixed tuples; no old-to-new migration is implied.
+
 ## Context
 
 The generated test foundation must support Vitest 5 without silently changing existing materialized repositories. Existing standards upgrades retain original recipe provenance, and historical app generation and incoming transitions have two valid Vitest 4 declarations. A new default must not change the descriptors, rendered bytes, dependency locks, diagnostics, or supported lifecycle operations of those repositories.

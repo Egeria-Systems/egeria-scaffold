@@ -30,3 +30,5 @@ If an ADR conflicts with implementation or another canonical document, identify 
 - [ADR-0018: Browser-hosted contact form](0018-hosted-contact-form.md)
 
 - [ADR-0019: Optional background job delivery in the primary Worker](0019-background-job-delivery.md)
+
+- [ADR-0020: Application environments](0020-application-environments.md) — Accepted 2026-09-24; scoped configuration, generation and supersession boundary.

@@ -4,6 +4,8 @@
 
 **Date:** 2026-09-14
 
+[ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) adds common application-target mapping and narrowly permits related unused snapshot retirement at complete generation activation. The APP_DB, local SQL/runtime evidence, approved remote-target, migration/removal and data-recovery protections below remain; persistence is never implicit.
+
 ## Context
 
 Application persistence needs shared deployment and test changes without changing the default app or invalidating materialized repositories. The user approved local-first configuration and separate persistence-specific contract versions on 2026-09-14, following the runner and export-removal review decisions.

@@ -1,6 +1,8 @@
 # Review and Contribution Protocol
 
 This document is the canonical owner of the implementation lifecycle. Root and nested instructions link here instead of maintaining competing copies.
+The [lean application environments exception](#lean-application-environments-delivery-exception) is the only approval/predecessor variation for that explicitly authorized stream; the general gates below continue to apply elsewhere.
+
 
 ## Increment request routing
 
@@ -164,3 +166,13 @@ Private workflow artifacts must not be force-added. A separately approved conten
 Present the final packet and stop. Gate 3 approval accepts only the verified increment diff. It does not itself authorize push, pull-request creation, merge, publication, deployment, persistent-data migration, provider cleanup, permission change, or production action.
 
 Pull-request creation requires a separate explicit request. Responding to GitHub review comments also requires an explicit request. Production deployment and persistent-data/provider changes always require their specified human gate and recovery plan; an agent or reviewer cannot self-approve them.
+
+## Lean application environments delivery exception
+
+The user's direct authorization on 2026-09-24 delegates routine Gate 2 exact-plan and Gate 3 verified-diff approval to the orchestrator for the ten-card [environment stream](../roadmaps/program-roadmap.md#lean-application-environments) only. Record each decision as **“orchestrator approval under delegated user authority”**, never human review. The implementation task cannot approve its own plan or diff. Preserve preparation, independent reviews, verification, exact packets and distinct gates; a material new design decision still requires the user.
+
+Bind each approval to frozen sources, actual worktree/branch, exact predecessor/head, plan or diff identity, relevant checks and reviewer dispositions. A reviewed, published but unmerged predecessor may supply the next card's base within this stack; the roadmap binds the initial direct admission and its pending subjects. First PR targets main; every later PR targets its immediate predecessor, and the controller verifies native stack membership. Serialize implementation writers and publication. Only the controller coordinates restacks, with preserved recovery references, expected remote identities and paused affected writers.
+
+Pending external review or a throttle need not block an otherwise eligible publication checkpoint; a known material failure affecting the dependent card does. “Published,” “eligible as this stack's predecessor” and “finally review-ready” remain distinct. This exception does not transfer to the Queue proof, authenticated-app composition or any other stream.
+
+The same direct authorization permits scoped commits, pushes, PRs, non-deploying CI and relevant CodeRabbit exchange under separately granted controller windows. It does not permit merge, deployment, package publication, provider provisioning, application sends/submissions, remote data mutation, permission/secret/protection changes, resource deletion or spending. Host permission controls remain applicable. Final source activation, exact-subject certification, phase closure and external release remain separate boundaries; no missing historical approval or certificate is manufactured.

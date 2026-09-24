@@ -4,6 +4,8 @@
 
 **Date:** 2026-09-23
 
+[ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) replaces literal public-key creation/settings transport with fixed public build configuration at complete generation activation. It preserves the six-field browser/hCaptcha contract, bounds, no retry/fallback, independent Resend and separate provider/data disposition below.
+
 ## Context
 
 Public contact needs a small independently selectable form without requiring application email or durable submission infrastructure. The user approved current portfolio/site/app recipes, direct browser fetch with localized outcomes, and free hCaptcha with subsequent provider-side certification.
