@@ -232,7 +232,8 @@ it("loads real nested alias imports on pinned native Node and refuses unsupporte
   const run = promisify(execFile);
   const program = 'const { loadApplication } = await import("./scripts/job-operator.mjs"); try { const loaded = await loadApplication(process.cwd()); const data = JSON.parse(process.argv[1]); const plan = loaded.policy.buildReplayPlan(data.request, [data.message], loaded.handlers, data.now); console.log(JSON.stringify({ envelope: plan.entries[0].envelope, digest: loaded.registryDigest })); } catch (error) { console.log(error.message); process.exitCode = 1; }';
   const args = ["--input-type=module", "-e", program, JSON.stringify({ request: request("plan-replay", { priorEffectsReconciled: true, selection: [{ messageId: message.id, originalRetentionDeadline: now + 40_000 }] }), message, now })];
-  const options = { cwd: directory, env: { PATH: process.env.PATH, NODE_ENV: "test" as const }, timeout: 10_000 };
+  // Application-specific ProcessEnv augmentations do not describe this isolated child.
+  const options = { cwd: directory, env: { PATH: process.env.PATH, NODE_ENV: "test" } as unknown as NodeJS.ProcessEnv, timeout: 10_000 };
   const result = JSON.parse((await run(process.execPath, args, options)).stdout);
   expect(result.envelope).toEqual(job); expect(result.digest).toMatch(/^[a-f0-9]{64}$/u);
   await writeFile(resolve(directory, "src/application/job-handlers.ts"), 'import "server-only"; export const jobHandlers = [];');
@@ -261,9 +262,10 @@ it("does not remove a source when the remote consumer changes after send accepta
 it("keeps command refusals free of rejected input, ambient synthetic credentials and raw errors", async () => {
   const task = await setup(); const input = resolve(task.directory, "request.json");
   await writeFile(input, JSON.stringify({ command: "inspect", authorized: false, private: "SYNTHETIC_PRIVATE_BODY" }), { mode: 0o600 });
+  // Keep this child isolated even when Wrangler adds required application bindings to ProcessEnv.
   await expect(promisify(execFile)(process.execPath, [resolve(process.cwd(), "scripts/job-operator.mjs"), "inspect", "--request", input,
     "--directory", task.directory, "--token-file", resolve(task.directory, "absent-token.json")],
-  { env: { PATH: process.env.PATH, NODE_ENV: "test", CLOUDFLARE_API_TOKEN: "SYNTHETIC_AMBIENT_SECRET" }, timeout: 10_000 })).rejects.toMatchObject({
+  { env: { PATH: process.env.PATH, NODE_ENV: "test", CLOUDFLARE_API_TOKEN: "SYNTHETIC_AMBIENT_SECRET" } as unknown as NodeJS.ProcessEnv, timeout: 10_000 })).rejects.toMatchObject({
     code: 1, stdout: '{"version":1,"outcome":"refused","code":"job-operator-refused"}\n', stderr: "",
   });
 });
