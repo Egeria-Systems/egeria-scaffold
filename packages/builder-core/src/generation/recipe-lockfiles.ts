@@ -35,7 +35,7 @@ export function resolveRecipeLockfileVersion(
   }
   if (vitest === "5.0.0") {
     if (identity.originProfile === "app") {
-      return identity.recipeVersion === "0.2.0" && next === "16.3.3" &&
+      return (identity.recipeVersion === "0.2.0" || identity.recipeVersion === "0.3.0") && next === "16.3.3" &&
         eslintConfigNext === "16.3.3" && dependencies.effect === "4.0.0-rc.112"
         ? "app-0.2.0" : undefined;
     }
@@ -45,10 +45,10 @@ export function resolveRecipeLockfileVersion(
       return identity.originProfile === "site" && identity.recipeVersion === "0.12.0" && next === "16.3.3" && eslintConfigNext === "16.3.3" ? "app-0.2.0" : undefined;
     }
     if (identity.originProfile === "portfolio") {
-      return identity.recipeVersion === "0.11.0" && next === "16.3.0" &&
+      return (identity.recipeVersion === "0.11.0" || identity.recipeVersion === "0.12.0") && next === "16.3.0" &&
         eslintConfigNext === "16.3.0" ? "portfolio-0.11.0" : undefined;
     }
-    return identity.originProfile === "site" && identity.recipeVersion === "0.12.0" &&
+    return identity.originProfile === "site" && (identity.recipeVersion === "0.12.0" || identity.recipeVersion === "0.13.0") &&
       next === "16.3.3" && eslintConfigNext === "16.3.3" ? "site-0.12.0" : undefined;
   }
   if (identity.originProfile === "app") {

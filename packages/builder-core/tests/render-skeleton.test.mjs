@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -6074,4 +6074,112 @@ test("Vitest five generation materializes each exact recipe without changing the
     const changed = historical.value.files.filter(({ path, content }) => !Buffer.from(content).equals(currentFiles.get(path))).map(({ path }) => path).sort();
     assert.deepEqual(changed, ["apps/web/package.json", "apps/web/tests/setup/component.ts", "pnpm-workspace.yaml"]);
   }
+});
+
+const applicationEnvironmentContext = {
+  projectSchemaVersion: "2.0.0",
+  catalogSnapshot: { standards: "0.7.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0" },
+  profiles: [
+    { identifier: "portfolio", schemaVersion: "1.0.0", recipeVersion: "0.12.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability"] },
+    { identifier: "site", schemaVersion: "1.0.0", recipeVersion: "0.13.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "site-routing"] },
+    { identifier: "app", schemaVersion: "1.0.0", recipeVersion: "0.3.0", defaultCapabilities: ["app-foundation", "site-routing"] },
+  ],
+};
+
+async function renderApplicationEnvironment(profile, options = {}) {
+  const core = await import("../dist/index.js");
+  return core.renderSkeleton({ profile, projectName: "environment-example", displayName: "Environment Example", packageVersions: core.verifiedCapabilityPackageVersions, ...options }, applicationEnvironmentContext);
+}
+
+test("application environment rendering preserves profile identity and materializes common targets without optional providers", async () => {
+  for (const [profile, recipeVersion] of [["portfolio", "0.12.0"], ["site", "0.13.0"], ["app", "0.3.0"]]) {
+    for (const multilingual of [false, true]) {
+      const rendered = assertSuccess(await renderApplicationEnvironment(profile, multilingual ? { multilingual: true } : {}));
+      assert.equal(rendered.project.schemaVersion, "2.0.0");
+      assert.equal(rendered.project.recipeVersion, recipeVersion);
+      assert.deepEqual(rendered.project.capabilitySettings, {});
+      assert.equal(rendered.project.selectedCapabilities.includes("app-foundation"), profile === "app");
+      assert.equal(rendered.project.selectedCapabilities.includes("multilingual"), multilingual);
+      const files = new Map(rendered.files.map(({ path, content }) => [path, Buffer.from(content).toString("utf8")]));
+      assert.ok(files.has("apps/web/src/configuration/application-environment.ts"));
+      assert.ok(files.has("docs/environments.md"));
+      const manifest = JSON.parse(files.get("apps/web/package.json"));
+      assert.equal(manifest.devDependencies.vitest, "5.0.0");
+      assert.equal(manifest.dependencies.effect, profile === "app" ? "4.0.0-rc.112" : undefined);
+      assert.equal(manifest.scripts["check:environment"], "node scripts/check-application-environment.mjs --local");
+      assert.equal(manifest.scripts["check:environment:deployment"], "node scripts/check-application-environment.mjs --deployment");
+      assert.equal(JSON.parse(files.get("apps/web/tsconfig.json")).compilerOptions.allowImportingTsExtensions, true);
+      assert.doesNotMatch(files.get("apps/web/.env.example"), /WEB3FORMS|CALENDLY|ANALYTICS|RESEND|NEXT_PUBLIC_APPLICATION_ENVIRONMENT/u);
+      assert.doesNotMatch(files.get("apps/web/.dev.vars.example"), /RESEND|TRANSACTIONAL_EMAIL|APP_DB/u);
+      const generatedPaths = new Set(rendered.files.map(({ path }) => path));
+      assert.equal(generatedPaths.size, rendered.files.length);
+      assert.ok(rendered.surfaces.some(({ path, owner }) => path === "docs/environments.md" && owner.kind === "builder-kernel"));
+    }
+  }
+});
+
+test("application environment generated ignore rules protect actual build and runtime values while tracking examples", async () => {
+  const rendered = assertSuccess(await renderApplicationEnvironment("app"));
+  const root = await mkdtemp(join(tmpdir(), "application-environment-ignore-"));
+  try {
+    const ignore = rendered.files.find(({ path }) => path === ".gitignore");
+    await writeFile(join(root, ".gitignore"), ignore.content);
+    assert.equal(spawnSync("git", ["init", "--quiet", root], { encoding: "utf8" }).status, 0);
+    for (const path of ["apps/web/.env.local", "apps/web/.env.production", "apps/web/.dev.vars", "apps/web/.dev.vars.staging"]) {
+      assert.equal(spawnSync("git", ["check-ignore", "--no-index", path], { cwd: root, encoding: "utf8" }).status, 0, path);
+    }
+    for (const path of ["apps/web/.env.example", "apps/web/.dev.vars.example"]) {
+      assert.equal(spawnSync("git", ["check-ignore", "--no-index", path], { cwd: root, encoding: "utf8" }).status, 1, path);
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("application environment generated preflight rejects unsafe targets without loading or echoing secret values", async () => {
+  const rendered = assertSuccess(await renderApplicationEnvironment("portfolio"));
+  const files = new Map(rendered.files.map(({ path, content }) => [path, content]));
+  const root = await mkdtemp(join(tmpdir(), "application-environment-preflight-"));
+  try {
+    for (const path of ["apps/web/src/configuration/application-environment.ts", "apps/web/scripts/check-application-environment.mjs"]) {
+      const destination = join(root, path);
+      await mkdir(join(destination, ".."), { recursive: true });
+      await writeFile(destination, files.get(path));
+    }
+    const helper = await import(pathToFileURL(join(root, "apps/web/src/configuration/application-environment.ts")));
+    for (const [input, want] of [[undefined, "missing"], ["", "missing"], [" ", "invalid"], ["Production", "invalid"], ["private-sentinel", "invalid"], [null, "invalid"], [42, "invalid"]]) {
+      assert.deepEqual(helper.parseApplicationEnvironment(input), { ok: false, issue: { field: "APPLICATION_ENVIRONMENT", reason: want } });
+    }
+    for (const target of ["development", "staging", "production"]) {
+      assert.deepEqual(helper.parseApplicationEnvironment(target), { ok: true, value: target });
+      assert.deepEqual(helper.validateRuntimeApplicationEnvironment(target, target), { ok: true, value: target });
+    }
+    assert.deepEqual(helper.resolveBuildApplicationEnvironment({ applicationEnvironment: undefined }, "local"), { ok: true, value: "development" });
+    assert.equal(helper.validateRuntimeApplicationEnvironment(undefined, "development").ok, false);
+    assert.equal(helper.validateRuntimeApplicationEnvironment("production", "staging").ok, false);
+    const script = join(root, "apps/web/scripts/check-application-environment.mjs");
+    for (const [args, env, code] of [
+      [["--local"], {}, 0], [["--local"], { APPLICATION_ENVIRONMENT: "" }, 0],
+      [["--deployment"], {}, 1], [["--deployment"], { APPLICATION_ENVIRONMENT: "development" }, 1],
+      [["--deployment"], { APPLICATION_ENVIRONMENT: "staging" }, 0],
+      [["--deployment"], { APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production" }, 0],
+      [["--local"], { APPLICATION_ENVIRONMENT: "private-sentinel" }, 1],
+      [["--local"], { APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production" }, 1],
+      [["--deployment"], { NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "staging" }, 1],
+      [["--other"], {}, 2], [["--local", "--local"], {}, 2],
+    ]) {
+      const result = spawnSync(process.execPath, [script, ...args], { encoding: "utf8", env });
+      assert.equal(result.status, code, `${JSON.stringify({ args, env })}: ${result.stderr}`);
+      assert.doesNotMatch(result.stdout + result.stderr, /private-sentinel/u);
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("application environment rendering refuses incomplete selections and mixed contexts", async () => {
+  for (const selection of [{ contactFormWeb3Forms: true }, { bookingCalendly: { mode: "link" } }, { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } }, { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true }]) {
+    const result = await renderApplicationEnvironment("app", selection);
+    assert.equal(result.ok, false);
+    assert.equal(result.issues[0].code, "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
+  }
+  const core = await import("../dist/index.js");
+  const result = await core.renderSkeleton({ profile: "portfolio", projectName: "example", displayName: "Example", packageVersions: core.verifiedCapabilityPackageVersions }, { ...applicationEnvironmentContext, projectSchemaVersion: "1.0.0" });
+  assert.equal(result.ok, false);
 });

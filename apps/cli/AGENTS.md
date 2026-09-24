@@ -2,6 +2,8 @@
 
 The [application environment boundary](../../docs/architecture/capability-model.md#application-environments) qualifies only the related target/settings and unused-generation preservation rules below. Assemble the finite candidate internally; public CLI/defaults change only with its complete consumers. Selection-only inputs and unknown/obsolete/mixed installed-state refusal must precede writes; preserve operation-specific safeguards and the exact jobs lifecycle/refusal boundary. [ADR-0020](../../docs/adr/0020-application-environments.md#generation-and-precise-supersessions) owns the precise retirement boundary. Routine stream approval uses only the [scoped governance exception](../../docs/governance/review-and-contribution.md#lean-application-environments-delivery-exception).
 
+The [common configuration internal candidate](../../docs/architecture/capability-model.md#common-configuration-internal-candidate) owns the implemented explicit parser/runner mode and its create/infer/doctor limits. `productionRunner` remains on public defaults; no shipped command or environment switch activates the candidate.
+
 Read the repository [`AGENTS.md`](../../AGENTS.md), the canonical [package ownership](../../docs/architecture/package-ownership.md), and the [review and contribution protocol](../../docs/governance/review-and-contribution.md) before editing this surface.
 
 `apps/cli` is the private executable adapter for the builder kernel.

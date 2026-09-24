@@ -1,12 +1,12 @@
 import type { CapabilityDescriptor } from "../contracts/capability.js";
 import type { MigrationRecord } from "../contracts/migration.js";
 import type { ProfileRecipe } from "../contracts/profile.js";
-import type { ProjectConfiguration } from "../contracts/project.js";
+import type { ApplicationEnvironmentProjectConfiguration, ProjectConfiguration } from "../contracts/project.js";
 import type {
   ContractIssue,
   ValidationResult,
 } from "../contracts/result.js";
-import type { InstalledSurface } from "../contracts/state.js";
+import type { ApplicationEnvironmentInstalledState, InstalledState, InstalledSurface } from "../contracts/state.js";
 import {
   inferRepository,
   type EvidenceCategory,
@@ -35,10 +35,10 @@ export type ControlFileEvidence<T> =
   | Readonly<{ kind: "invalid"; issues: readonly ContractIssue[] }>
   | Readonly<{ kind: "ambiguous"; code: string }>;
 
-export type ProjectInspection = Readonly<{
-  project: ControlFileEvidence<ProjectConfiguration>;
+export type ProjectInspection<P = ProjectConfiguration, S = InstalledState> = Readonly<{
+  project: ControlFileEvidence<P>;
   migrations: ControlFileEvidence<readonly MigrationRecord[]>;
-  inference: RepositoryInference;
+  inference: RepositoryInference<S>;
   resolution?: ValidationResult<ResolvedCapabilities>;
 }>;
 
@@ -83,7 +83,7 @@ function capabilityOwner(surface?: InstalledSurface): string | undefined {
 }
 
 export function deriveProjectDiscrepancies(
-  inspection: ProjectInspection,
+  inspection: ProjectInspection<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration, InstalledState | ApplicationEnvironmentInstalledState>,
 ): ProjectDiscrepancies {
   if (
     inspection.resolution?.ok !== true ||
@@ -198,28 +198,34 @@ async function readControlFile<T>(
   }
 }
 
-export async function inspectProject(input: Readonly<{
+type ProjectInspectionRequest = Readonly<{
   reader: RepositoryReader;
   catalog: readonly CapabilityDescriptor[];
   profiles: readonly ProfileRecipe[];
-}>): Promise<ProjectInspection> {
+}>;
+
+export function inspectProject(input: ProjectInspectionRequest & Readonly<{ projectSchemaVersion: "2.0.0" }>): Promise<ProjectInspection<ApplicationEnvironmentProjectConfiguration, ApplicationEnvironmentInstalledState>>;
+export function inspectProject(input: ProjectInspectionRequest): Promise<ProjectInspection>;
+export async function inspectProject(input: ProjectInspectionRequest & Readonly<{ projectSchemaVersion?: "2.0.0" }>): Promise<ProjectInspection<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration, InstalledState | ApplicationEnvironmentInstalledState>> {
   const reader = createCachingRepositoryReader(input.reader);
-  const project = await readControlFile(
+  const project = await readControlFile<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration>(
     reader,
     projectConfigurationPath,
-    parseProjectYaml,
+    (source) => input.projectSchemaVersion === "2.0.0"
+      ? parseProjectYaml(source, "2.0.0") : parseProjectYaml(source),
   );
-  const state = await readControlFile(
+  const state = await readControlFile<InstalledState | ApplicationEnvironmentInstalledState>(
     reader,
     statePath,
-    parseStateJson,
+    (source) => input.projectSchemaVersion === "2.0.0"
+      ? parseStateJson(source, "2.0.0") : parseStateJson(source),
   );
   const migrations = await readControlFile(
     reader,
     migrationLogPath,
     parseMigrationLog,
   );
-  const controlInference: RepositoryInference = {
+  const controlInference: RepositoryInference<InstalledState | ApplicationEnvironmentInstalledState> = {
     state,
     capabilities: [],
     surfaces: [],
@@ -251,7 +257,9 @@ export async function inspectProject(input: Readonly<{
     };
   }
 
-  const inference = await inferRepository({ reader, catalog: input.catalog });
+  const inference = input.projectSchemaVersion === "2.0.0"
+    ? await inferRepository({ reader, catalog: input.catalog, projectSchemaVersion: "2.0.0" })
+    : await inferRepository({ reader, catalog: input.catalog });
 
   return { project, migrations, inference, resolution };
 }

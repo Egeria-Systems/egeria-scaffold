@@ -32,6 +32,9 @@ const portfolioRecipeIdentity = Object.freeze({
   recipeVersion: "0.10.0",
 });
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
+const { createGenerationRenderingContext } = await import(
+  pathToFileURL(resolve(packageRoot, "dist/catalog/verified-package-versions.js")),
+);
 const verifierModule = await import(
   pathToFileURL(
     resolve(packageRoot, "dist/generation/verify-generated-project.js"),
@@ -60,6 +63,101 @@ const completeChecks = [
   ...generatedChecks,
   "post-state-inference",
 ];
+
+test("application environment generation preserves state-last verification and supports exact read-only inspection", async () => {
+  const context = core.createApplicationEnvironmentRenderingContext();
+  for (const profile of ["portfolio", "site"]) {
+    await withTestRoot(async (owner) => {
+      const verifier = createFakeVerifier();
+      const result = assertSuccess(await core.generateProject({
+        request: { profile, projectName: "target-example", displayName: "Target Example", multilingual: true },
+        destination: join(owner, profile), verifier: verifier.verifier, renderingContext: context,
+      }));
+      assert.equal(result.state.schemaVersion, "2.0.0");
+      assert.equal(result.state.projectSchemaVersion, "2.0.0");
+      assert.deepEqual(result.state.lastSuccessfulVerification.checks, completeChecks);
+      assert.deepEqual(verifier.calls, ["prepare-lockfile", "verify-isolated-copy"]);
+      const reader = core.createFileSystemRepositoryReader(result.destination);
+      const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(reader, context));
+      const inference = await core.inferRepository({ reader, catalog: snapshot.catalog, projectSchemaVersion: "2.0.0" });
+      assert.equal(inference.state.kind, "valid");
+      assert.ok(inference.capabilities.every(({ category }) => category === "confirmed"));
+      assert.deepEqual(await core.doctorRepository({ reader, catalog: snapshot.catalog, profiles: snapshot.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
+      assert.equal((await core.inferRepository({ reader, catalog: snapshot.catalog })).state.kind, "invalid");
+    });
+  }
+});
+
+test("application environment generation rejects noncandidate contexts before destination or verifier access", async (context) => {
+  const candidate = core.createApplicationEnvironmentRenderingContext();
+  for (const [name, renderingContext] of [
+    ["legacy", createGenerationRenderingContext()],
+    ["null", null],
+    ["undefined", undefined],
+    ["empty", {}],
+    ["wrong schema", { ...candidate, projectSchemaVersion: "1.0.0" }],
+    ["mixed catalog", { ...candidate, catalogSnapshot: createGenerationRenderingContext().catalogSnapshot }],
+    ["malformed profiles", { ...candidate, profiles: undefined }],
+  ]) {
+    await context.test(name, async () => {
+      let destinationReads = 0;
+      let verifierReads = 0;
+      const result = await core.generateProject({
+        request: { profile: "portfolio", projectName: "target-example", displayName: "Target Example" },
+        renderingContext,
+        get destination() { destinationReads += 1; return ""; },
+        get verifier() { verifierReads += 1; throw new Error("unexpected verifier access"); },
+      });
+      assert.equal(result.ok, false);
+      assert.equal(result.issues[0].code, "APPLICATION_ENVIRONMENT_CONTEXT_INVALID");
+      assert.equal(destinationReads, 0);
+      assert.equal(verifierReads, 0);
+    });
+  }
+});
+
+test("application environment generation rejects incomplete and malformed selections before destination inspection", async () => {
+  await withTestRoot(async (owner) => {
+    const before = await snapshotFileBytes(owner);
+    for (const selection of [
+      { contactFormWeb3Forms: true }, { bookingCalendly: { mode: "link" } },
+      { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } },
+      { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true },
+      { contactFormWeb3Forms: { accessKey: "secret-sentinel" } },
+      { bookingCalendly: { mode: "link", url: "https://secret-sentinel.test" } },
+    ]) {
+      const verifier = createFakeVerifier();
+      const result = await core.generateProject({
+        request: { profile: "portfolio", projectName: "target-example", displayName: "Target Example", ...selection },
+        destination: "\0invalid", verifier: verifier.verifier,
+        renderingContext: core.createApplicationEnvironmentRenderingContext(),
+      });
+      assert.equal(result.ok, false);
+      const malformed = JSON.stringify(selection).includes("secret-sentinel");
+      assert.equal(result.issues[0].code, malformed ? "PROJECT_GENERATION_REQUEST_INVALID" : "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
+      assert.equal(JSON.stringify(result).includes("secret-sentinel"), false);
+      assert.deepEqual(verifier.calls, []);
+    }
+    assert.deepEqual(await snapshotFileBytes(owner), before);
+  });
+});
+
+test("application environment lock selection reuses only the matching dependency graphs", () => {
+  for (const [profile, version, lock, next, eslint] of [
+    ["portfolio", "0.12.0", "portfolio-0.11.0", "16.3.0", "16.3.0"],
+    ["site", "0.13.0", "site-0.12.0", "16.3.3", "16.3.3"],
+    ["app", "0.3.0", "app-0.2.0", "16.3.3", "16.3.3"],
+  ]) {
+    const identity = { originProfile: profile, recipeVersion: version };
+    const manifest = { dependencies: { next, ...(profile === "app" ? { effect: "4.0.0-rc.112" } : {}) }, devDependencies: { "eslint-config-next": eslint, vitest: "5.0.0" } };
+    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), lock);
+    for (const dependencies of [
+      { ...manifest.dependencies, next: "16.3.2" },
+      { ...manifest.dependencies, effect: profile === "app" ? "4.0.0-rc.111" : "4.0.0-rc.112" },
+      { ...manifest.dependencies, "drizzle-orm": "0.45.2" },
+    ]) assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...manifest, dependencies }), undefined);
+  }
+});
 
 test("app lockfile selection requires exact profile, recipe, Next, ESLint, and Effect", async () => {
   const identity = { originProfile: "app", recipeVersion: "0.1.0" };
