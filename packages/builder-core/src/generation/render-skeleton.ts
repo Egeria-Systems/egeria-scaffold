@@ -52,6 +52,7 @@ export type GenerationRequest = Readonly<{
   multilingual?: true;
   applicationPersistence?: true;
   transactionalEmailResend?: true;
+  backgroundJobDelivery?: true;
   packageVersions: CapabilityPackageVersions;
 }>;
 
@@ -430,7 +431,7 @@ export async function renderSkeleton(
     standards: request.packageVersions.standards,
     observability: request.packageVersions.observability,
   };
-  const renderingContext = context ?? createGenerationRenderingContext(request.applicationPersistence === true, request.transactionalEmailResend === true);
+  const renderingContext = context ?? createGenerationRenderingContext(request.applicationPersistence === true, request.transactionalEmailResend === true, request.backgroundJobDelivery === true);
   const retainedFoundation = renderingContext.catalogSnapshot.appFoundation === "0.2.0";
   const catalogResult = createCapabilityCatalogSnapshot(packageVersions, renderingContext.catalogSnapshot);
   if (!catalogResult.ok) {
@@ -444,7 +445,7 @@ export async function renderSkeleton(
         request.contactFormWeb3Forms === undefined &&
         request.analytics === undefined &&
         request.bookingCalendly === undefined &&
-        request.multilingual !== true && request.applicationPersistence !== true && request.transactionalEmailResend !== true && !retainedFoundation
+        request.multilingual !== true && request.applicationPersistence !== true && request.transactionalEmailResend !== true && request.backgroundJobDelivery !== true && !retainedFoundation
           ? {}
           : {
               requestedCapabilities: [
@@ -456,6 +457,7 @@ export async function renderSkeleton(
                 ...(request.multilingual === true ? ["multilingual"] : []),
                 ...(request.applicationPersistence === true ? ["application-persistence"] : []),
                 ...(request.transactionalEmailResend === true ? ["transactional-email-resend"] : []),
+                ...(request.backgroundJobDelivery === true ? ["background-job-delivery"] : []),
                 ...(retainedFoundation ? ["app-foundation"] : []),
               ],
             }
@@ -483,6 +485,7 @@ export async function renderSkeleton(
     resolutionResult.value.capabilities.some(({ identifier }) => identifier === "app-foundation"),
     request.transactionalEmailResend === true,
     request.contactFormWeb3Forms !== undefined,
+    request.backgroundJobDelivery === true,
   );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;
@@ -492,6 +495,7 @@ export async function renderSkeleton(
     projectName: projectResult.value.project.name,
     displayNameJson: JSON.stringify(projectResult.value.project.displayName),
     workerName: projectResult.value.project.name,
+    workerEntryJson: JSON.stringify(request.backgroundJobDelivery === true ? "worker.mjs" : ".open-next/worker.js"),
     ...(request.contactFormWeb3Forms === undefined ? {} : { web3FormsAccessKeyJson: JSON.stringify(request.contactFormWeb3Forms.accessKey) }),
     ...(request.analytics === undefined
       ? {}

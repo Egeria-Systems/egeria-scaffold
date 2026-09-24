@@ -1,3 +1,4 @@
+import { backgroundJobFiles } from "../catalog/capability-catalog.js";
 import type { ContractIssue, ValidationResult } from "../contracts/result.js";
 import type { ProfileIdentifier } from "../contracts/profile.js";
 import { deriveTemplateDestination } from "./render-template.js";
@@ -326,7 +327,7 @@ const persistenceTemplateSources = textTemplateSources([
 
 const persistenceSharedTemplateSources: readonly TemplateSource[] = [
   { source: "deployment-cloudflare/application-persistence/apps/web/wrangler.jsonc.template", destinationSource: "common/apps/web/wrangler.jsonc.template", contentKind: "text" },
-  { source: "deployment-cloudflare/application-persistence/apps/web/scripts/check-application-database.mjs", destinationSource: "common/apps/web/scripts/check-application-database.mjs", contentKind: "text" },
+  { source: "deployment-cloudflare/application-persistence/apps/web/scripts/check-application-database.mjs.template", destinationSource: "common/apps/web/scripts/check-application-database.mjs", contentKind: "text" },
   { source: "deployment-cloudflare/application-persistence/.github/workflows/deploy.yml.template", destinationSource: "common/.github/workflows/deploy.yml.template", contentKind: "text" },
   { source: "standards/application-persistence/.github/workflows/quality.yml.template", destinationSource: "common/.github/workflows/quality.yml.template", contentKind: "text" },
 ];
@@ -355,6 +356,7 @@ export function createTemplateCatalog(
   includeFoundation = false,
   includeTransactionalEmail = false,
   includeWeb3Forms = false,
+  includeBackgroundJobs = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0");
   const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0"));
@@ -370,6 +372,7 @@ export function createTemplateCatalog(
       ? { ...entry, source: entry.source.replace("common/", "common/vitest-five/"), destinationSource: entry.source }
       : entry).filter(
       ({ source }) =>
+        !(includeBackgroundJobs && ["common/apps/web/wrangler.jsonc.template", "common/.github/workflows/deploy.yml.template"].includes(source)) &&
         !(includeApplicationPersistence && persistenceSharedTemplateSources.some(({ destinationSource }) => destinationSource === source)) &&
         !(
           (includeBookingCalendly || productionSite) &&
@@ -429,7 +432,15 @@ export function createTemplateCatalog(
       destinationSource: "common/apps/web/app/layout.tsx",
       contentKind: "text" as const,
     }] : []),
-    ...(includeApplicationPersistence ? [...persistenceTemplateSources, ...persistenceSharedTemplateSources] : []),
+    ...(includeApplicationPersistence ? [...persistenceTemplateSources, ...persistenceSharedTemplateSources.filter(({ destinationSource }) =>
+      !includeBackgroundJobs || destinationSource === undefined || !["common/apps/web/wrangler.jsonc.template", "common/.github/workflows/deploy.yml.template"].includes(destinationSource))] : []),
+    ...(includeBackgroundJobs ? [
+      ...textTemplateSources(backgroundJobFiles.map(({ path }) => `background-job-delivery/${path}`)),
+      { source: "deployment-cloudflare/background-job-delivery/apps/web/worker.mjs", destinationSource: "common/apps/web/worker.mjs", contentKind: "text" as const },
+      { source: "deployment-cloudflare/background-job-delivery/apps/web/scripts/check-job-delivery.mjs", destinationSource: "common/apps/web/scripts/check-job-delivery.mjs", contentKind: "text" as const },
+      { source: `deployment-cloudflare/background-job-delivery/apps/web/wrangler${includeApplicationPersistence ? ".persistence" : ""}.jsonc.template`, destinationSource: "common/apps/web/wrangler.jsonc.template", contentKind: "text" as const },
+      { source: `deployment-cloudflare/background-job-delivery/.github/workflows/deploy${includeApplicationPersistence ? ".persistence" : ""}.yml.template`, destinationSource: "common/.github/workflows/deploy.yml.template", contentKind: "text" as const },
+    ] : []),
   ];
   const destinations = new Set<string>();
   const entries: TemplateCatalogEntry[] = [];

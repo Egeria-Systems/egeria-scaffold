@@ -7,7 +7,7 @@ import test from "node:test";
 import { parse } from "yaml";
 
 const templateRoot = new URL("../templates/", import.meta.url);
-const scriptSource = new URL("deployment-cloudflare/application-persistence/apps/web/scripts/check-application-database.mjs", templateRoot);
+const scriptSource = new URL("deployment-cloudflare/application-persistence/apps/web/scripts/check-application-database.mjs.template", templateRoot);
 const emptyHash = "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945";
 const exampleHash = "906bfcb10142df41a32676dffe6660675f775d40d5edcc179523e9536cb5cf65";
 const stagingId = "11111111-1111-4111-8111-111111111111";
@@ -18,7 +18,7 @@ async function fixture(context) {
   context.after(() => rm(root, { recursive: true, force: true }));
   const web = path.join(root, "apps/web");
   await mkdir(path.join(web, "scripts"), { recursive: true });
-  await writeFile(path.join(web, "scripts/check-application-database.mjs"), await readFile(scriptSource));
+  await writeFile(path.join(web, "scripts/check-application-database.mjs"), (await readFile(scriptSource, "utf8")).replace("{{workerEntryJson}}", JSON.stringify(".open-next/worker.js")));
   const source = await readFile(new URL("deployment-cloudflare/application-persistence/apps/web/wrangler.jsonc.template", templateRoot), "utf8");
   await writeFile(path.join(web, "wrangler.jsonc"), source.replaceAll("{{workerName}}", "example-app"));
   await writeFile(path.join(root, ".gitignore"), ".wrangler/\n");

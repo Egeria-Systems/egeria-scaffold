@@ -24,7 +24,7 @@ Accepted ADR-0016 owns local-first D1, finite persistence-specific standards/dep
 
 ### Current delivery position
 
-The [integrated delivery status and hosted-contact sequencing amendment](program-roadmap.md#hosted-contact-form--next-two-increments) own the current position: Resend and Web3Forms implementations are integrated, Web3Forms certification integrated through PR #144, and Resend certification remains required separate later work. The [Queue topology proof exception](program-roadmap.md#one-time-2026-09-23-queue-topology-proof-exception) authorizes only the isolated test-only P5E-1 increment before P4 closure. Do not restart P5D-1, P5D-2 or P5D-3 from this older plan. [ADR-0017](../adr/0017-transactional-email-resend.md) and the [transactional-email boundary](../architecture/capability-model.md#transactional-email-boundary) own the implemented email contract; [ADR-0018](../adr/0018-hosted-contact-form.md) owns the independent browser contact form.
+The [integrated delivery status and hosted-contact sequencing amendment](program-roadmap.md#hosted-contact-form--next-two-increments) own the current position: Resend and Web3Forms implementations are integrated, Web3Forms certification integrated through PR #144, and Resend certification remains required separate later work. The merged P5E-1 proof is accepted as local predecessor evidence. The [background job runtime exception](program-roadmap.md#one-time-2026-09-23-background-job-runtime-exception) permits only the P5E-2 candidate through an open MR before P4 closure. Do not restart P5D-1, P5D-2 or P5D-3 from this older plan. [ADR-0017](../adr/0017-transactional-email-resend.md) and the [transactional-email boundary](../architecture/capability-model.md#transactional-email-boundary) own the implemented email contract; [ADR-0018](../adr/0018-hosted-contact-form.md) owns the independent browser contact form.
 
 The [decision record](2026-09-16-remaining-program-decisions.md) preserves the accepted directions. At the next preparation gate, bind the accepted implementation receipt, exact subject, current main revision and applicable terminal hosted checks; integration alone does not certify a provider or close P4. The P7-only staging exception and every unrelated predecessor or evidence obligation remain unchanged.
 
@@ -123,7 +123,7 @@ This is a scheduling order. It does not add capability dependencies. Existing ex
 
 1. Follow the [hosted-contact sequencing amendment](program-roadmap.md#hosted-contact-form--next-two-increments): preserve Web3Forms certification integrated through PR #144. Preserve the integrated P5D-1–P5D-3 delivery and P5C work; their implementation is not a new assignment. Existing owners retain P4 acceptance reconciliation and P5C certification.
 2. Retain P5D-C as required separate later Resend certification under its own predecessor, subject and external-action gates. It does not precede or interrupt Web3Forms certification. Serialize shared-subject changes against P5C where scopes overlap; this scheduling update supplies no phase-closure or provider evidence.
-3. P5E-1 alone may proceed under the [bounded proof exception](program-roadmap.md#one-time-2026-09-23-queue-topology-proof-exception). P5E-2 → P5E-3 → P5E-C retain P4 closure, topology acceptance and their own gates. Reuse the accepted binding lane only after its ownership/runner decision is reconciled.
+3. Accepted merged P5E-1 and the subsequent shared-Worker decision permit the P5E-2 candidate under the [bounded runtime exception](program-roadmap.md#one-time-2026-09-23-background-job-runtime-exception). P5E-3 and P5E-C remain separately gated after later reconciliation; neither is authorized here. Reuse the existing compatible whole-Worker harness and retain actual generated pins.
 4. P5F-1 → P5F-C0 → P5F-2 → P5F-CP → P5F-3 → P5F-4 → P5F-C. First deliver and separately certify complete app-only contact on certified P5C. Then extend those already-accepted contact/persistence implementations together to public profiles and separately certify the new subjects. Only then add optional notifications. This avoids an unused dependency-only persistence baseline with no selectable consumer.
 5. P6-1 → P6-2 → P6-3 → P6-C.
 6. P7-1 → accepted canonical staging amendment and exact Gate 2 → P7-2 complete fresh baseline → prerequisite shared-subject certification within P7-CF → P7-CI → P7-CP/CG/CA after their actual dependencies → P7-CS after CI/CP/CA → P7-CF final composed-baseline checkpoint → P7-3 migration → P7-CL lifecycle renewal → explicit P7 closure. The user approved only this initial-composition implementation start-order exception. Section 7 makes the shared-subject and identity certification order explicit; all other gates remain.
@@ -141,7 +141,9 @@ flowchart TD
   WEB3[Web3Forms implementation integrated in PR 139] --> WEB3C[Web3Forms certification integrated in PR 144]
   P4 --> PC[Preserved P5C acceptance reconciliation and certification]
   FOUNDATION[Accepted foundation predecessor] -- bounded test-only exception --> PROOF[P5E-1 topology proof and human decision]
-  P4 --> E[P5E-2 and P5E-3 job implementation]
+  PROOF -- bounded runtime exception --> E2[P5E-2 candidate through open MR]
+  P4 --> E[P5E-3 job lifecycle]
+  E2 -- separate acceptance and reconciliation --> E
   PROOF --> E
   PC -. accepted shared binding lane; no D1 descriptor dependency .-> E
   D --> DC[P5D separate certification]
@@ -276,6 +278,8 @@ The [Queue topology proof record](../compatibility/queue-consumer-topology.md) r
 - [ ] **GREEN / acceptance evidence:** Record actual ack/retry/duplicate/failure behavior, operational cost and a bounded recommendation. Obtain the topology decision before any product deployment configuration.
 
 #### P5E-2 — Deliver bounded dispatch, consumption and terminal failure
+
+The subsequent human decision selects the shared primary Worker under [ADR-0019](../adr/0019-background-job-delivery.md). This candidate may proceed before P4 closure only under the [bounded runtime exception](program-roadmap.md#one-time-2026-09-23-background-job-runtime-exception), mirrored in the source plan; the historical proof exception does not supply runtime authority.
 
 1. **Outcome / exclusions:** Optional jobs selection materializes `JobDispatcher`, handler contracts, memory and Queue adapters, selected topology, explicit retry/terminal-failure behavior, bounded diagnostics and reconciliation entry points. No business jobs, global retry layer, scheduler, hidden database or unrestricted public replay endpoint.
 2. **Predecessor:** Accepted P5E-1 topology and compatible shared lane. Reconcile P5D/P5C catalog, deployment and lock changes serially.
@@ -779,7 +783,7 @@ The user has answered the direction questions. The [decision record](2026-09-16-
 | **D1 — public-profile backend support** | Implemented under ADR-0017. | Preserve the installed-snapshot contract; separately certify the exact affected subjects. |
 | **D2 — email outcome/retry boundary** | Implemented under ADR-0017. | Preserve the sender/configuration contract and consumer-owned retry boundary; complete separate Resend certification. |
 | **D3 — testing** | Most resilient maintained approach within reasonable scope. | Prove real capability coverage and explain any additional runner's benefit/cost. |
-| **D4 — topology** | Separate Worker preferred; reasoned pushback invited. | P5E-1 proves whether deployment separation earns its operational cost. |
+| **D4 — topology** | Historical separate-Worker preference; subsequent shared-primary-Worker decision accepted. | ADR-0019 binds the decision after merged P5E-1, preserving its limitations. |
 | **D5 — contact** | Recommended minimal scope plus reasonable practice. | Concrete bounded abuse/privacy/retention settings. |
 | **D6 — CMS** | Recommended scope with useful configurability. | Ordinary owned CMS configuration and actual content/role/media/cutover policy. |
 | **D7 — accounts** | Reasonable secure practice with useful configurability. | Concrete bounded account/session/recovery/deletion policy. |
@@ -789,7 +793,7 @@ The user has answered the direction questions. The [decision record](2026-09-16-
 | **D11 — fleet** | Recommended scope accepted; performance stays deferred. | Actual authorized fleet/version/recovery/portability targets. |
 | **D12 — identity staging** | Initial-composition staging exception explicitly approved on 2026-09-16. | Require acceptance of the canonical amendment and exact P7 plan; implement the complete fresh recipe, then certify separately in dependency order before migration/downstream work. |
 
-**No program-level material decision is awaiting an answer.** D12 is resolved by explicit approval. D4 retains the already planned evidence-led topology checkpoint. Later exact plans may expose material choices affecting data, assurance, money or support scope; present those choices when they exist. These answers preserve implementation, exact-diff, certification and external-action gates.
+**No program-level material decision is awaiting an answer.** D12 is resolved by explicit approval. D4 is resolved by ADR-0019. The jobs terminal-retention decision selects the 24-hour Free-tier maximum under ADR-0019. Later exact plans may expose material choices affecting data, assurance, money or support scope; present those choices when they exist. These answers preserve implementation, exact-diff, certification and external-action gates.
 
 ## 11. Dated primary-source checks and planning consequences
 

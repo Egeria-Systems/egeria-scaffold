@@ -4,6 +4,8 @@
 
 This is the test-only P5E-1 increment under the [bounded sequencing exception](../roadmaps/program-roadmap.md#one-time-2026-09-23-queue-topology-proof-exception). It preserves the accepted app-foundation predecessor and all certification state. It neither closes P4 nor implements jobs. The [D3/D4 decisions](../roadmaps/2026-09-16-remaining-program-decisions.md#4-d4-source-separation-and-worker-separation-are-different-decisions) own runner selection criteria and the user's separate-Worker preference.
 
+Subsequent decision: the user accepted this local evidence and selected the shared primary Worker for the bounded runtime increment; see [ADR-0019](../adr/0019-background-job-delivery.md). The original findings and recommendation below remain historical proof evidence.
+
 ## Result and recommendation
 
 Both candidates execute the same synthetic producer/consumer behavior locally: a Queue handler composed with the full built OpenNext Worker, and a separate queue-only Worker reached through the web Worker's producer binding. The web route and static page continue to work, including HTTP after a rejected Queue handler. No OpenNext integration obstacle was observed in this graph.
@@ -92,3 +94,9 @@ Preserve the isolated branch and private preparation, raw failed/successful logs
 - [Local development](https://developers.cloudflare.com/queues/configuration/local-development/): separate local producers/consumers and unavailable local consumer-concurrency proof.
 
 These official sources were refreshed on the date above. They guide expectations; only the named executed checks establish local observations.
+
+## Subsequent generated-runtime characterization
+
+The shared-Worker implementation also exercises the actual generated graph: Next `16.3.3`, OpenNext `1.20.2`, Wrangler `4.118.0`, Vitest `5.0.0`, Effect `4.0.0-rc.112`, Miniflare `5.20260730.0-alpha` and workerd `1.20260730.1`. This is a distinct retained generation graph; the proof graph and its evidence above are unchanged.
+
+Its [generated whole-Worker specification](../../packages/builder-core/templates/background-job-delivery/apps/web/tests/integration/job-worker.test.ts) deliberately acknowledges one real consumer message before a later synthetic batch throw. The targeted local run observed attempts `[1, 2]` while its monotonic side effect remained `1`. This is negative acknowledgement characterization and repeat-safety evidence, not a pass of Cloudflare's documented no-redelivery guarantee. No dependency change or second runner conceals the discrepancy.
