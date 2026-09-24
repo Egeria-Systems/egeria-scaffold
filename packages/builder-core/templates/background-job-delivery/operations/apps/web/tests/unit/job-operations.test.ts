@@ -192,11 +192,21 @@ it("stops interrupted work before send and preserves safe prepared resumption", 
 
 it("retains uncertainty when durable acceptance cannot be recorded after sending", async () => {
   const task = await setup(); const plan = await task.plan();
-  task.transport.send = async (envelope: unknown) => { task.sent.push(envelope); await chmod(task.directory, 0o500); };
-  try { await expect(task.run(request("replay", { priorEffectsReconciled: true, approvalFingerprint: plan.fingerprint }))).rejects.toThrow(); }
-  finally { await chmod(task.directory, 0o700); }
+  const write = task.store.write; let writesUnavailable = false;
+  // Root can bypass filesystem modes; make subsequent writes fail independently of privileges.
+  task.store.write = async (name: string, value: unknown, exclusive = false) => {
+    if (writesUnavailable) throw new Error("synthetic-storage-unavailable");
+    await write(name, value, exclusive);
+  };
+  task.transport.send = async (envelope: unknown) => { task.sent.push(envelope); writesUnavailable = true; };
+  const input = request("replay", { priorEffectsReconciled: true, approvalFingerprint: plan.fingerprint });
+  try { await expect(task.run(input)).rejects.toThrow(); }
+  finally { writesUnavailable = false; }
   expect(task.sent).toEqual([job]); expect(task.removed).toEqual([]);
   expect((await task.store.read("checkpoint.json")).entries[0].stage).toBe("send-started");
+  const callCount = task.calls.length;
+  await expect(task.run(input)).rejects.toThrow("job-reconciliation-required");
+  expect(task.calls.length).toBe(callCount);
 });
 
 it("does not mistake one empty observation before delayed or in-flight work for completion", async () => {
