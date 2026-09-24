@@ -14,7 +14,7 @@ try {
     const queue = config.vars.JOB_QUEUE_NAME;
     const dead = config.vars.JOB_DEAD_LETTER_QUEUE_NAME;
     for (const identity of [queue, dead]) {
-      if (typeof identity !== "string" || !/^[a-z0-9][a-z0-9-]{0,99}$/u.test(identity) || names.has(identity)) throw new Error();
+      if (typeof identity !== "string" || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(identity) || names.has(identity)) throw new Error();
       names.add(identity);
     }
     const producers = config.queues?.producers;

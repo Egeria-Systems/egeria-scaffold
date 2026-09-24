@@ -30,7 +30,9 @@ const syntheticWorker = {
     if (pathname === "/__synthetic-jobs/state") return Response.json({ observations, terminals, values: Object.fromEntries(values) });
     if (pathname === "/__synthetic-jobs/handlers") {
       const handlerState = await request.json();
-      jobHandlers.splice(0, jobHandlers.length, ...(handlerState === "missing" ? [] : handlerState === "duplicate" ? [...handlers, ...handlers] : handlers));
+      const registered = handlerState === "missing" ? [] : handlerState === "duplicate" ? [...handlers, ...handlers] :
+        handlerState === "validator-failure" ? handlers.map((handler) => ({ ...handler, validate: () => { throw new Error("synthetic-validator-secret"); } })) : handlers;
+      jobHandlers.splice(0, jobHandlers.length, ...registered);
       return new Response(null, { status: 204 });
     }
     if (pathname === "/__synthetic-jobs/enqueue") {

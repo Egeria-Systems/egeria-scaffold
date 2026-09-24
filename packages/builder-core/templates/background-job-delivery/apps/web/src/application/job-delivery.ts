@@ -89,7 +89,10 @@ export function validateJob(value: unknown, environment: JobEnvironment, handler
     const handler = handlers.find((candidate) => candidate.type === value.jobType && candidate.version === value.jobVersion);
     if (handler === undefined) throw new JobDeliveryFailure("job-unsupported");
     const job: JobEnvelope = JSON.parse(JSON.stringify(value));
-    if (!handler.validate(job.payload)) throw new JobDeliveryFailure("job-validation");
+    let accepted: boolean;
+    try { accepted = handler.validate(job.payload); }
+    catch { throw new JobDeliveryFailure("job-configuration"); }
+    if (accepted !== true) throw new JobDeliveryFailure("job-validation");
     return job;
   } catch (error) {
     throw error instanceof JobDeliveryFailure ? error : new JobDeliveryFailure("job-validation");

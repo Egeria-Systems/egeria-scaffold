@@ -26,7 +26,7 @@ function configuration(value: unknown): Configuration {
     const queue: unknown = Reflect.get(value, "JOB_QUEUE");
     const deadLetters: unknown = Reflect.get(value, "JOB_DEAD_LETTER_QUEUE");
     if (!isJobEnvironment(environment) || typeof queueName !== "string" || typeof deadName !== "string" ||
-      !/^[a-z0-9][a-z0-9-]{0,99}$/u.test(queueName) || !/^[a-z0-9][a-z0-9-]{0,99}$/u.test(deadName) ||
+      !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(queueName) || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(deadName) ||
       queueName === deadName || !queueBinding(queue) || !queueBinding(deadLetters) || queue === deadLetters) throw new Error();
     return { environment, queueName, queue, deadLetters };
   } catch { throw new JobDeliveryFailure("job-configuration"); }

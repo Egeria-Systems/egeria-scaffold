@@ -78,6 +78,18 @@ test("remote jobs preflight requires explicit review of the Free-tier retention 
       }
       const configFile = selectedFiles.find(({ path }) => path.endsWith("wrangler.jsonc"));
       const config = JSON.parse(new TextDecoder().decode(configFile.content));
+      for (const binding of ["JOB_QUEUE", "JOB_DEAD_LETTER_QUEUE"]) {
+        for (const identity of ["a", "a".repeat(63), "a".repeat(64), "jobs-", "-jobs"]) {
+          const candidate = structuredClone(config);
+          const production = candidate.env.production;
+          production.vars[binding === "JOB_QUEUE" ? "JOB_QUEUE_NAME" : "JOB_DEAD_LETTER_QUEUE_NAME"] = identity;
+          production.queues.producers.find((item) => item.binding === binding).queue = identity;
+          production.queues.consumers[0][binding === "JOB_QUEUE" ? "queue" : "dead_letter_queue"] = identity;
+          await writeFile(join(root, "apps/web/wrangler.jsonc"), JSON.stringify(candidate));
+          if ([1, 63].includes(identity.length)) assert.equal(invoke("production", "true"), "JOB_CONFIGURATION_VALID\n");
+          else assert.throws(() => invoke("production", "true"), { status: 1 });
+        }
+      }
       delete config.env.production.queues.consumers[0].dead_letter_queue;
       await writeFile(join(root, "apps/web/wrangler.jsonc"), JSON.stringify(config));
       assert.throws(() => invoke("production", "true"), { status: 1 });

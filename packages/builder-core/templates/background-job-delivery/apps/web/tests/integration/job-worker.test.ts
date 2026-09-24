@@ -154,7 +154,7 @@ it("characterizes acknowledged-message redelivery after a later batch throw on t
 });
 
 
-it.each(["missing", "duplicate"])("retains accepted work through native exhaustion after %s handler configuration and recovers after repair", async (handlerState) => {
+it.each(["missing", "duplicate", "validator-failure"])("retains accepted work through native exhaustion after %s handler configuration and recovers after repair", async (handlerState) => {
   await enqueue();
   const web = harness.getWorker("jobs-local");
   const setHandlers = (value: string) => web.fetch("/__synthetic-jobs/handlers", { method: "POST", body: JSON.stringify(value) });

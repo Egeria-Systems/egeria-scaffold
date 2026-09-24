@@ -166,7 +166,7 @@ it("enforces aggregate UTF-8 bytes and retained memory capacity independently of
 
 it("native retries preserve accepted work while handler support or registration is repaired", async () => {
   const restored = [definition(() => Effect.void)];
-  for (const handlers of [[], [restored[0]!, restored[0]!]]) {
+  for (const handlers of [[], [restored[0]!, restored[0]!], [{ ...restored[0]!, validate: () => { throw new Error("synthetic-validator-secret"); } }]]) {
     const { environment, terminals, accepted } = nativeEnvironment();
     const layer = createCloudflareJobDispatcherLayer({ configuration: Effect.succeed(environment), handlers: restored });
     await Effect.runPromise(dispatch(envelope()).pipe(Effect.provide(layer)));
@@ -203,4 +203,31 @@ it("server composition dispatches through its context and consumes through its a
       .rejects.toMatchObject({ code: "job-configuration" });
     expect(accepted).toHaveLength(1);
   } finally { compositionContext.handlers.length = 0; compositionContext.environment = {}; }
+});
+
+
+it("requires an affirmative validator result and preserves thrown validation failures as configuration errors", () => {
+  for (const result of [false, undefined, "truthy-invalid"]) {
+    const handlers = [{ ...definition(() => Effect.void), validate: (() => result) as JobDefinition["validate"] }];
+    expect(() => validateJob(envelope(), "local", handlers)).toThrow(expect.objectContaining({ code: "job-validation" }));
+  }
+  const handlers = [{ ...definition(() => Effect.void), validate: () => { throw new Error("synthetic-validator-secret"); } }];
+  expect(() => validateJob(envelope(), "local", handlers)).toThrow(expect.objectContaining({ code: "job-configuration" }));
+});
+
+it("Cloudflare admission rejects invalid queue identities before sending", async () => {
+  for (const key of ["JOB_QUEUE_NAME", "JOB_DEAD_LETTER_QUEUE_NAME"]) {
+    for (const identity of ["a", "a".repeat(63), "a".repeat(64), "jobs-", "-jobs"]) {
+      const { environment, accepted } = nativeEnvironment();
+      const layer = createCloudflareJobDispatcherLayer({ configuration: Effect.succeed({ ...environment, [key]: identity }), handlers: [definition(() => Effect.void)] });
+      const result = Effect.runPromise(dispatch(envelope()).pipe(Effect.provide(layer)));
+      if ([1, 63].includes(identity.length)) {
+        expect(await result).toEqual({ status: "accepted", operationId });
+        expect(accepted).toHaveLength(1);
+      } else {
+        await expect(result).rejects.toMatchObject({ code: "job-configuration" });
+        expect(accepted).toEqual([]);
+      }
+    }
+  }
 });
