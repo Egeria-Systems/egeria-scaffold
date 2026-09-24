@@ -24,7 +24,7 @@ Accepted ADR-0016 owns local-first D1, finite persistence-specific standards/dep
 
 ### Current delivery position
 
-The [integrated delivery status and hosted-contact sequencing amendment](program-roadmap.md#hosted-contact-form--next-two-increments) own the current position: Resend and Web3Forms implementations are integrated, Web3Forms certification is the immediate next increment, and Resend certification remains required separate later work. Do not restart P5D-1, P5D-2 or P5D-3 from this older plan. [ADR-0017](../adr/0017-transactional-email-resend.md) and the [transactional-email boundary](../architecture/capability-model.md#transactional-email-boundary) own the implemented email contract; [ADR-0018](../adr/0018-hosted-contact-form.md) owns the independent browser contact form.
+The [integrated delivery status and hosted-contact sequencing amendment](program-roadmap.md#hosted-contact-form--next-two-increments) own the current position: Resend and Web3Forms implementations are integrated, Web3Forms certification integrated through PR #144, and Resend certification remains required separate later work. The [Queue topology proof exception](program-roadmap.md#one-time-2026-09-23-queue-topology-proof-exception) authorizes only the isolated test-only P5E-1 increment before P4 closure. Do not restart P5D-1, P5D-2 or P5D-3 from this older plan. [ADR-0017](../adr/0017-transactional-email-resend.md) and the [transactional-email boundary](../architecture/capability-model.md#transactional-email-boundary) own the implemented email contract; [ADR-0018](../adr/0018-hosted-contact-form.md) owns the independent browser contact form.
 
 The [decision record](2026-09-16-remaining-program-decisions.md) preserves the accepted directions. At the next preparation gate, bind the accepted implementation receipt, exact subject, current main revision and applicable terminal hosted checks; integration alone does not certify a provider or close P4. The P7-only staging exception and every unrelated predecessor or evidence obligation remain unchanged.
 
@@ -121,9 +121,9 @@ The source paths below are canonical. This map is a traceability index, not a se
 
 This is a scheduling order. It does not add capability dependencies. Existing explicit independent tracks remain available after their real prerequisites, with one shared-contract mutation stream and sequential merges.
 
-1. Follow the [hosted-contact sequencing amendment](program-roadmap.md#hosted-contact-form--next-two-increments): certify the integrated Web3Forms capability next. Preserve the integrated P5D-1–P5D-3 delivery and P5C work; their implementation is not a new assignment. Existing owners retain P4 acceptance reconciliation and P5C certification.
+1. Follow the [hosted-contact sequencing amendment](program-roadmap.md#hosted-contact-form--next-two-increments): preserve Web3Forms certification integrated through PR #144. Preserve the integrated P5D-1–P5D-3 delivery and P5C work; their implementation is not a new assignment. Existing owners retain P4 acceptance reconciliation and P5C certification.
 2. Retain P5D-C as required separate later Resend certification under its own predecessor, subject and external-action gates. It does not precede or interrupt Web3Forms certification. Serialize shared-subject changes against P5C where scopes overlap; this scheduling update supplies no phase-closure or provider evidence.
-3. P5E-1 → P5E-2 → P5E-3 → P5E-C. Reuse the accepted binding lane only after its ownership/runner decision is reconciled.
+3. P5E-1 alone may proceed under the [bounded proof exception](program-roadmap.md#one-time-2026-09-23-queue-topology-proof-exception). P5E-2 → P5E-3 → P5E-C retain P4 closure, topology acceptance and their own gates. Reuse the accepted binding lane only after its ownership/runner decision is reconciled.
 4. P5F-1 → P5F-C0 → P5F-2 → P5F-CP → P5F-3 → P5F-4 → P5F-C. First deliver and separately certify complete app-only contact on certified P5C. Then extend those already-accepted contact/persistence implementations together to public profiles and separately certify the new subjects. Only then add optional notifications. This avoids an unused dependency-only persistence baseline with no selectable consumer.
 5. P6-1 → P6-2 → P6-3 → P6-C.
 6. P7-1 → accepted canonical staging amendment and exact Gate 2 → P7-2 complete fresh baseline → prerequisite shared-subject certification within P7-CF → P7-CI → P7-CP/CG/CA after their actual dependencies → P7-CS after CI/CP/CA → P7-CF final composed-baseline checkpoint → P7-3 migration → P7-CL lifecycle renewal → explicit P7 closure. The user approved only this initial-composition implementation start-order exception. Section 7 makes the shared-subject and identity certification order explicit; all other gates remain.
@@ -138,9 +138,11 @@ If an optional integration is not selected in a generated project, it stays abse
 ```mermaid
 flowchart TD
   P4[P4 explicit closure and all-certified gate] -- historical integration requirement --> D[P5D email implementation integrated in PR 138]
-  WEB3[Web3Forms implementation integrated in PR 139] --> WEB3C[Immediate Web3Forms certification]
+  WEB3[Web3Forms implementation integrated in PR 139] --> WEB3C[Web3Forms certification integrated in PR 144]
   P4 --> PC[Preserved P5C acceptance reconciliation and certification]
-  P4 --> E[P5E topology and job implementation]
+  FOUNDATION[Accepted foundation predecessor] -- bounded test-only exception --> PROOF[P5E-1 topology proof and human decision]
+  P4 --> E[P5E-2 and P5E-3 job implementation]
+  PROOF --> E
   PC -. accepted shared binding lane; no D1 descriptor dependency .-> E
   D --> DC[P5D separate certification]
   E --> EC[P5E separate certification]
@@ -257,8 +259,10 @@ Accepted main now allows future binding capabilities to choose compatible runner
 
 #### P5E-1 — Prove and choose Queue consumer topology
 
+The [Queue topology proof record](../compatibility/queue-consumer-topology.md) records the local comparison and recommendation for the human D4 decision; it does not accept a production topology or open P5E-2.
+
 1. **Outcome / exclusions:** A bounded compatibility receipt shows whether a consumer can safely execute with the primary OpenNext Worker or needs its own Worker. This is a test-only proof with synthetic jobs, no product event bus or placeholder domain handler.
-2. **Predecessor:** Accepted P4 closure and recorded D3 selection criteria. Reuse the accepted shared binding-lane owner only after proving Queue behavior; jobs gains no D1 dependency. D4 records a separate-Worker preference with an evidence-led topology checkpoint.
+2. **Predecessor:** Normally accepted P4 closure and recorded D3 selection criteria. Only this proof may use the [one-time Queue topology proof exception](program-roadmap.md#one-time-2026-09-23-queue-topology-proof-exception), mirrored in the [source plan](2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md#one-time-2026-09-23-queue-topology-proof-exception), with its exact accepted predecessor, protected state and later reconciliation gate. Reuse the accepted shared binding-lane owner only after proving Queue behavior; jobs gains no D1 dependency. D4 records a separate-Worker preference with an evidence-led topology checkpoint.
 3. **Owners:** Cloudflare integration/composition/deployment and capability-owned Queue proof; no new package.
 4. **Intermediate / compatibility:** Product generation remains unchanged. The proof cannot become a deployment default. A separate `apps/jobs` is selected only with documented technical, permission, failure, scale, bundle or operational evidence and human approval.
 5. **Tests / recovery:** Enqueue/consume, explicit acknowledgement, failure/retry, duplicate/out-of-order delivery, missing binding and environment isolation against actual local Queue runtime; whole OpenNext Worker integration if proposed. Retain failed evidence; remove only identity-owned disposable proof data under its approved scope.
