@@ -4,6 +4,8 @@
 
 **Date:** 2026-08-04
 
+[ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) supersedes only literal destination persistence and extends the consent context for the complete environment generation. Purpose semantics, lifetime, withdrawal, cross-tab and reload protections below remain; current executable behavior is preserved until that generation activates.
+
 ## Context
 
 [ADR-0010](0010-analytics-and-observability.md) separates optional visitor analytics from operational observability and requires provider-neutral consent orchestration. The first analytics implementation records one provider-group choice. That representation cannot preserve independent visitor choices when configured purposes change, distinguish a current choice from an expired or materially changed notice, or safely coordinate reductions across open tabs.

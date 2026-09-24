@@ -16,6 +16,8 @@ Do not rely on conversation memory. Verify decisions against repository sources 
 - Use small focused commits named for their actual change. Do not use branch names, commit prefixes, file names, or user-facing Git labels prefixed with `codex`.
 
 ## Stage discipline
+The [application environment boundary](docs/architecture/capability-model.md#application-environments) and [roadmap admission](docs/roadmaps/program-roadmap.md#lean-application-environments) govern the accepted environment stream, including prospective retirement of related unused generation support. Preserve current public generation until complete activation. Its routine approvals and reviewed unmerged predecessor use only the [scoped governance exception](docs/governance/review-and-contribution.md#lean-application-environments-delivery-exception); all other gates remain.
+
 
 Implement only the approved increment. Future capabilities may be documented without creating their runtime code, packages, schemas, workflows, state, bindings, or provider resources. Do not create a production profile in P0.1, compatibility-proof functionality before P0.2, or builder packages before P0.3.
 

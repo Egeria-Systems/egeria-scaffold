@@ -4,6 +4,8 @@
 
 **Date:** 2026-09-22
 
+[ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) adds environment-bound configuration and exact nonproduction recipient restrictions and permits only necessary unused shared-snapshot retirement at complete generation activation. Preserve independent selection, profile identity, foundation composition and the attempt, timeout, idempotency and uncertain-outcome semantics below.
+
 ## Context
 
 Transactional email needs a provider-neutral application boundary and explicit provider semantics without introducing a business workflow. The user approved current-profile support, native HTTP transport, the sender and reliability contract, and privacy/removal behavior on 2026-09-22.

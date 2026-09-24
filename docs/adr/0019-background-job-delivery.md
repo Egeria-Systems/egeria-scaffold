@@ -4,6 +4,8 @@
 
 **Date:** 2026-09-23
 
+[ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) adds common application-target/deployment reconciliation and narrowly permits related unused snapshot retirement at complete generation activation. It does not reopen primary-Worker topology, queue/envelope guards, retention/attestation, local-runtime limitations or unsupported lifecycle/replay/drain.
+
 ## Context and decision
 
 The user accepts [merged Queue topology proof](../compatibility/queue-consumer-topology.md) as local predecessor evidence, including its emulator acknowledgement discrepancy. The subsequent explicit human decision selects one shared primary OpenNext Worker. HTTP delivery and Queue delivery remain cohesive separate modules with a narrow composition entry point preserving OpenNext fetch and named exports. The historical separate-Worker preference in [D4](../roadmaps/2026-09-16-remaining-program-decisions.md#4-d4-source-separation-and-worker-separation-are-different-decisions) is preserved as history. No second topology or `apps/jobs` is generated.

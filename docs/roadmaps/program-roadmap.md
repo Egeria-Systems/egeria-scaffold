@@ -180,7 +180,7 @@ Read-only planning and fingerprint-gated execution retain the original app edges
 
 **Current certification work:** The coordinated renewal records six accepted local subjects at evidence revision `fe16ae41153f89242cdf48c0f899c3720f511557`: app-foundation, standards, content-files, section-composition, site-routing and multilingual. Their fresh generation, applicable compiled lifecycle, whole-Worker, Effect build and visual evidence passed, and the user accepted the subject-specific outcomes and documentation/recovery limits. Post-merge Repository quality run `34799203126` passed every applicable job at that revision. The user accepted exact default-app deployment and observability fresh-scaffold, deployed-application and cleanup-recovery outcomes at evidence revision `9ea5dce328a9a065f71e168cb2c82ea515f54ae1`: diagnostics run `34926395956` and recovery run `34927988761` passed, provider readback reconciled, and the shared Worker returned to its verified compatibility baseline. The unchanged observability admission record is certified. The accepted default deployment `0.3.0` receipt remains bound to its retained subject; it does not certify persistence-specific deployment `0.4.0`. Analytics and booking-calendly remain pending for the default baseline. After PR #129, the [certification registry](../../certifications/capabilities.json) contains eleven admission subjects, with six certified and five pending; changed standards and deployment plus new persistence retain their separate renewal plans. [Certification coverage](../architecture/capability-model.md#certification-coverage) distinguishes current admission from the retained default baseline. P4 remains open; certification of already-merged persistence follows the [certification-only sequencing amendment](#one-time-2026-09-17-persistence-certification-sequencing-amendment). App capability upgrades remain unsupported. Certification, merge, deployment, provider mutation, publication and production action retain their separate gates.
 
-**Stop gate:** Complete every subject's required evidence and review, the all-certified machine closure check, and explicit phase acceptance before closing P4. The [certification-only sequencing amendment](#one-time-2026-09-17-persistence-certification-sequencing-amendment) controls the limited reconciliation for already-merged P5C; it does not open another product increment. The [Queue topology proof exception](#one-time-2026-09-23-queue-topology-proof-exception) permits only test-only P5E-1 before closure; the subsequent [background job runtime exception](#one-time-2026-09-23-background-job-runtime-exception) separately permits only the P5E-2 candidate through an open MR. The separately user-directed [hosted contact form pair](#hosted-contact-form--next-two-increments) permits only its two named increments before this phase closes. The [one-time parallel implementation exception](#one-time-2026-09-14-persistence-implementation-exception) records the earlier isolated development authority. Local execution, implementation closeout, historical certification, or passing image comparisons alone cannot satisfy the closure gate. New visual inputs still require separate exact-manifest human approval, and baseline promotion requires its own authorization. The [capability model](../architecture/capability-model.md#accepted-app-architecture-boundary) owns verification and claim boundaries.
+**Stop gate:** Complete every subject's required evidence and review, the all-certified machine closure check, and explicit phase acceptance before closing P4. The separately admitted [environment stream](#lean-application-environments) does not close or waive this gate. The [certification-only sequencing amendment](#one-time-2026-09-17-persistence-certification-sequencing-amendment) controls the limited reconciliation for already-merged P5C; it does not open another product increment. The [Queue topology proof exception](#one-time-2026-09-23-queue-topology-proof-exception) permits only test-only P5E-1 before closure; the subsequent [background job runtime exception](#one-time-2026-09-23-background-job-runtime-exception) separately permits only the P5E-2 candidate through an open MR. The separately user-directed [hosted contact form pair](#hosted-contact-form--next-two-increments) permits only its two named increments before this phase closes. The [one-time parallel implementation exception](#one-time-2026-09-14-persistence-implementation-exception) records the earlier isolated development authority. Local execution, implementation closeout, historical certification, or passing image comparisons alone cannot satisfy the closure gate. New visual inputs still require separate exact-manifest human approval, and baseline promotion requires its own authorization. The [capability model](../architecture/capability-model.md#accepted-app-architecture-boundary) owns verification and claim boundaries.
 
 ## Hosted contact form — next two increments
 
@@ -202,7 +202,57 @@ This bounded exception allows the pair to proceed through ordinary implementatio
 
 **Approved baseline fixture exception (2026-09-23):** After preparation found pre-existing Resend renderer/fixture drift, the user approved targeted regeneration of `portfolio-email` and `app-persistence-email` adapter files and recorded fingerprints to preserve merged additive success-response handling. All other existing fixture bytes, merged runtime behavior and historical receipts remain protected. The actual baseline has ten retained fixture roots; this exception changes only the two identified fixture subjects and does not weaken verification. The new contact fixture uses the current site recipe to declare its already effective patched Next.js version directly; temporary portfolio coverage and all historical fixtures remain preserved.
 
+## Lean application environments
+
+**Admission recorded 2026-09-24:** The user directly admits one ten-card environment stream from exact baseline `4b713dabbbf0b3c405c0fa07352e90e6de629d3d`. This is new bounded admission, not retrospective acceptance of all merged work. [ADR-0020](../adr/0020-application-environments.md) owns the architecture and precise supersessions; the [governance exception](../governance/review-and-contribution.md#lean-application-environments-delivery-exception) owns delegated approvals, serialized work/publication and reviewed published unmerged predecessors.
+
+**Evidence:** The accepted foundation receipt `docs/implementation-evidence/2026-09-13-app-foundation-app-certification-receipt.md`, recorded under [certification coverage](../architecture/capability-model.md#certification-coverage), binds its exact `0.1.0` subject to ancestor `fe16ae41153f89242cdf48c0f899c3720f511557`, not the wider admission subject below. Existing observability and hosted-contact receipts remain exact-subject evidence. [Repository quality run 36015266198](https://github.com/Egeria-Systems/egeria-scaffold/actions/runs/36015266198) passed every applicable job at this baseline: builder-and-packages, scope, app-transition-visuals, generated-projects and compatibility-proof; dependency-review was inapplicable to the main push. Verification is not human acceptance or certification. The bounded audit did not establish later email integration acceptance or a final jobs acceptance artifact; preserved private preparation/review material does not fill those gaps. This direct admission permits only this stream's use of the actual baseline and named pending subjects. P4 remains open, and unrelated downstream admission remains gated.
+
+**Frozen subject inventory:** The following snapshot is from the [registry](../../certifications/capabilities.json) at the bound revision. It identifies six certified and eight pending subjects, including the exact pending shared inputs admitted solely for this assembly. It does not reset records, transfer certificates or permanently fix current versions. The registry remains the machine owner; future cards compute actual version/digest/evidence deltas from their real input trees.
+
+| Capability | Version | Behavior-contract digest | Status | Causal renewal assessment |
+| --- | --- | --- | --- | --- |
+| `analytics` | `0.1.0` | `sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba` | pending | Settings, consent, build activation and provider isolation |
+| `app-foundation` | `0.2.0` | `sha256:16eb4a047176fead1fbada2f8b6b0ca3cda8e7faa57ca228763ee3392c14d47a` | pending | Compiled/runtime target and current-profile composition; assess installed default 0.1.0 separately |
+| `application-persistence` | `0.1.0` | `sha256:dcb911f024f4a0cf792396bf919e2387f0193fae6608071c6dea7aa371eb4c95` | pending | Target mapping, bindings, preflight and workflow evidence |
+| `background-job-delivery` | `0.1.0` | `sha256:97c9aa94d8c489ec6eaca1a61258546aa511105c5f3a565509da01e752f0883b` | pending | Target/Worker/deployment inputs; lifecycle remains unsupported and pending |
+| `booking-calendly` | `0.1.0` | `sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca` | pending | Target input, local absence and mode/composition evidence |
+| `contact-form-web3forms` | `0.1.0` | `sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9` | certified | Target input and unavailable/deployment behavior; preserve old receipt |
+| `content-files` | `0.4.0` | `sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4` | certified | Only actual changed content/metadata/shared evidence inputs |
+| `deployment-cloudflare` | `0.6.0` | `sha256:55c727c3636b4405e489d6e65d5b435228f50b1ef6ede51293d44556137576fd` | pending | Target/artifact/credentials and all affected installed 0.3.0–0.6.0 variants |
+| `multilingual` | `0.1.0` | `sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891` | certified | Only changed localized copy and composed evidence |
+| `observability` | `0.3.0` | `sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43` | certified | Exact staging credential exception, destination and privacy evidence |
+| `section-composition` | `0.3.0` | `sha256:9f9830fd6fc0674d3851e42ca6b7f3a14b2182b60a994bc470399043b98b771e` | certified | Only changed rendered UI or shared verification inputs |
+| `site-routing` | `0.4.0` | `sha256:a8bd53e9b32546266efd3dde9dc96fc3914cb06e9e811b8bf96ebd42822e2dac` | certified | Origin/noindex/metadata and genuinely affected transitions |
+| `standards` | `0.6.0` | `sha256:631efaeae569c27f225e9df3eeaacd28537f66a30f1533da70185e017508a4fd` | pending | Common configuration, generated checks/examples and workflow inputs |
+| `transactional-email-resend` | `0.1.0` | `sha256:558ff80dacef968fecf3e8a34e52ecd6672f0619a8fee1b73dcbb9d094a04ff3` | pending | Target, exact recipients, sender/domain and outcome evidence |
+
+Changed source, locks, workflow or runner inputs can require renewal even without a changed descriptor digest. Each card records old/new subjects, changed required evidence, still-applicable causal evidence, exact pending task and missing local/external/human outcomes. Required-evidence changes travel with coherent implementation. Separate certification retains its own plan, authorization and accepted outcomes. Historical receipts survive retirement of related unused generation support.
+
+### Environment delivery checkpoints
+
+| Card | Coherent implementation and documentation owner |
+| --- | --- |
+| 1. Accept architecture, entry and future-service requirements | This documentary admission, ADR, canonical references and all future card/certification amendments; no runtime or registry change |
+| 2. Establish common configuration and internal generation | Freeze actual helper interfaces and version/schema ledger; target/settings, selection-only inputs, refusal and foundation checks; shared environment guide, examples and README |
+| 3. Complete hosted contact configuration | Public target, local unavailability, provider-compatible hCaptcha, browser bounds and contact guide/example |
+| 4. Complete booking configuration | One target for all modes, local absence and isolated test calendar guide/example |
+| 5. Complete analytics, consent and analytics-related guidance | All providers, exact build flag, consent context, Search Console/Looker and provider-specific guide/examples |
+| 6. Reconcile persistence environment selection | Existing target mapping, D1 safeguards, controlled binding evidence and guide/example |
+| 7. Complete transactional email safeguards | Exact recipients, target/sender/domain, bounded outcomes and Resend guide/example |
+| 8. Complete observability configuration and browser diagnostics | Optional provider configuration, exact staging cookie exception and diagnostic guide/example |
+| 9. Complete deployment, artifact verification and site URLs | All four deployment variants, separate prepared artifacts, Access transport, native approval contract, metadata/noindex and jobs target/retention/attestation guide/examples |
+| 10. Release the complete generation and reconcile evidence | Verify coherent public CLI/recipes/lifecycle/guides and representative composed fixtures; activate complete local candidate atomically and reconcile exact subject/certification handoffs |
+
+Every card requires its exact plan, evidence-gap or meaningful RED/GREEN checks, bounded review, verified-diff checkpoint and separately granted publication window. The [capability boundary](../architecture/capability-model.md#application-environments) owns current public and stateful composed acceptance; their consumers ship examples and tests in the owning cards above. Documentation is not deferred to the final card. No current business contact-notification endpoint, queue-to-email workflow, replay tool or future provider is introduced for an example.
+
+During internal assembly public defaults remain byte-identical to the last complete generation. The final checkpoint activates only a coherent generation and retires related unused support under ADR-0020; it does not erase historical evidence or create migration paths for nonexistent clients. “Complete and releasable” additionally requires all required release certification and acceptance outcomes. Source activation does not authorize package publication, live certification, deployment or P4 closure. Stop at each scoped approval gate and before any separately gated operation.
+
+The [future environment acceptance clauses](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance), all 28 delivery cards and every certification row own later service, guide, composed-flow and recovery obligations. Existing detailed private persistence/email/jobs handoffs remain exact historical-subject inputs and must be rebound before later certification; they cannot carry contradictory old environment assumptions into active work. The remaining decisions preserve D1–D12, all dependencies, policy gates and phase statuses.
+
 ## P5 — Remaining independent backend capabilities
+
+The [owning delivery cards and certification rows](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) include environment configuration, composed guide/examples, negative cases and recovery at first executable delivery; existing prerequisites and phase closure remain.
 
 The [remaining-program delivery plan](2026-09-16-remaining-program-delivery-plan.md) decomposes P5D through P10 into outcome increments, dependency and requirement coverage, and separate certification tasks. Its [historical email contract handoff](2026-09-16-email-delivery-contract-plan.md) preserves the original planning record; [recorded decisions](2026-09-16-remaining-program-decisions.md) explain the approved directions. Current sequencing follows the [integrated delivery status](#hosted-contact-form--next-two-increments). These plans do not change current phase acceptance or authorize runtime work.
 
@@ -275,11 +325,15 @@ The user's delivery authorization permits routine in-scope commits, pushes, pull
 
 ## P6 — Payload CMS
 
+The [owning delivery cards and certification rows](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) include environment configuration, composed guide/examples, negative cases and recovery at first executable delivery; existing prerequisites and phase closure remain.
+
 Add separate CMS D1/R2, explicit Payload adapters, file import and parity, drafts/preview, authority cutover, localization integration, export, and recovery. P6 follows stable content and multilingual contracts.
 
 **Stop gate:** Staging parity, cutover, export, and recovery evidence is approved.
 
 ## P7 — Authenticated app
+
+The [owning delivery cards and certification rows](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) include environment configuration, composed guide/examples, negative cases and recovery at first executable delivery; existing prerequisites and phase closure remain.
 
 After accepted certification of P5C, P5D and the required existing shared subjects, run the separately authorized deployed Better Auth/Next.js/OpenNext/D1/Drizzle compatibility and security spike. Implement individual accounts, verified email/password, Google sign-in, sessions, protected use cases, account profile, export/delete hooks, roles, audit events, abuse controls, and the narrow support console. P7 does not require jobs or durable contact submissions.
 
@@ -297,6 +351,8 @@ Only after that checkpoint, deliver the exact supported app-to-authenticated-app
 
 ## P8 — Independent identity assurance and payments
 
+The [owning delivery cards and certification rows](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) include environment configuration, composed guide/examples, negative cases and recovery at first executable delivery; existing prerequisites and phase closure remain.
+
 - P8A: independently migratable TOTP and recovery codes.
 - P8B: independently migratable passkeys and recovery.
 - P8C: independent Stripe payments with `one-time`, `subscriptions`, or `both`.
@@ -307,11 +363,15 @@ These tracks may proceed separately after their prerequisites stabilize. One-tim
 
 ## P9 — Booking webhooks
 
+The [owning delivery cards and certification rows](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) include environment configuration, composed guide/examples, negative cases and recovery at first executable delivery; existing prerequisites and phase closure remain.
+
 Implement verified/idempotent Calendly events, normalized booking events, optional queue processing, replay, diagnostics, and failure recovery without creating a CRM.
 
 **Stop gate:** Security, idempotency, replay, and recovery evidence is approved.
 
 ## P10 — Fleet hardening
+
+The [owning delivery cards and certification rows](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) include environment configuration, composed guide/examples, negative cases and recovery at first executable delivery; existing prerequisites and phase closure remain.
 
 After representative synthetic client-journey evidence, reassess package boundaries, measure inference and migration failures, simplify weak abstractions, verify supported upgrades, run data/provider recovery drills, and perform a bounded portability spike without claiming a second supported production platform.
 
