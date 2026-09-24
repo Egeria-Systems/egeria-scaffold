@@ -23,7 +23,7 @@
   "dependencies": {
     "typescript": "6.0.3",
     "yaml": "2.9.1",
-    "zod": "4.6.1"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@egeria-systems/standards": "workspace:*",
