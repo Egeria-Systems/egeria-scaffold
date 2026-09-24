@@ -739,7 +739,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   for (const [identifier, job] of Object.entries(workflow.jobs)) {
     assert.equal(job["runs-on"], "ubuntu-24.04", identifier);
     assert.equal(typeof job["timeout-minutes"], "number", identifier);
-    const maximumMinutes = ["builder-and-packages", "generated-projects"].includes(identifier) ? 60 : 45;
+    const maximumMinutes = identifier === "generated-projects" ? 90 : identifier === "builder-and-packages" ? 60 : 45;
     assert.ok(job["timeout-minutes"] > 0 && job["timeout-minutes"] <= maximumMinutes);
   }
   for (const identifier of jobsWithCheckout) {
@@ -2493,7 +2493,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     capabilityModel,
-    /Runtime status:[^\n]+thirteen admission descriptors[^\n]+three generation recipes[^\n]+exact descriptors[^\n]+Implementation and registry admission do not certify/iu,
+    /Runtime status:[^\n]+fourteen admission descriptors[^\n]+three generation recipes[^\n]+exact descriptors[^\n]+Implementation and registry admission do not certify/iu,
   );
   const completedRemovalGuardStage = ["P", "3", "C"].join("");
   const appFoundationStage = ["P", "4"].join("");
@@ -2522,7 +2522,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     packageOwnership,
-    /thirteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
   );
   assert.match(
     programRoadmap,
@@ -2853,7 +2853,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /thirteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
+    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
   );
 });
 
@@ -3403,6 +3403,7 @@ test("executable capability certification ownership is current", async () => {
     "analytics",
     "app-foundation",
     "application-persistence",
+    "background-job-delivery",
     "booking-calendly",
     "contact-form-web3forms",
     "content-files",
@@ -3415,7 +3416,7 @@ test("executable capability certification ownership is current", async () => {
     "transactional-email-resend",
   ]);
   const pendingSubjects = new Set([
-    "analytics", "app-foundation", "application-persistence", "booking-calendly",
+    "analytics", "app-foundation", "application-persistence", "background-job-delivery", "booking-calendly",
     "deployment-cloudflare", "standards", "transactional-email-resend",
   ]);
   for (const [capabilityId, record] of Object.entries(registry.records)) {
@@ -3423,7 +3424,7 @@ test("executable capability certification ownership is current", async () => {
     assert.equal(record.status, pending ? "pending" : "certified");
     assert.equal(
       record.taskPlan,
-      capabilityId === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md" : ["app-foundation", "transactional-email-resend"].includes(capabilityId)
+      ["background-job-delivery", "deployment-cloudflare"].includes(capabilityId) ? "docs/superpowers/plans/2026-09-23-background-job-delivery-certification.md" : capabilityId === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md" : ["app-foundation", "transactional-email-resend"].includes(capabilityId)
         ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
         : ["application-persistence", "standards", "deployment-cloudflare"].includes(capabilityId)
         ? "docs/superpowers/plans/2026-09-14-application-persistence-certification.md"
@@ -3606,8 +3607,8 @@ test("canonical documentation records visual regression and the client-ready clo
   ]) {
     assert.match(currentContractOwner, /\bsubjects\b[^\n]+\b(?:pending|empty evidence)\b/iu);
   }
-  assert.match(capabilityModel, /\bCurrent admission passes for all thirteen records\b/iu);
-  assert.match(capabilityModel, /\bsix certified and seven pending subjects\b/iu);
+  assert.match(capabilityModel, /\bCurrent admission passes for all fourteen records\b/iu);
+  assert.match(capabilityModel, /\bsix certified and eight pending subjects\b/iu);
 
   assert.match(
     capabilityModel,
@@ -4195,7 +4196,7 @@ test("canonical documentation accepts profile-transition execution and records t
   ]) {
     assert.match(historicalCertificationOwner, multilingualEligibilityPattern);
   }
-  assert.match(builderCoreInstructions, /\bsix exact subjects are certified; seven subjects remain pending\b/iu);
+  assert.match(builderCoreInstructions, /\bsix exact subjects are certified; eight subjects remain pending\b/iu);
 
   for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
     assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);
@@ -4624,7 +4625,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     {
       fixtures: "node --test tests/generated-fixtures/*.test.mjs",
       kernel:
-        "pnpm run test:constitution && pnpm run test:synthetic-client-journey && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages && pnpm run test:capability-certification && pnpm run check:capability-certification && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run changeset:status",
+        "pnpm run test:constitution && pnpm run test:synthetic-client-journey && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages && pnpm run test:capability-certification && pnpm run check:capability-certification && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run test:generated-jobs && pnpm run changeset:status",
       skeletons: "node scripts/verify-generated-skeletons.mjs",
     },
   );
@@ -4654,15 +4655,15 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     capabilityModel,
-    /thirteen admission descriptors.*three generation recipes.*exact descriptors.*Implementation and registry admission do not certify/isu,
+    /fourteen admission descriptors.*three generation recipes.*exact descriptors.*Implementation and registry admission do not certify/isu,
   );
   assert.match(
     packageOwnership,
-    /thirteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
   );
   assert.match(
     builderCoreReadme,
-    /exact thirteen executable admission capability descriptors/iu,
+    /exact fourteen executable admission capability descriptors/iu,
   );
   assert.match(
     cliReadme,

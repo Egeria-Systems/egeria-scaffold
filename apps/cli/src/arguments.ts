@@ -24,6 +24,7 @@ export type CliCommand =
       multilingual?: true;
       applicationPersistence?: true;
       transactionalEmailResend?: true;
+      backgroundJobDelivery?: true;
       contactFormWeb3Forms?: Web3FormsContactSettings;
     }>
   | Readonly<{
@@ -249,6 +250,7 @@ function parseCreate(
         multilingual: { type: "boolean" },
         "application-persistence": { type: "boolean" },
         "transactional-email-resend": { type: "boolean" },
+        "background-job-delivery": { type: "boolean" },
         ...analyticsOptionDefinitions,
       },
       strict: true,
@@ -264,6 +266,7 @@ function parseCreate(
     const multilingual = values.multilingual;
     const applicationPersistence = values["application-persistence"];
     const transactionalEmailResend = values["transactional-email-resend"];
+    const backgroundJobDelivery = values["background-job-delivery"];
     const parsedContact = values["web3forms-access-key"] === undefined ? undefined
       : web3FormsContactSettingsSchema.safeParse({ accessKey: values["web3forms-access-key"] });
     const parsedAnalytics = parseAnalyticsSettings(values);
@@ -293,6 +296,7 @@ function parseCreate(
       ...(multilingual === true ? ["multilingual"] : []),
       ...(applicationPersistence === true ? ["application-persistence"] : []),
       ...(transactionalEmailResend === true ? ["transactional-email-resend"] : []),
+      ...(backgroundJobDelivery === true ? ["background-job-delivery"] : []),
       ...(parsedContact === undefined ? [] : ["web3forms-access-key"]),
       ...selectedAnalyticsOptions(values),
     ];
@@ -329,6 +333,7 @@ function parseCreate(
         ...(multilingual === true ? { multilingual: true } : {}),
         ...(applicationPersistence === true ? { applicationPersistence: true } : {}),
         ...(transactionalEmailResend === true ? { transactionalEmailResend: true } : {}),
+        ...(backgroundJobDelivery === true ? { backgroundJobDelivery: true } : {}),
       },
     };
   } catch {

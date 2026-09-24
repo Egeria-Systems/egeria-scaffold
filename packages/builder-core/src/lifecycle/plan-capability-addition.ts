@@ -552,6 +552,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   }
 
   const project = inspection.project.value;
+  if (project.selectedCapabilities.includes("background-job-delivery")) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
 
   if (hasMaterialDrift(inspection)) {
     return planningFailure("PROJECT_DRIFT_DETECTED");

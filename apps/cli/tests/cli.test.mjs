@@ -7396,3 +7396,19 @@ for (const profile of ["portfolio", "app"]) {
     }, { generation:"vitest-five" });
   });
 }
+
+
+test("jobs create selection remains independent and lifecycle requests refuse", () => {
+  const directory = resolve("/private/generated-jobs-example");
+  const arguments_ = [...appCreateArguments(directory), "--background-job-delivery"];
+  const selected = assertSuccess(cliArguments.parseCliArguments(arguments_));
+  assert.equal(selected.backgroundJobDelivery, true);
+  assert.equal(selected.applicationPersistence, undefined);
+  assert.equal(selected.transactionalEmailResend, undefined);
+  assert.equal(cliArguments.parseCliArguments([...arguments_, "--background-job-delivery"]).ok, false);
+  assert.equal(cliArguments.parseCliArguments([...appCreateArguments(directory), "--background-job-delivery=false"]).ok, false);
+  for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
+    assert.equal(cliArguments.parseCliArguments([kind, "--directory", directory, "--capability", "background-job-delivery",
+      ...(kind.startsWith("apply") ? ["--approved-plan", `sha256:${"a".repeat(64)}`] : [])]).ok, false);
+  }
+});

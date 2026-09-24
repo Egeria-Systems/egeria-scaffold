@@ -139,3 +139,5 @@ Optional application persistence follows [ADR-0016](../adr/0016-optional-applica
 Optional transactional email follows [ADR-0017](../adr/0017-transactional-email-resend.md) and the [email boundary](capability-model.md#transactional-email-boundary). It selects a broader foundation view on current profiles, preserves default and historical recipes, and retains foundation after email removal. Provider setup and certification remain separate.
 
 Optional hosted contact follows [ADR-0018](../adr/0018-hosted-contact-form.md) and the [contact boundary](capability-model.md#hosted-contact-form-boundary). It adds a browser-only home form to current profiles without requiring foundation, Resend or persistence. Existing email and durable-contact responsibilities stay independent.
+
+Optional fresh-generation background jobs uses the shared primary OpenNext Worker selected by [ADR-0019](../adr/0019-background-job-delivery.md), with separate HTTP and Queue delivery modules. The [jobs boundary](capability-model.md#background-job-delivery-boundary) owns support, finite descriptor tuples, lifecycle refusal and certification limits.

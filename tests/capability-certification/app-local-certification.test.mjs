@@ -14,6 +14,7 @@ const revision = "4da1ad1e48c12567d4e477c4ecbc3b9d4e097922";
 const currentRegistry = JSON.parse(await readFile(join(repositoryRoot, "certifications/capabilities.json"), "utf8"));
 const registry = structuredClone(currentRegistry);
 delete registry.records["application-persistence"];
+delete registry.records["background-job-delivery"];
 delete registry.records["transactional-email-resend"];
 delete registry.records["contact-form-web3forms"];
 registry.records["app-foundation"] = {

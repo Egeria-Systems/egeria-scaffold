@@ -1669,7 +1669,7 @@ test("the repository registry admits accepted subjects and refuses closure for r
     stdout: `${JSON.stringify({
       ok: true,
       gate: "admission",
-      records: 13,
+      records: 14,
     })}\n`,
     stderr: "",
   });
@@ -1700,6 +1700,7 @@ test("the repository registry admits accepted subjects and refuses closure for r
       "analytics",
       "app-foundation",
       "application-persistence",
+      "background-job-delivery",
       "booking-calendly",
       "deployment-cloudflare",
       "standards",
@@ -1820,7 +1821,7 @@ test("ordinary admission requires a new pending task for a changed accepted subj
         stdout: `${JSON.stringify({
           ok: true,
           gate: "admission",
-          records: 13,
+          records: 14,
         })}\n`,
         stderr: "",
       },
@@ -1852,7 +1853,7 @@ test("the ordinary certification gate does not require private workflow artifact
       stdout: `${JSON.stringify({
         ok: true,
         gate: "admission",
-        records: 13,
+        records: 14,
       })}\n`,
       stderr: "",
     });

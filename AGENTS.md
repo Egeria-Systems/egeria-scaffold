@@ -93,3 +93,5 @@ The current P0.2 infrastructure proof lives under [`proofs/nextjs-cloudflare`](p
 The current P0.3 builder boundaries have more-specific instructions for [`apps/cli`](apps/cli/AGENTS.md), [`packages/builder-core`](packages/builder-core/AGENTS.md), [`packages/standards`](packages/standards/AGENTS.md), and [`packages/observability`](packages/observability/AGENTS.md). Read the applicable boundary before changing it.
 
 Optional hosted contact follows [ADR-0018](docs/adr/0018-hosted-contact-form.md) and the [contact boundary](docs/architecture/capability-model.md#hosted-contact-form-boundary). Preserve independent Resend behavior and installed foundation/persistence verification. No live provider certification or external data disposition is implied by local implementation.
+
+Optional fresh-generation jobs follows the [background job delivery boundary](docs/architecture/capability-model.md#background-job-delivery-boundary). Preserve exact default/installed views and refuse unsupported jobs lifecycle; no provider, replay, drain or deployment authority is implied.
