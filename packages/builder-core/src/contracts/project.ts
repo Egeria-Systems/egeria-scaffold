@@ -5,6 +5,7 @@ import {
   stableIdentifierSchema,
 } from "./identifiers.js";
 import {
+  applicationEnvironmentRecipeVersions,
   profileIdentifierSchema,
   profileRecipeVersionSchema,
 } from "./profile.js";
@@ -90,6 +91,39 @@ const googleSearchConsoleVerificationTokenSchema = z
   .string()
   .regex(/^[A-Za-z0-9_-]{16,128}$/u);
 
+function validateAnalyticsSelection(
+  settings: Readonly<{
+    providers: Readonly<Record<string, unknown>>;
+    operationalIntegrations: Readonly<{ googleSearchConsole?: unknown; lookerStudio?: unknown }>;
+  }>,
+  context: z.RefinementCtx,
+): void {
+    const hasRuntimeProvider = Object.values(settings.providers).some(
+      (provider) => provider !== undefined,
+    );
+    const hasSearchConsole =
+      settings.operationalIntegrations.googleSearchConsole !== undefined;
+
+    if (!hasRuntimeProvider && !hasSearchConsole) {
+      context.addIssue({
+        code: "custom",
+        message: "analytics requires a runtime provider or Search Console",
+        path: ["providers"],
+      });
+    }
+
+    if (
+      settings.operationalIntegrations.lookerStudio !== undefined &&
+      settings.providers.googleAnalytics4 === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Looker Studio requires Google Analytics 4",
+        path: ["operationalIntegrations", "lookerStudio"],
+      });
+    }
+}
+
 export const analyticsSettingsSchema = z
   .strictObject({
     consent: z
@@ -129,32 +163,7 @@ export const analyticsSettingsSchema = z
       })
       .readonly(),
   })
-  .superRefine((settings, context) => {
-    const hasRuntimeProvider = Object.values(settings.providers).some(
-      (provider) => provider !== undefined,
-    );
-    const hasSearchConsole =
-      settings.operationalIntegrations.googleSearchConsole !== undefined;
-
-    if (!hasRuntimeProvider && !hasSearchConsole) {
-      context.addIssue({
-        code: "custom",
-        message: "analytics requires a runtime provider or Search Console",
-        path: ["providers"],
-      });
-    }
-
-    if (
-      settings.operationalIntegrations.lookerStudio !== undefined &&
-      settings.providers.googleAnalytics4 === undefined
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "Looker Studio requires Google Analytics 4",
-        path: ["operationalIntegrations", "lookerStudio"],
-      });
-    }
-  })
+  .superRefine(validateAnalyticsSelection)
   .readonly();
 
 export type AnalyticsSettings = z.infer<typeof analyticsSettingsSchema>;
@@ -173,30 +182,13 @@ const capabilitySettingsSchema = z
   })
   .readonly();
 
-export const projectConfigurationSchema = z
-  .strictObject({
-    schemaVersion: z.literal("1.0.0"),
-    builderCompatibility: z.literal("0.0.0"),
-    project: z
-      .strictObject({
-        name: stableIdentifierSchema,
-        displayName: displayNameSchema,
-        defaultLocale: z.literal("en-CA"),
-      })
-      .readonly(),
-    originProfile: profileIdentifierSchema,
-    recipeVersion: profileRecipeVersionSchema,
-    platformAdapter: z.literal("cloudflare-workers"),
-    selectedCapabilities: capabilityIdentifierListSchema,
-    capabilitySettings: capabilitySettingsSchema,
-    ejectedAreas: ejectedAreaListSchema,
-  })
-  .superRefine((project, context) => {
-    const contactSelected = project.selectedCapabilities.includes("contact-form-web3forms");
-    const contactConfigured = project.capabilitySettings["contact-form-web3forms"] !== undefined;
-    if (contactSelected !== contactConfigured) {
-      context.addIssue({ code: "custom", message: "contact selection and settings must agree", path: ["capabilitySettings", "contact-form-web3forms"] });
-    }
+function validateProjectSelections(
+  project: Readonly<{
+    selectedCapabilities: readonly string[];
+    capabilitySettings: Readonly<{ analytics?: unknown; "booking-calendly"?: unknown }>;
+  }>,
+  context: z.RefinementCtx,
+): void {
     const bookingSelected =
       project.selectedCapabilities.includes("booking-calendly");
     const bookingConfigured =
@@ -226,6 +218,33 @@ export const projectConfigurationSchema = z
           : ["capabilitySettings", "analytics"],
       });
     }
+}
+
+export const projectConfigurationSchema = z
+  .strictObject({
+    schemaVersion: z.literal("1.0.0"),
+    builderCompatibility: z.literal("0.0.0"),
+    project: z
+      .strictObject({
+        name: stableIdentifierSchema,
+        displayName: displayNameSchema,
+        defaultLocale: z.literal("en-CA"),
+      })
+      .readonly(),
+    originProfile: profileIdentifierSchema,
+    recipeVersion: profileRecipeVersionSchema,
+    platformAdapter: z.literal("cloudflare-workers"),
+    selectedCapabilities: capabilityIdentifierListSchema,
+    capabilitySettings: capabilitySettingsSchema,
+    ejectedAreas: ejectedAreaListSchema,
+  })
+  .superRefine((project, context) => {
+    const contactSelected = project.selectedCapabilities.includes("contact-form-web3forms");
+    const contactConfigured = project.capabilitySettings["contact-form-web3forms"] !== undefined;
+    if (contactSelected !== contactConfigured) {
+      context.addIssue({ code: "custom", message: "contact selection and settings must agree", path: ["capabilitySettings", "contact-form-web3forms"] });
+    }
+    validateProjectSelections(project, context);
   })
   .readonly()
   .meta({
@@ -236,3 +255,41 @@ export const projectConfigurationSchema = z
 export type ProjectConfiguration = z.infer<
   typeof projectConfigurationSchema
 >;
+
+export const applicationEnvironmentBookingSettingsSchema = calendlyBookingSettingsSchema
+  .unwrap()
+  .pick({ mode: true })
+  .readonly();
+
+export const applicationEnvironmentAnalyticsSettingsSchema = z.strictObject({
+  consent: analyticsSettingsSchema.unwrap().shape.consent,
+  providers: z.strictObject({
+    cloudflareWebAnalytics: z.literal(true).optional(),
+    googleAnalytics4: z.literal(true).optional(),
+    microsoftClarity: z.strictObject({ audience: z.literal("not-directed-to-minors") }).readonly().optional(),
+  }).readonly(),
+  operationalIntegrations: z.strictObject({
+    googleSearchConsole: z.literal(true).optional(),
+    lookerStudio: analyticsSettingsSchema.unwrap().shape.operationalIntegrations.unwrap().shape.lookerStudio,
+  }).readonly(),
+}).superRefine(validateAnalyticsSelection).readonly();
+
+export const applicationEnvironmentProjectConfigurationSchema = z.strictObject({
+  ...projectConfigurationSchema.unwrap().shape,
+  schemaVersion: z.literal("2.0.0"),
+  capabilitySettings: z.strictObject({
+    analytics: applicationEnvironmentAnalyticsSettingsSchema.optional(),
+    "booking-calendly": applicationEnvironmentBookingSettingsSchema.optional(),
+  }).readonly(),
+}).superRefine(validateProjectSelections).superRefine((project, context) => {
+  if (project.recipeVersion !== applicationEnvironmentRecipeVersions[project.originProfile]) {
+    context.addIssue({ code: "custom", message: "application environment recipe must match profile", path: ["recipeVersion"] });
+  }
+}).readonly().meta({
+  id: "urn:egeria-systems:schema:project:2.0.0",
+  title: "Egeria application environment project configuration",
+});
+
+export type ApplicationEnvironmentAnalyticsSettings = z.infer<typeof applicationEnvironmentAnalyticsSettingsSchema>;
+export type ApplicationEnvironmentBookingSettings = z.infer<typeof applicationEnvironmentBookingSettingsSchema>;
+export type ApplicationEnvironmentProjectConfiguration = z.infer<typeof applicationEnvironmentProjectConfigurationSchema>;

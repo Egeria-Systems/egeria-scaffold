@@ -246,7 +246,7 @@ Changed source, locks, workflow or runner inputs can require renewal even withou
 | Card | Coherent implementation and documentation owner |
 | --- | --- |
 | 1. Accept architecture, entry and future-service requirements | This documentary admission, ADR, canonical references and all future card/certification amendments; no runtime or registry change |
-| 2. Establish common configuration and internal generation | Freeze actual helper interfaces and version/schema ledger; target/settings, selection-only inputs, refusal and foundation checks; shared environment guide, examples and README |
+| 2. Establish common configuration and internal generation | [Common internal candidate](../architecture/capability-model.md#common-configuration-internal-candidate) implements the finite version/schema ledger, shared target helper, selection-only parsing, state-last generation/inference/doctor, foundation guard and shared guide/examples. Candidate verification and independent acceptance remain separate; public activation and provider consumers remain later checkpoints. |
 | 3. Complete hosted contact configuration | Public target, local unavailability, provider-compatible hCaptcha, browser bounds and contact guide/example |
 | 4. Complete booking configuration | One target for all modes, local absence and isolated test calendar guide/example |
 | 5. Complete analytics, consent and analytics-related guidance | All providers, exact build flag, consent context, Search Console/Looker and provider-specific guide/examples |

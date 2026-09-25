@@ -3,16 +3,21 @@ import type { ProfileRecipe } from "../contracts/profile.js";
 import type { ProjectConfiguration } from "../contracts/project.js";
 import type { ValidationResult } from "../contracts/result.js";
 import type { InstalledState } from "../contracts/state.js";
-import type { SkeletonRenderingContext } from "../generation/render-skeleton.js";
+import type { ApplicationEnvironmentRenderingContext, SkeletonRenderingContext } from "../generation/render-skeleton.js";
 import {
+  createApplicationEnvironmentProfileRecipes,
   createVitestFourProfileRecipes,
   createVitestFiveProfileRecipes,
   profileRecipes,
 } from "../profiles/profile-recipes.js";
 import { createCachingRepositoryReader } from "../repository/cache-reader.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
+import { createInstalledManifest } from "../manifest/create-installed-manifest.js";
+import { resolveCapabilities } from "../resolution/resolve-capabilities.js";
+import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
 import { parseProjectYaml, parseStateJson } from "../state/codecs.js";
 import {
+  applicationEnvironmentCatalogSnapshot,
   createCapabilityCatalog,
   createCapabilityCatalogSnapshot,
   vitestFourCapabilityCatalogSnapshot,
@@ -117,10 +122,10 @@ function selectInstalledRenderingContext(
   };
 }
 
-type VerifiedProjectSnapshot = Readonly<{
+type VerifiedProjectSnapshot<C = SkeletonRenderingContext | undefined> = Readonly<{
   catalog: readonly CapabilityDescriptor[];
   profiles: readonly ProfileRecipe[];
-  renderingContext: SkeletonRenderingContext | undefined;
+  renderingContext: C;
 }>;
 
 export function createVerifiedProjectSnapshot(
@@ -149,8 +154,11 @@ export function createVerifiedProjectSnapshot(
     : catalog;
 }
 
+export function readVerifiedProjectSnapshot(sourceReader: RepositoryReader, context: ApplicationEnvironmentRenderingContext): Promise<ValidationResult<VerifiedProjectSnapshot<ApplicationEnvironmentRenderingContext> & Readonly<{ reader: RepositoryReader }>>>;
+export function readVerifiedProjectSnapshot(sourceReader: RepositoryReader): Promise<ValidationResult<VerifiedProjectSnapshot & Readonly<{ reader: RepositoryReader }>>>;
 export async function readVerifiedProjectSnapshot(
   sourceReader: RepositoryReader,
+  context?: ApplicationEnvironmentRenderingContext,
 ): Promise<ValidationResult<
   VerifiedProjectSnapshot & Readonly<{ reader: RepositoryReader }>
 >> {
@@ -159,6 +167,23 @@ export async function readVerifiedProjectSnapshot(
     reader.readText(".egeria/project.yaml"),
     reader.readText(".egeria/state.json"),
   ]);
+  if (context !== undefined) {
+    const invalid = (): ValidationResult<never> => ({
+      ok: false,
+      issues: [{ code: "PROJECT_INSPECTION_INVALID", path: [], context: { reason: "candidate-controls-invalid" } }],
+    });
+    if (!isApplicationEnvironmentRenderingContext(context) ||
+        projectSource.kind !== "file" || stateSource.kind !== "file") return invalid();
+    const project = parseProjectYaml(projectSource.content, "2.0.0");
+    const state = parseStateJson(stateSource.content, "2.0.0");
+    if (!project.ok || !state.ok || project.value.originProfile !== state.value.origin.profile ||
+        project.value.recipeVersion !== state.value.origin.recipeVersion) return invalid();
+    const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, context.catalogSnapshot);
+    if (!catalog.ok) return catalog;
+    const resolved = resolveCapabilities({ profile: project.value.originProfile, requestedCapabilities: project.value.selectedCapabilities }, catalog.value, context.profiles);
+    if (!resolved.ok || stringifyCanonicalJson(createInstalledManifest(resolved.value)) !== stringifyCanonicalJson(state.value.installedCapabilities)) return invalid();
+    return { ok: true, value: { reader, catalog: catalog.value, profiles: context.profiles, renderingContext: context } };
+  }
   const project = projectSource.kind === "file"
     ? parseProjectYaml(projectSource.content)
     : undefined;
@@ -172,4 +197,20 @@ export async function readVerifiedProjectSnapshot(
   return snapshot.ok
     ? { ok: true, value: { ...snapshot.value, reader } }
     : snapshot;
+}
+
+export function createApplicationEnvironmentRenderingContext(): ApplicationEnvironmentRenderingContext {
+  return {
+    projectSchemaVersion: "2.0.0",
+    catalogSnapshot: applicationEnvironmentCatalogSnapshot,
+    profiles: createApplicationEnvironmentProfileRecipes(),
+  };
+}
+
+export function isApplicationEnvironmentRenderingContext(value: unknown): value is ApplicationEnvironmentRenderingContext {
+  try {
+    return stringifyCanonicalJson(value) === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext());
+  } catch {
+    return false;
+  }
 }

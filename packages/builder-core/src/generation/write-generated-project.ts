@@ -10,6 +10,7 @@ import { basename, dirname, join, parse, resolve } from "node:path";
 
 import {
   createGenerationRenderingContext,
+  isApplicationEnvironmentRenderingContext,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
 import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
@@ -23,6 +24,10 @@ import type {
   ValidationResult,
 } from "../contracts/result.js";
 import {
+  applicationEnvironmentAnalyticsSettingsSchema,
+  applicationEnvironmentBookingSettingsSchema,
+  type ApplicationEnvironmentProjectConfiguration,
+  type ProjectConfiguration,
   analyticsSettingsSchema,
   type AnalyticsSettings,
   calendlyBookingSettingsSchema,
@@ -32,6 +37,8 @@ import {
 } from "../contracts/project.js";
 import { validateContract } from "../contracts/result.js";
 import {
+  applicationEnvironmentInstalledStateSchema,
+  type ApplicationEnvironmentInstalledState,
   installedStateSchema,
   type InstalledState,
 } from "../contracts/state.js";
@@ -45,6 +52,8 @@ import {
 } from "./builder-state-surfaces.js";
 import {
   renderSkeleton,
+  type ApplicationEnvironmentGenerationRequest,
+  type ApplicationEnvironmentRenderingContext,
   type GenerationRequest,
   type RenderedSkeleton,
 } from "./render-skeleton.js";
@@ -68,9 +77,13 @@ export type ProjectGenerationRequest = Omit<
   "packageVersions"
 >;
 
-export type GeneratedProject = Readonly<{
+export type ApplicationEnvironmentProjectGenerationRequest = Omit<ApplicationEnvironmentGenerationRequest, "packageVersions">;
+
+type GenerationSkeleton = RenderedSkeleton<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration>;
+
+export type GeneratedProject<S = InstalledState> = Readonly<{
   destination: string;
-  state: InstalledState;
+  state: S;
 }>;
 
 type Destination = Readonly<{
@@ -122,6 +135,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function validateRequest(
   value: unknown,
+  applicationEnvironments = false,
 ): ValidationResult<ProjectGenerationRequest> {
   if (!isPlainObject(value)) {
     return issue(
@@ -148,6 +162,16 @@ function validateRequest(
       ["request"],
       "invalid-keys",
     );
+  }
+
+  if (applicationEnvironments) {
+    if (includesContact && value.contactFormWeb3Forms !== true) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "contactFormWeb3Forms"], "invalid-selection");
+    if (includesAnalytics && !applicationEnvironmentAnalyticsSettingsSchema.safeParse(value.analytics).success) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "analytics"], "invalid-settings");
+    if (includesCalendly && !applicationEnvironmentBookingSettingsSchema.safeParse(value.bookingCalendly).success) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "bookingCalendly"], "invalid-settings");
+    for (const key of ["multilingual", "applicationPersistence", "transactionalEmailResend", "backgroundJobDelivery"] as const) {
+      if (Object.hasOwn(value, key) && value[key] !== true) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", key], "invalid-selection");
+    }
+    if (includesContact || includesAnalytics || includesCalendly || includesPersistence || includesEmail || includesJobs) return issue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
   }
 
   let contactFormWeb3Forms: Web3FormsContactSettings | undefined;
@@ -329,7 +353,7 @@ async function writeExclusive(
 
 async function writeInitialFiles(
   source: PathIdentity,
-  rendered: RenderedSkeleton,
+  rendered: GenerationSkeleton,
   projectContent: Uint8Array,
 ): Promise<ValidationResult<void>> {
   const files = [
@@ -363,7 +387,7 @@ function validatePreparedLockfile(
 }
 
 function expectedCapabilityIdentifiers(
-  rendered: RenderedSkeleton,
+  rendered: GenerationSkeleton,
 ): readonly string[] {
   return rendered.resolved.capabilities
     .map(({ identifier }) => identifier)
@@ -372,13 +396,13 @@ function expectedCapabilityIdentifiers(
 
 async function requirePreStateInference(
   source: PathIdentity,
-  rendered: RenderedSkeleton,
+  rendered: GenerationSkeleton,
   catalog: readonly CapabilityDescriptor[],
 ): Promise<ValidationResult<void>> {
-  const inference = await inferRepository({
-    reader: createFileSystemRepositoryReader(source.path),
-    catalog,
-  });
+  const request = { reader: createFileSystemRepositoryReader(source.path), catalog };
+  const inference = rendered.project.schemaVersion === "2.0.0"
+    ? await inferRepository({ ...request, projectSchemaVersion: "2.0.0" })
+    : await inferRepository(request);
 
   if (
     inference.state.kind !== "missing" ||
@@ -399,7 +423,7 @@ async function requirePreStateInference(
 
 function verificationIsExact(
   value: unknown,
-  rendered: RenderedSkeleton,
+  rendered: GenerationSkeleton,
 ): value is GeneratedProjectVerification {
   if (!isPlainObject(value) || !Array.isArray(value.checks)) {
     return false;
@@ -420,10 +444,10 @@ function verificationIsExact(
 
 async function createInstalledState(input: Readonly<{
   source: PathIdentity;
-  rendered: RenderedSkeleton;
+  rendered: GenerationSkeleton;
   projectContent: Uint8Array;
   verification: GeneratedProjectVerification;
-}>): Promise<ValidationResult<InstalledState>> {
+}>): Promise<ValidationResult<InstalledState | ApplicationEnvironmentInstalledState>> {
   let lockfileContent: Uint8Array;
   try {
     lockfileContent = await readFile(join(input.source.path, "pnpm-lock.yaml"));
@@ -459,10 +483,10 @@ async function createInstalledState(input: Readonly<{
     );
   }
 
-  const state = validateContract(installedStateSchema, {
-    schemaVersion: "1.0.0",
+  const stateInput = {
+    schemaVersion: input.rendered.project.schemaVersion,
     builderVersion: "0.0.0",
-    projectSchemaVersion: "1.0.0",
+    projectSchemaVersion: input.rendered.project.schemaVersion,
     origin: {
       profile: input.rendered.project.originProfile,
       recipeVersion: input.rendered.project.recipeVersion,
@@ -485,8 +509,11 @@ async function createInstalledState(input: Readonly<{
         "post-state-inference",
       ],
     },
-  });
+  };
 
+  const state = input.rendered.project.schemaVersion === "2.0.0"
+    ? validateContract(applicationEnvironmentInstalledStateSchema, stateInput)
+    : validateContract(installedStateSchema, stateInput);
   return state.ok
     ? state
     : issue("STATE_CONSTRUCTION_FAILED", [], "contract-invalid");
@@ -494,14 +521,14 @@ async function createInstalledState(input: Readonly<{
 
 async function requirePostStateInference(
   source: PathIdentity,
-  rendered: RenderedSkeleton,
+  rendered: GenerationSkeleton,
   catalog: readonly CapabilityDescriptor[],
-  state: InstalledState,
+  state: InstalledState | ApplicationEnvironmentInstalledState,
 ): Promise<ValidationResult<void>> {
-  const inference = await inferRepository({
-    reader: createFileSystemRepositoryReader(source.path),
-    catalog,
-  });
+  const request = { reader: createFileSystemRepositoryReader(source.path), catalog };
+  const inference = rendered.project.schemaVersion === "2.0.0"
+    ? await inferRepository({ ...request, projectSchemaVersion: "2.0.0" })
+    : await inferRepository(request);
 
   if (
     inference.state.kind !== "valid" ||
@@ -526,10 +553,10 @@ async function requirePostStateInference(
 async function executeGeneration(input: Readonly<{
   source: PathIdentity;
   destination: Destination;
-  rendered: RenderedSkeleton;
+  rendered: GenerationSkeleton;
   catalog: readonly CapabilityDescriptor[];
   verifier: GeneratedProjectVerifier;
-}>): Promise<ValidationResult<GeneratedProject>> {
+}>): Promise<ValidationResult<GeneratedProject<InstalledState | ApplicationEnvironmentInstalledState>>> {
   const projectContent = encoder.encode(
     serializeProjectYaml(input.rendered.project),
   );
@@ -685,28 +712,49 @@ function appendCleanupFailure(
   };
 }
 
-export async function generateProject(input: Readonly<{
+type GenerateProjectInput = Readonly<{
   request: ProjectGenerationRequest;
   destination: string;
   verifier: GeneratedProjectVerifier;
-}>): Promise<ValidationResult<GeneratedProject>> {
-  const request = validateRequest(input.request);
+}>;
+type ApplicationEnvironmentGenerateProjectInput = Omit<GenerateProjectInput, "request"> & Readonly<{
+  request: ApplicationEnvironmentProjectGenerationRequest;
+  renderingContext: ApplicationEnvironmentRenderingContext;
+}>;
+
+export function generateProject(input: ApplicationEnvironmentGenerateProjectInput): Promise<ValidationResult<GeneratedProject<ApplicationEnvironmentInstalledState>>>;
+export function generateProject(input: GenerateProjectInput): Promise<ValidationResult<GeneratedProject>>;
+export async function generateProject(input: GenerateProjectInput | ApplicationEnvironmentGenerateProjectInput): Promise<ValidationResult<GeneratedProject<InstalledState | ApplicationEnvironmentInstalledState>>> {
+  const candidateContext = "renderingContext" in input ? input.renderingContext : undefined;
+  if ("renderingContext" in input && !isApplicationEnvironmentRenderingContext(candidateContext)) {
+    return issue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "unsupported-context");
+  }
+  const request = validateRequest(input.request, candidateContext !== undefined);
   if (!request.ok) {
     return request;
   }
 
-  const renderingContext = createGenerationRenderingContext(request.value.applicationPersistence === true, request.value.transactionalEmailResend === true, request.value.backgroundJobDelivery === true);
+  const renderingContext = candidateContext ?? createGenerationRenderingContext(request.value.applicationPersistence === true, request.value.transactionalEmailResend === true, request.value.backgroundJobDelivery === true);
   const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, renderingContext.catalogSnapshot);
   if (!catalog.ok) {
     return issue("VERIFIED_CATALOG_INVALID", [], "catalog-invalid");
   }
+
+  const candidateRendered = candidateContext === undefined ? undefined : await renderSkeleton({
+    profile: request.value.profile,
+    projectName: request.value.projectName,
+    displayName: request.value.displayName,
+    ...(request.value.multilingual === true ? { multilingual: true } : {}),
+    packageVersions: verifiedCapabilityPackageVersions,
+  }, candidateContext);
+  if (candidateRendered?.ok === false) return candidateRendered;
 
   const destination = await resolveDestination(input.destination);
   if (!destination.ok) {
     return destination;
   }
 
-  const rendered = await renderSkeleton({
+  const rendered = candidateRendered ?? await renderSkeleton({
     ...request.value,
     packageVersions: verifiedCapabilityPackageVersions,
   }, renderingContext);
@@ -719,7 +767,7 @@ export async function generateProject(input: Readonly<{
     return source;
   }
 
-  let result: ValidationResult<GeneratedProject>;
+  let result: ValidationResult<GeneratedProject<InstalledState | ApplicationEnvironmentInstalledState>>;
   try {
     result = await executeGeneration({
       source: source.value,

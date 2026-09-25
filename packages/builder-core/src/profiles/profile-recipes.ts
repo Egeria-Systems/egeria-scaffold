@@ -1,4 +1,4 @@
-import type { ProfileRecipe } from "../contracts/profile.js";
+import { applicationEnvironmentRecipeVersions, type ProfileRecipe } from "../contracts/profile.js";
 
 export type SupportedProfileRecipeVersion = "0.9.0" | "0.10.0";
 
@@ -11,8 +11,8 @@ const sharedPortfolioCapabilities = [
 ] as const;
 
 function createRecipes(input: Readonly<{
-  portfolio: "0.9.0" | "0.10.0" | "0.11.0";
-  site: "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0";
+  portfolio: "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0";
+  site: "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0";
 }>): readonly ProfileRecipe[] {
   return [
     {
@@ -74,3 +74,10 @@ export function createVitestFiveProfileRecipes(): readonly ProfileRecipe[] {
 }
 
 export const profileRecipes: readonly ProfileRecipe[] = createVitestFiveProfileRecipes();
+
+export function createApplicationEnvironmentProfileRecipes(): readonly ProfileRecipe[] {
+  return [
+    ...createRecipes(applicationEnvironmentRecipeVersions),
+    { identifier: "app", schemaVersion: "1.0.0", recipeVersion: applicationEnvironmentRecipeVersions.app, defaultCapabilities: ["app-foundation", "site-routing"] },
+  ];
+}

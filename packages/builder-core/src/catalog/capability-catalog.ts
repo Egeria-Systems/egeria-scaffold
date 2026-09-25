@@ -20,10 +20,10 @@ export type CapabilityPackageVersions = Readonly<{
 }>;
 
 export type CapabilityCatalogSnapshot = Readonly<{
-  standards: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0";
+  standards: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0";
   siteRouting?: "0.3.0" | "0.4.0";
-  appFoundation?: "0.1.0" | "0.2.0";
-  deploymentCloudflare?: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0";
+  appFoundation?: "0.1.0" | "0.2.0" | "0.3.0";
+  deploymentCloudflare?: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0";
   backgroundJobDelivery?: "0.1.0" | "0.2.0";
   applicationPersistence?: "0.1.0";
   transactionalEmailResend?: "0.1.0";
@@ -46,6 +46,18 @@ export const applicationPersistenceCatalogSnapshot: CapabilityCatalogSnapshot = 
   standards: "0.6.0",
   deploymentCloudflare: "0.4.0",
   applicationPersistence: "0.1.0",
+});
+
+export const applicationEnvironmentCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
+  standards: "0.7.0",
+  siteRouting: "0.4.0",
+  appFoundation: "0.3.0",
+  deploymentCloudflare: "0.7.0",
+});
+
+export const applicationEnvironmentScripts = Object.freeze({
+  "check:environment": "node scripts/check-application-environment.mjs --local",
+  "check:environment:deployment": "node scripts/check-application-environment.mjs --deployment",
 });
 
 export const applicationPersistenceScripts = Object.freeze({
@@ -88,7 +100,7 @@ const currentCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = {
 function isSupportedStandardsSnapshotVersion(
   value: string,
 ): value is CapabilityCatalogSnapshot["standards"] {
-  return value === "0.3.0" || value === "0.4.0" || value === "0.5.0" || value === "0.6.0";
+  return value === "0.3.0" || value === "0.4.0" || value === "0.5.0" || value === "0.6.0" || value === "0.7.0";
 }
 
 function isSupportedSiteRoutingSnapshotVersion(
@@ -100,7 +112,7 @@ function isSupportedSiteRoutingSnapshotVersion(
 function isSupportedAppFoundationSnapshotVersion(
   value: string,
 ): value is NonNullable<CapabilityCatalogSnapshot["appFoundation"]> {
-  return value === "0.1.0" || value === "0.2.0";
+  return value === "0.1.0" || value === "0.2.0" || value === "0.3.0";
 }
 
 const sharedCapabilityMetadata = {
@@ -261,6 +273,7 @@ function createDescriptors(
   packageVersions: CapabilityPackageVersions,
   snapshot: CapabilityCatalogSnapshot,
 ): readonly CapabilityDescriptor[] {
+  const applicationEnvironments = snapshot.standards === "0.7.0";
   const siteRoutingVersion = snapshot.siteRouting ?? "0.3.0";
   const persistence = snapshot.applicationPersistence === "0.1.0";
   const jobs = snapshot.backgroundJobDelivery !== undefined;
@@ -273,6 +286,9 @@ function createDescriptors(
     ? (["site", "app"] as const)
     : (["site"] as const);
   const standardsEvidencePoints = [
+    ...(applicationEnvironments ? [
+      createFileEvidencePoint("standards-application-environment-tests", "standards", "apps/web/tests/unit/application-environment.test.ts", "managed"),
+    ] : []),
     createPackageEvidencePoint(
       "standards-axe-playwright-package",
       "standards",
@@ -485,7 +501,7 @@ function createDescriptors(
       "standards",
       "devDependencies",
       "vitest",
-      snapshot.standards === "0.5.0" || snapshot.standards === "0.6.0" ? "5.0.0" : "4.1.10",
+      snapshot.standards === "0.5.0" || snapshot.standards === "0.6.0" || applicationEnvironments ? "5.0.0" : "4.1.10",
     ),
     createFileEvidencePoint(
       "standards-visual-regression-specification",
@@ -630,6 +646,11 @@ function createDescriptors(
   );
 
   const deploymentCloudflareEvidencePoints = [
+    ...(applicationEnvironments ? [
+      createFileEvidencePoint("deployment-application-environment-contract", "deployment-cloudflare", "apps/web/src/configuration/application-environment.ts", "managed"),
+      createFileEvidencePoint("deployment-application-environment-preflight", "deployment-cloudflare", "apps/web/scripts/check-application-environment.mjs", "managed"),
+      ...Object.entries(applicationEnvironmentScripts).map(([name, command]) => createPackageJsonValueEvidencePoint(`deployment-${name.replaceAll(":", "-")}-script`, "deployment-cloudflare", `/scripts/${name}`, command)),
+    ] : []),
     createPackageEvidencePoint(
       "deployment-cloudflare-package",
       "deployment-cloudflare",
@@ -1091,6 +1112,9 @@ function createDescriptors(
   ] as const;
 
   const appFoundationEvidencePoints = [
+    ...(applicationEnvironments ? [
+      createFileEvidencePoint("app-foundation-application-environment-adapter", "app-foundation", "apps/web/src/infrastructure/cloudflare/application-environment.ts", "managed"),
+    ] : []),
     createFileEvidencePoint(
       "app-foundation-health-route-entry",
       "app-foundation",
@@ -1349,7 +1373,7 @@ function createDescriptors(
       ...sharedCapabilityMetadata,
       supportedProfiles: sharedSupportedProfiles,
       requiredPackages: ["@opennextjs/cloudflare", "wrangler"],
-      environmentVariables: ["DEPLOY_URL", ...(jobs ? ["JOB_ENVIRONMENT", "JOB_QUEUE_NAME", "JOB_DEAD_LETTER_QUEUE_NAME", "JOB_RETENTION_REVIEWED"] : []), ...(persistence ? ["STAGING_APPLICATION_DATABASE_ID", "PRODUCTION_APPLICATION_DATABASE_ID"] : [])],
+      environmentVariables: ["DEPLOY_URL", ...(applicationEnvironments ? ["APPLICATION_ENVIRONMENT", "NEXT_PUBLIC_APPLICATION_ENVIRONMENT"] : []), ...(jobs ? ["JOB_ENVIRONMENT", "JOB_QUEUE_NAME", "JOB_DEAD_LETTER_QUEUE_NAME", "JOB_RETENTION_REVIEWED"] : []), ...(persistence ? ["STAGING_APPLICATION_DATABASE_ID", "PRODUCTION_APPLICATION_DATABASE_ID"] : [])],
       secrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
       platformResources: ["cloudflare-worker", "cloudflare-static-assets"],
       privilegedOperations: ["cloudflare-worker-deployment"],
@@ -1372,6 +1396,7 @@ function createDescriptors(
         "opennext-build",
         "wrangler-types",
         "deployment-workflow-contracts",
+        ...(applicationEnvironments ? ["application-environment-preflight", "compiled-runtime-target-agreement", "browser-artifact-secret-exclusion"] : []),
         ...(jobs ? ["queue-environment-and-terminal-configuration", "built-worker-queue-and-http"] : []),
         "browser-deployed",
         ...(persistence ? ["binding-runtime-tests", "database-environment-isolation"] : []),
@@ -1379,6 +1404,7 @@ function createDescriptors(
       documentationEvidenceRequirements: [
         "nextjs-opennext-cloudflare-compatibility",
         "deployment-authority-and-claim-boundaries",
+        ...(applicationEnvironments ? ["application-environment-build-runtime-configuration"] : []),
         ...(jobs ? ["queue-retention-and-recovery-handoff"] : []),
         ...(persistence ? ["database-environment-isolation-and-approval"] : []),
       ],
@@ -1889,7 +1915,7 @@ function createDescriptors(
               "multilingual",
               "site-routing",
             ],
-            supportedProfiles: snapshot.appFoundation === "0.2.0" ? ["portfolio", "site", "app"] : ["app"],
+            supportedProfiles: snapshot.appFoundation === "0.2.0" || applicationEnvironments ? ["portfolio", "site", "app"] : ["app"],
             requiredPackages: ["effect"],
             platformResources: [],
             adapterSemanticRequirements: [
@@ -1897,7 +1923,7 @@ function createDescriptors(
               "cloudflare-request-signal",
             ],
             ...projectEvidencePoints(appFoundationEvidencePoints),
-            migrationPlanners: snapshot.appFoundation === "0.2.0" ? ["add-transactional-email-resend-0-1-0"] : [
+            migrationPlanners: applicationEnvironments ? [] : snapshot.appFoundation === "0.2.0" ? ["add-transactional-email-resend-0-1-0"] : [
               "transition-portfolio-0-10-0-to-app-0-1-0",
               "transition-site-0-11-0-to-app-0-1-0",
             ],
@@ -1908,6 +1934,7 @@ function createDescriptors(
               "cause-and-cancellation-contracts",
               "health-delivery-contracts",
               "whole-worker-execution",
+              ...(applicationEnvironments ? ["runtime-target-refusal-before-effects"] : []),
               "server-only-imports",
             ],
             documentationEvidenceRequirements: [
@@ -1963,10 +1990,17 @@ export function createCapabilityCatalogSnapshot(
     ? Reflect.get(snapshotValue, "applicationPersistence") as unknown : undefined;
   const jobsSnapshot = typeof snapshotValue === "object" && snapshotValue !== null
     ? Reflect.get(snapshotValue, "backgroundJobDelivery") as unknown : undefined;
+  const applicationEnvironments = standardsSnapshot === "0.7.0" || deploymentSnapshot === "0.7.0" || appFoundationSnapshot === "0.3.0";
+  const applicationEnvironmentTupleValid = applicationEnvironments &&
+    standardsSnapshot === "0.7.0" && siteRoutingSnapshot === "0.4.0" &&
+    appFoundationSnapshot === "0.3.0" && deploymentSnapshot === "0.7.0" &&
+    snapshotValue !== null && typeof snapshotValue === "object" &&
+    Object.keys(snapshotValue).length === 4 &&
+    Object.keys(snapshotValue).every((key) => ["standards", "siteRouting", "appFoundation", "deploymentCloudflare"].includes(key));
   const supportedJobs = jobsSnapshot === "0.1.0" || jobsSnapshot === "0.2.0";
   const jobsTupleValid = jobsSnapshot === undefined || (supportedJobs && appFoundationSnapshot === "0.2.0" &&
     siteRoutingSnapshot === "0.4.0" && (standardsSnapshot === "0.5.0" || standardsSnapshot === "0.6.0"));
-  const persistenceTupleValid = persistenceSnapshot === undefined
+  const persistenceTupleValid = applicationEnvironments ? true : persistenceSnapshot === undefined
     ? standardsSnapshot !== "0.6.0" && (supportedJobs ? deploymentSnapshot === "0.5.0" : deploymentSnapshot === undefined || deploymentSnapshot === "0.3.0")
     : persistenceSnapshot === "0.1.0" && standardsSnapshot === "0.6.0" &&
       (supportedJobs ? deploymentSnapshot === "0.6.0" : deploymentSnapshot === "0.4.0") && (appFoundationSnapshot === "0.1.0" || appFoundationSnapshot === "0.2.0") && siteRoutingSnapshot === "0.4.0";
@@ -1984,8 +2018,9 @@ export function createCapabilityCatalogSnapshot(
           isSupportedSiteRoutingSnapshotVersion(siteRoutingSnapshot)
         ? siteRoutingSnapshot
         : undefined;
-  const supportedSnapshot =
-    typeof standardsSnapshot === "string" &&
+  const supportedSnapshot = applicationEnvironments
+    ? (applicationEnvironmentTupleValid ? applicationEnvironmentCatalogSnapshot : undefined)
+    : typeof standardsSnapshot === "string" &&
     isSupportedStandardsSnapshotVersion(standardsSnapshot) &&
     resolvedSiteRoutingSnapshot !== undefined && persistenceTupleValid && jobsTupleValid &&
     (appFoundationSnapshot === undefined ||
@@ -2024,7 +2059,8 @@ export function createCapabilityCatalogSnapshot(
   }
   if (
     typeof standardsSnapshot !== "string" ||
-    !isSupportedStandardsSnapshotVersion(standardsSnapshot)
+    !isSupportedStandardsSnapshotVersion(standardsSnapshot) ||
+    (standardsSnapshot === "0.7.0" && !applicationEnvironmentTupleValid)
   ) {
     versionIssues.push({
       code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID",
@@ -2045,13 +2081,18 @@ export function createCapabilityCatalogSnapshot(
   if (
     appFoundationSnapshot !== undefined &&
     (typeof appFoundationSnapshot !== "string" ||
-      !isSupportedAppFoundationSnapshotVersion(appFoundationSnapshot))
+      !isSupportedAppFoundationSnapshotVersion(appFoundationSnapshot) ||
+      (appFoundationSnapshot === "0.3.0" && !applicationEnvironmentTupleValid))
   ) {
     versionIssues.push({
       code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID",
       path: ["snapshot", "appFoundation"],
       context: { reason: "unsupported-version" },
     });
+  }
+
+  if (deploymentSnapshot === "0.7.0" && !applicationEnvironmentTupleValid) {
+    versionIssues.push({ code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID", path: ["snapshot", "deploymentCloudflare"], context: { reason: "unsupported-version" } });
   }
 
   if (versionIssues.length > 0 || supportedSnapshot === undefined) {
@@ -2061,10 +2102,10 @@ export function createCapabilityCatalogSnapshot(
   const catalog: CapabilityDescriptor[] = [];
   const catalogIssues: ContractIssue[] = [];
 
-  for (const [index, descriptor] of createDescriptors(
-    packageVersions,
-    supportedSnapshot,
-  ).entries()) {
+  const descriptors = createDescriptors(packageVersions, supportedSnapshot).filter((descriptor) =>
+    !applicationEnvironments || !["analytics", "booking-calendly", "contact-form-web3forms", "application-persistence", "transactional-email-resend", "background-job-delivery"].includes(descriptor.identifier),
+  );
+  for (const [index, descriptor] of descriptors.entries()) {
     const parsed = capabilityDescriptorSchema.safeParse(descriptor);
 
     if (parsed.success) {

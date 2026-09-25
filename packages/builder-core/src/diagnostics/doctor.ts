@@ -1,4 +1,6 @@
 import type { CapabilityDescriptor } from "../contracts/capability.js";
+import type { ApplicationEnvironmentProjectConfiguration, ProjectConfiguration } from "../contracts/project.js";
+import type { ApplicationEnvironmentInstalledState, InstalledState } from "../contracts/state.js";
 import type { ProfileRecipe } from "../contracts/profile.js";
 import type { ContractIssue } from "../contracts/result.js";
 import type { RepositoryStateEvidence } from "../inference/infer-repository.js";
@@ -39,6 +41,7 @@ type DoctorRepositoryRequest = Readonly<{
   reader: RepositoryReader;
   catalog: readonly CapabilityDescriptor[];
   profiles: readonly ProfileRecipe[];
+  projectSchemaVersion?: "2.0.0";
 }>;
 
 type DoctorResult = Readonly<{
@@ -166,7 +169,7 @@ function invalidControlDiagnostics(
 }
 
 function controlDiagnostics(
-  inspection: ProjectInspection,
+  inspection: ProjectInspection<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration, InstalledState | ApplicationEnvironmentInstalledState>,
 ): readonly Diagnostic[] {
   return [
     ...invalidControlDiagnostics(inspection.project, {
@@ -207,7 +210,7 @@ function uniqueSortedDiagnostics(
   return [...unique.values()].sort(compareDiagnostics);
 }
 
-function resolvedDiagnostics(inspection: ProjectInspection): readonly Diagnostic[] {
+function resolvedDiagnostics(inspection: ProjectInspection<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration, InstalledState | ApplicationEnvironmentInstalledState>): readonly Diagnostic[] {
   if (inspection.resolution?.ok !== true) {
     return [];
   }
@@ -305,7 +308,9 @@ function resolvedDiagnostics(inspection: ProjectInspection): readonly Diagnostic
 export async function doctorRepository(
   input: DoctorRepositoryRequest,
 ): Promise<DoctorResult> {
-  const inspection = await inspectProject(input);
+  const inspection = input.projectSchemaVersion === "2.0.0"
+    ? await inspectProject({ ...input, projectSchemaVersion: "2.0.0" })
+    : await inspectProject(input);
   const controls = controlDiagnostics(inspection);
 
   if (controls.length > 0) {

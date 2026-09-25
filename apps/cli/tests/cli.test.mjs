@@ -7413,6 +7413,131 @@ test("jobs create selection remains independent and removal requires evidence", 
   }
 });
 
+const environmentCreateArguments = ["create", "--profile", "app", "--name", "environment-app", "--display-name", "Environment App", "--directory", "/private/environment-app"];
+
+async function runEnvironmentCliProcess(arguments_, forbidDependencies = false, publicMode = false) {
+  return executeNode(["--input-type=module", "-e", `
+    import { createCliRunner } from ${JSON.stringify(pathToFileURL(resolve(packageRoot, "dist/run-cli.js")).href)};
+    const forbidden = () => { throw new Error("dependency-called-sentinel"); };
+    const dependencies = { createVerifier: forbidden, ${forbidDependencies ? "createReader: forbidden," : ""} inspectGitWorktree: forbidden, inspectGitRepositoryInventory: forbidden, inspectGitCreateTargets: forbidden };
+    const run = createCliRunner(dependencies${publicMode ? "" : ', "2.0.0"'});
+    process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => process.stdout.write(value), writeError: value => process.stderr.write(value) });
+  `]);
+}
+
+test("application environment compiled CLI refuses inputs before dependencies and preserves existing content", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "environment-cli-refusal-"));
+  try {
+    await writeFile(join(owner, "existing.txt"), "preexisting-content");
+    const before = await listTree(owner);
+    const base = ["create", "--profile", "portfolio", "--name", "environment-app", "--display-name", "Environment App", "--directory", owner];
+    for (const suffix of [
+      ["--calendly-url", "https://calendly.com/private-sentinel/intro", "--calendly-mode", "popup"],
+      ["--web3forms-access-key", "11111111-2222-3333-4444-555555555555"],
+      ["--google-analytics-id", "G-SECRET123456"],
+      ["--google-analytics-4=false"], ["--google-analytics-4", "--google-analytics-4"],
+      ["--microsoft-clarity"], ["--booking-calendly"], ["--looker-studio"], ["--unknown", "private-sentinel"],
+    ]) {
+      const result = await runEnvironmentCliProcess([...base, ...suffix], true);
+      assert.equal(result.exitCode, 2, JSON.stringify(result));
+      assert.deepEqual(JSON.parse(result.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
+    }
+    for (const command of ["diff", "plan-add", "apply-add", "plan-remove", "apply-remove", "plan-upgrade", "apply-upgrade", "plan-profile-transition", "apply-profile-transition"]) {
+      const result = await runEnvironmentCliProcess([command, "--directory", owner], true);
+      assert.equal(result.exitCode, 2, JSON.stringify(result));
+      assert.equal(JSON.parse(result.stderr).code, "CLI_ARGUMENT_INVALID");
+    }
+    for (const suffix of [["--contact-form-web3forms"], ["--google-analytics-4"], ["--booking-calendly", "--calendly-mode", "link"], ["--application-persistence"], ["--transactional-email-resend"], ["--background-job-delivery"]]) {
+      const result = await runEnvironmentCliProcess([...base, ...suffix], true);
+      assert.equal(result.exitCode, 1, JSON.stringify(result));
+      assert.equal(JSON.parse(result.stderr).issues[0].code, "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
+      assert.doesNotMatch(result.stderr, /sentinel/u);
+    }
+    assert.deepEqual(await listTree(owner), before);
+    assert.equal(await readFile(join(owner, "existing.txt"), "utf8"), "preexisting-content");
+  } finally { await rm(owner, { recursive: true, force: true }); }
+});
+
+test("application environment compiled doctor accepts exact generated controls and refuses legacy mixed and foreign controls", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "environment-cli-doctor-"));
+  try {
+    const request = { profile: "portfolio", projectName: "environment-app", displayName: "Environment App" };
+    const candidate = assertSuccess(await core.generateProject({ request, destination: join(owner, "candidate"), verifier: createFakeVerifier(), renderingContext: core.createApplicationEnvironmentRenderingContext() }));
+    const legacy = assertSuccess(await core.generateProject({ request, destination: join(owner, "legacy"), verifier: createFakeVerifier() }));
+    const projectPath = join(candidate.destination, ".egeria/project.yaml");
+    const statePath = join(candidate.destination, ".egeria/state.json");
+    const project = await readFile(projectPath, "utf8");
+    const state = await readFile(statePath, "utf8");
+    const legacyProject = await readFile(join(legacy.destination, ".egeria/project.yaml"), "utf8");
+    const legacyState = await readFile(join(legacy.destination, ".egeria/state.json"), "utf8");
+    const alteredMetadata = JSON.parse(state);
+    alteredMetadata.installedCapabilities[0].removalPolicy = "export-and-remove";
+    assert.equal(core.parseStateJson(JSON.stringify(alteredMetadata), "2.0.0").ok, true);
+    for (const [projectSource, stateSource, healthy] of [
+      [project, state, true], [legacyProject, legacyState, false],
+      [project, legacyState, false], [legacyProject, state, false],
+      ["invalid-private-sentinel", state, false], [project, "invalid-private-sentinel", false],
+      [project, state.replace('"recipeVersion": "0.12.0"', '"recipeVersion": "0.11.0"'), false],
+      [project, JSON.stringify(alteredMetadata), false],
+    ]) {
+      await writeFile(projectPath, projectSource); await writeFile(statePath, stateSource);
+      const before = await listTree(candidate.destination);
+      const result = await runEnvironmentCliProcess(["doctor", "--directory", candidate.destination]);
+      assert.equal(result.exitCode, healthy ? 0 : 1, JSON.stringify(result));
+      if (healthy) assert.deepEqual(JSON.parse(result.stdout).result, { healthy: true, diagnostics: [] });
+      assert.doesNotMatch(result.stdout + result.stderr, /private-sentinel/u);
+      assert.deepEqual(await listTree(candidate.destination), before);
+    }
+    const publicResult = await runEnvironmentCliProcess(["doctor", "--directory", legacy.destination], false, true);
+    assert.equal(publicResult.exitCode, 0, JSON.stringify(publicResult));
+    assert.equal(JSON.parse(publicResult.stdout).result.healthy, true);
+  } finally { await rm(owner, { recursive: true, force: true }); }
+});
+
+test("application environment CLI parses boolean provider selections without literal destinations", () => {
+  const result = cliArguments.parseCliArguments([...environmentCreateArguments,
+    "--contact-form-web3forms", "--booking-calendly", "--calendly-mode", "inline",
+    "--cloudflare-web-analytics", "--google-analytics-4", "--microsoft-clarity",
+    "--microsoft-clarity-audience", "not-directed-to-minors", "--google-search-console", "--looker-studio",
+  ], "2.0.0");
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.value, {
+    kind: "create", profile: "app", projectName: "environment-app", displayName: "Environment App", directory: "/private/environment-app",
+    contactFormWeb3Forms: true, bookingCalendly: { mode: "inline" },
+    analytics: {
+      consent: { policy: "explicit-opt-in" },
+      providers: { cloudflareWebAnalytics: true, googleAnalytics4: true, microsoftClarity: { audience: "not-directed-to-minors" } },
+      operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
+    },
+  });
+  assert.equal(cliArguments.parseCliArguments([...environmentCreateArguments, "--contact-form-web3forms"]).ok, false);
+});
+
+test("application environment CLI refuses obsolete and malformed inputs and unavailable internal commands", () => {
+  const suffixes = [
+    ["--calendly-url", "https://calendly.com/private-sentinel/intro", "--calendly-mode", "popup"],
+    ["--web3forms-access-key", "11111111-2222-3333-4444-555555555555"],
+    ["--google-analytics-id", "G-SECRET123456"],
+    ["--cloudflare-web-analytics-token", "0123456789abcdef0123456789abcdef"],
+    ["--microsoft-clarity-id", "clarity123", "--microsoft-clarity-audience", "not-directed-to-minors"],
+    ["--search-console-verification", "private-sentinel-value"],
+    ["--booking-calendly"], ["--calendly-mode", "popup"],
+    ["--booking-calendly", "--calendly-mode", "unknown"],
+    ["--microsoft-clarity"], ["--microsoft-clarity-audience", "not-directed-to-minors"],
+    ["--looker-studio"], ["--google-analytics-4=false"],
+    ["--google-analytics-4", "--google-analytics-4"], ["--unknown", "private-sentinel"],
+    ["private-sentinel"],
+  ];
+  for (const suffix of suffixes) {
+    const result = cliArguments.parseCliArguments([...environmentCreateArguments, ...suffix], "2.0.0");
+    assert.equal(result.ok, false, JSON.stringify(suffix));
+    assert.equal(result.issues[0].code, "CLI_ARGUMENT_INVALID");
+    assert.doesNotMatch(JSON.stringify(result), /private-sentinel|SECRET123456/u);
+  }
+  assert.equal(cliArguments.parseCliArguments(["diff", "--directory", "/private/environment-app"], "2.0.0").ok, false);
+  assert.equal(cliArguments.parseCliArguments(["diff", "--directory", "/private/environment-app"]).ok, true);
+});
+
 test("jobs lifecycle CLI requires exact removal evidence and human review flags", () => {
   const base = ["--directory", "/generated/jobs", "--capability", "background-job-delivery"];
   const approved = ["--approved-plan", `sha256:${"a".repeat(64)}`];

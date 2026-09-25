@@ -4,8 +4,8 @@ import { capabilityDescriptorSchema } from "./capability.js";
 import { certificationRegistrySchema } from "./certification.js";
 import { migrationRecordSchema } from "./migration.js";
 import { profileRecipeSchema } from "./profile.js";
-import { projectConfigurationSchema } from "./project.js";
-import { installedStateSchema } from "./state.js";
+import { applicationEnvironmentProjectConfigurationSchema, projectConfigurationSchema } from "./project.js";
+import { applicationEnvironmentInstalledStateSchema, installedStateSchema } from "./state.js";
 
 const schemaEntries = [
   ["capability.schema.json", capabilityDescriptorSchema],
@@ -13,7 +13,9 @@ const schemaEntries = [
   ["migration-record.schema.json", migrationRecordSchema],
   ["profile.schema.json", profileRecipeSchema],
   ["project.schema.json", projectConfigurationSchema],
+  ["project-environment.schema.json", applicationEnvironmentProjectConfigurationSchema],
   ["state.schema.json", installedStateSchema],
+  ["state-environment.schema.json", applicationEnvironmentInstalledStateSchema],
 ] as const;
 
 type JsonValue =
