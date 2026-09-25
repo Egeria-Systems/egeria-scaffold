@@ -49,6 +49,8 @@ const templateTokenPattern =
 const completeTokenPattern = /{{([^{}]*)}}/g;
 const bookingCalendlySettingsSource =
   "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template";
+const applicationEnvironmentBookingSettingsSource =
+  "booking-calendly/application-environments/apps/web/src/integrations/booking-calendly/booking-settings.ts.template";
 const bookingCalendlyTokenNames = new Set([
   "calendlyDestinationJson",
   "calendlyModeJson",
@@ -151,7 +153,8 @@ function validateTemplateSyntax(
       if (
         templateTokenNames.has(token) &&
         (!bookingCalendlyTokenNames.has(token) ||
-          source === bookingCalendlySettingsSource) &&
+          source === bookingCalendlySettingsSource ||
+          (token === "calendlyModeJson" && source === applicationEnvironmentBookingSettingsSource)) &&
         (!analyticsTokenNames.has(token) || source === analyticsSettingsSource) &&
         (token !== "web3FormsAccessKeyJson" || source === "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-settings.ts.template")
       ) {
