@@ -105,6 +105,7 @@ function removalMigrationIdentifier(
 ):
   | "remove-analytics-0-1-0"
   | "remove-booking-calendly-0-1-0"
+  | "remove-booking-calendly-0-2-0"
   | "remove-multilingual-0-1-0"
   | "remove-application-persistence-0-1-0"
   | "remove-transactional-email-resend-0-1-0"
@@ -124,7 +125,7 @@ function removalMigrationIdentifier(
     case "analytics":
       return "remove-analytics-0-1-0";
     case "booking-calendly":
-      return "remove-booking-calendly-0-1-0";
+      return version === "0.2.0" ? "remove-booking-calendly-0-2-0" : "remove-booking-calendly-0-1-0";
     case "multilingual":
       return "remove-multilingual-0-1-0";
   }
@@ -599,7 +600,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
 }>): Promise<CapabilityRemovalExecutionResult> {
   if (input.renderingContext !== undefined && (
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    input.capability !== "contact-form-web3forms" || input.persistenceRemoval !== undefined || input.persistenceRemovalHumanReview !== undefined
+    (input.capability !== "contact-form-web3forms" && input.capability !== "booking-calendly") || input.persistenceRemoval !== undefined || input.persistenceRemovalHumanReview !== undefined
   )) return failure("CAPABILITY_REMOVAL_UNSUPPORTED", "precondition", "not-required");
   const root = resolve(input.root);
   if (!isAbsolute(input.root) || root !== input.root) {
@@ -732,6 +733,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
     packageVersions: verifiedCapabilityPackageVersions,
   };
   const retainsPersistence = input.capability !== "application-persistence" && controls.project.value.selectedCapabilities.includes("application-persistence");
+  const environmentBookingSettings = controls.project.value.schemaVersion === "2.0.0" ? controls.project.value.capabilitySettings["booking-calendly"] : undefined;
   const desiredRender = input.renderingContext === undefined ? await renderSkeleton({
     profile: controls.project.value.originProfile,
     projectName: controls.project.value.project.name,
@@ -757,7 +759,11 @@ export async function applyCapabilityRemoval(input: Readonly<{
     ...(input.capability !== "contact-form-web3forms" && legacyProject?.capabilitySettings["contact-form-web3forms"] !== undefined ? { contactFormWeb3Forms: legacyProject.capabilitySettings["contact-form-web3forms"] } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   }, input.capability === "background-job-delivery" ? createGenerationRenderingContext(retainsPersistence, true, false)
-    : input.capability === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext) : await renderSkeleton(commonRenderRequest, input.renderingContext);
+    : input.capability === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext) : await renderSkeleton({
+    ...commonRenderRequest,
+    ...(input.capability !== "booking-calendly" && environmentBookingSettings !== undefined ? { bookingCalendly: environmentBookingSettings } : {}),
+    ...(input.capability !== "contact-form-web3forms" && controls.project.value.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
+  }, input.renderingContext);
   if (!desiredRender.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }

@@ -2430,7 +2430,7 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const destination = join(owner, "project");
     const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
-      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
+      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
       destination, renderingContext: core.createApplicationEnvironmentRenderingContext(),
       verifier: {
         async prepareLockfile(root) {
@@ -2532,4 +2532,63 @@ test("environment contact removal rechecks controls before transform and keeps s
     assert.equal(repository.files.get(".egeria/migrations.jsonl"), "");
     assert.equal(repository.files.get(".egeria/state.json"), originalState + (lateChange ? "\n" : ""));
   }
+});
+
+
+test("environment booking lifecycle preserves both provider installation orders and profile neighbors", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  for (const [profile, mode] of [["portfolio", "link"], ["site", "popup"], ["app", "inline"]]) {
+    const multilingual = profile === "site";
+    const repository = createRepository(await environmentContactEntries(profile, { multilingual }));
+    const initialLock = repository.files.get("pnpm-lock.yaml");
+    const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
+    let booking = false;
+    let contact = false;
+    for (const [operation, capability] of [["add", "booking-calendly"], ["add", "contact-form-web3forms"], ["remove", "booking-calendly"], ["add", "booking-calendly"], ["remove", "contact-form-web3forms"], ["add", "contact-form-web3forms"]]) {
+      const common = { reader: repository.reader, git, capability, renderingContext, inspectRepositoryInventory: inventoryInspectorForFiles(repository.files),
+        ...(operation === "add" && capability === "booking-calendly" ? { settings: { mode } } : {}) };
+      const planned = await (operation === "remove" ? core.planCapabilityRemoval(common) : core.planCapabilityAddition(common));
+      assert.equal(planned.ok, true, JSON.stringify(planned));
+      const calls = [];
+      const input = { ...common, root, writer: repository.writer, approvedPlanFingerprint: planned.value.planFingerprint,
+        verifier: successfulVerifier(calls, checks), inspectWorktree: async () => git,
+        inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }) };
+      const result = await (operation === "remove" ? core.applyCapabilityRemoval(input) : core.applyCapabilityAddition(input));
+      assert.equal(result.ok, true, JSON.stringify(result));
+      assert.equal(calls.length, 1);
+      if (capability === "booking-calendly") booking = operation === "add"; else contact = operation === "add";
+      assert.equal(repository.files.get("pnpm-lock.yaml"), initialLock);
+      const project = core.parseProjectYaml(repository.files.get(".egeria/project.yaml"), "2.0.0");
+      assert.equal(project.ok, true);
+      assert.deepEqual(project.value.capabilitySettings, booking ? { "booking-calendly": { mode } } : {});
+      const state = core.parseStateJson(repository.files.get(".egeria/state.json"), "2.0.0");
+      assert.equal(state.ok, true);
+      for (const [identifier, wanted] of [["booking-calendly", booking], ["contact-form-web3forms", contact]]) assert.equal(state.value.installedCapabilities.find(value => value.identifier === identifier)?.version, wanted ? "0.2.0" : undefined);
+      assert.equal(state.value.installedCapabilities.some(value => value.identifier === "multilingual"), multilingual);
+      assert.equal(state.value.installedCapabilities.some(value => value.identifier === "app-foundation"), profile === "app");
+      const expected = await environmentContactEntries(profile, { multilingual, contact, ...(booking ? { booking: mode } : {}) });
+      for (const [path, content] of expected) if (!path.startsWith(".egeria/")) assert.deepEqual(repository.files.get(path), content, path);
+      assert.deepEqual([...repository.files.keys()].sort(), [...expected.keys()].sort());
+    }
+  }
+});
+
+test("environment booking removal preserves edited guide and refuses re-add over its ejection", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const repository = createRepository(await environmentContactEntries("site", { booking: "popup", contact: true, multilingual: true }));
+  const path = "docs/booking-calendly.md";
+  const custom = repository.files.get(path) + "\nApplication-owned booking guidance.\n";
+  repository.files.set(path, custom);
+  const common = { reader: repository.reader, git, capability: "booking-calendly", renderingContext, inspectRepositoryInventory: inventoryInspectorForFiles(repository.files) };
+  const planned = await core.planCapabilityRemoval(common);
+  assert.equal(planned.ok, true, JSON.stringify(planned));
+  assert.ok(planned.value.actions.some(action => action.path === path && action.kind === "preserve-file-and-eject"));
+  const removed = await core.applyCapabilityRemoval({ ...common, root, writer: repository.writer, approvedPlanFingerprint: planned.value.planFingerprint,
+    verifier: successfulVerifier([]), inspectWorktree: async () => git, inspectExpectedChanges: async () => ({ ok: true }) });
+  assert.equal(removed.ok, true, JSON.stringify(removed));
+  assert.equal(repository.files.get(path), custom);
+  assert.deepEqual(JSON.parse(repository.files.get(".egeria/state.json")).ejections, [path]);
+  const readd = await core.planCapabilityAddition({ ...common, settings: { mode: "popup" } });
+  assert.equal(readd.ok, false);
+  assert.equal(readd.issues[0].code, "PROJECT_EJECTION_UNSUPPORTED");
 });

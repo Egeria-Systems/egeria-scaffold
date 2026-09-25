@@ -1191,7 +1191,7 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const destination = join(owner, "project");
     const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
-      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
+      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
       destination, renderingContext: core.createApplicationEnvironmentRenderingContext(),
       verifier: {
         async prepareLockfile(root) {
@@ -1277,6 +1277,50 @@ test("environment contact apply refuses forged or unsupported input before adapt
         reader: { readText: forbidden }, writer: { write: forbidden }, verifier: { verifyInIsolatedCopy: forbidden },
       });
       assert.deepEqual(result, { ok: false, code: operation === "add" ? "CAPABILITY_ADDITION_UNSUPPORTED" : "CAPABILITY_REMOVAL_UNSUPPORTED", phase: "precondition", recovery: "not-required" });
+    }
+  }
+});
+
+
+test("environment booking addition retains mode through late replan and state-last verification", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const entries = await environmentContactEntries("site", { contact: true, multilingual: true });
+  for (const scenario of ["accepted", "changed-mode", "mutated-caller", "verification-failure"]) {
+    const repository = createRepository(entries);
+    const settings = { mode: "inline" };
+    const common = { reader: repository.reader, git, capability: "booking-calendly", settings, renderingContext };
+    const plan = await core.planCapabilityAddition(common);
+    assert.equal(plan.ok, true, JSON.stringify(plan));
+    const stateBefore = repository.files.get(".egeria/state.json");
+    const layoutBefore = repository.files.get("apps/web/app/layout.tsx");
+    if (scenario === "changed-mode") settings.mode = "popup";
+    let verifications = 0;
+    let inspections = 0;
+    const result = await core.applyCapabilityAddition({ ...common, root, writer: repository.writer, approvedPlanFingerprint: plan.value.planFingerprint,
+      inspectWorktree: async () => { if (++inspections === 2 && scenario === "mutated-caller") settings.mode = "popup"; return git; },
+      inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }),
+      verifier: { async verifyInIsolatedCopy() {
+        verifications++;
+        assert.equal(repository.files.get(".egeria/state.json"), stateBefore);
+        assert.equal(repository.files.get(".egeria/migrations.jsonl"), "");
+        return scenario === "verification-failure" ? { ok: false, issues: [] } : { ok: true, value: { checks: core.ordinaryGenerationVerificationChecks } };
+      } },
+    });
+    assert.equal(result.ok, scenario === "accepted" || scenario === "mutated-caller", JSON.stringify(result));
+    assert.equal(verifications, scenario === "changed-mode" ? 0 : 1);
+    assert.equal(repository.files.get("apps/web/app/layout.tsx"), layoutBefore);
+    if (result.ok) {
+      const project = core.parseProjectYaml(repository.files.get(".egeria/project.yaml"), "2.0.0");
+      assert.equal(project.ok, true);
+      assert.deepEqual(project.value.capabilitySettings, { "booking-calendly": { mode: "inline" } });
+      const state = JSON.parse(repository.files.get(".egeria/state.json"));
+      assert.deepEqual(state.appliedMigrations, ["add-booking-calendly-0-2-0"]);
+      assert.deepEqual(repository.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
+    } else {
+      assert.equal(result.code, scenario === "changed-mode" ? "CAPABILITY_PLAN_APPROVAL_INVALID" : "CAPABILITY_VERIFICATION_FAILED");
+      assert.equal(repository.files.get(".egeria/state.json"), stateBefore);
+      assert.equal(repository.files.get(".egeria/migrations.jsonl"), "");
+      assert.equal(repository.writes.length, scenario === "changed-mode" ? 0 : 1);
     }
   }
 });

@@ -774,7 +774,7 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const destination = join(owner, "project");
     const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
-      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
+      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
       destination, renderingContext: core.createApplicationEnvironmentRenderingContext(),
       verifier: {
         async prepareLockfile(root) {
@@ -815,6 +815,33 @@ test("environment contact addition refuses settings, forged context and other li
   ]) {
     const result = await core.planCapabilityAddition({ reader, git, capability: "contact-form-web3forms", renderingContext, ...override });
     assertFailure(result, "CAPABILITY_ADDITION_UNSUPPORTED");
+  }
+  assert.equal(reads, 0);
+});
+
+
+test("environment booking addition binds mode and preserves existing contact and multilingual", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const entries = await environmentContactEntries("site", { contact: true, multilingual: true });
+  const fingerprints = new Set();
+  for (const mode of ["link", "inline", "popup"]) {
+    const plan = await core.planCapabilityAddition({ reader: createSnapshotReader(entries).reader, git, capability: "booking-calendly", settings: { mode }, renderingContext });
+    assert.equal(plan.ok, true, JSON.stringify(plan));
+    assert.deepEqual(plan.value.capability, { identifier: "booking-calendly", version: "0.2.0" });
+    assert.deepEqual(plan.value.settings, { mode });
+    assert.ok(plan.value.desiredCapabilities.includes("contact-form-web3forms"));
+    assert.ok(plan.value.desiredCapabilities.includes("multilingual"));
+    assert.equal(plan.value.actions.some(({ path }) => path === "apps/web/app/layout.tsx"), false);
+    fingerprints.add(plan.value.planFingerprint);
+  }
+  assert.equal(fingerprints.size, 3);
+});
+
+test("environment booking addition rejects literal and malformed mode settings before reads", async () => {
+  let reads = 0;
+  const reader = { async readText() { reads++; throw new Error("unexpected read"); } };
+  for (const settings of [undefined, {}, { mode: "widget" }, { mode: "link", destination: "https://calendly.com/private-sentinel/intro" }]) {
+    assertFailure(await core.planCapabilityAddition({ reader, git, capability: "booking-calendly", settings, renderingContext: core.createApplicationEnvironmentRenderingContext() }), "CAPABILITY_ADDITION_UNSUPPORTED");
   }
   assert.equal(reads, 0);
 });

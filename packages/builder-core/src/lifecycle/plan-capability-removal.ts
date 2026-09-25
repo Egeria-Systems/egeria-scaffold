@@ -112,9 +112,9 @@ export type CapabilityRemovalPlan = Readonly<{
   baseRevision: string;
   profile: ProfileIdentifier;
   capability: Readonly<{
-    identifier: Exclude<RemovableCapability, "contact-form-web3forms" | "background-job-delivery">;
+    identifier: Exclude<RemovableCapability, "contact-form-web3forms" | "booking-calendly" | "background-job-delivery">;
     version: "0.1.0";
-  }> | Readonly<{ identifier: "contact-form-web3forms" | "background-job-delivery"; version: "0.1.0" | "0.2.0" }>;
+  }> | Readonly<{ identifier: "contact-form-web3forms" | "booking-calendly" | "background-job-delivery"; version: "0.1.0" | "0.2.0" }>;
   jobRemovalReport?: JobRemovalMachineReport;
   jobRemovalSubject?: Omit<JobRemovalSubject, "resources">;
   persistenceRemovalReport?: PersistenceRemovalMachineReport;
@@ -909,7 +909,7 @@ export async function planCapabilityRemoval(input: Readonly<{
   const capabilityValue: unknown = Reflect.get(input, "capability");
   if (input.renderingContext !== undefined && (
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    capabilityValue !== "contact-form-web3forms" || input.persistenceRemoval !== undefined
+    (capabilityValue !== "contact-form-web3forms" && capabilityValue !== "booking-calendly") || input.persistenceRemoval !== undefined
   )) return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
 
   if (
@@ -1014,7 +1014,7 @@ export async function planCapabilityRemoval(input: Readonly<{
   const legacyProject = project.schemaVersion === "1.0.0" ? project : undefined;
   const bookingSettings = legacyProject?.capabilitySettings["booking-calendly"];
   const analyticsSettings = legacyProject?.capabilitySettings.analytics;
-  if (capabilityValue === "booking-calendly" && bookingSettings === undefined) {
+  if (capabilityValue === "booking-calendly" && project.capabilitySettings["booking-calendly"] === undefined) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
   if (capabilityValue === "analytics" && analyticsSettings === undefined) {
@@ -1043,10 +1043,15 @@ export async function planCapabilityRemoval(input: Readonly<{
     ...(legacyProject?.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: legacyProject.capabilitySettings["contact-form-web3forms"] }),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
+  const environmentBookingSettings = project.schemaVersion === "2.0.0" ? project.capabilitySettings["booking-calendly"] : undefined;
   const [currentRender, desiredRender] = await Promise.all([
     input.renderingContext === undefined
       ? renderSkeleton(renderRequest, snapshot.value.renderingContext)
-      : renderSkeleton({ ...commonRenderRequest, contactFormWeb3Forms: true }, input.renderingContext),
+       : renderSkeleton({
+        ...commonRenderRequest,
+        ...(environmentBookingSettings === undefined ? {} : { bookingCalendly: environmentBookingSettings }),
+        ...(project.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
+      }, input.renderingContext),
     input.renderingContext === undefined ? renderSkeleton({
       profile: renderRequest.profile,
       projectName: renderRequest.projectName,
@@ -1068,7 +1073,11 @@ export async function planCapabilityRemoval(input: Readonly<{
       packageVersions: verifiedCapabilityPackageVersions,
     }, capabilityValue === "background-job-delivery"
       ? createGenerationRenderingContext(project.selectedCapabilities.includes("application-persistence"), true, false)
-      : capabilityValue === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext) : renderSkeleton(commonRenderRequest, input.renderingContext),
+      : capabilityValue === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext) : renderSkeleton({
+      ...commonRenderRequest,
+      ...(capabilityValue !== "booking-calendly" && environmentBookingSettings !== undefined ? { bookingCalendly: environmentBookingSettings } : {}),
+      ...(capabilityValue !== "contact-form-web3forms" && project.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
+    }, input.renderingContext),
   ]);
 
   if (!currentRender.ok || !desiredRender.ok) {
@@ -1203,7 +1212,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     status: "approval-required",
     baseRevision: input.git.identity.revision,
     profile: project.originProfile,
-    capability: capabilityValue === "contact-form-web3forms"
+    capability: capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly"
       ? { identifier: capabilityValue, version: input.renderingContext === undefined ? "0.1.0" : "0.2.0" }
       : capabilityValue === "background-job-delivery"
         ? { identifier: capabilityValue, version: descriptor.version as "0.1.0" | "0.2.0" }

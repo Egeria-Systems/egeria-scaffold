@@ -6174,7 +6174,7 @@ test("application environment generated preflight rejects unsafe targets without
 });
 
 test("application environment rendering refuses incomplete selections and mixed contexts", async () => {
-  for (const selection of [{ bookingCalendly: { mode: "link" } }, { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } }, { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true }]) {
+  for (const selection of [{ analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } }, { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true }]) {
     const result = await renderApplicationEnvironment("app", selection);
     assert.equal(result.ok, false);
     assert.equal(result.issues[0].code, "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
@@ -6182,4 +6182,76 @@ test("application environment rendering refuses incomplete selections and mixed 
   const core = await import("../dist/index.js");
   const result = await core.renderSkeleton({ profile: "portfolio", projectName: "example", displayName: "Example", packageVersions: core.verifiedCapabilityPackageVersions }, { ...applicationEnvironmentContext, projectSchemaVersion: "1.0.0" });
   assert.equal(result.ok, false);
+});
+
+
+test("environment booking rendering preserves independent selections and mode-only controls", async () => {
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (const mode of ["link", "inline", "popup"]) {
+      for (const composed of [false, true]) {
+        const rendered = assertSuccess(await renderApplicationEnvironment(profile, {
+          bookingCalendly: { mode }, ...(composed ? { multilingual: true, contactFormWeb3Forms: true } : {}),
+        }));
+        assert.deepEqual(rendered.project.capabilitySettings, { "booking-calendly": { mode } });
+        assert.equal(rendered.project.selectedCapabilities.includes("contact-form-web3forms"), composed);
+        assert.equal(rendered.project.selectedCapabilities.includes("multilingual"), composed);
+        assert.equal(rendered.project.selectedCapabilities.includes("app-foundation"), profile === "app");
+        const files = new Map(rendered.files.map(({ path, content }) => [path, Buffer.from(content).toString("utf8")]));
+        assert.equal(new Set(files.keys()).size, rendered.files.length);
+        assert.ok(files.has("docs/booking-calendly.md"));
+        assert.ok(files.has("apps/web/content/fr-CA/booking-calendly.yaml"));
+        assert.match(files.get("apps/web/.env.example"), /^NEXT_PUBLIC_CALENDLY_URL=$/mu);
+        assert.equal(files.get("apps/web/.env.example").includes("NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY="), composed);
+        assert.doesNotMatch(files.get("apps/web/.dev.vars.example"), /CALENDLY|WEB3FORMS/u);
+        assert.equal(rendered.surfaces.filter(({ owner }) => owner.kind === "capability" && owner.identifier === "booking-calendly").length, 9);
+      }
+    }
+  }
+});
+
+
+test("environment booking validates generated destinations before process effects without exposing input", async () => {
+  const destinationA = "https://calendly.com/synthetic-nonproduction/intro";
+  const destinationB = "https://www.calendly.com:443/synthetic-production/intro";
+  for (const contact of [false, true]) {
+    const rendered = assertSuccess(await renderApplicationEnvironment("portfolio", { bookingCalendly: { mode: "popup" }, ...(contact ? { contactFormWeb3Forms: true } : {}) }));
+    const root = await mkdtemp(join(tmpdir(), "booking-environment-configuration-"));
+    try {
+      for (const file of rendered.files.filter(({ path }) => path.endsWith("application-environment.ts") || path.endsWith("booking-settings.ts") || path.endsWith("contact-settings.ts") || path.endsWith("check-application-environment.mjs"))) {
+        const destination = join(root, file.path);
+        await mkdir(join(destination, ".."), { recursive: true });
+        await writeFile(destination, file.content);
+      }
+      const helper = await import(pathToFileURL(join(root, "apps/web/src/integrations/booking-calendly/booking-settings.ts")));
+      for (const target of ["development", "staging", "production"]) {
+        for (const value of [undefined, ""]) {
+          assert.deepEqual(helper.resolveBookingDestination(value, target), target === "development"
+            ? { ok: true, destination: undefined }
+            : { ok: false, issue: { field: "NEXT_PUBLIC_CALENDLY_URL", reason: "missing" } });
+        }
+        for (const value of [destinationA, destinationB]) assert.deepEqual(helper.resolveBookingDestination(value, target), { ok: true, destination: value });
+        for (const value of [null, 7, false, {}, " ", "http://calendly.com/a", "https://calendly.com/", "https://other.test/a", "https://calendly.com.other.test/a", "https://private-sentinel@calendly.com/a", `${destinationA}?private-sentinel`, `${destinationA}#private-sentinel`, `${destinationA} `, "https://calendly.com:444/a", `https://calendly.com/${"a".repeat(2048)}`]) {
+          assert.deepEqual(helper.resolveBookingDestination(value, target), { ok: false, issue: { field: "NEXT_PUBLIC_CALENDLY_URL", reason: "invalid" } });
+        }
+      }
+      const script = join(root, "apps/web/scripts/check-application-environment.mjs");
+      for (const target of ["development", "staging", "production"]) {
+        for (const value of ["", "private-sentinel", destinationA]) {
+          const result = spawnSync(process.execPath, [script, target === "development" ? "--local" : "--deployment"], { encoding: "utf8", env: {
+            APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_CALENDLY_URL: value,
+            ...(contact ? { NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "00000000-0000-4000-8000-000000000001" } : {}),
+          } });
+          assert.equal(result.status, value === destinationA || (value === "" && target === "development") ? 0 : 1, result.stderr);
+          assert.doesNotMatch(result.stdout + result.stderr, /private-sentinel/u);
+          if (result.status !== 0) assert.match(result.stderr, /BOOKING_CONFIGURATION_INVALID/u);
+        }
+      }
+      const conflict = spawnSync(process.execPath, [script, "--local"], { encoding: "utf8", env: {
+        APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_CALENDLY_URL: "private-sentinel",
+      } });
+      assert.equal(conflict.status, 1);
+      assert.match(conflict.stderr, /APPLICATION_ENVIRONMENT_INVALID/u);
+      assert.doesNotMatch(conflict.stderr, /BOOKING_CONFIGURATION_INVALID|CONTACT_CONFIGURATION_INVALID|private-sentinel/u);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  }
 });

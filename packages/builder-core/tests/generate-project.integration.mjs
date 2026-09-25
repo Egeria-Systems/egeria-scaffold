@@ -465,3 +465,152 @@ test("environment contact builds freeze selected public values in controlled bro
   await browser("portfolio-configured", "dev", "development", keyA, keyA, portfolio);
   context.diagnostic(JSON.stringify({ owner, artifacts, portfolio: "configured one-page home and fallback; all provider requests intercepted" }));
 });
+
+for (const [profile, bookingMode, contact, multilingual] of [
+  ["portfolio", "link", false, false],
+  ["app", "inline", true, false],
+  ["site", "popup", true, true],
+]) {
+  test(`environment booking builds freeze ${profile} selected values in controlled browsers`, { timeout: 60 * 60 * 1000 }, async context => {
+    const owner = await mkdtemp(join(tmpdir(), `egeria-environment-booking-${profile}-`));
+    context.diagnostic(`Retained booking evidence: ${owner}`);
+    const urlA = "https://calendly.com/egeria-synthetic-nonproduction/intro";
+    const urlB = "https://calendly.com/egeria-synthetic-production/intro";
+    const keyA = "00000000-0000-4000-8000-000000000001";
+    const keyB = "00000000-0000-4000-8000-000000000002";
+    const invalidUrl = "invalid-booking-input-sentinel";
+    const supportRoot = join(owner, "support");
+    await mkdir(supportRoot);
+    const support = await prepareLiveSupport(supportRoot);
+    const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+    const commands = [];
+    const artifacts = [];
+    const destination = join(owner, "generated");
+    const generated = assertSuccess(await generateProject({
+      request: { profile, projectName: `booking-${profile}`, displayName: "Booking Example", bookingCalendly: { mode: bookingMode },
+        ...(contact ? { contactFormWeb3Forms: true } : {}), ...(multilingual ? { multilingual: true } : {}),
+      },
+      destination, renderingContext: createApplicationEnvironmentRenderingContext(),
+      verifier: createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
+    }));
+    assert.equal(generated.state.schemaVersion, "2.0.0");
+    assert.equal(generated.state.installedCapabilities.find(value => value.identifier === "booking-calendly")?.version, "0.2.0");
+    await writeFile(join(owner, "generation-state.json"), JSON.stringify(generated.state, null, 2));
+    const project = join(owner, "browser-proof");
+    await cp(destination, project, { recursive: true, force: false, errorOnExist: true, dereference: false });
+    const app = join(project, "apps/web");
+
+    async function run(name, arguments_, additions = {}, succeeds = true) {
+      let result;
+      try {
+        result = await runPnpm(arguments_, { cwd: project, env: { ...environment, ...additions } });
+        commands.push({ name, arguments: arguments_, exitCode: 0 });
+      } catch (error) {
+        result = { stdout: error.stdout ?? "", stderr: error.stderr ?? "" };
+        commands.push({ name, arguments: arguments_, exitCode: error.code });
+        if (succeeds) {
+          await writeFile(join(owner, `${name}.log`), result.stdout + result.stderr);
+          throw error;
+        }
+      } finally { await writeFile(join(owner, "commands.json"), JSON.stringify(commands, null, 2)); }
+      await writeFile(join(owner, `${name}.log`), result.stdout + result.stderr);
+      assert.equal(commands.at(-1).exitCode === 0, succeeds, name);
+      return result;
+    }
+
+    const entries = await readdir(destination, { recursive: true, withFileTypes: true });
+    const sourcePaths = entries.filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name).slice(destination.length + 1)).sort();
+    async function sourceDigest() {
+      const digest = createHash("sha256");
+      for (const path of sourcePaths) { digest.update(path); digest.update(await readFile(join(project, path))); }
+      return digest.digest("hex");
+    }
+    async function artifactDigest() {
+      const staticRoot = join(app, ".open-next/assets");
+      const entries = await readdir(staticRoot, { recursive: true, withFileTypes: true });
+      const paths = entries.filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name).slice(staticRoot.length + 1)).sort();
+      const digest = createHash("sha256");
+      for (const path of paths) { digest.update(path); digest.update(await readFile(join(staticRoot, path))); }
+      return { workerSha256: createHash("sha256").update(await readFile(join(app, ".open-next/worker.js"))).digest("hex"), staticSha256: digest.digest("hex"), staticFiles: paths.length };
+    }
+    async function browser(name, mode, target, runtimeUrl, expectedUrl, runtimeKey, expectedKey) {
+      const reportPath = join(owner, `${name}.json`);
+      await run(name, ["--dir", "apps/web", "run", `test:e2e:${mode}`, "--reporter=json", "--output", join(owner, `${name}-results`), "calendly-booking.spec.ts", ...(contact ? ["web3forms-contact.spec.ts"] : [])], {
+        APPLICATION_ENVIRONMENT: target,
+        ...(mode === "dev" ? { WATCHPACK_POLLING: "true" } : {}),
+        ...(mode === "preview" && target !== "development" ? { CLOUDFLARE_ENV: target } : {}),
+        NEXT_PUBLIC_CALENDLY_URL: runtimeUrl,
+        NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: runtimeKey,
+        BOOKING_TEST_EXPECTED_URL: expectedUrl,
+        BOOKING_TEST_MODE: bookingMode,
+        BOOKING_TEST_MULTILINGUAL: String(multilingual),
+        CONTACT_TEST_EXPECTED_ACCESS_KEY: expectedKey,
+        PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath,
+      });
+      const report = JSON.parse(await readFile(reportPath, "utf8"));
+      const bookingCount = (expectedUrl === "" ? 2 : bookingMode === "link" ? 3 : 5) * (multilingual ? 2 : 1);
+      assert.equal(report.stats.expected, bookingCount + (contact ? expectedKey === "" ? 3 : 7 : 0), name);
+      assert.equal(report.stats.unexpected, 0, name);
+      assert.equal(report.stats.flaky, 0, name);
+      const label = value => value === "" ? "absent" : value === urlA || value === keyA ? "synthetic-A" : "synthetic-B";
+      return { executed: report.stats.expected, skipped: report.stats.skipped, expectedUrl: label(expectedUrl), expectedKey: label(expectedKey), runtimeUrl: label(runtimeUrl), runtimeKey: label(runtimeKey) };
+    }
+
+    await run("install", ["install", "--frozen-lockfile", "--store-dir", support.store]);
+    await run("browser-install", ["--dir", "apps/web", "run", "browser:install"]);
+    for (const target of ["development", "staging", "production"]) {
+      for (const [label, url] of [["absent", ""], ["invalid", invalidUrl], ["configured", urlA]]) {
+        const succeeds = label === "configured" || (target === "development" && label === "absent");
+        const inputs = { APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_CALENDLY_URL: url, NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: contact ? keyA : "" };
+        const result = await run(`${target}-${label}-preflight`, ["--dir", "apps/web", "run", target === "development" ? "check:environment" : "check:environment:deployment"], inputs, succeeds);
+        if (!succeeds) assert.match(result.stderr, /"code":"BOOKING_CONFIGURATION_INVALID","field":"NEXT_PUBLIC_CALENDLY_URL","reason":"(?:missing|invalid)"/u);
+        assert.equal((result.stdout + result.stderr).includes(invalidUrl), false);
+        if (!succeeds) {
+          const failed = await run(`${target}-${label}-build`, ["--dir", "apps/web", "run", "build"], inputs, false);
+          assert.match(failed.stderr, /BOOKING_CONFIGURATION_INVALID:NEXT_PUBLIC_CALENDLY_URL:(?:missing|invalid)/u);
+          assert.equal((failed.stdout + failed.stderr).includes(invalidUrl), false);
+          await assertAbsent(join(app, ".open-next/worker.js"));
+        }
+      }
+    }
+    for (const command of ["check:environment", "build"]) {
+      const conflict = await run(`target-conflict-${command.replace(":", "-")}`, ["--dir", "apps/web", "run", command], {
+        APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_CALENDLY_URL: invalidUrl, NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "invalid-contact-input-sentinel",
+      }, false);
+      assert.match(conflict.stderr, /APPLICATION_ENVIRONMENT_INVALID/u);
+      assert.doesNotMatch(conflict.stderr, /BOOKING_CONFIGURATION_INVALID|CONTACT_CONFIGURATION_INVALID|invalid-booking-input-sentinel|invalid-contact-input-sentinel/u);
+    }
+    // This temporary copy is the app root Next actually reads; plain preflight must not load its local file.
+    await writeFile(join(app, ".env.local"), `NEXT_PUBLIC_CALENDLY_URL=${invalidUrl}\n`);
+    const localInputs = { APPLICATION_ENVIRONMENT: "development", NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: contact ? keyA : "" };
+    await run("env-local-plain-preflight", ["--dir", "apps/web", "run", "check:environment"], localInputs);
+    const localFileFailure = await run("env-local-next-build", ["--dir", "apps/web", "run", "build"], localInputs, false);
+    assert.match(localFileFailure.stderr, /BOOKING_CONFIGURATION_INVALID:NEXT_PUBLIC_CALENDLY_URL:invalid/u);
+    assert.equal((localFileFailure.stdout + localFileFailure.stderr).includes(invalidUrl), false);
+    await rm(join(app, ".env.local"));
+
+    const developments = multilingual ? [["neither", "", ""], ["booking-only", urlA, ""], ["contact-only", "", keyA], ["both", urlA, keyA]]
+      : [["absent", "", ""], ["configured", urlA, contact ? keyA : ""]];
+    for (const [label, url, key] of developments) await browser(`development-${label}`, "dev", "development", url, url, key, key);
+    const sourceHash = await sourceDigest();
+    for (const [target, buildUrl, runtimeUrl, buildKey, runtimeKey] of [
+      ["development", "", urlB, "", contact ? keyB : ""],
+      ["staging", urlA, urlB, contact ? keyA : "", contact ? keyB : ""],
+      ["production", urlB, urlA, contact ? keyB : "", contact ? keyA : ""],
+    ]) {
+      assert.equal(await sourceDigest(), sourceHash);
+      const inputs = { APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_CALENDLY_URL: buildUrl, NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: buildKey };
+      await run(`${target}-next`, ["--dir", "apps/web", "run", "build"], inputs);
+      await run(`${target}-opennext`, ["--dir", "apps/web", "exec", "opennextjs-cloudflare", "build", "--skipNextBuild"], {
+        ...inputs, ...(target === "development" ? {} : { CLOUDFLARE_ENV: target }),
+      });
+      const before = await artifactDigest();
+      const observed = await browser(`${target}-prepared`, "preview", target, runtimeUrl, buildUrl, runtimeKey, buildKey);
+      assert.deepEqual(await artifactDigest(), before, "worker and sorted static assets must remain byte-identical after runtime challenge");
+      assert.equal(await sourceDigest(), sourceHash);
+      artifacts.push({ profile, bookingMode, target, sourceHash, ...before, ...observed });
+      await writeFile(join(owner, "artifacts.json"), JSON.stringify(artifacts, null, 2));
+    }
+    context.diagnostic(JSON.stringify({ owner, artifacts, providers: "all third-party attempts intercepted before navigation" }));
+  });
+}
