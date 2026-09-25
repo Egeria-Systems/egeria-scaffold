@@ -165,6 +165,8 @@ Profile inclusion distinguishes recipe defaults from independent selections. `de
 | `payments-stripe` | `hybrid` | `repository-stateful`, `external-stateful`, `persistent-data` | `reviewed` | optional: site, app, authenticated-app | `app-foundation`; persistence/jobs resolved by mode; subscriptions require `BillingSubjectProvider` |
 | `booking-webhooks` | `hybrid` | `repository-stateful`, `external-stateful`, `persistent-data` | `reviewed` | optional: app, authenticated-app | `app-foundation`, `application-persistence`; jobs optional |
 
+**Deferred catalog requirement:** `durable-contact-submissions` retains the exact metadata and optional profile membership above, but has no executable selection today. The [contact and portability deferral](../roadmaps/program-roadmap.md#contact-and-portability-work-deferred) owns its scheduling and reactivation; the independent implemented Web3Forms capability is unchanged.
+
 ## Accepted app architecture boundary
 
 The current `app@0.2.0` recipe directly selects only `app-foundation@0.1.0` and `site-routing@0.4.0`; declared dependencies supply the complete production-site content, navigation, contact, accessibility, responsive, and visual behavior. `app-foundation` is hybrid and owns the explicit generated server-source and test allowlist plus the exact merge-managed `/dependencies/effect` member for `effect@4.0.0-rc.112` and `/scripts/test:integration:cloudflare` member. The recipe selects the resolved graph, while builder-kernel alone owns the exact root `pnpm-lock.yaml` and `.egeria` state lifecycle. App rendering uses the existing production-site and multilingual presentation owners without creating a parallel UI.
