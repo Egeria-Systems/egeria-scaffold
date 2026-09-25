@@ -116,6 +116,11 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       },
       {
         filePath:
+          "packages/builder-core/templates/booking-calendly/application-environments/apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+        messages: [],
+      },
+      {
+        filePath:
           "packages/builder-core/templates/booking-calendly/apps/web/app/page.tsx",
         messages: [],
       },
@@ -201,6 +206,16 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       {
         filePath:
           "packages/builder-core/templates/contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/web3forms-contact.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/multilingual/application-environments/apps/web/app/[locale]/[[...segments]]/page.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/multilingual/application-environments/apps/web/src/integrations/booking/localized-booking.calendly.tsx",
         messages: [],
       },
       {

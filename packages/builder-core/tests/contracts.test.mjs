@@ -1621,7 +1621,7 @@ test("application environment catalog admits only the complete common tuple with
   const snapshot = { standards: "0.7.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0" };
   const result = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, snapshot);
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.deepEqual(result.value.map(({ identifier }) => identifier).sort(), ["app-foundation", "contact-form-web3forms", "content-files", "deployment-cloudflare", "multilingual", "observability", "section-composition", "site-routing", "standards"]);
+  assert.deepEqual(result.value.map(({ identifier }) => identifier).sort(), ["app-foundation", "booking-calendly", "contact-form-web3forms", "content-files", "deployment-cloudflare", "multilingual", "observability", "section-composition", "site-routing", "standards"]);
   const deployment = result.value.find(({ identifier }) => identifier === "deployment-cloudflare");
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/src/configuration/application-environment.ts"));
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/scripts/check-application-environment.mjs"));
@@ -1637,4 +1637,23 @@ test("environment contact installed state admits only its exact candidate versio
     state.installedCapabilities.push({ ...state.installedCapabilities[0], identifier: "contact-form-web3forms", version });
     assert.equal(contracts.parseStateJson(JSON.stringify(state), "2.0.0").ok, version === "0.2.0");
   }
+});
+
+
+test("environment booking installed state and catalog admit only the mode-only candidate subject", () => {
+  for (const version of ["0.1.0", "0.2.0", "0.3.0"]) {
+    const state = structuredClone(environmentState);
+    state.installedCapabilities.push({ ...state.installedCapabilities[0], identifier: "booking-calendly", version });
+    state.installedCapabilities.push({ ...state.installedCapabilities[0], identifier: "contact-form-web3forms", version: "0.2.0" });
+    assert.equal(contracts.parseStateJson(JSON.stringify(state), "2.0.0").ok, version === "0.2.0");
+  }
+  const catalog = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, contracts.createApplicationEnvironmentRenderingContext().catalogSnapshot);
+  assert.equal(catalog.ok, true);
+  const booking = catalog.value.find(({ identifier }) => identifier === "booking-calendly");
+  assert.equal(booking?.version, "0.2.0");
+  assert.deepEqual(booking.dependencies, ["section-composition"]);
+  assert.deepEqual(booking.environmentVariables, ["NEXT_PUBLIC_CALENDLY_URL"]);
+  assert.deepEqual(booking.migrationPlanners, ["add-booking-calendly-0-2-0", "remove-booking-calendly-0-2-0"]);
+  assert.equal(booking.managedSurfaces.length, 9);
+  assert.equal(booking.managedSurfaces.find(({ path }) => path === "docs/booking-calendly.md")?.ownership, "application-owned");
 });

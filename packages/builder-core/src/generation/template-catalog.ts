@@ -475,8 +475,34 @@ export function createTemplateCatalog(
       });
     }
   }
+  if (applicationEnvironments && includeBookingCalendly) {
+    for (const path of ["apps/web/content/fr-CA/booking-calendly.yaml", "apps/web/tests/unit/booking-configuration.test.ts", "apps/web/tests/component/booking-availability.test.tsx"]) {
+      sources.push({ source: `booking-calendly/application-environments/${path}`, destinationSource: `booking-calendly/${path}`, contentKind: "text" });
+    }
+    sources.push({ source: "booking-calendly/docs/booking-calendly.md", contentKind: "text" });
+  }
   const selectedSources = sources.map((entry) => {
     if (!applicationEnvironments) return entry;
+    if (includeBookingCalendly) {
+      if (entry.source === "common/apps/web/next.config.ts") {
+        return { ...entry, source: `booking-calendly/application-environments/apps/web/next${includeWeb3Forms ? ".contact" : ".config"}.ts`, destinationSource: entry.source };
+      }
+      if (entry.source === "common/apps/web/scripts/check-application-environment.mjs") {
+        return { ...entry, source: `booking-calendly/application-environments/apps/web/scripts/check-application-environment${includeWeb3Forms ? ".contact" : ""}.mjs`, destinationSource: entry.source };
+      }
+      if ([
+        "booking-calendly/apps/web/content/en-CA/booking-calendly.yaml",
+        "booking-calendly/apps/web/src/integrations/booking-calendly/booking-content.ts",
+        "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template",
+        "booking-calendly/apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+        "booking-calendly/apps/web/tests/e2e/calendly-booking.spec.ts",
+        "multilingual/apps/web/app/[locale]/[[...segments]]/page.tsx",
+        "multilingual/apps/web/src/integrations/booking/localized-booking.calendly.tsx",
+      ].includes(entry.source)) {
+        const separator = entry.source.indexOf("/");
+        return { ...entry, source: `${entry.source.slice(0, separator)}/application-environments${entry.source.slice(separator)}`, destinationSource: entry.destinationSource ?? entry.source };
+      }
+    }
     if (includeWeb3Forms) {
       if (["common/apps/web/next.config.ts", "common/apps/web/scripts/check-application-environment.mjs"].includes(entry.source)) {
         return { ...entry, source: entry.source.replace("common/", "contact-form-web3forms/application-environments/"), destinationSource: entry.source };

@@ -1609,7 +1609,7 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const destination = join(owner, "project");
     const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
-      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
+      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
       destination, renderingContext: core.createApplicationEnvironmentRenderingContext(),
       verifier: {
         async prepareLockfile(root) {
@@ -1650,4 +1650,23 @@ test("environment contact removal refuses forged contexts and unsupported operat
     assertFailure(await core.planCapabilityRemoval({ reader, git, capability: "contact-form-web3forms", renderingContext, ...override }), "CAPABILITY_REMOVAL_UNSUPPORTED");
   }
   assert.equal(reads, 0);
+});
+
+
+test("environment booking removal preserves contact and refuses shared drift or surviving references", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const entries = await environmentContactEntries("site", { booking: "popup", contact: true, multilingual: true });
+  const plan = files => core.planCapabilityRemoval({ reader: createSnapshotReader(files).reader, git, capability: "booking-calendly", renderingContext, inspectRepositoryInventory: async () => inventoryFromEntries(files) });
+  const accepted = await plan(entries);
+  assert.equal(accepted.ok, true, JSON.stringify(accepted));
+  assert.deepEqual(accepted.value.capability, { identifier: "booking-calendly", version: "0.2.0" });
+  assert.ok(accepted.value.desiredCapabilities.includes("contact-form-web3forms"));
+  assert.ok(accepted.value.desiredCapabilities.includes("multilingual"));
+  for (const path of ["apps/web/.env.example", "apps/web/next.config.ts", "apps/web/scripts/check-application-environment.mjs", "apps/web/app/[locale]/[[...segments]]/page.tsx", "apps/web/src/integrations/booking/localized-booking.tsx"]) {
+    const changed = new Map(entries); changed.set(path, changed.get(path) + "\n// owned modification\n");
+    assert.equal((await plan(changed)).ok, false, path);
+  }
+  const referenced = new Map(entries);
+  referenced.set("apps/web/src/booking-consumer.ts", 'import { bookingCalendlySettings } from "./integrations/booking-calendly/booking-settings";\n');
+  assertFailure(await plan(referenced), "CAPABILITY_REMOVAL_REFERENCE_CONFLICT");
 });

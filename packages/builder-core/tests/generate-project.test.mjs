@@ -145,7 +145,6 @@ test("application environment generation rejects incomplete and malformed select
   await withTestRoot(async (owner) => {
     const before = await snapshotFileBytes(owner);
     for (const selection of [
-      { bookingCalendly: { mode: "link" } },
       { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } },
       { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true },
       { contactFormWeb3Forms: { accessKey: "secret-sentinel" } },
@@ -2178,6 +2177,30 @@ test("public generation validates and projects contact settings before writes", 
       assert.deepEqual(fake.calls, []);
       assert.equal(await exists(destination), false);
       assert.doesNotMatch(JSON.stringify(result.issues), /invalid-form-identifier|private-endpoint/);
+    });
+  }
+});
+
+
+test("environment booking generation passes writer admission and records exact verified controls", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  for (const [profile, mode] of [["portfolio", "link"], ["site", "popup"], ["app", "inline"]]) {
+    await withTestRoot(async owner => {
+      const composed = profile === "site";
+      const checks = profile === "app" ? [...generatedChecks, "worker-integration"] : generatedChecks;
+      const verifier = createFakeVerifier({ verify: async () => ({ ok: true, value: { checks } }) });
+      const result = assertSuccess(await core.generateProject({
+        request: { profile, projectName: "booking-environment", displayName: "Booking Environment", bookingCalendly: { mode }, ...(composed ? { multilingual: true, contactFormWeb3Forms: true } : {}) },
+        destination: join(owner, profile), verifier: verifier.verifier, renderingContext,
+      }));
+      assert.equal(result.state.schemaVersion, "2.0.0");
+      assert.equal(result.state.installedCapabilities.find(({ identifier }) => identifier === "booking-calendly")?.version, "0.2.0");
+      assert.deepEqual(verifier.calls, ["prepare-lockfile", "verify-isolated-copy"]);
+      const reader = core.createFileSystemRepositoryReader(result.destination);
+      const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(reader, renderingContext));
+      const project = assertSuccess(core.parseProjectYaml((await reader.readText(".egeria/project.yaml")).content, "2.0.0"));
+      assert.deepEqual(project.capabilitySettings, { "booking-calendly": { mode } });
+      assert.deepEqual(await core.doctorRepository({ reader, catalog: snapshot.catalog, profiles: snapshot.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
     });
   }
 });

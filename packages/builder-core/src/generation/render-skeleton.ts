@@ -473,7 +473,7 @@ export async function renderSkeleton(
   if (applicationEnvironments && Object.hasOwn(request, "contactFormWeb3Forms") && request.contactFormWeb3Forms !== true) {
     return generatedIssue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "contactFormWeb3Forms"], "invalid-selection");
   }
-  if (applicationEnvironments && (request.analytics !== undefined || request.bookingCalendly !== undefined || request.applicationPersistence === true || request.transactionalEmailResend === true || request.backgroundJobDelivery === true)) {
+  if (applicationEnvironments && (request.analytics !== undefined || request.applicationPersistence === true || request.transactionalEmailResend === true || request.backgroundJobDelivery === true)) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
   }
   const packageVersions: CapabilityPackageVersions = {
@@ -553,14 +553,10 @@ export async function renderSkeleton(
       : {
           analyticsSettingsJson: JSON.stringify(request.analytics, null, 2),
         }),
-    ...(request.bookingCalendly === undefined || !("destination" in request.bookingCalendly)
-      ? {}
-      : {
-          calendlyDestinationJson: JSON.stringify(
-            request.bookingCalendly.destination,
-          ),
-          calendlyModeJson: JSON.stringify(request.bookingCalendly.mode),
-        }),
+    ...(request.bookingCalendly === undefined ? {} : {
+      calendlyModeJson: JSON.stringify(request.bookingCalendly.mode),
+      ...("destination" in request.bookingCalendly ? { calendlyDestinationJson: JSON.stringify(request.bookingCalendly.destination) } : {}),
+    }),
   };
   const templateRoot = new URL("../../templates/", import.meta.url);
   const files: GeneratedFile[] = [];
@@ -580,7 +576,7 @@ export async function renderSkeleton(
 
   if (applicationEnvironments) {
     files.push(
-      { path: "apps/web/.env.example", content: encoder.encode(`APPLICATION_ENVIRONMENT=development\nNEXT_PUBLIC_SITE_URL=http://localhost:3000\n${request.contactFormWeb3Forms === true ? "NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=\n" : ""}`) },
+      { path: "apps/web/.env.example", content: encoder.encode(`APPLICATION_ENVIRONMENT=development\nNEXT_PUBLIC_SITE_URL=http://localhost:3000\n${request.contactFormWeb3Forms === true ? "NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=\n" : ""}${request.bookingCalendly === undefined ? "" : "NEXT_PUBLIC_CALENDLY_URL=\n"}`) },
       { path: "apps/web/.dev.vars.example", content: encoder.encode("APPLICATION_ENVIRONMENT=development\nBETTER_STACK_INGESTING_HOST=\nBETTER_STACK_SOURCE_TOKEN=\n") },
     );
   }

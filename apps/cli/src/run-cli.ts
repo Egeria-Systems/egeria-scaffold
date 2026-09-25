@@ -302,7 +302,7 @@ async function runCreate(
   dependencies: CliRunnerDependencies,
 ): Promise<0 | 1> {
   const command = input.command;
-  if (input.renderingContext !== undefined && (command.analytics !== undefined || command.bookingCalendly !== undefined || command.applicationPersistence === true || command.transactionalEmailResend === true || command.backgroundJobDelivery === true)) {
+  if (input.renderingContext !== undefined && (command.analytics !== undefined || command.applicationPersistence === true || command.transactionalEmailResend === true || command.backgroundJobDelivery === true)) {
     writeJson(output.writeError, { ok: false, command: "create", issues: [{ code: "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", path: ["request"], context: { reason: "incomplete-capability" } }] });
     return 1;
   }
@@ -478,7 +478,7 @@ async function inspectCreateTargetsForPlan(
 }
 
 async function runPlanAdd(
-  command: Extract<CliCommand, Readonly<{ kind: "plan-add" }>>,
+  command: Extract<CliCommand | ApplicationEnvironmentCliCommand, Readonly<{ kind: "plan-add" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
   renderingContext?: ApplicationEnvironmentRenderingContext,
@@ -811,7 +811,7 @@ async function runPlanProfileTransition(
 }
 
 async function runApplyAdd(
-  command: Extract<CliCommand, Readonly<{ kind: "apply-add" }>>,
+  command: Extract<CliCommand | ApplicationEnvironmentCliCommand, Readonly<{ kind: "apply-add" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
   renderingContext?: ApplicationEnvironmentRenderingContext,
