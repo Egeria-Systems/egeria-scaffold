@@ -2,6 +2,18 @@
 
 This is the concise execution sequence. It does not supersede the [full approved source plan](2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md) or an accepted ADR.
 
+## Contact and portability work deferred
+
+**User decision — 2026-09-24:** Defer durable contact submissions (P5F-1–4 and contact certification tasks P5F-C0, P5F-CP and P5F-C) and the alternate-adapter/package-support experiment (P10-4) until separately reactivated. Their original requirements and identifiers remain available in the [delivery plan](2026-09-16-remaining-program-delivery-plan.md). They are outside the active delivery sequence and its completion obligations, not implemented, certified, cancelled or deleted.
+
+Every other increment remains required: existing P4 and P5C/D/E acceptance and certification duties; P6; the complete P7 recipe including Google and support-console; P8A/B and every P8C mode and migration; P9-1/2; and P10-1/2/3/5. Web3Forms, the environment stream and ADR-0020 activation gates, existing deferrals, and capability-owned security, privacy, deployment and recovery requirements are unchanged. Keep conditional contact views dormant until a supported, certified contact capability exists; the retained account/support baseline and later billing views remain required.
+
+The site dependency-only persistence extension still needed by retained payments transfers to [P8C-1](2026-09-16-remaining-program-delivery-plan.md#p8c-1--deliver-reconciled-one-time-payments), with separate exact-subject acceptance and its strict future admission gate. Portfolio widening for contact stays deferred. This transfers planning ownership, grants no certification or composition exception, and does not restart P5C. [ADR-0004](../adr/0004-cloudflare-isolation.md) isolation and in-memory/contract tests, [ADR-0005](../adr/0005-evidence-driven-package-extraction.md) extraction controls, and measured package reassessment in P10-1/2 remain required; only the alternate-adapter experiment and its contingent support/extraction decisions are deferred.
+
+Future final approval may accept the amended active delivery scope only after every retained obligation and applicable executable certification gate is satisfied, with these two deferrals and their limitations explicit. It cannot mark P5F, P10-4 or the original entire program complete. Existing pending registry records and `all-certified` semantics remain unchanged; this scheduling decision excuses no executable subject or missing prerequisite.
+
+Reactivation requires an explicit user request, a demonstrated contact workflow or alternate-adapter/portability need, fresh canonical and dependency review, exact implementation/evidence scope and the usual approvals. It is not automatic at the next phase or final hardening. Contact preparation must discover and reuse whatever exact persistence support has actually been accepted, without repeating completed widening because an older card still names it. Preserve all existing source, evidence, fixtures and external resources.
+
 ## P0 — Architecture materialization and compatibility proof
 
 ### P0.1 — Constitution and ADRs
@@ -130,7 +142,7 @@ No approved task, requirement, gate, or identifier is removed:
 - P5A multilingual work moves here intact; its capability identifier and requirements remain unchanged.
 - P5B analytics and provider-neutral consent work moves here intact; its capability identifier and requirements remain unchanged.
 - P4 app-foundation, `app`, and portfolio/site-to-app transition work remains in P4.
-- P5C through P5F remain in P5 with their existing ordering and requirements.
+- P5C through P5F retain their P5 identifiers and requirements; the later [contact deferral](#contact-and-portability-work-deferred) removes P5F from active scheduling.
 
 P5A and P5B are therefore not deleted and not renumbered.
 
@@ -256,14 +268,14 @@ The [owning delivery cards and certification rows](2026-09-16-remaining-program-
 
 The [remaining-program delivery plan](2026-09-16-remaining-program-delivery-plan.md) decomposes P5D through P10 into outcome increments, dependency and requirement coverage, and separate certification tasks. Its [historical email contract handoff](2026-09-16-email-delivery-contract-plan.md) preserves the original planning record; [recorded decisions](2026-09-16-remaining-program-decisions.md) explain the approved directions. Current sequencing follows the [integrated delivery status](#hosted-contact-form--next-two-increments). These plans do not change current phase acceptance or authorize runtime work.
 
-P5A and P5B are relocated intact to P3B; they are not deleted and not renumbered. P5C through P5F remain here with their existing ordering and requirements:
+P5A and P5B are relocated intact to P3B; they are not deleted and not renumbered. P5C through P5F retain their identifiers and requirements here, subject to the [contact deferral](#contact-and-portability-work-deferred):
 
 - P5C: `application-persistence`
 - P5D: `transactional-email-resend`
 - P5E: `background-job-delivery`
-- P5F: `durable-contact-submissions`
+- P5F: `durable-contact-submissions` — deferred, including its separate contact certification tasks.
 
-P5C through P5E may be developed independently after P4 when they do not alter shared contracts concurrently, but merge sequentially with fixtures rerun after each merge. The bounded persistence, transactional-email, [Queue topology proof](#one-time-2026-09-23-queue-topology-proof-exception) and [background job runtime](#one-time-2026-09-23-background-job-runtime-exception) exceptions below permit only their named isolated work before P4 closure. P5F requires P5C; its email and queue integrations require P5D and P5E respectively.
+P5C through P5E may be developed independently after P4 when they do not alter shared contracts concurrently, but merge sequentially with fixtures rerun after each merge. The bounded persistence, transactional-email, [Queue topology proof](#one-time-2026-09-23-queue-topology-proof-exception) and [background job runtime](#one-time-2026-09-23-background-job-runtime-exception) exceptions below permit only their named isolated work before P4 closure. If separately reactivated, P5F retains its P5C prerequisite; its email and queue integrations require P5D and P5E respectively.
 
 ### One-time 2026-09-24 job lifecycle and operator safety exception
 
@@ -311,7 +323,7 @@ For this increment, the approved binding lane uses the existing Wrangler `create
 
 Export-and-remove requires a read-only machine assessment of supplied evidence with reasons, provenance, recommendations and explicit uncertainty, followed by human review of required dispositions and the exact fingerprinted removal plan. Machine recommendations provide no execution authority. Integrity failures and changed evidence refuse before writes. Remote provisioning, credential/permission changes, deployment, remote migrations, export/restore/deletion, spending and production actions retain separate concrete approval.
 
-**Stop gate:** Each capability has its own implementation task followed by a separate certification task, evidence, add/upgrade/removal or ejection behavior, recovery plan, review packet, and approval.
+**Stop gate:** Each retained active capability has its own implementation task followed by a separate certification task, evidence, add/upgrade/removal or ejection behavior, recovery plan, review packet, and approval. Deferred contact retains those duties for reactivation under the [amendment](#contact-and-portability-work-deferred).
 
 ### One-time 2026-09-17 persistence certification sequencing amendment
 
@@ -387,11 +399,11 @@ Implement verified/idempotent Calendly events, normalized booking events, option
 
 The [owning delivery cards and certification rows](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance) include environment configuration, composed guide/examples, negative cases and recovery at first executable delivery; existing prerequisites and phase closure remain.
 
-After representative synthetic client-journey evidence, reassess package boundaries, measure inference and migration failures, simplify weak abstractions, verify supported upgrades, run data/provider recovery drills, and perform a bounded portability spike without claiming a second supported production platform.
+After representative synthetic client-journey evidence, reassess package boundaries, measure inference and migration failures, simplify weak abstractions, verify supported upgrades and run data/provider recovery drills. Active order is P10-1 → evidence-selected P10-2 repairs/renewals → P10-3 → P10-5 → final acceptance of the amended active scope. P10-4 and its contingent package/support decisions are [deferred](#contact-and-portability-work-deferred); no portability evidence or second supported production platform is claimed.
 
 At the end of the final fleet-hardening task, run permanent documentation hardening: inventory architecture, ADR, governance, and agent-instruction sequencing labels; replace implementation-routing references where provenance is no longer necessary; and narrow the scanner exemptions while preserving historical records and content whose subject is genuinely sequencing.
 
-**Stop gate:** Present fleet evidence, residual risks, and explicit approval for any continuing support or extraction decision.
+**Stop gate:** Present all retained active obligations, fleet evidence, applicable certification closure, residual risks and the two explicit deferrals for final user acceptance of the amended scope. Retained support or evidence-led extraction decisions still require approval; deferred contact and P10-4 evidence do not block that scoped acceptance and are not claimed complete.
 
 ### Delivery authorization extension — 2026-09-23
 

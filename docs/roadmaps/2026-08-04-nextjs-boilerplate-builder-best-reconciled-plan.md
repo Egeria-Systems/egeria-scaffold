@@ -9,6 +9,9 @@
 Accepted ADRs own individual architecture decisions. The [capability model](../architecture/capability-model.md) owns descriptor vocabulary and the initial catalog. The [review and contribution protocol](../governance/review-and-contribution.md) owns the implementation lifecycle, approvals, and action authority. The [program roadmap](program-roadmap.md) owns current implementation and certification status. This source plan owns durable product outcomes, sequencing, and gaps not yet materialized in those canonical owners.
 
 ## 1. Authoritative decisions
+
+**2026-09-24 scheduling amendment:** The [contact and portability deferral](program-roadmap.md#contact-and-portability-work-deferred) removes P5F and P10-4 from active delivery and completion scope while preserving their original requirements below. Every other increment and applicable certification gate remains required; the delivery plan assigns retained site-payment persistence work to P8C-1.
+
 **2026-09-24 environment amendment:** [ADR-0020](../adr/0020-application-environments.md) owns application-target/configuration and the narrow future retirement of related unused generation support; it qualifies conflicting literal-settings, retained-generation and deployment assumptions below without rewriting historical evidence. The [roadmap](program-roadmap.md#lean-application-environments) owns actual admission and complete candidate activation; the [protocol exception](../governance/review-and-contribution.md#lean-application-environments-delivery-exception) owns this stream’s delegated checkpoints and reviewed unmerged predecessors. P4 and separate certification remain open where already recorded.
 
 
@@ -819,6 +822,8 @@ A separate `apps/jobs` Worker is generated only if the implementation spike demo
 
 ### `durable-contact-submissions`
 
+**Deferred:** The [contact and portability deferral](program-roadmap.md#contact-and-portability-work-deferred) governs scheduling and reactivation. The following requirements remain for future delivery; they do not describe executable support.
+
 Core behavior:
 
 1. validate and normalize the request;
@@ -1111,7 +1116,7 @@ Certification is introduced in stages:
 
 ### Risk-based fixture matrix
 
-Required representative cases include:
+Required representative cases for retained active delivery include the matrix below, except its three durable-contact cases, which remain future requirements under the [contact and portability deferral](program-roadmap.md#contact-and-portability-work-deferred). No contact fixture or contact-support claim is required for active-scope completion:
 
 ```text
 portfolio
@@ -1267,8 +1272,6 @@ P4  App profile/app-foundation
 ├─ P5C Application persistence
 ├─ P5D Transactional email with Resend
 └─ P5E Background job delivery
-       ↓
-     P5F Durable contact submissions and optional email/queue integration
  ↓
 P6  Payload CMS
  ↓
@@ -1280,10 +1283,12 @@ P7  authenticated-app + support console
  ↓
 P9  Booking webhooks
  ↓
-P10 Fleet hardening, package review, and portability evidence
+P10 Fleet evidence, selected repairs/renewals, recovery, documentation hardening
 ```
 
 ### Sequencing rules
+
+Deferred outside this active sequence: P5F durable contact and its certification tasks; P10-4 alternate-adapter/package-support experiment. Reactivation follows the [contact and portability deferral](program-roadmap.md#contact-and-portability-work-deferred).
 
 - The unnumbered P2 closure amendment retains every accepted portfolio, Calendly, observability, CI/deployment, visual, and automated-accessibility increment while deferring performance budgets and making no performance or production-readiness claim; it closes an accepted client-ready portfolio baseline and does not run the combined client journey early.
 - P2 Task 6C normally begins only after production-observability implementation and separate Task 6B certification are integrated and approved. The explicit 2026-08-11 exception permits only Task 6C's isolated implementation from the accepted Task 6 base while Task 6B remains pending, with non-overlapping ownership and separate later reconciliation. Separate Task 6D then certifies the materially changed `standards` capability before P2 can close. Existing later task numbers remain unchanged.
@@ -1307,10 +1312,10 @@ P10 Fleet hardening, package review, and portability evidence
 - P4 uses generated Vitest Node tests for provider-neutral app-foundation behavior and may use `createTestHarness()` for whole built-Worker contracts; it does not introduce Workers Vitest without an installed binding.
 - P5C introduces the approved Vitest 5 host/Wrangler harness binding lane with direct D1 evidence. P5E, P6, and P7 select a compatible binding runner at their own implementation gates and establish only the binding behavior they own.
 - They merge sequentially, rerunning generated-project and migration fixtures after every merge.
-- P5F requires P5C. Its email and queue integrations require P5D and P5E respectively.
+- P5F is deferred under the [contact and portability deferral](program-roadmap.md#contact-and-portability-work-deferred). On reactivation, its P5C prerequisite and P5D/P5E optional-integration prerequisites remain, with reuse of accepted persistence widening.
 - P6 follows stable content and multilingual contracts.
 - P7 requires P5C and P5D; it does not require P5E or P5F.
-- P8C can implement one-time mode with app foundation/persistence/job capabilities; subscription validation uses P7's `BillingSubjectProvider`.
+- P8C retains site/app one-time mode with app foundation/persistence/job capabilities; [P8C-1](2026-09-16-remaining-program-delivery-plan.md#p8c-1--deliver-reconciled-one-time-payments) owns site persistence admission and separate certification without a contact prerequisite or gate waiver. Subscription validation uses P7's `BillingSubjectProvider`.
 - P8A, P8B, and P8C may proceed independently after their prerequisites stabilize, with explicit cross-capability testing.
 - P9 reuses application persistence and optional job delivery but does not create a CRM.
 
@@ -1430,7 +1435,7 @@ No task, requirement, gate, or identifier is deleted or renumbered:
 | P5A | `multilingual` | P3B `multilingual` implementation and separate certification tasks; P5A identifier retained as relocation provenance |
 | P5B | `analytics` and provider-neutral consent | P3B `analytics` implementation and separate certification tasks; P5B identifier retained as relocation provenance |
 | P4 | Internal `app-foundation`, public `app`, and portfolio/site-to-app transitions | P4 unchanged except for the relocated production `site` completion |
-| P5C–P5F | Persistence, Resend email, Cloudflare job delivery, and durable contact submissions | P5 unchanged and not renumbered |
+| P5C–P5F | Persistence, Resend email, Cloudflare job delivery, and durable contact submissions | P5 identifiers preserved; P5F scheduling follows the later [contact and portability deferral](program-roadmap.md#contact-and-portability-work-deferred) |
 
 P5A and P5B are therefore not deleted and not renumbered.
 
@@ -1485,7 +1490,7 @@ The accepted app-fixture predecessor supplies default app and app with Calendly,
 
 #### P5C–P5F — Remaining independent backend capabilities
 
-P5A `multilingual` and P5B `analytics` retain their identifiers as requirements relocated intact to P3B; they are not deleted or renumbered. Preserve the accepted P5C application-persistence implementation and its separate certification handoff. The [remaining-program delivery plan](2026-09-16-remaining-program-delivery-plan.md) supplies the P5D–P5F email, job-delivery and durable-contact sequence and the later program increments; it does not restart P5C or replace predecessor acceptance gates.
+P5A `multilingual` and P5B `analytics` retain their identifiers as requirements relocated intact to P3B; they are not deleted or renumbered. Preserve the accepted P5C application-persistence implementation and its separate certification handoff. The [remaining-program delivery plan](2026-09-16-remaining-program-delivery-plan.md) supplies the active email/job-delivery sequence, preserves the deferred contact cards under the [contact and portability deferral](program-roadmap.md#contact-and-portability-work-deferred), and sequences the later program increments; it does not restart P5C or replace predecessor acceptance gates.
 
 The [Queue topology proof exception](#one-time-2026-09-23-queue-topology-proof-exception) bounds the isolated P5E-1 evidence work. P5C introduces the approved Wrangler harness binding lane with shared Cloudflare deployment test configuration and application-persistence-owned D1 specifications. Future Queue, D1/R2 and persistence-backed identity capabilities select their compatible runner at their own gates. Each capability retains ownership of its own tests and does not treat a shared runner as evidence for another capability.
 
@@ -1535,11 +1540,15 @@ After representative synthetic client-journey evidence:
 - verify current/previous-major upgrades;
 - run data/provider recovery drills;
 - rerun selected deployed capability journeys across representative real-fleet repositories and supported upgrades;
-- perform a bounded portability spike without claiming another supported production platform.
+- complete permanent documentation hardening and final acceptance of the retained active scope.
+
+Active order: P10-1 → evidence-selected P10-2 repairs/renewals → P10-3 → P10-5 → final acceptance. The bounded P10-4 portability spike and contingent package/support decisions remain preserved but deferred under the [contact and portability deferral](program-roadmap.md#contact-and-portability-work-deferred); isolation, contract tests and measured package reassessment remain required.
 
 ## 22. Program acceptance principles
 
-A phase is complete only when:
+Final acceptance covers every retained active obligation under the [contact and portability deferral](program-roadmap.md#contact-and-portability-work-deferred), with P5F/contact certification and P10-4 explicitly left deferred. It does not complete the original entire program, certify deferred work or excuse any pending executable subject. Existing `all-certified`, predecessor and human acceptance gates remain unchanged.
+
+Within that amended scope, a phase is complete only when:
 
 - its generated result is usable, not merely scaffolded;
 - manifest and repository inference agree;

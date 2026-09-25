@@ -23,6 +23,8 @@ app@0.2.0 = app-foundation@0.1.0 + site-routing@0.4.0
   Calendly, multilingual, and analytics remain independent optional selections. Persistence, email, jobs, durable contact submissions, booking webhooks, and payments also remain independent selections.
 - `authenticated-app` is an individual-account application recipe. It materializes `app-foundation`, application persistence, Resend transactional email, Better Auth verified email/password, Google sign-in, protected routes, account-profile behavior, and a narrow support console. TOTP, passkeys, payments, durable contact submissions, jobs, and CMS remain independent.
 
+The optional durable-contact capability listed above is [deferred](../roadmaps/program-roadmap.md#contact-and-portability-work-deferred) and is not executable selection today; its architecture requirements remain preserved.
+
 ### Internal app foundation
 
 `app-foundation` establishes server composition roots, route-handler and server-action conventions, request context, typed server errors, stable application-facing error categories, environment separation, provider-neutral port conventions, Cloudflare adapter boundaries, backend tests, and health/build information.
