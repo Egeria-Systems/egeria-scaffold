@@ -433,6 +433,7 @@ export const applicationEnvironmentInstalledStateSchema = z.strictObject({
     ...(state.origin.profile !== "portfolio" ? { "site-routing": "0.4.0" } : {}),
     ...(state.origin.profile === "app" ? { "app-foundation": "0.3.0" } : {}),
     ...(state.installedCapabilities.some(({ identifier }) => identifier === "multilingual") ? { multilingual: "0.1.0" } : {}),
+    ...(state.installedCapabilities.some(({ identifier }) => identifier === "contact-form-web3forms") ? { "contact-form-web3forms": "0.2.0" } : {}),
   };
   if (state.origin.recipeVersion !== applicationEnvironmentRecipeVersions[state.origin.profile] ||
     state.installedCapabilities.length !== Object.keys(versions).length ||

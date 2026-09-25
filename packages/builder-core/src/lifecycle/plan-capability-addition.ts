@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { createGenerationRenderingContext, readVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
+import { createGenerationRenderingContext, isApplicationEnvironmentRenderingContext, readVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
 import { fingerprintFileContent, fingerprintJsonValue } from "../ownership/fingerprint.js";
 import { prepareCapabilityDependencyChange } from "./prepare-capability-dependency-change.js";
@@ -10,13 +10,15 @@ import type { ProfileIdentifier, ProfileRecipe } from "../contracts/profile.js";
 import {
   analyticsSettingsSchema,
   type AnalyticsSettings,
+  type ProjectConfiguration,
+  type ApplicationEnvironmentProjectConfiguration,
   calendlyBookingSettingsSchema,
   web3FormsContactSettingsSchema,
   type Web3FormsContactSettings,
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
 import type { ContractIssue } from "../contracts/result.js";
-import type { InstalledSurface } from "../contracts/state.js";
+import type { InstalledSurface, InstalledState, ApplicationEnvironmentInstalledState } from "../contracts/state.js";
 import {
   deriveProjectDiscrepancies,
   inspectProject,
@@ -26,6 +28,7 @@ import {
   renderSkeleton,
   type GeneratedFile,
   type RenderedSkeleton,
+  type ApplicationEnvironmentRenderingContext,
 } from "../generation/render-skeleton.js";
 import { createBuilderStateSurfaces } from "../generation/builder-state-surfaces.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
@@ -47,9 +50,10 @@ export type CapabilityAdditionPlan = Readonly<{
   baseRevision: string;
   profile: ProfileIdentifier;
   capability: Readonly<{
-    identifier: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
-    version: "0.1.0" | "0.2.0";
-  }>;
+    identifier: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend";
+    version: "0.1.0";
+  }> | Readonly<{ identifier: "contact-form-web3forms"; version: "0.1.0" | "0.2.0" }>
+    | Readonly<{ identifier: "background-job-delivery"; version: "0.2.0" }>;
   settings:
     | Readonly<{
         consentPolicy: "explicit-opt-in";
@@ -107,22 +111,26 @@ type PlanningResult<T> =
       issues: readonly PlanningIssue[];
     }>;
 
-type ValidInspection = ProjectInspection &
+type LifecycleProject = ProjectConfiguration | ApplicationEnvironmentProjectConfiguration;
+type LifecycleState = InstalledState | ApplicationEnvironmentInstalledState;
+type LifecycleInspection = ProjectInspection<LifecycleProject, LifecycleState>;
+
+type ValidInspection = LifecycleInspection &
   Readonly<{
-    project: Extract<ProjectInspection["project"], Readonly<{ kind: "valid" }>>;
+    project: Extract<LifecycleInspection["project"], Readonly<{ kind: "valid" }>>;
     migrations: Extract<
-      ProjectInspection["migrations"],
+      LifecycleInspection["migrations"],
       Readonly<{ kind: "valid" }>
     >;
-    inference: ProjectInspection["inference"] &
+    inference: LifecycleInspection["inference"] &
       Readonly<{
         state: Extract<
-          ProjectInspection["inference"]["state"],
+          LifecycleInspection["inference"]["state"],
           Readonly<{ kind: "valid" }>
         >;
       }>;
     resolution: Extract<
-      NonNullable<ProjectInspection["resolution"]>,
+      NonNullable<LifecycleInspection["resolution"]>,
       Readonly<{ ok: true }>
     >;
   }>;
@@ -181,7 +189,7 @@ function fingerprintPlan(input: Readonly<{
 }
 
 function validatedInspection(
-  inspection: ProjectInspection,
+  inspection: LifecycleInspection,
   profiles: readonly ProfileRecipe[],
 ): ValidInspection | undefined {
   if (
@@ -262,7 +270,7 @@ function hasUnsupportedEjection(inspection: ValidInspection): boolean {
 
 async function hasUnavailableApplicationOwnedSurface(
   reader: RepositoryReader,
-  rendered: RenderedSkeleton,
+  rendered: RenderedSkeleton<LifecycleProject>,
 ): Promise<boolean> {
   const paths = [
     ...new Set(
@@ -353,7 +361,7 @@ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
 }
 
 function actionOwnership(
-  rendered: RenderedSkeleton,
+  rendered: RenderedSkeleton<LifecycleProject>,
   path: string,
 ): Pick<CapabilityAdditionAction, "owner" | "ownership"> | undefined {
   if (path === "apps/web/package.json" || path === "pnpm-lock.yaml") {
@@ -389,8 +397,8 @@ function actionOwnership(
 }
 
 function changedFiles(
-  current: RenderedSkeleton,
-  desired: RenderedSkeleton,
+  current: RenderedSkeleton<LifecycleProject>,
+  desired: RenderedSkeleton<LifecycleProject>,
 ):
   | Readonly<{
       created: readonly GeneratedFile[];
@@ -428,8 +436,8 @@ function changedFiles(
 
 async function deriveActions(input: Readonly<{
   reader: RepositoryReader;
-  current: RenderedSkeleton;
-  desired: RenderedSkeleton;
+  current: RenderedSkeleton<LifecycleProject>;
+  desired: RenderedSkeleton<LifecycleProject>;
 }>): Promise<PlanningResult<readonly CapabilityAdditionAction[]>> {
   const differences = changedFiles(input.current, input.desired);
 
@@ -501,8 +509,13 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
   settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
+  renderingContext?: ApplicationEnvironmentRenderingContext;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
+  if (input.renderingContext !== undefined && (
+    !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
+    capabilityValue !== "contact-form-web3forms" || input.settings !== undefined
+  )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
 
   if (
     capabilityValue !== "analytics" &&
@@ -519,7 +532,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   const settingsResult = capabilityValue === "booking-calendly"
     ? calendlyBookingSettingsSchema.safeParse(input.settings)
     : undefined;
-  const contactSettingsResult = capabilityValue === "contact-form-web3forms"
+  const contactSettingsResult = input.renderingContext === undefined && capabilityValue === "contact-form-web3forms"
     ? web3FormsContactSettingsSchema.safeParse(input.settings) : undefined;
   const analyticsSettingsResult = capabilityValue === "analytics"
     ? analyticsSettingsSchema.safeParse(input.settings)
@@ -533,18 +546,18 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
 
-  const snapshot = await readVerifiedProjectSnapshot(input.reader);
+  const snapshot = input.renderingContext === undefined
+    ? await readVerifiedProjectSnapshot(input.reader)
+    : await readVerifiedProjectSnapshot(input.reader, input.renderingContext);
 
   if (!snapshot.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
   const inspection = validatedInspection(
-    await inspectProject({
-      reader: snapshot.value.reader,
-      catalog: snapshot.value.catalog,
-      profiles: snapshot.value.profiles,
-    }),
+    await (input.renderingContext === undefined
+      ? inspectProject({ reader: snapshot.value.reader, catalog: snapshot.value.catalog, profiles: snapshot.value.profiles })
+      : inspectProject({ reader: snapshot.value.reader, catalog: snapshot.value.catalog, profiles: snapshot.value.profiles, projectSchemaVersion: "2.0.0" })),
     snapshot.value.profiles,
   );
 
@@ -568,7 +581,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     project.originProfile !== "app" || project.recipeVersion !== "0.2.0" ||
     snapshot.value.renderingContext?.catalogSnapshot.standards !== "0.5.0"
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
-  if ((capabilityValue === "transactional-email-resend" || capabilityValue === "contact-form-web3forms" || capabilityValue === "background-job-delivery") && !(
+  if (input.renderingContext === undefined && (capabilityValue === "transactional-email-resend" || capabilityValue === "contact-form-web3forms" || capabilityValue === "background-job-delivery") && !(
     (project.originProfile === "portfolio" && project.recipeVersion === "0.11.0") ||
     (project.originProfile === "site" && project.recipeVersion === "0.12.0") ||
     (project.originProfile === "app" && project.recipeVersion === "0.2.0")
@@ -592,26 +605,30 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   const targetCatalog = targetContext === undefined ? { ok: true as const, value: snapshot.value.catalog }
     : createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, targetContext.catalogSnapshot);
   if (!targetCatalog.ok) return planningFailure("PROJECT_INSPECTION_INVALID");
-  const renderRequest = {
+  const commonRenderRequest = {
     profile: project.originProfile,
     projectName: project.project.name,
     displayName: project.project.displayName,
-    ...(project.capabilitySettings["booking-calendly"] === undefined
+    ...(project.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
+    packageVersions: verifiedCapabilityPackageVersions,
+  };
+  const legacyProject = project.schemaVersion === "1.0.0" ? project : undefined;
+  const renderRequest = {
+    ...commonRenderRequest,
+    ...(legacyProject?.capabilitySettings["booking-calendly"] === undefined
       ? {}
-      : { bookingCalendly: project.capabilitySettings["booking-calendly"] }),
-    ...(project.selectedCapabilities.includes("multilingual")
-      ? { multilingual: true as const }
-      : {}),
-    ...(project.capabilitySettings.analytics === undefined
+      : { bookingCalendly: legacyProject.capabilitySettings["booking-calendly"] }),
+    ...(legacyProject?.capabilitySettings.analytics === undefined
       ? {}
-      : { analytics: project.capabilitySettings.analytics }),
+      : { analytics: legacyProject.capabilitySettings.analytics }),
     ...(project.selectedCapabilities.includes("application-persistence")
       ? { applicationPersistence: true as const } : {}),
     ...(project.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
-    ...(project.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: project.capabilitySettings["contact-form-web3forms"] }),
-    packageVersions: verifiedCapabilityPackageVersions,
-  } as const;
-  const currentResult = await renderSkeleton(renderRequest, snapshot.value.renderingContext);
+    ...(legacyProject?.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: legacyProject.capabilitySettings["contact-form-web3forms"] }),
+  };
+  const currentResult = input.renderingContext === undefined
+    ? await renderSkeleton(renderRequest, snapshot.value.renderingContext)
+    : await renderSkeleton(commonRenderRequest, input.renderingContext);
 
   if (!currentResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -637,11 +654,11 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     ({ identifier }) => identifier === capabilityValue,
   );
 
-  if (descriptor?.version !== (capabilityValue === "background-job-delivery" ? "0.2.0" : "0.1.0")) {
+  if (descriptor?.version !== (input.renderingContext !== undefined || capabilityValue === "background-job-delivery" ? "0.2.0" : "0.1.0")) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
-  const desiredResult = await renderSkeleton({
+  const desiredResult = input.renderingContext === undefined ? await renderSkeleton({
     ...renderRequest,
     ...(capabilityValue === "analytics" && analyticsSettingsResult?.success === true
       ? { analytics: analyticsSettingsResult.data }
@@ -656,7 +673,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
         : capabilityValue === "application-persistence"
           ? { applicationPersistence: true as const }
           : { multilingual: true as const }),
-  }, targetContext);
+  }, targetContext) : await renderSkeleton({ ...commonRenderRequest, contactFormWeb3Forms: true }, input.renderingContext);
 
   if (!desiredResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -673,7 +690,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("PROJECT_DRIFT_DETECTED");
   }
 
-  const prepared = await prepareCapabilityDependencyChange({
+  const prepared = await prepareCapabilityDependencyChange<LifecycleProject>({
     reader: input.reader, current: currentResult.value, desired: desiredResult.value,
   });
   if (!prepared.ok) return planningFailure("PROJECT_DRIFT_DETECTED");
@@ -695,10 +712,11 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       status: "approval-required",
       baseRevision: input.git.identity.revision,
       profile: project.originProfile,
-      capability: {
-        identifier: capabilityValue,
-        version: descriptor.version,
-      },
+      capability: capabilityValue === "contact-form-web3forms"
+        ? { identifier: capabilityValue, version: input.renderingContext === undefined ? "0.1.0" : "0.2.0" }
+        : capabilityValue === "background-job-delivery"
+          ? { identifier: capabilityValue, version: "0.2.0" }
+          : { identifier: capabilityValue, version: "0.1.0" },
       settings:
         analyticsSettingsResult?.success === true
           ? {
@@ -745,12 +763,14 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   };
 
   let persistenceSnapshot: string | undefined;
-  if (capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery") {
-    const controls = await readControlSnapshot(input.reader);
+  if (input.renderingContext !== undefined || capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery") {
+    const controls = input.renderingContext === undefined
+      ? await readControlSnapshot(input.reader) : await readControlSnapshot(input.reader, "2.0.0");
     if (controls === undefined) return planningFailure("PROJECT_INSPECTION_INVALID");
     persistenceSnapshot = fingerprintJsonValue({
       current: prepared.value.current.files.map(({ path, content }) => ({ path, fingerprint: fingerprintFileContent(content) })),
       desired: prepared.value.desired.files.map(({ path, content }) => ({ path, fingerprint: fingerprintFileContent(content) })),
+      ...(input.renderingContext === undefined ? {} : { renderingContext: input.renderingContext }),
       sourceCatalog: snapshot.value.catalog,
       targetCatalog: targetCatalog.value,
       project: controls.projectSource,
@@ -782,6 +802,7 @@ export async function planCapabilityAddition(input: Readonly<{
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
   settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
+  renderingContext?: ApplicationEnvironmentRenderingContext;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   return planCapabilityAdditionUnchecked(input);
 }

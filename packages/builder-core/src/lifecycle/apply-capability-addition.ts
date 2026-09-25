@@ -3,6 +3,8 @@ import { isAbsolute, resolve } from "node:path";
 import {
   createVerifiedProjectSnapshot,
   createGenerationRenderingContext,
+  readVerifiedProjectSnapshot,
+  isApplicationEnvironmentRenderingContext,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
 import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
@@ -23,6 +25,8 @@ import {
   web3FormsContactSettingsSchema,
   type Web3FormsContactSettings,
   type AnalyticsSettings,
+  type ProjectConfiguration,
+  type ApplicationEnvironmentProjectConfiguration,
   type CalendlyBookingSettings,
 } from "../contracts/project.js";
 import {
@@ -34,15 +38,17 @@ import {
   capabilityAdditionVerificationChecks,
   installedStateSchema,
   type InstalledState,
+  type ApplicationEnvironmentInstalledState,
+  applicationEnvironmentInstalledStateSchema,
   type InstalledSurface,
 } from "../contracts/state.js";
 import { createBuilderStateSurfaces } from "../generation/builder-state-surfaces.js";
-import { renderSkeleton } from "../generation/render-skeleton.js";
+import { renderSkeleton, type RenderedSkeleton, type ApplicationEnvironmentRenderingContext } from "../generation/render-skeleton.js";
 import type {
   GeneratedProjectVerification,
   GeneratedProjectVerifier,
 } from "../generation/verify-generated-project.js";
-import { inferRepository } from "../inference/infer-repository.js";
+import { inferRepository, type RepositoryInference } from "../inference/infer-repository.js";
 import { createInstalledManifest } from "../manifest/create-installed-manifest.js";
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
 import {
@@ -75,13 +81,18 @@ import { readControlSnapshot } from "./lifecycle-control-snapshot.js";
 import {
   planCapabilityAddition,
   type PlanningFailureCode,
+  type CapabilityAdditionPlan,
 } from "./plan-capability-addition.js";
+
+type LifecycleProject = ProjectConfiguration | ApplicationEnvironmentProjectConfiguration;
+type LifecycleState = InstalledState | ApplicationEnvironmentInstalledState;
 
 const encoder = new TextEncoder();
 type AddableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
 
 function additionMigrationIdentifier(
   capability: AddableCapability,
+  applicationEnvironment = false,
 ):
   | "add-analytics-0-1-0"
   | "add-booking-calendly-0-1-0"
@@ -89,12 +100,13 @@ function additionMigrationIdentifier(
   | "add-application-persistence-0-1-0"
   | "add-transactional-email-resend-0-1-0"
   | "add-contact-form-web3forms-0-1-0"
+  | "add-contact-form-web3forms-0-2-0"
   | "add-background-job-delivery-0-2-0" {
   switch (capability) {
     case "background-job-delivery":
       return "add-background-job-delivery-0-2-0";
     case "contact-form-web3forms":
-      return "add-contact-form-web3forms-0-1-0";
+      return applicationEnvironment ? "add-contact-form-web3forms-0-2-0" : "add-contact-form-web3forms-0-1-0";
     case "analytics":
       return "add-analytics-0-1-0";
     case "booking-calendly":
@@ -143,10 +155,7 @@ export type CapabilityAdditionExecutionResult =
       value: Readonly<{
         status: "verified-final-diff-approval-required";
         baseRevision: string;
-        capability: Readonly<{
-          identifier: AddableCapability;
-          version: "0.1.0" | "0.2.0";
-        }>;
+        capability: CapabilityAdditionPlan["capability"];
         migration: ReturnType<typeof additionMigrationIdentifier>;
         changedPaths: readonly string[];
         verificationChecks:
@@ -257,8 +266,8 @@ function sameSurfaceDescriptor(
 }
 
 function requirePendingInference(
-  inference: Awaited<ReturnType<typeof inferRepository>>,
-  currentState: InstalledState,
+  inference: RepositoryInference<LifecycleState>,
+  currentState: LifecycleState,
   desiredCapabilities: readonly string[],
   addedCapability: AddableCapability,
   plannedReplacementPaths: readonly string[],
@@ -308,8 +317,8 @@ function requirePendingInference(
 }
 
 function requireFinalInference(
-  inference: Awaited<ReturnType<typeof inferRepository>>,
-  expectedState: InstalledState,
+  inference: RepositoryInference<LifecycleState>,
+  expectedState: LifecycleState,
   desiredCapabilities: readonly string[],
 ): boolean {
   return (
@@ -328,12 +337,12 @@ function requireFinalInference(
 }
 
 function createNextState(input: Readonly<{
-  current: InstalledState;
-  desired: Awaited<ReturnType<typeof renderSkeleton>> & Readonly<{ ok: true }>;
+  current: LifecycleState;
+  desired: Readonly<{ ok: true; value: RenderedSkeleton<LifecycleProject> }>;
   actionPaths: readonly string[];
   files: ReadonlyMap<string, Uint8Array>;
   migration: MigrationRecord;
-}>): InstalledState | undefined {
+}>): LifecycleState | undefined {
   const descriptors = [
     ...input.desired.value.surfaces,
     ...createBuilderStateSurfaces(),
@@ -375,7 +384,7 @@ function createNextState(input: Readonly<{
     managedSurfaces.push(existing);
   }
 
-  const parsed = installedStateSchema.safeParse({
+  const parsed = (input.current.schemaVersion === "2.0.0" ? applicationEnvironmentInstalledStateSchema : installedStateSchema).safeParse({
     ...input.current,
     installedCapabilities: createInstalledManifest(
       input.desired.value.resolved,
@@ -396,6 +405,7 @@ function createNextState(input: Readonly<{
 export async function applyCapabilityAddition(input: Readonly<{
   root: string;
   capability: AddableCapability;
+  renderingContext?: ApplicationEnvironmentRenderingContext;
   settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
   approvedPlanFingerprint: string;
   verifier: GeneratedProjectVerifier;
@@ -406,6 +416,10 @@ export async function applyCapabilityAddition(input: Readonly<{
   inspectExpectedChanges?: InspectExpectedChanges;
   now?: () => string;
 }>): Promise<CapabilityAdditionExecutionResult> {
+  if (input.renderingContext !== undefined && (
+    !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
+    input.capability !== "contact-form-web3forms" || input.settings !== undefined
+  )) return failure("CAPABILITY_ADDITION_UNSUPPORTED", "precondition", "not-required");
   const root = resolve(input.root);
   if (!isAbsolute(input.root) || root !== input.root) {
     return failure(
@@ -442,7 +456,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       ? analyticsSettingsSchema.safeParse(input.settings)
       : input.capability === "booking-calendly"
         ? calendlyBookingSettingsSchema.safeParse(input.settings)
-        : input.capability === "contact-form-web3forms"
+        : input.renderingContext === undefined && input.capability === "contact-form-web3forms"
           ? web3FormsContactSettingsSchema.safeParse(input.settings)
         : input.settings === undefined
           ? { success: true as const, data: undefined }
@@ -462,6 +476,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       reader,
       git: initialGit,
       capability: input.capability,
+      ...(input.renderingContext === undefined ? {} : { renderingContext: input.renderingContext }),
       ...(settingsSnapshot === undefined ? {} : { settings: settingsSnapshot }),
     });
   } catch {
@@ -487,7 +502,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
-  const controls = await readControlSnapshot(reader);
+  const controls = input.renderingContext === undefined ? await readControlSnapshot(reader) : await readControlSnapshot(reader, "2.0.0");
   if (controls === undefined) {
     return failure(
       "PROJECT_INSPECTION_INVALID",
@@ -496,20 +511,35 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
-  const snapshot = createVerifiedProjectSnapshot(controls.project.value, controls.state.value);
-  if (!snapshot.ok) {
+  if (input.renderingContext === undefined && (controls.project.value.schemaVersion !== "1.0.0" || controls.state.value.schemaVersion !== "1.0.0")) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
+  const snapshot = input.renderingContext !== undefined
+    ? await readVerifiedProjectSnapshot(reader, input.renderingContext)
+    : controls.project.value.schemaVersion === "1.0.0" && controls.state.value.schemaVersion === "1.0.0"
+      ? createVerifiedProjectSnapshot(controls.project.value, controls.state.value)
+      : undefined;
+  if (snapshot?.ok !== true) {
+    return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+  }
+  const legacyProject = controls.project.value.schemaVersion === "1.0.0" ? controls.project.value : undefined;
+  const commonRenderRequest = {
+    profile: controls.project.value.originProfile,
+    projectName: controls.project.value.project.name,
+    displayName: controls.project.value.project.displayName,
+    ...(controls.project.value.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
+    packageVersions: verifiedCapabilityPackageVersions,
+  };
   const renderRequest = {
     profile: controls.project.value.originProfile,
     projectName: controls.project.value.project.name,
     displayName: controls.project.value.project.displayName,
-    ...(controls.project.value.capabilitySettings.analytics === undefined ? {} : { analytics: controls.project.value.capabilitySettings.analytics }),
-    ...(controls.project.value.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: controls.project.value.capabilitySettings["booking-calendly"] }),
+    ...(legacyProject?.capabilitySettings.analytics === undefined ? {} : { analytics: legacyProject.capabilitySettings.analytics }),
+    ...(legacyProject?.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: legacyProject.capabilitySettings["booking-calendly"] }),
     ...(controls.project.value.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
     ...(controls.project.value.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
     ...(controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
-    ...(controls.project.value.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: controls.project.value.capabilitySettings["contact-form-web3forms"] }),
+    ...(legacyProject?.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: legacyProject.capabilitySettings["contact-form-web3forms"] }),
     packageVersions: verifiedCapabilityPackageVersions,
   };
   const targetContext = input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery"
@@ -521,7 +551,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   const targetCatalog = targetContext === undefined ? { ok: true as const, value: snapshot.value.catalog }
     : createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, targetContext.catalogSnapshot);
   if (!targetCatalog.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-  let desired = await renderSkeleton({
+  const desiredRender = input.renderingContext === undefined ? await renderSkeleton({
     ...renderRequest,
     ...(input.capability === "contact-form-web3forms" ? { contactFormWeb3Forms: settingsSnapshot as Web3FormsContactSettings } : {}),
     ...(input.capability === "analytics" ? { analytics: settingsSnapshot as AnalyticsSettings } : {}),
@@ -530,12 +560,13 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...(input.capability === "application-persistence" ? { applicationPersistence: true as const } : {}),
     ...(input.capability === "transactional-email-resend" ? { transactionalEmailResend: true as const } : {}),
     ...(input.capability === "background-job-delivery" ? { backgroundJobDelivery: true as const } : {}),
-  }, targetContext);
-  if (!desired.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+  }, targetContext) : await renderSkeleton({ ...commonRenderRequest, contactFormWeb3Forms: true }, input.renderingContext);
+  if (!desiredRender.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+  let desired: Readonly<{ ok: true; value: RenderedSkeleton<LifecycleProject> }> = desiredRender;
   if (input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery") {
     const current = await renderSkeleton(renderRequest, snapshot.value.renderingContext);
     if (!current.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-    const prepared = await prepareCapabilityDependencyChange({ reader, current: current.value, desired: desired.value });
+    const prepared = await prepareCapabilityDependencyChange<LifecycleProject>({ reader, current: current.value, desired: desired.value });
     if (!prepared.ok) return failure("PROJECT_DRIFT_DETECTED", "precondition", "not-required");
     desired = { ok: true, value: prepared.value.desired };
   }
@@ -603,8 +634,10 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
-  if (input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery") {
-    const freshPlan = await planCapabilityAddition({ reader, git: finalCleanGit, capability: input.capability });
+  if (input.renderingContext !== undefined || input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery") {
+    const freshPlan = await planCapabilityAddition({ reader, git: finalCleanGit, capability: input.capability,
+      ...(input.renderingContext === undefined ? {} : { renderingContext: input.renderingContext }),
+    });
     if (!freshPlan.ok || freshPlan.value.planFingerprint !== plan.planFingerprint) {
       return failure("CAPABILITY_PLAN_APPROVAL_INVALID", "precondition", "not-required");
     }
@@ -636,7 +669,9 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
-  const pendingInference = await inferRepository({ reader, catalog: targetCatalog.value });
+  const pendingInference = input.renderingContext === undefined
+    ? await inferRepository({ reader, catalog: targetCatalog.value })
+    : await inferRepository({ reader, catalog: targetCatalog.value, projectSchemaVersion: "2.0.0" });
   if (
     !requirePendingInference(
       pendingInference,
@@ -681,7 +716,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   }
   const migration = migrationRecordSchema.safeParse({
     schemaVersion: "1.0.0",
-    identifier: additionMigrationIdentifier(input.capability),
+    identifier: additionMigrationIdentifier(input.capability, input.renderingContext !== undefined),
     kind: "migration",
     outcome: "succeeded",
     completedAt,
@@ -773,7 +808,9 @@ export async function applyCapabilityAddition(input: Readonly<{
   }
   actualFiles.set(".egeria/state.json", persistedState.content);
 
-  const finalInference = await inferRepository({ reader, catalog: targetCatalog.value });
+  const finalInference = input.renderingContext === undefined
+    ? await inferRepository({ reader, catalog: targetCatalog.value })
+    : await inferRepository({ reader, catalog: targetCatalog.value, projectSchemaVersion: "2.0.0" });
   if (
     !requireFinalInference(
       finalInference,
@@ -826,7 +863,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       status: "verified-final-diff-approval-required",
       baseRevision: initialGit.identity.revision,
       capability: plan.capability,
-      migration: additionMigrationIdentifier(input.capability),
+      migration: additionMigrationIdentifier(input.capability, input.renderingContext !== undefined),
       changedPaths,
       verificationChecks: hasPersistence
         ? persistenceCapabilityAdditionVerificationChecks

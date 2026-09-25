@@ -124,7 +124,7 @@ function createProject(
       ({ identifier }) => identifier,
     ),
     capabilitySettings: {
-      ...(request.contactFormWeb3Forms === undefined ? {} : { "contact-form-web3forms": request.contactFormWeb3Forms }),
+      ...(applicationEnvironments || request.contactFormWeb3Forms === undefined ? {} : { "contact-form-web3forms": request.contactFormWeb3Forms }),
       ...(request.analytics === undefined
         ? {}
         : { analytics: request.analytics }),
@@ -470,7 +470,10 @@ export async function renderSkeleton(
       (!applicationEnvironments || !isApplicationEnvironmentRenderingContext(context))) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "unsupported-context");
   }
-  if (applicationEnvironments && (request.analytics !== undefined || request.bookingCalendly !== undefined || request.contactFormWeb3Forms !== undefined || request.applicationPersistence === true || request.transactionalEmailResend === true || request.backgroundJobDelivery === true)) {
+  if (applicationEnvironments && Object.hasOwn(request, "contactFormWeb3Forms") && request.contactFormWeb3Forms !== true) {
+    return generatedIssue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "contactFormWeb3Forms"], "invalid-selection");
+  }
+  if (applicationEnvironments && (request.analytics !== undefined || request.bookingCalendly !== undefined || request.applicationPersistence === true || request.transactionalEmailResend === true || request.backgroundJobDelivery === true)) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
   }
   const packageVersions: CapabilityPackageVersions = {
@@ -577,7 +580,7 @@ export async function renderSkeleton(
 
   if (applicationEnvironments) {
     files.push(
-      { path: "apps/web/.env.example", content: encoder.encode("APPLICATION_ENVIRONMENT=development\nNEXT_PUBLIC_SITE_URL=http://localhost:3000\n") },
+      { path: "apps/web/.env.example", content: encoder.encode(`APPLICATION_ENVIRONMENT=development\nNEXT_PUBLIC_SITE_URL=http://localhost:3000\n${request.contactFormWeb3Forms === true ? "NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=\n" : ""}`) },
       { path: "apps/web/.dev.vars.example", content: encoder.encode("APPLICATION_ENVIRONMENT=development\nBETTER_STACK_INGESTING_HOST=\nBETTER_STACK_SOURCE_TOKEN=\n") },
     );
   }

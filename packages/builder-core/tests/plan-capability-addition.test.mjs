@@ -765,3 +765,56 @@ test("capability addition plan propagates unexpected reader failures for boundar
     }),
   );
 });
+
+async function environmentContactEntries(profile = "portfolio", options = {}) {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const owner = await mkdtemp(join(tmpdir(), "egeria-contact-lifecycle-"));
+  try {
+    const destination = join(owner, "project");
+    const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
+    const generated = await core.generateProject({
+      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
+      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(),
+      verifier: {
+        async prepareLockfile(root) {
+          const version = profile === "portfolio" ? "portfolio-0.11.0" : profile === "site" ? "site-0.12.0" : "app-0.2.0";
+          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}/pnpm-lock.yaml`)));
+          return { ok: true, value: undefined };
+        },
+        async verifyInIsolatedCopy() { return { ok: true, value: { checks } }; },
+      },
+    });
+    assert.equal(generated.ok, true, JSON.stringify(generated.issues));
+    return await loadTextEntries(destination);
+  } finally { await rm(owner, { recursive: true, force: true }); }
+}
+
+test("environment contact addition plans are selection-only and bind exact controls", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const entries = await environmentContactEntries();
+  const plan = await core.planCapabilityAddition({ reader: createSnapshotReader(entries).reader, git, capability: "contact-form-web3forms", renderingContext });
+  assert.equal(plan.ok, true, JSON.stringify(plan.issues));
+  assert.deepEqual(plan.value.capability, { identifier: "contact-form-web3forms", version: "0.2.0" });
+  assert.equal(plan.value.settings, null);
+  assert.doesNotMatch(JSON.stringify(plan), /accessKey|00000000/u);
+  entries.set(".egeria/state.json", entries.get(".egeria/state.json") + "\n");
+  const rebound = await core.planCapabilityAddition({ reader: createSnapshotReader(entries).reader, git, capability: "contact-form-web3forms", renderingContext });
+  assert.equal(rebound.ok, true, JSON.stringify(rebound.issues));
+  assert.notEqual(rebound.value.planFingerprint, plan.value.planFingerprint);
+});
+
+test("environment contact addition refuses settings, forged context and other lifecycle before reading", async () => {
+  let reads = 0;
+  const reader = { async readText() { reads += 1; return { kind: "missing" }; } };
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  for (const override of [
+    { settings: {} }, { settings: { accessKey: "00000000-0000-4000-8000-000000000001" } },
+    { renderingContext: { ...renderingContext, projectSchemaVersion: "1.0.0" } },
+    ...["analytics", "booking-calendly", "multilingual", "application-persistence", "transactional-email-resend", "background-job-delivery"].map(capability => ({ capability })),
+  ]) {
+    const result = await core.planCapabilityAddition({ reader, git, capability: "contact-form-web3forms", renderingContext, ...override });
+    assertFailure(result, "CAPABILITY_ADDITION_UNSUPPORTED");
+  }
+  assert.equal(reads, 0);
+});

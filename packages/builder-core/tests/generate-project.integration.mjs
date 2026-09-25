@@ -331,3 +331,137 @@ it("keeps the public build target and public values fixed when runtime configura
     await writeFile(join(owner, `${target}-artifact.json`), JSON.stringify({ target, syntheticClientConsumer: true, staticFiles: buffers.length, browserSha256: createHash("sha256").update(browserBytes).digest("hex"), workerSha256: createHash("sha256").update(await readFile(join(app, ".open-next/worker.js"))).digest("hex") }, null, 2));
   }
 });
+
+
+test("environment contact builds freeze selected public values in controlled browser journeys", { timeout: 45 * 60 * 1000 }, async (context) => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-environment-contact-"));
+  context.diagnostic(`Retained contact evidence: ${owner}`);
+  const renderingContext = createApplicationEnvironmentRenderingContext();
+  const keyA = "00000000-0000-4000-8000-000000000001";
+  const keyB = "00000000-0000-4000-8000-000000000002";
+  const invalidKey = "invalid-contact-input-sentinel";
+  const supportRoot = join(owner, "support");
+  await mkdir(supportRoot);
+  const support = await prepareLiveSupport(supportRoot);
+  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+  const commands = [];
+  const artifacts = [];
+  const destination = join(owner, "generated");
+  const generated = assertSuccess(await generateProject({
+    request: { profile: "site", projectName: "contact-example", displayName: "Contact Example", multilingual: true, contactFormWeb3Forms: true },
+    destination, renderingContext,
+    verifier: createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
+  }));
+  assert.equal(generated.state.schemaVersion, "2.0.0");
+  assert.equal(generated.state.installedCapabilities.find(value => value.identifier === "contact-form-web3forms")?.version, "0.2.0");
+  await writeFile(join(owner, "generation-state.json"), JSON.stringify(generated.state, null, 2));
+  const project = join(owner, "browser-proof");
+  await cp(destination, project, { recursive: true, force: false, errorOnExist: true, dereference: false });
+  const app = join(project, "apps/web");
+
+  async function run(name, arguments_, additions = {}, succeeds = true, cwd = project) {
+    let result;
+    try {
+      result = await runPnpm(arguments_, { cwd, env: { ...environment, ...additions } });
+      commands.push({ name, arguments: arguments_, exitCode: 0 });
+    } catch (error) {
+      result = { stdout: error.stdout ?? "", stderr: error.stderr ?? "" };
+      commands.push({ name, arguments: arguments_, exitCode: error.code });
+      if (succeeds) {
+        await writeFile(join(owner, `${name}.log`), result.stdout + result.stderr);
+        throw error;
+      }
+    } finally { await writeFile(join(owner, "commands.json"), JSON.stringify(commands, null, 2)); }
+    await writeFile(join(owner, `${name}.log`), result.stdout + result.stderr);
+    assert.equal(commands.at(-1).exitCode === 0, succeeds, name);
+    return result;
+  }
+
+  async function sourceDigest() {
+    const paths = await readdir(destination, { recursive: true, withFileTypes: true });
+    const relativePaths = paths.filter(entry => entry.isFile())
+      .map(entry => join(entry.parentPath, entry.name).slice(destination.length + 1)).sort();
+    const digest = createHash("sha256");
+    for (const path of relativePaths) {
+      digest.update(path); digest.update(await readFile(join(project, path)));
+    }
+    return digest.digest("hex");
+  }
+
+  async function browser(name, mode, target, runtimeKey, expectedKey, cwd = project) {
+    const reportPath = join(owner, `${name}.json`);
+    await run(name, ["--dir", "apps/web", "run", `test:e2e:${mode}`, "--reporter=json", "web3forms-contact.spec.ts"], {
+      APPLICATION_ENVIRONMENT: target,
+      ...(mode === "dev" ? { WATCHPACK_POLLING: "true" } : {}),
+      ...(mode === "preview" && target !== "development" ? { CLOUDFLARE_ENV: target } : {}),
+      NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: runtimeKey,
+      CONTACT_TEST_EXPECTED_ACCESS_KEY: expectedKey,
+      PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath,
+    }, true, cwd);
+    const report = JSON.parse(await readFile(reportPath, "utf8"));
+    assert.equal(report.stats.expected, expectedKey === "" ? 3 : 7, name);
+    assert.equal(report.stats.unexpected, 0, name);
+    assert.equal(report.stats.flaky, 0, name);
+    return { executed: report.stats.expected, skipped: report.stats.skipped, expectedKey: expectedKey === "" ? "absent" : expectedKey === keyA ? "synthetic-A" : "synthetic-B" };
+  }
+
+  await run("install", ["install", "--frozen-lockfile", "--store-dir", support.store]);
+  await run("browser-install", ["--dir", "apps/web", "run", "browser:install"]);
+  // The state-last generator already ran actual lint, typecheck, unit/component and both builds in isolation.
+  // These process checks exercise the selected preflight itself, without loading Next environment files.
+  for (const target of ["development", "staging", "production"]) {
+    for (const [label, key] of [["absent", ""], ["invalid", invalidKey], ["configured", keyA]]) {
+      const succeeds = label === "configured" || (target === "development" && label === "absent");
+      const result = await run(`${target}-${label}-preflight`, ["--dir", "apps/web", "run", target === "development" ? "check:environment" : "check:environment:deployment"], {
+        APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: key,
+      }, succeeds);
+      if (!succeeds) assert.match(result.stderr, /"code":"CONTACT_CONFIGURATION_INVALID","field":"NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY","reason":"(?:missing|invalid)"/u);
+      assert.equal((result.stdout + result.stderr).includes(invalidKey), false);
+      if (target !== "development" && label !== "configured") {
+        const failedBuild = await run(`${target}-${label}-build`, ["--dir", "apps/web", "run", "build"], {
+          APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: key,
+        }, false);
+        assert.match(failedBuild.stderr, /CONTACT_CONFIGURATION_INVALID:NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY:(?:missing|invalid)/u);
+        assert.equal((failedBuild.stdout + failedBuild.stderr).includes(invalidKey), false);
+      }
+    }
+  }
+  for (const command of ["check:environment", "build"]) {
+    const conflict = await run(`target-conflict-${command.replace(":", "-")}`, ["--dir", "apps/web", "run", command], {
+      APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: invalidKey,
+    }, false);
+    assert.match(conflict.stderr, /APPLICATION_ENVIRONMENT_INVALID/u);
+    assert.doesNotMatch(conflict.stderr, /CONTACT_CONFIGURATION_INVALID|invalid-contact-input-sentinel/u);
+  }
+  await browser("development-absent", "dev", "development", "", "");
+  await browser("development-configured", "dev", "development", keyA, keyA);
+  const sourceHash = await sourceDigest();
+  for (const [target, buildKey, runtimeKey] of [["development", "", keyB], ["staging", keyA, keyB], ["production", keyB, keyA]]) {
+    assert.equal(await sourceDigest(), sourceHash);
+    await run(`${target}-next`, ["--dir", "apps/web", "run", "build"], {
+      APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: buildKey,
+    });
+    await run(`${target}-opennext`, ["--dir", "apps/web", "exec", "opennextjs-cloudflare", "build", "--skipNextBuild"], {
+      APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: buildKey,
+      ...(target === "development" ? {} : { CLOUDFLARE_ENV: target }),
+    });
+    const worker = await readFile(join(app, ".open-next/worker.js"));
+    const staticRoot = join(app, ".open-next/assets/_next/static");
+    const entries = await readdir(staticRoot, { recursive: true, withFileTypes: true });
+    const assets = await Promise.all(entries.filter(entry => entry.isFile()).map(entry => readFile(join(entry.parentPath, entry.name))));
+    const before = createHash("sha256").update(worker).update(Buffer.concat(assets)).digest("hex");
+    const observed = await browser(`${target}-prepared`, "preview", target, runtimeKey, buildKey);
+    assert.deepEqual(await readFile(join(app, ".open-next/worker.js")), worker);
+    assert.equal(await sourceDigest(), sourceHash);
+    artifacts.push({ target, sourceHash, artifactHash: before, buildKey: buildKey === "" ? "absent" : buildKey === keyA ? "synthetic-A" : "synthetic-B", runtimeKey: runtimeKey === keyA ? "synthetic-A" : "synthetic-B", ...observed });
+    await writeFile(join(owner, "artifacts.json"), JSON.stringify(artifacts, null, 2));
+  }
+
+  const portfolio = join(owner, "portfolio");
+  assertSuccess(await generateProject({ request: { profile: "portfolio", projectName: "contact-portfolio", displayName: "Contact Portfolio", contactFormWeb3Forms: true },
+    destination: portfolio, renderingContext, verifier: createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
+  }));
+  await run("portfolio-install", ["install", "--frozen-lockfile", "--store-dir", support.store], {}, true, portfolio);
+  await browser("portfolio-configured", "dev", "development", keyA, keyA, portfolio);
+  context.diagnostic(JSON.stringify({ owner, artifacts, portfolio: "configured one-page home and fallback; all provider requests intercepted" }));
+});
