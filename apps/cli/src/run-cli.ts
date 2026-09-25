@@ -19,6 +19,10 @@ import {
   planProfileTransition as planProfileTransitionDefault,
   persistenceRemovalHumanReviewSchema,
   persistenceRemovalInputSchema,
+  jobRemovalInputSchema,
+  jobRemovalHumanReviewSchema,
+  type JobRemovalInput,
+  type JobRemovalHumanReview,
   type CapabilityAdditionPlan,
   type CapabilityAdditionExecutionResult,
   type CapabilityRemovalPlan,
@@ -124,6 +128,8 @@ const removalPlannerRefusalCodes =
     "CAPABILITY_REMOVAL_INVENTORY_INVALID",
     "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
     "CAPABILITY_REMOVAL_UNSUPPORTED",
+    "JOB_REMOVAL_INPUT_INVALID",
+    "JOB_REMOVAL_SUBJECT_UNAVAILABLE",
     "PERSISTENCE_REMOVAL_INPUT_INVALID",
     "PERSISTENCE_REMOVAL_SUBJECT_UNAVAILABLE",
   ]);
@@ -221,13 +227,17 @@ async function readJsonInput(path: string): Promise<unknown> {
   }
 }
 
-async function readPersistenceRemovalInputs(
+async function readRemovalInputs(
   command: Extract<CliCommand, Readonly<{ kind: "plan-remove" | "apply-remove" }>>,
 ): Promise<Readonly<{
   persistenceRemoval?: PersistenceRemovalInput;
   persistenceRemovalHumanReview?: PersistenceRemovalHumanReview;
+  jobRemoval?: JobRemovalInput;
+  jobRemovalHumanReview?: JobRemovalHumanReview;
 }>> {
   return {
+    ...(command.jobRemovalPath === undefined ? {} : {jobRemoval:jobRemovalInputSchema.parse(await readJsonInput(command.jobRemovalPath))}),
+    ...(command.kind !== "apply-remove" || command.jobRemovalHumanReviewPath === undefined ? {} : {jobRemovalHumanReview:jobRemovalHumanReviewSchema.parse(await readJsonInput(command.jobRemovalHumanReviewPath))}),
     ...(command.persistenceRemovalPath === undefined ? {} : {
       persistenceRemoval: persistenceRemovalInputSchema.parse(
         await readJsonInput(command.persistenceRemovalPath),
@@ -535,7 +545,7 @@ async function runPlanRemove(
 ): Promise<0 | 1 | 2> {
   let persistenceInputs;
   try {
-    persistenceInputs = await readPersistenceRemovalInputs(command);
+    persistenceInputs = await readRemovalInputs(command);
   } catch {
     return writeInvalidArguments(output);
   }
@@ -842,7 +852,7 @@ async function runApplyRemove(
 ): Promise<0 | 1 | 2> {
   let persistenceInputs;
   try {
-    persistenceInputs = await readPersistenceRemovalInputs(command);
+    persistenceInputs = await readRemovalInputs(command);
   } catch {
     return writeInvalidArguments(output);
   }

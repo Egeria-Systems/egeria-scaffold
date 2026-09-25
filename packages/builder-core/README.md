@@ -80,4 +80,4 @@ Optional transactional email follows [ADR-0017](../../docs/adr/0017-transactiona
 
 Current-profile hosted contact selection, lifecycle and source-only removal follow the [hosted contact boundary](../../docs/architecture/capability-model.md#hosted-contact-form-boundary). It remains independent from application email and requires separate live certification.
 
-Optional fresh-generation jobs uses the [background job boundary](../../docs/architecture/capability-model.md#background-job-delivery-boundary), including finite installed tuples and safe refusal of later lifecycle operations. `pnpm run test:generated-jobs` exercises actual fixed-root generation and Worker tests on current profiles.
+Optional jobs generation and exact source lifecycle use the [background job boundary](../../docs/architecture/capability-model.md#background-job-delivery-boundary), including finite installed tuples, fresh reviewed removal evidence and safe refusal of unsupported operations. `pnpm run test:generated-jobs` exercises actual fixed-root generation and Worker tests on current profiles.

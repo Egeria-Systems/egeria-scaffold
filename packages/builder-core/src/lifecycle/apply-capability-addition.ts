@@ -78,7 +78,7 @@ import {
 } from "./plan-capability-addition.js";
 
 const encoder = new TextEncoder();
-type AddableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms";
+type AddableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
 
 function additionMigrationIdentifier(
   capability: AddableCapability,
@@ -88,8 +88,11 @@ function additionMigrationIdentifier(
   | "add-multilingual-0-1-0"
   | "add-application-persistence-0-1-0"
   | "add-transactional-email-resend-0-1-0"
-  | "add-contact-form-web3forms-0-1-0" {
+  | "add-contact-form-web3forms-0-1-0"
+  | "add-background-job-delivery-0-2-0" {
   switch (capability) {
+    case "background-job-delivery":
+      return "add-background-job-delivery-0-2-0";
     case "contact-form-web3forms":
       return "add-contact-form-web3forms-0-1-0";
     case "analytics":
@@ -142,7 +145,7 @@ export type CapabilityAdditionExecutionResult =
         baseRevision: string;
         capability: Readonly<{
           identifier: AddableCapability;
-          version: "0.1.0";
+          version: "0.1.0" | "0.2.0";
         }>;
         migration: ReturnType<typeof additionMigrationIdentifier>;
         changedPaths: readonly string[];
@@ -274,13 +277,14 @@ function requirePendingInference(
     evidenceByIdentifier.size !== desiredCapabilities.length ||
     desiredCapabilities.some((identifier) => {
       const evidence = evidenceByIdentifier.get(identifier);
-      if (addedCapability === "application-persistence" &&
-        (identifier === "standards" || identifier === "deployment-cloudflare")) {
+      if (((addedCapability === "application-persistence" &&
+        (identifier === "standards" || identifier === "deployment-cloudflare")) ||
+          (addedCapability === "background-job-delivery" && identifier === "deployment-cloudflare"))) {
         return evidence?.category !== "contradictory" ||
           evidence.code !== "CAPABILITY_METADATA_MISMATCH" ||
           evidence.probes.some(({ status }) => status !== "present");
       }
-      if (addedCapability === "transactional-email-resend" && identifier === "app-foundation") {
+      if ((addedCapability === "transactional-email-resend" || addedCapability === "background-job-delivery") && identifier === "app-foundation") {
         const installed = currentState.installedCapabilities.find(({ identifier }) => identifier === "app-foundation");
         if (installed === undefined) return evidence?.category !== "probable";
         if (installed.version === "0.1.0") return evidence?.category !== "contradictory" ||
@@ -508,10 +512,11 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...(controls.project.value.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: controls.project.value.capabilitySettings["contact-form-web3forms"] }),
     packageVersions: verifiedCapabilityPackageVersions,
   };
-  const targetContext = input.capability === "application-persistence" || input.capability === "transactional-email-resend"
+  const targetContext = input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery"
     ? createGenerationRenderingContext(
         input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"),
-        input.capability === "transactional-email-resend" || snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0",
+        input.capability === "transactional-email-resend" || input.capability === "background-job-delivery" || snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0",
+        input.capability === "background-job-delivery",
       ) : snapshot.value.renderingContext;
   const targetCatalog = targetContext === undefined ? { ok: true as const, value: snapshot.value.catalog }
     : createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, targetContext.catalogSnapshot);
@@ -524,9 +529,10 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...(input.capability === "multilingual" ? { multilingual: true as const } : {}),
     ...(input.capability === "application-persistence" ? { applicationPersistence: true as const } : {}),
     ...(input.capability === "transactional-email-resend" ? { transactionalEmailResend: true as const } : {}),
+    ...(input.capability === "background-job-delivery" ? { backgroundJobDelivery: true as const } : {}),
   }, targetContext);
   if (!desired.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-  if (input.capability === "application-persistence" || input.capability === "transactional-email-resend") {
+  if (input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery") {
     const current = await renderSkeleton(renderRequest, snapshot.value.renderingContext);
     if (!current.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
     const prepared = await prepareCapabilityDependencyChange({ reader, current: current.value, desired: desired.value });
@@ -597,7 +603,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
-  if (input.capability === "application-persistence" || input.capability === "transactional-email-resend") {
+  if (input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery") {
     const freshPlan = await planCapabilityAddition({ reader, git: finalCleanGit, capability: input.capability });
     if (!freshPlan.ok || freshPlan.value.planFingerprint !== plan.planFingerprint) {
       return failure("CAPABILITY_PLAN_APPROVAL_INVALID", "precondition", "not-required");
@@ -819,7 +825,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     value: {
       status: "verified-final-diff-approval-required",
       baseRevision: initialGit.identity.revision,
-      capability: { identifier: input.capability, version: "0.1.0" },
+      capability: plan.capability,
       migration: additionMigrationIdentifier(input.capability),
       changedPaths,
       verificationChecks: hasPersistence

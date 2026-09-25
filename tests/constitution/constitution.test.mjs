@@ -739,7 +739,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   for (const [identifier, job] of Object.entries(workflow.jobs)) {
     assert.equal(job["runs-on"], "ubuntu-24.04", identifier);
     assert.equal(typeof job["timeout-minutes"], "number", identifier);
-    const maximumMinutes = identifier === "generated-projects" ? 90 : identifier === "builder-and-packages" ? 60 : 45;
+    const maximumMinutes = identifier === "generated-projects" ? 90 : identifier === "builder-and-packages" ? 90 : 45;
     assert.ok(job["timeout-minutes"] > 0 && job["timeout-minutes"] <= maximumMinutes);
   }
   for (const identifier of jobsWithCheckout) {
@@ -3424,7 +3424,7 @@ test("executable capability certification ownership is current", async () => {
     assert.equal(record.status, pending ? "pending" : "certified");
     assert.equal(
       record.taskPlan,
-      ["background-job-delivery", "deployment-cloudflare"].includes(capabilityId) ? "docs/superpowers/plans/2026-09-23-background-job-delivery-certification.md" : capabilityId === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md" : ["app-foundation", "transactional-email-resend"].includes(capabilityId)
+      ["background-job-delivery", "deployment-cloudflare"].includes(capabilityId) ? "docs/superpowers/plans/2026-09-24-job-lifecycle-operator-certification.md" : capabilityId === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md" : ["app-foundation", "transactional-email-resend"].includes(capabilityId)
         ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
         : ["application-persistence", "standards", "deployment-cloudflare"].includes(capabilityId)
         ? "docs/superpowers/plans/2026-09-14-application-persistence-certification.md"

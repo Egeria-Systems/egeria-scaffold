@@ -40,7 +40,8 @@ export type CliCommand =
         | "multilingual"
         | "application-persistence"
         | "transactional-email-resend"
-        | "contact-form-web3forms";
+        | "contact-form-web3forms"
+        | "background-job-delivery";
       settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
     }>
   | Readonly<{
@@ -52,8 +53,10 @@ export type CliCommand =
         | "multilingual"
         | "application-persistence"
         | "transactional-email-resend"
-        | "contact-form-web3forms";
+        | "contact-form-web3forms"
+        | "background-job-delivery";
       persistenceRemovalPath?: string;
+      jobRemovalPath?: string;
     }>
   | Readonly<{
       kind: "plan-upgrade";
@@ -75,7 +78,8 @@ export type CliCommand =
         | "multilingual"
         | "application-persistence"
         | "transactional-email-resend"
-        | "contact-form-web3forms";
+        | "contact-form-web3forms"
+        | "background-job-delivery";
       settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
       approvedPlanFingerprint: string;
     }>
@@ -88,9 +92,12 @@ export type CliCommand =
         | "multilingual"
         | "application-persistence"
         | "transactional-email-resend"
-        | "contact-form-web3forms";
+        | "contact-form-web3forms"
+        | "background-job-delivery";
       persistenceRemovalPath?: string;
+      jobRemovalPath?: string;
       persistenceRemovalHumanReviewPath?: string;
+      jobRemovalHumanReviewPath?: string;
       approvedPlanFingerprint: string;
     }>
   | Readonly<{
@@ -426,7 +433,7 @@ function parseAdd(
       !hasExactOptions(tokens, expectedOptions) ||
       !validDirectory(directory) ||
       (!analyticsSelection && !calendlySelection &&
-        !multilingualSelection && !persistenceSelection && !contactSelection && capability !== "transactional-email-resend") ||
+        !multilingualSelection && !persistenceSelection && !contactSelection && capability !== "transactional-email-resend" && capability !== "background-job-delivery") ||
       (calendlySelection && !settings.success) ||
       (contactSelection && !contactSettings.success) ||
       (analyticsSelection && analyticsSettings?.success !== true)
@@ -478,8 +485,9 @@ function parseRemove(
         directory: { type: "string" },
         capability: { type: "string" },
         "persistence-removal": { type: "string" },
+        "job-removal": { type: "string" },
         ...(applying
-          ? { "persistence-human-review": { type: "string" } as const }
+          ? { "persistence-human-review": { type: "string" } as const, "job-human-review": { type: "string" } as const }
           : {}),
         ...(applying ? approvedPlanOptionDefinitions : {}),
       },
@@ -491,6 +499,10 @@ function parseRemove(
     const capability = values.capability;
     const approvedPlanFingerprint = values["approved-plan"];
     const persistenceSelection = capability === "application-persistence";
+    const jobSelection = capability === "background-job-delivery";
+    const jobRemovalPath = values["job-removal"];
+    const jobHumanReviewOption = values["job-human-review"];
+    const jobRemovalHumanReviewPath = typeof jobHumanReviewOption === "string" ? jobHumanReviewOption : undefined;
     const persistenceRemovalPath = values["persistence-removal"];
     const humanReviewOption = values["persistence-human-review"];
     const persistenceRemovalHumanReviewPath = typeof humanReviewOption === "string"
@@ -502,23 +514,28 @@ function parseRemove(
         "directory",
         "capability",
         ...(persistenceSelection ? ["persistence-removal"] : []),
+        ...(jobSelection ? ["job-removal"] : []),
+        ...(jobSelection && applying ? ["job-human-review"] : []),
         ...(persistenceSelection && applying ? ["persistence-human-review"] : []),
         ...(applying ? ["approved-plan"] : []),
       ]) ||
       !validDirectory(directory) ||
+      (jobSelection && !validDirectory(jobRemovalPath)) ||
+      (jobSelection && applying && !validDirectory(jobRemovalHumanReviewPath)) ||
       (persistenceSelection && !validDirectory(persistenceRemovalPath)) ||
       (persistenceSelection && applying && !validDirectory(persistenceRemovalHumanReviewPath)) ||
       (capability !== "analytics" &&
         capability !== "booking-calendly" &&
         capability !== "multilingual" &&
-        capability !== "application-persistence" && capability !== "transactional-email-resend" && capability !== "contact-form-web3forms")
+        capability !== "application-persistence" && capability !== "transactional-email-resend" && capability !== "contact-form-web3forms" && capability !== "background-job-delivery")
     ) {
       return invalidArguments();
     }
 
-    const persistenceInput = persistenceSelection && validDirectory(persistenceRemovalPath)
-      ? { persistenceRemovalPath }
-      : {};
+    const persistenceInput = {
+      ...(persistenceSelection && validDirectory(persistenceRemovalPath) ? { persistenceRemovalPath } : {}),
+      ...(jobSelection && validDirectory(jobRemovalPath) ? { jobRemovalPath } : {}),
+    };
 
     if (kind === "apply-remove") {
       if (!validApprovedPlanFingerprint(approvedPlanFingerprint)) {
@@ -533,6 +550,7 @@ function parseRemove(
           capability,
           approvedPlanFingerprint,
           ...persistenceInput,
+          ...(jobSelection && validDirectory(jobRemovalHumanReviewPath) ? { jobRemovalHumanReviewPath } : {}),
           ...(persistenceSelection && validDirectory(persistenceRemovalHumanReviewPath)
             ? { persistenceRemovalHumanReviewPath }
             : {}),

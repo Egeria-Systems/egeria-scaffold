@@ -486,6 +486,7 @@ export async function renderSkeleton(
     request.transactionalEmailResend === true,
     request.contactFormWeb3Forms !== undefined,
     request.backgroundJobDelivery === true,
+    renderingContext.catalogSnapshot.backgroundJobDelivery,
   );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;
