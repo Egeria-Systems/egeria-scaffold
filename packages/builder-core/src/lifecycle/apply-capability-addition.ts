@@ -22,6 +22,8 @@ import {
 import {
   analyticsSettingsSchema,
   calendlyBookingSettingsSchema,
+  applicationEnvironmentBookingSettingsSchema,
+  type ApplicationEnvironmentBookingSettings,
   web3FormsContactSettingsSchema,
   type Web3FormsContactSettings,
   type AnalyticsSettings,
@@ -96,6 +98,7 @@ function additionMigrationIdentifier(
 ):
   | "add-analytics-0-1-0"
   | "add-booking-calendly-0-1-0"
+  | "add-booking-calendly-0-2-0"
   | "add-multilingual-0-1-0"
   | "add-application-persistence-0-1-0"
   | "add-transactional-email-resend-0-1-0"
@@ -110,7 +113,7 @@ function additionMigrationIdentifier(
     case "analytics":
       return "add-analytics-0-1-0";
     case "booking-calendly":
-      return "add-booking-calendly-0-1-0";
+      return applicationEnvironment ? "add-booking-calendly-0-2-0" : "add-booking-calendly-0-1-0";
     case "multilingual":
       return "add-multilingual-0-1-0";
     case "transactional-email-resend":
@@ -406,7 +409,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   root: string;
   capability: AddableCapability;
   renderingContext?: ApplicationEnvironmentRenderingContext;
-  settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
+  settings?: AnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings;
   approvedPlanFingerprint: string;
   verifier: GeneratedProjectVerifier;
   reader?: RepositoryReader;
@@ -416,9 +419,13 @@ export async function applyCapabilityAddition(input: Readonly<{
   inspectExpectedChanges?: InspectExpectedChanges;
   now?: () => string;
 }>): Promise<CapabilityAdditionExecutionResult> {
+  const environmentBookingSettings = input.renderingContext !== undefined && input.capability === "booking-calendly"
+    ? applicationEnvironmentBookingSettingsSchema.safeParse(input.settings) : undefined;
   if (input.renderingContext !== undefined && (
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    input.capability !== "contact-form-web3forms" || input.settings !== undefined
+    (input.capability !== "contact-form-web3forms" && input.capability !== "booking-calendly") ||
+    (input.capability === "contact-form-web3forms" && input.settings !== undefined) ||
+    (environmentBookingSettings !== undefined && !environmentBookingSettings.success)
   )) return failure("CAPABILITY_ADDITION_UNSUPPORTED", "precondition", "not-required");
   const root = resolve(input.root);
   if (!isAbsolute(input.root) || root !== input.root) {
@@ -455,7 +462,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     input.capability === "analytics"
       ? analyticsSettingsSchema.safeParse(input.settings)
       : input.capability === "booking-calendly"
-        ? calendlyBookingSettingsSchema.safeParse(input.settings)
+        ? environmentBookingSettings ?? calendlyBookingSettingsSchema.safeParse(input.settings)
         : input.renderingContext === undefined && input.capability === "contact-form-web3forms"
           ? web3FormsContactSettingsSchema.safeParse(input.settings)
         : input.settings === undefined
@@ -551,6 +558,12 @@ export async function applyCapabilityAddition(input: Readonly<{
   const targetCatalog = targetContext === undefined ? { ok: true as const, value: snapshot.value.catalog }
     : createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, targetContext.catalogSnapshot);
   if (!targetCatalog.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+  const environmentProject = controls.project.value.schemaVersion === "2.0.0" ? controls.project.value : undefined;
+  const environmentRenderRequest = {
+    ...commonRenderRequest,
+    ...(environmentProject?.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: environmentProject.capabilitySettings["booking-calendly"] }),
+    ...(controls.project.value.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
+  };
   const desiredRender = input.renderingContext === undefined ? await renderSkeleton({
     ...renderRequest,
     ...(input.capability === "contact-form-web3forms" ? { contactFormWeb3Forms: settingsSnapshot as Web3FormsContactSettings } : {}),
@@ -560,7 +573,11 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...(input.capability === "application-persistence" ? { applicationPersistence: true as const } : {}),
     ...(input.capability === "transactional-email-resend" ? { transactionalEmailResend: true as const } : {}),
     ...(input.capability === "background-job-delivery" ? { backgroundJobDelivery: true as const } : {}),
-  }, targetContext) : await renderSkeleton({ ...commonRenderRequest, contactFormWeb3Forms: true }, input.renderingContext);
+  }, targetContext) : await renderSkeleton({
+    ...environmentRenderRequest,
+    ...(input.capability === "contact-form-web3forms" ? { contactFormWeb3Forms: true as const } : {}),
+    ...(environmentBookingSettings?.success ? { bookingCalendly: environmentBookingSettings.data } : {}),
+  }, input.renderingContext);
   if (!desiredRender.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   let desired: Readonly<{ ok: true; value: RenderedSkeleton<LifecycleProject> }> = desiredRender;
   if (input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery") {
@@ -636,6 +653,7 @@ export async function applyCapabilityAddition(input: Readonly<{
 
   if (input.renderingContext !== undefined || input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery") {
     const freshPlan = await planCapabilityAddition({ reader, git: finalCleanGit, capability: input.capability,
+      ...(settingsSnapshot === undefined ? {} : { settings: settingsSnapshot }),
       ...(input.renderingContext === undefined ? {} : { renderingContext: input.renderingContext }),
     });
     if (!freshPlan.ok || freshPlan.value.planFingerprint !== plan.planFingerprint) {
