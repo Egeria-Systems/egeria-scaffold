@@ -811,12 +811,21 @@ test("environment contact addition refuses settings, forged context and other li
   for (const override of [
     { settings: {} }, { settings: { accessKey: "00000000-0000-4000-8000-000000000001" } },
     { renderingContext: { ...renderingContext, projectSchemaVersion: "1.0.0" } },
-    ...["analytics", "booking-calendly", "multilingual", "application-persistence", "transactional-email-resend", "background-job-delivery"].map(capability => ({ capability })),
+    ...["analytics", "booking-calendly", "multilingual", "transactional-email-resend", "background-job-delivery"].map(capability => ({ capability })),
   ]) {
     const result = await core.planCapabilityAddition({ reader, git, capability: "contact-form-web3forms", renderingContext, ...override });
     assertFailure(result, "CAPABILITY_ADDITION_UNSUPPORTED");
   }
   assert.equal(reads, 0);
+});
+
+test("environment persistence addition binds the optional tuple and preserves selected public integrations", async () => {
+  const entries = await environmentContactEntries("app", { contact: true, booking: "popup", multilingual: true, analytics: environmentAnalyticsSelection });
+  const plan = await core.planCapabilityAddition({ reader: createSnapshotReader(entries).reader, git, capability: "application-persistence", renderingContext: core.createApplicationEnvironmentRenderingContext() });
+  assert.equal(plan.ok, true, JSON.stringify(plan));
+  assert.deepEqual(plan.value.capability, { identifier: "application-persistence", version: "0.2.0" });
+  for (const identifier of ["contact-form-web3forms", "booking-calendly", "analytics", "multilingual", "app-foundation"]) assert.ok(plan.value.desiredCapabilities.includes(identifier));
+  assert.equal(plan.value.settings, null);
 });
 
 

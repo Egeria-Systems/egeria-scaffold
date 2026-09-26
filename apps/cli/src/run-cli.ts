@@ -302,15 +302,12 @@ async function runCreate(
   dependencies: CliRunnerDependencies,
 ): Promise<0 | 1> {
   const command = input.command;
-  if (input.renderingContext !== undefined && (command.applicationPersistence === true || command.transactionalEmailResend === true || command.backgroundJobDelivery === true)) {
-    writeJson(output.writeError, { ok: false, command: "create", issues: [{ code: "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", path: ["request"], context: { reason: "incomplete-capability" } }] });
-    return 1;
-  }
   const destination = resolve(command.directory);
-  const verifier = dependencies.createVerifier();
   const result = input.renderingContext === undefined
-    ? await generateProject({ request: createRequest(input.command), destination, verifier })
-    : await generateProject({ request: createRequest(input.command), destination, verifier, renderingContext: input.renderingContext });
+    ? await generateProject({ request: createRequest(input.command), destination, verifier: dependencies.createVerifier() })
+    : await generateProject({ request: createRequest(input.command), destination, renderingContext: input.renderingContext,
+        get verifier() { return dependencies.createVerifier(); },
+      });
 
   if (!result.ok) {
     writeJson(output.writeError, {
@@ -1018,7 +1015,7 @@ export function createCliRunner(
     if (projectSchemaVersion === "2.0.0") {
       const parsed = parseCliArguments(arguments_, "2.0.0");
       if (!parsed.ok) return writeInvalidArguments(output);
-      const renderingContext = createApplicationEnvironmentRenderingContext();
+      const renderingContext = createApplicationEnvironmentRenderingContext(parsed.value.kind === "create" && parsed.value.applicationPersistence === true);
       if (parsed.value.kind === "plan-add") return runPlanAdd(parsed.value, output, dependencies, renderingContext);
       if (parsed.value.kind === "plan-remove") return runPlanRemove(parsed.value, output, dependencies, renderingContext);
       if (parsed.value.kind === "apply-add") return runApplyAdd(parsed.value, output, dependencies, renderingContext);

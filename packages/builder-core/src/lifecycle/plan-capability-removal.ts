@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { applicationPersistenceCatalogSnapshot, createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
 import {
-  createGenerationRenderingContext, isApplicationEnvironmentRenderingContext,
+  createApplicationEnvironmentRenderingContext, createGenerationRenderingContext, isApplicationEnvironmentRenderingContext,
   readVerifiedProjectSnapshot,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
@@ -112,9 +112,9 @@ export type CapabilityRemovalPlan = Readonly<{
   baseRevision: string;
   profile: ProfileIdentifier;
   capability: Readonly<{
-    identifier: Exclude<RemovableCapability, "analytics" | "contact-form-web3forms" | "booking-calendly" | "background-job-delivery">;
+    identifier: Exclude<RemovableCapability, "analytics" | "contact-form-web3forms" | "booking-calendly" | "background-job-delivery" | "application-persistence">;
     version: "0.1.0";
-  }> | Readonly<{ identifier: "analytics" | "contact-form-web3forms" | "booking-calendly" | "background-job-delivery"; version: "0.1.0" | "0.2.0" }>;
+  }> | Readonly<{ identifier: "analytics" | "contact-form-web3forms" | "booking-calendly" | "background-job-delivery" | "application-persistence"; version: "0.1.0" | "0.2.0" }>;
   jobRemovalReport?: JobRemovalMachineReport;
   jobRemovalSubject?: Omit<JobRemovalSubject, "resources">;
   persistenceRemovalReport?: PersistenceRemovalMachineReport;
@@ -909,7 +909,8 @@ export async function planCapabilityRemoval(input: Readonly<{
   const capabilityValue: unknown = Reflect.get(input, "capability");
   if (input.renderingContext !== undefined && (
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    (capabilityValue !== "contact-form-web3forms" && capabilityValue !== "booking-calendly" && capabilityValue !== "analytics") || input.persistenceRemoval !== undefined
+    (capabilityValue !== "contact-form-web3forms" && capabilityValue !== "booking-calendly" && capabilityValue !== "analytics" && capabilityValue !== "application-persistence") ||
+    (capabilityValue !== "application-persistence" && input.persistenceRemoval !== undefined)
   )) return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
 
   if (
@@ -943,9 +944,10 @@ export async function planCapabilityRemoval(input: Readonly<{
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
+  const environmentContext = isApplicationEnvironmentRenderingContext(snapshot.value.renderingContext) ? snapshot.value.renderingContext : undefined;
   let inspectionCatalog = snapshot.value.catalog;
   if ((capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery") && !inspectionCatalog.some(({ identifier }) => identifier === capabilityValue)) {
-    const persistenceCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, capabilityValue === "application-persistence" ? applicationPersistenceCatalogSnapshot : createGenerationRenderingContext(false, true, capabilityValue === "background-job-delivery").catalogSnapshot);
+    const persistenceCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, capabilityValue === "application-persistence" ? (environmentContext === undefined ? applicationPersistenceCatalogSnapshot : createApplicationEnvironmentRenderingContext(true).catalogSnapshot) : createGenerationRenderingContext(false, true, capabilityValue === "background-job-delivery").catalogSnapshot);
     const removedDescriptor = persistenceCatalog.ok
       ? persistenceCatalog.value.find(({ identifier }) => identifier === capabilityValue) : undefined;
     if (removedDescriptor === undefined) return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -1046,14 +1048,15 @@ export async function planCapabilityRemoval(input: Readonly<{
   const environmentAnalyticsSettings = project.schemaVersion === "2.0.0" ? project.capabilitySettings.analytics : undefined;
   const environmentBookingSettings = project.schemaVersion === "2.0.0" ? project.capabilitySettings["booking-calendly"] : undefined;
   const [currentRender, desiredRender] = await Promise.all([
-    input.renderingContext === undefined
+    environmentContext === undefined
       ? renderSkeleton(renderRequest, snapshot.value.renderingContext)
        : renderSkeleton({
         ...commonRenderRequest,
+        ...(project.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
         ...(environmentAnalyticsSettings === undefined ? {} : { analytics: environmentAnalyticsSettings }),
         ...(environmentBookingSettings === undefined ? {} : { bookingCalendly: environmentBookingSettings }),
         ...(project.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
-      }, input.renderingContext),
+      }, environmentContext),
     input.renderingContext === undefined ? renderSkeleton({
       profile: renderRequest.profile,
       projectName: renderRequest.projectName,
@@ -1077,10 +1080,11 @@ export async function planCapabilityRemoval(input: Readonly<{
       ? createGenerationRenderingContext(project.selectedCapabilities.includes("application-persistence"), true, false)
       : capabilityValue === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext) : renderSkeleton({
       ...commonRenderRequest,
+      ...(capabilityValue !== "application-persistence" && project.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
       ...(capabilityValue !== "analytics" && environmentAnalyticsSettings !== undefined ? { analytics: environmentAnalyticsSettings } : {}),
       ...(capabilityValue !== "booking-calendly" && environmentBookingSettings !== undefined ? { bookingCalendly: environmentBookingSettings } : {}),
       ...(capabilityValue !== "contact-form-web3forms" && project.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
-    }, input.renderingContext),
+    }, createApplicationEnvironmentRenderingContext(capabilityValue !== "application-persistence" && project.selectedCapabilities.includes("application-persistence"))),
   ]);
 
   if (!currentRender.ok || !desiredRender.ok) {
@@ -1215,7 +1219,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     status: "approval-required",
     baseRevision: input.git.identity.revision,
     profile: project.originProfile,
-    capability: capabilityValue === "analytics" || capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly"
+    capability: capabilityValue === "analytics" || capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly" || capabilityValue === "application-persistence"
       ? { identifier: capabilityValue, version: input.renderingContext === undefined ? "0.1.0" : "0.2.0" }
       : capabilityValue === "background-job-delivery"
         ? { identifier: capabilityValue, version: descriptor.version as "0.1.0" | "0.2.0" }
@@ -1251,7 +1255,7 @@ export async function planCapabilityRemoval(input: Readonly<{
         state,
         git: input.git,
         ...(persistenceBindings === undefined ? {} : { persistenceBindings: input.renderingContext === undefined
-          ? persistenceBindings : { bindings: persistenceBindings, renderingContext: input.renderingContext, catalog: snapshot.value.catalog } }),
+          ? persistenceBindings : { bindings: persistenceBindings, renderingContext: environmentContext, catalog: snapshot.value.catalog } }),
       }),
     },
   };

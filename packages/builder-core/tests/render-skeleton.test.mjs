@@ -6174,7 +6174,7 @@ test("application environment generated preflight rejects unsafe targets without
 });
 
 test("application environment rendering refuses incomplete selections and mixed contexts", async () => {
-  for (const selection of [ { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true }]) {
+  for (const selection of [{ transactionalEmailResend: true }, { backgroundJobDelivery: true }]) {
     const result = await renderApplicationEnvironment("app", selection);
     assert.equal(result.ok, false);
     assert.equal(result.issues[0].code, "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
@@ -6182,6 +6182,33 @@ test("application environment rendering refuses incomplete selections and mixed 
   const core = await import("../dist/index.js");
   const result = await core.renderSkeleton({ profile: "portfolio", projectName: "example", displayName: "Example", packageVersions: core.verifiedCapabilityPackageVersions }, { ...applicationEnvironmentContext, projectSchemaVersion: "1.0.0" });
   assert.equal(result.ok, false);
+});
+
+test("environment persistence rendering selects its target configuration while preserving the public package graph", async () => {
+  const core = await import("../dist/index.js");
+  const request = { profile: "app", projectName: "example", displayName: "Example", applicationPersistence: true, packageVersions: core.verifiedCapabilityPackageVersions };
+  const candidate = assertSuccess(await core.renderSkeleton(request, core.createApplicationEnvironmentRenderingContext(true)));
+  const historical = assertSuccess(await core.renderSkeleton(request));
+  const files = new Map(candidate.files.map(({ path, content }) => [path, new TextDecoder().decode(content)]));
+  assert.equal(candidate.project.schemaVersion, "2.0.0");
+  assert.ok(candidate.project.selectedCapabilities.includes("application-persistence"));
+  const historicalPackage = historical.files.find(({ path }) => path === "apps/web/package.json");
+  const expected = JSON.parse(new TextDecoder().decode(historicalPackage.content));
+  const actual = JSON.parse(files.get("apps/web/package.json"));
+  assert.deepEqual(actual.dependencies, expected.dependencies);
+  assert.deepEqual(actual.devDependencies, expected.devDependencies);
+  for (const path of ["apps/web/src/configuration/application-database.ts", "apps/web/tests/unit/application-database-environment.test.ts", "docs/application-persistence.md"]) assert.ok(files.has(path), path);
+  const config = JSON.parse(files.get("apps/web/wrangler.jsonc"));
+  assert.deepEqual([config.vars, config.env.staging.vars, config.env.production.vars], [
+    { APPLICATION_ENVIRONMENT: "development", APPLICATION_DATABASE_ENVIRONMENT: "local" },
+    { APPLICATION_ENVIRONMENT: "staging", APPLICATION_DATABASE_ENVIRONMENT: "staging" },
+    { APPLICATION_ENVIRONMENT: "production", APPLICATION_DATABASE_ENVIRONMENT: "production" },
+  ]);
+  for (const [selection, context] of [[request, core.createApplicationEnvironmentRenderingContext()], [{ ...request, applicationPersistence: undefined }, core.createApplicationEnvironmentRenderingContext(true)]]) {
+    const result = await core.renderSkeleton(selection, context);
+    assert.equal(result.ok, false);
+    assert.equal(result.issues[0].code, "APPLICATION_ENVIRONMENT_CONTEXT_INVALID");
+  }
 });
 
 const environmentAnalyticsSettings = {

@@ -2,6 +2,7 @@ import { isAbsolute, resolve } from "node:path";
 
 import {
   createVerifiedProjectSnapshot,
+  createApplicationEnvironmentRenderingContext,
   createGenerationRenderingContext,
   readVerifiedProjectSnapshot,
   isApplicationEnvironmentRenderingContext,
@@ -104,6 +105,7 @@ function additionMigrationIdentifier(
   | "add-booking-calendly-0-2-0"
   | "add-multilingual-0-1-0"
   | "add-application-persistence-0-1-0"
+  | "add-application-persistence-0-2-0"
   | "add-transactional-email-resend-0-1-0"
   | "add-contact-form-web3forms-0-1-0"
   | "add-contact-form-web3forms-0-2-0"
@@ -122,7 +124,7 @@ function additionMigrationIdentifier(
     case "transactional-email-resend":
       return "add-transactional-email-resend-0-1-0";
     case "application-persistence":
-      return "add-application-persistence-0-1-0";
+      return applicationEnvironment ? "add-application-persistence-0-2-0" : "add-application-persistence-0-1-0";
   }
 }
 
@@ -428,7 +430,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     ? applicationEnvironmentBookingSettingsSchema.safeParse(input.settings) : undefined;
   if (input.renderingContext !== undefined && (
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    (input.capability !== "contact-form-web3forms" && input.capability !== "booking-calendly" && input.capability !== "analytics") ||
+    (input.capability !== "contact-form-web3forms" && input.capability !== "booking-calendly" && input.capability !== "analytics" && input.capability !== "application-persistence") ||
     (input.capability === "contact-form-web3forms" && input.settings !== undefined) ||
     (environmentAnalyticsSettings !== undefined && !environmentAnalyticsSettings.success) ||
     (environmentBookingSettings !== undefined && !environmentBookingSettings.success)
@@ -555,23 +557,26 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...(legacyProject?.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: legacyProject.capabilitySettings["contact-form-web3forms"] }),
     packageVersions: verifiedCapabilityPackageVersions,
   };
-  const targetContext = input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery"
+  const environmentContext = isApplicationEnvironmentRenderingContext(snapshot.value.renderingContext) ? snapshot.value.renderingContext : undefined;
+  const environmentTargetContext = environmentContext === undefined ? undefined : createApplicationEnvironmentRenderingContext(input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"));
+  const targetContext = environmentTargetContext ?? (input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery"
     ? createGenerationRenderingContext(
         input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"),
         input.capability === "transactional-email-resend" || input.capability === "background-job-delivery" || snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0",
         input.capability === "background-job-delivery",
-      ) : snapshot.value.renderingContext;
+      ) : snapshot.value.renderingContext);
   const targetCatalog = targetContext === undefined ? { ok: true as const, value: snapshot.value.catalog }
     : createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, targetContext.catalogSnapshot);
   if (!targetCatalog.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   const environmentProject = controls.project.value.schemaVersion === "2.0.0" ? controls.project.value : undefined;
   const environmentRenderRequest = {
     ...commonRenderRequest,
+    ...(controls.project.value.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
     ...(environmentProject?.capabilitySettings.analytics === undefined ? {} : { analytics: environmentProject.capabilitySettings.analytics }),
     ...(environmentProject?.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: environmentProject.capabilitySettings["booking-calendly"] }),
     ...(controls.project.value.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
   };
-  const desiredRender = input.renderingContext === undefined ? await renderSkeleton({
+  const desiredRender = environmentTargetContext === undefined ? await renderSkeleton({
     ...renderRequest,
     ...(input.capability === "contact-form-web3forms" ? { contactFormWeb3Forms: settingsSnapshot as Web3FormsContactSettings } : {}),
     ...(input.capability === "analytics" ? { analytics: settingsSnapshot as AnalyticsSettings } : {}),
@@ -582,14 +587,17 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...(input.capability === "background-job-delivery" ? { backgroundJobDelivery: true as const } : {}),
   }, targetContext) : await renderSkeleton({
     ...environmentRenderRequest,
+    ...(input.capability === "application-persistence" ? { applicationPersistence: true as const } : {}),
     ...(input.capability === "contact-form-web3forms" ? { contactFormWeb3Forms: true as const } : {}),
     ...(environmentBookingSettings?.success ? { bookingCalendly: environmentBookingSettings.data } : {}),
     ...(environmentAnalyticsSettings?.success ? { analytics: environmentAnalyticsSettings.data } : {}),
-  }, input.renderingContext);
+  }, environmentTargetContext);
   if (!desiredRender.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   let desired: Readonly<{ ok: true; value: RenderedSkeleton<LifecycleProject> }> = desiredRender;
   if (input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery") {
-    const current = await renderSkeleton(renderRequest, snapshot.value.renderingContext);
+    const current = environmentContext === undefined
+      ? await renderSkeleton(renderRequest, snapshot.value.renderingContext)
+      : await renderSkeleton(environmentRenderRequest, environmentContext);
     if (!current.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
     const prepared = await prepareCapabilityDependencyChange<LifecycleProject>({ reader, current: current.value, desired: desired.value });
     if (!prepared.ok) return failure("PROJECT_DRIFT_DETECTED", "precondition", "not-required");

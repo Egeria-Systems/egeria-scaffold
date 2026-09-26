@@ -1168,6 +1168,42 @@ test("application persistence creation reaches installed state through the gener
   }
 });
 
+test("environment persistence creation reaches installed state through the generation boundary", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-cli-persistence-create-"));
+  try {
+    const destination = join(owner, "application");
+    let verificationCalls = 0;
+    const runner = cli.createCliRunner({
+      createVerifier: () => ({
+        ...core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
+        async verifyInIsolatedCopy(root) {
+          verificationCalls += 1;
+          const manifest = JSON.parse(await readFile(join(root, "apps/web/package.json"), "utf8"));
+          assert.equal(manifest.dependencies["drizzle-orm"], "0.45.2");
+          assert.equal(manifest.devDependencies["drizzle-kit"], "0.31.10");
+          await assert.rejects(readFile(join(root, ".egeria/state.json")), { code: "ENOENT" });
+          return { ok: true, value: { checks: core.persistenceGenerationVerificationChecks } };
+        },
+      }),
+    }, "2.0.0");
+    const captured = captureOutput();
+    assert.equal(await runner([
+      ...appCreateArguments(destination), "--application-persistence",
+    ], captured.output), 0, captured.error.join("\n"));
+    assert.equal(verificationCalls, 1);
+    assert.deepEqual(captured.error, []);
+    assert.equal(captured.standard.length, 1);
+    const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8"), "2.0.0"));
+    const state = assertSuccess(core.parseStateJson(await readFile(join(destination, ".egeria/state.json"), "utf8"), "2.0.0"));
+    assert.equal(project.selectedCapabilities.includes("application-persistence"), true);
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence")?.version, "0.2.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards")?.version, "0.8.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version, "0.8.0");
+  } finally {
+    await rm(owner, { recursive: true, force: false });
+  }
+});
+
 test("application persistence removal validates bounded JSON before builder calls without leaking paths or content", async () => {
   const owner = await mkdtemp(join(tmpdir(), "egeria-private-removal-input-"));
   try {
@@ -7462,7 +7498,7 @@ test("application environment compiled CLI refuses inputs before dependencies an
     for (const suffix of [["--application-persistence"], ["--transactional-email-resend"], ["--background-job-delivery"]]) {
       const result = await runEnvironmentCliProcess([...base, ...suffix], true);
       assert.equal(result.exitCode, 1, JSON.stringify(result));
-      assert.equal(JSON.parse(result.stderr).issues[0].code, "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
+      assert.equal(JSON.parse(result.stderr).issues[0].code, suffix[0] === "--application-persistence" ? "CAPABILITY_UNSUPPORTED" : "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
       assert.doesNotMatch(result.stderr, /sentinel/u);
     }
     assert.deepEqual(await listTree(owner), before);
@@ -7563,7 +7599,7 @@ test("environment contact CLI admits selection-only lifecycle and forwards exact
       assert.equal(refused.exitCode, 2, JSON.stringify(refused));
       assert.deepEqual(JSON.parse(refused.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
     }
-    for (const capability of ["multilingual", "application-persistence", "transactional-email-resend", "background-job-delivery"]) {
+    for (const capability of ["multilingual", "transactional-email-resend", "background-job-delivery"]) {
       const refused = await runEnvironmentCliProcess(arguments_.map(value => value === "contact-form-web3forms" ? capability : value), true);
       assert.equal(refused.exitCode, 2, JSON.stringify(refused));
     }
@@ -7813,4 +7849,52 @@ test("environment analytics CLI admits exact selection-only lifecycle and reject
       assert.deepEqual(observed[0].renderingContext, core.createApplicationEnvironmentRenderingContext());
     }
   }
+});
+
+
+test("environment persistence CLI admits exact lifecycle and forwards removal review without accepting cross-capability flags", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "environment-persistence-cli-"));
+  try {
+    const inputPath = join(owner, "removal.json");
+    const humanReviewPath = join(owner, "review.json");
+    const input = localPersistenceRemovalInput();
+    const review = { reportFingerprint: `sha256:${"a".repeat(64)}`, dispositions: [{ identifier: "source-removal", disposition: "accepted" }] };
+    const planFingerprint = `sha256:${"b".repeat(64)}`;
+    await writeFile(inputPath, JSON.stringify(input));
+    await writeFile(humanReviewPath, JSON.stringify(review));
+    for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
+      const adding = kind.endsWith("add");
+      const arguments_ = adding ? [kind, "--directory", owner, "--capability", "application-persistence",
+        ...(kind.startsWith("apply") ? ["--approved-plan", planFingerprint] : [])]
+        : persistenceRemovalArguments(owner, inputPath, kind.startsWith("apply") ? { humanReviewPath, planFingerprint } : undefined);
+      const parsed = cliArguments.parseCliArguments(arguments_, "2.0.0");
+      assert.equal(parsed.ok, true, JSON.stringify(parsed));
+      assert.equal(parsed.value.capability, "application-persistence");
+      for (const suffix of [["--calendly-mode", "popup"], ["--application-persistence"], ["--job-removal", inputPath]]) {
+        const refused = await runEnvironmentCliProcess([...arguments_, ...suffix], true);
+        assert.equal(refused.exitCode, 2, JSON.stringify(refused));
+        assert.deepEqual(JSON.parse(refused.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
+      }
+      if (!adding) for (const capability of ["analytics", "booking-calendly", "contact-form-web3forms"]) {
+        assert.equal(cliArguments.parseCliArguments(arguments_.map(value => value === "application-persistence" ? capability : value), "2.0.0").ok, false);
+      }
+      if (kind.startsWith("apply")) {
+        const calls = [];
+        const run = cli.createCliRunner({ createVerifier: createFakeVerifier,
+          [adding ? "applyCapabilityAddition" : "applyCapabilityRemoval"]: async request => {
+            calls.push(request);
+            return { ok: false, code: "CAPABILITY_PLAN_APPROVAL_INVALID", phase: "precondition", recovery: "not-required" };
+          },
+        }, "2.0.0");
+        assert.equal(await run(arguments_, captureOutput().output), 1);
+        assert.equal(calls.length, 1);
+        assert.equal(calls[0].capability, "application-persistence");
+        assert.deepEqual(calls[0].renderingContext, core.createApplicationEnvironmentRenderingContext());
+        if (!adding) {
+          assert.deepEqual(calls[0].persistenceRemoval, input);
+          assert.deepEqual(calls[0].persistenceRemovalHumanReview, review);
+        }
+      }
+    }
+  } finally { await rm(owner, { recursive: true, force: false }); }
 });

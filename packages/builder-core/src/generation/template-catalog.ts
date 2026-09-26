@@ -466,6 +466,11 @@ export function createTemplateCatalog(
       contentKind: "text",
     });
   }
+  if (applicationEnvironments && includeApplicationPersistence) {
+    for (const path of ["apps/web/src/configuration/application-database.ts", "apps/web/tests/unit/application-database-environment.test.ts"]) {
+      sources.push({ source: `application-persistence/application-environments/${path}`, destinationSource: `application-persistence/${path}`, contentKind: "text" });
+    }
+  }
   if (applicationEnvironments && includeWeb3Forms) {
     for (const path of ["apps/web/tests/unit/contact-configuration.test.ts", "apps/web/tests/component/contact-availability.test.tsx"]) {
       sources.push({
@@ -488,6 +493,19 @@ export function createTemplateCatalog(
   }
   const selectedSources = sources.map((entry) => {
     if (!applicationEnvironments) return entry;
+    if (includeApplicationPersistence) {
+      if ([
+        "application-persistence/apps/web/tests/bindings/application-persistence.test.ts",
+        "application-persistence/apps/web/tests/bindings/fixtures/worker.ts",
+        "application-persistence/.github/workflows/migrate-application-database.yml.template",
+        "application-persistence/docs/application-persistence.md",
+      ].includes(entry.source)) {
+        return { ...entry, source: entry.source.replace("application-persistence/", "application-persistence/application-environments/"), destinationSource: entry.destinationSource ?? entry.source };
+      }
+      if (entry.source.startsWith("deployment-cloudflare/application-persistence/")) {
+        return { ...entry, source: entry.source.replace("application-persistence/", "application-persistence/application-environments/") };
+      }
+    }
     if (includeAnalytics) {
       const composition = includeWeb3Forms && includeBookingCalendly ? "contact-booking" : includeWeb3Forms ? "contact" : includeBookingCalendly ? "booking" : undefined;
       if (entry.source === "common/apps/web/next.config.ts") {

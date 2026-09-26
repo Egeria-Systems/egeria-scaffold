@@ -163,7 +163,7 @@ test("environment contact generation preserves exact installed state for every p
   }
 });
 
-test("application environment generation rejects incomplete and malformed selections before destination inspection", async () => {
+test("application environment generation rejects incomplete malformed and mismatched selections before destination inspection", async () => {
   await withTestRoot(async (owner) => {
     const before = await snapshotFileBytes(owner);
     for (const selection of [
@@ -181,7 +181,7 @@ test("application environment generation rejects incomplete and malformed select
       });
       assert.equal(result.ok, false);
       const malformed = JSON.stringify(selection).includes("secret-sentinel");
-      assert.equal(result.issues[0].code, malformed ? "PROJECT_GENERATION_REQUEST_INVALID" : "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
+      assert.equal(result.issues[0].code, malformed ? "PROJECT_GENERATION_REQUEST_INVALID" : selection.applicationPersistence ? "APPLICATION_ENVIRONMENT_CONTEXT_INVALID" : "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
       assert.equal(JSON.stringify(result).includes("secret-sentinel"), false);
       assert.deepEqual(verifier.calls, []);
     }
@@ -342,6 +342,7 @@ test("persistence lock selection requires the exact compatible optional packages
   const identity = { originProfile: "app", recipeVersion: "0.2.0" };
   const manifest = { dependencies: { next: "16.3.3", effect: "4.0.0-rc.112", "drizzle-orm": "0.45.2" }, devDependencies: { "eslint-config-next": "16.3.3", vitest: "5.0.0", "drizzle-kit": "0.31.10", "@cloudflare/workers-types": "5.20260730.1" } };
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), "application-persistence");
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ ...identity, recipeVersion: "0.3.0" }, manifest), "application-persistence");
   for (const [section, key] of [["dependencies", "drizzle-orm"], ["devDependencies", "drizzle-kit"], ["devDependencies", "@cloudflare/workers-types"]]) {
     for (const version of [undefined, "latest", "0.1.0"]) {
       assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...manifest, [section]: { ...manifest[section], [key]: version } }), undefined);
@@ -349,6 +350,51 @@ test("persistence lock selection requires the exact compatible optional packages
   }
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ ...identity, recipeVersion: "0.1.0" }, manifest), undefined);
   assert.equal(recipeLockfiles.createRecipeLockfileUrl("application-persistence").pathname, resolve(packageRoot, "lockfiles/web-application-persistence/pnpm-lock.yaml"));
+});
+
+test("environment persistence generation verifies bindings and derives the installed context from exact controls", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext(true);
+  const complete = [...generatedChecks.slice(0, 3), "cloudflare-types", ...generatedChecks.slice(3), "worker-integration", "binding-integration"];
+  for (const checks of [complete.filter(check => check !== "binding-integration"), complete.filter(check => check !== "cloudflare-types"), complete]) {
+    await withTestRoot(async owner => {
+      const verifier = createFakeVerifier({ verify: async () => ({ ok: true, value: { checks } }) });
+      const destination = join(owner, "environment-persistence");
+      const result = await core.generateProject({ request: { profile: "app", projectName: "environment-persistence", displayName: "Environment Persistence", applicationPersistence: true }, destination, verifier: verifier.verifier, renderingContext });
+      if (checks.length !== complete.length) {
+        assert.equal(result.ok, false);
+        assert.equal(result.issues[0].code, "GENERATED_VERIFICATION_INVALID");
+        assert.equal(await exists(destination), false);
+        return;
+      }
+      const generated = assertSuccess(result);
+      assert.equal(generated.state.schemaVersion, "2.0.0");
+      assert.equal(generated.state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.2.0");
+      const reader = core.createFileSystemRepositoryReader(destination);
+      const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(reader, core.createApplicationEnvironmentRenderingContext()));
+      assert.deepEqual(snapshot.renderingContext, renderingContext);
+      assert.deepEqual(await core.doctorRepository({ reader, catalog: snapshot.catalog, profiles: snapshot.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
+      const projectPath = join(destination, ".egeria/project.yaml");
+      const project = assertSuccess(core.parseProjectYaml(await readFile(projectPath, "utf8"), "2.0.0"));
+      await writeFile(projectPath, core.serializeProjectYaml({ ...project, selectedCapabilities: project.selectedCapabilities.filter(identifier => identifier !== "application-persistence") }));
+      assert.equal((await core.readVerifiedProjectSnapshot(core.createFileSystemRepositoryReader(destination), renderingContext)).ok, false);
+    });
+  }
+});
+
+test("environment persistence refuses unsupported profiles and mismatched context before destination or verification effects", async () => {
+  for (const [profile, persistence, contextPersistence] of [["site", true, true], ["portfolio", true, true], ["app", true, false], ["app", false, true]]) {
+    let destinationReads = 0;
+    let verifierReads = 0;
+    const result = await core.generateProject({
+      request: { profile, projectName: "example", displayName: "Example", ...(persistence ? { applicationPersistence: true } : {}) },
+      renderingContext: core.createApplicationEnvironmentRenderingContext(contextPersistence),
+      get destination() { destinationReads += 1; throw new Error("unexpected destination access"); },
+      get verifier() { verifierReads += 1; throw new Error("unexpected verifier access"); },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(destinationReads, 0);
+    assert.equal(verifierReads, 0);
+  }
 });
 
 test("persistence generation requires binding checks before state or destination persistence", async () => {
