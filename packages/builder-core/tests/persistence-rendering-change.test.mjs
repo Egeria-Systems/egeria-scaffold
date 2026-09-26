@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { prepareCapabilityDependencyChange } from "../dist/lifecycle/prepare-capability-dependency-change.js";
 import { renderSkeleton } from "../dist/generation/render-skeleton.js";
-import { createGenerationRenderingContext, verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
+import { createApplicationEnvironmentRenderingContext, createGenerationRenderingContext, verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
 import { createInMemoryRepositoryReader } from "../dist/repository/repository-reader.js";
 const decoder = new TextDecoder();
 const request = { profile: "app", projectName: "test-app", displayName: "Test app", packageVersions: verifiedCapabilityPackageVersions };
@@ -98,5 +98,22 @@ test("historical and security dependency replacement refuses swapped source lock
         assert.equal(refused.ok, false);
       }
     }
+  }
+});
+
+test("environment persistence dependency changes preserve custom members and reuse both exact locks", async () => {
+  const environmentLock = async persistent => readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.2-persistence" : "web-recipe-app-0.3.0"}/pnpm-lock.yaml`, import.meta.url), "utf8");
+  const ordinaryCandidate = (await renderSkeleton(request, createApplicationEnvironmentRenderingContext())).value;
+  const persistentCandidate = (await renderSkeleton({ ...request, applicationPersistence: true }, createApplicationEnvironmentRenderingContext(true))).value;
+  for (const [current, desired, removing] of [[ordinaryCandidate, persistentCandidate, false], [persistentCandidate, ordinaryCandidate, true]]) {
+    const sourceLock = await environmentLock(removing);
+    const result = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, value => ({ ...value, description: "Owned application", scripts: { ...value.scripts, custom: "node custom.mjs" } }), sourceLock) });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(manifest(result.value.desired).scripts.custom, "node custom.mjs");
+    assert.equal(manifest(result.value.desired).description, "Owned application");
+    assert.deepEqual(manifest(result.value.desired).dependencies, manifest(desired).dependencies);
+    assert.equal(decoder.decode(result.value.desired.files.find(({ path }) => path === "pnpm-lock.yaml").content), await environmentLock(!removing));
+    const refused = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, value => ({ ...value, dependencies: { ...value.dependencies, custom: "1.0.0" } }), sourceLock) });
+    assert.equal(refused.ok, false);
   }
 });
