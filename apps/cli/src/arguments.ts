@@ -127,10 +127,11 @@ export type ApplicationEnvironmentCliCommand =
   | Readonly<{ kind: "infer" | "doctor"; directory: string }>
   | (Readonly<{ kind: "plan-add"; directory: string }> | Readonly<{ kind: "apply-add"; directory: string; approvedPlanFingerprint: string }>) & (
       Readonly<{ capability: "contact-form-web3forms"; settings?: never }> |
-      Readonly<{ capability: "booking-calendly"; settings: ApplicationEnvironmentBookingSettings }>
+      Readonly<{ capability: "booking-calendly"; settings: ApplicationEnvironmentBookingSettings }> |
+      Readonly<{ capability: "analytics"; settings: ApplicationEnvironmentAnalyticsSettings }>
     )
   | (Extract<CliCommand, { kind: "plan-remove" | "apply-remove" }> & Readonly<{
-      capability: "contact-form-web3forms" | "booking-calendly";
+      capability: "analytics" | "contact-form-web3forms" | "booking-calendly";
       persistenceRemovalPath?: never;
       persistenceRemovalHumanReviewPath?: never;
     }>);
@@ -145,6 +146,36 @@ const applicationEnvironmentOptionDefinitions = {
   "microsoft-clarity-audience": { type: "string" },
   "looker-studio": { type: "boolean" },
 } as const;
+
+const environmentAnalyticsOptionNames = [
+  "cloudflare-web-analytics", "google-analytics-4", "microsoft-clarity",
+  "google-search-console", "microsoft-clarity-audience", "looker-studio",
+] as const;
+
+type EnvironmentAnalyticsOptionValues = Readonly<{
+  "cloudflare-web-analytics"?: boolean;
+  "google-analytics-4"?: boolean;
+  "microsoft-clarity"?: boolean;
+  "google-search-console"?: boolean;
+  "microsoft-clarity-audience"?: string;
+  "looker-studio"?: boolean;
+}>;
+
+function parseEnvironmentAnalyticsSettings(values: EnvironmentAnalyticsOptionValues) {
+  if (!environmentAnalyticsOptionNames.some((name) => values[name] !== undefined)) return undefined;
+  return applicationEnvironmentAnalyticsSettingsSchema.safeParse({
+    consent: { policy: "explicit-opt-in" },
+    providers: {
+      ...(values["cloudflare-web-analytics"] === true ? { cloudflareWebAnalytics: true } : {}),
+      ...(values["google-analytics-4"] === true ? { googleAnalytics4: true } : {}),
+      ...(values["microsoft-clarity"] === true ? { microsoftClarity: { audience: values["microsoft-clarity-audience"] } } : {}),
+    },
+    operationalIntegrations: {
+      ...(values["google-search-console"] === true ? { googleSearchConsole: true } : {}),
+      ...(values["looker-studio"] === true ? { lookerStudio: { connector: "google-analytics-4" } } : {}),
+    },
+  });
+}
 
 const projectFields = projectConfigurationSchema
   .unwrap()
@@ -310,20 +341,7 @@ function parseCreate(
       const hasBooking = values["booking-calendly"] === true;
       const mode = values["calendly-mode"];
       const booking = hasBooking ? applicationEnvironmentBookingSettingsSchema.safeParse({ mode }) : undefined;
-      const hasAnalytics = ["cloudflare-web-analytics", "google-analytics-4", "microsoft-clarity", "google-search-console", "microsoft-clarity-audience", "looker-studio"]
-        .some((name) => values[name as keyof typeof values] !== undefined);
-      const analytics = hasAnalytics ? applicationEnvironmentAnalyticsSettingsSchema.safeParse({
-        consent: { policy: "explicit-opt-in" },
-        providers: {
-          ...(values["cloudflare-web-analytics"] === true ? { cloudflareWebAnalytics: true } : {}),
-          ...(values["google-analytics-4"] === true ? { googleAnalytics4: true } : {}),
-          ...(values["microsoft-clarity"] === true ? { microsoftClarity: { audience: values["microsoft-clarity-audience"] } } : {}),
-        },
-        operationalIntegrations: {
-          ...(values["google-search-console"] === true ? { googleSearchConsole: true } : {}),
-          ...(values["looker-studio"] === true ? { lookerStudio: { connector: "google-analytics-4" } } : {}),
-        },
-      }) : undefined;
+      const analytics = parseEnvironmentAnalyticsSettings(values);
       const expectedOptions = ["profile", "name", "display-name", "directory",
         ...(hasBooking ? ["calendly-mode"] : []),
         ...Object.keys(applicationEnvironmentOptionDefinitions).filter((name) => values[name as keyof typeof values] !== undefined),
@@ -475,6 +493,7 @@ function parseAdd(
         "web3forms-access-key": { type: "string" },
         "calendly-mode": { type: "string" },
         ...analyticsOptionDefinitions,
+        ...applicationEnvironmentOptionDefinitions,
         ...(applying ? approvedPlanOptionDefinitions : {}),
       },
       strict: true,
@@ -483,7 +502,7 @@ function parseAdd(
     });
     const directory = values.directory;
     const capability = values.capability;
-    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms" && capability !== "booking-calendly") return invalidArguments();
+    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms" && capability !== "booking-calendly" && capability !== "analytics") return invalidArguments();
     const approvedPlanFingerprint = values["approved-plan"];
     const settings = calendlyBookingSettingsSchema.safeParse({
       destination: values["calendly-url"],
@@ -491,6 +510,7 @@ function parseAdd(
     });
     const environmentSettings = applicationEnvironmentBookingSettingsSchema.safeParse({ mode: values["calendly-mode"] });
     const analyticsSettings = parseAnalyticsSettings(values);
+    const environmentAnalyticsSettings = parseEnvironmentAnalyticsSettings(values);
     const calendlySelection = capability === "booking-calendly";
     const analyticsSelection = capability === "analytics";
     const contactSelection = capability === "contact-form-web3forms";
@@ -500,7 +520,7 @@ function parseAdd(
     const capabilityOptions = calendlySelection
       ? schemaVersion === "2.0.0" ? ["calendly-mode"] : ["calendly-url", "calendly-mode"]
       : analyticsSelection
-        ? selectedAnalyticsOptions(values)
+        ? schemaVersion === "2.0.0" ? environmentAnalyticsOptionNames.filter((name) => values[name] !== undefined) : selectedAnalyticsOptions(values)
         : contactSelection && schemaVersion === "1.0.0" ? ["web3forms-access-key"] : [];
     const expectedOptions = [
       "directory",
@@ -516,7 +536,8 @@ function parseAdd(
         !multilingualSelection && !persistenceSelection && !contactSelection && capability !== "transactional-email-resend" && capability !== "background-job-delivery") ||
       (calendlySelection && !(schemaVersion === "2.0.0" ? environmentSettings.success : settings.success)) ||
       (contactSelection && schemaVersion === "1.0.0" && !contactSettings.success) ||
-      (analyticsSelection && analyticsSettings?.success !== true)
+      (analyticsSelection && (schemaVersion === "2.0.0" ? environmentAnalyticsSettings?.success !== true : analyticsSettings?.success !== true)) ||
+      (schemaVersion === "2.0.0" && (values["microsoft-clarity"] === true) !== (values["microsoft-clarity-audience"] !== undefined))
     ) {
       return invalidArguments();
     }
@@ -524,7 +545,9 @@ function parseAdd(
     if (schemaVersion === "2.0.0") {
       const selection = capability === "booking-calendly" && environmentSettings.success
         ? { capability, settings: environmentSettings.data } as const
-        : { capability: "contact-form-web3forms" } as const;
+        : capability === "analytics" && environmentAnalyticsSettings?.success === true
+          ? { capability, settings: environmentAnalyticsSettings.data } as const
+          : { capability: "contact-form-web3forms" } as const;
       if (kind === "apply-add") {
         if (!validApprovedPlanFingerprint(approvedPlanFingerprint)) return invalidArguments();
         return { ok: true, value: { kind, directory, ...selection, approvedPlanFingerprint } };
@@ -589,7 +612,7 @@ function parseRemove(
     });
     const directory = values.directory;
     const capability = values.capability;
-    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms" && capability !== "booking-calendly") return invalidArguments();
+    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms" && capability !== "booking-calendly" && capability !== "analytics") return invalidArguments();
     const approvedPlanFingerprint = values["approved-plan"];
     const persistenceSelection = capability === "application-persistence";
     const jobSelection = capability === "background-job-delivery";
