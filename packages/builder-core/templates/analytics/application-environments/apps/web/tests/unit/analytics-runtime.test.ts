@@ -828,20 +828,20 @@ describe("analytics consent runtime", () => {
       synchronized,
     );
 
-    browser.dispatchStorage(
-      JSON.stringify(
-        createAnalyticsConsentRecord(
-          next,
-          createAnalyticsConsentContext(analyticsSettings),
-          now,
-        ),
-      ),
-    );
+    const source = JSON.stringify(createAnalyticsConsentRecord(
+      next,
+      createAnalyticsConsentContext(analyticsSettings),
+      now,
+    ));
+    browser.storedValues.set(analyticsConsentStorageKey, source);
+    browser.dispatchStorage(source);
 
     expect(synchronized).toHaveBeenCalledWith(next);
     expect(browser.scripts.map(({ id }) => id)).toEqual([
       "analytics-microsoft-clarity",
     ]);
+    browser.dispatchStorage(source);
+    expect(browser.effects.filter(effect => effect === "append:analytics-microsoft-clarity")).toHaveLength(1);
     expect(browser.reload).not.toHaveBeenCalled();
     const registered = browser.addEventListener.mock.calls[0]?.[1];
     dispose();
@@ -850,7 +850,85 @@ describe("analytics consent runtime", () => {
       registered,
     );
     browser.dispatchStorage(JSON.stringify(storedRecord(analyticsSettings, [])));
-    expect(synchronized).toHaveBeenCalledOnce();
+    expect(synchronized).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["denied", "cleared", "context-changed", "replaced-grant", "unreadable"] as const)(
+    "does not authorize an event grant when current storage is %s",
+    (storedState) => {
+      const context = createAnalyticsConsentContext(analyticsSettings);
+      const denied = purposeDecisions(analyticsSettings, []);
+      const granted = purposeDecisions(analyticsSettings, context.map(({ purpose }) => purpose));
+      const record = createAnalyticsConsentRecord(granted, context, new Date(now.getTime() - 1000));
+      const source = JSON.stringify(record);
+      expect(parseAnalyticsConsentRecord(source, context, collectionContext(context), now)).toEqual({ status: "valid", record });
+      const browser = createTestBrowser({}, "", true);
+      if (storedState === "denied") {
+        browser.storedValues.set(analyticsConsentStorageKey, JSON.stringify(storedRecord(analyticsSettings, [])));
+      } else if (storedState === "context-changed") {
+        browser.storedValues.set(analyticsConsentStorageKey, JSON.stringify({
+          ...record,
+          collectionContext: { ...record.collectionContext, applicationEnvironment: "production" },
+        }));
+      } else if (storedState === "replaced-grant") {
+        browser.storedValues.set(analyticsConsentStorageKey, JSON.stringify(createAnalyticsConsentRecord(granted, context, now)));
+      } else if (storedState === "unreadable") {
+        browser.localStorage.getItem.mockImplementation(() => { throw new Error("read unavailable"); });
+      }
+      const synchronized = vi.fn();
+      browserAnalyticsConsentRuntime.subscribe(analyticsSettings, () => denied, synchronized);
+
+      browser.dispatchStorage(source);
+
+      expect(browser.scripts).toEqual([]);
+      expect(synchronized).not.toHaveBeenCalled();
+      expect(browser.reload).not.toHaveBeenCalled();
+      for (const name of ["dataLayer", "gtag", "clarity"]) expect(browser.window).not.toHaveProperty(name);
+    },
+  );
+
+  it.each(["superseded", "unreadable"] as const)(
+    "applies mixed-event reductions without synchronizing an addition when storage is %s",
+    (storedState) => {
+      const browser = createTestBrowser();
+      const denied = purposeDecisions(analyticsSettings, []);
+      const previous = purposeDecisions(analyticsSettings, ["audience-measurement"]);
+      browserAnalyticsConsentRuntime.save(analyticsSettings, denied, previous);
+      const source = JSON.stringify(storedRecord(analyticsSettings, ["aggregate-traffic-and-performance"]));
+      browser.storedValues.set(analyticsConsentStorageKey, JSON.stringify(storedRecord(analyticsSettings, [])));
+      if (storedState === "unreadable") {
+        browser.localStorage.getItem.mockImplementation(() => { throw new Error("read unavailable"); });
+      }
+      const synchronized = vi.fn();
+      browserAnalyticsConsentRuntime.subscribe(analyticsSettings, () => previous, synchronized);
+
+      browser.dispatchStorage(source);
+
+      expect(synchronized).toHaveBeenCalledWith(denied);
+      expect(browser.scripts).toEqual([]);
+      expect(browser.dataLayer.entries).toContainEqual([
+        "consent", "update", expect.objectContaining({ analytics_storage: "denied" }),
+      ]);
+      expect(browser.reload).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("synchronizes an authoritative mixed event and reloads without loading its addition", () => {
+    const browser = createTestBrowser();
+    const denied = purposeDecisions(analyticsSettings, []);
+    const previous = purposeDecisions(analyticsSettings, ["audience-measurement"]);
+    const next = purposeDecisions(analyticsSettings, ["aggregate-traffic-and-performance"]);
+    browserAnalyticsConsentRuntime.save(analyticsSettings, denied, previous);
+    const source = JSON.stringify(storedRecord(analyticsSettings, ["aggregate-traffic-and-performance"]));
+    browser.storedValues.set(analyticsConsentStorageKey, source);
+    const synchronized = vi.fn();
+    browserAnalyticsConsentRuntime.subscribe(analyticsSettings, () => previous, synchronized);
+
+    browser.dispatchStorage(source);
+
+    expect(synchronized).toHaveBeenCalledWith(next);
+    expect(browser.scripts).toEqual([]);
+    expect(browser.reload).toHaveBeenCalledOnce();
   });
 
   it("ignores same-key events from non-authoritative storage", () => {

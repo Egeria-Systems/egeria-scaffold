@@ -559,8 +559,20 @@ function subscribe(
       return;
     }
 
-    const next = resolution.record.purposes;
+    let next = resolution.record.purposes;
     const transition = compareAnalyticsPurposeDecisions(previous, next);
+    if (transition.added.length > 0) {
+      const stored = readStoredConsent(browser, settings);
+      if (
+        !stored.readable || stored.resolution.status !== "valid" ||
+        !recordsEqual(stored.resolution.record, resolution.record)
+      ) {
+        if (transition.removed.length === 0) return;
+        next = next.map(decision => transition.added.includes(decision.purpose)
+          ? { ...decision, decision: "denied" }
+          : decision);
+      }
+    }
     if (transition.removed.length > 0) {
       synchronized(next);
       applyReductionEffects(settings, transition.removed, browser);

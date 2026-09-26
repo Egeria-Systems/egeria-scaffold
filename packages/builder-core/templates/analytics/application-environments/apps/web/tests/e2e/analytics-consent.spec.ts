@@ -170,6 +170,9 @@ test.beforeEach(async ({ context, baseURL }) => {
 });
 
 test.afterEach(async ({ context }, information) => {
+  // Stop request producers before removing interception, then drain handlers before context disposal.
+  for (const page of context.pages()) await page.close();
+  await context.unrouteAll({ behavior: "wait" });
   const audit = audits.get(context);
   if (audit === undefined) throw new Error("ANALYTICS_TEST_AUDIT_MISSING");
   await information.attach("controlled-request-audit", { contentType: "application/json", body: JSON.stringify({
@@ -269,9 +272,42 @@ test("metadata belongs only to the expected production property and first visit 
 });
 
 if (declarations.length > 0) {
-  test("denial persists in the current exact context", async ({ page }) => {
+  test("denial remains authoritative across queued grant events and reload", async ({ page }) => {
     await visit(page, primaryPath);
     await action(page, "decline").click();
+    const events = await page.evaluate(({ key, granted, denied }) => new Promise<{
+      trusted: boolean; grant: boolean; storedDenial: boolean; scripts: string[];
+    }[]>(resolve => {
+      const frame = document.createElement("iframe");
+      frame.hidden = true;
+      document.body.append(frame);
+      const storage = frame.contentWindow?.localStorage;
+      if (storage === undefined) throw new Error("ANALYTICS_TEST_STORAGE_WRITER_MISSING");
+      const observed: { trusted: boolean; grant: boolean; storedDenial: boolean; scripts: string[] }[] = [];
+      const listener = (event: StorageEvent) => {
+        if (event.key !== key || event.storageArea !== localStorage) return;
+        observed.push({
+          trusted: event.isTrusted, grant: event.newValue === granted,
+          storedDenial: localStorage.getItem(key) === denied,
+          scripts: Array.from(document.querySelectorAll('script[id^="analytics-"]'), script => script.id),
+        });
+        if (observed.length === 2) {
+          window.removeEventListener("storage", listener);
+          frame.remove();
+          resolve(observed);
+        }
+      };
+      window.addEventListener("storage", listener);
+      // Both writes finish in this task before native FIFO events reach the page's consent listener.
+      storage.setItem(key, granted);
+      storage.setItem(key, denied);
+    }), { key: analyticsConsentStorageKey, granted: JSON.stringify(consentRecord()), denied: JSON.stringify(consentRecord([])) });
+    expect(events).toEqual([
+      { trusted: true, grant: true, storedDenial: true, scripts: [] },
+      { trusted: true, grant: false, storedDenial: true, scripts: [] },
+    ]);
+    await assertProviders(page, []);
+    expect(auditFor(page).commands).toEqual([]);
     await page.reload();
     await expect(action(page, "manage")).toBeVisible();
     const record = await readRecord(page);
