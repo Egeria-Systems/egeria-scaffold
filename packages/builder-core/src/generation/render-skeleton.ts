@@ -473,7 +473,7 @@ export async function renderSkeleton(
   if (applicationEnvironments && Object.hasOwn(request, "contactFormWeb3Forms") && request.contactFormWeb3Forms !== true) {
     return generatedIssue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "contactFormWeb3Forms"], "invalid-selection");
   }
-  if (applicationEnvironments && (request.analytics !== undefined || request.applicationPersistence === true || request.transactionalEmailResend === true || request.backgroundJobDelivery === true)) {
+  if (applicationEnvironments && (request.applicationPersistence === true || request.transactionalEmailResend === true || request.backgroundJobDelivery === true)) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
   }
   const packageVersions: CapabilityPackageVersions = {
@@ -575,8 +575,17 @@ export async function renderSkeleton(
   }
 
   if (applicationEnvironments) {
+    const analytics = request.analytics;
+    const analyticsExample = analytics === undefined ? "" : [
+      "NEXT_PUBLIC_ANALYTICS_ENABLED=false",
+      ...(analytics.providers.cloudflareWebAnalytics === undefined ? [] : ["NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN="]),
+      ...(analytics.providers.googleAnalytics4 === undefined ? [] : ["NEXT_PUBLIC_GA4_MEASUREMENT_ID="]),
+      ...(analytics.providers.microsoftClarity === undefined ? [] : ["NEXT_PUBLIC_CLARITY_PROJECT_ID="]),
+      ...(analytics.operationalIntegrations.googleSearchConsole === undefined ? [] : ["NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION="]),
+      "",
+    ].join("\n");
     files.push(
-      { path: "apps/web/.env.example", content: encoder.encode(`APPLICATION_ENVIRONMENT=development\nNEXT_PUBLIC_SITE_URL=http://localhost:3000\n${request.contactFormWeb3Forms === true ? "NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=\n" : ""}${request.bookingCalendly === undefined ? "" : "NEXT_PUBLIC_CALENDLY_URL=\n"}`) },
+      { path: "apps/web/.env.example", content: encoder.encode(`APPLICATION_ENVIRONMENT=development\nNEXT_PUBLIC_SITE_URL=http://localhost:3000\n${request.contactFormWeb3Forms === true ? "NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=\n" : ""}${request.bookingCalendly === undefined ? "" : "NEXT_PUBLIC_CALENDLY_URL=\n"}${analyticsExample}`) },
       { path: "apps/web/.dev.vars.example", content: encoder.encode("APPLICATION_ENVIRONMENT=development\nBETTER_STACK_INGESTING_HOST=\nBETTER_STACK_SOURCE_TOKEN=\n") },
     );
   }

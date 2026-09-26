@@ -1621,7 +1621,7 @@ test("application environment catalog admits only the complete common tuple with
   const snapshot = { standards: "0.7.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0" };
   const result = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, snapshot);
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.deepEqual(result.value.map(({ identifier }) => identifier).sort(), ["app-foundation", "booking-calendly", "contact-form-web3forms", "content-files", "deployment-cloudflare", "multilingual", "observability", "section-composition", "site-routing", "standards"]);
+  assert.deepEqual(result.value.map(({ identifier }) => identifier).sort(), ["analytics", "app-foundation", "booking-calendly", "contact-form-web3forms", "content-files", "deployment-cloudflare", "multilingual", "observability", "section-composition", "site-routing", "standards"]);
   const deployment = result.value.find(({ identifier }) => identifier === "deployment-cloudflare");
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/src/configuration/application-environment.ts"));
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/scripts/check-application-environment.mjs"));
@@ -1656,4 +1656,25 @@ test("environment booking installed state and catalog admit only the mode-only c
   assert.deepEqual(booking.migrationPlanners, ["add-booking-calendly-0-2-0", "remove-booking-calendly-0-2-0"]);
   assert.equal(booking.managedSurfaces.length, 9);
   assert.equal(booking.managedSurfaces.find(({ path }) => path === "docs/booking-calendly.md")?.ownership, "application-owned");
+});
+
+test("environment analytics admits only its exact selection-only candidate subject and ownership", () => {
+  const context = contracts.createApplicationEnvironmentRenderingContext();
+  const catalog = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, context.catalogSnapshot);
+  assert.equal(catalog.ok, true);
+  const analytics = catalog.value.find(({ identifier }) => identifier === "analytics");
+  assert.equal(analytics?.version, "0.2.0");
+  assert.deepEqual(analytics.migrationPlanners, ["add-analytics-0-2-0", "remove-analytics-0-2-0"]);
+  assert.equal(analytics.managedSurfaces.length, 17);
+  for (const path of ["apps/web/src/integrations/analytics/analytics-configuration.ts", "apps/web/tests/unit/analytics-configuration.test.ts"]) {
+    assert.equal(analytics.managedSurfaces.find(surface => surface.path === path)?.ownership, "managed");
+  }
+  for (const version of ["0.1.0", "0.2.0", "0.3.0"]) {
+    const state = structuredClone(environmentState);
+    state.installedCapabilities.push({ ...state.installedCapabilities[0], identifier: "analytics", version });
+    assert.equal(contracts.parseStateJson(JSON.stringify(state), "2.0.0").ok, version === "0.2.0", version);
+  }
+  const publicCatalog = contracts.createVerifiedCapabilityCatalog();
+  assert.equal(publicCatalog.ok, true);
+  assert.equal(publicCatalog.value.find(({ identifier }) => identifier === "analytics").version, "0.1.0");
 });
