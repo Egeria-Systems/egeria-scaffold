@@ -6174,7 +6174,7 @@ test("application environment generated preflight rejects unsafe targets without
 });
 
 test("application environment rendering refuses incomplete selections and mixed contexts", async () => {
-  for (const selection of [{ analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } }, { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true }]) {
+  for (const selection of [ { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true }]) {
     const result = await renderApplicationEnvironment("app", selection);
     assert.equal(result.ok, false);
     assert.equal(result.issues[0].code, "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
@@ -6182,6 +6182,43 @@ test("application environment rendering refuses incomplete selections and mixed 
   const core = await import("../dist/index.js");
   const result = await core.renderSkeleton({ profile: "portfolio", projectName: "example", displayName: "Example", packageVersions: core.verifiedCapabilityPackageVersions }, { ...applicationEnvironmentContext, projectSchemaVersion: "1.0.0" });
   assert.equal(result.ok, false);
+});
+
+const environmentAnalyticsSettings = {
+  consent: { policy: "explicit-opt-in" },
+  providers: {
+    cloudflareWebAnalytics: true,
+    googleAnalytics4: true,
+    microsoftClarity: { audience: "not-directed-to-minors" },
+  },
+  operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
+};
+
+test("environment analytics rendering composes every profile with selection-only controls and owned configuration", async () => {
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (let selection = 0; selection < 8; selection += 1) {
+      const rendered = assertSuccess(await renderApplicationEnvironment(profile, {
+        analytics: environmentAnalyticsSettings,
+        ...(selection & 1 ? { contactFormWeb3Forms: true } : {}),
+        ...(selection & 2 ? { bookingCalendly: { mode: "popup" } } : {}),
+        ...(selection & 4 ? { multilingual: true } : {}),
+      }));
+      assert.deepEqual(rendered.project.capabilitySettings.analytics, environmentAnalyticsSettings);
+      assert.equal(rendered.resolved.capabilities.find(({ identifier }) => identifier === "analytics")?.version, "0.2.0");
+      assert.equal(rendered.surfaces.filter(({ owner }) => owner.kind === "capability" && owner.identifier === "analytics").length, 17);
+      const files = new Map(rendered.files.map(({ path, content }) => [path, Buffer.from(content).toString("utf8")]));
+      assert.equal(files.size, rendered.files.length);
+      assert.ok(files.has("apps/web/src/integrations/analytics/analytics-configuration.ts"));
+      assert.ok(files.has("apps/web/tests/unit/analytics-configuration.test.ts"));
+      for (const name of ["CLOUDFLARE_WEB_ANALYTICS_TOKEN", "GA4_MEASUREMENT_ID", "CLARITY_PROJECT_ID", "GOOGLE_SITE_VERIFICATION"]) {
+        assert.match(files.get("apps/web/.env.example"), new RegExp(`^NEXT_PUBLIC_${name}=$`, "mu"));
+      }
+      assert.match(files.get("apps/web/.env.example"), /^NEXT_PUBLIC_ANALYTICS_ENABLED=false$/mu);
+      assert.equal(files.get("apps/web/.env.example").includes("NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY="), Boolean(selection & 1));
+      assert.equal(files.get("apps/web/.env.example").includes("NEXT_PUBLIC_CALENDLY_URL="), Boolean(selection & 2));
+      assert.doesNotMatch(files.get("apps/web/.dev.vars.example"), /ANALYTICS|MEASUREMENT|CLARITY|VERIFICATION/u);
+    }
+  }
 });
 
 
@@ -6253,5 +6290,52 @@ test("environment booking validates generated destinations before process effect
       assert.match(conflict.stderr, /APPLICATION_ENVIRONMENT_INVALID/u);
       assert.doesNotMatch(conflict.stderr, /BOOKING_CONFIGURATION_INVALID|CONTACT_CONFIGURATION_INVALID|private-sentinel/u);
     } finally { await rm(root, { recursive: true, force: true }); }
+  }
+});
+
+
+test("environment analytics preflight validates all compositions with field-only ordered refusals", async (context) => {
+  for (const selection of [0, 1, 2, 3]) {
+    await context.test(`contact=${Boolean(selection & 1)} booking=${Boolean(selection & 2)}`, async () => {
+      const rendered = assertSuccess(await renderApplicationEnvironment("site", {
+        analytics: environmentAnalyticsSettings,
+        ...(selection & 1 ? { contactFormWeb3Forms: true } : {}),
+        ...(selection & 2 ? { bookingCalendly: { mode: "popup" } } : {}),
+      }));
+      const root = await mkdtemp(join(tmpdir(), "analytics-environment-preflight-"));
+      for (const file of rendered.files.filter(({ path }) => /(?:application-environment|booking-settings|contact-settings|analytics-configuration|analytics-settings)\.ts$/u.test(path) || path.endsWith("check-application-environment.mjs"))) {
+        const destination = join(root, file.path);
+        await mkdir(join(destination, ".."), { recursive: true });
+        await writeFile(destination, file.content);
+      }
+      const valid = {
+        APPLICATION_ENVIRONMENT: "staging",
+        NEXT_PUBLIC_ANALYTICS_ENABLED: "true",
+        NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: "0123456789abcdef0123456789abcdef",
+        NEXT_PUBLIC_GA4_MEASUREMENT_ID: "G-TEST123456",
+        NEXT_PUBLIC_CLARITY_PROJECT_ID: "clarity123",
+        NEXT_PUBLIC_SITE_URL: "https://qa.analytics-test.invalid",
+        NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: "synthetic-verification-token",
+        NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "00000000-0000-4000-8000-000000000001",
+        NEXT_PUBLIC_CALENDLY_URL: "https://calendly.com/synthetic-nonproduction/intro",
+      };
+      const script = join(root, "apps/web/scripts/check-application-environment.mjs");
+      const check = (overrides, expected) => {
+        const result = spawnSync(process.execPath, [script, "--local"], { encoding: "utf8", env: { ...valid, ...overrides } });
+        assert.equal(result.status, expected === undefined ? 0 : 1, result.stderr);
+        if (expected !== undefined) assert.deepEqual(JSON.parse(result.stderr.trim()), expected);
+        assert.doesNotMatch(result.stdout + result.stderr, /private-sentinel|0123456789abcdef|G-TEST123456|clarity123/u);
+      };
+      check({ NEXT_PUBLIC_GA4_MEASUREMENT_ID: "" }, { code: "ANALYTICS_CONFIGURATION_INVALID", field: "NEXT_PUBLIC_GA4_MEASUREMENT_ID", reason: "missing" });
+      check({}, undefined);
+      check({ APPLICATION_ENVIRONMENT: "development", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "" }, undefined);
+      check({ NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "", NEXT_PUBLIC_CLARITY_PROJECT_ID: "", NEXT_PUBLIC_SITE_URL: "" }, undefined);
+      check({ NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, { code: "ANALYTICS_CONFIGURATION_INVALID", field: "NEXT_PUBLIC_GA4_MEASUREMENT_ID", reason: "invalid" });
+      check({ APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: "" }, { code: "ANALYTICS_CONFIGURATION_INVALID", field: "NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION", reason: "missing" });
+      check({ APPLICATION_ENVIRONMENT: "production" }, undefined);
+      check({ NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, { code: "APPLICATION_ENVIRONMENT_INVALID", field: "NEXT_PUBLIC_APPLICATION_ENVIRONMENT", reason: "mismatch" });
+      if (selection & 1) check({ NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "", NEXT_PUBLIC_CALENDLY_URL: "private-sentinel", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, { code: "CONTACT_CONFIGURATION_INVALID", field: "NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY", reason: "missing" });
+      if (selection & 2) check({ NEXT_PUBLIC_CALENDLY_URL: "", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, { code: "BOOKING_CONFIGURATION_INVALID", field: "NEXT_PUBLIC_CALENDLY_URL", reason: "missing" });
+    });
   }
 });

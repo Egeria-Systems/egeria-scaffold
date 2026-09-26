@@ -614,3 +614,185 @@ for (const [profile, bookingMode, contact, multilingual] of [
     context.diagnostic(JSON.stringify({ owner, artifacts, providers: "all third-party attempts intercepted before navigation" }));
   });
 }
+
+const environmentAnalyticsSelection = {
+  consent: { policy: "explicit-opt-in" },
+  providers: { cloudflareWebAnalytics: true, googleAnalytics4: true, microsoftClarity: { audience: "not-directed-to-minors" } },
+  operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
+};
+
+for (const [name, profile, contact, booking, multilingual, searchOnly] of [
+  ["composed-site", "site", true, "popup", true, false],
+  ["portfolio", "portfolio", false, undefined, false, false],
+  ["application", "app", false, "inline", false, false],
+  ["search-only", "site", false, undefined, false, true],
+]) {
+  test(`environment analytics builds freeze ${name} activation and destinations`, { timeout: 90 * 60 * 1000 }, async context => {
+    const owner = await mkdtemp(join(tmpdir(), `egeria-environment-analytics-${name}-`));
+    context.diagnostic(`Retained analytics evidence: ${owner}`);
+    const supportRoot = join(owner, "support");
+    await mkdir(supportRoot);
+    const support = await prepareLiveSupport(supportRoot);
+    const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+    const commands = [];
+    const artifacts = [];
+    const identifiersA = {
+      NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: "0123456789abcdef0123456789abcdef",
+      NEXT_PUBLIC_GA4_MEASUREMENT_ID: "G-TEST123456",
+      NEXT_PUBLIC_CLARITY_PROJECT_ID: "qatest1234",
+      NEXT_PUBLIC_SITE_URL: "https://qa.analytics-test.invalid",
+      NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: "synthetic-nonproduction-verification",
+      NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: contact ? "00000000-0000-4000-8000-000000000001" : "",
+      NEXT_PUBLIC_CALENDLY_URL: booking === undefined ? "" : "https://calendly.com/egeria-synthetic-nonproduction/intro",
+    };
+    const identifiersB = {
+      NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: "fedcba9876543210fedcba9876543210",
+      NEXT_PUBLIC_GA4_MEASUREMENT_ID: "G-PROD123456",
+      NEXT_PUBLIC_CLARITY_PROJECT_ID: "prodtest1234",
+      NEXT_PUBLIC_SITE_URL: "https://www.analytics-live.invalid",
+      NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: "synthetic-production-verification",
+      NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: contact ? "00000000-0000-4000-8000-000000000002" : "",
+      NEXT_PUBLIC_CALENDLY_URL: booking === undefined ? "" : "https://calendly.com/egeria-synthetic-production/intro",
+    };
+    const analytics = searchOnly ? { consent: { policy: "explicit-opt-in" }, providers: {}, operationalIntegrations: { googleSearchConsole: true } } : environmentAnalyticsSelection;
+    const destination = join(owner, "generated");
+    const generated = assertSuccess(await generateProject({
+      request: { profile, projectName: `analytics-${name}`, displayName: "Analytics Example", analytics,
+        ...(contact ? { contactFormWeb3Forms: true } : {}), ...(booking === undefined ? {} : { bookingCalendly: { mode: booking } }), ...(multilingual ? { multilingual: true } : {}),
+      }, destination, renderingContext: createApplicationEnvironmentRenderingContext(),
+      verifier: createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
+    }));
+    assert.equal(generated.state.installedCapabilities.find(value => value.identifier === "analytics")?.version, "0.2.0");
+    await writeFile(join(owner, "generation-state.json"), JSON.stringify(generated.state, null, 2));
+    const project = join(owner, "browser-proof");
+    await cp(destination, project, { recursive: true, force: false, errorOnExist: true, dereference: false });
+    const app = join(project, "apps/web");
+    async function run(label, arguments_, additions = {}, succeeds = true) {
+      let result;
+      try {
+        result = await runPnpm(arguments_, { cwd: project, env: { ...environment, ...additions } });
+        commands.push({ label, arguments: arguments_, exitCode: 0 });
+      } catch (error) {
+        result = { stdout: error.stdout ?? "", stderr: error.stderr ?? "" };
+        commands.push({ label, arguments: arguments_, exitCode: error.code });
+        if (succeeds) { await writeFile(join(owner, `${label}.log`), result.stdout + result.stderr); throw error; }
+      } finally { await writeFile(join(owner, "commands.json"), JSON.stringify(commands, null, 2)); }
+      await writeFile(join(owner, `${label}.log`), result.stdout + result.stderr);
+      assert.equal(commands.at(-1).exitCode === 0, succeeds, label);
+      return result;
+    }
+    const entries = await readdir(destination, { recursive: true, withFileTypes: true });
+    const sourcePaths = entries.filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name).slice(destination.length + 1)).sort();
+    async function sourceDigest() {
+      const hash = createHash("sha256");
+      for (const path of sourcePaths) { hash.update(path); hash.update(await readFile(join(project, path))); }
+      return hash.digest("hex");
+    }
+    async function artifactDigest() {
+      const staticRoot = join(app, ".open-next/assets");
+      const entries = await readdir(staticRoot, { recursive: true, withFileTypes: true });
+      const paths = entries.filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name).slice(staticRoot.length + 1)).sort();
+      const hash = createHash("sha256");
+      for (const path of paths) { hash.update(path); hash.update(await readFile(join(staticRoot, path))); }
+      return { workerSha256: createHash("sha256").update(await readFile(join(app, ".open-next/worker.js"))).digest("hex"), staticSha256: hash.digest("hex"), staticFiles: paths.length };
+    }
+    async function browser(label, mode, build, runtime) {
+      const expectedOrigin = build.NEXT_PUBLIC_SITE_URL || "https://qa.analytics-test.invalid";
+      const configPath = join(app, "playwright.analytics-acceptance.config.ts");
+      await writeFile(configPath, `import config from "./playwright.preview.config";\nexport default { ...config, retries: 0, use: { ...config.use, baseURL: ${JSON.stringify(expectedOrigin)} }, ${mode === "dev" ? 'webServer: { command: "pnpm run dev --hostname 127.0.0.1 --port 3101", url: "http://127.0.0.1:3101", reuseExistingServer: false, timeout: 180000 },' : ""} };\n`);
+      const reportPath = join(owner, `${label}.json`);
+      await run(label, ["--dir", "apps/web", "exec", "playwright", "test", "--config", configPath, "tests/e2e/analytics-consent.spec.ts", "--reporter=json", "--output", join(owner, `${label}-results`)], {
+        ...runtime,
+        ...(mode === "dev" ? { WATCHPACK_POLLING: "true" } : {}),
+        ...(mode === "preview" && build.APPLICATION_ENVIRONMENT !== "development" ? { CLOUDFLARE_ENV: build.APPLICATION_ENVIRONMENT } : {}),
+        ANALYTICS_TEST_BUILD_FLAG: build.NEXT_PUBLIC_ANALYTICS_ENABLED,
+        ANALYTICS_TEST_EXPECTED_CLOUDFLARE_TOKEN: searchOnly ? "" : build.NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN,
+        ANALYTICS_TEST_EXPECTED_GA4_ID: searchOnly ? "" : build.NEXT_PUBLIC_GA4_MEASUREMENT_ID,
+        ANALYTICS_TEST_EXPECTED_CLARITY_ID: searchOnly ? "" : build.NEXT_PUBLIC_CLARITY_PROJECT_ID,
+        ANALYTICS_TEST_EXPECTED_SITE_ORIGIN: searchOnly ? "" : build.NEXT_PUBLIC_SITE_URL,
+        ANALYTICS_TEST_EXPECTED_VERIFICATION: build.APPLICATION_ENVIRONMENT === "production" ? build.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION : "",
+        ANALYTICS_TEST_TARGET: build.APPLICATION_ENVIRONMENT,
+        CONTACT_TEST_EXPECTED_ACCESS_KEY: build.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY,
+        BOOKING_TEST_EXPECTED_URL: build.NEXT_PUBLIC_CALENDLY_URL,
+        ...(booking === undefined ? {} : { BOOKING_TEST_MODE: booking }),
+        PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath,
+      });
+      const report = JSON.parse(await readFile(reportPath, "utf8"));
+      const active = build.NEXT_PUBLIC_ANALYTICS_ENABLED === "true" && build.NEXT_PUBLIC_GA4_MEASUREMENT_ID !== "";
+      const expected = searchOnly ? 1 : 14 + (multilingual ? 2 : 1) * (active ? 2 : 1) + (active ? 1 : 0) + (contact || booking !== undefined ? 1 : 0);
+      assert.equal(report.stats.expected, expected, label);
+      assert.equal(report.stats.skipped, 0, label);
+      assert.equal(report.stats.unexpected, 0, label);
+      assert.equal(report.stats.flaky, 0, label);
+      return { executed: report.stats.expected, skipped: report.stats.skipped, report: reportPath };
+    }
+    await run("install", ["install", "--frozen-lockfile", "--store-dir", support.store]);
+    await run("browser-install", ["--dir", "apps/web", "run", "browser:install"]);
+    if (name === "composed-site") {
+      for (const [label, overrides, pattern] of [
+        ["missing-active", { NEXT_PUBLIC_GA4_MEASUREMENT_ID: "" }, /ANALYTICS_CONFIGURATION_INVALID.*NEXT_PUBLIC_GA4_MEASUREMENT_ID.*missing/u],
+        ["invalid-off", { NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "invalid-analytics-input-sentinel" }, /ANALYTICS_CONFIGURATION_INVALID.*NEXT_PUBLIC_GA4_MEASUREMENT_ID.*invalid/u],
+        ["production-verification", { APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: "" }, /ANALYTICS_CONFIGURATION_INVALID.*NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION.*missing/u],
+        ["target-conflict", { NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "invalid-analytics-input-sentinel" }, /APPLICATION_ENVIRONMENT_INVALID/u],
+      ]) {
+        for (const command of ["check:environment:deployment", "build"]) {
+          const result = await run(`${label}-${command.replaceAll(":", "-")}`, ["--dir", "apps/web", "run", command], { ...identifiersA, APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_ANALYTICS_ENABLED: "true", ...overrides }, false);
+          assert.match(result.stderr, pattern);
+          assert.doesNotMatch(result.stdout + result.stderr, /invalid-analytics-input-sentinel/u);
+        }
+      }
+      await writeFile(join(app, ".env.local"), "NEXT_PUBLIC_GA4_MEASUREMENT_ID=invalid-local-input-sentinel\n");
+      const local = { APPLICATION_ENVIRONMENT: "development", NEXT_PUBLIC_ANALYTICS_ENABLED: "false" };
+      await run("env-local-process-only", ["--dir", "apps/web", "run", "check:environment"], local);
+      const rejected = await run("env-local-next-load", ["--dir", "apps/web", "run", "build"], local, false);
+      assert.match(rejected.stderr, /ANALYTICS_CONFIGURATION_INVALID:NEXT_PUBLIC_GA4_MEASUREMENT_ID:invalid/u);
+      assert.doesNotMatch(rejected.stdout + rejected.stderr, /invalid-local-input-sentinel/u);
+      await rm(join(app, ".env.local")); // this test's own deliberately invalid input
+      const partial = { ...identifiersA, APPLICATION_ENVIRONMENT: "development", NEXT_PUBLIC_ANALYTICS_ENABLED: "true", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "", NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "", NEXT_PUBLIC_CALENDLY_URL: "", NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:3101" };
+      await browser("development-missing-local-inputs", "dev", partial, partial);
+    }
+    const sourceHash = await sourceDigest();
+    const matrix = searchOnly ? [["development", "false", identifiersA, identifiersB], ["staging", "false", identifiersA, identifiersB], ["production", "false", identifiersB, identifiersA]] :
+      name === "composed-site" ? [["development", "false", identifiersA, identifiersB], ["staging", "true", identifiersA, identifiersB], ["production", "true", identifiersB, identifiersA]] :
+        [["development", "false", identifiersA, identifiersB], ["development", "true", identifiersA, identifiersB]];
+    for (const [target, flag, identifiers, contradiction] of matrix) {
+      assert.equal(await sourceDigest(), sourceHash);
+      const label = `${target}-${flag}`;
+      const build = { ...identifiers, APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_ANALYTICS_ENABLED: flag };
+      const runtime = { ...contradiction, APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_ANALYTICS_ENABLED: flag === "true" ? "false" : "true" };
+      await run(`${label}-next`, ["--dir", "apps/web", "run", "build"], build);
+      await run(`${label}-opennext`, ["--dir", "apps/web", "exec", "opennextjs-cloudflare", "build", "--skipNextBuild"], { ...build, ...(target === "development" ? {} : { CLOUDFLARE_ENV: target }) });
+      const before = await artifactDigest();
+      const staticEntries = await readdir(join(app, ".open-next/assets"), { recursive: true, withFileTypes: true });
+      const chunks = [];
+      for (const entry of staticEntries) if (entry.isFile() && entry.name.endsWith(".js")) chunks.push(await readFile(join(entry.parentPath, entry.name), "utf8"));
+      const browserBytes = chunks.join("\n");
+      if (!searchOnly) {
+        for (const key of ["NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN", "NEXT_PUBLIC_GA4_MEASUREMENT_ID", "NEXT_PUBLIC_CLARITY_PROJECT_ID"]) {
+          assert.ok(browserBytes.includes(identifiers[key]), key);
+          assert.equal(browserBytes.includes(contradiction[key]), false, key);
+        }
+      }
+      assert.equal(browserBytes.includes(identifiersA.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION), false);
+      if (target !== "production") assert.equal(browserBytes.includes(identifiersB.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION), false);
+      const observed = await browser(`${label}-runtime-challenge`, "preview", build, runtime);
+      assert.deepEqual(await artifactDigest(), before);
+      assert.equal(await sourceDigest(), sourceHash);
+      artifacts.push({ name, profile, target, sourceHash, rawBuildFlag: flag, build, runtime, ...before, ...observed });
+      await writeFile(join(owner, "artifacts.json"), JSON.stringify(artifacts, null, 2));
+      if (name === "composed-site" && flag === "false") {
+        const reportPath = join(owner, "disabled-neighbor-browser.json");
+        await run("disabled-neighbor-browser", ["--dir", "apps/web", "run", "test:e2e:preview", "--reporter=json", "--output", join(owner, "disabled-neighbor-results"), "web3forms-contact.spec.ts", "calendly-booking.spec.ts"], {
+          ...runtime, CONTACT_TEST_EXPECTED_ACCESS_KEY: build.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY, BOOKING_TEST_EXPECTED_URL: build.NEXT_PUBLIC_CALENDLY_URL,
+          BOOKING_TEST_MODE: booking, BOOKING_TEST_MULTILINGUAL: String(multilingual), PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath,
+        });
+        const report = JSON.parse(await readFile(reportPath, "utf8"));
+        assert.equal(report.stats.expected, 17);
+        assert.equal(report.stats.unexpected, 0);
+        assert.equal(report.stats.flaky, 0);
+        assert.deepEqual(await artifactDigest(), before);
+      }
+    }
+    context.diagnostic(JSON.stringify({ owner, artifacts, providerBoundary: "synthetic intercepted requests only" }));
+  });
+}

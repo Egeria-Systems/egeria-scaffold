@@ -21,6 +21,8 @@ import {
 } from "../contracts/migration.js";
 import {
   analyticsSettingsSchema,
+  applicationEnvironmentAnalyticsSettingsSchema,
+  type ApplicationEnvironmentAnalyticsSettings,
   calendlyBookingSettingsSchema,
   applicationEnvironmentBookingSettingsSchema,
   type ApplicationEnvironmentBookingSettings,
@@ -97,6 +99,7 @@ function additionMigrationIdentifier(
   applicationEnvironment = false,
 ):
   | "add-analytics-0-1-0"
+  | "add-analytics-0-2-0"
   | "add-booking-calendly-0-1-0"
   | "add-booking-calendly-0-2-0"
   | "add-multilingual-0-1-0"
@@ -111,7 +114,7 @@ function additionMigrationIdentifier(
     case "contact-form-web3forms":
       return applicationEnvironment ? "add-contact-form-web3forms-0-2-0" : "add-contact-form-web3forms-0-1-0";
     case "analytics":
-      return "add-analytics-0-1-0";
+      return applicationEnvironment ? "add-analytics-0-2-0" : "add-analytics-0-1-0";
     case "booking-calendly":
       return applicationEnvironment ? "add-booking-calendly-0-2-0" : "add-booking-calendly-0-1-0";
     case "multilingual":
@@ -409,7 +412,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   root: string;
   capability: AddableCapability;
   renderingContext?: ApplicationEnvironmentRenderingContext;
-  settings?: AnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings;
+  settings?: AnalyticsSettings | ApplicationEnvironmentAnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings;
   approvedPlanFingerprint: string;
   verifier: GeneratedProjectVerifier;
   reader?: RepositoryReader;
@@ -419,12 +422,15 @@ export async function applyCapabilityAddition(input: Readonly<{
   inspectExpectedChanges?: InspectExpectedChanges;
   now?: () => string;
 }>): Promise<CapabilityAdditionExecutionResult> {
+  const environmentAnalyticsSettings = input.renderingContext !== undefined && input.capability === "analytics"
+    ? applicationEnvironmentAnalyticsSettingsSchema.safeParse(input.settings) : undefined;
   const environmentBookingSettings = input.renderingContext !== undefined && input.capability === "booking-calendly"
     ? applicationEnvironmentBookingSettingsSchema.safeParse(input.settings) : undefined;
   if (input.renderingContext !== undefined && (
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    (input.capability !== "contact-form-web3forms" && input.capability !== "booking-calendly") ||
+    (input.capability !== "contact-form-web3forms" && input.capability !== "booking-calendly" && input.capability !== "analytics") ||
     (input.capability === "contact-form-web3forms" && input.settings !== undefined) ||
+    (environmentAnalyticsSettings !== undefined && !environmentAnalyticsSettings.success) ||
     (environmentBookingSettings !== undefined && !environmentBookingSettings.success)
   )) return failure("CAPABILITY_ADDITION_UNSUPPORTED", "precondition", "not-required");
   const root = resolve(input.root);
@@ -460,7 +466,7 @@ export async function applyCapabilityAddition(input: Readonly<{
 
   const settingsSnapshotResult =
     input.capability === "analytics"
-      ? analyticsSettingsSchema.safeParse(input.settings)
+      ? environmentAnalyticsSettings ?? analyticsSettingsSchema.safeParse(input.settings)
       : input.capability === "booking-calendly"
         ? environmentBookingSettings ?? calendlyBookingSettingsSchema.safeParse(input.settings)
         : input.renderingContext === undefined && input.capability === "contact-form-web3forms"
@@ -561,6 +567,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   const environmentProject = controls.project.value.schemaVersion === "2.0.0" ? controls.project.value : undefined;
   const environmentRenderRequest = {
     ...commonRenderRequest,
+    ...(environmentProject?.capabilitySettings.analytics === undefined ? {} : { analytics: environmentProject.capabilitySettings.analytics }),
     ...(environmentProject?.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: environmentProject.capabilitySettings["booking-calendly"] }),
     ...(controls.project.value.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
   };
@@ -577,6 +584,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...environmentRenderRequest,
     ...(input.capability === "contact-form-web3forms" ? { contactFormWeb3Forms: true as const } : {}),
     ...(environmentBookingSettings?.success ? { bookingCalendly: environmentBookingSettings.data } : {}),
+    ...(environmentAnalyticsSettings?.success ? { analytics: environmentAnalyticsSettings.data } : {}),
   }, input.renderingContext);
   if (!desiredRender.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   let desired: Readonly<{ ok: true; value: RenderedSkeleton<LifecycleProject> }> = desiredRender;

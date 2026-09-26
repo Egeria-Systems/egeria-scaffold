@@ -1671,12 +1671,17 @@ function createDescriptors(
     },
     {
       identifier: "analytics",
-      version: "0.1.0",
+      version: applicationEnvironments ? "0.2.0" : "0.1.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
       dependencies: ["content-files", "section-composition"],
       ...sharedCapabilityMetadata,
+      ...(applicationEnvironments ? { environmentVariables: [
+        "NEXT_PUBLIC_ANALYTICS_ENABLED", "NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN",
+        "NEXT_PUBLIC_GA4_MEASUREMENT_ID", "NEXT_PUBLIC_CLARITY_PROJECT_ID",
+        "NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION", "NEXT_PUBLIC_SITE_URL",
+      ] } : {}),
       optionalIntegrations: ["multilingual", "site-routing"],
       supportedProfiles: sharedSupportedProfiles,
       requiredPackages: [],
@@ -1705,7 +1710,9 @@ function createDescriptors(
       browserStorage: [
         "functional-consent-local-storage",
         "cloudflare-web-analytics-cookie-free",
-        "google-analytics-first-party-cookies-_ga-and-_ga_<container-id>",
+        ...(applicationEnvironments
+          ? ["google-analytics-host-only-cookies-egeria_production_ga-and-egeria_nonproduction_ga-with-stream-suffix"]
+          : ["google-analytics-first-party-cookies-_ga-and-_ga_<container-id>"]),
         "microsoft-clarity-first-party-cookies-_clck-and-_clsk",
         "provider-controlled-third-party-storage",
       ],
@@ -1740,8 +1747,14 @@ function createDescriptors(
         "keep-advertising-signals-denied",
         "withdraw-consent-clear-accessible-cookies-and-reload",
       ],
-      ...projectEvidencePoints(analyticsEvidencePoints),
-      migrationPlanners: [
+      ...projectEvidencePoints([
+        ...analyticsEvidencePoints,
+        ...(applicationEnvironments ? [
+          createFileEvidencePoint("analytics-configuration", "analytics", "apps/web/src/integrations/analytics/analytics-configuration.ts", "managed"),
+          createFileEvidencePoint("analytics-configuration-specification", "analytics", "apps/web/tests/unit/analytics-configuration.test.ts", "managed"),
+        ] : []),
+      ]),
+      migrationPlanners: applicationEnvironments ? ["add-analytics-0-2-0", "remove-analytics-0-2-0"] : [
         "add-analytics-0-1-0",
         "remove-analytics-0-1-0",
       ],
@@ -2122,7 +2135,7 @@ export function createCapabilityCatalogSnapshot(
   const catalogIssues: ContractIssue[] = [];
 
   const descriptors = createDescriptors(packageVersions, supportedSnapshot).filter((descriptor) =>
-    !applicationEnvironments || !["analytics", "application-persistence", "transactional-email-resend", "background-job-delivery"].includes(descriptor.identifier),
+    !applicationEnvironments || !["application-persistence", "transactional-email-resend", "background-job-delivery"].includes(descriptor.identifier),
   );
   for (const [index, descriptor] of descriptors.entries()) {
     const parsed = capabilityDescriptorSchema.safeParse(descriptor);

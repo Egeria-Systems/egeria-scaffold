@@ -1609,7 +1609,7 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const destination = join(owner, "project");
     const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
-      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
+      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
       destination, renderingContext: core.createApplicationEnvironmentRenderingContext(),
       verifier: {
         async prepareLockfile(root) {
@@ -1668,5 +1668,28 @@ test("environment booking removal preserves contact and refuses shared drift or 
   }
   const referenced = new Map(entries);
   referenced.set("apps/web/src/booking-consumer.ts", 'import { bookingCalendlySettings } from "./integrations/booking-calendly/booking-settings";\n');
+  assertFailure(await plan(referenced), "CAPABILITY_REMOVAL_REFERENCE_CONFLICT");
+});
+
+const environmentAnalyticsSelection = {
+  consent: { policy: "explicit-opt-in" },
+  providers: { cloudflareWebAnalytics: true, googleAnalytics4: true, microsoftClarity: { audience: "not-directed-to-minors" } },
+  operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
+};
+
+test("environment analytics removal preserves neighbors and refuses surviving references or managed drift", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const entries = await environmentContactEntries("site", { analytics: environmentAnalyticsSelection, booking: "popup", contact: true, multilingual: true });
+  const plan = files => core.planCapabilityRemoval({ reader: createSnapshotReader(files).reader, git, capability: "analytics", renderingContext, inspectRepositoryInventory: async () => inventoryFromEntries(files) });
+  const accepted = await plan(entries);
+  assert.equal(accepted.ok, true, JSON.stringify(accepted));
+  assert.deepEqual(accepted.value.capability, { identifier: "analytics", version: "0.2.0" });
+  for (const neighbor of ["booking-calendly", "contact-form-web3forms", "multilingual"]) assert.ok(accepted.value.desiredCapabilities.includes(neighbor));
+  for (const path of ["apps/web/.env.example", "apps/web/next.config.ts", "apps/web/scripts/check-application-environment.mjs", "apps/web/src/integrations/analytics/analytics-runtime.ts"]) {
+    const changed = new Map(entries); changed.set(path, changed.get(path) + "\n// owned modification\n");
+    assert.equal((await plan(changed)).ok, false, path);
+  }
+  const referenced = new Map(entries);
+  referenced.set("apps/web/src/analytics-consumer.ts", 'import { analyticsSettings } from "./integrations/analytics/analytics-settings";\n');
   assertFailure(await plan(referenced), "CAPABILITY_REMOVAL_REFERENCE_CONFLICT");
 });
