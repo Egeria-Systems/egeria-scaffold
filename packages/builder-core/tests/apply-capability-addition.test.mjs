@@ -1231,6 +1231,53 @@ test("environment contact addition persists schema two only after verification",
   assert.deepEqual(repository.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
 });
 
+test("environment persistence addition verifies bindings before changing controls and preserves neighboring selections", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const entries = await environmentContactEntries("app", { contact: true, booking: "popup", multilingual: true });
+  const checks = [...core.appGenerationVerificationChecks];
+  checks.splice(checks.indexOf("typecheck"), 0, "cloudflare-types");
+  checks.push("binding-integration");
+  for (const scenario of ["success", "missing-binding-check", "wrong-check-order", "verification-failure", "late-controls", "final-controls"]) {
+    const repository = createRepository(entries);
+    const beforeState = repository.files.get(".egeria/state.json");
+    const planned = await core.planCapabilityAddition({ reader: repository.reader, git, capability: "application-persistence", renderingContext });
+    assert.equal(planned.ok, true, JSON.stringify(planned));
+    let inspections = 0;
+    const result = await core.applyCapabilityAddition({
+      root, capability: "application-persistence", renderingContext, approvedPlanFingerprint: planned.value.planFingerprint,
+      reader: repository.reader, writer: repository.writer,
+      inspectWorktree: async () => { if (++inspections === 2 && scenario === "late-controls") repository.files.set(".egeria/state.json", beforeState + "\n"); return git; },
+      inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => { if (scenario === "final-controls") repository.files.set(".egeria/state.json", beforeState); return { ok: true }; },
+      verifier: { async verifyInIsolatedCopy() {
+        assert.equal(repository.files.get(".egeria/state.json"), beforeState);
+        assert.equal(repository.files.get(".egeria/migrations.jsonl"), "");
+        if (scenario === "verification-failure") return { ok: false };
+        return { ok: true, value: { checks: scenario === "missing-binding-check" ? checks.filter(check => check !== "binding-integration") : scenario === "wrong-check-order" ? [...checks].reverse() : checks } };
+      } },
+    });
+    if (scenario === "final-controls") {
+      assert.equal(result.ok, false);
+      assert.equal(result.code, "CAPABILITY_POST_STATE_FAILED");
+      assert.equal(repository.writes.length, 3);
+      continue;
+    }
+    if (scenario !== "success") {
+      assert.equal(result.ok, false, scenario);
+      assert.equal(repository.writes.length, scenario === "late-controls" ? 0 : 1);
+      assert.equal(repository.files.get(".egeria/state.json"), beforeState + (scenario === "late-controls" ? "\n" : ""));
+      assert.equal(repository.files.get(".egeria/migrations.jsonl"), "");
+      continue;
+    }
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const state = core.parseStateJson(repository.files.get(".egeria/state.json"), "2.0.0");
+    assert.equal(state.ok, true);
+    assert.deepEqual(state.value.appliedMigrations, ["add-application-persistence-0-2-0"]);
+    assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.8.0");
+    for (const identifier of ["contact-form-web3forms", "booking-calendly", "multilingual"]) assert.ok(state.value.installedCapabilities.some(capability => capability.identifier === identifier));
+    assert.deepEqual(repository.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
+  }
+});
+
 
 test("environment contact addition rejects stale approval before writes and retains controls on verifier failure", async () => {
   const renderingContext = core.createApplicationEnvironmentRenderingContext();

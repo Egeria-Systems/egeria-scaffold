@@ -20,12 +20,12 @@ export type CapabilityPackageVersions = Readonly<{
 }>;
 
 export type CapabilityCatalogSnapshot = Readonly<{
-  standards: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0";
+  standards: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0" | "0.8.0";
   siteRouting?: "0.3.0" | "0.4.0";
   appFoundation?: "0.1.0" | "0.2.0" | "0.3.0";
-  deploymentCloudflare?: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0";
+  deploymentCloudflare?: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0" | "0.8.0";
   backgroundJobDelivery?: "0.1.0" | "0.2.0";
-  applicationPersistence?: "0.1.0";
+  applicationPersistence?: "0.1.0" | "0.2.0";
   transactionalEmailResend?: "0.1.0";
 }>;
 
@@ -53,6 +53,13 @@ export const applicationEnvironmentCatalogSnapshot: CapabilityCatalogSnapshot = 
   siteRouting: "0.4.0",
   appFoundation: "0.3.0",
   deploymentCloudflare: "0.7.0",
+});
+
+export const applicationEnvironmentPersistenceCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
+  ...applicationEnvironmentCatalogSnapshot,
+  standards: "0.8.0",
+  deploymentCloudflare: "0.8.0",
+  applicationPersistence: "0.2.0",
 });
 
 export const applicationEnvironmentScripts = Object.freeze({
@@ -100,7 +107,7 @@ const currentCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = {
 function isSupportedStandardsSnapshotVersion(
   value: string,
 ): value is CapabilityCatalogSnapshot["standards"] {
-  return value === "0.3.0" || value === "0.4.0" || value === "0.5.0" || value === "0.6.0" || value === "0.7.0";
+  return value === "0.3.0" || value === "0.4.0" || value === "0.5.0" || value === "0.6.0" || value === "0.7.0" || value === "0.8.0";
 }
 
 function isSupportedSiteRoutingSnapshotVersion(
@@ -273,9 +280,9 @@ function createDescriptors(
   packageVersions: CapabilityPackageVersions,
   snapshot: CapabilityCatalogSnapshot,
 ): readonly CapabilityDescriptor[] {
-  const applicationEnvironments = snapshot.standards === "0.7.0";
+  const applicationEnvironments = snapshot.standards === "0.7.0" || snapshot.standards === "0.8.0";
   const siteRoutingVersion = snapshot.siteRouting ?? "0.3.0";
-  const persistence = snapshot.applicationPersistence === "0.1.0";
+  const persistence = snapshot.applicationPersistence !== undefined;
   const jobs = snapshot.backgroundJobDelivery !== undefined;
   const jobOperations = snapshot.backgroundJobDelivery === "0.2.0";
   const supportsApp = snapshot.appFoundation !== undefined;
@@ -1784,7 +1791,7 @@ function createDescriptors(
     },
     ...(persistence ? [{
       identifier: "application-persistence",
-      version: "0.1.0",
+      version: applicationEnvironments ? "0.2.0" : "0.1.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful", "persistent-data"],
       removalPolicy: "export-and-remove",
@@ -1813,9 +1820,15 @@ function createDescriptors(
         createFileEvidencePoint("persistence-test-index-migration", "application-persistence", "apps/web/tests/bindings/fixtures/migrations/0001_persistence_fixture_index.sql", "application-owned"),
         createFileEvidencePoint("persistence-migration-workflow", "application-persistence", ".github/workflows/migrate-application-database.yml", "managed"),
         createFileEvidencePoint("persistence-operator-guide", "application-persistence", "docs/application-persistence.md", "application-owned"),
+        ...(applicationEnvironments ? [
+          createFileEvidencePoint("persistence-environment-mapping", "application-persistence", "apps/web/src/configuration/application-database.ts", "managed"),
+          createFileEvidencePoint("persistence-environment-tests", "application-persistence", "apps/web/tests/unit/application-database-environment.test.ts", "application-owned"),
+        ] : []),
         ...Object.entries(applicationPersistenceScripts).map(([name, command]) => createPackageJsonValueEvidencePoint(`persistence-${name.replaceAll(":", "-")}-script`, "application-persistence", `/scripts/${name}`, command)),
       ]),
-      migrationPlanners: ["add-application-persistence-0-1-0", "remove-application-persistence-0-1-0"],
+      migrationPlanners: applicationEnvironments
+        ? ["add-application-persistence-0-2-0", "remove-application-persistence-0-2-0"]
+        : ["add-application-persistence-0-1-0", "remove-application-persistence-0-1-0"],
       verificationPlan: ["binding-runtime-tests", "migration-generation", "migration-replay", "database-environment-isolation", "export-and-removal-review", "typecheck", "next-build", "opennext-build"],
       documentationEvidenceRequirements: ["schema-and-migration-ownership", "environment-isolation-and-migration-authority", "backup-export-and-recovery-boundaries", "machine-and-human-removal-review"],
       removalAndRecoveryRequirements: ["review-exact-export-and-recovery-evidence", "review-required-uncertainty-dispositions", "preserve-application-owned-schema-and-migrations", "refuse-surviving-package-references", "separate-source-and-persistent-data-recovery"],
@@ -2022,13 +2035,14 @@ export function createCapabilityCatalogSnapshot(
     ? Reflect.get(snapshotValue, "applicationPersistence") as unknown : undefined;
   const jobsSnapshot = typeof snapshotValue === "object" && snapshotValue !== null
     ? Reflect.get(snapshotValue, "backgroundJobDelivery") as unknown : undefined;
-  const applicationEnvironments = standardsSnapshot === "0.7.0" || deploymentSnapshot === "0.7.0" || appFoundationSnapshot === "0.3.0";
+  const applicationEnvironments = standardsSnapshot === "0.7.0" || standardsSnapshot === "0.8.0" ||
+    deploymentSnapshot === "0.7.0" || deploymentSnapshot === "0.8.0" || appFoundationSnapshot === "0.3.0";
+  const environmentSnapshot = persistenceSnapshot === "0.2.0"
+    ? applicationEnvironmentPersistenceCatalogSnapshot : applicationEnvironmentCatalogSnapshot;
   const applicationEnvironmentTupleValid = applicationEnvironments &&
-    standardsSnapshot === "0.7.0" && siteRoutingSnapshot === "0.4.0" &&
-    appFoundationSnapshot === "0.3.0" && deploymentSnapshot === "0.7.0" &&
     snapshotValue !== null && typeof snapshotValue === "object" &&
-    Object.keys(snapshotValue).length === 4 &&
-    Object.keys(snapshotValue).every((key) => ["standards", "siteRouting", "appFoundation", "deploymentCloudflare"].includes(key));
+    Object.keys(snapshotValue).length === Object.keys(environmentSnapshot).length &&
+    Object.entries(environmentSnapshot).every(([key, value]) => Reflect.get(snapshotValue, key) === value);
   const supportedJobs = jobsSnapshot === "0.1.0" || jobsSnapshot === "0.2.0";
   const jobsTupleValid = jobsSnapshot === undefined || (supportedJobs && appFoundationSnapshot === "0.2.0" &&
     siteRoutingSnapshot === "0.4.0" && (standardsSnapshot === "0.5.0" || standardsSnapshot === "0.6.0"));
@@ -2051,7 +2065,7 @@ export function createCapabilityCatalogSnapshot(
         ? siteRoutingSnapshot
         : undefined;
   const supportedSnapshot = applicationEnvironments
-    ? (applicationEnvironmentTupleValid ? applicationEnvironmentCatalogSnapshot : undefined)
+    ? (applicationEnvironmentTupleValid ? environmentSnapshot : undefined)
     : typeof standardsSnapshot === "string" &&
     isSupportedStandardsSnapshotVersion(standardsSnapshot) &&
     resolvedSiteRoutingSnapshot !== undefined && persistenceTupleValid && jobsTupleValid &&
@@ -2092,7 +2106,7 @@ export function createCapabilityCatalogSnapshot(
   if (
     typeof standardsSnapshot !== "string" ||
     !isSupportedStandardsSnapshotVersion(standardsSnapshot) ||
-    (standardsSnapshot === "0.7.0" && !applicationEnvironmentTupleValid)
+    ((standardsSnapshot === "0.7.0" || standardsSnapshot === "0.8.0") && !applicationEnvironmentTupleValid)
   ) {
     versionIssues.push({
       code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID",
@@ -2123,7 +2137,7 @@ export function createCapabilityCatalogSnapshot(
     });
   }
 
-  if (deploymentSnapshot === "0.7.0" && !applicationEnvironmentTupleValid) {
+  if ((deploymentSnapshot === "0.7.0" || deploymentSnapshot === "0.8.0") && !applicationEnvironmentTupleValid) {
     versionIssues.push({ code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID", path: ["snapshot", "deploymentCloudflare"], context: { reason: "unsupported-version" } });
   }
 
@@ -2135,7 +2149,7 @@ export function createCapabilityCatalogSnapshot(
   const catalogIssues: ContractIssue[] = [];
 
   const descriptors = createDescriptors(packageVersions, supportedSnapshot).filter((descriptor) =>
-    !applicationEnvironments || !["application-persistence", "transactional-email-resend", "background-job-delivery"].includes(descriptor.identifier),
+    !applicationEnvironments || !["transactional-email-resend", "background-job-delivery"].includes(descriptor.identifier),
   );
   for (const [index, descriptor] of descriptors.entries()) {
     const parsed = capabilityDescriptorSchema.safeParse(descriptor);
