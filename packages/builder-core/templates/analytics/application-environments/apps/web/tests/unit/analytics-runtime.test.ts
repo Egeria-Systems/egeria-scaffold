@@ -887,6 +887,140 @@ describe("analytics consent runtime", () => {
     },
   );
 
+  it.each([
+    {
+      label: "complete withdrawal",
+      previous: ["audience-measurement"],
+      event: ["audience-measurement", "aggregate-traffic-and-performance"],
+      stored: [],
+      synchronized: [],
+      removed: ["audience-measurement"],
+      remainingScripts: [],
+      reloadedScripts: [],
+    },
+    {
+      label: "partial withdrawal retaining Clarity",
+      previous: ["audience-measurement", "consented-experience-analysis"],
+      event: ["audience-measurement", "aggregate-traffic-and-performance", "consented-experience-analysis"],
+      stored: ["consented-experience-analysis"],
+      synchronized: ["consented-experience-analysis"],
+      removed: ["audience-measurement"],
+      remainingScripts: ["analytics-microsoft-clarity"],
+      reloadedScripts: ["analytics-microsoft-clarity"],
+    },
+    {
+      label: "a newer independent Cloudflare grant",
+      previous: ["audience-measurement"],
+      event: ["audience-measurement", "aggregate-traffic-and-performance"],
+      stored: ["aggregate-traffic-and-performance"],
+      synchronized: [],
+      removed: ["audience-measurement"],
+      remainingScripts: [],
+      reloadedScripts: ["analytics-cloudflare-web-analytics"],
+    },
+    {
+      label: "combined event and stored reductions",
+      previous: ["audience-measurement", "consented-experience-analysis"],
+      event: ["audience-measurement", "aggregate-traffic-and-performance"],
+      stored: [],
+      synchronized: [],
+      removed: ["audience-measurement", "consented-experience-analysis"],
+      remainingScripts: [],
+      reloadedScripts: [],
+    },
+  ] as const)("applies the current stored denial before another event for $label", (scenario) => {
+    const context = createAnalyticsConsentContext(analyticsSettings);
+    const initialSource = JSON.stringify(storedRecord(analyticsSettings, scenario.previous));
+    const eventSource = JSON.stringify(storedRecord(analyticsSettings, scenario.event));
+    const currentSource = JSON.stringify(storedRecord(analyticsSettings, scenario.stored));
+    for (const source of [initialSource, eventSource, currentSource]) {
+      expect(parseAnalyticsConsentRecord(source, context, collectionContext(context), now).status).toBe("valid");
+    }
+    const browser = createTestBrowser({ [analyticsConsentStorageKey]: initialSource });
+    let verified = browserAnalyticsConsentRuntime.initialize(analyticsSettings).decisions;
+    expect(browser.scripts.map(({ id }) => id)).toContain("analytics-google-analytics-4");
+    browser.effects.length = 0;
+    browser.dataLayer.entries.length = 0;
+    browser.clarity.mockClear();
+    const synchronized = vi.fn((decisions: readonly AnalyticsPurposeDecision[]) => {
+      verified = decisions;
+      browser.effects.push("synchronized");
+    });
+    browserAnalyticsConsentRuntime.subscribe(analyticsSettings, () => verified, synchronized);
+    browser.storedValues.set(analyticsConsentStorageKey, currentSource);
+
+    // Assert the first queued expansion alone; a later denial must not hide missing effects.
+    browser.dispatchStorage(eventSource);
+
+    expect(synchronized).toHaveBeenCalledExactlyOnceWith(purposeDecisions(analyticsSettings, scenario.synchronized));
+    expect(verified).toEqual(purposeDecisions(analyticsSettings, scenario.synchronized));
+    expect(browser.scripts.map(({ id }) => id)).toEqual(scenario.remainingScripts);
+    expect(browser.effects.some(effect => effect.startsWith("append:"))).toBe(false);
+    expect(browser.dataLayer.entries).toEqual([
+      ["consent", "update", expect.objectContaining({ analytics_storage: "denied" })],
+    ]);
+    expect(browser.cookieWrites).toContain("egeria_nonproduction_ga=; Max-Age=0; Path=/; SameSite=Lax");
+    expect(browser.cookieWrites).toContain("egeria_nonproduction_ga_TEST123456=; Max-Age=0; Path=/; SameSite=Lax");
+    expect(browser.cookieWrites.some(value => /^(?:_ga|egeria_production_ga|egeria_nonproduction_ga_OTHER123|session)=/u.test(value))).toBe(false);
+    if (scenario.removed.some(purpose => purpose === "consented-experience-analysis")) {
+      expect(browser.clarity).toHaveBeenCalledWith("consent", false);
+      expect(effectIndex(browser.effects, "clarity:consent:false")).toBeLessThan(effectIndex(browser.effects, "reload"));
+    } else {
+      expect(browser.clarity).not.toHaveBeenCalled();
+      expect(browser.cookieWrites.some(value => value.startsWith("_cl"))).toBe(false);
+    }
+    expect(effectIndex(browser.effects, "synchronized")).toBeLessThan(effectIndex(browser.effects, "google:consent:update"));
+    expect(effectIndex(browser.effects, "google:consent:update")).toBeLessThan(effectIndex(browser.effects, "reload"));
+    expect(effectIndex(browser.effects, "remove-script:analytics-google-analytics-4")).toBeLessThan(effectIndex(browser.effects, "reload"));
+    expect(effectIndex(browser.effects, "cookie:egeria_nonproduction_ga=")).toBeLessThan(effectIndex(browser.effects, "reload"));
+    expect(browser.reload).toHaveBeenCalledOnce();
+    expect(browser.localStorage.setItem).not.toHaveBeenCalled();
+    expect(browser.localStorage.removeItem).not.toHaveBeenCalled();
+    expect(browser.storedValues.get(analyticsConsentStorageKey)).toBe(currentSource);
+
+    const reloaded = createTestBrowser({ [analyticsConsentStorageKey]: currentSource });
+    expect(browserAnalyticsConsentRuntime.initialize(analyticsSettings).decisions).toEqual(purposeDecisions(analyticsSettings, scenario.stored));
+    expect(reloaded.scripts.map(({ id }) => id)).toEqual(scenario.reloadedScripts);
+  });
+
+  it.each(["unreadable", "malformed", "context-invalid", "absent", "different-grant"] as const)(
+    "preserves the active grant without authorizing an expansion when current storage is %s",
+    (storedState) => {
+      const initialSource = JSON.stringify(storedRecord(analyticsSettings, ["audience-measurement"]));
+      const browser = createTestBrowser({ [analyticsConsentStorageKey]: initialSource });
+      const previous = browserAnalyticsConsentRuntime.initialize(analyticsSettings).decisions;
+      const source = JSON.stringify(storedRecord(analyticsSettings, ["audience-measurement", "aggregate-traffic-and-performance"]));
+      if (storedState === "unreadable") {
+        browser.localStorage.getItem.mockImplementation(() => { throw new Error("read unavailable"); });
+      } else if (storedState === "malformed") {
+        browser.storedValues.set(analyticsConsentStorageKey, "{");
+      } else if (storedState === "absent") {
+        browser.storedValues.delete(analyticsConsentStorageKey);
+      } else if (storedState === "context-invalid") {
+        const record = storedRecord(analyticsSettings, []);
+        browser.storedValues.set(analyticsConsentStorageKey, JSON.stringify({
+          ...record, collectionContext: { ...record.collectionContext, applicationEnvironment: "production" },
+        }));
+      } else {
+        browser.storedValues.set(analyticsConsentStorageKey, JSON.stringify(storedRecord(analyticsSettings, [
+          "audience-measurement", "aggregate-traffic-and-performance", "consented-experience-analysis",
+        ])));
+      }
+      browser.effects.length = 0;
+      const synchronized = vi.fn();
+      browserAnalyticsConsentRuntime.subscribe(analyticsSettings, () => previous, synchronized);
+
+      browser.dispatchStorage(source);
+
+      expect(browser.scripts.map(({ id }) => id)).toEqual(["analytics-google-analytics-4"]);
+      expect(browser.effects.filter(effect => !effect.startsWith("storage:get:"))).toEqual([]);
+      expect(synchronized).not.toHaveBeenCalled();
+      expect(browser.reload).not.toHaveBeenCalled();
+      expect(browser.localStorage.setItem).not.toHaveBeenCalled();
+      expect(browser.localStorage.removeItem).not.toHaveBeenCalled();
+    },
+  );
+
   it.each(["superseded", "unreadable"] as const)(
     "applies mixed-event reductions without synchronizing an addition when storage is %s",
     (storedState) => {
