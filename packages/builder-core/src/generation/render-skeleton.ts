@@ -84,7 +84,7 @@ export type SkeletonRenderingContext = Readonly<{
   profiles: readonly ProfileRecipe[];
 }>;
 
-export type ApplicationEnvironmentRenderingContext = SkeletonRenderingContext & Readonly<{ projectSchemaVersion: "2.0.0" }>;
+export type ApplicationEnvironmentRenderingContext = SkeletonRenderingContext & Readonly<{ projectSchemaVersion: "2.0.0"; retainAppFoundation?: true }>;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -473,7 +473,7 @@ export async function renderSkeleton(
   if (applicationEnvironments && Object.hasOwn(request, "contactFormWeb3Forms") && request.contactFormWeb3Forms !== true) {
     return generatedIssue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "contactFormWeb3Forms"], "invalid-selection");
   }
-  if (applicationEnvironments && (request.transactionalEmailResend === true || request.backgroundJobDelivery === true)) {
+  if (applicationEnvironments && request.backgroundJobDelivery === true) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
   }
   if (applicationEnvironments && (request.applicationPersistence === true) !== (context.catalogSnapshot.applicationPersistence === "0.2.0")) {
@@ -484,7 +484,7 @@ export async function renderSkeleton(
     observability: request.packageVersions.observability,
   };
   const renderingContext = context ?? createGenerationRenderingContext(request.applicationPersistence === true, request.transactionalEmailResend === true, request.backgroundJobDelivery === true);
-  const retainedFoundation = renderingContext.catalogSnapshot.appFoundation === "0.2.0";
+  const retainedFoundation = renderingContext.catalogSnapshot.appFoundation === "0.2.0" || (applicationEnvironments && context.retainAppFoundation === true);
   const catalogResult = createCapabilityCatalogSnapshot(packageVersions, renderingContext.catalogSnapshot);
   if (!catalogResult.ok) {
     return catalogResult;
@@ -589,7 +589,7 @@ export async function renderSkeleton(
     ].join("\n");
     files.push(
       { path: "apps/web/.env.example", content: encoder.encode(`APPLICATION_ENVIRONMENT=development\nNEXT_PUBLIC_SITE_URL=http://localhost:3000\n${request.contactFormWeb3Forms === true ? "NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=\n" : ""}${request.bookingCalendly === undefined ? "" : "NEXT_PUBLIC_CALENDLY_URL=\n"}${analyticsExample}`) },
-      { path: "apps/web/.dev.vars.example", content: encoder.encode("APPLICATION_ENVIRONMENT=development\nBETTER_STACK_INGESTING_HOST=\nBETTER_STACK_SOURCE_TOKEN=\n") },
+      { path: "apps/web/.dev.vars.example", content: encoder.encode("APPLICATION_ENVIRONMENT=development\nBETTER_STACK_INGESTING_HOST=\nBETTER_STACK_SOURCE_TOKEN=\n" + (request.transactionalEmailResend === true ? "RESEND_API_KEY=\nTRANSACTIONAL_EMAIL_FROM=\nTRANSACTIONAL_EMAIL_DOMAIN=\nTRANSACTIONAL_EMAIL_ALLOWED_RECIPIENTS=\n" : "")) },
     );
   }
   const manifestResult = enrichApplicationManifest(

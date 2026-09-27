@@ -7495,7 +7495,7 @@ test("application environment compiled CLI refuses inputs before dependencies an
       assert.equal(result.exitCode, 2, JSON.stringify(result));
       assert.equal(JSON.parse(result.stderr).code, "CLI_ARGUMENT_INVALID");
     }
-    for (const suffix of [["--application-persistence"], ["--transactional-email-resend"], ["--background-job-delivery"]]) {
+    for (const suffix of [["--application-persistence"], ["--background-job-delivery"]]) {
       const result = await runEnvironmentCliProcess([...base, ...suffix], true);
       assert.equal(result.exitCode, 1, JSON.stringify(result));
       assert.equal(JSON.parse(result.stderr).issues[0].code, suffix[0] === "--application-persistence" ? "CAPABILITY_UNSUPPORTED" : "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
@@ -7599,7 +7599,7 @@ test("environment contact CLI admits selection-only lifecycle and forwards exact
       assert.equal(refused.exitCode, 2, JSON.stringify(refused));
       assert.deepEqual(JSON.parse(refused.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
     }
-    for (const capability of ["multilingual", "transactional-email-resend", "background-job-delivery"]) {
+    for (const capability of ["multilingual", "background-job-delivery"]) {
       const refused = await runEnvironmentCliProcess(arguments_.map(value => value === "contact-form-web3forms" ? capability : value), true);
       assert.equal(refused.exitCode, 2, JSON.stringify(refused));
     }
@@ -7897,4 +7897,41 @@ test("environment persistence CLI admits exact lifecycle and forwards removal re
       }
     }
   } finally { await rm(owner, { recursive: true, force: false }); }
+});
+
+
+test("environment email CLI preserves exact selection without literal runtime configuration", async () => {
+  const directory = "/private/generated-worktree";
+  const approvedPlanFingerprint = `sha256:${"a".repeat(64)}`;
+  const create = cliArguments.parseCliArguments([...environmentCreateArguments, "--transactional-email-resend"], "2.0.0");
+  assert.equal(create.ok, true, JSON.stringify(create));
+  assert.equal(create.value.transactionalEmailResend, true);
+  assert.equal(create.value.applicationPersistence, undefined);
+  for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
+    const arguments_ = [kind, "--directory", directory, "--capability", "transactional-email-resend", ...(kind.startsWith("apply") ? ["--approved-plan", approvedPlanFingerprint] : [])];
+    const parsed = cliArguments.parseCliArguments(arguments_, "2.0.0");
+    assert.equal(parsed.ok, true, JSON.stringify(parsed));
+    assert.equal(parsed.value.capability, "transactional-email-resend");
+    assert.equal(parsed.value.settings, undefined);
+    for (const suffix of [["--resend-api-key", "private-sentinel"], ["--allowed-recipients", "private-sentinel"], ["--transactional-email-resend"], ["--capability", "transactional-email-resend"], ["--persistence-removal", "/private/sentinel"]]) {
+      const refused = await runEnvironmentCliProcess([...arguments_, ...suffix], true);
+      assert.equal(refused.exitCode, 2, JSON.stringify(refused));
+      assert.deepEqual(JSON.parse(refused.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
+    }
+    if (kind.startsWith("apply")) {
+      const observed = [];
+      const output = captureOutput();
+      const run = cli.createCliRunner({ createVerifier: createFakeVerifier,
+        [kind === "apply-add" ? "applyCapabilityAddition" : "applyCapabilityRemoval"]: async input => {
+          observed.push(input);
+          return { ok: false, code: "CAPABILITY_PLAN_APPROVAL_INVALID", phase: "precondition", recovery: "not-required" };
+        },
+      }, "2.0.0");
+      assert.equal(await run(arguments_, output.output), 1);
+      assert.equal(observed.length, 1);
+      assert.equal(observed[0].capability, "transactional-email-resend");
+      assert.deepEqual(observed[0].renderingContext, core.createApplicationEnvironmentRenderingContext());
+      assert.equal(observed[0].settings, undefined);
+    }
+  }
 });

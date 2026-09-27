@@ -6078,7 +6078,7 @@ test("Vitest five generation materializes each exact recipe without changing the
 
 const applicationEnvironmentContext = {
   projectSchemaVersion: "2.0.0",
-  catalogSnapshot: { standards: "0.7.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0" },
+  catalogSnapshot: { standards: "0.7.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0", transactionalEmailResend: "0.2.0" },
   profiles: [
     { identifier: "portfolio", schemaVersion: "1.0.0", recipeVersion: "0.12.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability"] },
     { identifier: "site", schemaVersion: "1.0.0", recipeVersion: "0.13.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "site-routing"] },
@@ -6174,7 +6174,7 @@ test("application environment generated preflight rejects unsafe targets without
 });
 
 test("application environment rendering refuses incomplete selections and mixed contexts", async () => {
-  for (const selection of [{ transactionalEmailResend: true }, { backgroundJobDelivery: true }]) {
+  for (const selection of [{ backgroundJobDelivery: true }]) {
     const result = await renderApplicationEnvironment("app", selection);
     assert.equal(result.ok, false);
     assert.equal(result.issues[0].code, "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");

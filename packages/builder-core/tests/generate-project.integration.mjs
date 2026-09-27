@@ -890,3 +890,212 @@ process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => pr
   for (const operation of ["infer", "doctor"]) assert.equal((await cli(`final-${operation}`, [operation, "--directory", linked])).ok, true);
   await writeFile(join(owner, "verification-evidence.json"), JSON.stringify({ initial: initialState.lastSuccessfulVerification, removed: removedState.lastSuccessfulVerification, restored: finalState.lastSuccessfulVerification, localSyntheticOnly: true, providerAccess: false }, null, 2));
 });
+
+test("environment email generation and lifecycle preserve recipient isolation", { timeout: 90 * 60 * 1000 }, async context => {
+  const owner = await realpath(await mkdtemp(join(tmpdir(), "egeria-environment-email-")));
+  context.diagnostic(`Retained local email evidence: ${owner}`);
+  const cliUrl = new URL("../../../apps/cli/dist/run-cli.js", import.meta.url).href;
+  const coreUrl = new URL("../dist/index.js", import.meta.url).href;
+  const commands = [];
+  const receipts = [];
+  const supportRoot = join(owner, "support");
+  await mkdir(supportRoot);
+  const support = await prepareLiveSupport(supportRoot);
+  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+  const digest = bytes => createHash("sha256").update(bytes).digest("hex");
+  async function command(label, executable, arguments_, cwd = owner, additions = {}) {
+    try {
+      const result = await execFileAsync(executable, arguments_, { cwd, encoding: "utf8", maxBuffer: 5 * 1024 * 1024, timeout: 20 * 60 * 1000, env: { ...environment, ...additions } });
+      await writeFile(join(owner, `${label}.log`), result.stdout + result.stderr);
+      commands.push({ label, executable, arguments: arguments_, exitCode: 0 });
+      return result.stdout;
+    } catch (error) {
+      await writeFile(join(owner, `${label}.log`), (error.stdout ?? "") + (error.stderr ?? ""));
+      commands.push({ label, executable, arguments: arguments_, exitCode: error.code });
+      throw error;
+    } finally { await writeFile(join(owner, "commands.json"), JSON.stringify(commands, null, 2)); }
+  }
+  async function cli(label, arguments_) {
+    const source = `import { createCliRunner } from ${JSON.stringify(cliUrl)};
+import { createPnpmGeneratedProjectVerifier } from ${JSON.stringify(coreUrl)};
+const run = createCliRunner({ createVerifier: () => createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }) }, "2.0.0");
+process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => process.stdout.write(value), writeError: value => process.stderr.write(value) });`;
+    return JSON.parse(await command(label, process.execPath, ["--input-type=module", "-e", source]));
+  }
+  async function record(label, root, email, persistence) {
+    const state = JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8"));
+    const versions = Object.fromEntries(state.installedCapabilities.map(({ identifier, version }) => [identifier, version]));
+    assert.equal(versions["transactional-email-resend"], email ? "0.2.0" : undefined);
+    assert.equal(versions["application-persistence"], persistence ? "0.2.0" : undefined);
+    if (email || label.includes("remove")) assert.equal(versions["app-foundation"], "0.3.0");
+    assert.equal(versions["site-routing"], state.origin.profile === "portfolio" ? undefined : "0.4.0");
+    for (const operation of ["infer", "doctor"]) assert.equal((await cli(`${label}-${operation}`, [operation, "--directory", root])).ok, true);
+    receipts.push({ label, root, versions, verification: state.lastSuccessfulVerification,
+      projectSha256: digest(await readFile(join(root, ".egeria/project.yaml"))), lockSha256: digest(await readFile(join(root, "pnpm-lock.yaml"))) });
+    await writeFile(join(owner, "verification-evidence.json"), JSON.stringify({ receipts, localSyntheticOnly: true, liveProviderAccess: false }, null, 2));
+  }
+  async function commitFixture(label, root) {
+    await command(`${label}-add-files`, "git", ["add", "-A"], root);
+    await command(`${label}-commit`, "git", ["commit", "-m", label], root);
+  }
+  const projects = new Map();
+  for (const profile of ["portfolio", "site", "app"]) {
+    const primary = join(owner, `${profile}-primary`);
+    const selected = profile === "portfolio" ? [] : ["--transactional-email-resend"];
+    const neighbors = profile === "app" ? ["--application-persistence", "--contact-form-web3forms", "--booking-calendly", "--calendly-mode", "link", "--google-analytics-4"] : [];
+    const created = await cli(`${profile}-create`, ["create", "--profile", profile, "--name", "email-example", "--display-name", "Email Example", "--directory", primary, ...selected, ...neighbors]);
+    assert.equal(created.ok, true);
+    await record(`${profile}-create`, primary, profile !== "portfolio", profile === "app");
+    if (profile === "site") { projects.set(profile, primary); continue; }
+    await command(`${profile}-init`, "git", ["init", "--initial-branch=main", primary]);
+    await command(`${profile}-name`, "git", ["config", "user.name", "Email Integration Test"], primary);
+    await command(`${profile}-identity`, "git", ["config", "user.email", "email-test@example.test"], primary);
+    await commitFixture(`${profile}-generated`, primary);
+    const primaryProject = await readFile(join(primary, ".egeria/project.yaml"));
+    const primaryLock = await readFile(join(primary, "pnpm-lock.yaml"));
+    const linked = join(owner, `${profile}-linked`);
+    await command(`${profile}-worktree`, "git", ["worktree", "add", "-b", `${profile}-email-lifecycle-test`, linked], primary);
+    const neighborPaths = profile === "app" ? ["apps/web/src/configuration/application-database.ts", "apps/web/src/integrations/contact-form-web3forms/contact-settings.ts", "apps/web/src/integrations/booking-calendly/booking-settings.ts", "apps/web/src/integrations/analytics/analytics-configuration.ts"] : [];
+    const neighborBytes = new Map(await Promise.all(neighborPaths.map(async path => [path, await readFile(join(linked, path))])));
+    for (const [index, operation] of (profile === "portfolio" ? ["add", "remove", "add"] : ["remove", "add"]).entries()) {
+      const label = `${profile}-${index}-${operation}`;
+      const arguments_ = ["--directory", linked, "--capability", "transactional-email-resend"];
+      const envelope = await cli(`${label}-plan`, [`plan-${operation}`, ...arguments_]);
+      const plan = operation === "add" ? envelope.result : envelope.plan;
+      assert.equal(plan.capability.version, "0.2.0");
+      const executed = await cli(`${label}-apply`, [`apply-${operation}`, ...arguments_, "--approved-plan", plan.planFingerprint]);
+      assert.equal(executed.ok, true);
+      assert.equal(executed.result.status, "verified-final-diff-approval-required");
+      await record(label, linked, operation === "add", profile === "app");
+      for (const [path, bytes] of neighborBytes) assert.deepEqual(await readFile(join(linked, path)), bytes);
+      if (profile === "app") assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), primaryLock);
+      await commitFixture(label, linked);
+    }
+    assert.deepEqual(await readFile(join(primary, ".egeria/project.yaml")), primaryProject);
+    assert.deepEqual(await readFile(join(primary, "pnpm-lock.yaml")), primaryLock);
+    projects.set(profile, linked);
+  }
+
+  const workerProject = join(owner, "intercepted-worker");
+  await cp(projects.get("portfolio"), workerProject, { recursive: true, filter: source => ![".git", "node_modules", ".next", ".open-next", ".wrangler"].includes(source.split("/").at(-1)) });
+  const app = join(workerProject, "apps/web");
+  await mkdir(join(app, "app/email-proof"));
+  await writeFile(join(app, "app/email-proof/route.ts"), `import { Cause, Effect, Exit } from "effect";
+import { TransactionalEmailSender } from "@/src/application/transactional-email-sender";
+import { serverTransactionalEmailLayer } from "@/src/composition/server-transactional-email";
+export const dynamic = "force-dynamic";
+export async function POST(request: Request) {
+  let attemptedCalls = 0;
+  const previous = globalThis.fetch;
+  globalThis.fetch = async input => {
+    if (input !== "https://api.resend.com/emails") throw new Error("Unexpected transport");
+    attemptedCalls += 1;
+    return Response.json({ id: "synthetic-acceptance" });
+  };
+  try {
+    const recipient = new URL(request.url).searchParams.has("unauthorized") ? "different@example.test" : "allowed@example.test";
+    const program = Effect.gen(function* () {
+      const sender = yield* TransactionalEmailSender;
+      return yield* sender.send({ to: recipient, subject: "Synthetic example", text: "Synthetic message", idempotencyKey: "worker-example-001" });
+    }).pipe(Effect.provide(serverTransactionalEmailLayer));
+    const result = await Effect.runPromiseExit(program);
+    const reason = Exit.isFailure(result) ? result.cause.reasons.find(Cause.isFailReason) : undefined;
+    return Response.json({ outcome: Exit.isSuccess(result) ? "accepted" : reason?.error.code ?? "unexpected-failure", attemptedCalls });
+  } finally { globalThis.fetch = previous; }
+}
+`);
+  const harnessPath = join(app, "email-proof.mjs");
+  await writeFile(harnessPath, `import assert from "node:assert/strict";
+import { readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { createTestHarness } from "wrangler";
+const target = process.env.APPLICATION_ENVIRONMENT;
+const generated = JSON.parse(await readFile("wrangler.jsonc", "utf8"));
+const base = { ...generated, main: resolve(".open-next/worker.js"), assets: { ...generated.assets, directory: resolve(".open-next/assets") } };
+delete base.env; delete base.$schema;
+const valid = { ...base.vars, APPLICATION_ENVIRONMENT: target, RESEND_API_KEY: "re_controlled_test_credential", TRANSACTIONAL_EMAIL_FROM: "sender@example.test", TRANSACTIONAL_EMAIL_DOMAIN: "example.test", ...(target === "production" ? {} : { TRANSACTIONAL_EMAIL_ALLOWED_RECIPIENTS: "allowed@example.test,second@example.test" }) };
+const cases = [
+  { name: "matching", values: valid, outcome: "accepted", calls: 1 },
+  { name: "missing-target", values: { ...valid, APPLICATION_ENVIRONMENT: undefined }, outcome: "transactional-email-configuration", calls: 0 },
+  { name: "invalid-target", values: { ...valid, APPLICATION_ENVIRONMENT: "invalid" }, outcome: "transactional-email-configuration", calls: 0 },
+  { name: "opposite-target", values: { ...valid, APPLICATION_ENVIRONMENT: target === "production" ? "staging" : "production" }, outcome: "transactional-email-configuration", calls: 0 },
+  { name: "invalid-key", values: { ...valid, RESEND_API_KEY: "invalid" }, outcome: "transactional-email-configuration", calls: 0 },
+  { name: "invalid-sender", values: { ...valid, TRANSACTIONAL_EMAIL_FROM: "invalid" }, outcome: "transactional-email-configuration", calls: 0 },
+  ...(target === "production" ? [{ name: "ignored-list", values: { ...valid, TRANSACTIONAL_EMAIL_ALLOWED_RECIPIENTS: "invalid" }, outcome: "accepted", calls: 1 }] : [
+    { name: "missing-list", values: { ...valid, TRANSACTIONAL_EMAIL_ALLOWED_RECIPIENTS: undefined }, outcome: "transactional-email-configuration", calls: 0 },
+    { name: "malformed-list", values: { ...valid, TRANSACTIONAL_EMAIL_ALLOWED_RECIPIENTS: "allowed@example.test," }, outcome: "transactional-email-configuration", calls: 0 },
+    { name: "unauthorized", values: valid, query: "?unauthorized", outcome: "transactional-email-authorization", calls: 0 },
+  ]),
+  { name: "restored", values: valid, outcome: "accepted", calls: 1 },
+];
+const outcomes = [];
+for (const scenario of cases) {
+  const configPath = resolve("email-proof.wrangler.json");
+  await writeFile(configPath, JSON.stringify({ ...base, vars: scenario.values }));
+  const server = createTestHarness({ workers: [{ configPath }] });
+  try {
+    await server.listen();
+    const response = await server.fetch("/email-proof" + (scenario.query ?? ""), { method: "POST" });
+    assert.equal(response.status, 200, scenario.name);
+    const result = await response.json();
+    assert.deepEqual(result, { outcome: scenario.outcome, attemptedCalls: scenario.calls }, scenario.name);
+    outcomes.push({ name: scenario.name, ...result });
+  } finally { await server.close(); }
+}
+await writeFile(process.argv[2], JSON.stringify({ target, outcomes }, null, 2));
+`);
+  await command("worker-install", "pnpm", ["install", "--frozen-lockfile", "--store-dir", support.store], workerProject);
+  await command("worker-consumer-typecheck", "pnpm", ["--dir", "apps/web", "run", "typecheck"], workerProject);
+  async function hashTree(root) {
+    const paths = (await readdir(root, { recursive: true, withFileTypes: true })).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name)).sort();
+    const hash = createHash("sha256");
+    for (const path of paths) hash.update(path.slice(root.length)).update(await readFile(path));
+    return { sha256: hash.digest("hex"), files: paths.length };
+  }
+  const sourceBefore = await hashTree(join(app, "src"));
+  const consumerBefore = await readFile(join(app, "app/email-proof/route.ts"));
+  const artifactEvidence = [];
+  for (const target of ["development", "staging", "production"]) {
+    await command(`${target}-build`, "pnpm", ["--dir", "apps/web", "run", "build:cloudflare"], workerProject, { APPLICATION_ENVIRONMENT: target });
+    const artifact = { target, worker: await hashTree(join(app, ".open-next")), source: sourceBefore, consumerSha256: digest(consumerBefore) };
+    await command(`${target}-challenges`, process.execPath, [harnessPath, join(owner, `${target}-outcomes.json`)], app, { APPLICATION_ENVIRONMENT: target });
+    assert.deepEqual(await hashTree(join(app, ".open-next")), artifact.worker);
+    assert.deepEqual(await hashTree(join(app, "src")), sourceBefore);
+    assert.deepEqual(await readFile(join(app, "app/email-proof/route.ts")), consumerBefore);
+    artifactEvidence.push(artifact);
+    await writeFile(join(owner, "worker-artifacts.json"), JSON.stringify(artifactEvidence, null, 2));
+  }
+
+  // These temporary consumers use existing jobs contracts without candidate admission or a product job flow.
+  const jobsRoot = new URL("../templates/background-job-delivery/apps/web/", import.meta.url);
+  for (const path of ["src/application/job-delivery.ts", "src/application/job-handlers.ts", "src/composition/server-jobs.ts", "src/infrastructure/cloudflare/job-delivery.ts", "src/infrastructure/memory/job-delivery.ts", "tests/unit/job-delivery.test.ts"]) {
+    await mkdir(join(app, path, ".."), { recursive: true });
+    await writeFile(join(app, path), await readFile(new URL(path, jobsRoot)));
+  }
+  await writeFile(join(app, "tests/unit/independent-email-jobs.test.ts"), `import { Effect, Exit } from "effect";
+import { expect, it, vi } from "vitest";
+import { JobDispatcher, type JobEnvelope } from "@/src/application/job-delivery";
+import { createCloudflareJobDispatcherLayer } from "@/src/infrastructure/cloudflare/job-delivery";
+it("optional absence and invalid independent queue configuration cause no external work", async () => {
+  const request = vi.fn<typeof fetch>();
+  vi.stubGlobal("fetch", request);
+  try {
+    expect(await Effect.runPromise(Effect.succeed("email-absent"))).toBe("email-absent");
+    for (const target of ["local", "staging", "production"] as const) {
+      for (const invalid of ["environment", "binding", "envelope"] as const) {
+        const send = vi.fn();
+        const configuration = { JOB_ENVIRONMENT: invalid === "environment" ? undefined : target, JOB_QUEUE_NAME: "jobs-" + target, JOB_DEAD_LETTER_QUEUE_NAME: "jobs-" + target + "-dead", JOB_QUEUE: invalid === "binding" ? undefined : { send }, JOB_DEAD_LETTER_QUEUE: { send } };
+        const layer = createCloudflareJobDispatcherLayer({ configuration: Effect.succeed(configuration), handlers: [{ type: "synthetic", version: 1, repeatSafety: "monotonic", validate: () => true, handle: () => Effect.void }] });
+        const envelope: JobEnvelope = { version: 1, environment: invalid === "envelope" ? target === "production" ? "local" : "production" : target, operationId: "00000000-0000-4000-8000-000000000001", jobType: "synthetic", jobVersion: 1, payload: {} };
+        const result = await Effect.runPromiseExit(Effect.flatMap(JobDispatcher, dispatcher => dispatcher.dispatch(envelope)).pipe(Effect.provide(layer)));
+        expect(Exit.isFailure(result)).toBe(true);
+        expect(send).not.toHaveBeenCalled();
+      }
+    }
+    expect(request).not.toHaveBeenCalled();
+  } finally { vi.unstubAllGlobals(); }
+});
+`);
+  await command("independent-consumers", "pnpm", ["--dir", "apps/web", "run", "test:unit", "job-delivery.test.ts", "independent-email-jobs.test.ts"], workerProject);
+  context.diagnostic(JSON.stringify({ owner, generationReceipts: receipts.length, builtTargets: artifactEvidence.length, transport: "intercepted-only", persistenceBindingChecks: "app generation and lifecycle receipts", jobsCandidateAdmitted: false }));
+});

@@ -811,7 +811,7 @@ test("environment contact addition refuses settings, forged context and other li
   for (const override of [
     { settings: {} }, { settings: { accessKey: "00000000-0000-4000-8000-000000000001" } },
     { renderingContext: { ...renderingContext, projectSchemaVersion: "1.0.0" } },
-    ...["analytics", "booking-calendly", "multilingual", "transactional-email-resend", "background-job-delivery"].map(capability => ({ capability })),
+    ...["analytics", "booking-calendly", "multilingual", "background-job-delivery"].map(capability => ({ capability })),
   ]) {
     const result = await core.planCapabilityAddition({ reader, git, capability: "contact-form-web3forms", renderingContext, ...override });
     assertFailure(result, "CAPABILITY_ADDITION_UNSUPPORTED");

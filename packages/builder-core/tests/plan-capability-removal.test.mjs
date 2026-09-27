@@ -1646,7 +1646,7 @@ test("environment contact removal refuses forged contexts and unsupported operat
   let reads = 0;
   const reader = { async readText() { reads += 1; return { kind: "missing" }; } };
   const renderingContext = core.createApplicationEnvironmentRenderingContext();
-  for (const override of [{ renderingContext: {} }, { capability: "multilingual" }, { capability: "transactional-email-resend" }]) {
+  for (const override of [{ renderingContext: {} }, { capability: "multilingual" }, { capability: "background-job-delivery" }]) {
     assertFailure(await core.planCapabilityRemoval({ reader, git, capability: "contact-form-web3forms", renderingContext, ...override }), "CAPABILITY_REMOVAL_UNSUPPORTED");
   }
   assert.equal(reads, 0);

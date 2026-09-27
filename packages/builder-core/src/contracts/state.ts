@@ -426,6 +426,8 @@ export const applicationEnvironmentInstalledStateSchema = z.strictObject({
   projectSchemaVersion: z.literal("2.0.0"),
 }).superRefine(validateStateVerification).superRefine((state, context) => {
   const persistence = state.installedCapabilities.some(({ identifier }) => identifier === "application-persistence");
+  const foundation = state.installedCapabilities.some(({ identifier }) => identifier === "app-foundation");
+  const email = state.installedCapabilities.some(({ identifier }) => identifier === "transactional-email-resend");
   const versions: Readonly<Record<string, string>> = {
     standards: persistence ? "0.8.0" : "0.7.0",
     "content-files": "0.4.0",
@@ -433,14 +435,15 @@ export const applicationEnvironmentInstalledStateSchema = z.strictObject({
     "deployment-cloudflare": persistence ? "0.8.0" : "0.7.0",
     observability: "0.3.0",
     ...(state.origin.profile !== "portfolio" ? { "site-routing": "0.4.0" } : {}),
-    ...(state.origin.profile === "app" ? { "app-foundation": "0.3.0" } : {}),
+    ...(state.origin.profile === "app" || foundation ? { "app-foundation": "0.3.0" } : {}),
+    ...(email ? { "transactional-email-resend": "0.2.0" } : {}),
     ...(persistence && state.origin.profile === "app" ? { "application-persistence": "0.2.0" } : {}),
     ...(state.installedCapabilities.some(({ identifier }) => identifier === "multilingual") ? { multilingual: "0.1.0" } : {}),
     ...(state.installedCapabilities.some(({ identifier }) => identifier === "booking-calendly") ? { "booking-calendly": "0.2.0" } : {}),
     ...(state.installedCapabilities.some(({ identifier }) => identifier === "analytics") ? { analytics: "0.2.0" } : {}),
     ...(state.installedCapabilities.some(({ identifier }) => identifier === "contact-form-web3forms") ? { "contact-form-web3forms": "0.2.0" } : {}),
   };
-  if (state.origin.recipeVersion !== applicationEnvironmentRecipeVersions[state.origin.profile] ||
+  if ((email && !foundation) || state.origin.recipeVersion !== applicationEnvironmentRecipeVersions[state.origin.profile] ||
     state.installedCapabilities.length !== Object.keys(versions).length ||
     state.installedCapabilities.some(({ identifier, version }) => versions[identifier] !== version)) {
     context.addIssue({ code: "custom", message: "application environment installed tuple must match recipe", path: ["installedCapabilities"] });

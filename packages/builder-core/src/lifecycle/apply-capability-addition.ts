@@ -107,6 +107,7 @@ function additionMigrationIdentifier(
   | "add-application-persistence-0-1-0"
   | "add-application-persistence-0-2-0"
   | "add-transactional-email-resend-0-1-0"
+  | "add-transactional-email-resend-0-2-0"
   | "add-contact-form-web3forms-0-1-0"
   | "add-contact-form-web3forms-0-2-0"
   | "add-background-job-delivery-0-2-0" {
@@ -122,7 +123,7 @@ function additionMigrationIdentifier(
     case "multilingual":
       return "add-multilingual-0-1-0";
     case "transactional-email-resend":
-      return "add-transactional-email-resend-0-1-0";
+      return applicationEnvironment ? "add-transactional-email-resend-0-2-0" : "add-transactional-email-resend-0-1-0";
     case "application-persistence":
       return applicationEnvironment ? "add-application-persistence-0-2-0" : "add-application-persistence-0-1-0";
   }
@@ -430,7 +431,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     ? applicationEnvironmentBookingSettingsSchema.safeParse(input.settings) : undefined;
   if (input.renderingContext !== undefined && (
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    (input.capability !== "contact-form-web3forms" && input.capability !== "booking-calendly" && input.capability !== "analytics" && input.capability !== "application-persistence") ||
+    (input.capability !== "contact-form-web3forms" && input.capability !== "booking-calendly" && input.capability !== "analytics" && input.capability !== "application-persistence" && input.capability !== "transactional-email-resend") ||
     (input.capability === "contact-form-web3forms" && input.settings !== undefined) ||
     (environmentAnalyticsSettings !== undefined && !environmentAnalyticsSettings.success) ||
     (environmentBookingSettings !== undefined && !environmentBookingSettings.success)
@@ -558,7 +559,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     packageVersions: verifiedCapabilityPackageVersions,
   };
   const environmentContext = isApplicationEnvironmentRenderingContext(snapshot.value.renderingContext) ? snapshot.value.renderingContext : undefined;
-  const environmentTargetContext = environmentContext === undefined ? undefined : createApplicationEnvironmentRenderingContext(input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"));
+  const environmentTargetContext = environmentContext === undefined ? undefined : createApplicationEnvironmentRenderingContext(input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"), controls.project.value.selectedCapabilities.includes("app-foundation"));
   const targetContext = environmentTargetContext ?? (input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery"
     ? createGenerationRenderingContext(
         input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"),
@@ -571,6 +572,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   const environmentProject = controls.project.value.schemaVersion === "2.0.0" ? controls.project.value : undefined;
   const environmentRenderRequest = {
     ...commonRenderRequest,
+    ...(controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
     ...(controls.project.value.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
     ...(environmentProject?.capabilitySettings.analytics === undefined ? {} : { analytics: environmentProject.capabilitySettings.analytics }),
     ...(environmentProject?.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: environmentProject.capabilitySettings["booking-calendly"] }),
@@ -587,6 +589,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...(input.capability === "background-job-delivery" ? { backgroundJobDelivery: true as const } : {}),
   }, targetContext) : await renderSkeleton({
     ...environmentRenderRequest,
+    ...(input.capability === "transactional-email-resend" ? { transactionalEmailResend: true as const } : {}),
     ...(input.capability === "application-persistence" ? { applicationPersistence: true as const } : {}),
     ...(input.capability === "contact-form-web3forms" ? { contactFormWeb3Forms: true as const } : {}),
     ...(environmentBookingSettings?.success ? { bookingCalendly: environmentBookingSettings.data } : {}),
