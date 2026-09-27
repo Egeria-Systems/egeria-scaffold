@@ -226,7 +226,8 @@ test("application environment generation rejects incomplete malformed and mismat
     const before = await snapshotFileBytes(owner);
     for (const selection of [
 
-      { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true },
+      { applicationPersistence: true }, { backgroundJobDelivery: true },
+      { transactionalEmailResend: { apiKey: "secret-sentinel" } },
       { contactFormWeb3Forms: { accessKey: "secret-sentinel" } },
       { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: { measurementId: "secret-sentinel" } }, operationalIntegrations: {} } },
       { bookingCalendly: { mode: "link", url: "https://secret-sentinel.test" } },
@@ -247,6 +248,64 @@ test("application environment generation rejects incomplete malformed and mismat
   });
 });
 
+for (const [profile, expectedLock] of [
+  ["portfolio", "portfolio-0.11.2-foundation"],
+  ["site", "app-0.2.2"],
+]) {
+  test(`environment ${profile} email foundation prepares the matching security lock`, async () => {
+    for (const transactionalEmailResend of [true, false]) {
+      const request = {
+        profile, projectName: "email-security", displayName: "Email Security",
+        packageVersions: core.verifiedCapabilityPackageVersions, transactionalEmailResend,
+      };
+      const rendered = assertSuccess(await core.renderSkeleton(request, core.createApplicationEnvironmentRenderingContext(false, true)));
+      const publicRendered = assertSuccess(await core.renderSkeleton(request, createGenerationRenderingContext(false, true)));
+      const bytes = await readFile(recipeLockfiles.createRecipeLockfileUrl(expectedLock));
+      const lock = parseYaml(bytes.toString("utf8"));
+      for (const [importer, path] of [[".", "package.json"], ["apps/web", "apps/web/package.json"]]) {
+        const manifest = JSON.parse(new TextDecoder().decode(rendered.files.find(file => file.path === path).content));
+        const publicManifest = JSON.parse(new TextDecoder().decode(publicRendered.files.find(file => file.path === path).content));
+        assert.deepEqual(manifest, path === "apps/web/package.json" ? {
+          ...publicManifest,
+          scripts: {
+            ...publicManifest.scripts,
+            "check:environment": "node scripts/check-application-environment.mjs --local",
+            "check:environment:deployment": "node scripts/check-application-environment.mjs --deployment",
+          },
+        } : publicManifest);
+        for (const section of ["dependencies", "devDependencies", "optionalDependencies"]) {
+          assert.deepEqual(Object.fromEntries(Object.entries(lock.importers[importer][section] ?? {}).map(([name, value]) => [name, value.specifier])), manifest[section] ?? {});
+        }
+      }
+      const workspace = parseYaml(new TextDecoder().decode(rendered.files.find(({ path }) => path === "pnpm-workspace.yaml").content));
+      const publicWorkspace = parseYaml(new TextDecoder().decode(publicRendered.files.find(({ path }) => path === "pnpm-workspace.yaml").content));
+      assert.deepEqual(workspace, publicWorkspace);
+      assert.deepEqual(lock.overrides, workspace.overrides);
+      const manifestBytes = rendered.files.find(({ path }) => path === "apps/web/package.json").content;
+      const manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
+      assert.equal(rendered.project.recipeVersion, profile === "portfolio" ? "0.12.0" : "0.13.0");
+      assert.equal(rendered.project.selectedCapabilities.includes("transactional-email-resend"), transactionalEmailResend);
+      assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, manifest), expectedLock);
+      for (const [section, key] of [["dependencies", "next"], ["dependencies", "effect"], ["devDependencies", "eslint-config-next"], ["devDependencies", "vitest"]]) {
+        for (const version of ["latest", "0.1.0"]) {
+          assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, { ...manifest, [section]: { ...manifest[section], [key]: version } }), undefined);
+        }
+      }
+      for (const next of ["16.3.3", "16.3.6"]) {
+        assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, { ...manifest, dependencies: { ...manifest.dependencies, next } }), undefined);
+      }
+      assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ ...rendered.project, recipeVersion: "unknown" }, manifest), undefined);
+      assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, { ...manifest, dependencies: { ...manifest.dependencies, "drizzle-orm": "0.45.2" }, devDependencies: { ...manifest.devDependencies, "drizzle-kit": "0.31.10", "@cloudflare/workers-types": "5.20260730.1" } }), undefined);
+      await withTestRoot(async root => {
+        await mkdir(join(root, "apps/web"), { recursive: true });
+        await writeFile(join(root, "apps/web/package.json"), manifestBytes);
+        assertSuccess(await verifierModule.prepareLockfile(root, rendered.project));
+        assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), bytes);
+      });
+    }
+  });
+}
+
 test("application environment lock selection uses its own matching dependency graphs", () => {
   for (const [profile, version, lock, next, eslint] of [
     ["portfolio", "0.12.0", "portfolio-0.12.0", "16.3.8", "16.3.0"],
@@ -258,7 +317,7 @@ test("application environment lock selection uses its own matching dependency gr
     assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), lock);
     for (const dependencies of [
       { ...manifest.dependencies, next: "16.3.2" },
-      { ...manifest.dependencies, effect: profile === "app" ? "4.0.0-rc.111" : "4.0.0-rc.112" },
+      { ...manifest.dependencies, effect: "4.0.0-rc.111" },
       { ...manifest.dependencies, "drizzle-orm": "0.45.2" },
     ]) assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...manifest, dependencies }), undefined);
   }
@@ -484,7 +543,7 @@ test("environment persistence generation verifies bindings and derives the insta
       assert.equal(generated.state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.2.0");
       const reader = core.createFileSystemRepositoryReader(destination);
       const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(reader, core.createApplicationEnvironmentRenderingContext()));
-      assert.deepEqual(snapshot.renderingContext, renderingContext);
+      assert.deepEqual(snapshot.renderingContext, core.createApplicationEnvironmentRenderingContext(true, true));
       assert.deepEqual(await core.doctorRepository({ reader, catalog: snapshot.catalog, profiles: snapshot.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
       const projectPath = join(destination, ".egeria/project.yaml");
       const project = assertSuccess(core.parseProjectYaml(await readFile(projectPath, "utf8"), "2.0.0"));
@@ -2447,5 +2506,39 @@ test("environment booking generation passes writer admission and records exact v
       assert.deepEqual(project.capabilitySettings, { "booking-calendly": { mode } });
       assert.deepEqual(await core.doctorRepository({ reader, catalog: snapshot.catalog, profiles: snapshot.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
     });
+  }
+});
+
+
+test("environment email generation requires Worker verification and reads the actual installed tuple", async () => {
+  for (const [profile, persistence] of [["portfolio", false], ["site", false], ["app", false], ["app", true]]) {
+    const complete = persistence ? core.persistenceGenerationVerificationChecks : core.appGenerationVerificationChecks;
+    for (const checks of [complete.filter(check => check !== "worker-integration"), complete]) {
+      await withTestRoot(async owner => {
+        const verifier = createFakeVerifier({ verify: async () => ({ ok: true, value: { checks } }) });
+        const destination = join(owner, "email-environment");
+        const result = await core.generateProject({
+          request: { profile, projectName: "email-environment", displayName: "Email Environment", transactionalEmailResend: true, ...(persistence ? { applicationPersistence: true } : {}) },
+          destination, verifier: verifier.verifier, renderingContext: core.createApplicationEnvironmentRenderingContext(persistence),
+        });
+        if (!checks.includes("worker-integration")) {
+          assert.equal(result.ok, false);
+          assert.equal(result.issues[0].code, "GENERATED_VERIFICATION_INVALID");
+          assert.equal(await exists(destination), false);
+          return;
+        }
+        const generated = assertSuccess(result);
+        assert.equal(generated.state.installedCapabilities.find(value => value.identifier === "transactional-email-resend").version, "0.2.0");
+        assert.deepEqual(generated.state.lastSuccessfulVerification.checks, ["contracts", "pre-state-inference", ...complete, "post-state-inference"]);
+        const reader = core.createFileSystemRepositoryReader(destination);
+        const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(reader, core.createApplicationEnvironmentRenderingContext(!persistence)));
+        assert.deepEqual(snapshot.renderingContext, core.createApplicationEnvironmentRenderingContext(persistence, true));
+        const inference = await core.inferRepository({ reader, catalog: snapshot.catalog, projectSchemaVersion: "2.0.0" });
+        assert.equal(inference.state.kind, "valid");
+        assert.ok(inference.capabilities.every(({ category }) => category === "confirmed"));
+        assert.deepEqual(await core.doctorRepository({ reader, catalog: snapshot.catalog, profiles: snapshot.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
+        assert.deepEqual(verifier.calls, ["prepare-lockfile", "verify-isolated-copy"]);
+      });
+    }
   }
 });
