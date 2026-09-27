@@ -45,7 +45,7 @@ export function resolveRecipeLockfileVersion(
     }
     if (environment) {
       if (identity.originProfile === "app") return "app-0.3.0";
-      if (foundation) return undefined;
+      if (foundation) return identity.originProfile === "portfolio" ? "portfolio-0.11.2-foundation" : "app-0.2.2";
       return identity.originProfile === "portfolio" ? "portfolio-0.12.0" : "site-0.13.0";
     }
     if (identity.originProfile === "app" || (identity.originProfile === "site" && foundation)) return "app-0.2.2";
