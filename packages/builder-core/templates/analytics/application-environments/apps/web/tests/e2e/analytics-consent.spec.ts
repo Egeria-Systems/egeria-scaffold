@@ -325,6 +325,76 @@ if (declarations.length > 0) {
     await assertProviders(page, declarations.map(value => value.identifier));
   });
 
+  if (active && settings.providers.googleAnalytics4 !== undefined && settings.providers.cloudflareWebAnalytics !== undefined) {
+    for (const retainClarity of settings.providers.microsoftClarity === undefined ? [false] : [false, true]) {
+      test(`current stored denial reduces active providers before another event${retainClarity ? " while retaining Clarity" : ""}`, async ({ page }, information) => {
+        const retained: AnalyticsPurposeIdentifier[] = retainClarity ? ["consented-experience-analysis"] : [];
+        await visit(page, primaryPath);
+        await select(page, ["audience-measurement", ...retained]);
+        await assertProviders(page, ["google-analytics-4", ...(retainClarity ? ["microsoft-clarity" as const] : [])]);
+        const requestsBefore = auditFor(page).requests.length;
+        const observationKey = "egeria.analytics.test.first-event";
+        const stored = JSON.stringify(consentRecord(retained));
+        await Promise.all([
+          page.waitForEvent("domcontentloaded"),
+          page.evaluate(({ key, observationKey, expansion, stored }) => {
+            sessionStorage.removeItem(observationKey);
+            const google = Reflect.get(window, "gtag") as (...parameters: unknown[]) => void;
+            const commands: unknown[][] = [];
+            Reflect.set(window, "gtag", (...parameters: unknown[]) => {
+              commands.push(parameters);
+              google(...parameters);
+            });
+            const listener = (event: StorageEvent) => {
+              if (event.key !== key || event.storageArea !== localStorage || event.newValue !== expansion) return;
+              // This observer follows the application listener; its first-event snapshot survives reload.
+              sessionStorage.setItem(observationKey, JSON.stringify({
+                trusted: event.isTrusted,
+                storedDenial: localStorage.getItem(key) === stored,
+                scripts: Array.from(document.querySelectorAll('script[id^="analytics-"]'), script => script.id),
+                cookies: document.cookie.split(";").map(cookie => cookie.split("=", 1)[0]?.trim()),
+                commands,
+              }));
+              window.removeEventListener("storage", listener);
+            };
+            window.addEventListener("storage", listener);
+            const frame = document.createElement("iframe");
+            frame.hidden = true;
+            document.body.append(frame);
+            const storage = frame.contentWindow?.localStorage;
+            if (storage === undefined) throw new Error("ANALYTICS_TEST_STORAGE_WRITER_MISSING");
+            storage.setItem(key, expansion);
+            storage.setItem(key, stored);
+          }, {
+            key: analyticsConsentStorageKey, observationKey, stored,
+            expansion: JSON.stringify(consentRecord(["audience-measurement", "aggregate-traffic-and-performance", ...retained])),
+          }),
+        ]);
+        const source = await page.evaluate(key => sessionStorage.getItem(key), observationKey);
+        expect(source).not.toBeNull();
+        const observed = JSON.parse(source ?? "null");
+        await information.attach("first-storage-event", { contentType: "application/json", body: source ?? "null" });
+        expect(observed).toMatchObject({
+          trusted: true, storedDenial: true,
+          scripts: retainClarity ? ["analytics-microsoft-clarity"] : [],
+          commands: [["consent", "update", { analytics_storage: "denied", ad_storage: "denied", ad_user_data: "denied", ad_personalization: "denied" }]],
+        });
+        expect(observed.cookies).not.toContain(`${cookiePrefix}_ga`);
+        expect(observed.cookies).not.toContain(`${cookiePrefix}_ga_${expectedGoogleId.slice(2)}`);
+        if (retainClarity) expect(observed.cookies).toEqual(expect.arrayContaining(["_clck", "_clsk"]));
+        await expect(action(page, "manage")).toBeVisible();
+        expect((await readRecord(page)).purposes).toEqual(decisions(retained));
+        for (const declaration of declarations) {
+          await expect(page.locator(`#${declaration.scriptId}`)).toHaveCount(retainClarity && declaration.identifier === "microsoft-clarity" ? 1 : 0);
+        }
+        await assertQueues(page, retainClarity ? ["microsoft-clarity"] : []);
+        if (retainClarity) await expect.poll(() => auditFor(page).requests.slice(requestsBefore).some(request => request.provider === "microsoft-clarity" && !request.script)).toBe(true);
+        expect(auditFor(page).requests.slice(requestsBefore).filter(request => !retainClarity || request.provider !== "microsoft-clarity")).toEqual([]);
+        await page.evaluate(key => sessionStorage.removeItem(key), observationKey);
+      });
+    }
+  }
+
   for (const declaration of declarations) {
     test(`an isolated ${declaration.purpose} choice activates only its own provider`, async ({ page }) => {
       await visit(page, primaryPath);

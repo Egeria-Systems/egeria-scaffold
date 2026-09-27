@@ -560,17 +560,21 @@ function subscribe(
     }
 
     let next = resolution.record.purposes;
-    const transition = compareAnalyticsPurposeDecisions(previous, next);
+    let transition = compareAnalyticsPurposeDecisions(previous, next);
     if (transition.added.length > 0) {
       const stored = readStoredConsent(browser, settings);
       if (
         !stored.readable || stored.resolution.status !== "valid" ||
         !recordsEqual(stored.resolution.record, resolution.record)
       ) {
-        if (transition.removed.length === 0) return;
-        next = next.map(decision => transition.added.includes(decision.purpose)
+        const storedRemoved = stored.readable && stored.resolution.status === "valid"
+          ? compareAnalyticsPurposeDecisions(previous, stored.resolution.record.purposes).removed
+          : [];
+        next = next.map(decision => transition.added.includes(decision.purpose) || storedRemoved.includes(decision.purpose)
           ? { ...decision, decision: "denied" }
           : decision);
+        transition = compareAnalyticsPurposeDecisions(previous, next);
+        if (transition.removed.length === 0) return;
       }
     }
     if (transition.removed.length > 0) {
