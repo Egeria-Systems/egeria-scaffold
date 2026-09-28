@@ -37,7 +37,6 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_GA4_MEASUREMENT_ID: analytics.configuration.googleMeasurementId ?? "",
     NEXT_PUBLIC_CLARITY_PROJECT_ID: analytics.configuration.clarityProjectId ?? "",
     NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: analytics.configuration.googleSiteVerification ?? "",
-    NEXT_PUBLIC_SITE_URL: analytics.configuration.siteOrigin ?? "",
   },
   output: "standalone",
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
