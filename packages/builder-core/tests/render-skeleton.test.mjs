@@ -6222,6 +6222,162 @@ test("environment analytics rendering composes every profile with selection-only
 });
 
 
+async function withEnvironmentAnalyticsNextConfiguration(selection, analytics, check) {
+  const rendered = assertSuccess(await renderApplicationEnvironment("site", {
+    ...(analytics ? { analytics } : {}),
+    ...(selection & 1 ? { contactFormWeb3Forms: true } : {}),
+    ...(selection & 2 ? { bookingCalendly: { mode: "popup" } } : {}),
+  }));
+  const root = await mkdtemp(join(tmpdir(), "analytics-next-configuration-"));
+  try {
+    for (const file of rendered.files.filter(({ path }) => path === "apps/web/next.config.ts" || /(?:application-environment|booking-settings|contact-settings|analytics-configuration|analytics-settings)\.ts$/u.test(path))) {
+      const destination = join(root, file.path);
+      await mkdir(join(destination, ".."), { recursive: true });
+      await writeFile(destination, file.content);
+    }
+    await writeFile(join(root, "package.json"), JSON.stringify({ type: "module" }));
+    const platform = join(root, "node_modules/@opennextjs/cloudflare");
+    await mkdir(platform, { recursive: true });
+    await writeFile(join(platform, "package.json"), JSON.stringify({ type: "module", exports: "./index.js" }));
+    await writeFile(join(platform, "index.js"), "export function initOpenNextCloudflareForDev() { globalThis.platformInitializations += 1; }\n");
+    const runner = join(root, "apps/web/check-next.mjs");
+    await writeFile(runner, `
+globalThis.platformInitializations = 0;
+try {
+  if (process.argv[2] === "reader") {
+    const { readCompiledAnalyticsConfiguration } = await import("./src/integrations/analytics/analytics-configuration.ts");
+    const { analyticsSettings } = await import("./src/integrations/analytics/analytics-settings.ts");
+    console.log(JSON.stringify(readCompiledAnalyticsConfiguration(analyticsSettings)));
+  } else {
+    const { default: configuration } = await import("./next.config.ts");
+    console.log(JSON.stringify({ env: configuration.env, siteUrl: process.env.NEXT_PUBLIC_SITE_URL, initializations: globalThis.platformInitializations }));
+  }
+} catch (error) {
+  console.log(JSON.stringify({ error: error.message, initializations: globalThis.platformInitializations }));
+  process.exitCode = 1;
+}
+`);
+    const invoke = (overrides = {}, mode = "next") => {
+      const result = spawnSync(process.execPath, [runner, mode], { encoding: "utf8", env: {
+        APPLICATION_ENVIRONMENT: "staging",
+        NEXT_PUBLIC_ANALYTICS_ENABLED: "true",
+        NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: "0123456789abcdef0123456789abcdef",
+        NEXT_PUBLIC_GA4_MEASUREMENT_ID: "G-TEST123456",
+        NEXT_PUBLIC_CLARITY_PROJECT_ID: "clarity123",
+        NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: "synthetic-verification-token",
+        NEXT_PUBLIC_SITE_URL: "https://qa.analytics-test.invalid",
+        NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "00000000-0000-4000-8000-000000000001",
+        NEXT_PUBLIC_CALENDLY_URL: "https://calendly.com/synthetic-nonproduction/intro",
+        ...overrides,
+      } });
+      assert.doesNotMatch(result.stdout + result.stderr, /private-sentinel/u);
+      assert.notEqual(result.stdout.trim(), "", result.stderr);
+      return { status: result.status, value: JSON.parse(result.stdout), stderr: result.stderr };
+    };
+    await check(invoke);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+test("environment analytics Next configuration preserves the common origin across independent selections", async (context) => {
+  const selections = [
+    { providers: { googleAnalytics4: true }, operationalIntegrations: {} },
+    { providers: { cloudflareWebAnalytics: true }, operationalIntegrations: {} },
+    { providers: {}, operationalIntegrations: { googleSearchConsole: true } },
+    environmentAnalyticsSettings,
+    undefined,
+  ];
+  for (const composition of [0, 1, 2, 3]) {
+    await context.test(`contact=${Boolean(composition & 1)} booking=${Boolean(composition & 2)}`, async () => {
+      for (const selected of selections) {
+        const analytics = selected ? { consent: { policy: "explicit-opt-in" }, ...selected } : undefined;
+        await withEnvironmentAnalyticsNextConfiguration(composition, analytics, async (invoke) => {
+          for (const target of composition === 0 ? ["development", "staging", "production"] : ["staging"]) {
+            for (const enabled of ["false", "true"]) {
+              const result = invoke({ APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_ANALYTICS_ENABLED: enabled });
+              assert.equal(result.status, 0, result.stderr);
+              assert.equal(result.value.initializations, 1);
+              assert.equal(result.value.siteUrl, "https://qa.analytics-test.invalid");
+              assert.equal(Object.hasOwn(result.value.env, "NEXT_PUBLIC_SITE_URL"), false, "Analytics must leave the common origin to native public environment compilation");
+              assert.equal(result.value.env.NEXT_PUBLIC_APPLICATION_ENVIRONMENT, target);
+              if (analytics) {
+                assert.equal(result.value.env.NEXT_PUBLIC_ANALYTICS_ENABLED, enabled);
+                assert.equal(result.value.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID, selected.providers.googleAnalytics4 ? "G-TEST123456" : "");
+                assert.equal(result.value.env.NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN, selected.providers.cloudflareWebAnalytics ? "0123456789abcdef0123456789abcdef" : "");
+                assert.equal(result.value.env.NEXT_PUBLIC_CLARITY_PROJECT_ID, selected.providers.microsoftClarity ? "clarity123" : "");
+                assert.equal(result.value.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION, selected.operationalIntegrations.googleSearchConsole && target === "production" ? "synthetic-verification-token" : "");
+              }
+              if (composition & 1) assert.equal(result.value.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY, "00000000-0000-4000-8000-000000000001");
+              if (composition & 2) assert.equal(result.value.env.NEXT_PUBLIC_CALENDLY_URL, "https://calendly.com/synthetic-nonproduction/intro");
+            }
+          }
+        });
+      }
+    });
+  }
+});
+
+test("environment analytics Next configuration retains Clarity origin validation and normalization", async () => {
+  for (const composition of [0, 1, 2, 3]) {
+    await withEnvironmentAnalyticsNextConfiguration(composition, environmentAnalyticsSettings, async (invoke) => {
+      for (const target of ["staging", "production"]) {
+        const missing = invoke({ APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_SITE_URL: "" });
+        assert.equal(missing.status, 1);
+        assert.deepEqual(missing.value, { error: "ANALYTICS_CONFIGURATION_INVALID:NEXT_PUBLIC_SITE_URL:missing", initializations: 0 });
+        assert.equal(invoke({ APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_SITE_URL: "" }).status, 0);
+      }
+      for (const enabled of ["false", "true"]) {
+        const malformed = invoke({ NEXT_PUBLIC_ANALYTICS_ENABLED: enabled, NEXT_PUBLIC_SITE_URL: "https://qa.analytics-test.invalid/private-sentinel" });
+        assert.equal(malformed.status, 1);
+        assert.deepEqual(malformed.value, { error: "ANALYTICS_CONFIGURATION_INVALID:NEXT_PUBLIC_SITE_URL:invalid", initializations: 0 });
+      }
+      for (const [target, siteUrl, expectedOrigin] of [
+        ["staging", "https://qa.analytics-test.invalid:443/", "https://qa.analytics-test.invalid"],
+        ["development", "http://localhost:3000", "http://localhost:3000"],
+      ]) {
+        const result = invoke({ APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_SITE_URL: siteUrl });
+        assert.equal(result.status, 0);
+        assert.equal(result.value.siteUrl, siteUrl);
+        const reader = invoke({ APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_SITE_URL: siteUrl }, "reader");
+        assert.equal(reader.status, 0);
+        assert.equal(reader.value.ok, true);
+        assert.equal(reader.value.configuration.siteOrigin, expectedOrigin);
+      }
+      const unavailable = invoke({ NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_SITE_URL: "" }, "reader");
+      assert.equal(unavailable.value.ok, true);
+      assert.equal(unavailable.value.configuration.collectionAvailable, false);
+      assert.deepEqual(unavailable.value.configuration.missingFields, ["NEXT_PUBLIC_SITE_URL"]);
+    });
+  }
+  await withEnvironmentAnalyticsNextConfiguration(0, { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} }, async (invoke) => {
+    const result = invoke({ NEXT_PUBLIC_SITE_URL: "not-an-origin", NEXT_PUBLIC_ANALYTICS_ENABLED: "TRUE" });
+    assert.equal(result.status, 0);
+    assert.equal(result.value.siteUrl, "not-an-origin");
+    assert.equal(result.value.env.NEXT_PUBLIC_ANALYTICS_ENABLED, "TRUE");
+    const reader = invoke({ NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_SITE_URL: "not-an-origin", NEXT_PUBLIC_ANALYTICS_ENABLED: "TRUE" }, "reader");
+    assert.equal(reader.value.ok, true);
+    assert.equal(reader.value.configuration.collectionEnabled, false);
+    assert.equal(reader.value.configuration.siteOrigin, undefined);
+  });
+});
+
+test("environment analytics Next configuration refuses invalid inputs before platform initialization", async () => {
+  for (const composition of [0, 1, 2, 3]) {
+    await withEnvironmentAnalyticsNextConfiguration(composition, environmentAnalyticsSettings, async (invoke) => {
+      const refuse = (overrides, error) => {
+        const result = invoke(overrides);
+        assert.equal(result.status, 1);
+        assert.deepEqual(result.value, { error, initializations: 0 });
+      };
+      refuse({ NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, "APPLICATION_ENVIRONMENT_INVALID:NEXT_PUBLIC_APPLICATION_ENVIRONMENT:mismatch");
+      if (composition & 1) refuse({ NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "", NEXT_PUBLIC_CALENDLY_URL: "private-sentinel", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, "CONTACT_CONFIGURATION_INVALID:NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY:missing");
+      if (composition & 2) refuse({ NEXT_PUBLIC_CALENDLY_URL: "", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, "BOOKING_CONFIGURATION_INVALID:NEXT_PUBLIC_CALENDLY_URL:missing");
+      refuse({ NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, "ANALYTICS_CONFIGURATION_INVALID:NEXT_PUBLIC_GA4_MEASUREMENT_ID:invalid");
+    });
+  }
+});
+
 test("environment booking rendering preserves independent selections and mode-only controls", async () => {
   for (const profile of ["portfolio", "site", "app"]) {
     for (const mode of ["link", "inline", "popup"]) {
