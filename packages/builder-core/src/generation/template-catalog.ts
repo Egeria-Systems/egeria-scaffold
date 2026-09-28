@@ -481,8 +481,27 @@ export function createTemplateCatalog(
     }
     sources.push({ source: "booking-calendly/docs/booking-calendly.md", contentKind: "text" });
   }
+  if (applicationEnvironments && includeAnalytics) {
+    for (const path of ["apps/web/src/integrations/analytics/analytics-configuration.ts", "apps/web/tests/unit/analytics-configuration.test.ts"]) {
+      sources.push({ source: `analytics/application-environments/${path}`, destinationSource: `analytics/${path}`, contentKind: "text" });
+    }
+  }
   const selectedSources = sources.map((entry) => {
     if (!applicationEnvironments) return entry;
+    if (includeAnalytics) {
+      const composition = includeWeb3Forms && includeBookingCalendly ? "contact-booking" : includeWeb3Forms ? "contact" : includeBookingCalendly ? "booking" : undefined;
+      if (entry.source === "common/apps/web/next.config.ts") {
+        return { ...entry, source: `analytics/application-environments/apps/web/next.${composition ?? "config"}.ts`, destinationSource: entry.source };
+      }
+      if (entry.source === "common/apps/web/scripts/check-application-environment.mjs") {
+        return { ...entry, source: `analytics/application-environments/apps/web/scripts/check-application-environment${composition === undefined ? "" : `.${composition}`}.mjs`, destinationSource: entry.source };
+      }
+      if ((entry.source.startsWith("analytics/") && !entry.source.startsWith("analytics/application-environments/") && !entry.source.endsWith("analytics-content-source.d.ts")) ||
+        ["contact-form-web3forms/apps/web/app/layout.analytics.tsx", "contact-form-web3forms/apps/web/app/layout.multilingual-analytics.tsx"].includes(entry.source)) {
+        const separator = entry.source.indexOf("/");
+        return { ...entry, source: `${entry.source.slice(0, separator)}/application-environments${entry.source.slice(separator)}`, destinationSource: entry.destinationSource ?? entry.source };
+      }
+    }
     if (includeBookingCalendly) {
       if (entry.source === "common/apps/web/next.config.ts") {
         return { ...entry, source: `booking-calendly/application-environments/apps/web/next${includeWeb3Forms ? ".contact" : ".config"}.ts`, destinationSource: entry.source };

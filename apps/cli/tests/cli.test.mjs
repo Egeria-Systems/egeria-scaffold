@@ -4551,6 +4551,7 @@ async function withGitFixture(name, run, options = {}) {
         ...(options.multilingual === true ? ["--multilingual"] : []),
         ...(options.bookingCalendly === undefined ? [] : ["--booking-calendly", "--calendly-mode", options.bookingCalendly.mode]),
         ...(options.contactFormWeb3Forms === true ? ["--contact-form-web3forms"] : []),
+        ...(options.analytics === undefined ? [] : environmentAnalyticsOptions),
       ]);
       assert.equal(created.exitCode, 0, created.stderr);
       assert.equal(JSON.parse(created.stdout).profile, name);
@@ -7458,7 +7459,7 @@ test("application environment compiled CLI refuses inputs before dependencies an
       assert.equal(result.exitCode, 2, JSON.stringify(result));
       assert.equal(JSON.parse(result.stderr).code, "CLI_ARGUMENT_INVALID");
     }
-    for (const suffix of [["--google-analytics-4"], ["--application-persistence"], ["--transactional-email-resend"], ["--background-job-delivery"]]) {
+    for (const suffix of [["--application-persistence"], ["--transactional-email-resend"], ["--background-job-delivery"]]) {
       const result = await runEnvironmentCliProcess([...base, ...suffix], true);
       assert.equal(result.exitCode, 1, JSON.stringify(result));
       assert.equal(JSON.parse(result.stderr).issues[0].code, "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
@@ -7562,7 +7563,7 @@ test("environment contact CLI admits selection-only lifecycle and forwards exact
       assert.equal(refused.exitCode, 2, JSON.stringify(refused));
       assert.deepEqual(JSON.parse(refused.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
     }
-    for (const capability of ["analytics", "multilingual", "application-persistence", "transactional-email-resend", "background-job-delivery"]) {
+    for (const capability of ["multilingual", "application-persistence", "transactional-email-resend", "background-job-delivery"]) {
       const refused = await runEnvironmentCliProcess(arguments_.map(value => value === "contact-form-web3forms" ? capability : value), true);
       assert.equal(refused.exitCode, 2, JSON.stringify(refused));
     }
@@ -7633,22 +7634,27 @@ async function executeEnvironmentBuilt(arguments_) {
 }
 
 for (const [profile, mode, multilingual] of [["portfolio", "link", false], ["site", "popup", true], ["app", "inline", false]]) {
-  test(`compiled environment booking and contact lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 1_800_000 }, async () => {
+  test(`compiled environment analytics and neighbor lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 1_800_000 }, async () => {
     const renderingContext = core.createApplicationEnvironmentRenderingContext();
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = withoutSharedRefs(await gitRepositorySnapshot(primary));
-      const layout = await readFile(join(linked, "apps/web/app/layout.tsx"));
       const lockfile = await readFile(join(linked, "pnpm-lock.yaml"));
       const initialProject = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8"), "2.0.0"));
-      assert.deepEqual(initialProject.capabilitySettings["booking-calendly"], { mode });
+      assert.deepEqual(initialProject.capabilitySettings["booking-calendly"], profile === "portfolio" ? undefined : { mode });
+      assert.deepEqual(initialProject.capabilitySettings.analytics, environmentAnalyticsSelection);
+      let booking = profile !== "portfolio";
+      let analytics = true;
+      let retainedAnalyticsCopy;
       assert.equal(initialProject.selectedCapabilities.includes("contact-form-web3forms"), profile === "site");
       const operations = [
+        ...["remove", "add"].map(operation => ["analytics", operation]),
         ...(profile === "site" ? ["remove", "add"] : ["add", "remove", "add"]).map(operation => ["contact-form-web3forms", operation]),
-        ...["remove", "add", "remove", "add"].map(operation => ["booking-calendly", operation]),
+        ...(profile === "portfolio" ? ["add", "remove", "add"] : ["remove", "add"]).map(operation => ["booking-calendly", operation]),
       ];
       for (const [capability, operation] of operations) {
         const arguments_ = ["--directory", linked, "--capability", capability,
-          ...(capability === "booking-calendly" && operation === "add" ? ["--calendly-mode", mode] : [])];
+          ...(capability === "booking-calendly" && operation === "add" ? ["--calendly-mode", mode] : []),
+          ...(capability === "analytics" && operation === "add" ? environmentAnalyticsOptions : [])];
         const before = await gitRepositorySnapshot(linked);
         const planning = await executeEnvironmentBuilt([`plan-${operation}`, ...arguments_]);
         assert.equal(planning.exitCode, 0, planning.stderr);
@@ -7667,21 +7673,29 @@ for (const [profile, mode, multilingual] of [["portfolio", "link", false], ["sit
         const project = assertSuccess(core.parseProjectYaml(projectSource, "2.0.0"));
         const state = assertSuccess(core.parseStateJson(stateSource, "2.0.0"));
         assert.doesNotMatch(projectSource + stateSource, /https:\/\/calendly|NEXT_PUBLIC_|accessKey/u);
-        assert.deepEqual(project.capabilitySettings["booking-calendly"], capability === "booking-calendly" && operation === "remove" ? undefined : { mode });
+        if (capability === "booking-calendly") booking = operation === "add";
+        if (capability === "analytics") analytics = operation === "add";
+        assert.deepEqual(project.capabilitySettings["booking-calendly"], booking ? { mode } : undefined);
+        assert.deepEqual(project.capabilitySettings.analytics, analytics ? environmentAnalyticsSelection : undefined);
+        if (retainedAnalyticsCopy !== undefined) assert.equal(await readFile(join(linked, "apps/web/content/en-CA/analytics.yaml"), "utf8"), retainedAnalyticsCopy);
+        if (capability === "analytics" && operation === "add") {
+          const path = join(linked, "apps/web/content/en-CA/analytics.yaml");
+          retainedAnalyticsCopy = (await readFile(path, "utf8")).replace("heading: Analytics choices", "heading: Analytics preferences");
+          await writeFile(path, retainedAnalyticsCopy);
+        }
         assert.equal(project.capabilitySettings["contact-form-web3forms"], undefined);
         assert.equal(project.selectedCapabilities.includes("multilingual"), multilingual);
         assert.equal(project.selectedCapabilities.includes("app-foundation"), profile === "app");
         assert.equal(state.installedCapabilities.find(value => value.identifier === capability)?.version, operation === "remove" ? undefined : "0.2.0");
         assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), lockfile);
         if (capability === "booking-calendly") assert.equal(project.selectedCapabilities.includes("contact-form-web3forms"), true);
-        if (capability === "contact-form-web3forms" && operation === "remove" && profile !== "site") assert.deepEqual(await readFile(join(linked, "apps/web/app/layout.tsx")), layout);
         await commitAll(linked, `${operation} environment ${capability}`);
         const diagnosis = await executeEnvironmentBuilt(["doctor", "--directory", linked]);
         assert.equal(diagnosis.exitCode, 0, diagnosis.stderr);
         assert.deepEqual(JSON.parse(diagnosis.stdout).result, { healthy: true, diagnostics: [] });
       }
       assert.deepEqual(withoutSharedRefs(await gitRepositorySnapshot(primary)), primaryBefore);
-    }, { generation: "vitest-five", multilingual, bookingCalendly: { mode }, contactFormWeb3Forms: profile === "site", renderingContext });
+    }, { generation: "vitest-five", multilingual, ...(profile === "portfolio" ? {} : { bookingCalendly: { mode } }), analytics: environmentAnalyticsSelection, contactFormWeb3Forms: profile === "site", renderingContext });
   });
 }
 
@@ -7761,3 +7775,42 @@ for (const fixture of ["portfolio", "app-persistence-email"]) {
     },{generation:"vitest-five",branch:`${fixture}-jobs-lifecycle-test`});
   });
 }
+
+
+const environmentAnalyticsOptions = ["--cloudflare-web-analytics", "--google-analytics-4", "--microsoft-clarity", "--microsoft-clarity-audience", "not-directed-to-minors", "--google-search-console", "--looker-studio"];
+const environmentAnalyticsSelection = {
+  consent: { policy: "explicit-opt-in" },
+  providers: { cloudflareWebAnalytics: true, googleAnalytics4: true, microsoftClarity: { audience: "not-directed-to-minors" } },
+  operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
+};
+
+test("environment analytics CLI admits exact selection-only lifecycle and rejects destination switches before adapters", async () => {
+  for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
+    const adding = kind.endsWith("add");
+    const arguments_ = [kind, "--directory", "/private/generated-worktree", "--capability", "analytics",
+      ...(adding ? environmentAnalyticsOptions : []),
+      ...(kind.startsWith("apply") ? ["--approved-plan", `sha256:${"a".repeat(64)}`] : [])];
+    const parsed = cliArguments.parseCliArguments(arguments_, "2.0.0");
+    assert.equal(parsed.ok, true, JSON.stringify(parsed));
+    assert.deepEqual(parsed.value.settings, adding ? environmentAnalyticsSelection : undefined);
+    for (const suffix of [["--google-analytics-id", "G-PRIVATE123"], ["--calendly-mode", "popup"], ["--google-analytics-4"], ["--persistence-removal", "/private/sentinel"]]) {
+      const refused = await runEnvironmentCliProcess([...arguments_, ...suffix], true);
+      assert.equal(refused.exitCode, 2, JSON.stringify(refused));
+      assert.deepEqual(JSON.parse(refused.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
+    }
+    if (kind.startsWith("apply")) {
+      const observed = [];
+      const output = captureOutput();
+      const run = cli.createCliRunner({ createVerifier: createFakeVerifier,
+        [adding ? "applyCapabilityAddition" : "applyCapabilityRemoval"]: async input => {
+          observed.push(input);
+          return { ok: false, code: "CAPABILITY_PLAN_APPROVAL_INVALID", phase: "precondition", recovery: "not-required" };
+        },
+      }, "2.0.0");
+      assert.equal(await run(arguments_, output.output), 1);
+      assert.equal(observed.length, 1);
+      assert.deepEqual(observed[0].settings, adding ? environmentAnalyticsSelection : undefined);
+      assert.deepEqual(observed[0].renderingContext, core.createApplicationEnvironmentRenderingContext());
+    }
+  }
+});

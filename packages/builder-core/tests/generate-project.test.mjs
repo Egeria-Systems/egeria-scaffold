@@ -88,6 +88,28 @@ test("application environment generation preserves state-last verification and s
   }
 });
 
+test("environment analytics generation verifies and infers the selected candidate on every profile", async () => {
+  const context = core.createApplicationEnvironmentRenderingContext();
+  const analytics = { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} };
+  for (const profile of ["portfolio", "site", "app"]) {
+    await withTestRoot(async owner => {
+      const checks = profile === "app" ? [...generatedChecks, "worker-integration"] : generatedChecks;
+      const verifier = createFakeVerifier({ verify: async () => ({ ok: true, value: { checks } }) });
+      const result = assertSuccess(await core.generateProject({
+        request: { profile, projectName: "analytics-environment", displayName: "Analytics Environment", analytics },
+        destination: join(owner, profile), verifier: verifier.verifier, renderingContext: context,
+      }));
+      assert.equal(result.state.installedCapabilities.find(({ identifier }) => identifier === "analytics")?.version, "0.2.0");
+      const reader = core.createFileSystemRepositoryReader(result.destination);
+      const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(reader, context));
+      const project = assertSuccess(core.parseProjectYaml(await readFile(join(result.destination, ".egeria/project.yaml"), "utf8"), "2.0.0"));
+      assert.deepEqual(project.capabilitySettings.analytics, analytics);
+      assert.deepEqual(await core.doctorRepository({ reader, catalog: snapshot.catalog, profiles: snapshot.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
+      assert.deepEqual(verifier.calls, ["prepare-lockfile", "verify-isolated-copy"]);
+    });
+  }
+});
+
 test("application environment generation rejects noncandidate contexts before destination or verifier access", async (context) => {
   const candidate = core.createApplicationEnvironmentRenderingContext();
   for (const [name, renderingContext] of [
@@ -145,9 +167,10 @@ test("application environment generation rejects incomplete and malformed select
   await withTestRoot(async (owner) => {
     const before = await snapshotFileBytes(owner);
     for (const selection of [
-      { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } },
+
       { applicationPersistence: true }, { transactionalEmailResend: true }, { backgroundJobDelivery: true },
       { contactFormWeb3Forms: { accessKey: "secret-sentinel" } },
+      { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: { measurementId: "secret-sentinel" } }, operationalIntegrations: {} } },
       { bookingCalendly: { mode: "link", url: "https://secret-sentinel.test" } },
     ]) {
       const verifier = createFakeVerifier();

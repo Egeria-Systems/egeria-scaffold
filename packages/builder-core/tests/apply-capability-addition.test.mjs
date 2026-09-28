@@ -1191,7 +1191,7 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const destination = join(owner, "project");
     const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
-      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
+      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
       destination, renderingContext: core.createApplicationEnvironmentRenderingContext(),
       verifier: {
         async prepareLockfile(root) {
@@ -1321,6 +1321,53 @@ test("environment booking addition retains mode through late replan and state-la
       assert.equal(repository.files.get(".egeria/state.json"), stateBefore);
       assert.equal(repository.files.get(".egeria/migrations.jsonl"), "");
       assert.equal(repository.writes.length, scenario === "changed-mode" ? 0 : 1);
+    }
+  }
+});
+
+const environmentAnalyticsSelection = {
+  consent: { policy: "explicit-opt-in" },
+  providers: { cloudflareWebAnalytics: true, googleAnalytics4: true, microsoftClarity: { audience: "not-directed-to-minors" } },
+  operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
+};
+
+test("environment analytics addition retains selection through late replan and state-last verification", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const entries = await environmentContactEntries("site", { contact: true, multilingual: true, booking: "inline" });
+  for (const scenario of ["accepted", "changed-selection", "mutated-caller", "verification-failure"]) {
+    const repository = createRepository(entries);
+    const settings = structuredClone(environmentAnalyticsSelection);
+    const common = { reader: repository.reader, git, capability: "analytics", settings, renderingContext };
+    const plan = await core.planCapabilityAddition(common);
+    assert.equal(plan.ok, true, JSON.stringify(plan));
+    const stateBefore = repository.files.get(".egeria/state.json");
+    if (scenario === "changed-selection") delete settings.providers.cloudflareWebAnalytics;
+    let verifications = 0;
+    let inspections = 0;
+    const result = await core.applyCapabilityAddition({ ...common, root, writer: repository.writer, approvedPlanFingerprint: plan.value.planFingerprint,
+      inspectWorktree: async () => { if (++inspections === 2 && scenario === "mutated-caller") delete settings.providers.cloudflareWebAnalytics; return git; },
+      inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }),
+      verifier: { async verifyInIsolatedCopy() {
+        verifications++;
+        assert.equal(repository.files.get(".egeria/state.json"), stateBefore);
+        assert.equal(repository.files.get(".egeria/migrations.jsonl"), "");
+        return scenario === "verification-failure" ? { ok: false, issues: [] } : { ok: true, value: { checks: core.ordinaryGenerationVerificationChecks } };
+      } },
+    });
+    assert.equal(result.ok, scenario === "accepted" || scenario === "mutated-caller", JSON.stringify(result));
+    assert.equal(verifications, scenario === "changed-selection" ? 0 : 1);
+    if (result.ok) {
+      const project = core.parseProjectYaml(repository.files.get(".egeria/project.yaml"), "2.0.0");
+      assert.equal(project.ok, true);
+      assert.deepEqual(project.value.capabilitySettings, { analytics: environmentAnalyticsSelection, "booking-calendly": { mode: "inline" } });
+      const state = JSON.parse(repository.files.get(".egeria/state.json"));
+      assert.deepEqual(state.appliedMigrations, ["add-analytics-0-2-0"]);
+      assert.deepEqual(repository.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
+    } else {
+      assert.equal(result.code, scenario === "changed-selection" ? "CAPABILITY_PLAN_APPROVAL_INVALID" : "CAPABILITY_VERIFICATION_FAILED");
+      assert.equal(repository.files.get(".egeria/state.json"), stateBefore);
+      assert.equal(repository.files.get(".egeria/migrations.jsonl"), "");
+      assert.equal(repository.writes.length, scenario === "changed-selection" ? 0 : 1);
     }
   }
 });
