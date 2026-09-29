@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createCapabilityCatalogSnapshot } from "../dist/catalog/capability-catalog.js";
-import { verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
+import { createApplicationEnvironmentRenderingContext, isApplicationEnvironmentRenderingContext, verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
 import { resolveCapabilities } from "../dist/resolution/resolve-capabilities.js";
 import { profileRecipes } from "../dist/profiles/profile-recipes.js";
 import { renderSkeleton } from "../dist/generation/render-skeleton.js";
@@ -93,4 +93,52 @@ test("persistence is unavailable to portfolio and site and historical app views"
   const historical = catalog({ ...defaultSnapshot, standards: "0.4.0" });
   assert.equal(historical.ok, true);
   assert.equal(resolveCapabilities({ profile: "app", requestedCapabilities: ["application-persistence"] }, historical.value, profileRecipes).ok, false);
+});
+
+test("environment persistence resolves the complete app tuple without changing ordinary candidate subjects", () => {
+  const context = createApplicationEnvironmentRenderingContext(true);
+  const result = catalog(context.catalogSnapshot);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const resolved = resolveCapabilities({ profile: "app", requestedCapabilities: ["application-persistence"] }, result.value, context.profiles);
+  assert.equal(resolved.ok, true, JSON.stringify(resolved));
+  const versions = Object.fromEntries(resolved.value.capabilities.map(({ identifier, version }) => [identifier, version]));
+  assert.equal(versions["application-persistence"], "0.2.0");
+  assert.equal(versions.standards, "0.8.0");
+  assert.equal(versions["deployment-cloudflare"], "0.8.0");
+  assert.equal(versions["app-foundation"], "0.3.0");
+  const persistence = result.value.find(({ identifier }) => identifier === "application-persistence");
+  assert.equal(persistence.removalPolicy, "export-and-remove");
+  assert.deepEqual(persistence.dependencies, ["app-foundation"]);
+  assert.equal(persistence.managedSurfaces.some(({ path, ownership }) => path === "apps/web/src/configuration/application-database.ts" && ownership === "managed"), true);
+  assert.deepEqual(persistence.migrationPlanners, ["add-application-persistence-0-2-0", "remove-application-persistence-0-2-0"]);
+  const ordinary = catalog(createApplicationEnvironmentRenderingContext().catalogSnapshot);
+  assert.equal(ordinary.ok, true);
+  for (const descriptor of ordinary.value) {
+    if (["standards", "deployment-cloudflare"].includes(descriptor.identifier)) continue;
+    assert.deepEqual(result.value.find(({ identifier }) => identifier === descriptor.identifier), descriptor);
+  }
+  for (const profile of ["portfolio", "site"]) {
+    assert.equal(resolveCapabilities({ profile, requestedCapabilities: ["application-persistence"] }, result.value, context.profiles).ok, false);
+  }
+  for (const identifier of ["transactional-email-resend", "background-job-delivery"]) {
+    assert.equal(resolveCapabilities({ profile: "app", requestedCapabilities: [identifier] }, result.value, context.profiles).ok, false);
+  }
+});
+
+test("environment persistence rejects partial and mixed snapshots at the catalog and rendering-context boundaries", () => {
+  const context = createApplicationEnvironmentRenderingContext(true);
+  const exact = { standards: "0.8.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.8.0", applicationPersistence: "0.2.0" };
+  assert.deepEqual(context.catalogSnapshot, exact);
+  assert.equal(isApplicationEnvironmentRenderingContext(context), true);
+  for (const snapshot of [
+    { ...exact, standards: "0.7.0" },
+    { ...exact, deploymentCloudflare: "0.7.0" },
+    { ...exact, applicationPersistence: "0.1.0" },
+    { ...exact, applicationPersistence: undefined },
+    { ...exact, appFoundation: undefined },
+    { ...exact, unsupported: true },
+  ]) {
+    assert.equal(catalog(snapshot).ok, false, JSON.stringify(snapshot));
+    assert.equal(isApplicationEnvironmentRenderingContext({ ...context, catalogSnapshot: snapshot }), false);
+  }
 });

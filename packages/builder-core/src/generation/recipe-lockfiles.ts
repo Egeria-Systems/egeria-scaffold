@@ -27,7 +27,7 @@ export function resolveRecipeLockfileVersion(
   const eslintConfigNext = devDependencies["eslint-config-next"];
   const vitest = devDependencies.vitest;
   if (dependencies["drizzle-orm"] !== undefined || devDependencies["drizzle-kit"] !== undefined) {
-    return identity.originProfile === "app" && identity.recipeVersion === "0.2.0" &&
+    return identity.originProfile === "app" && (identity.recipeVersion === "0.2.0" || identity.recipeVersion === "0.3.0") &&
       next === "16.3.3" && eslintConfigNext === "16.3.3" && vitest === "5.0.0" &&
       dependencies.effect === "4.0.0-rc.112" && dependencies["drizzle-orm"] === "0.45.2" &&
       devDependencies["drizzle-kit"] === "0.31.10" &&

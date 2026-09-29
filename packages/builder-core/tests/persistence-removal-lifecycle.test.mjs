@@ -22,12 +22,13 @@ const digest = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("h
 const fingerprint = (value) => digest(stringifyCanonicalJson(value));
 
 async function repository(options = {}) {
+  const renderingContext = options.applicationEnvironments ? core.createApplicationEnvironmentRenderingContext(true) : undefined;
   const rendered = await core.renderSkeleton({
     profile: "app", projectName: "persistence-removal", displayName: "Persistence removal",
-    applicationPersistence: true, ...(options.multilingual ? { multilingual: true } : {}),
+    applicationPersistence: true, ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.multilingual ? { multilingual: true } : {}),
     ...(options.transactionalEmailResend ? { transactionalEmailResend: true } : {}),
     packageVersions: core.verifiedCapabilityPackageVersions,
-  });
+  }, renderingContext);
   assert.equal(rendered.ok, true, JSON.stringify(rendered));
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, content]));
   files.set("pnpm-lock.yaml", new Uint8Array(await readFile(new URL("../lockfiles/web-application-persistence/pnpm-lock.yaml", import.meta.url))));
@@ -36,8 +37,8 @@ async function repository(options = {}) {
   const surfaces = core.materializeInstalledSurfaces({ files, surfaces: [...rendered.value.surfaces, ...createBuilderStateSurfaces()] });
   assert.equal(surfaces.ok, true, JSON.stringify(surfaces));
   const state = {
-    schemaVersion: "1.0.0", builderVersion: "0.0.0", projectSchemaVersion: "1.0.0",
-    origin: { profile: "app", recipeVersion: "0.2.0" },
+    schemaVersion: options.applicationEnvironments ? "2.0.0" : "1.0.0", builderVersion: "0.0.0", projectSchemaVersion: options.applicationEnvironments ? "2.0.0" : "1.0.0",
+    origin: { profile: "app", recipeVersion: options.applicationEnvironments ? "0.3.0" : "0.2.0" },
     installedCapabilities: core.createInstalledManifest(rendered.value.resolved),
     appliedMigrations: [], managedSurfaces: surfaces.value, ejections: [],
     compatibility: { node: "22.23.2", pnpm: "11.20.0", platformAdapter: "cloudflare-workers" },
@@ -55,7 +56,7 @@ async function repository(options = {}) {
     },
   };
   const writer = { async write(changes) {
-    for (const change of changes) assert.deepEqual(files.get(change.path), change.expected);
+    for (const change of changes) assert.deepEqual(files.get(change.path), change.expected?.kind === "file" ? change.expected.content : change.expected?.kind === "missing" ? undefined : change.expected);
     for (const change of changes) {
       if (change.kind === "delete-file") files.delete(change.path);
       else files.set(change.path, change.content);
@@ -67,14 +68,14 @@ async function repository(options = {}) {
   const inventory = async () => ({ ok: true, value: {
     entries: [...files.keys()].filter((path) => !path.startsWith(".wrangler/")).sort().map((path) => ({ path, kind: "file", source: "tracked" })), truncated: false,
   } });
-  return { files, writes, reader, writer, inventory, rendered: rendered.value };
+  return { files, writes, reader, writer, inventory, rendered: rendered.value, renderingContext };
 }
 
 function removalEvidence(repository) {
   const databases = [{ environment: "local", databaseId: "local-application-database" }];
   const schemaPath = "apps/web/src/infrastructure/persistence/schema.ts";
   const subject = {
-    descriptorVersion: "0.1.0",
+    descriptorVersion: repository.rendered.resolved.capabilities.find(({ identifier }) => identifier === "application-persistence").version,
     descriptorFingerprint: fingerprint(repository.rendered.resolved.capabilities.find(({ identifier }) => identifier === "application-persistence")),
     schemaFingerprint: fingerprint([{ path: schemaPath, fingerprint: digest(repository.files.get(schemaPath)) }]),
     migrationsFingerprint: fingerprint([...repository.files.keys()].filter((path) => path.startsWith("apps/web/migrations/")).sort().map((path) => ({ path, fingerprint: digest(repository.files.get(path)) }))),
@@ -97,7 +98,7 @@ function removalEvidence(repository) {
 }
 
 async function plan(repository, persistenceRemoval, capability = "application-persistence") {
-  return planCapabilityRemoval({ reader: repository.reader, git, capability, persistenceRemoval, inspectRepositoryInventory: repository.inventory });
+  return planCapabilityRemoval({ reader: repository.reader, git, capability, persistenceRemoval, inspectRepositoryInventory: repository.inventory, ...(repository.renderingContext === undefined ? {} : { renderingContext: repository.renderingContext }) });
 }
 
 function humanReview(plan) {
@@ -125,11 +126,44 @@ async function apply(repository, planned, evidence, overrides = {}) {
     root, capability: "application-persistence", approvedPlanFingerprint: planned.planFingerprint,
     persistenceRemoval: evidence, persistenceRemovalHumanReview: humanReview(planned),
     reader: repository.reader, writer: repository.writer, inspectRepositoryInventory: repository.inventory,
+    ...(repository.renderingContext === undefined ? {} : { renderingContext: repository.renderingContext }),
     inspectWorktree: async () => git, inspectExpectedChanges: async () => ({ ok: true }),
     verifier: { verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: core.appGenerationVerificationChecks } }) },
     now: () => "2026-09-14T02:00:00Z", ...overrides,
   });
 }
+
+test("environment persistence removal requires reviewed evidence and permits exact re-addition after restoring the candidate app", async () => {
+  const repo = await repository({ applicationEnvironments: true, multilingual: true });
+  const evidence = removalEvidence(repo);
+  const planned = await plan(repo, evidence);
+  assert.equal(planned.ok, true, JSON.stringify(planned));
+  assert.equal(planned.value.persistenceRemovalSubject.descriptorVersion, "0.2.0");
+  assert.equal(planned.value.persistenceRemovalReport.recommendation, "ready-for-human-review");
+  const refused = await apply(repo, planned.value, evidence, { persistenceRemovalHumanReview: undefined });
+  assert.equal(refused.ok, false);
+  assert.equal(repo.writes.length, 0);
+  const removed = await apply(repo, planned.value, evidence);
+  assert.equal(removed.ok, true, JSON.stringify(removed));
+  const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")), "2.0.0");
+  assert.equal(state.ok, true, JSON.stringify(state));
+  assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.7.0");
+  assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.7.0");
+  assert.ok(state.value.installedCapabilities.some(({ identifier }) => identifier === "multilingual"));
+  assert.equal(repo.files.has("apps/web/src/configuration/application-database.ts"), false);
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const addedPlan = await core.planCapabilityAddition({ reader: repo.reader, git, capability: "application-persistence", renderingContext });
+  assert.equal(addedPlan.ok, true, JSON.stringify(addedPlan));
+  const added = await core.applyCapabilityAddition({ root, capability: "application-persistence", renderingContext, approvedPlanFingerprint: addedPlan.value.planFingerprint,
+    reader: repo.reader, writer: repo.writer, inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }),
+    verifier: { verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: persistenceGenerationVerificationChecks } }) },
+  });
+  assert.equal(added.ok, true, JSON.stringify(added));
+  const restored = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")), "2.0.0");
+  assert.equal(restored.ok, true, JSON.stringify(restored));
+  assert.deepEqual(restored.value.appliedMigrations, ["remove-application-persistence-0-2-0", "add-application-persistence-0-2-0"]);
+  assert.equal(restored.value.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.2.0");
+});
 
 test("persistence removal requires evidence review and restores the default app in a state-last transaction", async () => {
   const repo = await repository();
@@ -164,8 +198,9 @@ test("persistence removal requires evidence review and restores the default app 
   assert.deepEqual(repo.files.get("pnpm-lock.yaml"), new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.2.0/pnpm-lock.yaml", import.meta.url))));
 });
 
-test("machine-ready persistence removal never writes without complete human dispositions", async () => {
-  const repo = await repository();
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment " : ""}machine-ready persistence removal never writes without complete human dispositions`, async () => {
+  const repo = await repository({ applicationEnvironments });
   const evidence = removalEvidence(repo);
   const planned = await plan(repo, evidence);
   assert.equal(planned.ok, true, JSON.stringify(planned));
@@ -176,6 +211,7 @@ test("machine-ready persistence removal never writes without complete human disp
     assert.deepEqual(repo.writes, []);
   }
 });
+}
 
 test("persistence removal preserves customized content mentioning removed packages for human review", async () => {
   for (const packageName of ["drizzle-orm", "drizzle-kit"]) {
@@ -249,8 +285,9 @@ test("author-added content directories retain package, source and deleted-path r
   }
 });
 
-test("changed export bytes after approval refuse before the first write", async () => {
-  const repo = await repository();
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment " : ""}changed export bytes after approval refuse before the first write`, async () => {
+  const repo = await repository({ applicationEnvironments });
   const evidence = removalEvidence(repo);
   const planned = await plan(repo, evidence);
   assert.equal(planned.ok, true, JSON.stringify(planned));
@@ -260,8 +297,10 @@ test("changed export bytes after approval refuse before the first write", async 
   assert.equal(result.phase, "precondition");
   assert.deepEqual(repo.writes, []);
 });
+}
 
-test("persistence evidence subjects and required recovery cannot be self-certified by the supplied envelope", async () => {
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment " : ""}persistence evidence subjects and required recovery cannot be self-certified by the supplied envelope`, async () => {
   for (const mutate of [
     (input) => { delete input.evidence; },
     (input) => { input.evidence.subject.schemaFingerprint = `sha256:${"0".repeat(64)}`; },
@@ -269,7 +308,7 @@ test("persistence evidence subjects and required recovery cannot be self-certifi
     (input) => { input.evidence.databases[0].recovery.restoration = "failed"; },
     (input) => { input.policy.recoveryRequirements[0].scope = "deployed"; },
   ]) {
-    const repo = await repository();
+    const repo = await repository({ applicationEnvironments });
     const evidence = removalEvidence(repo);
     mutate(evidence);
     const planned = await plan(repo, evidence);
@@ -281,9 +320,11 @@ test("persistence evidence subjects and required recovery cannot be self-certifi
     assert.deepEqual(repo.writes, []);
   }
 });
+}
 
-test("persistence removal preserves changed application schema and user migration SQL", async () => {
-  const repo = await repository();
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment " : ""}persistence removal preserves changed application schema and user migration SQL`, async () => {
+  const repo = await repository({ applicationEnvironments });
   const schemaPath = "apps/web/src/infrastructure/persistence/schema.ts";
   const schema = encoder.encode("export const applicationSchema = {};\n");
   const sql = encoder.encode("CREATE TABLE customer_owned(id INTEGER PRIMARY KEY);\n");
@@ -304,15 +345,17 @@ test("persistence removal preserves changed application schema and user migratio
   assert.equal(repeated.ok, false);
   assert.equal(repeated.issues[0].code, "CAPABILITY_NOT_INSTALLED");
 });
+}
 
-test("surviving Drizzle consumers refuse persistence removal without erasing custom source", async () => {
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment " : ""}surviving Drizzle consumers refuse persistence removal without erasing custom source`, async () => {
   for (const [path, content] of [
     ["apps/web/src/custom.ts", 'import { sql } from "drizzle-orm"; export { sql };\n'],
     ["apps/web/src/custom.ts", 'export { sqliteTable } from "drizzle-orm/sqlite-core";\n'],
     ["apps/web/custom.config.ts", 'import { defineConfig } from "drizzle-kit"; export default defineConfig({});\n'],
     ["apps/web/src/custom.ts", 'import type { D1Database } from "@cloudflare/workers-types"; export type Database = D1Database;\n'],
   ]) {
-    const repo = await repository();
+    const repo = await repository({ applicationEnvironments });
     repo.files.set(path, encoder.encode(content));
     const planned = await plan(repo, removalEvidence(repo));
     assert.equal(planned.ok, false);
@@ -321,6 +364,7 @@ test("surviving Drizzle consumers refuse persistence removal without erasing cus
     assert.equal(decoder.decode(repo.files.get(path)), content);
   }
 });
+}
 
 test("persistence removal refuses static Drizzle commands reached through custom JavaScript tools", async () => {
   for (const source of [
@@ -355,8 +399,9 @@ test("a custom dependency graph refuses persistence removal before replacement",
   assert.deepEqual(repo.writes, []);
 });
 
-test("evidence changed during final preflight refuses before source writes", async () => {
-  const repo = await repository();
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment " : ""}evidence changed during final preflight refuses before source writes`, async () => {
+  const repo = await repository({ applicationEnvironments });
   const evidence = removalEvidence(repo);
   const planned = await plan(repo, evidence);
   assert.equal(planned.ok, true, JSON.stringify(planned));
@@ -370,9 +415,11 @@ test("evidence changed during final preflight refuses before source writes", asy
   assert.equal(result.code, "CAPABILITY_PLAN_APPROVAL_INVALID");
   assert.deepEqual(repo.writes, []);
 });
+}
 
-test("failed verification retains transformed source and the original state and migration log", async () => {
-  const repo = await repository();
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment " : ""}failed verification retains transformed source and the original state and migration log`, async () => {
+  const repo = await repository({ applicationEnvironments });
   const evidence = removalEvidence(repo);
   const planned = await plan(repo, evidence);
   assert.equal(planned.ok, true, JSON.stringify(planned));
@@ -387,6 +434,7 @@ test("failed verification retains transformed source and the original state and 
   assert.deepEqual(repo.files.get(".egeria/migrations.jsonl"), migrations);
   assert.equal(repo.files.has("apps/web/drizzle.config.ts"), false);
 });
+}
 
 test("other optional removal retains persistence and requires the binding verification lane", async () => {
   for (const bindingChecked of [false, true]) {
@@ -428,8 +476,9 @@ test("unavailable selected local artifacts remain explicit human review obligati
   assert.equal(accepted.ok, true, JSON.stringify(accepted));
 });
 
-test("changed user migration bytes invalidate an approved evidence subject before writes", async () => {
-  const repo = await repository();
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment " : ""}changed user migration bytes invalidate an approved evidence subject before writes`, async () => {
+  const repo = await repository({ applicationEnvironments });
   const path = "apps/web/migrations/0000_application.sql";
   repo.files.set(path, encoder.encode("CREATE TABLE user_owned(id TEXT);\n"));
   const evidence = removalEvidence(repo);
@@ -440,4 +489,65 @@ test("changed user migration bytes invalidate an approved evidence subject befor
   assert.equal(result.ok, false);
   assert.equal(result.code, "CAPABILITY_PLAN_APPROVAL_INVALID");
   assert.deepEqual(repo.writes, []);
+});
+}
+
+
+test("environment persistence neighbors preserve database ownership and enforce the binding lane", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const analytics = { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} };
+  for (const [capability, settings] of [["contact-form-web3forms", undefined], ["booking-calendly", { mode: "link" }], ["analytics", analytics]]) {
+    const repo = await repository({ applicationEnvironments: true, multilingual: true });
+    const retainedPaths = ["apps/web/src/configuration/application-database.ts", "apps/web/wrangler.jsonc", "apps/web/tests/bindings/application-persistence.test.ts", "apps/web/src/infrastructure/persistence/schema.ts"];
+    const retained = new Map(retainedPaths.map(path => [path, repo.files.get(path)]));
+    const addedPlan = await core.planCapabilityAddition({ reader: repo.reader, git, capability, settings, renderingContext });
+    assert.equal(addedPlan.ok, true, JSON.stringify(addedPlan));
+    const added = await core.applyCapabilityAddition({ root, capability, settings, renderingContext, approvedPlanFingerprint: addedPlan.value.planFingerprint,
+      reader: repo.reader, writer: repo.writer, inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }),
+      verifier: { verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: persistenceGenerationVerificationChecks } }) },
+    });
+    assert.equal(added.ok, true, JSON.stringify(added));
+    const planned = await plan(repo, undefined, capability);
+    assert.equal(planned.ok, true, JSON.stringify(planned));
+    const result = await applyCapabilityRemoval({ root, capability, renderingContext, approvedPlanFingerprint: planned.value.planFingerprint,
+      reader: repo.reader, writer: repo.writer, inspectRepositoryInventory: repo.inventory, inspectWorktree: async () => git, inspectExpectedChanges: async () => ({ ok: true }),
+      verifier: { verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: persistenceGenerationVerificationChecks } }) },
+    });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const state = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.2.0");
+    assert.ok(state.installedCapabilities.some(({ identifier }) => identifier === "multilingual"));
+    for (const [path, bytes] of retained) assert.deepEqual(repo.files.get(path), bytes, path);
+  }
+  const repo = await repository({ applicationEnvironments: true, contact: true });
+  const planned = await plan(repo, undefined, "contact-form-web3forms");
+  assert.equal(planned.ok, true, JSON.stringify(planned));
+  const state = repo.files.get(".egeria/state.json");
+  const result = await applyCapabilityRemoval({ root, capability: "contact-form-web3forms", renderingContext, approvedPlanFingerprint: planned.value.planFingerprint,
+    reader: repo.reader, writer: repo.writer, inspectRepositoryInventory: repo.inventory, inspectWorktree: async () => git, inspectExpectedChanges: async () => ({ ok: true }),
+    verifier: { verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: core.appGenerationVerificationChecks } }) },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "CAPABILITY_VERIFICATION_FAILED");
+  assert.deepEqual(repo.files.get(".egeria/state.json"), state);
+});
+
+test("environment persistence removal ejects modified binding examples and refuses re-add overwrite", async () => {
+  const repo = await repository({ applicationEnvironments: true });
+  const path = "apps/web/tests/unit/application-database-environment.test.ts";
+  const content = encoder.encode("// Application-owned extended database checks.\n");
+  repo.files.set(path, content);
+  const evidence = removalEvidence(repo);
+  const planned = await plan(repo, evidence);
+  assert.equal(planned.ok, true, JSON.stringify(planned));
+  assert.equal(planned.value.actions.find(action => action.path === path).kind, "preserve-file-and-eject");
+  const removed = await apply(repo, planned.value, evidence);
+  assert.equal(removed.ok, true, JSON.stringify(removed));
+  assert.deepEqual(repo.files.get(path), content);
+  assert.ok(JSON.parse(decoder.decode(repo.files.get(".egeria/state.json"))).ejections.includes(path));
+  const before = repo.writes.length;
+  const readd = await core.planCapabilityAddition({ reader: repo.reader, git, capability: "application-persistence", renderingContext: core.createApplicationEnvironmentRenderingContext() });
+  assert.equal(readd.ok, false);
+  assert.equal(readd.issues[0].code, "PROJECT_EJECTION_UNSUPPORTED");
+  assert.equal(repo.writes.length, before);
 });

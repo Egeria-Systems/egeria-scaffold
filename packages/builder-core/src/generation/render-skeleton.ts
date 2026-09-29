@@ -465,7 +465,7 @@ export async function renderSkeleton(
   context?: SkeletonRenderingContext | ApplicationEnvironmentRenderingContext,
 ): Promise<ValidationResult<RenderedSkeleton<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration>>> {
   const applicationEnvironments = context !== undefined && "projectSchemaVersion" in context;
-  const environmentDescriptor = context?.catalogSnapshot.standards === "0.7.0" || context?.catalogSnapshot.appFoundation === "0.3.0" || context?.catalogSnapshot.deploymentCloudflare === "0.7.0";
+  const environmentDescriptor = context?.catalogSnapshot.standards === "0.7.0" || context?.catalogSnapshot.standards === "0.8.0" || context?.catalogSnapshot.appFoundation === "0.3.0" || context?.catalogSnapshot.deploymentCloudflare === "0.7.0" || context?.catalogSnapshot.deploymentCloudflare === "0.8.0";
   if ((applicationEnvironments || environmentDescriptor || (context !== undefined && "projectSchemaVersion" in context)) &&
       (!applicationEnvironments || !isApplicationEnvironmentRenderingContext(context))) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "unsupported-context");
@@ -473,8 +473,11 @@ export async function renderSkeleton(
   if (applicationEnvironments && Object.hasOwn(request, "contactFormWeb3Forms") && request.contactFormWeb3Forms !== true) {
     return generatedIssue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "contactFormWeb3Forms"], "invalid-selection");
   }
-  if (applicationEnvironments && (request.applicationPersistence === true || request.transactionalEmailResend === true || request.backgroundJobDelivery === true)) {
+  if (applicationEnvironments && (request.transactionalEmailResend === true || request.backgroundJobDelivery === true)) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
+  }
+  if (applicationEnvironments && (request.applicationPersistence === true) !== (context.catalogSnapshot.applicationPersistence === "0.2.0")) {
+    return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "selection-mismatch");
   }
   const packageVersions: CapabilityPackageVersions = {
     standards: request.packageVersions.standards,

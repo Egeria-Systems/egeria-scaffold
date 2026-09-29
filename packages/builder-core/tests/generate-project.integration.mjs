@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -796,3 +796,97 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
     context.diagnostic(JSON.stringify({ owner, artifacts, providerBoundary: "synthetic intercepted requests only" }));
   });
 }
+
+
+test("environment persistence generation and lifecycle preserve target isolation", { timeout: 60 * 60 * 1000 }, async context => {
+  const owner = await realpath(await mkdtemp(join(tmpdir(), "egeria-environment-persistence-")));
+  context.diagnostic(`Retained local persistence evidence: ${owner}`);
+  const primary = join(owner, "primary");
+  const linked = join(owner, "linked");
+  const commands = [];
+  const cliUrl = new URL("../../../apps/cli/dist/run-cli.js", import.meta.url).href;
+  const coreUrl = new URL("../dist/index.js", import.meta.url).href;
+  async function command(label, executable, arguments_, cwd = owner) {
+    try {
+      const result = await execFileAsync(executable, arguments_, { cwd, encoding: "utf8", maxBuffer: 5 * 1024 * 1024, timeout: 20 * 60 * 1000, env: { PATH: process.env.PATH, LANG: process.env.LANG } });
+      await writeFile(join(owner, `${label}.log`), result.stdout + result.stderr);
+      commands.push({ label, executable, exitCode: 0 });
+      return result.stdout;
+    } catch (error) {
+      await writeFile(join(owner, `${label}.log`), (error.stdout ?? "") + (error.stderr ?? ""));
+      commands.push({ label, executable, exitCode: error.code });
+      throw error;
+    } finally { await writeFile(join(owner, "commands.json"), JSON.stringify(commands, null, 2)); }
+  }
+  async function cli(label, arguments_) {
+    const source = `import { createCliRunner } from ${JSON.stringify(cliUrl)};
+import { createPnpmGeneratedProjectVerifier } from ${JSON.stringify(coreUrl)};
+const run = createCliRunner({ createVerifier: () => createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }) }, "2.0.0");
+process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => process.stdout.write(value), writeError: value => process.stderr.write(value) });`;
+    return JSON.parse(await command(label, process.execPath, ["--input-type=module", "-e", source]));
+  }
+  async function commitFixture(label, root) {
+    await command(`${label}-add`, "git", ["add", "-A"], root);
+    await command(`${label}-commit`, "git", ["commit", "-m", label], root);
+  }
+  const created = await cli("create", ["create", "--profile", "app", "--name", "persistence-example", "--display-name", "Persistence Example", "--directory", primary, "--application-persistence", "--multilingual", "--contact-form-web3forms", "--booking-calendly", "--calendly-mode", "link", "--google-analytics-4"]);
+  assert.equal(created.ok, true);
+  const initialState = JSON.parse(await readFile(join(primary, ".egeria/state.json"), "utf8"));
+  assert.equal(initialState.schemaVersion, "2.0.0");
+  for (const lane of ["cloudflare-types", "unit-tests", "next-build", "opennext-build", "worker-integration", "binding-integration"]) assert.ok(initialState.lastSuccessfulVerification.checks.includes(lane));
+  const initialProject = await readFile(join(primary, ".egeria/project.yaml"));
+  const initialLock = await readFile(join(primary, "pnpm-lock.yaml"));
+  for (const operation of ["infer", "doctor"]) assert.equal((await cli(`initial-${operation}`, [operation, "--directory", primary])).ok, true);
+  await command("fixture-init", "git", ["init", "--initial-branch=main", primary]);
+  await command("fixture-name", "git", ["config", "user.name", "Persistence Integration Test"], primary);
+  await command("fixture-email", "git", ["config", "user.email", "persistence-test@example.test"], primary);
+  await commitFixture("generated-persistence", primary);
+  await command("fixture-worktree", "git", ["worktree", "add", "-b", "persistence-lifecycle-test", linked], primary);
+
+  // This evidence and its acceptances exercise only the synthetic source-removal contract.
+  const inputPath = join(owner, "removal.json");
+  const reviewPath = join(owner, "review.json");
+  const databases = [{ environment: "local", databaseId: "local-test-database" }];
+  const input = { databases, policy: { exportNotBefore: "2026-09-26T00:00:00Z", retainUntil: "2026-10-26T00:00:00Z", recoveryRequirements: [{ environment: "local", scope: "local" }], writeConsistency: "writes-paused" } };
+  await writeFile(inputPath, JSON.stringify(input));
+  const removalArguments = ["--directory", linked, "--capability", "application-persistence", "--persistence-removal", inputPath];
+  const initialPlan = (await cli("removal-subject", ["plan-remove", ...removalArguments])).plan;
+  const exportBytes = "synthetic local contract export\n";
+  const recoveryBytes = "synthetic local contract recovery\n";
+  const digest = bytes => `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+  await mkdir(join(linked, ".wrangler/removal-evidence"), { recursive: true });
+  await writeFile(join(linked, ".wrangler/removal-evidence/export.sql"), exportBytes);
+  await writeFile(join(linked, ".wrangler/removal-evidence/recovery.json"), recoveryBytes);
+  input.evidence = { schemaVersion: "1.0.0", subject: { ...initialPlan.persistenceRemovalSubject, databases }, databases: [{ ...databases[0],
+    export: { artifactReference: "local-export", digest: digest(exportBytes), completedAt: "2026-09-26T01:00:00Z", outcome: "passed" },
+    recovery: { artifactReference: "local-recovery", digest: digest(recoveryBytes), exportDigest: digest(exportBytes), scope: "local", restoration: "passed", readback: "passed" },
+    writeConsistency: { mode: "writes-paused", outcome: "passed" }, retention: { retainedUntil: "2026-10-26T00:00:00Z", outcome: "passed" },
+  }] };
+  input.localArtifacts = [{ reference: "local-export", path: ".wrangler/removal-evidence/export.sql" }, { reference: "local-recovery", path: ".wrangler/removal-evidence/recovery.json" }];
+  await writeFile(inputPath, JSON.stringify(input));
+  const removalPlan = (await cli("plan-remove", ["plan-remove", ...removalArguments])).plan;
+  assert.equal(removalPlan.persistenceRemovalReport.recommendation, "ready-for-human-review");
+  await writeFile(reviewPath, JSON.stringify({ reportFingerprint: removalPlan.persistenceRemovalReport.reportFingerprint, dispositions: removalPlan.persistenceRemovalReport.requiredReviewItems.map(({ identifier }) => ({ identifier, disposition: "accepted" })) }));
+  const removed = await cli("apply-remove", ["apply-remove", ...removalArguments, "--persistence-human-review", reviewPath, "--approved-plan", removalPlan.planFingerprint]);
+  assert.equal(removed.ok, true);
+  assert.equal(removed.result.status, "verified-final-diff-approval-required");
+  const removedState = JSON.parse(await readFile(join(linked, ".egeria/state.json"), "utf8"));
+  assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.7.0");
+  assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.7.0");
+  assert.equal(removedState.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"), false);
+  assert.equal(removedState.lastSuccessfulVerification.checks.includes("binding-integration"), false);
+  await commitFixture("removed-persistence", linked);
+  const additionArguments = ["--directory", linked, "--capability", "application-persistence"];
+  const additionPlan = (await cli("plan-readd", ["plan-add", ...additionArguments])).result;
+  const added = await cli("apply-readd", ["apply-add", ...additionArguments, "--approved-plan", additionPlan.planFingerprint]);
+  assert.equal(added.ok, true);
+  assert.equal(added.result.status, "verified-final-diff-approval-required");
+  const finalState = JSON.parse(await readFile(join(linked, ".egeria/state.json"), "utf8"));
+  assert.deepEqual(finalState.appliedMigrations, ["remove-application-persistence-0-2-0", "add-application-persistence-0-2-0"]);
+  for (const [identifier, version] of [["application-persistence", "0.2.0"], ["standards", "0.8.0"], ["deployment-cloudflare", "0.8.0"], ["app-foundation", "0.3.0"]]) assert.equal(finalState.installedCapabilities.find(capability => capability.identifier === identifier).version, version);
+  assert.ok(finalState.lastSuccessfulVerification.checks.includes("binding-integration"));
+  assert.deepEqual(await readFile(join(linked, ".egeria/project.yaml")), initialProject);
+  assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), initialLock);
+  for (const operation of ["infer", "doctor"]) assert.equal((await cli(`final-${operation}`, [operation, "--directory", linked])).ok, true);
+  await writeFile(join(owner, "verification-evidence.json"), JSON.stringify({ initial: initialState.lastSuccessfulVerification, removed: removedState.lastSuccessfulVerification, restored: finalState.lastSuccessfulVerification, localSyntheticOnly: true, providerAccess: false }, null, 2));
+});

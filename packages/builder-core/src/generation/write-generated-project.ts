@@ -175,7 +175,7 @@ function validateRequest(
     for (const key of ["multilingual", "applicationPersistence", "transactionalEmailResend", "backgroundJobDelivery"] as const) {
       if (Object.hasOwn(value, key) && value[key] !== true) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", key], "invalid-selection");
     }
-    if (includesPersistence || includesEmail || includesJobs) return issue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
+    if (includesEmail || includesJobs) return issue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
     return {
       ok: true,
       value: {
@@ -186,6 +186,7 @@ function validateRequest(
         ...(booking?.success ? { bookingCalendly: booking.data } : {}),
         ...(includesContact ? { contactFormWeb3Forms: true } : {}),
         ...(includesMultilingual ? { multilingual: true } : {}),
+        ...(includesPersistence ? { applicationPersistence: true } : {}),
       },
     };
   }
@@ -447,7 +448,7 @@ function verificationIsExact(
 
   const checks = value.checks;
   const app = rendered.resolved.capabilities.some(({ identifier }) => identifier === "app-foundation");
-  const persistence = rendered.resolved.capabilities.some(({ identifier, version }) => identifier === "application-persistence" && version === "0.1.0");
+  const persistence = rendered.resolved.capabilities.some(({ identifier }) => identifier === "application-persistence");
   const expectedChecks = persistence ? persistenceGenerationVerificationChecks : app ? appGenerationVerificationChecks : verificationChecks;
 
   return (

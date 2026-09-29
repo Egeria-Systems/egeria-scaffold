@@ -1593,6 +1593,38 @@ const environmentState = {
   ].map(([identifier, version]) => ({ ...validState.installedCapabilities[0], identifier, version })),
 };
 
+test("environment persistence state requires the complete optional tuple and binding verification", () => {
+  const state = {
+    ...environmentState,
+    origin: { profile: "app", recipeVersion: "0.3.0" },
+    installedCapabilities: [
+      ["standards", "0.8.0"], ["content-files", "0.4.0"], ["section-composition", "0.3.0"],
+      ["deployment-cloudflare", "0.8.0"], ["observability", "0.3.0"], ["site-routing", "0.4.0"],
+      ["app-foundation", "0.3.0"], ["application-persistence", "0.2.0"],
+    ].map(([identifier, version]) => ({ ...validState.installedCapabilities[0], identifier, version })),
+    lastSuccessfulVerification: { kind: "generation", checks: [
+      "contracts", "pre-state-inference", "lockfile", "frozen-install", "lint", "cloudflare-types", "typecheck",
+      "unit-tests", "component-tests", "next-build", "opennext-build", "worker-integration", "binding-integration", "post-state-inference",
+    ] },
+  };
+  const parsed = contracts.parseStateJson(JSON.stringify(state), "2.0.0");
+  assert.equal(parsed.ok, true, JSON.stringify(parsed));
+  assert.equal(contracts.parseStateJson(JSON.stringify(state)).ok, false);
+  for (const mutate of [
+    (value) => { value.installedCapabilities[0].version = "0.7.0"; },
+    (value) => { value.installedCapabilities[3].version = "0.7.0"; },
+    (value) => { value.installedCapabilities[7].version = "0.1.0"; },
+    (value) => { value.installedCapabilities.splice(6, 1); },
+    (value) => { value.installedCapabilities.push(value.installedCapabilities[7]); },
+    (value) => { value.origin = { profile: "site", recipeVersion: "0.13.0" }; },
+    (value) => { value.lastSuccessfulVerification.checks = value.lastSuccessfulVerification.checks.filter(check => check !== "binding-integration"); },
+    (value) => { value.lastSuccessfulVerification.checks = value.lastSuccessfulVerification.checks.filter(check => check !== "cloudflare-types"); },
+  ]) {
+    const invalid = structuredClone(state); mutate(invalid);
+    assert.equal(contracts.parseStateJson(JSON.stringify(invalid), "2.0.0").ok, false);
+  }
+});
+
 test("application environment state parsing enforces the exact candidate tuple and verification vector", () => {
   const result = contracts.parseStateJson(JSON.stringify(environmentState), "2.0.0");
   assert.equal(result.ok, true, JSON.stringify(result));

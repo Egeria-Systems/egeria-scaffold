@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { createGenerationRenderingContext, isApplicationEnvironmentRenderingContext, readVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
+import { createApplicationEnvironmentRenderingContext, createGenerationRenderingContext, isApplicationEnvironmentRenderingContext, readVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
 import { fingerprintFileContent, fingerprintJsonValue } from "../ownership/fingerprint.js";
 import { prepareCapabilityDependencyChange } from "./prepare-capability-dependency-change.js";
@@ -54,9 +54,9 @@ export type CapabilityAdditionPlan = Readonly<{
   baseRevision: string;
   profile: ProfileIdentifier;
   capability: Readonly<{
-    identifier: "multilingual" | "application-persistence" | "transactional-email-resend";
+    identifier: "multilingual" | "transactional-email-resend";
     version: "0.1.0";
-  }> | Readonly<{ identifier: "analytics" | "contact-form-web3forms" | "booking-calendly"; version: "0.1.0" | "0.2.0" }>
+  }> | Readonly<{ identifier: "analytics" | "contact-form-web3forms" | "booking-calendly" | "application-persistence"; version: "0.1.0" | "0.2.0" }>
     | Readonly<{ identifier: "background-job-delivery"; version: "0.2.0" }>;
   settings:
     | Readonly<{
@@ -519,7 +519,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   const capabilityValue: unknown = Reflect.get(input, "capability");
   if (input.renderingContext !== undefined && (
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    (capabilityValue !== "contact-form-web3forms" && capabilityValue !== "booking-calendly" && capabilityValue !== "analytics") ||
+    (capabilityValue !== "contact-form-web3forms" && capabilityValue !== "booking-calendly" && capabilityValue !== "analytics" && capabilityValue !== "application-persistence") ||
     (capabilityValue === "contact-form-web3forms" && input.settings !== undefined)
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
 
@@ -594,8 +594,8 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 
   const state = inspection.inference.state.value;
   if (capabilityValue === "application-persistence" && (
-    project.originProfile !== "app" || project.recipeVersion !== "0.2.0" ||
-    snapshot.value.renderingContext?.catalogSnapshot.standards !== "0.5.0"
+    project.originProfile !== "app" || project.recipeVersion !== (input.renderingContext === undefined ? "0.2.0" : "0.3.0") ||
+    snapshot.value.renderingContext?.catalogSnapshot.standards !== (input.renderingContext === undefined ? "0.5.0" : "0.7.0")
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   if (input.renderingContext === undefined && (capabilityValue === "transactional-email-resend" || capabilityValue === "contact-form-web3forms" || capabilityValue === "background-job-delivery") && !(
     (project.originProfile === "portfolio" && project.recipeVersion === "0.11.0") ||
@@ -612,12 +612,14 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("CAPABILITY_ALREADY_INSTALLED");
   }
 
-  const targetContext = capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery"
+  const environmentContext = isApplicationEnvironmentRenderingContext(snapshot.value.renderingContext) ? snapshot.value.renderingContext : undefined;
+  const environmentTargetContext = environmentContext === undefined ? undefined : createApplicationEnvironmentRenderingContext(capabilityValue === "application-persistence" || project.selectedCapabilities.includes("application-persistence"));
+  const targetContext = environmentTargetContext ?? (capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery"
     ? createGenerationRenderingContext(
         capabilityValue === "application-persistence" || project.selectedCapabilities.includes("application-persistence"),
         capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery" || snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0",
         capabilityValue === "background-job-delivery",
-      ) : snapshot.value.renderingContext;
+      ) : snapshot.value.renderingContext);
   const targetCatalog = targetContext === undefined ? { ok: true as const, value: snapshot.value.catalog }
     : createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, targetContext.catalogSnapshot);
   if (!targetCatalog.ok) return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -645,13 +647,14 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   const environmentProject = project.schemaVersion === "2.0.0" ? project : undefined;
   const environmentRenderRequest = {
     ...commonRenderRequest,
+    ...(project.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
     ...(environmentProject?.capabilitySettings.analytics === undefined ? {} : { analytics: environmentProject.capabilitySettings.analytics }),
     ...(environmentProject?.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: environmentProject.capabilitySettings["booking-calendly"] }),
     ...(project.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
   };
-  const currentResult = input.renderingContext === undefined
+  const currentResult = environmentContext === undefined
     ? await renderSkeleton(renderRequest, snapshot.value.renderingContext)
-    : await renderSkeleton(environmentRenderRequest, input.renderingContext);
+    : await renderSkeleton(environmentRenderRequest, environmentContext);
 
   if (!currentResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -681,7 +684,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
-  const desiredResult = input.renderingContext === undefined ? await renderSkeleton({
+  const desiredResult = environmentTargetContext === undefined ? await renderSkeleton({
     ...renderRequest,
     ...(capabilityValue === "analytics" && analyticsSettingsResult?.success === true
       ? { analytics: analyticsSettingsResult.data }
@@ -698,10 +701,11 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
           : { multilingual: true as const }),
   }, targetContext) : await renderSkeleton({
     ...environmentRenderRequest,
+    ...(capabilityValue === "application-persistence" ? { applicationPersistence: true as const } : {}),
     ...(capabilityValue === "contact-form-web3forms" ? { contactFormWeb3Forms: true as const } : {}),
     ...(environmentBookingSettings?.success ? { bookingCalendly: environmentBookingSettings.data } : {}),
     ...(environmentAnalyticsSettings?.success ? { analytics: environmentAnalyticsSettings.data } : {}),
-  }, input.renderingContext);
+  }, environmentTargetContext);
 
   if (!desiredResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -740,7 +744,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       status: "approval-required",
       baseRevision: input.git.identity.revision,
       profile: project.originProfile,
-      capability: capabilityValue === "analytics" || capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly"
+      capability: capabilityValue === "analytics" || capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly" || capabilityValue === "application-persistence"
         ? { identifier: capabilityValue, version: input.renderingContext === undefined ? "0.1.0" : "0.2.0" }
         : capabilityValue === "background-job-delivery"
           ? { identifier: capabilityValue, version: "0.2.0" }
@@ -799,7 +803,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     persistenceSnapshot = fingerprintJsonValue({
       current: prepared.value.current.files.map(({ path, content }) => ({ path, fingerprint: fingerprintFileContent(content) })),
       desired: prepared.value.desired.files.map(({ path, content }) => ({ path, fingerprint: fingerprintFileContent(content) })),
-      ...(input.renderingContext === undefined ? {} : { renderingContext: input.renderingContext }),
+      ...(input.renderingContext === undefined ? {} : { renderingContext: environmentContext }),
       sourceCatalog: snapshot.value.catalog,
       targetCatalog: targetCatalog.value,
       project: controls.projectSource,

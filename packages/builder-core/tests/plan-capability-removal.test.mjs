@@ -1607,14 +1607,14 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
   const owner = await mkdtemp(join(tmpdir(), "egeria-contact-lifecycle-"));
   try {
     const destination = join(owner, "project");
-    const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
+    const checks = options.persistence ? core.persistenceGenerationVerificationChecks : profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
-      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
-      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(),
+      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.persistence ? { applicationPersistence: true } : {}), ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
+      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(options.persistence === true),
       verifier: {
         async prepareLockfile(root) {
           const version = profile === "portfolio" ? "portfolio-0.11.0" : profile === "site" ? "site-0.12.0" : "app-0.2.0";
-          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}/pnpm-lock.yaml`)));
+          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/${options.persistence ? "web-application-persistence" : `web-recipe-${version}`}/pnpm-lock.yaml`)));
           return { ok: true, value: undefined };
         },
         async verifyInIsolatedCopy() { return { ok: true, value: { checks } }; },
@@ -1692,4 +1692,15 @@ test("environment analytics removal preserves neighbors and refuses surviving re
   const referenced = new Map(entries);
   referenced.set("apps/web/src/analytics-consumer.ts", 'import { analyticsSettings } from "./integrations/analytics/analytics-settings";\n');
   assertFailure(await plan(referenced), "CAPABILITY_REMOVAL_REFERENCE_CONFLICT");
+});
+
+
+test("environment persistence neighbor removal binds actual source context and preserves the optional tuple", async () => {
+  const entries = await environmentContactEntries("app", { persistence: true, analytics: environmentAnalyticsSelection, booking: "link", contact: true, multilingual: true });
+  for (const capability of ["analytics", "booking-calendly", "contact-form-web3forms"]) {
+    const result = await core.planCapabilityRemoval({ reader: createSnapshotReader(entries).reader, git, capability, renderingContext: core.createApplicationEnvironmentRenderingContext(), inspectRepositoryInventory: async () => inventoryFromEntries(entries) });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.ok(result.value.desiredCapabilities.includes("application-persistence"));
+    for (const path of ["apps/web/wrangler.jsonc", "apps/web/src/configuration/application-database.ts", "apps/web/tests/bindings/application-persistence.test.ts"]) assert.equal(result.value.actions.some(action => action.path === path), false, path);
+  }
 });
