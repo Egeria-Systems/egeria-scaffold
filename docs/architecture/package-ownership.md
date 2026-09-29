@@ -79,3 +79,5 @@ The [jobs boundary](capability-model.md#background-job-delivery-boundary) owns t
 
 
 The [internal persistence candidate](capability-model.md#persistence-internal-candidate) adds a persistence-managed pure application-to-database mapping source and its application-owned unit specification. Candidate alternatives retain the existing owners of binding examples, guide, migration workflow, Wrangler configuration, preflight and deployment workflow. The descriptor is the exact surface inventory; no package or production database consumer is added.
+
+The [internal email candidate](capability-model.md#transactional-email-internal-candidate) retains the nine email surface owners and selects four explicit template alternatives. Builder-core owns exact candidate context/state and retained-foundation lifecycle; the adapter owns runtime target and recipient validation, and the application owns the shared runtime example and operator guide. No new public package, provider port or product sending endpoint is added.

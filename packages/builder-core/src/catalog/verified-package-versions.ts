@@ -179,7 +179,7 @@ export async function readVerifiedProjectSnapshot(
     const state = parseStateJson(stateSource.content, "2.0.0");
     if (!project.ok || !state.ok || project.value.originProfile !== state.value.origin.profile ||
         project.value.recipeVersion !== state.value.origin.recipeVersion) return invalid();
-    const installedContext = createApplicationEnvironmentRenderingContext(project.value.selectedCapabilities.includes("application-persistence"));
+    const installedContext = createApplicationEnvironmentRenderingContext(project.value.selectedCapabilities.includes("application-persistence"), project.value.selectedCapabilities.includes("app-foundation"));
     const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, installedContext.catalogSnapshot);
     if (!catalog.ok) return catalog;
     const resolved = resolveCapabilities({ profile: project.value.originProfile, requestedCapabilities: project.value.selectedCapabilities }, catalog.value, installedContext.profiles);
@@ -201,9 +201,10 @@ export async function readVerifiedProjectSnapshot(
     : snapshot;
 }
 
-export function createApplicationEnvironmentRenderingContext(applicationPersistence = false): ApplicationEnvironmentRenderingContext {
+export function createApplicationEnvironmentRenderingContext(applicationPersistence = false, retainAppFoundation = false): ApplicationEnvironmentRenderingContext {
   return {
     projectSchemaVersion: "2.0.0",
+    ...(retainAppFoundation ? { retainAppFoundation: true } : {}),
     catalogSnapshot: applicationPersistence ? applicationEnvironmentPersistenceCatalogSnapshot : applicationEnvironmentCatalogSnapshot,
     profiles: createApplicationEnvironmentProfileRecipes(),
   };
@@ -212,7 +213,7 @@ export function createApplicationEnvironmentRenderingContext(applicationPersiste
 export function isApplicationEnvironmentRenderingContext(value: unknown): value is ApplicationEnvironmentRenderingContext {
   try {
     return [false, true].some((persistence) =>
-      stringifyCanonicalJson(value) === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence)),
+      [false, true].some((retainFoundation) => stringifyCanonicalJson(value) === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation))),
     );
   } catch {
     return false;

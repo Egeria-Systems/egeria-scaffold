@@ -26,7 +26,7 @@ export type CapabilityCatalogSnapshot = Readonly<{
   deploymentCloudflare?: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0" | "0.8.0";
   backgroundJobDelivery?: "0.1.0" | "0.2.0";
   applicationPersistence?: "0.1.0" | "0.2.0";
-  transactionalEmailResend?: "0.1.0";
+  transactionalEmailResend?: "0.1.0" | "0.2.0";
 }>;
 
 export const vitestFourCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
@@ -53,6 +53,7 @@ export const applicationEnvironmentCatalogSnapshot: CapabilityCatalogSnapshot = 
   siteRouting: "0.4.0",
   appFoundation: "0.3.0",
   deploymentCloudflare: "0.7.0",
+  transactionalEmailResend: "0.2.0",
 });
 
 export const applicationEnvironmentPersistenceCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
@@ -1906,7 +1907,7 @@ function createDescriptors(
     } as const] : []),
     ...(snapshot.transactionalEmailResend === undefined ? [] : [{
       identifier: "transactional-email-resend",
-      version: "0.1.0",
+      version: snapshot.transactionalEmailResend,
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -1915,14 +1916,14 @@ function createDescriptors(
       supportedProfiles: ["portfolio", "site", "app"],
       requiredPackages: [],
       platformResources: [],
-      environmentVariables: ["TRANSACTIONAL_EMAIL_FROM", "TRANSACTIONAL_EMAIL_DOMAIN"],
+      environmentVariables: ["TRANSACTIONAL_EMAIL_FROM", "TRANSACTIONAL_EMAIL_DOMAIN", ...(applicationEnvironments ? ["APPLICATION_ENVIRONMENT", "TRANSACTIONAL_EMAIL_ALLOWED_RECIPIENTS"] : [])],
       secrets: ["RESEND_API_KEY"],
       externalDomains: ["api.resend.com"],
       dataClassifications: ["email-addresses", "transactional-message-content"],
       retentionAssumptions: ["provider-idempotency-window-24-hours", "operator-reviewed-provider-message-retention"],
       privilegedOperations: ["send-transactional-email"],
       threatReviewLevel: "elevated",
-      adapterSemanticRequirements: ["provider-acceptance-is-not-delivery", "caller-idempotency-key", "single-attempt-deadline-and-cancellation", "ambiguous-acceptance-is-unknown"],
+      adapterSemanticRequirements: ["provider-acceptance-is-not-delivery", "caller-idempotency-key", "single-attempt-deadline-and-cancellation", "ambiguous-acceptance-is-unknown", ...(applicationEnvironments ? ["matched-build-runtime-target", "exact-nonproduction-recipient-allowlist"] : [])],
       ...projectEvidencePoints([
         createFileEvidencePoint("transactional-email-sender-port", "transactional-email-resend", "apps/web/src/application/transactional-email-sender.ts", "managed"),
         createFileEvidencePoint("transactional-email-resend-adapter", "transactional-email-resend", "apps/web/src/infrastructure/resend/transactional-email-sender.ts", "managed"),
@@ -1934,9 +1935,9 @@ function createDescriptors(
         createFileEvidencePoint("transactional-email-event-tests", "transactional-email-resend", "apps/web/tests/unit/transactional-email-events.test.ts", "managed"),
         createFileEvidencePoint("transactional-email-operator-guide", "transactional-email-resend", "docs/transactional-email.md", "application-owned"),
       ]),
-      migrationPlanners: ["add-transactional-email-resend-0-1-0", "remove-transactional-email-resend-0-1-0"],
-      verificationPlan: ["controlled-provider-contracts", "configuration-validation", "idempotency-timeout-cancellation", "privacy-safe-delivery-events", "source-removal-and-foundation-retention", "typecheck", "next-build", "opennext-build"],
-      documentationEvidenceRequirements: ["acceptance-and-idempotency-limitations", "sender-domain-and-scoped-credential-handoff", "privacy-and-provider-retention", "reviewed-source-removal"],
+      migrationPlanners: applicationEnvironments ? ["add-transactional-email-resend-0-2-0", "remove-transactional-email-resend-0-2-0"] : ["add-transactional-email-resend-0-1-0", "remove-transactional-email-resend-0-1-0"],
+      verificationPlan: ["controlled-provider-contracts", "configuration-validation", "idempotency-timeout-cancellation", "privacy-safe-delivery-events", "source-removal-and-foundation-retention", ...(applicationEnvironments ? ["same-artifact-runtime-target-guard", "nonproduction-recipient-refusal-before-transport"] : []), "typecheck", "next-build", "opennext-build"],
+      documentationEvidenceRequirements: ["acceptance-and-idempotency-limitations", "sender-domain-and-scoped-credential-handoff", "privacy-and-provider-retention", "reviewed-source-removal", ...(applicationEnvironments ? ["runtime-target-and-recipient-policy", "intercepted-independent-composition-example"] : [])],
       removalAndRecoveryRequirements: ["review-provider-credential-and-retention-dispositions", "refuse-surviving-email-references", "preserve-application-owned-operator-guide", "retain-required-app-foundation", "separate-source-and-provider-recovery"],
     } as const]),
     ...(snapshot.appFoundation === undefined
@@ -2053,8 +2054,9 @@ export function createCapabilityCatalogSnapshot(
   const emailSnapshot = typeof snapshotValue === "object" && snapshotValue !== null
     ? Reflect.get(snapshotValue, "transactionalEmailResend") as unknown : undefined;
   if ((emailSnapshot !== undefined || appFoundationSnapshot === "0.2.0") &&
-      !(emailSnapshot === "0.1.0" && appFoundationSnapshot === "0.2.0" &&
-        (standardsSnapshot === "0.5.0" || standardsSnapshot === "0.6.0") && siteRoutingSnapshot === "0.4.0")) {
+      !((applicationEnvironmentTupleValid && emailSnapshot === "0.2.0") ||
+        (emailSnapshot === "0.1.0" && appFoundationSnapshot === "0.2.0" &&
+          (standardsSnapshot === "0.5.0" || standardsSnapshot === "0.6.0") && siteRoutingSnapshot === "0.4.0"))) {
     versionIssues.push({ code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID", path: ["snapshot", "transactionalEmailResend"], context: { reason: "unsupported-version" } });
   }
   const resolvedSiteRoutingSnapshot =
@@ -2149,7 +2151,7 @@ export function createCapabilityCatalogSnapshot(
   const catalogIssues: ContractIssue[] = [];
 
   const descriptors = createDescriptors(packageVersions, supportedSnapshot).filter((descriptor) =>
-    !applicationEnvironments || !["transactional-email-resend", "background-job-delivery"].includes(descriptor.identifier),
+    !applicationEnvironments || descriptor.identifier !== "background-job-delivery",
   );
   for (const [index, descriptor] of descriptors.entries()) {
     const parsed = capabilityDescriptorSchema.safeParse(descriptor);

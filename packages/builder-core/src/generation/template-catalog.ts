@@ -493,6 +493,14 @@ export function createTemplateCatalog(
   }
   const selectedSources = sources.map((entry) => {
     if (!applicationEnvironments) return entry;
+    if (includeTransactionalEmail && [
+      "transactional-email-resend/apps/web/src/infrastructure/resend/transactional-email-sender.ts",
+      "transactional-email-resend/apps/web/tests/unit/resend-transactional-email-sender.test.ts",
+      "transactional-email-resend/apps/web/tests/unit/server-transactional-email.test.ts",
+      "transactional-email-resend/docs/transactional-email.md",
+    ].includes(entry.source)) {
+      return { ...entry, source: entry.source.replace("transactional-email-resend/", "transactional-email-resend/application-environments/"), destinationSource: entry.destinationSource ?? entry.source };
+    }
     if (includeApplicationPersistence) {
       if ([
         "application-persistence/apps/web/tests/bindings/application-persistence.test.ts",

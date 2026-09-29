@@ -1650,10 +1650,10 @@ test("application environment state parsing enforces the exact candidate tuple a
 });
 
 test("application environment catalog admits only the complete common tuple with owned target surfaces", () => {
-  const snapshot = { standards: "0.7.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0" };
+  const snapshot = { standards: "0.7.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0", transactionalEmailResend: "0.2.0" };
   const result = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, snapshot);
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.deepEqual(result.value.map(({ identifier }) => identifier).sort(), ["analytics", "app-foundation", "booking-calendly", "contact-form-web3forms", "content-files", "deployment-cloudflare", "multilingual", "observability", "section-composition", "site-routing", "standards"]);
+  assert.deepEqual(result.value.map(({ identifier }) => identifier).sort(), ["analytics", "app-foundation", "booking-calendly", "contact-form-web3forms", "content-files", "deployment-cloudflare", "multilingual", "observability", "section-composition", "site-routing", "standards", "transactional-email-resend"]);
   const deployment = result.value.find(({ identifier }) => identifier === "deployment-cloudflare");
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/src/configuration/application-environment.ts"));
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/scripts/check-application-environment.mjs"));
@@ -1709,4 +1709,30 @@ test("environment analytics admits only its exact selection-only candidate subje
   const publicCatalog = contracts.createVerifiedCapabilityCatalog();
   assert.equal(publicCatalog.ok, true);
   assert.equal(publicCatalog.value.find(({ identifier }) => identifier === "analytics").version, "0.1.0");
+});
+
+
+test("environment email state requires exact foundation and complete Worker verification", () => {
+  for (const [profile, recipeVersion] of [["portfolio", "0.12.0"], ["site", "0.13.0"], ["app", "0.3.0"]]) {
+    const state = structuredClone(environmentState);
+    state.origin = { profile, recipeVersion };
+    for (const [identifier, version] of [["app-foundation", "0.3.0"], ["transactional-email-resend", "0.2.0"], ...(profile === "portfolio" ? [] : [["site-routing", "0.4.0"]])]) {
+      state.installedCapabilities.push({ ...state.installedCapabilities[0], identifier, version });
+    }
+    state.lastSuccessfulVerification = { kind: "generation", checks: [
+      "contracts", "pre-state-inference", "lockfile", "frozen-install", "lint", "typecheck", "unit-tests", "component-tests", "next-build", "opennext-build", "worker-integration", "post-state-inference",
+    ] };
+    assert.equal(contracts.parseStateJson(JSON.stringify(state), "2.0.0").ok, true, profile);
+    for (const change of [
+      value => { value.installedCapabilities = value.installedCapabilities.filter(capability => capability.identifier !== "app-foundation"); },
+      value => { value.installedCapabilities.find(capability => capability.identifier === "app-foundation").version = "0.2.0"; },
+      value => { value.installedCapabilities.find(capability => capability.identifier === "transactional-email-resend").version = "0.1.0"; },
+      value => { value.lastSuccessfulVerification.checks = value.lastSuccessfulVerification.checks.filter(check => check !== "worker-integration"); },
+    ]) {
+      const invalid = structuredClone(state); change(invalid);
+      assert.equal(contracts.parseStateJson(JSON.stringify(invalid), "2.0.0").ok, false);
+    }
+    state.installedCapabilities = state.installedCapabilities.filter(capability => capability.identifier !== "transactional-email-resend");
+    assert.equal(contracts.parseStateJson(JSON.stringify(state), "2.0.0").ok, true);
+  }
 });

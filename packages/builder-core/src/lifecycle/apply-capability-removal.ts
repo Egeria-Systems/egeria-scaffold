@@ -112,6 +112,7 @@ function removalMigrationIdentifier(
   | "remove-application-persistence-0-1-0"
   | "remove-application-persistence-0-2-0"
   | "remove-transactional-email-resend-0-1-0"
+  | "remove-transactional-email-resend-0-2-0"
   | "remove-contact-form-web3forms-0-1-0"
   | "remove-contact-form-web3forms-0-2-0"
   | "remove-background-job-delivery-0-1-0"
@@ -122,7 +123,7 @@ function removalMigrationIdentifier(
     case "contact-form-web3forms":
       return version === "0.2.0" ? "remove-contact-form-web3forms-0-2-0" : "remove-contact-form-web3forms-0-1-0";
     case "transactional-email-resend":
-      return "remove-transactional-email-resend-0-1-0";
+      return version === "0.2.0" ? "remove-transactional-email-resend-0-2-0" : "remove-transactional-email-resend-0-1-0";
     case "application-persistence":
       return version === "0.2.0" ? "remove-application-persistence-0-2-0" : "remove-application-persistence-0-1-0";
     case "analytics":
@@ -603,7 +604,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
 }>): Promise<CapabilityRemovalExecutionResult> {
   if (input.renderingContext !== undefined && (
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    (input.capability !== "contact-form-web3forms" && input.capability !== "booking-calendly" && input.capability !== "analytics" && input.capability !== "application-persistence") ||
+    (input.capability !== "contact-form-web3forms" && input.capability !== "booking-calendly" && input.capability !== "analytics" && input.capability !== "application-persistence" && input.capability !== "transactional-email-resend") ||
     (input.capability !== "application-persistence" && (input.persistenceRemoval !== undefined || input.persistenceRemovalHumanReview !== undefined))
   )) return failure("CAPABILITY_REMOVAL_UNSUPPORTED", "precondition", "not-required");
   const root = resolve(input.root);
@@ -767,11 +768,12 @@ export async function applyCapabilityRemoval(input: Readonly<{
   }, input.capability === "background-job-delivery" ? createGenerationRenderingContext(retainsPersistence, true, false)
     : input.capability === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext) : await renderSkeleton({
     ...commonRenderRequest,
+    ...(input.capability !== "transactional-email-resend" && controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
     ...(retainsPersistence ? { applicationPersistence: true as const } : {}),
     ...(input.capability !== "analytics" && environmentAnalyticsSettings !== undefined ? { analytics: environmentAnalyticsSettings } : {}),
     ...(input.capability !== "booking-calendly" && environmentBookingSettings !== undefined ? { bookingCalendly: environmentBookingSettings } : {}),
     ...(input.capability !== "contact-form-web3forms" && controls.project.value.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
-  }, createApplicationEnvironmentRenderingContext(retainsPersistence));
+  }, createApplicationEnvironmentRenderingContext(retainsPersistence, controls.project.value.selectedCapabilities.includes("app-foundation")));
   if (!desiredRender.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
@@ -791,6 +793,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
       packageVersions: verifiedCapabilityPackageVersions,
     }, snapshot.value.renderingContext) : await renderSkeleton({
       ...commonRenderRequest, applicationPersistence: true,
+      ...(controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
       ...(environmentAnalyticsSettings === undefined ? {} : { analytics: environmentAnalyticsSettings }),
       ...(environmentBookingSettings === undefined ? {} : { bookingCalendly: environmentBookingSettings }),
       ...(controls.project.value.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),

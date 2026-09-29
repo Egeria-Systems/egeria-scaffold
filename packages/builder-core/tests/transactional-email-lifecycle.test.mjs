@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { stringifyCanonicalJson } from "../dist/serialization/canonical-json.js";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import * as core from "../dist/index.js";
@@ -6,7 +8,7 @@ import { inspectProject } from "../dist/diagnostics/project-inspection.js";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
 import { createVitestFourProfileRecipes } from "../dist/profiles/profile-recipes.js";
-import { createGenerationRenderingContext, readVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
+import { createApplicationEnvironmentRenderingContext, createGenerationRenderingContext, readVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -25,7 +27,7 @@ async function repository(profile = "portfolio", options = {}) {
   const surfaces = core.materializeInstalledSurfaces({ files, surfaces: [...rendered.value.surfaces, ...createBuilderStateSurfaces()] });
   assert.equal(surfaces.ok, true, JSON.stringify(surfaces));
   const checks = options.applicationPersistence ? core.persistenceGenerationVerificationChecks : rendered.value.project.selectedCapabilities.includes("app-foundation") ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
-  const state = { schemaVersion: "1.0.0", builderVersion: "0.0.0", projectSchemaVersion: "1.0.0", origin: { profile, recipeVersion: rendered.value.project.recipeVersion }, installedCapabilities: core.createInstalledManifest(rendered.value.resolved), appliedMigrations: [], managedSurfaces: surfaces.value, ejections: [], compatibility: { node: "22.23.2", pnpm: "11.20.0", platformAdapter: "cloudflare-workers" }, lastSuccessfulVerification: { kind: "generation", checks: ["contracts", "pre-state-inference", ...checks, "post-state-inference"] } };
+  const state = { schemaVersion: rendered.value.project.schemaVersion, builderVersion: "0.0.0", projectSchemaVersion: rendered.value.project.schemaVersion, origin: { profile, recipeVersion: rendered.value.project.recipeVersion }, installedCapabilities: core.createInstalledManifest(rendered.value.resolved), appliedMigrations: [], managedSurfaces: surfaces.value, ejections: [], compatibility: { node: "22.23.2", pnpm: "11.20.0", platformAdapter: "cloudflare-workers" }, lastSuccessfulVerification: { kind: "generation", checks: ["contracts", "pre-state-inference", ...checks, "post-state-inference"] } };
   files.set(".egeria/state.json", encoder.encode(core.serializeStateJson(state)));
   const writes = [];
   const reader = {
@@ -46,7 +48,7 @@ async function repository(profile = "portfolio", options = {}) {
     return { ok: true };
   } };
   const inventory = async () => ({ ok: true, value: { entries: [...files.keys()].sort().map((path) => ({ path, kind: "file", source: "tracked" })), truncated: false } });
-  return { files, writes, reader, writer, inventory };
+  return { files, writes, reader, writer, inventory, ...(options.context?.projectSchemaVersion === "2.0.0" ? { renderingContext: options.context } : {}) };
 }
 
 async function addition(repo, selectedCapability = capability, overrides = {}) {
@@ -181,7 +183,7 @@ test("surviving email imports and changed reviewed guide bytes refuse removal be
 const contactCapability = "contact-form-web3forms";
 const contactSettings = { accessKey: "00000000-0000-4000-8000-000000000001" };
 async function contactOperation(repo, operation, subject = contactCapability, settings, checks = core.appGenerationVerificationChecks, overrides = {}) {
-  const input = { reader: repo.reader, git, capability: subject, ...(settings === undefined ? {} : {settings}), inspectRepositoryInventory: repo.inventory };
+  const input = { reader: repo.reader, git, ...(repo.renderingContext === undefined ? {} : { renderingContext: repo.renderingContext }), capability: subject, ...(settings === undefined ? {} : {settings}), inspectRepositoryInventory: repo.inventory };
   const planned = await (operation === "add" ? core.planCapabilityAddition(input) : core.planCapabilityRemoval(input));
   assert.equal(planned.ok, true, JSON.stringify(planned));
   const result = await (operation === "add" ? core.applyCapabilityAddition : core.applyCapabilityRemoval)({
@@ -339,4 +341,162 @@ test("jobs repositories refuse profile transitions and unsupported upgrades befo
   }
   assert.deepEqual(repo.files, before);
   assert.deepEqual(repo.writes, []);
+});
+
+
+async function inspectEnvironmentEmail(repo, emailInstalled, persistence = false) {
+  const snapshot = await readVerifiedProjectSnapshot(repo.reader, createApplicationEnvironmentRenderingContext(!persistence));
+  assert.equal(snapshot.ok, true, JSON.stringify(snapshot));
+  assert.deepEqual(snapshot.value.renderingContext, createApplicationEnvironmentRenderingContext(persistence, true));
+  const inspection = await inspectProject({ reader: repo.reader, catalog: snapshot.value.catalog, profiles: snapshot.value.profiles, projectSchemaVersion: "2.0.0" });
+  assert.equal(inspection.project.kind, "valid");
+  assert.equal(inspection.inference.state.kind, "valid");
+  assert.equal(inspection.resolution?.ok, true);
+  assert.deepEqual(await core.doctorRepository({ reader: repo.reader, catalog: snapshot.value.catalog, profiles: snapshot.value.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
+  const state = inspection.inference.state.value;
+  assert.equal(state.installedCapabilities.find(value => value.identifier === capability)?.version, emailInstalled ? "0.2.0" : undefined);
+  assert.equal(state.installedCapabilities.find(value => value.identifier === "app-foundation").version, "0.3.0");
+  assert.equal(state.installedCapabilities.some(value => value.identifier === "application-persistence"), persistence);
+  assert.equal(inspection.project.value.selectedCapabilities.includes("site-routing"), inspection.project.value.originProfile !== "portfolio");
+  return inspection.project.value;
+}
+
+test("environment email add remove and readd retain foundation on every profile", async () => {
+  for (const profile of ["portfolio", "site", "app"]) {
+    const repo = await repository(profile, { context: createApplicationEnvironmentRenderingContext() });
+    const runtimeExample = encoder.encode("APPLICATION_ENVIRONMENT=development\n# Application-owned configuration\n");
+    repo.files.set("apps/web/.dev.vars.example", runtimeExample);
+    repo.files.set("notes.md", encoder.encode("User-owned notes\n"));
+    for (const operation of ["add", "remove", "add"]) {
+      const { planned, result } = await contactOperation(repo, operation, capability);
+      assert.equal(result.ok, true, JSON.stringify(result));
+      assert.equal(planned.capability.version, "0.2.0");
+      await inspectEnvironmentEmail(repo, operation === "add");
+      assert.deepEqual(repo.files.get("apps/web/.dev.vars.example"), runtimeExample);
+      assert.equal(decoder.decode(repo.files.get("notes.md")), "User-owned notes\n");
+      assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
+    }
+    const migrations = decoder.decode(repo.files.get(".egeria/migrations.jsonl"));
+    assert.match(migrations, /add-transactional-email-resend-0-2-0/u);
+    assert.match(migrations, /remove-transactional-email-resend-0-2-0/u);
+  }
+});
+
+test("environment email and persistence compose in both addition orders", async () => {
+  for (const emailFirst of [false, true]) {
+    const repo = await repository("app", { context: createApplicationEnvironmentRenderingContext() });
+    for (const subject of emailFirst ? [capability, "application-persistence"] : ["application-persistence", capability]) {
+      const checks = subject === "application-persistence" || !emailFirst ? core.persistenceGenerationVerificationChecks : core.appGenerationVerificationChecks;
+      const outcome = await contactOperation(repo, "add", subject, undefined, checks);
+      assert.equal(outcome.result.ok, true, JSON.stringify(outcome));
+      const project = core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml")), "2.0.0").value;
+      await inspectEnvironmentEmail(repo, project.selectedCapabilities.includes(capability), project.selectedCapabilities.includes("application-persistence"));
+    }
+  }
+});
+
+test("environment neighbors preserve email and retained foundation through their lifecycles", async () => {
+  const integrations = [
+    ["contact-form-web3forms", undefined],
+    ["booking-calendly", { mode: "link" }],
+    ["analytics", { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} }],
+  ];
+  for (const emailInstalled of [false, true]) {
+    const repo = await repository("portfolio", { context: createApplicationEnvironmentRenderingContext(false, true), ...(emailInstalled ? { transactionalEmailResend: true } : {}) });
+    const lock = repo.files.get("pnpm-lock.yaml");
+    for (const [subject, settings] of integrations) {
+      for (const operation of ["add", "remove"]) {
+        const outcome = await contactOperation(repo, operation, subject, operation === "add" ? settings : undefined);
+        assert.equal(outcome.result.ok, true, JSON.stringify(outcome));
+        const project = await inspectEnvironmentEmail(repo, emailInstalled);
+        if (operation === "add" && settings !== undefined) assert.deepEqual(project.capabilitySettings[subject], settings);
+        assert.deepEqual(repo.files.get("pnpm-lock.yaml"), lock);
+      }
+    }
+  }
+});
+
+
+async function removeEnvironmentPersistence(repo) {
+  const digest = value => `sha256:${createHash("sha256").update(value).digest("hex")}`;
+  const fingerprint = value => digest(stringifyCanonicalJson(value));
+  const snapshot = await readVerifiedProjectSnapshot(repo.reader, repo.renderingContext);
+  assert.equal(snapshot.ok, true, JSON.stringify(snapshot));
+  const descriptor = snapshot.value.catalog.find(value => value.identifier === "application-persistence");
+  const databases = [{ environment: "local", databaseId: "local-application-database" }];
+  const schemaPath = "apps/web/src/infrastructure/persistence/schema.ts";
+  const exportBytes = encoder.encode("Synthetic local export\n");
+  const recoveryBytes = encoder.encode("Synthetic local recovery\n");
+  repo.files.set(".wrangler/removal-evidence/export.sql", exportBytes);
+  repo.files.set(".wrangler/removal-evidence/recovery.json", recoveryBytes);
+  const persistenceRemoval = {
+    databases,
+    policy: { exportNotBefore: "2026-09-26T00:00:00Z", retainUntil: "2026-10-26T00:00:00Z", recoveryRequirements: [{ environment: "local", scope: "local" }], writeConsistency: "writes-paused" },
+    evidence: { schemaVersion: "1.0.0", subject: {
+      descriptorVersion: descriptor.version, descriptorFingerprint: fingerprint(descriptor),
+      schemaFingerprint: fingerprint([{ path: schemaPath, fingerprint: digest(repo.files.get(schemaPath)) }]),
+      migrationsFingerprint: fingerprint([...repo.files.keys()].filter(path => path.startsWith("apps/web/migrations/")).sort().map(path => ({ path, fingerprint: digest(repo.files.get(path)) }))), databases,
+    }, databases: [{ ...databases[0],
+      export: { artifactReference: "local-export", digest: digest(exportBytes), completedAt: "2026-09-26T01:00:00Z", outcome: "passed" },
+      recovery: { artifactReference: "local-recovery", digest: digest(recoveryBytes), exportDigest: digest(exportBytes), scope: "local", restoration: "passed", readback: "passed" },
+      writeConsistency: { mode: "writes-paused", outcome: "passed" }, retention: { retainedUntil: "2026-10-26T00:00:00Z", outcome: "passed" },
+    }] },
+    localArtifacts: [{ reference: "local-export", path: ".wrangler/removal-evidence/export.sql" }, { reference: "local-recovery", path: ".wrangler/removal-evidence/recovery.json" }],
+  };
+  const input = { reader: repo.reader, git, capability: "application-persistence", renderingContext: repo.renderingContext, persistenceRemoval, inspectRepositoryInventory: repo.inventory, now: () => "2026-09-26T02:00:00Z" };
+  const planned = await core.planCapabilityRemoval(input);
+  assert.equal(planned.ok, true, JSON.stringify(planned));
+  const result = await core.applyCapabilityRemoval({
+    ...input, root, writer: repo.writer, approvedPlanFingerprint: planned.value.planFingerprint,
+    persistenceRemovalHumanReview: { reportFingerprint: planned.value.persistenceRemovalReport.reportFingerprint, dispositions: planned.value.persistenceRemovalReport.requiredReviewItems.map(({ identifier }) => ({ identifier, disposition: "accepted" })) },
+    inspectWorktree: async () => git, inspectExpectedChanges: async () => ({ ok: true }),
+    verifier: { verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: core.appGenerationVerificationChecks } }) },
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+}
+
+test("environment persistence and email preserve independence in both removal orders", async () => {
+  for (const emailFirst of [false, true]) {
+    const repo = await repository("app", { applicationPersistence: true, transactionalEmailResend: true, context: createApplicationEnvironmentRenderingContext(true) });
+    for (const subject of emailFirst ? [capability, "application-persistence"] : ["application-persistence", capability]) {
+      if (subject === "application-persistence") await removeEnvironmentPersistence(repo);
+      else {
+        const project = core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml")), "2.0.0").value;
+        const checks = project.selectedCapabilities.includes("application-persistence") ? core.persistenceGenerationVerificationChecks : core.appGenerationVerificationChecks;
+        const outcome = await contactOperation(repo, "remove", capability, undefined, checks);
+        assert.equal(outcome.result.ok, true, JSON.stringify(outcome.result));
+      }
+      const project = core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml")), "2.0.0").value;
+      await inspectEnvironmentEmail(repo, project.selectedCapabilities.includes(capability), project.selectedCapabilities.includes("application-persistence"));
+    }
+  }
+});
+
+test("environment email refuses stale approval source references and managed drift before writes", async () => {
+  for (const mutation of ["reference", "managed", "approved-guide"]) {
+    const repo = await repository("portfolio", { transactionalEmailResend: true, context: createApplicationEnvironmentRenderingContext() });
+    const input = { reader: repo.reader, git, capability, renderingContext: repo.renderingContext, inspectRepositoryInventory: repo.inventory };
+    const planned = await core.planCapabilityRemoval(input);
+    assert.equal(planned.ok, true, JSON.stringify(planned));
+    if (mutation === "reference") repo.files.set("apps/web/src/application/consumer.ts", encoder.encode('import { TransactionalEmailSender } from "./transactional-email-sender";\n'));
+    if (mutation === "managed") repo.files.set("apps/web/src/infrastructure/resend/transactional-email-sender.ts", encoder.encode("Changed adapter\n"));
+    if (mutation === "approved-guide") repo.files.set("docs/transactional-email.md", encoder.encode("Changed reviewed guide\n"));
+    const before = new Map(repo.files);
+    const result = await core.applyCapabilityRemoval({ ...input, root, writer: repo.writer, approvedPlanFingerprint: planned.value.planFingerprint, inspectWorktree: async () => git, inspectExpectedChanges: async () => ({ ok: true }) });
+    assert.equal(result.ok, false);
+    assert.equal(result.phase, "precondition");
+    assert.deepEqual(repo.writes, []);
+    assert.deepEqual(repo.files, before);
+  }
+});
+
+test("environment email verifier failure preserves the transformed prefix without advancing state", async () => {
+  const repo = await repository("portfolio", { context: createApplicationEnvironmentRenderingContext() });
+  const before = repo.files.get(".egeria/state.json");
+  const outcome = await contactOperation(repo, "add", capability, undefined, core.appGenerationVerificationChecks, { verifier: { verifyInIsolatedCopy: async () => ({ ok: false }) } });
+  assert.equal(outcome.result.ok, false);
+  assert.equal(outcome.result.phase, "verify");
+  assert.deepEqual(repo.files.get(".egeria/state.json"), before);
+  assert.equal(decoder.decode(repo.files.get(".egeria/migrations.jsonl")), "");
+  assert.ok(repo.files.has("apps/web/src/infrastructure/resend/transactional-email-sender.ts"));
 });
