@@ -785,6 +785,11 @@ function createDescriptors(
     "application-owned",
   );
 
+  const observabilityEnvironmentEvidencePoints = applicationEnvironments ? [
+    createFileEvidencePoint("observability-environment-tests", "observability", "apps/web/tests/unit/observability-environment.test.ts", "application-owned"),
+    createFileEvidencePoint("observability-operator-guide", "observability", "docs/observability.md", "application-owned"),
+  ] : [];
+
   const siteRoutingEvidencePoints = [
     createFileEvidencePoint(
       "site-routing-about-route",
@@ -1423,7 +1428,7 @@ function createDescriptors(
     },
     {
       identifier: "observability",
-      version: "0.3.0",
+      version: applicationEnvironments ? "0.4.0" : "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -1435,6 +1440,7 @@ function createDescriptors(
       ...sharedCapabilityMetadata,
       supportedProfiles: sharedSupportedProfiles,
       requiredPackages: ["@egeria-systems/observability"],
+      ...(applicationEnvironments ? { environmentVariables: ["APPLICATION_ENVIRONMENT", "NEXT_PUBLIC_SITE_URL"] } : {}),
       secrets: [
         "BETTER_STACK_INGESTING_HOST",
         "BETTER_STACK_SOURCE_TOKEN",
@@ -1460,6 +1466,7 @@ function createDescriptors(
         "cloudflare-version-metadata",
         "same-origin-browser-ingest",
         "separate-operational-and-diagnostic-sinks",
+        ...(applicationEnvironments ? ["matched-build-runtime-target", "optional-complete-provider-configuration", "authoritative-environment-labels", "exact-staging-origin-browser-credentials", "redirect-refusal"] : []),
       ],
       managedSurfaces: projectManagedSurfaces([
         observabilityPackage,
@@ -1476,6 +1483,7 @@ function createDescriptors(
         observabilityErrorCopySource,
         observabilityErrorCopy,
         observabilityErrorFallback,
+        ...observabilityEnvironmentEvidencePoints,
       ]),
       inferenceProbes: [
         ...projectInferenceProbes([
@@ -1493,6 +1501,7 @@ function createDescriptors(
           observabilityErrorCopySource,
           observabilityErrorCopy,
           observabilityErrorFallback,
+          ...observabilityEnvironmentEvidencePoints,
         ]),
         createJsonValueProbe(
           "apps/web/wrangler.jsonc",
@@ -1518,6 +1527,7 @@ function createDescriptors(
       verificationPlan: [
         "package-resolution",
         "observability-contracts",
+        ...(applicationEnvironments ? ["environment-configuration-and-target-refusal", "same-artifact-runtime-and-browser-isolation", "controlled-route-diagnostics-delivery"] : []),
         "lint",
         "typecheck",
         "next-build",
@@ -1529,6 +1539,7 @@ function createDescriptors(
       documentationEvidenceRequirements: [
         "public-package-version-and-provenance",
         "analytics-separation",
+        ...(applicationEnvironments ? ["console-only-and-runtime-provider-examples", "environment-and-staging-session-boundary", "provider-retention-and-recovery-handoff"] : []),
       ],
       removalAndRecoveryRequirements: [
         "review-deployment-observability-configuration-removal",
@@ -1923,7 +1934,7 @@ function createDescriptors(
       retentionAssumptions: ["provider-idempotency-window-24-hours", "operator-reviewed-provider-message-retention"],
       privilegedOperations: ["send-transactional-email"],
       threatReviewLevel: "elevated",
-      adapterSemanticRequirements: ["provider-acceptance-is-not-delivery", "caller-idempotency-key", "single-attempt-deadline-and-cancellation", "ambiguous-acceptance-is-unknown", ...(applicationEnvironments ? ["matched-build-runtime-target", "exact-nonproduction-recipient-allowlist"] : [])],
+      adapterSemanticRequirements: ["provider-acceptance-is-not-delivery", "caller-idempotency-key", "single-attempt-deadline-and-cancellation", "ambiguous-acceptance-is-unknown", ...(applicationEnvironments ? ["matched-build-runtime-target", "exact-nonproduction-recipient-allowlist", "target-validated-safe-event-labels"] : [])],
       ...projectEvidencePoints([
         createFileEvidencePoint("transactional-email-sender-port", "transactional-email-resend", "apps/web/src/application/transactional-email-sender.ts", "managed"),
         createFileEvidencePoint("transactional-email-resend-adapter", "transactional-email-resend", "apps/web/src/infrastructure/resend/transactional-email-sender.ts", "managed"),
@@ -1936,7 +1947,7 @@ function createDescriptors(
         createFileEvidencePoint("transactional-email-operator-guide", "transactional-email-resend", "docs/transactional-email.md", "application-owned"),
       ]),
       migrationPlanners: applicationEnvironments ? ["add-transactional-email-resend-0-2-0", "remove-transactional-email-resend-0-2-0"] : ["add-transactional-email-resend-0-1-0", "remove-transactional-email-resend-0-1-0"],
-      verificationPlan: ["controlled-provider-contracts", "configuration-validation", "idempotency-timeout-cancellation", "privacy-safe-delivery-events", "source-removal-and-foundation-retention", ...(applicationEnvironments ? ["same-artifact-runtime-target-guard", "nonproduction-recipient-refusal-before-transport"] : []), "typecheck", "next-build", "opennext-build"],
+      verificationPlan: ["controlled-provider-contracts", "configuration-validation", "idempotency-timeout-cancellation", "privacy-safe-delivery-events", "source-removal-and-foundation-retention", ...(applicationEnvironments ? ["same-artifact-runtime-target-guard", "nonproduction-recipient-refusal-before-transport", "independent-safe-event-target-refusal-and-labels"] : []), "typecheck", "next-build", "opennext-build"],
       documentationEvidenceRequirements: ["acceptance-and-idempotency-limitations", "sender-domain-and-scoped-credential-handoff", "privacy-and-provider-retention", "reviewed-source-removal", ...(applicationEnvironments ? ["runtime-target-and-recipient-policy", "intercepted-independent-composition-example"] : [])],
       removalAndRecoveryRequirements: ["review-provider-credential-and-retention-dispositions", "refuse-surviving-email-references", "preserve-application-owned-operator-guide", "retain-required-app-foundation", "separate-source-and-provider-recovery"],
     } as const]),

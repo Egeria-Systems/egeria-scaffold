@@ -1589,7 +1589,7 @@ const environmentState = {
   origin: { profile: "portfolio", recipeVersion: "0.12.0" },
   installedCapabilities: [
     ["standards", "0.7.0"], ["content-files", "0.4.0"], ["section-composition", "0.3.0"],
-    ["deployment-cloudflare", "0.7.0"], ["observability", "0.3.0"],
+    ["deployment-cloudflare", "0.7.0"], ["observability", "0.4.0"],
   ].map(([identifier, version]) => ({ ...validState.installedCapabilities[0], identifier, version })),
 };
 
@@ -1599,7 +1599,7 @@ test("environment persistence state requires the complete optional tuple and bin
     origin: { profile: "app", recipeVersion: "0.3.0" },
     installedCapabilities: [
       ["standards", "0.8.0"], ["content-files", "0.4.0"], ["section-composition", "0.3.0"],
-      ["deployment-cloudflare", "0.8.0"], ["observability", "0.3.0"], ["site-routing", "0.4.0"],
+      ["deployment-cloudflare", "0.8.0"], ["observability", "0.4.0"], ["site-routing", "0.4.0"],
       ["app-foundation", "0.3.0"], ["application-persistence", "0.2.0"],
     ].map(([identifier, version]) => ({ ...validState.installedCapabilities[0], identifier, version })),
     lastSuccessfulVerification: { kind: "generation", checks: [
@@ -1735,4 +1735,23 @@ test("environment email state requires exact foundation and complete Worker veri
     state.installedCapabilities = state.installedCapabilities.filter(capability => capability.identifier !== "transactional-email-resend");
     assert.equal(contracts.parseStateJson(JSON.stringify(state), "2.0.0").ok, true);
   }
+});
+
+
+test("environment observability refuses stale installed identity and preserves public package selection", () => {
+  for (const version of ["0.2.0", "0.3.0", "0.4.0", "0.5.0"]) {
+    const state = structuredClone(environmentState);
+    state.installedCapabilities.find(({ identifier }) => identifier === "observability").version = version;
+    assert.equal(contracts.parseStateJson(JSON.stringify(state), "2.0.0").ok, version === "0.4.0", version);
+  }
+  const candidate = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, contracts.createApplicationEnvironmentRenderingContext().catalogSnapshot);
+  assert.equal(candidate.ok, true);
+  const observability = candidate.value.find(({ identifier }) => identifier === "observability");
+  assert.equal(observability.version, "0.4.0");
+  for (const path of ["docs/observability.md", "apps/web/tests/unit/observability-environment.test.ts"]) {
+    assert.equal(observability.managedSurfaces.find(surface => surface.path === path)?.ownership, "application-owned");
+  }
+  const email = candidate.value.find(({ identifier }) => identifier === "transactional-email-resend");
+  assert.equal(email.managedSurfaces.find(({ path }) => path.endsWith("/transactional-email-events.ts"))?.ownership, "managed");
+  assert.equal(contracts.verifiedCapabilityPackageVersions.observability, "0.3.0");
 });

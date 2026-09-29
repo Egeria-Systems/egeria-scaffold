@@ -433,7 +433,7 @@ export const applicationEnvironmentInstalledStateSchema = z.strictObject({
     "content-files": "0.4.0",
     "section-composition": "0.3.0",
     "deployment-cloudflare": persistence ? "0.8.0" : "0.7.0",
-    observability: "0.3.0",
+    observability: "0.4.0",
     ...(state.origin.profile !== "portfolio" ? { "site-routing": "0.4.0" } : {}),
     ...(state.origin.profile === "app" || foundation ? { "app-foundation": "0.3.0" } : {}),
     ...(email ? { "transactional-email-resend": "0.2.0" } : {}),

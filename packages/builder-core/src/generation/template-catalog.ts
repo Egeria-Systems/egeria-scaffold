@@ -459,6 +459,11 @@ export function createTemplateCatalog(
       { source: `deployment-cloudflare/background-job-delivery/.github/workflows/deploy${includeApplicationPersistence ? ".persistence" : ""}.yml.template`, destinationSource: "common/.github/workflows/deploy.yml.template", contentKind: "text" as const },
     ] : []),
   ];
+  if (applicationEnvironments) {
+    for (const path of ["apps/web/tests/unit/observability-environment.test.ts", "docs/observability.md"]) {
+      sources.push({ source: `common/application-environments/${path}`, destinationSource: `common/${path}`, contentKind: "text" });
+    }
+  }
   if (applicationEnvironments && (app || includeFoundation)) {
     sources.push({
       source: "app-foundation/application-environments/apps/web/src/infrastructure/cloudflare/application-environment.ts",
@@ -497,6 +502,8 @@ export function createTemplateCatalog(
       "transactional-email-resend/apps/web/src/infrastructure/resend/transactional-email-sender.ts",
       "transactional-email-resend/apps/web/tests/unit/resend-transactional-email-sender.test.ts",
       "transactional-email-resend/apps/web/tests/unit/server-transactional-email.test.ts",
+      "transactional-email-resend/apps/web/src/infrastructure/observability/transactional-email-events.ts",
+      "transactional-email-resend/apps/web/tests/unit/transactional-email-events.test.ts",
       "transactional-email-resend/docs/transactional-email.md",
     ].includes(entry.source)) {
       return { ...entry, source: entry.source.replace("transactional-email-resend/", "transactional-email-resend/application-environments/"), destinationSource: entry.destinationSource ?? entry.source };
@@ -565,7 +572,12 @@ export function createTemplateCatalog(
         return { ...entry, source: entry.source.replace("contact-form-web3forms/", "contact-form-web3forms/application-environments/").replace(/\.template$/u, ""), destinationSource: entry.source };
       }
     }
-    const common = ["common/apps/web/next.config.ts", "common/apps/web/wrangler.jsonc.template"].includes(entry.source);
+    const common = [
+      "common/apps/web/next.config.ts", "common/apps/web/wrangler.jsonc.template", "common/apps/web/AGENTS.md.template",
+      "common/apps/web/src/infrastructure/cloudflare/observability-context.ts",
+      "common/apps/web/src/infrastructure/observability/server-reporter.ts",
+      "common/apps/web/src/infrastructure/observability/browser-reporter.ts",
+    ].includes(entry.source);
     const foundation = [
       "app-foundation/apps/web/src/composition/server-health.ts",
       "app-foundation/apps/web/src/delivery/health-route.ts",

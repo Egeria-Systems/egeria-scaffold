@@ -18,6 +18,546 @@ import {
 import { derivePnpmToolEnvironment } from "../dist/generation/verify-generated-project.js";
 
 const execFileAsync = promisify(execFile);
+
+async function prepareObservabilityBrowserProof(app) {
+  const reporterPath = join(app, "src/infrastructure/observability/browser-reporter.ts");
+  const prefix = await readFile(reporterPath);
+  const suffix = Buffer.from("\nexport { sendEnvelope as sendObservabilityEnvelopeForProof };\n");
+  await writeFile(reporterPath, Buffer.concat([prefix, suffix]));
+  const reporter = await readFile(reporterPath);
+  assert.deepEqual(reporter.subarray(0, prefix.length), prefix);
+  assert.deepEqual(reporter.subarray(prefix.length), suffix);
+  await mkdir(join(app, "app/[locale]/browser-proof"), { recursive: true });
+  await writeFile(join(app, "app/[locale]/browser-proof/page.tsx"), [
+    '"use client";',
+    'import { useEffect } from "react";',
+    'import { reportCaughtBrowserError, reportWebVital, sendObservabilityEnvelopeForProof } from "@/src/infrastructure/observability/browser-reporter";',
+    'import { submitContact } from "@/src/integrations/contact-form-web3forms/submit-contact";',
+    'export default function Proof() {',
+    '  useEffect(() => { Object.assign(window, { sendObservabilityEnvelopeForProof }); return () => { Reflect.deleteProperty(window, "sendObservabilityEnvelopeForProof"); }; }, []);',
+    '  return <><button onClick={() => reportWebVital({ name: "LCP", value: 12, delta: 1, rating: "good", navigationType: "navigate" })}>Send vital</button>',
+    '  <button onClick={() => reportCaughtBrowserError(new Error("Synthetic browser failure"), { operation: "proof-load" })}>Send error</button>',
+    '  <button onClick={() => submitContact({ settings: { accessKey: "00000000-0000-4000-8000-000000000001" }, fields: { name: "Synthetic Example", email: "synthetic@example.test", message: "Synthetic test only" }, subject: "Synthetic example", captchaToken: "synthetic-token", signal: new AbortController().signal })}>Send contact</button></>;',
+    '}',
+  ].join("\n"));
+  const digest = bytes => createHash("sha256").update(bytes).digest("hex");
+  return { reporterPrefix: digest(prefix), reporterSuffix: digest(suffix), reporter: digest(reporter), page: digest(await readFile(join(app, "app/[locale]/browser-proof/page.tsx"))) };
+}
+
+async function runObservabilityProofHarness() {
+  const assert = (await import("node:assert/strict")).default;
+  const { createHash } = await import("node:crypto");
+  const { once } = await import("node:events");
+  const { readFile, writeFile } = await import("node:fs/promises");
+  const { createServer } = await import("node:http");
+  const { resolve } = await import("node:path");
+  const { createTestHarness } = await import("wrangler");
+  const { chromium } = await import("@playwright/test");
+  const { createOperationalEvent, createOperationalErrorReport } = await import("@egeria-systems/observability");
+  const { createBrowserErrorEnvelope } = await import("@egeria-systems/observability/browser");
+  const target = process.env.APPLICATION_ENVIRONMENT;
+  const origin = "https://" + target + ".observability.test";
+  const generated = JSON.parse(await readFile("wrangler.jsonc", "utf8"));
+  const configuration = { ...generated, main: resolve("observability-proof-worker.mjs"), assets: { ...generated.assets, directory: resolve(".open-next/assets") }, vars: { ...generated.vars, APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "contradictory", NEXT_PUBLIC_SITE_URL: "https://different.observability.test" } };
+  delete configuration.env; delete configuration.$schema;
+  const configPath = resolve(process.argv[1] + ".wrangler.json");
+  await writeFile(configPath, JSON.stringify(configuration));
+  const server = createTestHarness({ workers: [{ configPath }] });
+  const pair = { BETTER_STACK_INGESTING_HOST: "s123.eu-nbg-2.betterstackdata.com", BETTER_STACK_SOURCE_TOKEN: "controlled-source-value-123456" };
+  const outcomes = [];
+  const browserOutcomes = [];
+  const failures = [];
+  const digest = bytes => createHash("sha256").update(bytes).digest("hex");
+  async function bounded(promise, operation) {
+    let timer;
+    try {
+      return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Timed out: " + operation)), 30_000); })]);
+    } finally { clearTimeout(timer); }
+  }
+  function isControlledDiagnostic(body) {
+    return body.type === "error-report" ? body.report.capture.operation === "proof-load" : body.type === "operational-event" && body.event.attributes.metric_name === "LCP" && body.event.attributes.value === 12;
+  }
+  async function forwardBrowserRequest(url, method, headers, body) {
+    return server.fetch(url.pathname + url.search, { method, redirect: "manual", headers: { ...Object.fromEntries(new Headers(headers)), "x-observability-proof-url": url.href }, ...(body === null ? {} : { body }) });
+  }
+  function createNativeIngress(visibleOrigin, forward, diagnostics) {
+    const authority = new URL(visibleOrigin).host;
+    assert.ok(["http://127.0.0.1:3101", "http://localhost:3101"].includes(visibleOrigin));
+    const documents = [];
+    const failures = [];
+    const completions = new Map();
+    let automaticVitals = 0;
+    const hopHeaders = ["connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade"];
+    const protectedMetadata = headers => Object.fromEntries([...headers].filter(([name]) => ["host", "origin", "cookie", "referer"].includes(name) || name.startsWith("sec-fetch-") || name.startsWith("content-")));
+    const listener = createServer({ requestTimeout: 30_000, headersTimeout: 15_000 }, async (incoming, outgoing) => {
+      try {
+        assert.equal(incoming.headers.host, authority, "Unexpected HTTP authority");
+        assert.ok(incoming.url.startsWith("/") && !incoming.url.startsWith("//"), "Expected origin-form request target");
+        const url = new URL(incoming.url, visibleOrigin);
+        assert.equal(url.origin, visibleOrigin);
+        assert.ok(!url.pathname.startsWith("/__proof"), "Browser ingress cannot access proof controls");
+        const body = await bounded((async () => {
+          const chunks = []; let bytes = 0;
+          for await (const chunk of incoming) { bytes += chunk.length; assert.ok(bytes <= 8192, "Oversized ingress body"); chunks.push(chunk); }
+          return Buffer.concat(chunks);
+        })(), "native request body");
+        const received = new Headers();
+        for (const [name, value] of Object.entries(incoming.headers)) if (value !== undefined) received.set(name, Array.isArray(value) ? value.join(", ") : value);
+        let entry;
+        if (url.pathname === "/api/observability") {
+          const envelope = JSON.parse(body.toString("utf8"));
+          if (!isControlledDiagnostic(envelope)) {
+            assert.equal(envelope.type, "operational-event"); assert.equal(envelope.event.name, "browser.web.vital");
+            assert.equal(received.has("cookie"), false); assert.equal(received.has("referer"), false);
+            automaticVitals += 1; outgoing.writeHead(202); outgoing.end(); return;
+          }
+          entry = { url: url.href, method: incoming.method, envelopeType: envelope.type, eventName: envelope.type === "error-report" ? envelope.report.event.name : envelope.event.name, received: protectedMetadata(received), cookie: received.has("cookie"), referrer: received.has("referer"), bodySha256: digest(body) };
+          diagnostics.push(entry);
+        } else if (url.pathname === "/en-CA/browser-proof") {
+          documents.push({ url: url.href, cookieAvailable: received.get("cookie")?.includes("observability_session=synthetic-local-cookie") === true });
+        }
+        const headers = new Headers(received);
+        const nominated = (headers.get("connection") ?? "").split(",").map(name => name.trim().toLowerCase()).filter(Boolean);
+        for (const name of nominated) assert.ok(!Object.hasOwn(protectedMetadata(received), name) && !["host", "origin", "cookie", "referer"].includes(name) && !name.startsWith("sec-fetch-") && !name.startsWith("content-"), "Connection must not nominate protected metadata");
+        const removed = [];
+        for (const name of new Set([...hopHeaders, ...nominated])) if (headers.has(name)) { removed.push(name); headers.delete(name); }
+        assert.deepEqual(protectedMetadata(headers), protectedMetadata(received));
+        if (entry) entry.forwarding = { headers: protectedMetadata(headers), bodySha256: digest(body), removedHopByHopHeaders: removed };
+        const response = await bounded(forward(url, incoming.method, headers, body.length ? body : null), "native Worker response");
+        const responseBody = Buffer.from(await bounded(response.arrayBuffer(), "native Worker body"));
+        const responseHeaders = new Headers(response.headers);
+        const responseNominations = (responseHeaders.get("connection") ?? "").split(",").map(name => name.trim().toLowerCase()).filter(Boolean);
+        assert.ok(responseNominations.every(name => hopHeaders.includes(name)), "Response Connection must not nominate application headers");
+        // Fetch supplies decoded bytes; this listener frames them for its own HTTP connection.
+        for (const name of [...hopHeaders, "content-encoding", "content-length"]) responseHeaders.delete(name);
+        for (const [name, value] of responseHeaders) outgoing.setHeader(name, value);
+        outgoing.setHeader("content-length", String(responseBody.length));
+        if (entry) {
+          entry.workerResponse = { status: response.status, bodyBytes: responseBody.length };
+          const finished = once(outgoing, "finish").then(() => { entry.nativeResponseFinished = true; });
+          finished.catch(() => {}); completions.set(entry, finished);
+        }
+        outgoing.writeHead(response.status); outgoing.end(responseBody);
+      } catch (error) {
+        failures.push({ name: error.name, message: error.message });
+        if (!outgoing.headersSent) outgoing.writeHead(500);
+        outgoing.end();
+        if (!incoming.complete) incoming.destroy();
+      }
+    });
+    listener.on("error", error => failures.push({ name: error.name, code: error.code, message: error.message }));
+    return {
+      documents, failures, completions,
+      get automaticVitals() { return automaticVitals; },
+      async listen() {
+        const listening = once(listener, "listening");
+        listener.listen({ host: "127.0.0.1", port: 3101, exclusive: true });
+        await bounded(listening, "native listener startup");
+        assert.deepEqual(listener.address(), { address: "127.0.0.1", family: "IPv4", port: 3101 });
+      },
+      async close() {
+        if (!listener.listening) return;
+        const closed = once(listener, "close");
+        listener.close(); listener.closeAllConnections();
+        await bounded(closed, "native listener closure");
+      },
+    };
+  }
+  const vital = { schemaVersion: "2.0.0", type: "operational-event", event: { schemaVersion: "2.0.0", name: "browser.web.vital", kind: "web.vital", runtime: "browser", severity: "info", occurredAt: "2026-09-27T00:00:00.000Z", context: { eventId: "controlled-vital", service: "web" }, attributes: { metric_name: "LCP", value: 12, delta: 1, rating: "good", navigation_type: "navigate" } } };
+  const event = createOperationalEvent({ name: "browser.caught.error", kind: "application.error", runtime: "browser", severity: "error", context: { eventId: "controlled-error", service: "web" }, errorCategory: "unexpected", attributes: { capture_mechanism: "selected-catch", handled: true, operation: "proof-load" } }, { allowedAttributeNames: ["capture_mechanism", "handled", "operation"], clock: { now: () => new Date() } });
+  assert.equal(event.ok, true);
+  const report = createOperationalErrorReport(event.value, { name: "Error", message: "Synthetic example", stack: "Error: Synthetic example\n    at example (https://staging.observability.test/app.js:12:4)" }, { mechanism: "selected-catch", handled: true, operation: "proof-load" }, {});
+  assert.equal(report.ok, true);
+  const envelope = createBrowserErrorEnvelope(report.value);
+  assert.equal(envelope.ok, true);
+  async function control(overrides = {}, omissions = [], behavior = "accept") {
+    assert.equal((await server.fetch("/__proof/control", { method: "POST", body: JSON.stringify({ overrides, omissions, behavior }) })).status, 200);
+  }
+  async function observed() {
+    const value = await (await server.fetch("/__proof/observations")).json();
+    assert.equal(value.unexpectedOutbound, 0); assert.equal(value.unsafeRecord, false);
+    return value;
+  }
+  async function dispatch(path, body, headers = {}) {
+    return server.fetch(path, { method: "POST", redirect: "manual", headers: { "x-observability-proof-url": origin + path, origin, "content-type": "application/json", ...headers }, ...(body === undefined ? {} : { body: typeof body === "string" ? body : JSON.stringify(body) }) });
+  }
+  let browser;
+  let completed = false;
+  try {
+    await server.listen();
+    const cases = [
+      { name: "console-only", overrides: {}, calls: 0, records: 1 },
+      { name: "matching-provider", overrides: pair, calls: 1, records: 1 },
+      { name: "missing-target", overrides: pair, omissions: ["APPLICATION_ENVIRONMENT"], calls: 0, records: 0 },
+      { name: "invalid-target", overrides: { ...pair, APPLICATION_ENVIRONMENT: "invalid" }, calls: 0, records: 0 },
+      { name: "opposite-target", overrides: { ...pair, APPLICATION_ENVIRONMENT: target === "production" ? "staging" : "production" }, calls: 0, records: 0 },
+      ...(target === "staging" ? [
+        { name: "host-only", overrides: { BETTER_STACK_INGESTING_HOST: pair.BETTER_STACK_INGESTING_HOST }, calls: 0, records: 0 },
+        { name: "token-only", overrides: { BETTER_STACK_SOURCE_TOKEN: pair.BETTER_STACK_SOURCE_TOKEN }, calls: 0, records: 0 },
+        { name: "wrong-type", overrides: { ...pair, BETTER_STACK_SOURCE_TOKEN: 1 }, calls: 0, records: 0 },
+        { name: "invalid-host", overrides: { ...pair, BETTER_STACK_INGESTING_HOST: "outside.example.test" }, calls: 0, records: 0 },
+        { name: "invalid-token", overrides: { ...pair, BETTER_STACK_SOURCE_TOKEN: "short" }, calls: 0, records: 0 },
+        { name: "provider-rejection", overrides: pair, behavior: "reject", calls: 1, records: 2 },
+        { name: "provider-throw", overrides: pair, behavior: "throw", calls: 1, records: 2 },
+        { name: "provider-timeout", overrides: pair, behavior: "timeout", calls: 1, records: 2 },
+      ] : []),
+      { name: "restored", overrides: pair, calls: 1, records: 1 },
+    ];
+    for (const scenario of cases) {
+      await control(scenario.overrides, scenario.omissions, scenario.behavior);
+      assert.equal((await dispatch("/api/observability-proof")).status, 204, scenario.name);
+      const value = await observed();
+      assert.equal(value.attempts, scenario.calls, scenario.name); assert.equal(value.records.length, scenario.records, scenario.name);
+      for (const record of value.records) assert.equal(record.environment, target);
+      for (const label of value.providerEnvironments) assert.equal(label, target);
+      outcomes.push({ name: scenario.name, ...value });
+    }
+    for (const [name, body, headers, status] of [
+      ["browser-error", envelope.value, {}, 202], ["browser-vital", vital, {}, 202],
+      ["malformed", { unexpected: true }, {}, 400], ["wrong-origin", vital, { origin: "https://other.observability.test" }, 403],
+      ["wrong-media", vital, { "content-type": "text/plain" }, 415], ["oversized", "x".repeat(8193), {}, 413],
+      ["forged-environment", { ...vital, event: { ...vital.event, context: { ...vital.event.context, environment: "production" } } }, {}, 400],
+    ]) {
+      await control(pair);
+      assert.equal((await dispatch("/api/observability", body, headers)).status, status, name);
+      const value = await observed(); assert.equal(value.attempts, status === 202 ? 1 : 0, name);
+      if (status === 202) assert.equal(value.records[0].environment, target);
+      outcomes.push({ name, status, ...value });
+    }
+    await control(pair);
+    const oversizedStream = new ReadableStream({ start(controller) {
+      controller.enqueue(new TextEncoder().encode("x".repeat(4096)));
+      controller.enqueue(new TextEncoder().encode("x".repeat(4097))); controller.close();
+    } });
+    assert.equal((await server.fetch("/api/observability", { method: "POST", redirect: "manual", duplex: "half", body: oversizedStream, headers: { "x-observability-proof-url": origin + "/api/observability", origin, "content-type": "application/json" } })).status, 413);
+    outcomes.push({ name: "chunked-oversized", ...await observed() });
+    assert.equal(outcomes.at(-1).attempts, 0); assert.equal(outcomes.at(-1).records.length, 0);
+    await control({ ...pair, APPLICATION_ENVIRONMENT: "invalid" });
+    assert.equal((await dispatch("/api/observability", envelope.value)).status, 202);
+    assert.equal((await observed()).attempts, 0); assert.equal((await observed()).records.length, 0);
+    for (const [name, overrides, records] of [["email-valid", {}, 1], ["email-refused", { APPLICATION_ENVIRONMENT: "invalid" }, 0], ["email-restored-independent", { BETTER_STACK_SOURCE_TOKEN: "partial" }, 1]]) {
+      await control(overrides); assert.equal((await dispatch("/api/observability-proof?email")).status, 204);
+      const value = await observed(); assert.equal(value.attempts, 0); assert.equal(value.records.length, records);
+      if (records) assert.equal(value.records[0].environment, target);
+      outcomes.push({ name, ...value });
+    }
+    browser = await chromium.launch({ headless: true });
+    const origins = target === "staging" ? [origin, "https://alternate.observability.test", origin + ":8443", "http://staging.observability.test", "http://127.0.0.1:3101", "http://localhost:3101"] : [origin];
+    for (const visibleOrigin of origins) {
+      const browserContext = await browser.newContext({ serviceWorkers: "block" });
+      const transportOnly = visibleOrigin === "http://staging.observability.test";
+      const pageErrors = [];
+      const diagnostics = [];
+      const nativeIngress = ["http://127.0.0.1:3101", "http://localhost:3101"].includes(visibleOrigin) ? createNativeIngress(visibleOrigin, forwardBrowserRequest, diagnostics) : undefined;
+      const contactRequests = [];
+      let automaticVitals = 0;
+      const forbidden = [];
+      let redirect;
+      try {
+        await browserContext.addCookies([{ name: "observability_session", value: "synthetic-local-cookie", url: visibleOrigin, httpOnly: true, secure: visibleOrigin.startsWith("https:"), sameSite: "Lax" }]);
+        await browserContext.addCookies([{ name: "contact_session", value: "synthetic-provider-cookie", url: "https://api.web3forms.com", httpOnly: true, secure: true, sameSite: "None" }]);
+        await browserContext.route("**/*", async route => {
+          const request = route.request(); const url = new URL(request.url());
+          if (nativeIngress) {
+            if (url.origin === visibleOrigin) await route.continue();
+            else { forbidden.push({ origin: url.origin, path: url.pathname }); await route.abort(); }
+            return;
+          }
+          if (url.href === "https://api.web3forms.com/submit") {
+            const headers = await request.allHeaders();
+            if (request.method() === "POST") contactRequests.push({ cookie: Boolean(headers.cookie), referrer: Boolean(headers.referer) });
+            await route.fulfill({ status: 200, headers: { "access-control-allow-origin": visibleOrigin, "access-control-allow-methods": "POST, OPTIONS", "access-control-allow-headers": "content-type", "content-type": "application/json" }, body: JSON.stringify({ success: true }) }); return;
+          }
+          if (url.origin !== visibleOrigin || url.pathname === "/redirect-proof") {
+            forbidden.push({ origin: url.origin, path: url.pathname }); await route.abort(); return;
+          }
+          const headers = await request.allHeaders();
+          if (url.pathname === "/api/observability") {
+            const body = request.postDataJSON();
+            if (!isControlledDiagnostic(body)) {
+              assert.equal(body.type, "operational-event"); assert.equal(body.event.name, "browser.web.vital");
+              assert.equal(Boolean(headers.cookie?.includes("observability_session=")), target === "staging" && visibleOrigin === origin);
+              automaticVitals += 1; await route.fulfill({ status: 202 }); return;
+            }
+            diagnostics.push({ cookie: Boolean(headers.cookie), referrer: Boolean(headers.referer) });
+            if (redirect) { await route.fulfill({ status: 307, headers: { location: redirect } }); return; }
+          }
+          const response = await forwardBrowserRequest(url, request.method(), headers, request.postDataBuffer());
+          await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: Buffer.from(await response.arrayBuffer()) });
+        });
+        await nativeIngress?.listen();
+        await control(pair);
+        const page = await browserContext.newPage();
+        page.on("pageerror", error => pageErrors.push({ name: error.name, message: error.message, stack: error.stack }));
+        await page.goto(visibleOrigin + "/en-CA/browser-proof");
+        await page.getByRole("button", { name: "Send vital" }).waitFor();
+        if (nativeIngress) assert.deepEqual(nativeIngress.documents, [{ url: visibleOrigin + "/en-CA/browser-proof", cookieAvailable: true }]);
+        const platform = await page.evaluate(() => ({ secureContext: isSecureContext, randomUUID: typeof crypto.randomUUID }));
+        assert.deepEqual(platform, { secureContext: !transportOnly, randomUUID: transportOnly ? "undefined" : "function" });
+        browserOutcomes.push({ origin: visibleOrigin, kind: "native-platform", ...platform, transportOnly });
+        if (transportOnly) await page.waitForFunction(() => typeof window.sendObservabilityEnvelopeForProof === "function");
+        async function send(name) {
+          if (nativeIngress) {
+            const completed = page.waitForResponse(response => response.url() === visibleOrigin + "/api/observability" && isControlledDiagnostic(response.request().postDataJSON()), { timeout: 30_000 });
+            const [, response] = await Promise.all([page.getByRole("button", { name }).click(), completed]);
+            assert.equal(diagnostics.length, 1);
+            const entry = diagnostics[0];
+            assert.ok(nativeIngress.completions.has(entry));
+            await bounded(nativeIngress.completions.get(entry), "native response finish");
+            assert.equal(entry.nativeResponseFinished, true);
+            assert.equal(response.status(), entry.workerResponse.status);
+            assert.equal(entry.url, response.request().url()); assert.equal(entry.method, "POST");
+            assert.equal(entry.bodySha256, digest(response.request().postDataBuffer()));
+            assert.equal(entry.forwarding.bodySha256, entry.bodySha256);
+            assert.deepEqual(entry.forwarding.headers, entry.received);
+            assert.equal(entry.received.host, new URL(visibleOrigin).host); assert.equal(entry.received.origin, visibleOrigin);
+            assert.equal(entry.received["sec-fetch-site"], "same-origin"); assert.equal(entry.received["sec-fetch-mode"], "same-origin"); assert.equal(entry.received["sec-fetch-dest"], "empty");
+            assert.equal(entry.envelopeType, name === "Send error" ? "error-report" : "operational-event");
+            assert.equal(entry.eventName, name === "Send error" ? "browser.caught.error" : "browser.web.vital");
+            return response.status();
+          }
+          const finished = new Promise((resolve, reject) => {
+            const timer = setTimeout(() => { cleanup(); reject(new Error("Controlled diagnostic did not settle")); }, 30_000);
+            const cleanup = () => { clearTimeout(timer); page.off("requestfinished", settle); page.off("requestfailed", settle); };
+            const settle = request => {
+              if (new URL(request.url()).pathname !== "/api/observability") return;
+              const body = request.postDataJSON();
+              if (!isControlledDiagnostic(body)) return;
+              cleanup(); resolve(request);
+            };
+            page.on("requestfinished", settle); page.on("requestfailed", settle);
+          });
+          if (transportOnly) {
+            // Transport only: insecure HTTP cannot create native UUID-backed events.
+            assert.equal(await page.evaluate(value => window.sendObservabilityEnvelopeForProof(value), name === "Send vital" ? vital : envelope.value), true);
+          } else {
+            await page.getByRole("button", { name }).click();
+          }
+          return (await (await finished).response())?.status();
+        }
+        for (const kind of ["Send vital", "Send error"]) {
+          await bounded(control(pair), "controlled Worker setup"); diagnostics.length = 0;
+          const status = await send(kind);
+          assert.equal(status, 202);
+          assert.equal(diagnostics.length, 1);
+          assert.equal(diagnostics[0].cookie, target === "staging" && visibleOrigin === origin); assert.equal(diagnostics[0].referrer, false);
+          const value = await bounded(observed(), "controlled Worker observations"); assert.equal(value.attempts, 1);
+          assert.equal(value.records.length, 1);
+          assert.equal(value.records[0].name, kind === "Send error" ? "browser.caught.error" : "browser.web.vital");
+          assert.equal(value.records[0].environment, target);
+          assert.deepEqual(value.providerEnvironments, [target]);
+          assert.equal(value.restrictedReports, kind === "Send error" ? 1 : 0);
+          browserOutcomes.push({ origin: visibleOrigin, kind, status, transportOnly, ...diagnostics[0], ...value });
+        }
+        if (target === "staging" && visibleOrigin === origin) {
+          const contactFinished = page.waitForResponse("https://api.web3forms.com/submit");
+          await page.getByRole("button", { name: "Send contact" }).click(); await contactFinished;
+          assert.deepEqual(contactRequests, [{ cookie: false, referrer: false }]);
+          browserOutcomes.push({ kind: "web3forms-credentials-omitted", ...contactRequests[0] });
+          await page.evaluate(() => { const base = document.createElement("base"); base.href = "https://external.observability.test/"; document.head.prepend(base); });
+          await control({ ...pair, APPLICATION_ENVIRONMENT: "production" }); diagnostics.length = 0;
+          await send("Send vital"); assert.equal(diagnostics[0].cookie, true);
+          assert.equal((await observed()).attempts, 0); assert.equal((await observed()).records.length, 0);
+          for (const location of [origin + "/redirect-proof", "https://external.observability.test/redirect-proof"]) {
+            redirect = location; diagnostics.length = 0; await send("Send error");
+            assert.equal(diagnostics.length, 1); assert.equal(forbidden.length, 0);
+            browserOutcomes.push({ kind: "redirect-refused", crossOrigin: !location.startsWith(origin + "/"), cookie: diagnostics[0].cookie });
+          }
+        }
+        assert.equal(forbidden.length, 0);
+        browserOutcomes.push({ origin: visibleOrigin, kind: transportOnly ? "automatic-capture-unavailable" : "automatic-vitals-credential-check", count: nativeIngress?.automaticVitals ?? automaticVitals });
+      } finally {
+        const cleanup = await Promise.allSettled([bounded(browserContext.close(), "browser context closure"), nativeIngress?.close()]);
+        for (const result of cleanup) if (result.status === "rejected") failures.push({ origin: visibleOrigin, scope: "browser-row-cleanup", name: result.reason.name, message: result.reason.message });
+        for (const failure of nativeIngress?.failures ?? []) failures.push({ origin: visibleOrigin, scope: "native-ingress", ...failure });
+        if (nativeIngress) browserOutcomes.push({ origin: visibleOrigin, kind: "native-ingress", documents: nativeIngress.documents, failures: nativeIngress.failures });
+        browserOutcomes.push({ origin: visibleOrigin, kind: "page-errors", errors: pageErrors });
+        assert.deepEqual(failures, []);
+      }
+      for (const error of pageErrors) {
+        assert.equal(transportOnly, true, error.message);
+        assert.equal(error.name, "TypeError");
+        assert.match(error.message, /crypto\.randomUUID is not a function/u);
+      }
+    }
+    completed = true;
+  } finally {
+    const cleanup = await Promise.allSettled([bounded(browser?.close(), "browser closure"), bounded(server.close(), "Worker closure")]);
+    for (const result of cleanup) if (result.status === "rejected") failures.push({ scope: "harness-cleanup", name: result.reason.name, message: result.reason.message });
+    await writeFile(process.argv[2], JSON.stringify({ target, completed: completed && failures.length === 0, outcomes, browserOutcomes, failures, providerTraffic: false, realAccessSession: false }, null, 2));
+    assert.deepEqual(failures, []);
+  }
+}
+
+function instrumentObservabilityWorker(worker) {
+  let overrides = {};
+  let omissions = [];
+  let behavior = "accept";
+  let observations;
+  function reset() {
+    observations = { attempts: 0, records: [], providerEnvironments: [], restrictedReports: 0, unsafeRecord: false, unexpectedOutbound: 0 };
+  }
+  reset();
+  globalThis.fetch = async (input, options) => {
+    const url = typeof input === "string" ? input : input.url ?? String(input);
+    if (url !== "https://s123.eu-nbg-2.betterstackdata.com") {
+      observations.unexpectedOutbound += 1;
+      throw new Error("Unexpected outbound attempt");
+    }
+    observations.attempts += 1;
+    const body = JSON.parse(String(options?.body));
+    observations.providerEnvironments.push(body.environment);
+    if (body["exception.fingerprint"]) observations.restrictedReports += 1;
+    if (options?.redirect !== "error") throw new Error("Redirect refusal missing");
+    if (behavior === "reject") return new Response(null, { status: 403 });
+    if (behavior === "throw") throw new Error("Controlled transport failure");
+    if (behavior === "timeout") return new Promise((_, reject) => {
+      options.signal.addEventListener("abort", () => reject(new Error("Controlled timeout")), { once: true });
+    });
+    return new Response(null, { status: 202 });
+  };
+  console.info = record => {
+    if (!record || typeof record !== "object" || typeof record.event_name !== "string") return;
+    observations.unsafeRecord ||= Object.keys(record).some(key => key.startsWith("exception.") || ["message", "stack", "cookie", "authorization"].includes(key));
+    observations.records.push({ name: record.event_name, environment: record.environment });
+  };
+  return { async fetch(incoming, env, context) {
+    const path = new URL(incoming.url).pathname;
+    if (path === "/__proof/control") {
+      const input = await incoming.json();
+      overrides = input.overrides ?? {}; omissions = input.omissions ?? []; behavior = input.behavior ?? "accept"; reset();
+      return Response.json({ configured: true });
+    }
+    if (path === "/__proof/observations") return Response.json(observations);
+    const runtime = { ...env, ...overrides };
+    for (const key of omissions) delete runtime[key];
+    const tasks = [];
+    const url = new URL(incoming.headers.get("x-observability-proof-url") ?? incoming.url);
+    const headers = new Headers(incoming.headers);
+    headers.set("host", url.host); headers.set("x-forwarded-host", url.host); headers.set("x-forwarded-proto", url.protocol.slice(0, -1));
+    const request = new Request(url, { ...incoming, method: incoming.method, headers, body: incoming.body, redirect: "manual" });
+    const response = await worker.fetch(request, runtime, {
+      waitUntil(task) { tasks.push(Promise.resolve(task)); context.waitUntil(task); },
+      passThroughOnException() { context.passThroughOnException(); },
+    });
+    await Promise.allSettled(tasks);
+    return response;
+  } };
+}
+test("environment observability generation preserves diagnostics isolation", { timeout: 90 * 60 * 1000 }, async context => {
+  const owner = await realpath(await mkdtemp(join(tmpdir(), "egeria-environment-observability-")));
+  context.diagnostic("Retained observability evidence: " + owner);
+  const supportRoot = join(owner, "support");
+  await mkdir(supportRoot);
+  const support = await prepareLiveSupport(supportRoot);
+  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false", WRANGLER_LOG_PATH: join(owner, "wrangler.log") };
+  const commands = [];
+  const receipts = [];
+  const digest = bytes => createHash("sha256").update(bytes).digest("hex");
+  async function command(label, executable, arguments_, cwd = owner, additions = {}) {
+    try {
+      const result = await execFileAsync(executable, arguments_, { cwd, encoding: "utf8", maxBuffer: 8 * 1024 * 1024, timeout: 25 * 60 * 1000, env: { ...environment, ...additions } });
+      await writeFile(join(owner, label + ".log"), result.stdout + result.stderr);
+      commands.push({ label, executable, arguments: arguments_, exitCode: 0 });
+      return result.stdout;
+    } catch (error) {
+      await writeFile(join(owner, label + ".log"), (error.stdout ?? "") + (error.stderr ?? ""));
+      commands.push({ label, executable, arguments: arguments_, exitCode: error.code });
+      throw error;
+    } finally { await writeFile(join(owner, "commands.json"), JSON.stringify(commands, null, 2)); }
+  }
+  const cliUrl = new URL("../../../apps/cli/dist/run-cli.js", import.meta.url).href;
+  const coreUrl = new URL("../dist/index.js", import.meta.url).href;
+  async function cli(label, arguments_) {
+    const source = "import { createCliRunner } from " + JSON.stringify(cliUrl) + ";\n" +
+      "import { createPnpmGeneratedProjectVerifier } from " + JSON.stringify(coreUrl) + ";\n" +
+      'const run = createCliRunner({ createVerifier: () => createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }) }, "2.0.0");\n' +
+      "process.exitCode = await run(" + JSON.stringify(arguments_) + ", { write: value => process.stdout.write(value), writeError: value => process.stderr.write(value) });";
+    return JSON.parse(await command(label, process.execPath, ["--input-type=module", "-e", source]));
+  }
+  async function record(label, root) {
+    const state = JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8"));
+    const versions = Object.fromEntries(state.installedCapabilities.map(({ identifier, version }) => [identifier, version]));
+    assert.equal(versions.observability, "0.4.0");
+    for (const operation of ["infer", "doctor"]) assert.equal((await cli(label + "-" + operation, [operation, "--directory", root])).ok, true);
+    receipts.push({ label, root, versions, verification: state.lastSuccessfulVerification, stateSha256: digest(await readFile(join(root, ".egeria/state.json"))), lockSha256: digest(await readFile(join(root, "pnpm-lock.yaml"))) });
+    await writeFile(join(owner, "generation-receipts.json"), JSON.stringify(receipts, null, 2));
+  }
+  const portfolio = join(owner, "portfolio");
+  assert.equal((await cli("portfolio-create", ["create", "--profile", "portfolio", "--name", "observability-example", "--display-name", "Observability Example", "--directory", portfolio])).ok, true);
+  await record("portfolio", portfolio);
+  const primary = join(owner, "app-primary");
+  assert.equal((await cli("app-create", ["create", "--profile", "app", "--name", "observability-example", "--display-name", "Observability Example", "--directory", primary, "--transactional-email-resend", "--application-persistence", "--contact-form-web3forms", "--booking-calendly", "--calendly-mode", "link", "--google-analytics-4", "--multilingual"])).ok, true);
+  await record("app", primary);
+  await command("fixture-init", "git", ["init", "--initial-branch=main", primary]);
+  await command("fixture-name", "git", ["config", "user.name", "Observability Integration Test"], primary);
+  await command("fixture-email", "git", ["config", "user.email", "observability-test@example.test"], primary);
+  await command("fixture-add", "git", ["add", "-A"], primary);
+  await command("fixture-commit", "git", ["commit", "-m", "Preserve generated observability fixture"], primary);
+  const linked = join(owner, "app-linked");
+  await command("fixture-worktree", "git", ["worktree", "add", "-b", "observability-neighbor-check", linked], primary);
+  const sharedPaths = ["pnpm-lock.yaml", "docs/observability.md", "apps/web/src/infrastructure/observability/server-reporter.ts", "apps/web/src/infrastructure/observability/browser-reporter.ts", "apps/web/src/infrastructure/cloudflare/observability-context.ts", "apps/web/src/configuration/application-database.ts", "apps/web/src/infrastructure/observability/transactional-email-events.ts"];
+  const preserved = new Map(await Promise.all(sharedPaths.map(async path => [path, await readFile(join(linked, path))])));
+  for (const operation of ["remove", "add"]) {
+    const arguments_ = ["--directory", linked, "--capability", "booking-calendly", ...(operation === "add" ? ["--calendly-mode", "link"] : [])];
+    const envelope = await cli("booking-" + operation + "-plan", ["plan-" + operation, ...arguments_]);
+    const plan = operation === "add" ? envelope.result : envelope.plan;
+    const result = await cli("booking-" + operation + "-apply", ["apply-" + operation, ...arguments_, "--approved-plan", plan.planFingerprint]);
+    assert.equal(result.ok, true);
+    assert.equal(result.result.status, "verified-final-diff-approval-required");
+    await record("booking-" + operation, linked);
+    for (const [path, bytes] of preserved) assert.deepEqual(await readFile(join(linked, path)), bytes, path);
+    await command("booking-" + operation + "-add", "git", ["add", "-A"], linked);
+    await command("booking-" + operation + "-commit", "git", ["commit", "-m", "Verify booking " + operation + " preserves observability"], linked);
+  }
+  for (const [path, bytes] of preserved) assert.deepEqual(await readFile(join(primary, path)), bytes, path);
+  const project = join(owner, "worker-browser-proof");
+  await cp(linked, project, { recursive: true, filter: source => ![".git", "node_modules", ".next", ".open-next", ".wrangler"].includes(source.split("/").at(-1)) });
+  const app = join(project, "apps/web");
+  await mkdir(join(app, "app/api/observability-proof"));
+  await writeFile(join(app, "app/api/observability-proof/route.ts"), [
+    'import { reportCaughtServerError } from "@/src/infrastructure/observability/server-reporter";',
+    'import { reportTransactionalEmailEvent } from "@/src/infrastructure/observability/transactional-email-events";',
+    'export const dynamic = "force-dynamic";',
+    'export async function POST(request: Request) {',
+    '  if (new URL(request.url).searchParams.has("email")) await reportTransactionalEmailEvent({ outcome: "accepted" });',
+    '  else await reportCaughtServerError(new Error("Synthetic server failure"), { operation: "proof-load" });',
+    '  return new Response(null, { status: 204 });',
+    '}',
+  ].join("\n"));
+  const browserInstrumentation = await prepareObservabilityBrowserProof(app);
+  const wrapper = 'import worker from "./.open-next/worker.js";\nexport default (' + instrumentObservabilityWorker.toString() + ")(worker);\n";
+  const harness = "(" + runObservabilityProofHarness.toString() + ")();\n";
+  await writeFile(join(app, "observability-proof-worker.mjs"), wrapper);
+  await writeFile(join(app, "observability-proof.mjs"), harness);
+  await command("proof-install", "pnpm", ["install", "--frozen-lockfile", "--store-dir", support.store], project);
+  await command("proof-browser-install", "pnpm", ["--dir", "apps/web", "run", "browser:install"], project);
+  await command("guide-unit-examples", "pnpm", ["--dir", "apps/web", "run", "test:unit", "tests/unit/observability-environment.test.ts", "tests/unit/server-transactional-email.test.ts", "tests/unit/transactional-email-events.test.ts"], project);
+  async function hashTree(root) {
+    const paths = (await readdir(root, { recursive: true, withFileTypes: true })).filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name)).sort();
+    const hash = createHash("sha256");
+    for (const path of paths) hash.update(path.slice(root.length)).update(await readFile(path));
+    return { sha256: hash.digest("hex"), files: paths.length };
+  }
+  const sources = { browserInstrumentation, source: await hashTree(join(app, "src")), routes: await hashTree(join(app, "app")), wrapper: digest(Buffer.from(wrapper)), harness: digest(Buffer.from(harness)) };
+  const artifacts = [];
+  for (const target of ["development", "staging", "production"]) {
+    const build = { APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_SITE_URL: "https://" + target + ".observability.test", NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "00000000-0000-4000-8000-000000000001", NEXT_PUBLIC_CALENDLY_URL: "https://calendly.com/egeria-synthetic-nonproduction/intro", NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "G-TEST123456" };
+    await command(target + "-next", "pnpm", ["--dir", "apps/web", "run", "build"], project, build);
+    await command(target + "-opennext", "pnpm", ["--dir", "apps/web", "exec", "opennextjs-cloudflare", "build", "--skipNextBuild"], project, { ...build, ...(target === "development" ? {} : { CLOUDFLARE_ENV: target }) });
+    const artifact = { target, ...sources, completeWorkerTree: await hashTree(join(app, ".open-next")), workerSha256: digest(await readFile(join(app, ".open-next/worker.js"))), static: await hashTree(join(app, ".open-next/assets")) };
+    await command(target + "-runtime-browser", process.execPath, [join(app, "observability-proof.mjs"), join(owner, target + "-outcomes.json")], app, { APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "contradictory", NEXT_PUBLIC_SITE_URL: "https://different.observability.test" });
+    assert.deepEqual(await hashTree(join(app, ".open-next")), artifact.completeWorkerTree);
+    assert.deepEqual(await hashTree(join(app, "src")), sources.source);
+    assert.deepEqual(await hashTree(join(app, "app")), sources.routes);
+    assert.equal(digest(await readFile(join(app, "observability-proof-worker.mjs"))), sources.wrapper);
+    assert.equal(digest(await readFile(join(app, "observability-proof.mjs"))), sources.harness);
+    artifacts.push(artifact);
+    await writeFile(join(owner, "artifact-evidence.json"), JSON.stringify(artifacts, null, 2));
+  }
+  context.diagnostic(JSON.stringify({ owner, receipts: receipts.length, targets: artifacts.map(({ target }) => target), providerTraffic: false, realAccessSession: false }));
+});
+
 const publicRegistry = "https://registry.npmjs.org/";
 const packages = [
   {
