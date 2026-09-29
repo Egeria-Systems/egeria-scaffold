@@ -875,7 +875,10 @@ async function loadGeneratedBrowserReporter(files) {
     'from "@egeria-systems/observability"',
     `from ${JSON.stringify(new URL("../../observability/dist/index.js", import.meta.url).href)}`,
   );
-  const executable = withRoot.replace(
+  const withTarget = withRoot.includes('from "../../configuration/application-environment"')
+    ? withRoot.replace('from "../../configuration/application-environment"', `from ${JSON.stringify(await generatedApplicationEnvironmentModule(files))}`)
+    : withRoot;
+  const executable = withTarget.replace(
     'from "@egeria-systems/observability/browser"',
     `from ${JSON.stringify(new URL("../../observability/dist/browser.js", import.meta.url).href)}`,
   );
@@ -1072,6 +1075,7 @@ async function loadGeneratedServerReporter(
   {
     ingestingHost = "s123.eu-nbg-2.betterstackdata.com",
     rejectErrorDispatch = false,
+    runtimeContextModule,
     scheduleShouldThrow = false,
     sourceToken = "source-token-123456",
   } = {},
@@ -1108,7 +1112,7 @@ async function loadGeneratedServerReporter(
     "../../observability/dist/server.js",
     import.meta.url,
   ).href;
-  const contextModule = `data:text/javascript;base64,${Buffer.from(
+  const contextModule = runtimeContextModule ?? `data:text/javascript;base64,${Buffer.from(
     [
       "export async function readObservabilityRuntimeContext() {",
       `return { ingestingHost: ${JSON.stringify(ingestingHost)}, sourceToken: ${JSON.stringify(sourceToken)}, releaseId: "release-123", schedule(delivery) { globalThis[${JSON.stringify(scheduleKey)}].push(delivery); ${scheduleShouldThrow ? 'throw new Error("context failed");' : ""} } };`,
@@ -6521,4 +6525,124 @@ test("environment analytics preflight validates all compositions with field-only
       if (selection & 2) check({ NEXT_PUBLIC_CALENDLY_URL: "", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, { code: "BOOKING_CONFIGURATION_INVALID", field: "NEXT_PUBLIC_CALENDLY_URL", reason: "missing" });
     });
   }
+});
+
+
+async function generatedApplicationEnvironmentModule(files) {
+  const typescript = await import("typescript");
+  const source = indexFiles(files).get("apps/web/src/configuration/application-environment.ts");
+  const executable = typescript.transpileModule(source, { compilerOptions: { module: typescript.ModuleKind.ESNext, target: typescript.ScriptTarget.ES2022 } }).outputText;
+  return `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}`;
+}
+
+let environmentObservabilityLoad = 0;
+async function loadEnvironmentObservabilityContext(files, environment, testContext) {
+  const typescript = await import("typescript");
+  const key = `__environmentObservability${++environmentObservabilityLoad}`;
+  const scheduled = [];
+  globalThis[key] = { env: environment, ctx: { waitUntil(task) { scheduled.push(task); } } };
+  testContext.after(() => { delete globalThis[key]; });
+  const platformModule = `data:text/javascript;base64,${Buffer.from(`export async function getCloudflareContext() { return globalThis[${JSON.stringify(key)}]; }`).toString("base64")}`;
+  const source = indexFiles(files).get("apps/web/src/infrastructure/cloudflare/observability-context.ts");
+  const executable = typescript.transpileModule(source, { compilerOptions: { module: typescript.ModuleKind.ESNext, target: typescript.ScriptTarget.ES2022 } }).outputText
+    .replace('from "@opennextjs/cloudflare"', `from ${JSON.stringify(platformModule)}`)
+    .replace('from "../../configuration/application-environment"', `from ${JSON.stringify(await generatedApplicationEnvironmentModule(files))}`);
+  const moduleURL = `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#${key}`;
+  return { module: await import(moduleURL), moduleURL, scheduled };
+}
+
+function setEnvironmentInput(testContext, key, value) {
+  const original = process.env[key];
+  if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  testContext.after(() => { if (original === undefined) delete process.env[key]; else process.env[key] = original; });
+}
+
+test("environment observability preserves public bytes and all finite installed contexts", async () => {
+  const core = await import("../dist/index.js");
+  const request = { projectName: "observability-context", displayName: "Observability Context", packageVersions: core.verifiedCapabilityPackageVersions };
+  const sharedPaths = [
+    "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+    "apps/web/src/infrastructure/observability/server-reporter.ts",
+    "apps/web/src/infrastructure/observability/browser-reporter.ts",
+    "apps/web/app/api/observability/route.ts",
+  ];
+  const current = assertSuccess(await core.renderSkeleton({ ...request, profile: "portfolio" }));
+  const retained = assertSuccess(await core.renderSkeleton({ ...request, profile: "portfolio" }, retainedRenderingContext));
+  const publicFiles = indexFiles(current.files);
+  assert.equal(current.resolved.capabilities.find(({ identifier }) => identifier === "observability").version, "0.3.0");
+  assert.equal(retained.resolved.capabilities.find(({ identifier }) => identifier === "observability").version, "0.3.0");
+  for (const path of sharedPaths) {
+    assert.equal(publicFiles.get(path), indexFiles(retained.files).get(path), path);
+    assert.equal(publicFiles.get(path), await readCommonWebTemplate(path.slice("apps/web/".length)), path);
+  }
+  for (const persistence of [false, true]) {
+    for (const retainedFoundation of [false, true]) {
+      const rendered = assertSuccess(await core.renderSkeleton({
+        ...request, profile: persistence ? "app" : "portfolio", transactionalEmailResend: true,
+        ...(persistence ? { applicationPersistence: true } : {}),
+      }, core.createApplicationEnvironmentRenderingContext(persistence, retainedFoundation)));
+      const files = indexFiles(rendered.files);
+      const capability = rendered.resolved.capabilities.find(({ identifier }) => identifier === "observability");
+      assert.equal(capability.version, "0.4.0");
+      assert.equal(files.get("apps/web/app/api/observability/route.ts"), publicFiles.get("apps/web/app/api/observability/route.ts"));
+      for (const surface of capability.managedSurfaces) {
+        if (surface.fingerprintTarget.kind === "file") assert.ok(files.has(surface.path), surface.path);
+      }
+      assert.equal(JSON.parse(files.get("apps/web/package.json")).dependencies["@egeria-systems/observability"], "0.3.0");
+      for (const path of ["docs/environments.md", "docs/observability.md"]) {
+        const content = files.get(path);
+        const links = [...content.matchAll(/\[[^\]]+\]\(([^)]+)\)/gu), ...content.matchAll(/^\[[^\]]+\]:\s+(\S+)/gmu)];
+        assert.ok(links.length > 0, path);
+        for (const [, destination] of links) {
+          if (/^(?:https?:|#)/u.test(destination)) continue;
+          const target = new URL(destination, "https://generated.example/" + path);
+          assert.ok(files.has(target.pathname.slice(1)), `${path} -> ${destination}`);
+        }
+      }
+      assert.ok(files.has("apps/web/tests/unit/transactional-email-events.test.ts"));
+      assert.equal(new Set(rendered.files.map(({ path }) => path)).size, rendered.files.length);
+    }
+  }
+});
+
+test("environment observability rejects partial runtime provider input before dispatch", async (testContext) => {
+  const rendered = assertSuccess(await renderApplicationEnvironment("portfolio"));
+  setEnvironmentInput(testContext, "NEXT_PUBLIC_APPLICATION_ENVIRONMENT", "staging");
+  const context = await loadEnvironmentObservabilityContext(rendered.files, { APPLICATION_ENVIRONMENT: "staging", BETTER_STACK_INGESTING_HOST: "s123.eu-nbg-2.betterstackdata.com" }, testContext);
+  await assert.rejects(context.module.readObservabilityRuntimeContext(), { message: "BETTER_STACK_CONFIGURATION_INVALID" });
+  assert.deepEqual(context.scheduled, []);
+});
+
+test("environment observability labels actual structured events using runtime agreement", async (testContext) => {
+  const rendered = assertSuccess(await renderApplicationEnvironment("portfolio"));
+  setEnvironmentInput(testContext, "NEXT_PUBLIC_APPLICATION_ENVIRONMENT", "staging");
+  const context = await loadEnvironmentObservabilityContext(rendered.files, { APPLICATION_ENVIRONMENT: "staging" }, testContext);
+  const reporter = await loadGeneratedServerReporter(rendered.files, { runtimeContextModule: context.moduleURL });
+  const records = [];
+  testContext.mock.method(console, "info", record => records.push(record));
+  await reporter.module.reportCaughtServerError(new Error("synthetic failure"), { operation: "load-example" });
+  await Promise.all(context.scheduled);
+  assert.equal(records.length, 1);
+  assert.equal(records[0].environment, "staging");
+  assert.equal(records[0].event_name, "server.caught.error");
+  assert.doesNotMatch(JSON.stringify(records), /synthetic failure|stack_trace/u);
+});
+
+test("environment observability credentials require a staging artifact at its exact configured origin", async (testContext) => {
+  const rendered = assertSuccess(await renderApplicationEnvironment("portfolio"));
+  setEnvironmentInput(testContext, "NEXT_PUBLIC_APPLICATION_ENVIRONMENT", "staging");
+  setEnvironmentInput(testContext, "NEXT_PUBLIC_SITE_URL", "https://staging.example.test");
+  const original = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { location: { origin: "https://staging.example.test" } } });
+  testContext.after(() => { if (original) Object.defineProperty(globalThis, "window", original); else delete globalThis.window; });
+  const requests = [];
+  testContext.mock.method(globalThis, "fetch", async (url, options) => { requests.push({ url, options }); return new Response(null, { status: 202 }); });
+  const reporter = await loadGeneratedBrowserReporter(rendered.files);
+  reporter.module.reportWebVital({ name: "LCP", value: 12, delta: 1, rating: "good", navigationType: "navigate" });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].options.credentials, "same-origin");
+  assert.equal(requests[0].url, "https://staging.example.test/api/observability");
+  assert.equal(requests[0].options.mode, "same-origin");
+  assert.equal(requests[0].options.redirect, "error");
 });
