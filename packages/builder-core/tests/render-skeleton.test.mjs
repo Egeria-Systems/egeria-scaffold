@@ -20,6 +20,41 @@ const tokens = {
   workerName: "acme-studio-web",
 };
 
+test("application environment dependency policy preserves public graphs and direct pins", async () => {
+  const core = await import("../dist/index.js");
+  const { createGenerationRenderingContext } = await import("../dist/catalog/verified-package-versions.js");
+  for (const profile of ["portfolio", "site", "app"]) {
+    const request = { profile, projectName: "dependency-example", displayName: "Dependency Example", packageVersions: core.verifiedCapabilityPackageVersions };
+    const current = assertSuccess(await core.renderSkeleton(request, { ...createGenerationRenderingContext(), profiles: core.createVitestFiveProfileRecipes() }));
+    const candidate = assertSuccess(await core.renderSkeleton(request, core.createApplicationEnvironmentRenderingContext()));
+    const currentWorkspace = parseGeneratedYaml(current.files, "pnpm-workspace.yaml");
+    const candidateWorkspace = parseGeneratedYaml(candidate.files, "pnpm-workspace.yaml");
+    assert.equal(currentWorkspace.overrides["fast-uri@"], "3.1.6");
+    assert.equal(currentWorkspace.overrides["miniflare>undici"], "7.29.0");
+    assert.equal(currentWorkspace.overrides["jsdom>undici"], undefined);
+    const retainedOverrides = { ...currentWorkspace.overrides };
+    delete retainedOverrides["next@16.3.0"];
+    assert.deepEqual(candidateWorkspace, {
+      ...currentWorkspace,
+      minimumReleaseAgeExclude: [...currentWorkspace.minimumReleaseAgeExclude.filter(value => value !== "fast-uri@3.1.6"), "undici@7.29.1", "undici@8.10.2"],
+      overrides: {
+        ...retainedOverrides,
+        "fast-uri@": "3.1.8",
+        "miniflare>undici": "7.29.1",
+        "jsdom>undici": "8.10.2",
+        "next@>=16.2.0 <16.3.6": "16.3.6",
+        "brace-expansion@>=1.0.0 <1.1.21": "1.1.21",
+        "brace-expansion@>=2.0.0 <2.1.7": "2.1.7",
+        "brace-expansion@>=5.0.0 <5.0.12": "5.0.12",
+      },
+    });
+    const currentManifest = parseGeneratedJson(current.files, "apps/web/package.json");
+    const candidateManifest = parseGeneratedJson(candidate.files, "apps/web/package.json");
+    assert.deepEqual(candidateManifest.dependencies, currentManifest.dependencies);
+    assert.deepEqual(candidateManifest.devDependencies, currentManifest.devDependencies);
+  }
+});
+
 const analyticsSettings = {
   consent: { policy: "explicit-opt-in" },
   providers: {
@@ -67,9 +102,11 @@ const appFoundationPaths = [
 
 test("app generation preserves production-site bytes across all optional subsets", async () => {
   const core = await import("../dist/index.js");
+  const { createVitestFiveProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
   for (const generation of [
     { context: retainedRenderingContext, recipe: "0.1.0", standards: "0.4.0", appVitest: "4.1.11", siteVitest: "4.1.10" },
-    { context: undefined, recipe: "0.2.0", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
+    { context: { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: createVitestFiveProfileRecipes() }, recipe: "0.2.0", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
+    { context: undefined, recipe: "0.2.1", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
   ]) {
     const renderSkeleton = (request) => core.renderSkeleton(request, generation.context);
     for (let subset = 0; subset < 8; subset += 1) {
@@ -6050,11 +6087,11 @@ test("rendering returns isolated byte arrays and performs no repository write", 
 
 test("Vitest five generation materializes each exact recipe without changing the retained generation", async () => {
   const core = await import("../dist/index.js");
-  const { createVitestFourProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+  const { createVitestFourProfileRecipes, createVitestFiveProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
   const retained = { catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: createVitestFourProfileRecipes() };
   for (const [profile, recipeVersion, oldRecipeVersion] of [["portfolio", "0.11.0", "0.10.0"], ["site", "0.12.0", "0.11.0"], ["app", "0.2.0", "0.1.0"]]) {
     const request = { profile, projectName: "vitest-contract", displayName: "Vitest contract", packageVersions: core.verifiedCapabilityPackageVersions };
-    const current = await core.renderSkeleton(request);
+    const current = await core.renderSkeleton(request, { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: createVitestFiveProfileRecipes() });
     const historical = await core.renderSkeleton(request, retained);
     assert.equal(current.ok, true, JSON.stringify(current));
     assert.equal(historical.ok, true, JSON.stringify(historical));
@@ -6182,4 +6219,74 @@ test("application environment rendering refuses incomplete selections and mixed 
   const core = await import("../dist/index.js");
   const result = await core.renderSkeleton({ profile: "portfolio", projectName: "example", displayName: "Example", packageVersions: core.verifiedCapabilityPackageVersions }, { ...applicationEnvironmentContext, projectSchemaVersion: "1.0.0" });
   assert.equal(result.ok, false);
+});
+
+
+test("security recipe contexts preserve installed cohorts", async () => {
+  const core = await import("../dist/index.js");
+  const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
+  const expected = { portfolio: "0.11.1", site: "0.12.1", app: "0.2.1" };
+  const historical = { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" };
+  const historicalProfiles = core.createVitestFiveProfileRecipes();
+  for (const profile of ["portfolio", "site", "app"]) {
+    const request = { profile, projectName: "security-cohort", displayName: "Security Cohort", packageVersions: core.verifiedCapabilityPackageVersions };
+    const current = assertSuccess(await core.renderSkeleton(request));
+    assert.equal(current.project.recipeVersion, expected[profile]);
+    assert.equal(current.project.schemaVersion, "1.0.0");
+    for (const profiles of [historicalProfiles, core.createSecurityPatchedProfileRecipes()]) {
+      for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
+        for (const jobVersion of options.backgroundJobDelivery ? ["0.1.0", "0.2.0"] : ["0.2.0"]) {
+          const context = { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true, jobVersion), profiles };
+          const rendered = assertSuccess(await core.renderSkeleton({ ...request, ...options }, context));
+          const recipeVersion = profiles === historicalProfiles ? historical[profile] : expected[profile];
+          assert.equal(rendered.project.recipeVersion, recipeVersion);
+          const state = { origin: { profile, recipeVersion }, installedCapabilities: core.createInstalledManifest(rendered.resolved) };
+          const installed = assertSuccess(createVerifiedProjectSnapshot(rendered.project, state));
+          assert.deepEqual(installed.renderingContext, context);
+          assert.equal(assertSuccess(createVerifiedProjectSnapshot(rendered.project, { ...state, origin: { profile, recipeVersion: "9.9.9" } })).renderingContext, undefined);
+          if (options.applicationPersistence || options.transactionalEmailResend || options.backgroundJobDelivery) {
+            const changed = { ...state, installedCapabilities: state.installedCapabilities.map(capability => capability.identifier === "deployment-cloudflare" ? { ...capability, version: "9.9.9" } : capability) };
+            assert.equal(assertSuccess(createVerifiedProjectSnapshot(rendered.project, changed)).renderingContext, undefined);
+          }
+        }
+      }
+    }
+  }
+});
+
+test("security recipes remain outside environment schema controls", async () => {
+  const core = await import("../dist/index.js");
+  const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
+  for (const [profile, recipeVersion] of [["portfolio", "0.11.1"], ["site", "0.12.1"], ["app", "0.2.1"]]) {
+    const request = { profile, projectName: "security-cohort", displayName: "Security Cohort", packageVersions: core.verifiedCapabilityPackageVersions };
+    const historical = assertSuccess(await core.renderSkeleton(request, { ...createGenerationRenderingContext(), profiles: core.createVitestFiveProfileRecipes() }));
+    assert.equal(core.projectConfigurationSchema.safeParse({ ...historical.project, recipeVersion }).success, true);
+    const candidate = assertSuccess(await core.renderSkeleton(request, core.createApplicationEnvironmentRenderingContext()));
+    assert.equal(core.applicationEnvironmentProjectConfigurationSchema.safeParse(candidate.project).success, true);
+    assert.equal(core.applicationEnvironmentProjectConfigurationSchema.safeParse({ ...candidate.project, recipeVersion }).success, false);
+  }
+});
+
+
+test("security dependency policy shares exact reviewed patches with environment candidates", async () => {
+  const core = await import("../dist/index.js");
+  for (const profile of ["portfolio", "site", "app"]) {
+    const request = { profile, projectName: "security-policy", displayName: "Security Policy", packageVersions: core.verifiedCapabilityPackageVersions };
+    const current = assertSuccess(await core.renderSkeleton(request));
+    const candidate = assertSuccess(await core.renderSkeleton(request, core.createApplicationEnvironmentRenderingContext()));
+    const policy = parseGeneratedYaml(current.files, "pnpm-workspace.yaml");
+    assert.equal(policy.overrides["fast-uri@"], "3.1.8");
+    assert.equal(policy.overrides["next@16.3.0"], undefined);
+    assert.equal(policy.overrides["next@>=16.2.0 <16.3.6"], "16.3.6");
+    assert.equal(policy.overrides["brace-expansion@>=1.0.0 <1.1.21"], "1.1.21");
+    assert.equal(policy.overrides["brace-expansion@>=2.0.0 <2.1.7"], "2.1.7");
+    assert.equal(policy.overrides["brace-expansion@>=5.0.0 <5.0.12"], "5.0.12");
+    assert.equal(policy.overrides["miniflare>undici"], "7.29.1");
+    assert.equal(policy.overrides["jsdom>undici"], "8.10.2");
+    assert.deepEqual(policy, parseGeneratedYaml(candidate.files, "pnpm-workspace.yaml"));
+    assert.equal(policy.minimumReleaseAge, 1440);
+    assert.equal(policy.resolutionMode, "time-based");
+    assert.equal(current.project.schemaVersion, "1.0.0");
+    assert.equal(candidate.project.schemaVersion, "2.0.0");
+  }
 });

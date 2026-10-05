@@ -68,14 +68,14 @@ test("preparation checks compiled site generation without exposing its public fo
   assert.equal(result.ok, true);
   assert.equal(result.capability, "contact-form-web3forms");
   assert.equal(result.profile, "site");
-  assert.equal(result.recipeVersion, "0.12.0");
+  assert.equal(result.recipeVersion, "0.12.1");
   assert.equal(result.evidenceRevision, revision);
   assert.deepEqual(result.subject, subject);
   assert.deepEqual(result.checks, ["compiled-cli-create", "state-inference", "healthy-diagnostics", "exact-diff"]);
   assert.equal(JSON.stringify(result).includes(accessKey), false);
   assert.equal(JSON.stringify(result).includes(input.outputRoot), false);
   const projectRoot = join(input.outputRoot, "project");
-  assert.match(await readFile(join(projectRoot, ".egeria/project.yaml"), "utf8"), /recipeVersion: 0\.12\.0/u);
+  assert.match(await readFile(join(projectRoot, ".egeria/project.yaml"), "utf8"), /recipeVersion: 0\.12\.1/u);
   const manifest = JSON.parse(await readFile(join(projectRoot, "apps/web/package.json"), "utf8"));
   assert.equal(manifest.dependencies.next, "16.3.3");
   assert.equal(manifest.dependencies.effect, undefined);

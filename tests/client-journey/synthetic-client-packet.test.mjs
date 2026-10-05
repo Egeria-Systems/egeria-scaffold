@@ -20,6 +20,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
+import { generatedFixtureContracts } from "../../scripts/verify-generated-skeletons.mjs";
+
 import { applySyntheticClientPacket } from "../../scripts/apply-synthetic-client-packet.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -34,7 +36,7 @@ const packetRoot = resolve(
 );
 const generatedFixtureRoot = resolve(
   repositoryRoot,
-  "fixtures/generated/site-multilingual-analytics",
+  generatedFixtureContracts.find(({ identifier }) => identifier === "site-multilingual-analytics").relativeRoot,
 );
 const adapterPath = resolve(
   repositoryRoot,
@@ -555,6 +557,9 @@ test("the adapter accepts exact generation identities and refuses mixed or unsup
   const identities = [
     { recipe: "0.11.0", standards: "0.4.0", stateRecipe: "0.11.0", accepted: true },
     { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.12.0", accepted: true },
+    { recipe: "0.12.1", standards: "0.5.0", stateRecipe: "0.12.1", accepted: true },
+    { recipe: "0.12.1", standards: "0.4.0", stateRecipe: "0.12.1", accepted: false },
+    { recipe: "0.12.1", standards: "0.5.0", stateRecipe: "0.12.0", accepted: false },
     { recipe: "0.11.0", standards: "0.5.0", stateRecipe: "0.11.0", accepted: false },
     { recipe: "0.12.0", standards: "0.4.0", stateRecipe: "0.12.0", accepted: false },
     { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.11.0", accepted: false },

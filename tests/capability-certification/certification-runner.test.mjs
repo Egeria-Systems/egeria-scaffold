@@ -3874,7 +3874,7 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
                   state: {
                     kind: "valid",
                     value: {
-                      origin: { profile: "app", recipeVersion: "0.2.0" },
+                      origin: { profile: "app", recipeVersion: "0.2.1" },
                       installedCapabilities: [
                         { identifier: "standards", version: "0.5.0" },
                         { identifier: "deployment-cloudflare", version: "0.3.0" },

@@ -128,7 +128,7 @@ function measuredEvidence(mode = "exercise") {
       schemaVersion: "1.0.0",
       headSha: exactRevision,
       profile: "app",
-      recipeVersion: "0.2.0",
+      recipeVersion: "0.2.1",
       workerIntegration: { executed: ["app-analytics"], skipped: [] },
       appBuildEvidence: [{
         fixture: "app-analytics",
@@ -1175,6 +1175,8 @@ test("the redacted receipt is derived only from reconciled private measurements"
     ["prior subject", (value) => { value.context.subject.behaviorContractDigest = "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378"; }],
     ["missing app build", (value) => { value.appBuild = null; }],
     ["site build", (value) => { value.appBuild.profile = "site"; }],
+    ["historical app recipe", (value) => { value.appBuild.recipeVersion = "0.2.0"; }],
+    ["environment candidate recipe", (value) => { value.appBuild.recipeVersion = "0.3.0"; }],
     ["different build revision", (value) => { value.appBuild.headSha = "f".repeat(40); }],
     ["skipped Worker integration", (value) => { value.appBuild.workerIntegration = { executed: [], skipped: ["app-analytics"] }; }],
     ["wrong Effect version", (value) => { value.appBuild.appBuildEvidence[0].effect.version = "0.0.0"; }],

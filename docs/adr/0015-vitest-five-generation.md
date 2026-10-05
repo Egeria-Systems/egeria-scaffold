@@ -16,7 +16,7 @@ This ADR supersedes only [ADR-0013](0013-convergent-app-profile.md)'s exact curr
 
 ## Decision
 
-New generation selects standards capability `0.5.0` and Vitest `5.0.0` with these exact recipe versions:
+The initial Vitest 5 generation selected standards capability `0.5.0` and Vitest `5.0.0` with these exact recipe versions:
 
 | Profile | New recipe |
 |---|---|
@@ -26,7 +26,7 @@ New generation selects standards capability `0.5.0` and Vitest `5.0.0` with thes
 
 The app recipe continues to materialize exact `app-foundation@0.1.0 + site-routing@0.4.0`. Public standards remains `0.1.0`; generated app Effect remains `4.0.0-rc.112`. This change creates no package release, backend capability, new test environment, or builder/CLI test-runner migration.
 
-The new generation adds only these incoming app transitions, each across all eight existing Calendly, multilingual, and analytics subsets:
+That generation added only these incoming app transitions, each across all eight existing Calendly, multilingual, and analytics subsets:
 
 ```text
 portfolio@0.11.0 -> app@0.2.0
@@ -42,6 +42,26 @@ Historical descriptors, generated output, installed fingerprints, dependency loc
 Each new recipe selects its own reviewed lock matching the exact Next/ESLint/Vitest graph and app Effect graph. Existing release-age, security override, frozen-install, and build-script policies remain in force. The generated jsdom setup uses jest-dom's public matchers and Vitest's matcher extension contract while preserving the existing cleanup behavior and TypeScript/lint policies.
 
 The new standards descriptor subject remains pending with a renewed task plan and no carried-forward certification evidence. Historical evidence continues to certify only its exact recorded subject.
+
+## Dependency security successors
+
+The dependency-only successor dated 2026-09-29 selects schema `1.0.0` recipes `portfolio@0.11.1`, `site@0.12.1` and `app@0.2.1` for new public generation. Capability descriptors, direct dependency declarations, runtime and presentation sources, settings and removal policies remain unchanged. The exact graph substitutions are `next@16.3.6`, `fast-uri@3.1.8`, major-preserving `brace-expansion@1.1.21`, `2.1.7` and `5.0.12`, Miniflare's `undici@7.29.1` and jsdom's `undici@8.10.2`. The root tooling graph selects the same Next and brace-expansion corrections alongside its Miniflare substitution; it has no fast-uri dependency. The separate `braces@3.0.3` advisory remains unresolved: these corrections do not waive the audit gate or authorize security acceptance. The one-day release age and time-based resolution remain in force, with exact reviewed Undici age exclusions.
+
+Builder-core owns five new complete lock families:
+
+| Recipe selection | Lock identity |
+|---|---|
+| Portfolio | `portfolio-0.11.1` |
+| Site | `site-0.12.1` |
+| App or site with foundation | `app-0.2.1` |
+| App with persistence, independently including email or jobs | `app-0.2.1-persistence` |
+| Portfolio with foundation, independently including email or jobs | `portfolio-0.11.1-foundation` |
+
+Each identity has its own `web-recipe-<identity>/pnpm-lock.yaml`. Exact installed recipe and descriptor tuples select the matching complete policy and graph during planning and application. Addition/removal preserves that recipe view, including foundation retention; it cannot silently adopt the latest generation. Historical locks, fixtures, rendered bytes, diagnostics, supported operations and both historical Vitest declarations remain exact. There is no historical-to-security migration or mixed-cohort edge.
+
+The only additional incoming edges are `portfolio@0.11.1 -> app@0.2.1` and `site@0.12.1 -> app@0.2.1`, covering the same eight optional subsets. Their exact new visual inputs and candidate manifest require separate review and approval even when the resulting pixels match existing baselines. All previous edges and receipt identifiers remain available.
+
+The active eleven fixture contracts select complete versioned successor roots through `scripts/verify-generated-skeletons.mjs`; previous fixture roots remain immutable. Frozen installation, peers, audit/signatures, source/runtime/browser verification, visual evidence and independent review remain required. Dependency verification supplies implementation evidence, not a new capability certification. [ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) still owns later schema-2 activation and related retirement; this schema-1 successor activates neither.
 
 ## Rejected alternatives
 

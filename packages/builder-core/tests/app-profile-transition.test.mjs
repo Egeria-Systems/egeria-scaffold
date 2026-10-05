@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
+import { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes } from "../dist/profiles/profile-recipes.js";
+const currentTransitionCohorts = [
+  { label: "Vitest five", generation: "vitest-five", portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" },
+  { label: "Security", generation: "security", portfolio: "0.11.1", site: "0.12.1", app: "0.2.1" },
+];
+const currentTransitionContexts = {
+  "vitest-five": { ...createGenerationRenderingContext(), profiles: createVitestFiveProfileRecipes() },
+  security: { ...createGenerationRenderingContext(), profiles: createSecurityPatchedProfileRecipes() },
+};
+
 import { deflateSync } from "node:zlib";
 import { parseDocument, stringify } from "yaml";
 import * as core from "../dist/index.js";
@@ -24,13 +35,13 @@ async function fixture(profile, subset = 0, project = { projectName: "transition
   const request = {
     profile, ...project, packageVersions: core.verifiedCapabilityPackageVersions, ...(subset & 1 ? { bookingCalendly } : {}), ...(subset & 2 ? { multilingual: true } : {}), ...(subset & 4 ? { analytics } : {})
   };
-  const context = generation === "vitest-four" ? retainedRenderingContext : undefined;
+  const context = generation === "vitest-four" ? retainedRenderingContext : currentTransitionContexts[generation];
   const rendered = await core.renderSkeleton(request, context);
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
   const target = await core.renderSkeleton({ ...request, profile: "app" }, context);
   assert.equal(target.ok, true);
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, new Uint8Array(content)]));
-  files.set("pnpm-lock.yaml", new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${generation === "vitest-four" ? (profile === "portfolio" ? "0.10.0" : "0.9.0") : (profile === "portfolio" ? "portfolio-0.11.0" : "site-0.12.0")}/pnpm-lock.yaml`, import.meta.url))));
+  files.set("pnpm-lock.yaml", new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${generation === "vitest-four" ? (profile === "portfolio" ? "0.10.0" : "0.9.0") : `${profile}-${currentTransitionCohorts.find(cohort => cohort.generation === generation)[profile]}`}/pnpm-lock.yaml`, import.meta.url))));
   files.set(".egeria/project.yaml", encoder.encode(core.serializeProjectYaml(rendered.value.project)));
   files.set(".egeria/migrations.jsonl", encoder.encode(""));
   const surfaces = core.materializeInstalledSurfaces({ files, surfaces: [...rendered.value.surfaces, ...createBuilderStateSurfaces()] });
@@ -421,15 +432,22 @@ test("frozen visual inputs reject changed runtime or lockfile identities and ret
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const validators = await loadAppTransitionContentValidators();
-  const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.1.0/pnpm-lock.yaml", import.meta.url))));
+  const cohorts = [
+    { context: retainedRenderingContext, lock: "app-0.1.0" },
+    { context: currentTransitionContexts["vitest-five"], lock: "app-0.2.0" },
+    { context: currentTransitionContexts.security, lock: "app-0.2.1" },
+  ];
+  const lockFingerprints = await Promise.all(cohorts.map(async ({ lock }) => core.fingerprintFileContent(new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${lock}/pnpm-lock.yaml`, import.meta.url))))));
+  for (const [cohortIndex, cohort] of cohorts.entries()) {
+  const targetLockfileFingerprint = lockFingerprints[cohortIndex];
   for (let subset = 0; subset < 8; subset++) {
     const request = {...policy.appTransitionVisualProject, packageVersions:core.verifiedCapabilityPackageVersions,
       ...(subset & 1 ? {bookingCalendly:policy.appTransitionVisualBookingSettings}:{}),
       ...(subset & 2 ? {multilingual:true}:{}),
       ...(subset & 4 ? {analytics:policy.appTransitionVisualAnalyticsSettings}:{}),
     };
-    const source = await core.renderSkeleton({...request,profile:"portfolio"}, retainedRenderingContext);
-    const target = await core.renderSkeleton({...request,profile:"app"}, retainedRenderingContext);
+    const source = await core.renderSkeleton({...request,profile:"portfolio"}, cohort.context);
+    const target = await core.renderSkeleton({...request,profile:"app"}, cohort.context);
     assert.equal(source.ok,true);assert.equal(target.ok,true);
     const currentFiles = new Map(source.value.files.map(({path,content})=>[path,content]));
     const prepared = policy.prepareAppProfileTransition({source:source.value,target:target.value,currentFiles,validators});
@@ -437,6 +455,9 @@ test("frozen visual inputs reject changed runtime or lockfile identities and ret
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier=>["analytics","booking-calendly","multilingual"].includes(identifier));
     const identity = {optionalCapabilities,influencingFingerprints:prepared.value.influencingFingerprints,targetLockfileFingerprint};
     assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok,true);
+    for (const otherLock of lockFingerprints.filter(value => value !== targetLockfileFingerprint)) {
+      assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, targetLockfileFingerprint: otherLock }).ok, false, "other cohorts cannot approve these inputs");
+    }
     for (const pixel of [[255,0,0,255], [0,0,255,255]]) {
       const baselines = policy.appTransitionBaselinePaths.map(path => ({path,content:onePixelPng(pixel)}));
       assert.equal(policy.verifyAppTransitionVisualInputRecord({...identity,baselines}).ok,false,"unreviewed valid PNG bytes cannot self-approve");
@@ -450,6 +471,7 @@ test("frozen visual inputs reject changed runtime or lockfile identities and ret
     const customized = policy.prepareAppProfileTransition({source:source.value,target:target.value,currentFiles,validators});
     assert.equal(customized.ok,true);
     assert.equal(policy.verifyAppTransitionVisualInputRecord({...identity,influencingFingerprints:customized.value.influencingFingerprints}).ok,true);
+  }
   }
 });
 
@@ -472,20 +494,20 @@ function onePixelPng(pixel) {
 }
 
 
-test("Vitest five incoming app plans preserve all optional subsets and refuse mixed generations", async () => {
+for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming app plans preserve all optional subsets and refuse mixed generations`, async () => {
   const { resolveSupportedProfileTransition } = await import("../dist/lifecycle/supported-profile-transitions.js");
-  for (const [profile, version, retainedVersion] of [["portfolio", "0.11.0", "0.10.0"], ["site", "0.12.0", "0.11.0"]]) {
-    assert.deepEqual(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: version, toProfile: "app", toRecipeVersion: "0.2.0" }), { ok: true, value: { source: { profile, recipeVersion: version }, target: { profile: "app", recipeVersion: "0.2.0" } } });
-    for (const [source, target] of [[version, "0.1.0"], [retainedVersion, "0.2.0"]]) assert.deepEqual(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: source, toProfile: "app", toRecipeVersion: target }), { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" });
+  for (const [profile, version, retainedVersion] of [["portfolio", cohort.portfolio, "0.10.0"], ["site", cohort.site, "0.11.0"]]) {
+    assert.deepEqual(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: version, toProfile: "app", toRecipeVersion: cohort.app }), { ok: true, value: { source: { profile, recipeVersion: version }, target: { profile: "app", recipeVersion: cohort.app } } });
+    for (const [source, target] of [[version, "0.1.0"], [retainedVersion, cohort.app]]) assert.deepEqual(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: source, toProfile: "app", toRecipeVersion: target }), { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" });
     for (let subset = 0; subset < 8; subset++) {
-      const f = await fixture(profile, subset, undefined, "vitest-five");
+      const f = await fixture(profile, subset, undefined, cohort.generation);
       const prepared = await prepare(f);
       assert.equal(prepared.ok, true, JSON.stringify(prepared));
       const manifest = JSON.parse(decoder.decode(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content));
       assert.equal(manifest.devDependencies.vitest, "5.0.0");
       const result = await plan(f, await reviewed(f));
       assert.equal(result.ok, true, JSON.stringify(result));
-      assert.equal(result.value.target.recipeVersion, "0.2.0");
+      assert.equal(result.value.target.recipeVersion, cohort.app);
       assert.equal(result.value.target.capabilities.find(({ identifier }) => identifier === "standards").version, "0.5.0");
       assert.equal(result.value.actions.some(({ kind }) => kind.includes("delete")), false);
       assert.equal(result.value.actions.filter(({ path }) => path === "pnpm-lock.yaml").length, 1);

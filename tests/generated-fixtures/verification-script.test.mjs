@@ -25,7 +25,7 @@ import {
   inspectGeneratedFixture,
   parseVerificationArguments,
   verifyGeneratedProjectForTesting,
-  verifyGeneratedSkeletonsForTesting,
+  verifyGeneratedSkeletonsForTesting as verifySkeletons,
 } from "../../scripts/verify-generated-skeletons.mjs";
 
 const repositoryRoot = resolve(
@@ -33,6 +33,45 @@ const repositoryRoot = resolve(
   "../..",
 );
 const execFileAsync = promisify(execFile);
+const fixtureRoot = identifier => generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot;
+
+function verifyGeneratedSkeletonsForTesting(adapters, options) {
+  return verifySkeletons({ ...adapters, runAudit: adapters?.runAudit ?? (async input => {
+    await adapters.runCommand(input);
+    return { status: "passed", rawExitCode: 0 };
+  }) }, options);
+}
+
+test("the admitted skeleton audit exception never reaches strict single-project certification verification", async t => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-audit-boundary-"));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  let admittedAudits = 0;
+  const adapters = {
+    createOwner: () => createKnownOwner(parent),
+    runCommand: successfulCommand,
+    runAudit: async () => {
+      admittedAudits++;
+      return { status: "accepted-with-security-exception", rawExitCode: 1, advisory: "GHSA-vfj7-8cjw-p6xm" };
+    },
+  };
+  const result = await verifyGeneratedSkeletonsForTesting(adapters);
+  assert.equal(admittedAudits, generatedFixtureContracts.length);
+  assert.equal(result.auditDispositions.length, generatedFixtureContracts.length);
+  assert.equal(result.auditDispositions.every(receipt => receipt.rawExitCode === 1), true);
+  assert.equal(result.status, "completed-with-security-exception");
+  const commands = [];
+  await expectFixtureError(() => verifyGeneratedProjectForTesting(resolve(repositoryRoot, fixtureRoot("portfolio")), "portfolio", {
+    ...adapters,
+    runAudit: async () => assert.fail("certification must not use the exception route"),
+    runCommand: async input => {
+      commands.push(input.arguments);
+      if (input.arguments[0] === "audit") throw Object.assign(new Error("raw audit failure"), { code: 1 });
+      return successfulCommand(input);
+    },
+  }), "DEPENDENCY_AUDIT_FAILED");
+  assert.equal(commands.some(args => args.includes("lint")), false);
+  assert.equal(commands.some(args => args.includes("signatures")), false);
+});
 const repositoryGitArguments = Object.freeze([
   "-c",
   `safe.directory=${repositoryRoot}`,
@@ -124,7 +163,7 @@ test("persistence fixture binding verification executes separately and a failed 
       const commands = [];
       let ownedPath;
       const run = () => verifyGeneratedProjectForTesting(
-        resolve(repositoryRoot, "fixtures/generated/app-persistence"), "app-persistence",
+        resolve(repositoryRoot, fixtureRoot("app-persistence")), "app-persistence",
         {
           async createOwner() { const owner = await createKnownOwner(ownerParent); ownedPath = owner.path; return owner; },
           async runCommand(input) {
@@ -157,7 +196,7 @@ test("persistence fixture must typecheck before application binding types are ge
   const commands = [];
   try {
     await expectFixtureError(() => verifyGeneratedProjectForTesting(
-      resolve(repositoryRoot, "fixtures/generated/app-persistence"), "app-persistence",
+      resolve(repositoryRoot, fixtureRoot("app-persistence")), "app-persistence",
       {
         async createOwner() { return createKnownOwner(ownerParent); },
         async runCommand(input) {
@@ -199,7 +238,7 @@ test("app build evidence refuses client Effect markers and the wrong installed p
     for (const variant of [{ client: 'export const leaked = "~effect/Effect";' }, { effectVersion: "4.0.0-rc.113" }]) {
       const commands = [];
       await expectFixtureError(() => verifyGeneratedProjectForTesting(
-        resolve(repositoryRoot, "fixtures/generated/app"), "app",
+        resolve(repositoryRoot, fixtureRoot("app")), "app",
         {
           createOwner: () => createKnownOwner(owner),
           async runCommand(input) {
@@ -243,7 +282,7 @@ test("app Worker integration executes after OpenNext and records non-app absence
     for (const identifier of ["portfolio", "app", "app-all-optional-integrations"]) {
       const commands = [];
       const result = await verifyGeneratedProjectForTesting(
-        resolve(repositoryRoot, "fixtures/generated", identifier), identifier,
+        resolve(repositoryRoot, fixtureRoot(identifier)), identifier,
         {
           createOwner: () => createKnownOwner(ownerParent),
           async runCommand(input) {
@@ -307,7 +346,7 @@ test("a failing present Worker script refuses success and still cleans its tempo
   const commands = [];
   try {
     await expectFixtureError(() => verifyGeneratedProjectForTesting(
-      resolve(repositoryRoot, "fixtures/generated/app"), "app",
+      resolve(repositoryRoot, fixtureRoot("app")), "app",
       {
         async createOwner() { const owner = await createKnownOwner(ownerParent); ownedPath = owner.path; return owner; },
         async runCommand(input) {
@@ -335,58 +374,58 @@ test("fixture inspection accepts only the exact portable generated trees", async
       {
         identifier: "portfolio",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio",
+        relativeRoot: "fixtures/generated/portfolio-0.11.1",
       },
       {
         identifier: "portfolio-calendly",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-calendly",
+        relativeRoot: "fixtures/generated/portfolio-calendly-0.11.1",
       },
       {
         identifier: "site",
         profile: "site",
-        relativeRoot: "fixtures/generated/site",
+        relativeRoot: "fixtures/generated/site-0.12.1",
       },
       {
         identifier: "site-multilingual",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual",
+        relativeRoot: "fixtures/generated/site-multilingual-0.12.1",
       },
       {
         identifier: "site-multilingual-analytics",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-analytics",
+        relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.1",
       },
       {
         identifier: "app",
         profile: "app",
-        relativeRoot: "fixtures/generated/app",
+        relativeRoot: "fixtures/generated/app-0.2.1",
       },
       {
         identifier: "app-all-optional-integrations",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-all-optional-integrations",
+        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.1",
       },
       {
         identifier: "app-persistence", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence",
+        relativeRoot: "fixtures/generated/app-persistence-0.2.1",
       },
       {
         identifier: "portfolio-email", profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-email",
+        relativeRoot: "fixtures/generated/portfolio-email-0.11.1",
       },
       {
         identifier: "app-persistence-email", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-email",
+        relativeRoot: "fixtures/generated/app-persistence-email-0.2.1",
       },
-      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form" },
+      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.12.1" },
     ],
   );
 
   for (const contract of generatedFixtureContracts) {
     assert.equal(
       contract.expectedRecipeVersion,
-      contract.profile === "app" ? "0.2.0" : contract.profile === "site" ? "0.12.0" : "0.11.0",
+      contract.profile === "app" ? "0.2.1" : contract.profile === "site" ? "0.12.1" : "0.11.1",
     );
     assert.equal(contract.expectedStandardsVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.6.0" : "0.5.0");
     assert.equal(contract.expectedObservabilityVersion, "0.3.0");
@@ -631,28 +670,28 @@ test("generated fixture text and visual baseline attributes are explicit", async
   );
 
   assert.deepEqual(textAttributes.trimEnd().split("\n"), [
-    "fixtures/generated/portfolio/package.json: text: set",
-    "fixtures/generated/portfolio/package.json: eol: lf",
-    "fixtures/generated/portfolio-calendly/package.json: text: set",
-    "fixtures/generated/portfolio-calendly/package.json: eol: lf",
-    "fixtures/generated/site/package.json: text: set",
-    "fixtures/generated/site/package.json: eol: lf",
-    "fixtures/generated/site-multilingual/package.json: text: set",
-    "fixtures/generated/site-multilingual/package.json: eol: lf",
-    "fixtures/generated/site-multilingual-analytics/package.json: text: set",
-    "fixtures/generated/site-multilingual-analytics/package.json: eol: lf",
-    "fixtures/generated/app/package.json: text: set",
-    "fixtures/generated/app/package.json: eol: lf",
-    "fixtures/generated/app-all-optional-integrations/package.json: text: set",
-    "fixtures/generated/app-all-optional-integrations/package.json: eol: lf",
-    "fixtures/generated/app-persistence/package.json: text: set",
-    "fixtures/generated/app-persistence/package.json: eol: lf",
-    "fixtures/generated/portfolio-email/package.json: text: set",
-    "fixtures/generated/portfolio-email/package.json: eol: lf",
-    "fixtures/generated/app-persistence-email/package.json: text: set",
-    "fixtures/generated/app-persistence-email/package.json: eol: lf",
-    "fixtures/generated/site-contact-form/package.json: text: set",
-    "fixtures/generated/site-contact-form/package.json: eol: lf",
+    `${fixtureRoot("portfolio")}/package.json: text: set`,
+    `${fixtureRoot("portfolio")}/package.json: eol: lf`,
+    `${fixtureRoot("portfolio-calendly")}/package.json: text: set`,
+    `${fixtureRoot("portfolio-calendly")}/package.json: eol: lf`,
+    `${fixtureRoot("site")}/package.json: text: set`,
+    `${fixtureRoot("site")}/package.json: eol: lf`,
+    `${fixtureRoot("site-multilingual")}/package.json: text: set`,
+    `${fixtureRoot("site-multilingual")}/package.json: eol: lf`,
+    `${fixtureRoot("site-multilingual-analytics")}/package.json: text: set`,
+    `${fixtureRoot("site-multilingual-analytics")}/package.json: eol: lf`,
+    `${fixtureRoot("app")}/package.json: text: set`,
+    `${fixtureRoot("app")}/package.json: eol: lf`,
+    `${fixtureRoot("app-all-optional-integrations")}/package.json: text: set`,
+    `${fixtureRoot("app-all-optional-integrations")}/package.json: eol: lf`,
+    `${fixtureRoot("app-persistence")}/package.json: text: set`,
+    `${fixtureRoot("app-persistence")}/package.json: eol: lf`,
+    `${fixtureRoot("portfolio-email")}/package.json: text: set`,
+    `${fixtureRoot("portfolio-email")}/package.json: eol: lf`,
+    `${fixtureRoot("app-persistence-email")}/package.json: text: set`,
+    `${fixtureRoot("app-persistence-email")}/package.json: eol: lf`,
+    `${fixtureRoot("site-contact-form")}/package.json: text: set`,
+    `${fixtureRoot("site-contact-form")}/package.json: eol: lf`,
   ]);
 
   const baselineDirectory =
@@ -758,13 +797,12 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
     );
     const workspacePath = join(workspaceOverrideRoot, "pnpm-workspace.yaml");
     const workspace = await readFile(workspacePath, "utf8");
-    await writeFile(
-      workspacePath,
-      workspace.replace(
-        '  "miniflare>undici": 7.29.0',
-        '  "miniflare>undici": 7.29.0\n  next: 16.3.1',
-      ),
+    const unapprovedWorkspace = workspace.replace(
+      '  "miniflare>undici": 7.29.1',
+      '  "miniflare>undici": 7.29.1\n  next: 16.3.1',
     );
+    assert.notEqual(unapprovedWorkspace, workspace);
+    await writeFile(workspacePath, unapprovedWorkspace);
     await expectFixtureError(
       () => inspectGeneratedFixture(workspaceOverrideRoot, "portfolio"),
       "FIXTURE_WORKSPACE_POLICY_INVALID",
@@ -777,13 +815,12 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
     );
     const lockfilePath = join(lockfileOverrideRoot, "pnpm-lock.yaml");
     const lockfile = await readFile(lockfilePath, "utf8");
-    await writeFile(
-      lockfilePath,
-      lockfile.replace(
-        "  miniflare>undici: 7.29.0",
-        "  miniflare>undici: 7.29.1",
-      ),
+    const unapprovedLockfile = lockfile.replace(
+      "  miniflare>undici: 7.29.1",
+      "  miniflare>undici: 7.29.0",
     );
+    assert.notEqual(unapprovedLockfile, lockfile);
+    await writeFile(lockfilePath, unapprovedLockfile);
     await expectFixtureError(
       () => inspectGeneratedFixture(lockfileOverrideRoot, "portfolio"),
       "FIXTURE_LOCKFILE_INVALID",
@@ -819,13 +856,12 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
     const tarballRoot = await copyFixture(owner, "portfolio", "tarball");
     const tarballLockfilePath = join(tarballRoot, "pnpm-lock.yaml");
     const tarballLockfile = await readFile(tarballLockfilePath, "utf8");
-    await writeFile(
-      tarballLockfilePath,
-      tarballLockfile.replace(
-        "    resolution: {integrity:",
-        "    resolution:\n      tarball: https://example.invalid/package.tgz\n      integrity:",
-      ),
+    const tarballOverride = tarballLockfile.replace(
+      "    resolution:\n      integrity:",
+      "    resolution:\n      tarball: https://example.invalid/package.tgz\n      integrity:",
     );
+    assert.notEqual(tarballOverride, tarballLockfile);
+    await writeFile(tarballLockfilePath, tarballOverride);
     await expectFixtureError(
       () => inspectGeneratedFixture(tarballRoot, "portfolio"),
       "FIXTURE_LOCKFILE_INVALID",
@@ -1117,7 +1153,7 @@ test("single-project visual opt-in reports only checks that actually run", async
 
   try {
     const result = await verifyGeneratedProjectForTesting(
-      resolve(repositoryRoot, "fixtures/generated/site-multilingual"),
+      resolve(repositoryRoot, fixtureRoot("site-multilingual")),
       "site-multilingual",
       {
         async createOwner() {
@@ -1586,7 +1622,7 @@ test("single-root verification accepts an explicit generated project identity", 
   const ownerParent = await mkdtemp(
     join(tmpdir(), "egeria-single-root-identity-"),
   );
-  const canonicalRoot = resolve(repositoryRoot, "fixtures/generated/portfolio");
+  const canonicalRoot = resolve(repositoryRoot, fixtureRoot("portfolio"));
   const canonicalBefore = await inspectGeneratedFixture(
     canonicalRoot,
     "portfolio",
@@ -1725,7 +1761,10 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
       },
     });
 
-    const { appBuildEvidence, ...verification } = result;
+    const { appBuildEvidence, auditDispositions, status, ...verification } = result;
+    assert.equal(status, "completed");
+    assert.deepEqual(auditDispositions.map(({ fixture }) => fixture), result.fixtures);
+    assert.equal(auditDispositions.every(audit => audit.status === "passed" && audit.rawExitCode === 0), true);
     assert.deepEqual(appBuildEvidence.map(({ fixture }) => fixture), ["app", "app-all-optional-integrations", "app-persistence", "portfolio-email", "app-persistence-email"]);
     for (const build of appBuildEvidence) {
       assert.equal(build.effect.version, "4.0.0-rc.112");
@@ -1846,7 +1885,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     ["--version"],
     ["install", "--frozen-lockfile", "--store-dir", "<owned-path>"],
     ["peers", "check"],
-    ["audit", "--audit-level", "moderate"],
+    ["audit", "--audit-level", "moderate", "--json"],
     ["audit", "signatures"],
     ["run", "lint"],
     ["--dir", "apps/web", "run", "cf-typegen"],
@@ -1892,7 +1931,7 @@ test("live verification reports a stable failure and still removes its owner", a
             return identity;
           },
           async runCommand(input) {
-            if (input.arguments.join(" ") === "audit --audit-level moderate") {
+            if (input.arguments.join(" ") === "audit --audit-level moderate --json") {
               throw new Error("PRIVATE_VALUE");
             }
             return successfulCommand(input);
@@ -1934,5 +1973,15 @@ test("live verification maps the prepared OpenNext transform failure", async () 
     assert.equal(await pathExists(ownedPath), false);
   } finally {
     await rm(ownerParent, { recursive: true, force: true });
+  }
+});
+
+
+test("active fixture inspection refuses retained dependency cohorts", async () => {
+  for (const { identifier } of generatedFixtureContracts) {
+    await expectFixtureError(
+      () => inspectGeneratedFixture(resolve(repositoryRoot, "fixtures/generated", identifier), identifier),
+      "FIXTURE_WORKSPACE_POLICY_INVALID",
+    );
   }
 });

@@ -82,6 +82,8 @@ jobs:
             "scripts/verify-generated-skeletons.mjs"
             "scripts/verify-app-transition-visuals.mjs"
             "scripts/lib/isolated-process.mjs"
+            "scripts/lib/dependency-audit.mjs"
+            "scripts/dependency-audit-exception.json"
             "tests/generated-fixtures/**"
           )
           compatibility_paths=(
@@ -235,6 +237,16 @@ jobs:
       - name: Verify generated visual regressions
         run: pnpm run verify:generated-visuals
 
+      - name: Retain raw dependency audits and security exception dispositions
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: generated-dependency-audits
+          path: generated-visual-artifacts/dependency-audit/
+          if-no-files-found: ignore
+          include-hidden-files: false
+          retention-days: 7
+
       - name: Upload generated visual failure artifacts
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -283,6 +295,16 @@ jobs:
       - name: Compare all app transition visual subsets
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
         run: pnpm run verify:app-transition-visuals
+
+      - name: Retain raw dependency audits and security exception dispositions
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: app-transition-dependency-audits
+          path: generated-visual-artifacts/dependency-audit/
+          if-no-files-found: ignore
+          include-hidden-files: false
+          retention-days: 7
 
       - name: Upload app transition visual evidence
         if: failure() || (github.event_name == 'pull_request' && github.event.pull_request.draft)

@@ -16,6 +16,7 @@ import {
   readVerifiedProjectSnapshot,
 } from "../dist/index.js";
 import { derivePnpmToolEnvironment } from "../dist/generation/verify-generated-project.js";
+import { runDependencyAudit } from "../../../scripts/lib/dependency-audit.mjs";
 
 const execFileAsync = promisify(execFile);
 const publicRegistry = "https://registry.npmjs.org/";
@@ -116,10 +117,11 @@ async function validatePublicGraph(owner, profile, destination) {
     ["install", "--frozen-lockfile", "--store-dir", support.store],
     { cwd: validationRoot, env: support.environment },
   );
-  await runPnpm(["audit", "--audit-level", "moderate"], {
-    cwd: validationRoot,
-    env: support.environment,
+  const audit = await runDependencyAudit({
+    executable: "pnpm", cwd: validationRoot, environment: support.environment,
+    timeout: 15 * 60 * 1000,
   });
+  process.stdout.write(`${JSON.stringify({ profile, dependencyAudit: audit })}\n`);
   await runPnpm(["audit", "signatures"], {
     cwd: validationRoot,
     env: support.environment,

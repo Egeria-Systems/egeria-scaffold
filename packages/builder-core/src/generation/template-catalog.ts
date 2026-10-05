@@ -349,7 +349,7 @@ function remapSourceIssue(
 export function createTemplateCatalog(
   profile: ProfileIdentifier,
   includeBookingCalendly = false,
-  recipeVersion = profile === "app" ? "0.2.0" : profile === "site" ? "0.12.0" : "0.11.0",
+  recipeVersion = profile === "app" ? "0.2.1" : profile === "site" ? "0.12.1" : "0.11.1",
   includeMultilingual = false,
   includeAnalytics = false,
   includeApplicationPersistence = false,
@@ -360,11 +360,14 @@ export function createTemplateCatalog(
   backgroundJobVersion: "0.1.0" | "0.2.0" = "0.2.0",
   applicationEnvironments = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
-  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || (applicationEnvironments && recipeVersion === "0.3.0"));
-  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || (applicationEnvironments && recipeVersion === "0.13.0")));
-  const vitestFive = applicationEnvironments || (profile === "portfolio" && recipeVersion === "0.11.0") ||
-    (profile === "site" && recipeVersion === "0.12.0") ||
-    (profile === "app" && recipeVersion === "0.2.0");
+  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.1" || (applicationEnvironments && recipeVersion === "0.3.0"));
+  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.1" || (applicationEnvironments && recipeVersion === "0.13.0")));
+  const securityPatched = (profile === "portfolio" && recipeVersion === "0.11.1") ||
+    (profile === "site" && recipeVersion === "0.12.1") ||
+    (profile === "app" && recipeVersion === "0.2.1");
+  const vitestFive = applicationEnvironments || (profile === "portfolio" && (recipeVersion === "0.11.0" || recipeVersion === "0.11.1")) ||
+    (profile === "site" && (recipeVersion === "0.12.0" || recipeVersion === "0.12.1")) ||
+    (profile === "app" && (recipeVersion === "0.2.0" || recipeVersion === "0.2.1"));
   const sources = [
     ...(applicationEnvironments ? textTemplateSources([
       "common/apps/web/src/configuration/application-environment.ts",
@@ -372,7 +375,9 @@ export function createTemplateCatalog(
       "common/apps/web/tests/unit/application-environment.test.ts",
       "common/docs/environments.md",
     ]) : []),
-    ...commonTemplateSources.map(entry => vitestFive && [
+    ...commonTemplateSources.map(entry => (applicationEnvironments || securityPatched) && entry.source === "common/pnpm-workspace.yaml"
+      ? { ...entry, source: "common/security-patched/pnpm-workspace.yaml", destinationSource: entry.source }
+      : vitestFive && [
       "common/apps/web/package.json.template",
       "common/apps/web/tests/setup/component.ts",
       "common/pnpm-workspace.yaml",

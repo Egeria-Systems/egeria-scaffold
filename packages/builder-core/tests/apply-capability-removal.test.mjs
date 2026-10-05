@@ -4,6 +4,13 @@ import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
+import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
+import { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes } from "../dist/profiles/profile-recipes.js";
+const currentCohorts = [
+  { label: "Vitest five", generation: "vitest-five", profiles: createVitestFiveProfileRecipes(), versions: { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" } },
+  { label: "Security", generation: "security", profiles: createSecurityPatchedProfileRecipes(), versions: { portfolio: "0.11.1", site: "0.12.1", app: "0.2.1" } },
+];
+
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
@@ -84,6 +91,7 @@ async function loadTextEntries(directory) {
 }
 
 async function installedEntries(profile, options = {}) {
+  const cohort = currentCohorts.find(({ generation }) => generation === options.generation);
   const selectedVerificationChecks = profile === "app"
     ? core.appCapabilityAdditionPersistedVerificationChecks
     : persistedVerificationChecks;
@@ -98,7 +106,7 @@ async function installedEntries(profile, options = {}) {
     ...(includeBooking ? { bookingCalendly: settings } : {}),
     ...(includeMultilingual ? { multilingual: true } : {}),
     ...(includeAnalytics ? { analytics: analyticsSettings } : {}),
-  }, options.generation === "vitest-five" ? undefined : retainedRenderingContext);
+  }, cohort === undefined ? retainedRenderingContext : { ...createGenerationRenderingContext(), profiles: cohort.profiles });
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
 
   const byteFiles = new Map(
@@ -113,8 +121,8 @@ async function installedEntries(profile, options = {}) {
     "pnpm-lock.yaml",
     new Uint8Array(
       await readFile(
-        resolve(packageRoot, `lockfiles/web-recipe-${options.generation === "vitest-five"
-          ? (profile === "app" ? "app-0.2.0" : profile === "site" ? "site-0.12.0" : "portfolio-0.11.0")
+        resolve(packageRoot, `lockfiles/web-recipe-${cohort !== undefined
+          ? `${profile}-${cohort.versions[profile]}`
           : (profile === "app" ? "app-0.1.0" : profile === "site" ? "0.9.0" : "0.10.0")}/pnpm-lock.yaml`),
       ),
     ),
@@ -2384,12 +2392,12 @@ test("analytics removal retains failure prefixes and final authority", async () 
 });
 
 
-test("Vitest five optional lifecycle preserves its generation across every supported selection", async () => {
+for (const cohort of currentCohorts) test(`${cohort.label} optional lifecycle preserves its generation across every supported selection`, async () => {
   for (const profile of ["portfolio", "site", "app"]) {
     for (const operation of appOperations) {
       const otherOptions = ["booking", "multilingual", "analytics"].filter(option => option !== operation.option);
       for (let selection = 0; selection < 4; selection++) {
-        const options = { generation: "vitest-five", [operation.option]: operation.kind === "removal", [otherOptions[0]]: Boolean(selection & 1), [otherOptions[1]]: Boolean(selection & 2) };
+        const options = { generation: cohort.generation, [operation.option]: operation.kind === "removal", [otherOptions[0]]: Boolean(selection & 1), [otherOptions[1]]: Boolean(selection & 2) };
         const entries = await installedEntries(profile, options);
         const repository = createRepository(entries);
         const before = snapshot(repository.files);
@@ -2411,7 +2419,7 @@ test("Vitest five optional lifecycle preserves its generation across every suppo
         assert.equal(repository.files.get("pnpm-lock.yaml"), entries.get("pnpm-lock.yaml"));
         const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
         assert.equal(state.ok, true);
-        assert.deepEqual(state.value.origin, { profile, recipeVersion: { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" }[profile] });
+        assert.deepEqual(state.value.origin, { profile, recipeVersion: cohort.versions[profile] });
         assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.0");
         assert.equal(state.value.lastSuccessfulVerification.checks.includes("worker-integration"), profile === "app");
         const expected = await installedEntries(profile, { ...options, [operation.option]: operation.kind === "addition" });

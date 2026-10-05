@@ -24,6 +24,8 @@ Use the existing Wrangler harness from a Vitest 5 Node host for a separate bindi
 
 Removal assesses supplied export/recovery evidence locally, distinguishes checked and reported facts, reports uncertainty and requires subsequent human review of the exact evidence, report and source-removal plan. Integrity failures and changed approved inputs refuse before writes. Repository removal never performs or certifies export, remote restoration or database deletion.
 
+[ADR-0015's dependency security successors](0015-vitest-five-generation.md#dependency-security-successors) extend this same optional contract and lifecycle eligibility to the corresponding schema-1 patch recipes. Prior decisions, descriptor versions, capability settings, dependencies, removal rules and historical behavior remain unchanged; no migration or additional capability transition is introduced.
+
 ## Consequences
 
 Persistence is independently selectable while default and historical app behavior remain exact. The finite optional tuple adds explicit generation and lifecycle compatibility coverage. Local runtime evidence does not establish deployed persistence, recovery readiness or certification; remote resources and human outcome acceptance remain separately gated.

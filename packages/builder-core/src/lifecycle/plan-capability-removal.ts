@@ -1044,8 +1044,8 @@ export async function planCapabilityRemoval(input: Readonly<{
       ...(capabilityValue !== "contact-form-web3forms" && renderRequest.contactFormWeb3Forms !== undefined ? { contactFormWeb3Forms: renderRequest.contactFormWeb3Forms } : {}),
       packageVersions: verifiedCapabilityPackageVersions,
     }, capabilityValue === "background-job-delivery"
-      ? createGenerationRenderingContext(project.selectedCapabilities.includes("application-persistence"), true, false)
-      : capabilityValue === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext),
+      ? { ...createGenerationRenderingContext(project.selectedCapabilities.includes("application-persistence"), true, false), profiles: snapshot.value.profiles }
+      : capabilityValue === "application-persistence" ? { ...createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0"), profiles: snapshot.value.profiles } : snapshot.value.renderingContext),
   ]);
 
   if (!currentRender.ok || !desiredRender.ok) {

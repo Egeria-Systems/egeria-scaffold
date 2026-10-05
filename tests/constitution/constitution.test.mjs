@@ -491,6 +491,8 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "scripts/verify-generated-skeletons.mjs",
     "scripts/verify-app-transition-visuals.mjs",
     "scripts/lib/isolated-process.mjs",
+    "scripts/lib/dependency-audit.mjs",
+    "scripts/dependency-audit-exception.json",
     "tests/generated-fixtures/**",
   ];
   const compatibilityPaths = [
@@ -1151,7 +1153,7 @@ test("the workspace declares the approved proof root and install policy", async 
 
   assert.equal(
     workspace,
-    'packages:\n  - "apps/*"\n  - "packages/*"\n  - "proofs/*"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  "js-yaml@>=4.0.0 <4.3.2": 4.3.2\n  "miniflare>undici": 7.29.0\n  "qs@": 6.16.0\n  "sharp@>=0.35.0 <0.35.4": 0.35.4\n\nallowBuilds:\n  "@parcel/watcher": true\n  "@swc/core": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n',
+    'packages:\n  - "apps/*"\n  - "packages/*"\n  - "proofs/*"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  "next@>=16.2.0 <16.3.6": 16.3.6\n  "brace-expansion@>=1.0.0 <1.1.21": 1.1.21\n  "brace-expansion@>=2.0.0 <2.1.7": 2.1.7\n  "brace-expansion@>=5.0.0 <5.0.12": 5.0.12\n  "js-yaml@>=4.0.0 <4.3.2": 4.3.2\n  "miniflare>undici": 7.29.1\n  "qs@": 6.16.0\n  "sharp@>=0.35.0 <0.35.4": 0.35.4\n\nallowBuilds:\n  "@parcel/watcher": true\n  "@swc/core": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n',
   );
 });
 
@@ -2522,7 +2524,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     packageOwnership,
-    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.1[^\n]+require separate certification/iu,
   );
   assert.match(
     programRoadmap,
@@ -2542,7 +2544,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     rootInstructions,
-    /Builder-core supports `app@0\.2\.0` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
+    /Builder-core supports `app@0\.2\.1` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
   );
   for (const instructions of [builderInstructions, cliInstructions]) {
     assert.match(
@@ -2853,7 +2855,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
+    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.1[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
   );
 });
 
@@ -3448,7 +3450,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /generation-executable recipes are `portfolio@0\.11\.0`, `site@0\.12\.0`, and `app@0\.2\.0`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
+    /generation-executable recipes are `portfolio@0\.11\.1`, `site@0\.12\.1`, and `app@0\.2\.1`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
   );
   assert.match(
     capabilityModel,
@@ -4630,15 +4632,8 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     },
   );
   await Promise.all(
-    [
-      "fixtures/generated/portfolio",
-      "fixtures/generated/portfolio-calendly",
-      "fixtures/generated/site",
-      "fixtures/generated/site-multilingual",
-      "fixtures/generated/site-multilingual-analytics",
-      "fixtures/generated/app",
-      "fixtures/generated/app-all-optional-integrations",
-    ].map((path) => access(resolve(repositoryRoot, path))),
+    (await import("../../scripts/verify-generated-skeletons.mjs")).generatedFixtureContracts
+      .map(({ relativeRoot }) => access(resolve(repositoryRoot, relativeRoot))),
   );
 
   assert.match(
@@ -4659,7 +4654,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     packageOwnership,
-    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.1[^\n]+require separate certification/iu,
   );
   assert.match(
     builderCoreReadme,

@@ -101,6 +101,21 @@ export const vitestFiveAppTransitionVisualInputRecord = Object.freeze({
     "analytics+booking-calendly+multilingual": "sha256:3baacdc7a131838d5a5a3431e71beb7788550500c852002864e2e60f89da90a2",
   }),
 });
+// Fixed security-recipe inputs; acceptance still requires exact-manifest review.
+export const securityPatchedAppTransitionVisualInputRecord = Object.freeze({
+  targetLockfileFingerprint: "sha256:fa8ce392f2da0c645f4e26a2eb788a431defab7d3e22fc5e01b8824f0cb2fc4b",
+  baselines: appTransitionVisualInputRecord.baselines,
+  subsets: Object.freeze({
+    "none": "sha256:7eff583b73d1d1e1228f178880df2b18fddc3c41b1c6c23e978217e6c4a2f85c",
+    "analytics": "sha256:3c43c3717d2c73b671ac7eccbaf8e2e3c260915ab0bbcd80ed77beeda0e3b7fb",
+    "booking-calendly": "sha256:5a72911349b2dd066617e0d95e7c6a17e3ba59746f7eb74034d9d9b2473013c7",
+    "analytics+booking-calendly": "sha256:c0245422d9a38a6025f42b67b031da0712f8ec91a8be1e2ff22467a0795234a3",
+    "multilingual": "sha256:bc97938a606983554689f8987f09ca7aa337e059db2f3a30807a7292ef288afe",
+    "analytics+multilingual": "sha256:52f9456ce9dcd50fb37d3dbc1cdb71cdca23c7f1b2a1ff47950ccb641e1e7806",
+    "booking-calendly+multilingual": "sha256:9f5fcb246893c0da55990fbe8ed69c104161b879816083653ce5dec08ba42c80",
+    "analytics+booking-calendly+multilingual": "sha256:c80de7e01a484d56cfdb9a819cf6605bec29eba5af395b425accf2d868f208e0",
+  }),
+});
 export function verifyAppTransitionVisualInputRecord(input: Readonly<{
   optionalCapabilities: readonly string[];
   influencingFingerprints: readonly AppTransitionPathFingerprint[];
@@ -111,7 +126,9 @@ export function verifyAppTransitionVisualInputRecord(input: Readonly<{
     ? appTransitionVisualInputRecord
     : input.targetLockfileFingerprint === vitestFiveAppTransitionVisualInputRecord.targetLockfileFingerprint
       ? vitestFiveAppTransitionVisualInputRecord
-      : undefined;
+      : input.targetLockfileFingerprint === securityPatchedAppTransitionVisualInputRecord.targetLockfileFingerprint
+        ? securityPatchedAppTransitionVisualInputRecord
+        : undefined;
   if (record === undefined) return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
   const optionalCapabilities = [...input.optionalCapabilities].sort(compareText);
   const key = optionalCapabilities.join("+") || "none";

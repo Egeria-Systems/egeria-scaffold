@@ -461,6 +461,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/docs/environments.md",
       "common/package.json.template",
       "common/pnpm-workspace.yaml",
+      "common/security-patched/pnpm-workspace.yaml",
       "common/vitest-five/apps/web/package.json.template",
       "common/vitest-five/apps/web/tests/setup/component.ts",
       "common/vitest-five/pnpm-workspace.yaml",

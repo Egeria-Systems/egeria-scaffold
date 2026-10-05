@@ -6,7 +6,7 @@ export type SupportedProfileTransitionResolutionFailureCode =
 
 export type SupportedProfileTransitionEndpoint = Readonly<{
   profile: "portfolio" | "site" | "app";
-  recipeVersion: "0.10.0" | "0.11.0" | "0.12.0" | "0.1.0" | "0.2.0";
+  recipeVersion: "0.10.0" | "0.11.0" | "0.11.1" | "0.12.0" | "0.12.1" | "0.1.0" | "0.2.0" | "0.2.1";
 }>;
 
 export type SupportedHistoricalProfileTransition = Readonly<{
@@ -24,6 +24,11 @@ export type SupportedAppProfileTransition = Readonly<{
     | Readonly<{ profile: "portfolio"; recipeVersion: "0.11.0" }>
     | Readonly<{ profile: "site"; recipeVersion: "0.12.0" }>;
   target: Readonly<{ profile: "app"; recipeVersion: "0.2.0" }>;
+}> | Readonly<{
+  source:
+    | Readonly<{ profile: "portfolio"; recipeVersion: "0.11.1" }>
+    | Readonly<{ profile: "site"; recipeVersion: "0.12.1" }>;
+  target: Readonly<{ profile: "app"; recipeVersion: "0.2.1" }>;
 }>;
 
 export type SupportedProfileTransition =
@@ -49,6 +54,15 @@ export function resolveSupportedProfileTransition(input: Readonly<{
     }
     if (input.fromProfile !== "portfolio" && input.fromProfile !== "site") {
       return { ok: false, code: "PROFILE_TRANSITION_SOURCE_UNSUPPORTED" };
+    }
+    if (input.toRecipeVersion === "0.2.1" &&
+        (input.fromProfile === "portfolio" ? input.fromRecipeVersion === "0.11.1" : input.fromRecipeVersion === "0.12.1")) {
+      return { ok: true, value: {
+        source: input.fromProfile === "portfolio"
+          ? { profile: "portfolio", recipeVersion: "0.11.1" }
+          : { profile: "site", recipeVersion: "0.12.1" },
+        target: { profile: "app", recipeVersion: "0.2.1" },
+      } };
     }
     if (input.toRecipeVersion === "0.2.0" &&
         (input.fromProfile === "portfolio" ? input.fromRecipeVersion === "0.11.0" : input.fromRecipeVersion === "0.12.0")) {

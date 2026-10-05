@@ -67,6 +67,8 @@ The complete new generation uses selection-only settings and creation arguments,
 
 Assemble one finite internal candidate through existing rendering boundaries. Public creation/defaults retain the last complete generation during partial implementation. Assign exact versions and schema dispositions from actual contents at the common-contract gate. Activate the public CLI/recipes atomically only when every consumer, verification path and guide is coherent. Retire only related unused generation support then; preserve historical decisions, receipts and evidence. Activation of a complete local builder candidate is distinct from certification, package publication and describing it as complete and releasable: all required release certification and acceptance outcomes must still be satisfied.
 
+The schema-1 [dependency security successors](0015-vitest-five-generation.md#dependency-security-successors) are a dependency-only update to the complete public generation. They do not activate schema-2 configuration/settings, its CLI or provider consumers, or the retirement permitted below. The internal environment recipe identities remain unchanged.
+
 This ADR supersedes only these conflicting obligations, at that activation boundary:
 
 - [ADR-0012](0012-purpose-based-analytics-consent.md): literal provider destinations in persisted analytics settings and the earlier consent-context shape; purpose-based policy and existing consent protections remain.

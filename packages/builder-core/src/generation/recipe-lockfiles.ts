@@ -1,4 +1,4 @@
-type RecipeLockfileVersion = "0.8.0" | "0.9.0" | "0.10.0" | "app-0.1.0" | "portfolio-0.11.0" | "site-0.12.0" | "app-0.2.0" | "application-persistence" | "portfolio-foundation";
+type RecipeLockfileVersion = "0.8.0" | "0.9.0" | "0.10.0" | "app-0.1.0" | "portfolio-0.11.0" | "site-0.12.0" | "app-0.2.0" | "portfolio-0.12.0" | "site-0.13.0" | "app-0.3.0" | "application-persistence" | "portfolio-foundation" | "portfolio-0.11.1" | "site-0.12.1" | "app-0.2.1" | "app-0.2.1-persistence" | "portfolio-0.11.1-foundation";
 
 export type RecipeLockfileIdentity = Readonly<{
   originProfile: string;
@@ -27,29 +27,40 @@ export function resolveRecipeLockfileVersion(
   const eslintConfigNext = devDependencies["eslint-config-next"];
   const vitest = devDependencies.vitest;
   if (dependencies["drizzle-orm"] !== undefined || devDependencies["drizzle-kit"] !== undefined) {
-    return identity.originProfile === "app" && identity.recipeVersion === "0.2.0" &&
+    return identity.originProfile === "app" && (identity.recipeVersion === "0.2.0" || identity.recipeVersion === "0.2.1") &&
       next === "16.3.3" && eslintConfigNext === "16.3.3" && vitest === "5.0.0" &&
       dependencies.effect === "4.0.0-rc.112" && dependencies["drizzle-orm"] === "0.45.2" &&
       devDependencies["drizzle-kit"] === "0.31.10" &&
-      devDependencies["@cloudflare/workers-types"] === "5.20260730.1" ? "application-persistence" : undefined;
+      devDependencies["@cloudflare/workers-types"] === "5.20260730.1"
+        ? identity.recipeVersion === "0.2.1" ? "app-0.2.1-persistence" : "application-persistence" : undefined;
   }
   if (vitest === "5.0.0") {
     if (identity.originProfile === "app") {
-      return (identity.recipeVersion === "0.2.0" || identity.recipeVersion === "0.3.0") && next === "16.3.3" &&
-        eslintConfigNext === "16.3.3" && dependencies.effect === "4.0.0-rc.112"
-        ? "app-0.2.0" : undefined;
+      if (next !== "16.3.3" || eslintConfigNext !== "16.3.3" || dependencies.effect !== "4.0.0-rc.112") return undefined;
+      if (identity.recipeVersion === "0.2.1") return "app-0.2.1";
+      if (identity.recipeVersion === "0.3.0") return "app-0.3.0";
+      return identity.recipeVersion === "0.2.0" ? "app-0.2.0" : undefined;
     }
     if (dependencies.effect !== undefined) {
       if (dependencies.effect !== "4.0.0-rc.112") return undefined;
-      if (identity.originProfile === "portfolio" && identity.recipeVersion === "0.11.0" && next === "16.3.3" && eslintConfigNext === "16.3.0") return "portfolio-foundation";
-      return identity.originProfile === "site" && identity.recipeVersion === "0.12.0" && next === "16.3.3" && eslintConfigNext === "16.3.3" ? "app-0.2.0" : undefined;
+      if (identity.originProfile === "portfolio" && next === "16.3.3" && eslintConfigNext === "16.3.0") {
+        if (identity.recipeVersion === "0.11.1") return "portfolio-0.11.1-foundation";
+        return identity.recipeVersion === "0.11.0" ? "portfolio-foundation" : undefined;
+      }
+      if (identity.originProfile !== "site" || next !== "16.3.3" || eslintConfigNext !== "16.3.3") return undefined;
+      if (identity.recipeVersion === "0.12.1") return "app-0.2.1";
+      return identity.recipeVersion === "0.12.0" ? "app-0.2.0" : undefined;
     }
     if (identity.originProfile === "portfolio") {
-      return (identity.recipeVersion === "0.11.0" || identity.recipeVersion === "0.12.0") && next === "16.3.0" &&
-        eslintConfigNext === "16.3.0" ? "portfolio-0.11.0" : undefined;
+      if (next !== "16.3.0" || eslintConfigNext !== "16.3.0") return undefined;
+      if (identity.recipeVersion === "0.11.1") return "portfolio-0.11.1";
+      if (identity.recipeVersion === "0.12.0") return "portfolio-0.12.0";
+      return identity.recipeVersion === "0.11.0" ? "portfolio-0.11.0" : undefined;
     }
-    return identity.originProfile === "site" && (identity.recipeVersion === "0.12.0" || identity.recipeVersion === "0.13.0") &&
-      next === "16.3.3" && eslintConfigNext === "16.3.3" ? "site-0.12.0" : undefined;
+    if (identity.originProfile !== "site" || next !== "16.3.3" || eslintConfigNext !== "16.3.3") return undefined;
+    if (identity.recipeVersion === "0.12.1") return "site-0.12.1";
+    if (identity.recipeVersion === "0.13.0") return "site-0.13.0";
+    return identity.recipeVersion === "0.12.0" ? "site-0.12.0" : undefined;
   }
   if (identity.originProfile === "app") {
     return identity.recipeVersion === "0.1.0" &&

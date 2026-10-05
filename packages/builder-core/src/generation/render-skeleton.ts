@@ -265,8 +265,8 @@ function enrichApplicationManifest(
     );
   }
 
-  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || (applicationEnvironments && recipeVersion === "0.3.0"));
-  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || (applicationEnvironments && recipeVersion === "0.13.0")));
+  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.1" || (applicationEnvironments && recipeVersion === "0.3.0"));
+  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.1" || (applicationEnvironments && recipeVersion === "0.13.0")));
   const enrichedManifest = {
     ...manifest,
     scripts: {
