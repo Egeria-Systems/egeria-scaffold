@@ -4633,9 +4633,11 @@ async function withGitFixture(name, run, options = {}) {
         }),
       );
     }
-    if (options.generation === "vitest-five") await restoreVitestFiveTestGeneration(primary);
-    else if (options.generation === "security") await restoreVitestFiveTestGeneration(primary, lifecycleCohorts[1]);
-    else if (options.generation !== "dependency-security") await restoreRetainedTestGeneration(primary);
+    if (options.renderingContext === undefined) {
+      if (options.generation === "vitest-five") await restoreVitestFiveTestGeneration(primary);
+      else if (options.generation === "security") await restoreVitestFiveTestGeneration(primary, lifecycleCohorts[1]);
+      else if (options.generation !== "dependency-security") await restoreRetainedTestGeneration(primary);
+    }
     if (options.preparePrimary !== undefined) {
       await options.preparePrimary(primary);
     }
