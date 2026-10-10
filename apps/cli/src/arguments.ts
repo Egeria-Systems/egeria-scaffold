@@ -126,14 +126,12 @@ export type ApplicationEnvironmentCliCommand =
     }>
   | Readonly<{ kind: "infer" | "doctor"; directory: string }>
   | (Readonly<{ kind: "plan-add"; directory: string }> | Readonly<{ kind: "apply-add"; directory: string; approvedPlanFingerprint: string }>) & (
-      Readonly<{ capability: "contact-form-web3forms"; settings?: never }> |
+      Readonly<{ capability: "contact-form-web3forms" | "application-persistence"; settings?: never }> |
       Readonly<{ capability: "booking-calendly"; settings: ApplicationEnvironmentBookingSettings }> |
       Readonly<{ capability: "analytics"; settings: ApplicationEnvironmentAnalyticsSettings }>
     )
   | (Extract<CliCommand, { kind: "plan-remove" | "apply-remove" }> & Readonly<{
-      capability: "analytics" | "contact-form-web3forms" | "booking-calendly";
-      persistenceRemovalPath?: never;
-      persistenceRemovalHumanReviewPath?: never;
+      capability: "analytics" | "contact-form-web3forms" | "booking-calendly" | "application-persistence";
     }>);
 
 const applicationEnvironmentOptionDefinitions = {
@@ -502,7 +500,7 @@ function parseAdd(
     });
     const directory = values.directory;
     const capability = values.capability;
-    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms" && capability !== "booking-calendly" && capability !== "analytics") return invalidArguments();
+    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms" && capability !== "booking-calendly" && capability !== "analytics" && capability !== "application-persistence") return invalidArguments();
     const approvedPlanFingerprint = values["approved-plan"];
     const settings = calendlyBookingSettingsSchema.safeParse({
       destination: values["calendly-url"],
@@ -547,7 +545,7 @@ function parseAdd(
         ? { capability, settings: environmentSettings.data } as const
         : capability === "analytics" && environmentAnalyticsSettings?.success === true
           ? { capability, settings: environmentAnalyticsSettings.data } as const
-          : { capability: "contact-form-web3forms" } as const;
+          : capability === "application-persistence" ? { capability } as const : { capability: "contact-form-web3forms" } as const;
       if (kind === "apply-add") {
         if (!validApprovedPlanFingerprint(approvedPlanFingerprint)) return invalidArguments();
         return { ok: true, value: { kind, directory, ...selection, approvedPlanFingerprint } };
@@ -612,7 +610,7 @@ function parseRemove(
     });
     const directory = values.directory;
     const capability = values.capability;
-    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms" && capability !== "booking-calendly" && capability !== "analytics") return invalidArguments();
+    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms" && capability !== "booking-calendly" && capability !== "analytics" && capability !== "application-persistence") return invalidArguments();
     const approvedPlanFingerprint = values["approved-plan"];
     const persistenceSelection = capability === "application-persistence";
     const jobSelection = capability === "background-job-delivery";
