@@ -9,6 +9,8 @@ import { renderSkeleton } from "../dist/generation/render-skeleton.js";
 import { resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
 import { createGenerationRenderingContext, verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
 
+import { createVitestFiveProfileRecipes } from "../dist/profiles/profile-recipes.js";
+
 import { createCapabilityCatalogSnapshot } from "../dist/catalog/capability-catalog.js";
 
 const request = (profile, extra = {}) => ({ profile, projectName: "jobs-example", displayName: "Jobs example", packageVersions: verifiedCapabilityPackageVersions, ...extra });
@@ -123,7 +125,7 @@ test("retained jobs renders its accepted descriptor and exact predecessor bytes"
     ["app", true, "29c69cfb6947064e82fcb3f0bf22529c8a6f0b1914971edbc64250ace5e91e48"],
   ];
   for (const [profile, persistence, expected] of cases) {
-    const context = createGenerationRenderingContext(persistence, true, true, "0.1.0");
+    const context = { ...createGenerationRenderingContext(persistence, true, true, "0.1.0"), profiles: createVitestFiveProfileRecipes() };
     const result = await renderSkeleton(request(profile, { backgroundJobDelivery: true, ...(persistence ? { applicationPersistence: true } : {}) }), context);
     assert.equal(result.ok, true, JSON.stringify(result));
     const bytes = result.value.files.map(({ path, content }) => [path, Buffer.from(content).toString("base64")]);

@@ -8,6 +8,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
+import { runDependencyAudit } from "./lib/dependency-audit.mjs";
 import { cleanupOwnedDirectory, createIsolatedProcessEnvironment, isolatedProcessOptions, pathIdentityMatches, readPathIdentity } from "./lib/isolated-process.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -117,7 +118,8 @@ async function snapshotSource(root) {
   const paths = [...new Set(stdout.split("\0").filter(Boolean))].filter((path) => !excluded.has(path) && (
     ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".npmrc"].includes(path) ||
     /^packages\/builder-core\/(src\/|templates\/|lockfiles\/|scripts\/|package.json$|tsconfig)/.test(path) ||
-    path === "scripts/verify-app-transition-visuals.mjs" || path === "scripts/lib/isolated-process.mjs"
+    ["scripts/verify-app-transition-visuals.mjs", "scripts/lib/isolated-process.mjs",
+      "scripts/lib/dependency-audit.mjs", "scripts/dependency-audit-exception.json"].includes(path)
   )).sort();
   const files = [];
   for (const path of paths) files.push({ path, sha256: digest(await boundedRead(filesystem, root, path)) });
@@ -288,13 +290,15 @@ async function prepareProject(root, subset) {
   const source = await core.renderSkeleton({ ...request, profile: "portfolio" });
   const target = await core.renderSkeleton({ ...request, profile: "app" });
   if (!source.ok || !target.ok) fail("VISUAL_RENDER_FAILED");
+  if (source.value.project.schemaVersion !== "1.0.0" || source.value.project.originProfile !== "portfolio" || source.value.project.recipeVersion !== "0.11.2" ||
+      target.value.project.schemaVersion !== "1.0.0" || target.value.project.originProfile !== "app" || target.value.project.recipeVersion !== "0.2.2") fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const prepared = policy.prepareAppProfileTransition({ source: source.value, target: target.value,
     currentFiles: new Map(source.value.files.map(({ path, content }) => [path, content])),
     validators: await validation.loadAppTransitionContentValidators() });
   if (!prepared.ok) fail("VISUAL_PREPARATION_FAILED");
   const manifest = JSON.parse(Buffer.from(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content).toString("utf8"));
   const version = lockfiles.resolveRecipeLockfileVersion(target.value.project, manifest);
-  if (version !== "app-0.2.0") fail("VISUAL_LOCKFILE_INVALID");
+  if (version !== "app-0.2.2") fail("VISUAL_LOCKFILE_INVALID");
   const lockfile = await filesystem.readFile(lockfiles.createRecipeLockfileUrl(version));
   return { request, sourceProject: source.value.project, targetProject: target.value.project,
     files: [...prepared.value.files, { path: "pnpm-lock.yaml", content: lockfile }], influencingFingerprints: prepared.value.influencingFingerprints };
@@ -314,7 +318,7 @@ export function createAppTransitionVisualSpec(source, multilingual) {
     // Playwright's pixel comparator can ignore antialiasing differences even
     // at zero tolerance. Stabilize retained actual bytes independently of the
     // expected image; exact reproduction and baseline checks remain separate.
-    result = result.replace(assertion, `  try {\n${assertion}\n  } finally {\n    let previousCapture: Buffer = Buffer.alloc(0);\n    let captureAttempt = 0;\n    await expect.poll(async () => {\n      const actual = await page.screenshot({ path: testInfo.outputPath(\`${viewport}-capture-\${captureAttempt++}.png\`), animations: "disabled", caret: "hide", scale: "css" });\n      const unchanged = previousCapture.equals(actual);\n      previousCapture = actual;\n      return unchanged;\n    }, { timeout: 5_000 }).toBe(true);\n    await writeFile(testInfo.outputPath("${viewport}-captured.png"), previousCapture);\n  }`);
+    result = result.replace(assertion, `  let previousCapture: Buffer = Buffer.alloc(0);\n  let captureAttempt = 0;\n  await expect.poll(async () => {\n    const actual = await page.screenshot({ path: testInfo.outputPath(\`${viewport}-capture-\${captureAttempt++}.png\`), animations: "disabled", caret: "hide", scale: "css" });\n    const unchanged = previousCapture.equals(actual);\n    previousCapture = actual;\n    return unchanged;\n  }, { timeout: 5_000 }).toBe(true);\n  await writeFile(testInfo.outputPath("${viewport}-captured.png"), previousCapture);\n${assertion}`);
   }
   // Every exercised provider remains intercepted. Unexpected external traffic
   // fails the visual proof instead of contacting a live provider.
@@ -449,6 +453,8 @@ async function retainBrowserArtifacts(fs, project, destination) {
 export async function executeAppTransitionVisualCase(input, injected = {}) {
   const fs = injected.filesystem ?? filesystem;
   const command = injected.runCommand ?? runCommand;
+  if (injected.runCommand && typeof injected.runAudit !== "function") fail("VISUAL_AUDIT_ADAPTER_INVALID");
+  const audit = injected.runAudit ?? runDependencyAudit;
   const prepared = await (injected.prepareProject ?? prepareProject)(input.repositoryRoot, input.subset);
   const root = await fs.mkdtemp(join(tmpdir(), "egeria-app-transition-visual-"));
   const identity = await readPathIdentity(root);
@@ -468,6 +474,21 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
   let build;
   async function checked(name, arguments_) {
     if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
+    if (name === "dependency-audit") {
+      try {
+        const disposition = await audit({ executable: "pnpm", cwd: project, environment, timeout: 15 * 60 * 1000 });
+        if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
+        checks.push({ name, exitCode: disposition.rawExitCode, disposition });
+        const auditAccepted = disposition.status === "passed"
+          ? disposition.thresholdExitCode === 0 && [0, 1].includes(disposition.rawExitCode)
+          : disposition.status === "accepted-with-security-exception" && disposition.thresholdExitCode === 1 && disposition.rawExitCode === 1;
+        if (!auditAccepted) fail("VISUAL_PROJECT_CHECK_FAILED");
+      } catch (error) {
+        if (error.auditDisposition) checks.push({ name, exitCode: error.auditDisposition.rawExitCode, disposition: error.auditDisposition });
+        fail("VISUAL_PROJECT_CHECK_FAILED");
+      }
+      return;
+    }
     const result = await command({ executable: "pnpm", arguments: arguments_, cwd: project, environment });
     if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
     await writeExclusive(fs, input.artifactDirectory, `${name}.log`, `${result.stdout}\n${result.stderr}`);
@@ -480,7 +501,7 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
     const commands = [
       ["frozen-install", ["install", "--frozen-lockfile", "--store-dir", support.store]],
       ["peer-dependencies", ["peers", "check"]],
-      ["dependency-audit", ["audit", "--audit-level", "moderate"]],
+      ["dependency-audit", ["audit", "--audit-level", "info", "--json"]],
       ["registry-signatures", ["audit", "signatures"]],
       ["lint", ["run", "lint"]],
       ["cloudflare-types", ["--dir", "apps/web", "run", "cf-typegen"]],

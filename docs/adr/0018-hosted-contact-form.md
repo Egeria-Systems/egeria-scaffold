@@ -22,6 +22,8 @@ One finite root-layout variant adds a Suspense-wrapped home-only placement after
 
 The public identifier, provider submissions and recipient inbox have separate retention and recovery responsibilities. The capability declares repository, external and persistent-data state with reviewed source-only removal. Generated code and copy are application-owned; settings and shared composition retain their existing managed protections. Removal preserves/ejects edits, checks surviving references and records operator dispositions without deleting external data.
 
+[ADR-0015's dependency security successors](0015-vitest-five-generation.md#dependency-security-successors) extend this same optional contract and lifecycle eligibility to the corresponding schema-1 patch recipes. Prior decisions, descriptor versions, capability settings, dependencies, removal rules and historical behavior remain unchanged; no migration or additional capability transition is introduced.
+
 ## Consequences
 
 Default recipes, historical descriptors and installed tuples remain exact. Current add/remove recomputation preserves every selected integration, including contact settings, Resend and retained foundation. Existing foundation and persistence continue to require their Worker and binding checks. Contact introduces no transition edge; installed contact conservatively refuses existing profile transitions.

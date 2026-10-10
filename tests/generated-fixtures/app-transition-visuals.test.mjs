@@ -4,10 +4,40 @@ import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 const producer = new URL("../../scripts/verify-app-transition-visuals.mjs", import.meta.url);
+
+for (const auditPath of ["scripts/lib/dependency-audit.mjs", "scripts/dependency-audit-exception.json"])
+test(`changing ${auditPath} invalidates visual candidates and promotion`, async t => {
+  const h = await harness(t);
+  const execute = promisify(execFile);
+  for (const path of ["scripts/lib/dependency-audit.mjs", "scripts/dependency-audit-exception.json", "packages/builder-core/dist/index.js"]) {
+    await mkdir(dirname(join(h.root, path)), { recursive: true });
+    await writeFile(join(h.root, path), "original reviewed content");
+  }
+  await execute("git", ["init", "--quiet"], { cwd: h.root });
+  await execute("git", ["add", "scripts"], { cwd: h.root });
+  await execute("git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "Initial fixture"], { cwd: h.root });
+  const adapters = { ...h.adapters };
+  delete adapters.snapshotSource;
+  const candidate = await h.module.verifyAppTransitionVisuals({ mode: "candidates" }, adapters);
+  await writeFile(join(h.root, auditPath), "changed audit decision");
+  await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "promote", digest: candidate.manifestSha256 }, adapters), /VISUAL_SOURCE_CHANGED/);
+  await writeFile(join(h.root, auditPath), "original reviewed content");
+  await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "candidates" }, {
+    ...adapters,
+    executeCase: async input => {
+      const result = await h.adapters.executeCase(input);
+      await writeFile(join(h.root, auditPath), "changed during capture");
+      return result;
+    },
+  }), /VISUAL_SOURCE_CHANGED/);
+});
 
 test("app transition visual producer exposes bounded candidate, comparison, and reviewed promotion modes", async () => {
   const exists = await access(producer).then(() => true, () => false);
@@ -195,7 +225,7 @@ test("visual reports require two executed viewport comparisons and reject skips,
   assert.throws(() => validateAppTransitionVisualReport(report([passed, { status: "failed", errors: [{ message: "page.goto timed out" }] }]), true), /VISUAL_COMPARISON_FAILED/);
 });
 
-test("visual capture requires consecutive exact bytes after the screenshot assertion and retains its failure", async () => {
+test("visual capture stabilizes and saves before screenshot comparison and preserves failures", async () => {
   const { createAppTransitionVisualSpec } = await import(producer);
   const require = createRequire(new URL("../../packages/builder-core/package.json", import.meta.url));
   const typescript = require("typescript");
@@ -209,13 +239,20 @@ test("visual capture requires consecutive exact bytes after the screenshot asser
     testAdapter.beforeEach = testAdapter.afterEach = () => {};
     const failure = new Error("toHaveScreenshot mismatch");
     const stabilityFailure = new Error("actual screenshot bytes never stabilized");
-    let stabilized = false;
+    let viewport;
+    let matcherCalls = 0;
+    let saveCompleted = false;
     let captured = 0;
     const written = [];
     const stableImage = Buffer.from("stable actual pixels");
     const expectAdapter = () => ({
       not: { toBeNull() {} }, toBe() {}, async toBeVisible() {},
-      async toHaveScreenshot() { stabilized = true; if (mismatch) throw failure; },
+      async toHaveScreenshot(name) {
+        assert.equal(saveCompleted, true, "authoritative PNG save must complete before screenshot comparison");
+        assert.equal(name, `home-${viewport}.png`);
+        matcherCalls++;
+        if (mismatch) throw failure;
+      },
     });
     expectAdapter.poll = (capture, options) => ({ async toBe(expected) {
       assert.equal(options.timeout, 5_000);
@@ -224,7 +261,13 @@ test("visual capture requires consecutive exact bytes after the screenshot asser
     } });
     runInNewContext(compiled, {
       Buffer, exports: {}, require: identifier => {
-        if (identifier === "node:fs/promises") return { async writeFile(path, content) { written.push({ path, content }); } };
+        if (identifier === "node:fs/promises") return { async writeFile(path, content) {
+          assert.equal(path, `${viewport}-captured.png`);
+          assert.equal(content.equals(stableImage), true);
+          await Promise.resolve();
+          written.push({ path, content });
+          saveCompleted = true;
+        } };
         assert.equal(identifier, "@playwright/test");
         return { test: testAdapter, expect: expectAdapter };
       },
@@ -232,41 +275,57 @@ test("visual capture requires consecutive exact bytes after the screenshot asser
     const page = {
       async route() {}, async setViewportSize() {}, async goto() { return { ok: () => true }; },
       getByRole() { return { async evaluate() {} }; },
-      async screenshot() {
-        assert.equal(stabilized, true, "capture must follow screenshot assertion");
+      async screenshot(options) {
+        assert.equal(matcherCalls, 0, "capture must precede screenshot comparison");
+        assert.deepEqual({ ...options }, {
+          path: `${viewport}-capture-${captured}.png`, animations: "disabled", caret: "hide", scale: "css",
+        });
         captured++;
         if (unstable) return Buffer.from(`alternating pixels ${captured % 2}`);
-        return captured % 3 === 1 ? Buffer.from("transient antialiasing pixels") : stableImage;
+        return captured === 1 ? Buffer.from("transient antialiasing pixels") : stableImage;
       },
     };
     assert.equal(callbacks.length, 2);
-    for (const callback of callbacks) {
-      stabilized = false;
+    for (const [index, callback] of callbacks.entries()) {
+      viewport = ["desktop", "mobile"][index];
+      matcherCalls = 0;
+      saveCompleted = false;
+      captured = 0;
+      const writesBefore = written.length;
       const outcome = callback({ page }, { outputPath: name => name });
       if (unstable) await assert.rejects(outcome, error => error === stabilityFailure);
       else if (mismatch) await assert.rejects(outcome, error => error === failure);
       else await outcome;
+      assert.equal(captured, unstable ? 4 : 3, "each viewport must discard a transient capture and prove two consecutive exact captures");
+      assert.equal(written.length - writesBefore, unstable ? 0 : 1);
+      assert.equal(saveCompleted, !unstable);
+      assert.equal(matcherCalls, unstable ? 0 : 1);
     }
-    assert.equal(captured, unstable ? 8 : 6, "each viewport must discard a transient capture and prove two consecutive exact captures");
     assert.equal(written.length, unstable ? 0 : 2);
     assert.equal(written.every(({ content }) => content.equals(stableImage)), true);
   }
 });
 
-test("disposable visual targets use exact production files, run non-update captures twice, and preserve process receipts", async (t) => {
+for (const preparation of ["synthetic", "security"])
+test(`${preparation} visual targets use exact production files, run non-update captures twice, and preserve process receipts`, async (t) => {
   const h = await harness(t);
   const spec = await readFile(new URL("../../packages/builder-core/templates/common/apps/web/tests/visual/home-visual.spec.ts", import.meta.url), "utf8");
   const artifactDirectory = join(h.root, "artifacts");
   await mkdir(artifactDirectory);
   const commands = [];
   let ownedProject;
-  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot: h.root, artifactDirectory }, {
-    prepareProject: async () => ({ request: {}, sourceProject: {}, targetProject: {}, files: [
+  const repositoryRoot = preparation === "security" ? fileURLToPath(new URL("../", producer)) : h.root;
+  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot, artifactDirectory }, {
+    ...(preparation === "synthetic" ? { prepareProject: async () => ({ request: {}, sourceProject: {}, targetProject: {}, files: [
       { path: "apps/web/tests/visual/home-visual.spec.ts", content: Buffer.from(spec) },
       ...Object.entries(h.images).map(([viewport, content]) => ({ path: `apps/web/tests/visual/home-visual.spec.ts-snapshots/home-${viewport}-chromium-linux.png`, content })),
-    ], influencingFingerprints: [{ path: "app.tsx", fingerprint: "sha256:synthetic" }] }),
+    ], influencingFingerprints: [{ path: "app.tsx", fingerprint: "sha256:synthetic" }] }) } : {}),
     inspectBrowser: async () => ({ synthetic: true }),
     inspectBuild: async () => ({ synthetic: true }),
+    runAudit: async input => {
+      commands.push({ ...input, arguments: ["audit", "--audit-level", "info", "--json"] });
+      return { status: "passed", rawExitCode: 0, thresholdExitCode: 0 };
+    },
     runCommand: async (input) => {
       commands.push(input);
       ownedProject = input.cwd;
@@ -281,6 +340,13 @@ test("disposable visual targets use exact production files, run non-update captu
       return { exitCode: 0, stdout: "synthetic adapter", stderr: "" };
     },
   });
+  if (preparation === "security") {
+    assert.equal(result.project.sourceProject.schemaVersion, "1.0.0");
+    assert.equal(result.project.sourceProject.recipeVersion, "0.11.2");
+    assert.equal(result.project.targetProject.schemaVersion, "1.0.0");
+    assert.equal(result.project.targetProject.recipeVersion, "0.2.2");
+    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "71c4d59802625006860409d6298e3bd13963089fc55260350ad4c262dd216067");
+  }
   assert.equal(commands.filter(({ arguments: args }) => args.includes("test:visual")).length, 2);
   assert.equal(commands.some(({ arguments: args }) => args.some(value => value.includes("update-snapshots"))), false);
   assert.equal(commands.every(({ environment }) => environment.NPM_CONFIG_REGISTRY === "https://registry.npmjs.org/" && !environment.GITHUB_TOKEN), true);
@@ -288,4 +354,45 @@ test("disposable visual targets use exact production files, run non-update captu
   await assert.rejects(access(ownedProject), { code: "ENOENT" });
   await access(join(artifactDirectory, "candidate/report.json"));
   await access(join(artifactDirectory, "reproduction/report.json"));
+});
+
+test("visual prerequisites retain raw and threshold audit results and reject incoherent dispositions", async t => {
+  const h = await harness(t);
+  const spec = await readFile(new URL("../../packages/builder-core/templates/common/apps/web/tests/visual/home-visual.spec.ts", import.meta.url));
+  const cases = [
+    { disposition: { status: "passed", rawExitCode: 0, thresholdExitCode: 0 }, accepted: true },
+    { disposition: { status: "passed", rawExitCode: 1, thresholdExitCode: 0 }, accepted: true },
+    { disposition: { status: "accepted-with-security-exception", rawExitCode: 1, thresholdExitCode: 1 }, accepted: true },
+    { disposition: { status: "passed", rawExitCode: 0 }, accepted: false },
+    { disposition: { status: "passed", rawExitCode: 0, thresholdExitCode: 1 }, accepted: false },
+    { disposition: { status: "passed", rawExitCode: 1, thresholdExitCode: 1 }, accepted: false },
+    { disposition: { status: "passed", rawExitCode: 2, thresholdExitCode: 0 }, accepted: false },
+    { disposition: { status: "accepted-with-security-exception", rawExitCode: 1 }, accepted: false },
+    { disposition: { status: "accepted-with-security-exception", rawExitCode: 1, thresholdExitCode: 0 }, accepted: false },
+    { disposition: { status: "accepted-with-security-exception", rawExitCode: 0, thresholdExitCode: 1 }, accepted: false },
+    { disposition: { status: "refused", rawExitCode: 1, thresholdExitCode: 1 }, accepted: false, throws: true },
+  ];
+  for (const [index, { disposition, accepted, throws }] of cases.entries()) {
+    const artifactDirectory = join(h.root, `audit-${index}`);
+    await mkdir(artifactDirectory);
+    const commands = [];
+    await assert.rejects(h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot: h.root, artifactDirectory }, {
+      prepareProject: async () => ({ files: [{ path: "apps/web/tests/visual/home-visual.spec.ts", content: spec }], influencingFingerprints: [] }),
+      runAudit: async () => {
+        if (throws) throw Object.assign(new Error("DEPENDENCY_AUDIT_FAILED"), { auditDisposition: disposition });
+        return disposition;
+      },
+      runCommand: async input => {
+        commands.push(input.arguments);
+        return { exitCode: input.arguments.includes("lint") ? 2 : 0, stdout: "synthetic", stderr: "" };
+      },
+      inspectBrowser: async () => assert.fail("failed prerequisites must prevent capture"),
+    }), /VISUAL_PROJECT_CHECK_FAILED/);
+    assert.equal(commands.some(args => args.includes("signatures")), accepted);
+    assert.equal(commands.some(args => args.includes("test:visual")), false);
+    const failure = JSON.parse(await readFile(join(artifactDirectory, "failure/failure.json")));
+    const audit = failure.checks.find(check => check.name === "dependency-audit");
+    assert.equal(audit.exitCode, disposition.rawExitCode);
+    assert.deepEqual(audit.disposition, disposition);
+  }
 });

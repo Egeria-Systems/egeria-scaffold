@@ -813,7 +813,7 @@ export type AppProfileTransitionPlan = Readonly<{
   }>;
   target: Readonly<{
     profile: "app";
-    recipeVersion: "0.1.0" | "0.2.0";
+    recipeVersion: "0.1.0" | "0.2.0" | "0.2.1" | "0.2.2";
     capabilities: readonly ProfileTransitionCapabilitySubject[];
   }>;
   actions: readonly AppTransitionDisposition[];
@@ -854,7 +854,7 @@ async function readReviewedAppTransitionVisualEvidence(input: Readonly<{
     return undefined;
   }
   const optionalCapabilities = input.source.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
-  const targetLockfileFingerprint = fingerprintFileContent(new Uint8Array(await readFile(createRecipeLockfileUrl(input.target.project.recipeVersion === "0.2.0" ? "app-0.2.0" : "app-0.1.0"))));
+  const targetLockfileFingerprint = fingerprintFileContent(new Uint8Array(await readFile(createRecipeLockfileUrl(input.target.project.recipeVersion === "0.2.2" ? "app-0.2.2" : input.target.project.recipeVersion === "0.2.1" ? "app-0.2.1" : input.target.project.recipeVersion === "0.2.0" ? "app-0.2.0" : "app-0.1.0"))));
   const inputRecord = verifyAppTransitionVisualInputRecord({
     optionalCapabilities,
     influencingFingerprints: canonical.value.influencingFingerprints,
@@ -921,7 +921,10 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
   }
   const renderingContext = snapshot.value.renderingContext;
-  const targetRecipeVersion = renderingContext.catalogSnapshot.standards === "0.5.0" ? "0.2.0" : "0.1.0";
+  const targetRecipeVersion = snapshot.value.profiles.find(({ identifier }) => identifier === "app")?.recipeVersion;
+  if (targetRecipeVersion !== "0.1.0" && targetRecipeVersion !== "0.2.0" && targetRecipeVersion !== "0.2.1" && targetRecipeVersion !== "0.2.2") {
+    return planningFailure("PROFILE_TRANSITION_EDGE_MISSING");
+  }
   const edge = resolveSupportedProfileTransition({
     fromProfile: project.originProfile, fromRecipeVersion: project.recipeVersion, toProfile: "app", toRecipeVersion: targetRecipeVersion
   });
@@ -1013,7 +1016,7 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
   }
   const fromLock = resolveRecipeLockfileVersion({ originProfile: project.originProfile, recipeVersion: project.recipeVersion }, JSON.parse(new TextDecoder().decode(sourceManifest.content)));
   const toLock = resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: targetRecipeVersion }, JSON.parse(new TextDecoder().decode(targetManifest.content)));
-  if (fromLock === undefined || toLock !== (targetRecipeVersion === "0.2.0" ? "app-0.2.0" : "app-0.1.0")) {
+  if (fromLock === undefined || toLock !== `app-${targetRecipeVersion}`) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
   const sourceLock = new Uint8Array(await readFile(createRecipeLockfileUrl(fromLock)));

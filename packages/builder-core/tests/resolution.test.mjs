@@ -63,7 +63,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
   assert.deepEqual(core.profileRecipes.at(-1), {
     identifier: "app",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.2.0",
+    recipeVersion: "0.2.2",
     defaultCapabilities: ["app-foundation", "site-routing"],
   });
 
@@ -81,7 +81,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
     );
     const identifiers = resolution.capabilities.map(({ identifier }) => identifier);
 
-    assert.equal(resolution.recipeVersion, "0.2.0");
+    assert.equal(resolution.recipeVersion, "0.2.2");
     assert.deepEqual(
       identifiers,
       [
@@ -1788,7 +1788,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.11.0",
+      recipeVersion: "0.11.2",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1800,7 +1800,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.12.0",
+      recipeVersion: "0.12.2",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1813,7 +1813,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "app",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.2.0",
+      recipeVersion: "0.2.2",
       defaultCapabilities: ["app-foundation", "site-routing"],
     },
   ]);
@@ -1837,7 +1837,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.11.0");
+  assert.equal(portfolio.recipeVersion, "0.11.2");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1873,7 +1873,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
 
     assert.equal(
       selected.recipeVersion,
-      profile === "portfolio" ? "0.11.0" : "0.12.0",
+      profile === "portfolio" ? "0.11.2" : "0.12.2",
     );
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
@@ -1969,9 +1969,9 @@ test("current recipes add app while historical portfolio and site snapshots stay
       recipeVersion,
     })),
     [
-      { identifier: "portfolio", recipeVersion: "0.11.0" },
-      { identifier: "site", recipeVersion: "0.12.0" },
-      { identifier: "app", recipeVersion: "0.2.0" },
+      { identifier: "portfolio", recipeVersion: "0.11.2" },
+      { identifier: "site", recipeVersion: "0.12.2" },
+      { identifier: "app", recipeVersion: "0.2.2" },
     ],
   );
 
@@ -2228,13 +2228,17 @@ test("resolution reports unsupported capabilities, missing dependencies, cycles,
 });
 
 
-test("supported profile transition admits only the historical and two exact incoming app edges", () => {
+test("supported profile transitions admit only historical and same-cohort incoming app edges", () => {
   for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion] of [
     ["portfolio", "0.10.0", "site", "0.10.0"],
     ["portfolio", "0.10.0", "app", "0.1.0"],
     ["site", "0.11.0", "app", "0.1.0"],
     ["portfolio", "0.11.0", "app", "0.2.0"],
     ["site", "0.12.0", "app", "0.2.0"],
+    ["portfolio", "0.11.1", "app", "0.2.1"],
+    ["site", "0.12.1", "app", "0.2.1"],
+    ["portfolio", "0.11.2", "app", "0.2.2"],
+    ["site", "0.12.2", "app", "0.2.2"],
   ]) {
     assert.deepEqual(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}), {
       ok: true, value: {source: {profile: fromProfile, recipeVersion: fromRecipeVersion}, target: {profile: toProfile, recipeVersion: toRecipeVersion}},
@@ -2245,5 +2249,12 @@ test("supported profile transition admits only the historical and two exact inco
     ["site", "0.12.0", "app", "0.1.0"], ["app", "0.1.0", "app", "0.1.0"],
     ["app", "0.1.0", "portfolio", "0.10.0"], ["portfolio", "0.10.0", "app", "0.2.0"],
     ["unknown", "0.10.0", "app", "0.1.0"],
+    ...["portfolio", "site"].flatMap(fromProfile => {
+      const versions = fromProfile === "portfolio" ? ["0.10.0", "0.11.0", "0.11.1", "0.11.2"] : ["0.11.0", "0.12.0", "0.12.1", "0.12.2"];
+      return versions.flatMap((fromVersion, index) => ["0.1.0", "0.2.0", "0.2.1", "0.2.2"].flatMap((toVersion, targetIndex) => index === targetIndex ? [] : [[fromProfile, fromVersion, "app", toVersion]]));
+    }),
+    ["portfolio", "0.12.1", "app", "0.2.1"],
+    ["site", "0.11.1", "app", "0.2.1"],
+    ["portfolio", "0.11.1", "app", "9.9.9"],
   ]) assert.equal(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}).ok, false);
 });

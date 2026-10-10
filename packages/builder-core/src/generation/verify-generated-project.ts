@@ -138,6 +138,7 @@ function createChildEnvironment(
     ...toolEnvironment,
     CI: "true",
     NEXT_TELEMETRY_DISABLED: "1",
+    WRANGLER_SEND_METRICS: "false",
     HOME: support.home,
     USERPROFILE: support.home,
     TMPDIR: support.temporary,

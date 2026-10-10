@@ -471,6 +471,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const expectedJobIdentifiers = [
     "scope",
     "builder-and-packages",
+    "cli-jobs",
     "generated-projects",
     "app-transition-visuals",
     "compatibility-proof",
@@ -491,6 +492,8 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "scripts/verify-generated-skeletons.mjs",
     "scripts/verify-app-transition-visuals.mjs",
     "scripts/lib/isolated-process.mjs",
+    "scripts/lib/dependency-audit.mjs",
+    "scripts/dependency-audit-exception.json",
     "tests/generated-fixtures/**",
   ];
   const compatibilityPaths = [
@@ -514,14 +517,17 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "cancel-in-progress": true,
   });
   assert.deepEqual(Object.keys(workflow.jobs), expectedJobIdentifiers);
-  assert.equal(
-    Object.hasOwn(workflow.jobs["builder-and-packages"], "if"),
-    false,
-  );
-  assert.equal(
-    Object.hasOwn(workflow.jobs["builder-and-packages"], "needs"),
-    false,
-  );
+  for (const identifier of ["builder-and-packages", "cli-jobs"]) {
+    const job = workflow.jobs[identifier];
+    assert.equal(job["timeout-minutes"], 90);
+    for (const property of ["if", "needs", "continue-on-error"]) {
+      assert.equal(Object.hasOwn(job, property), false, identifier);
+    }
+    for (const step of job.steps) {
+      assert.equal(Object.hasOwn(step, "if"), false, identifier);
+      assert.equal(Object.hasOwn(step, "continue-on-error"), false, identifier);
+    }
+  }
   assert.doesNotMatch(
     source,
     /\bpaths(?:-ignore)?:|\bsecrets\b|id-token:\s*write|environment:|pull_request_target|workflow_run/iu,
@@ -643,12 +649,39 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       workflowCommands(job),
     ]),
   );
+  const nonJobsCommand = "node --test --test-skip-pattern='^compiled (?:Vitest five|security) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$' apps/cli/tests/*.test.mjs";
+  const jobsCommand = 'node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs';
+  const cliJobs = workflow.jobs["cli-jobs"];
+  assert.equal(cliJobs.name, "CLI jobs (${{ matrix.cohort }})");
+  assert.deepEqual(cliJobs.strategy, {
+    "fail-fast": false,
+    matrix: {
+      include: [
+        { cohort: "vitest-five", "test-pattern": "^compiled Vitest five jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$" },
+        { cohort: "security", "test-pattern": "^compiled security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$" },
+      ],
+    },
+  });
+  assert.deepEqual(cliJobs.steps.filter(({ run }) => run).map(({ run }) => run), [
+    "pnpm install --frozen-lockfile",
+    "pnpm run build:builder",
+    jobsCommand,
+  ]);
+  assert.deepEqual(cliJobs.steps.find(({ run }) => run === jobsCommand).env, {
+    CLI_TEST_PATTERN: "${{ matrix.test-pattern }}",
+  });
+  assert.ok(cliJobs.steps.findIndex(({ uses }) => uses?.startsWith("pnpm/setup@")) <
+    cliJobs.steps.findIndex(({ run }) => run === "pnpm install --frozen-lockfile"));
+  assert.equal(
+    workflow.jobs["builder-and-packages"].steps.find(({ name }) => name === "Test CLI excluding jobs lifecycle")?.run,
+    nonJobsCommand,
+  );
   for (const command of [
     "pnpm run test:constitution",
     "pnpm run check:semantic-naming",
     "pnpm run test:package-boundaries",
     "pnpm run test:builder-core",
-    "pnpm run test:cli",
+    nonJobsCommand,
     "pnpm run test:packages",
     "pnpm run test:capability-certification",
     "pnpm run check:capability-certification",
@@ -726,12 +759,14 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const jobsWithCheckout = [
     "scope",
     "builder-and-packages",
+    "cli-jobs",
     "generated-projects",
     "app-transition-visuals",
     "compatibility-proof",
   ];
   const jobsWithToolchain = [
     "builder-and-packages",
+    "cli-jobs",
     "generated-projects",
     "app-transition-visuals",
     "compatibility-proof",
@@ -739,7 +774,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   for (const [identifier, job] of Object.entries(workflow.jobs)) {
     assert.equal(job["runs-on"], "ubuntu-24.04", identifier);
     assert.equal(typeof job["timeout-minutes"], "number", identifier);
-    const maximumMinutes = identifier === "generated-projects" ? 90 : identifier === "builder-and-packages" ? 90 : 45;
+    const maximumMinutes = ["generated-projects", "builder-and-packages", "cli-jobs"].includes(identifier) ? 90 : 45;
     assert.ok(job["timeout-minutes"] > 0 && job["timeout-minutes"] <= maximumMinutes);
   }
   for (const identifier of jobsWithCheckout) {
@@ -753,7 +788,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     );
     assert.equal(checkout?.with?.["persist-credentials"], false, identifier);
   }
-  for (const identifier of ["scope", "builder-and-packages"]) {
+  for (const identifier of ["scope", "builder-and-packages", "cli-jobs"]) {
     const checkout = workflow.jobs[identifier].steps.find(({ uses }) =>
       uses?.startsWith("actions/checkout@"),
     );
@@ -880,6 +915,47 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       },
     },
     {
+      name: "omitted CLI jobs cohort",
+      mutateWorkflow(candidate) {
+        candidate.jobs["cli-jobs"].strategy.matrix.include.pop();
+      },
+    },
+    {
+      name: "overlapping CLI jobs selectors",
+      mutateWorkflow(candidate) {
+        const groups = candidate.jobs["cli-jobs"].strategy.matrix.include;
+        groups[1]["test-pattern"] = groups[0]["test-pattern"];
+      },
+    },
+    {
+      name: "incomplete non-jobs selector",
+      mutateWorkflow(candidate) {
+        candidate.jobs["builder-and-packages"].steps.find(
+          ({ name }) => name === "Test CLI excluding jobs lifecycle",
+        ).run = "node --test --test-name-pattern='^parser' apps/cli/tests/*.test.mjs";
+      },
+    },
+    {
+      name: "skipped CLI jobs",
+      mutateWorkflow(candidate) {
+        candidate.jobs["cli-jobs"].if = "false";
+      },
+    },
+    {
+      name: "missing CLI jobs build prerequisite",
+      mutateWorkflow(candidate) {
+        candidate.jobs["cli-jobs"].steps = candidate.jobs["cli-jobs"].steps.filter(
+          ({ run }) => run !== "pnpm run build:builder",
+        );
+      },
+    },
+    {
+      name: "suppressed CLI jobs failure",
+      mutateWorkflow(candidate) {
+        candidate.jobs["cli-jobs"]["continue-on-error"] = true;
+      },
+    },
+    {
       name: "disabled fail-safe default",
       mutateWorkflow(candidate) {
         const scopeStep = candidate.jobs.scope.steps.find(
@@ -927,12 +1003,28 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
     ({ run }) => run === "pnpm run test:packages",
   );
   assert.ok(buildIndex >= 0 && buildIndex < packageTestIndex);
+  const cliTestIndex = builderSteps.findIndex(
+    ({ name }) => name === "Test CLI excluding jobs lifecycle",
+  );
+  assert.ok(buildIndex < cliTestIndex && cliTestIndex < packageTestIndex);
+  assert.deepEqual(builderSteps.slice(cliTestIndex + 1).map(({ name }) => name), [
+    "Test public packages",
+    "Test capability certification contracts",
+    "Check capability admission",
+    "Lint builder and packages",
+    "Typecheck builder and packages",
+    "Check release intent",
+  ]);
   assert.equal(
     builderSteps.find(({ name }) => name === "Check release intent")?.run,
     "pnpm run check:package-release dependency-update origin/main || pnpm run check:package-release pull-request origin/main || pnpm exec changeset status --since origin/main",
   );
 
   const rootManifest = JSON.parse(await readRepositoryFile("package.json"));
+  const cliManifest = JSON.parse(await readRepositoryFile("apps/cli/package.json"));
+  assert.equal(rootManifest.scripts["test:cli"],
+    "pnpm --filter @egeria-systems/cli run build && pnpm --filter @egeria-systems/cli run test");
+  assert.equal(cliManifest.scripts.test, "node --test tests/*.test.mjs");
   assert.equal(
     rootManifest.scripts["verify:generated-visuals"],
     "node scripts/verify-generated-skeletons.mjs --visual",
@@ -1151,7 +1243,7 @@ test("the workspace declares the approved proof root and install policy", async 
 
   assert.equal(
     workspace,
-    'packages:\n  - "apps/*"\n  - "packages/*"\n  - "proofs/*"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  "js-yaml@>=4.0.0 <4.3.2": 4.3.2\n  "miniflare>undici": 7.29.0\n  "qs@": 6.16.0\n  "sharp@>=0.35.0 <0.35.4": 0.35.4\n\nallowBuilds:\n  "@parcel/watcher": true\n  "@swc/core": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n',
+    "packages:\n  - \"apps/*\"\n  - \"packages/*\"\n  - \"proofs/*\"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  \"next@>=16.2.0 <16.3.8\": 16.3.8\n  \"brace-expansion@>=1.0.0 <1.1.21\": 1.1.21\n  \"brace-expansion@>=2.0.0 <2.1.7\": 2.1.7\n  \"brace-expansion@>=5.0.0 <5.0.12\": 5.0.12\n  \"js-yaml@>=4.0.0 <4.3.2\": 4.3.2\n  \"miniflare>undici\": 7.29.1\n  \"qs@\": 6.16.0\n  \"sharp@>=0.35.0 <0.35.5\": 0.35.5\n  \"source-map-js@>=1.0.0 <1.2.2\": 1.2.2\n  \"proxy-addr@>=2.0.0 <2.0.8\": 2.0.8\n\n  \"shell-quote@>=1.8.4 <1.11.0\": 1.11.0\n\nallowBuilds:\n  \"@parcel/watcher\": true\n  \"@swc/core\": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n",
   );
 });
 
@@ -2522,7 +2614,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     packageOwnership,
-    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.2[^\n]+require separate certification/iu,
   );
   assert.match(
     programRoadmap,
@@ -2542,7 +2634,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     rootInstructions,
-    /Builder-core supports `app@0\.2\.0` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
+    /Builder-core supports `app@0\.2\.2` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
   );
   for (const instructions of [builderInstructions, cliInstructions]) {
     assert.match(
@@ -2853,7 +2945,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
+    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.2[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
   );
 });
 
@@ -3448,7 +3540,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /generation-executable recipes are `portfolio@0\.11\.0`, `site@0\.12\.0`, and `app@0\.2\.0`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
+    /generation-executable recipes are `portfolio@0\.11\.2`, `site@0\.12\.2`, and `app@0\.2\.2`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
   );
   assert.match(
     capabilityModel,
@@ -4630,15 +4722,8 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     },
   );
   await Promise.all(
-    [
-      "fixtures/generated/portfolio",
-      "fixtures/generated/portfolio-calendly",
-      "fixtures/generated/site",
-      "fixtures/generated/site-multilingual",
-      "fixtures/generated/site-multilingual-analytics",
-      "fixtures/generated/app",
-      "fixtures/generated/app-all-optional-integrations",
-    ].map((path) => access(resolve(repositoryRoot, path))),
+    (await import("../../scripts/verify-generated-skeletons.mjs")).generatedFixtureContracts
+      .map(({ relativeRoot }) => access(resolve(repositoryRoot, relativeRoot))),
   );
 
   assert.match(
@@ -4659,7 +4744,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     packageOwnership,
-    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.0[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.2[^\n]+require separate certification/iu,
   );
   assert.match(
     builderCoreReadme,

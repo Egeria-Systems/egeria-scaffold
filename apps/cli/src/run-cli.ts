@@ -3,6 +3,8 @@ import {
   applyCapabilityRemoval as applyCapabilityRemovalDefault,
   applyCapabilityUpgrade as applyCapabilityUpgradeDefault,
   applyProfileTransition as applyProfileTransitionDefault,
+  createApplicationEnvironmentRenderingContext,
+  type ApplicationEnvironmentRenderingContext,
   createFileSystemRepositoryReader,
   createPnpmGeneratedProjectVerifier,
   readVerifiedProjectSnapshot,
@@ -48,7 +50,7 @@ import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { parseCliArguments, type CliCommand } from "./arguments.js";
+import { parseCliArguments, type ApplicationEnvironmentCliCommand, type CliCommand } from "./arguments.js";
 
 export type CliOutput = Readonly<{
   write(value: string): void;
@@ -286,31 +288,29 @@ function createCliRepositoryReader(root: string): RepositoryReader {
   };
 }
 
+function createRequest<C extends Extract<CliCommand | ApplicationEnvironmentCliCommand, { kind: "create" }>>(command: C): Omit<C, "kind" | "directory"> {
+  const request = { ...command };
+  Reflect.deleteProperty(request, "kind");
+  Reflect.deleteProperty(request, "directory");
+  return request;
+}
+
 async function runCreate(
-  command: Extract<CliCommand, Readonly<{ kind: "create" }>>,
+  input: Readonly<{ command: Extract<CliCommand, { kind: "create" }>; renderingContext?: never }> |
+    Readonly<{ command: Extract<ApplicationEnvironmentCliCommand, { kind: "create" }>; renderingContext: ApplicationEnvironmentRenderingContext }>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
 ): Promise<0 | 1> {
-  const result = await generateProject({
-    request: {
-      profile: command.profile,
-      projectName: command.projectName,
-      displayName: command.displayName,
-      ...(command.bookingCalendly === undefined
-        ? {}
-        : { bookingCalendly: command.bookingCalendly }),
-      ...(command.analytics === undefined
-        ? {}
-        : { analytics: command.analytics }),
-      ...(command.multilingual === true ? { multilingual: true } : {}),
-      ...(command.applicationPersistence === true ? { applicationPersistence: true } : {}),
-      ...(command.transactionalEmailResend === true ? { transactionalEmailResend: true } : {}),
-      ...(command.backgroundJobDelivery === true ? { backgroundJobDelivery: true } : {}),
-      ...(command.contactFormWeb3Forms === undefined ? {} : { contactFormWeb3Forms: command.contactFormWeb3Forms }),
-    },
-    destination: resolve(command.directory),
-    verifier: dependencies.createVerifier(),
-  });
+  const command = input.command;
+  if (input.renderingContext !== undefined && (command.analytics !== undefined || command.bookingCalendly !== undefined || command.contactFormWeb3Forms !== undefined || command.applicationPersistence === true || command.transactionalEmailResend === true || command.backgroundJobDelivery === true)) {
+    writeJson(output.writeError, { ok: false, command: "create", issues: [{ code: "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", path: ["request"], context: { reason: "incomplete-capability" } }] });
+    return 1;
+  }
+  const destination = resolve(command.directory);
+  const verifier = dependencies.createVerifier();
+  const result = input.renderingContext === undefined
+    ? await generateProject({ request: createRequest(input.command), destination, verifier })
+    : await generateProject({ request: createRequest(input.command), destination, verifier, renderingContext: input.renderingContext });
 
   if (!result.ok) {
     writeJson(output.writeError, {
@@ -337,17 +337,23 @@ async function runReadOnly(
   command: Extract<CliCommand, Readonly<{ kind: "infer" | "doctor" | "diff" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
+  projectSchemaVersion?: "2.0.0",
 ): Promise<0 | 1> {
   try {
     const reader = (dependencies.createReader ??
       createCliRepositoryReader)(resolve(command.directory));
-    const snapshot = await readVerifiedProjectSnapshot(reader);
+    const snapshot = projectSchemaVersion === "2.0.0"
+      ? await readVerifiedProjectSnapshot(reader, createApplicationEnvironmentRenderingContext())
+      : await readVerifiedProjectSnapshot(reader);
     if (!snapshot.ok) {
-      writeJson(output.writeError, { ok: false, code: "VERIFIED_CATALOG_INVALID" });
+      writeJson(output.writeError, { ok: false, code: projectSchemaVersion === "2.0.0" ? "PROJECT_INSPECTION_INVALID" : "VERIFIED_CATALOG_INVALID" });
       return 1;
     }
     if (command.kind === "infer") {
-      const result = await inferRepository({ reader: snapshot.value.reader, catalog: snapshot.value.catalog });
+      const request = { reader: snapshot.value.reader, catalog: snapshot.value.catalog };
+      const result = projectSchemaVersion === "2.0.0"
+        ? await inferRepository({ ...request, projectSchemaVersion: "2.0.0" })
+        : await inferRepository(request);
       writeJson(output.write, { ok: true, command: "infer", result });
       return 0;
     }
@@ -357,6 +363,7 @@ async function runReadOnly(
         reader: snapshot.value.reader,
         catalog: snapshot.value.catalog,
         profiles: snapshot.value.profiles,
+        ...(projectSchemaVersion === "2.0.0" ? { projectSchemaVersion } : {}),
       });
       writeJson(output.write, { ok: true, command: "doctor", result });
       return result.healthy ? 0 : 1;
@@ -997,8 +1004,20 @@ async function runApplyProfileTransition(
 
 export function createCliRunner(
   dependencies: CliRunnerDependencies,
+  projectSchemaVersion?: "2.0.0",
 ): CliRunner {
   return async (arguments_, output) => {
+    if (projectSchemaVersion === "2.0.0") {
+      const parsed = parseCliArguments(arguments_, "2.0.0");
+      if (!parsed.ok) return writeInvalidArguments(output);
+      if (parsed.value.kind !== "create") return runReadOnly(parsed.value, output, dependencies, "2.0.0");
+      try {
+        return await runCreate({ command: parsed.value, renderingContext: createApplicationEnvironmentRenderingContext() }, output, dependencies);
+      } catch {
+        writeJson(output.writeError, { ok: false, code: "PROJECT_GENERATION_FAILED" });
+        return 1;
+      }
+    }
     const parsed = parseCliArguments(arguments_);
 
     if (!parsed.ok) {
@@ -1022,7 +1041,7 @@ export function createCliRunner(
 
     if (parsed.value.kind === "create") {
       try {
-        return await runCreate(parsed.value, output, dependencies);
+        return await runCreate({ command: parsed.value }, output, dependencies);
       } catch {
         writeJson(output.writeError, {
           ok: false,

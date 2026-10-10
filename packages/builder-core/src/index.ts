@@ -65,5 +65,23 @@ export * from "./state/codecs.js";
 export * from "./contracts/persistence-removal-evidence.js";
 export * from "./lifecycle/review-persistence-removal-evidence.js";
 
+export {
+  applicationEnvironmentAnalyticsSettingsSchema,
+  applicationEnvironmentBookingSettingsSchema,
+  applicationEnvironmentProjectConfigurationSchema,
+  type ApplicationEnvironmentAnalyticsSettings,
+  type ApplicationEnvironmentBookingSettings,
+  type ApplicationEnvironmentProjectConfiguration,
+} from "./contracts/project.js";
+
+export {
+  applicationEnvironmentInstalledStateSchema,
+  type ApplicationEnvironmentInstalledState,
+} from "./contracts/state.js";
+
+export { createApplicationEnvironmentRenderingContext } from "./catalog/verified-package-versions.js";
+export type { ApplicationEnvironmentProjectGenerationRequest } from "./generation/write-generated-project.js";
+export type { ApplicationEnvironmentGenerationRequest, ApplicationEnvironmentRenderingContext } from "./generation/render-skeleton.js";
+
 export * from "./contracts/job-removal-evidence.js";
 export * from "./lifecycle/review-job-removal-evidence.js";

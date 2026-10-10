@@ -68,16 +68,16 @@ test("preparation checks compiled site generation without exposing its public fo
   assert.equal(result.ok, true);
   assert.equal(result.capability, "contact-form-web3forms");
   assert.equal(result.profile, "site");
-  assert.equal(result.recipeVersion, "0.12.0");
+  assert.equal(result.recipeVersion, "0.12.2");
   assert.equal(result.evidenceRevision, revision);
   assert.deepEqual(result.subject, subject);
   assert.deepEqual(result.checks, ["compiled-cli-create", "state-inference", "healthy-diagnostics", "exact-diff"]);
   assert.equal(JSON.stringify(result).includes(accessKey), false);
   assert.equal(JSON.stringify(result).includes(input.outputRoot), false);
   const projectRoot = join(input.outputRoot, "project");
-  assert.match(await readFile(join(projectRoot, ".egeria/project.yaml"), "utf8"), /recipeVersion: 0\.12\.0/u);
+  assert.match(await readFile(join(projectRoot, ".egeria/project.yaml"), "utf8"), /recipeVersion: 0\.12\.2/u);
   const manifest = JSON.parse(await readFile(join(projectRoot, "apps/web/package.json"), "utf8"));
-  assert.equal(manifest.dependencies.next, "16.3.3");
+  assert.equal(manifest.dependencies.next, "16.3.8");
   assert.equal(manifest.dependencies.effect, undefined);
   await assert.rejects(access(join(projectRoot, "apps/web/app/api/contact")), { code: "ENOENT" });
   assert.equal((await lstat(input.outputRoot)).mode & 0o777, 0o700);
@@ -146,6 +146,7 @@ test("a child failure produces a stable error and leaves an inspectable owned pr
 for (const [command, corrupt, code] of [
   ["create", value => { value.profile = "app"; }, "CERTIFICATION_CREATE_INVALID"],
   ["infer", value => { value.result.state.kind = "invalid"; }, "CERTIFICATION_INFERENCE_INVALID"],
+  ["infer", value => { value.result.state.value.origin.recipeVersion = "0.12.1"; }, "CERTIFICATION_INFERENCE_INVALID"],
   ["doctor", value => { value.result.healthy = false; }, "CERTIFICATION_DIAGNOSTICS_INVALID"],
   ["diff", value => { value.result.equal = false; }, "CERTIFICATION_DIFF_INVALID"],
 ]) {

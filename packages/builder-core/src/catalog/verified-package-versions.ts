@@ -3,16 +3,24 @@ import type { ProfileRecipe } from "../contracts/profile.js";
 import type { ProjectConfiguration } from "../contracts/project.js";
 import type { ValidationResult } from "../contracts/result.js";
 import type { InstalledState } from "../contracts/state.js";
-import type { SkeletonRenderingContext } from "../generation/render-skeleton.js";
+import type { ApplicationEnvironmentRenderingContext, SkeletonRenderingContext } from "../generation/render-skeleton.js";
 import {
+  createApplicationEnvironmentProfileRecipes,
   createVitestFourProfileRecipes,
   createVitestFiveProfileRecipes,
+  createSecurityPatchedProfileRecipes,
+  createDependencySecurityProfileRecipes,
   profileRecipes,
 } from "../profiles/profile-recipes.js";
 import { createCachingRepositoryReader } from "../repository/cache-reader.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
+import { createInstalledManifest } from "../manifest/create-installed-manifest.js";
+import { resolveCapabilities } from "../resolution/resolve-capabilities.js";
+import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
+import { fingerprintJsonValue } from "../ownership/fingerprint.js";
 import { parseProjectYaml, parseStateJson } from "../state/codecs.js";
 import {
+  applicationEnvironmentCatalogSnapshot,
   createCapabilityCatalog,
   createCapabilityCatalogSnapshot,
   vitestFourCapabilityCatalogSnapshot,
@@ -42,7 +50,7 @@ export function createGenerationRenderingContext(
     catalogSnapshot: { ...((emailFoundation || backgroundJobs) ? { ...base, appFoundation: "0.2.0", transactionalEmailResend: "0.1.0" } as const : base),
       ...(backgroundJobs ? { backgroundJobDelivery: backgroundJobVersion, deploymentCloudflare: applicationPersistence ? "0.6.0" : "0.5.0" } as const : {}),
     },
-    profiles: createVitestFiveProfileRecipes(),
+    profiles: createDependencySecurityProfileRecipes(),
   };
 }
 
@@ -60,15 +68,22 @@ function selectInstalledRenderingContext(
     return undefined;
   }
 
+  const securityProfiles = createSecurityPatchedProfileRecipes();
+  const dependencySecurityProfiles = createDependencySecurityProfileRecipes();
+  const profiles = dependencySecurityProfiles.some(({ identifier, recipeVersion }) =>
+    identifier === project.originProfile && recipeVersion === project.recipeVersion)
+    ? dependencySecurityProfiles : securityProfiles.some(({ identifier, recipeVersion }) =>
+    identifier === project.originProfile && recipeVersion === project.recipeVersion)
+    ? securityProfiles : createVitestFiveProfileRecipes();
+  const currentRecipe = profiles.some(({ identifier, recipeVersion }) =>
+    identifier === project.originProfile && recipeVersion === project.recipeVersion);
+
   const deployment = state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare");
   const persistence = state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence");
   const foundation = state.installedCapabilities.find(({ identifier }) => identifier === "app-foundation");
   const email = state.installedCapabilities.find(({ identifier }) => identifier === "transactional-email-resend");
   const jobs = state.installedCapabilities.find(({ identifier }) => identifier === "background-job-delivery");
   if (jobs !== undefined || deployment?.version === "0.5.0" || deployment?.version === "0.6.0") {
-    const currentRecipe = (project.originProfile === "portfolio" && project.recipeVersion === "0.11.0") ||
-      (project.originProfile === "site" && project.recipeVersion === "0.12.0") ||
-      (project.originProfile === "app" && project.recipeVersion === "0.2.0");
     const routing = state.installedCapabilities.find(({ identifier }) => identifier === "site-routing");
     const sharedTuple = persistence === undefined
       ? standards?.version === "0.5.0" && deployment?.version === "0.5.0"
@@ -76,12 +91,9 @@ function selectInstalledRenderingContext(
     return currentRecipe && sharedTuple && (jobs?.version === "0.1.0" || jobs?.version === "0.2.0") && foundation?.version === "0.2.0" &&
       (email === undefined || email.version === "0.1.0") &&
       (project.originProfile === "portfolio" ? routing === undefined : routing?.version === "0.4.0")
-      ? createGenerationRenderingContext(persistence !== undefined, true, true, jobs.version) : undefined;
+      ? { ...createGenerationRenderingContext(persistence !== undefined, true, true, jobs.version), profiles } : undefined;
   }
   if (foundation?.version === "0.2.0" || email !== undefined) {
-    const currentRecipe = (project.originProfile === "portfolio" && project.recipeVersion === "0.11.0") ||
-      (project.originProfile === "site" && project.recipeVersion === "0.12.0") ||
-      (project.originProfile === "app" && project.recipeVersion === "0.2.0");
     const routing = state.installedCapabilities.find(({ identifier }) => identifier === "site-routing");
     const sharedTuple = persistence === undefined
       ? standards?.version === "0.5.0" && deployment?.version === "0.3.0"
@@ -90,19 +102,19 @@ function selectInstalledRenderingContext(
     return currentRecipe && sharedTuple && foundation?.version === "0.2.0" &&
       (email === undefined || email.version === "0.1.0") &&
       (project.originProfile === "portfolio" ? routing === undefined : routing?.version === "0.4.0")
-      ? createGenerationRenderingContext(persistence !== undefined, true) : undefined;
+      ? { ...createGenerationRenderingContext(persistence !== undefined, true), profiles } : undefined;
   }
   if (standards?.version === "0.6.0" || deployment?.version === "0.4.0" || persistence !== undefined) {
     return standards?.version === "0.6.0" && deployment?.version === "0.4.0" && persistence?.version === "0.1.0" &&
-      project.originProfile === "app" && project.recipeVersion === "0.2.0" &&
+      project.originProfile === "app" && currentRecipe &&
       state.installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.1.0") &&
       state.installedCapabilities.some(({ identifier, version }) => identifier === "site-routing" && version === "0.4.0")
-      ? createGenerationRenderingContext(true) : undefined;
+      ? { ...createGenerationRenderingContext(true), profiles } : undefined;
   }
   if (standards?.version === "0.5.0") {
     return {
       catalogSnapshot: vitestFiveCapabilityCatalogSnapshot,
-      profiles: createVitestFiveProfileRecipes(),
+      profiles,
     };
   }
   if (standards?.version !== "0.3.0" && standards?.version !== "0.4.0") {
@@ -117,20 +129,52 @@ function selectInstalledRenderingContext(
   };
 }
 
-type VerifiedProjectSnapshot = Readonly<{
+type VerifiedProjectSnapshot<C = SkeletonRenderingContext | undefined> = Readonly<{
   catalog: readonly CapabilityDescriptor[];
   profiles: readonly ProfileRecipe[];
-  renderingContext: SkeletonRenderingContext | undefined;
+  renderingContext: C;
 }>;
+
+function selectInstalledSecurityNextDeclaration(
+  project: ProjectConfiguration,
+  state: InstalledState,
+  context: SkeletonRenderingContext,
+): ValidationResult<SkeletonRenderingContext> {
+  const invalid = (): ValidationResult<never> => ({
+    ok: false,
+    issues: [{ code: "PROJECT_INSPECTION_INVALID", path: ["state", "managedSurfaces"], context: { reason: "security-next-declaration" } }],
+  });
+  const managedSurfaces = state.managedSurfaces;
+  if (!Array.isArray(managedSurfaces)) return invalid();
+  const surfaces = state.managedSurfaces.filter(surface => surface.identifier === "builder-web-package-next" ||
+    (surface.path === "apps/web/package.json" && surface.fingerprintTarget.kind === "json-value" && surface.fingerprintTarget.pointer === "/dependencies/next"));
+  const surface = surfaces[0];
+  if (surfaces.length !== 1 || surface?.identifier !== "builder-web-package-next" ||
+      surface.path !== "apps/web/package.json" || surface.owner.kind !== "builder-kernel" ||
+      surface.ownership !== "merge-managed" || surface.mergeStrategy !== "json-property" ||
+      surface.fingerprintTarget.kind !== "json-value" || surface.fingerprintTarget.pointer !== "/dependencies/next") return invalid();
+  if (surface.fingerprint === fingerprintJsonValue("16.3.6")) return { ok: true, value: context };
+  const originalNext = project.originProfile === "portfolio" &&
+    !state.installedCapabilities.some(({ identifier }) => identifier === "app-foundation") ? "16.3.0" : "16.3.3";
+  return surface.fingerprint === fingerprintJsonValue(originalNext)
+    ? { ok: true, value: { ...context, securityNextDeclaration: "original" } }
+    : invalid();
+}
 
 export function createVerifiedProjectSnapshot(
   project: ProjectConfiguration | undefined,
   state: InstalledState | undefined,
 ): ValidationResult<VerifiedProjectSnapshot> {
-  const renderingContext =
+  let renderingContext =
     project !== undefined && state !== undefined
       ? selectInstalledRenderingContext(project, state)
       : undefined;
+  if (renderingContext !== undefined && project !== undefined && state !== undefined &&
+      createSecurityPatchedProfileRecipes().some(({ identifier, recipeVersion }) => identifier === project.originProfile && recipeVersion === project.recipeVersion)) {
+    const selected = selectInstalledSecurityNextDeclaration(project, state, renderingContext);
+    if (!selected.ok) return selected;
+    renderingContext = selected.value;
+  }
   const catalog = renderingContext === undefined
     ? createVerifiedCapabilityCatalog()
     : createCapabilityCatalogSnapshot(
@@ -149,8 +193,11 @@ export function createVerifiedProjectSnapshot(
     : catalog;
 }
 
+export function readVerifiedProjectSnapshot(sourceReader: RepositoryReader, context: ApplicationEnvironmentRenderingContext): Promise<ValidationResult<VerifiedProjectSnapshot<ApplicationEnvironmentRenderingContext> & Readonly<{ reader: RepositoryReader }>>>;
+export function readVerifiedProjectSnapshot(sourceReader: RepositoryReader): Promise<ValidationResult<VerifiedProjectSnapshot & Readonly<{ reader: RepositoryReader }>>>;
 export async function readVerifiedProjectSnapshot(
   sourceReader: RepositoryReader,
+  context?: ApplicationEnvironmentRenderingContext,
 ): Promise<ValidationResult<
   VerifiedProjectSnapshot & Readonly<{ reader: RepositoryReader }>
 >> {
@@ -159,6 +206,23 @@ export async function readVerifiedProjectSnapshot(
     reader.readText(".egeria/project.yaml"),
     reader.readText(".egeria/state.json"),
   ]);
+  if (context !== undefined) {
+    const invalid = (): ValidationResult<never> => ({
+      ok: false,
+      issues: [{ code: "PROJECT_INSPECTION_INVALID", path: [], context: { reason: "candidate-controls-invalid" } }],
+    });
+    if (!isApplicationEnvironmentRenderingContext(context) ||
+        projectSource.kind !== "file" || stateSource.kind !== "file") return invalid();
+    const project = parseProjectYaml(projectSource.content, "2.0.0");
+    const state = parseStateJson(stateSource.content, "2.0.0");
+    if (!project.ok || !state.ok || project.value.originProfile !== state.value.origin.profile ||
+        project.value.recipeVersion !== state.value.origin.recipeVersion) return invalid();
+    const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, context.catalogSnapshot);
+    if (!catalog.ok) return catalog;
+    const resolved = resolveCapabilities({ profile: project.value.originProfile, requestedCapabilities: project.value.selectedCapabilities }, catalog.value, context.profiles);
+    if (!resolved.ok || stringifyCanonicalJson(createInstalledManifest(resolved.value)) !== stringifyCanonicalJson(state.value.installedCapabilities)) return invalid();
+    return { ok: true, value: { reader, catalog: catalog.value, profiles: context.profiles, renderingContext: context } };
+  }
   const project = projectSource.kind === "file"
     ? parseProjectYaml(projectSource.content)
     : undefined;
@@ -172,4 +236,20 @@ export async function readVerifiedProjectSnapshot(
   return snapshot.ok
     ? { ok: true, value: { ...snapshot.value, reader } }
     : snapshot;
+}
+
+export function createApplicationEnvironmentRenderingContext(): ApplicationEnvironmentRenderingContext {
+  return {
+    projectSchemaVersion: "2.0.0",
+    catalogSnapshot: applicationEnvironmentCatalogSnapshot,
+    profiles: createApplicationEnvironmentProfileRecipes(),
+  };
+}
+
+export function isApplicationEnvironmentRenderingContext(value: unknown): value is ApplicationEnvironmentRenderingContext {
+  try {
+    return stringifyCanonicalJson(value) === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext());
+  } catch {
+    return false;
+  }
 }
