@@ -124,7 +124,13 @@ export type ApplicationEnvironmentCliCommand =
       bookingCalendly?: ApplicationEnvironmentBookingSettings;
       contactFormWeb3Forms?: true;
     }>
-  | Readonly<{ kind: "infer" | "doctor"; directory: string }>;
+  | Readonly<{ kind: "infer" | "doctor"; directory: string }>
+  | (Extract<CliCommand, { kind: "plan-add" | "apply-add" | "plan-remove" | "apply-remove" }> & Readonly<{
+      capability: "contact-form-web3forms";
+      settings?: never;
+      persistenceRemovalPath?: never;
+      persistenceRemovalHumanReviewPath?: never;
+    }>);
 
 const applicationEnvironmentOptionDefinitions = {
   "contact-form-web3forms": { type: "boolean" },
@@ -453,6 +459,7 @@ function validApprovedPlanFingerprint(
 function parseAdd(
   kind: "plan-add" | "apply-add",
   arguments_: readonly string[],
+  schemaVersion: "1.0.0" | "2.0.0",
 ): ValidationResult<CliCommand> {
   try {
     const applying = kind === "apply-add";
@@ -473,6 +480,7 @@ function parseAdd(
     });
     const directory = values.directory;
     const capability = values.capability;
+    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms") return invalidArguments();
     const approvedPlanFingerprint = values["approved-plan"];
     const settings = calendlyBookingSettingsSchema.safeParse({
       destination: values["calendly-url"],
@@ -489,7 +497,7 @@ function parseAdd(
       ? ["calendly-url", "calendly-mode"]
       : analyticsSelection
         ? selectedAnalyticsOptions(values)
-        : contactSelection ? ["web3forms-access-key"] : [];
+        : contactSelection && schemaVersion === "1.0.0" ? ["web3forms-access-key"] : [];
     const expectedOptions = [
       "directory",
       "capability",
@@ -503,7 +511,7 @@ function parseAdd(
       (!analyticsSelection && !calendlySelection &&
         !multilingualSelection && !persistenceSelection && !contactSelection && capability !== "transactional-email-resend" && capability !== "background-job-delivery") ||
       (calendlySelection && !settings.success) ||
-      (contactSelection && !contactSettings.success) ||
+      (contactSelection && schemaVersion === "1.0.0" && !contactSettings.success) ||
       (analyticsSelection && analyticsSettings?.success !== true)
     ) {
       return invalidArguments();
@@ -513,7 +521,7 @@ function parseAdd(
       ? { settings: settings.data }
       : analyticsSelection && analyticsSettings?.success === true
         ? { settings: analyticsSettings.data }
-        : contactSelection && contactSettings.success ? { settings: contactSettings.data } : {};
+        : contactSelection && schemaVersion === "1.0.0" && contactSettings.success ? { settings: contactSettings.data } : {};
 
     if (kind === "apply-add") {
       if (!validApprovedPlanFingerprint(approvedPlanFingerprint)) {
@@ -544,6 +552,7 @@ function parseAdd(
 function parseRemove(
   kind: "plan-remove" | "apply-remove",
   arguments_: readonly string[],
+  schemaVersion: "1.0.0" | "2.0.0",
 ): ValidationResult<CliCommand> {
   try {
     const applying = kind === "apply-remove";
@@ -565,6 +574,7 @@ function parseRemove(
     });
     const directory = values.directory;
     const capability = values.capability;
+    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms") return invalidArguments();
     const approvedPlanFingerprint = values["approved-plan"];
     const persistenceSelection = capability === "application-persistence";
     const jobSelection = capability === "background-job-delivery";
@@ -758,7 +768,7 @@ export function parseCliArguments(
   schemaVersion: "1.0.0" | "2.0.0" = "1.0.0",
 ): ValidationResult<CliCommand | ApplicationEnvironmentCliCommand> {
   const [command, ...commandArguments] = arguments_;
-  if (schemaVersion === "2.0.0" && command !== "create" && command !== "infer" && command !== "doctor") {
+  if (schemaVersion === "2.0.0" && command !== "create" && command !== "infer" && command !== "doctor" && command !== "plan-add" && command !== "apply-add" && command !== "plan-remove" && command !== "apply-remove") {
     return invalidArguments();
   }
 
@@ -771,10 +781,10 @@ export function parseCliArguments(
       return parseReadOnly(command, commandArguments);
     case "plan-add":
     case "apply-add":
-      return parseAdd(command, commandArguments);
+      return parseAdd(command, commandArguments, schemaVersion);
     case "plan-remove":
     case "apply-remove":
-      return parseRemove(command, commandArguments);
+      return parseRemove(command, commandArguments, schemaVersion);
     case "plan-upgrade":
     case "apply-upgrade":
       return parseUpgrade(command, commandArguments);

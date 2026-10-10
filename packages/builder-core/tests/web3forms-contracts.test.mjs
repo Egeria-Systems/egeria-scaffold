@@ -56,3 +56,41 @@ test("absent contact selection preserves the existing portfolio source", async (
   for (const path of ["apps/web/app/layout.tsx", "apps/web/app/page.tsx"])
     assert.deepEqual(Buffer.from(result.value.files.find(f => f.path === path).content), await readFile(new URL(`../../../fixtures/generated/portfolio/${path}`, import.meta.url)));
 });
+
+test("environment contact selection renders every profile and locale without literal settings", async () => {
+  const context = core.createApplicationEnvironmentRenderingContext();
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (const multilingual of [false, true]) {
+      const selection = { ...request(profile), ...(multilingual ? { multilingual: true } : {}) };
+      const rendered = await core.renderSkeleton({ ...selection, contactFormWeb3Forms: true }, context);
+      assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
+      assert.equal(rendered.value.project.schemaVersion, "2.0.0");
+      assert.equal(rendered.value.project.capabilitySettings["contact-form-web3forms"], undefined);
+      assert.ok(rendered.value.project.selectedCapabilities.includes("contact-form-web3forms"));
+      const contact = rendered.value.resolved.capabilities.find(value => value.identifier === "contact-form-web3forms");
+      assert.equal(contact.version, "0.2.0");
+      assert.equal(contact.managedSurfaces.length, 16);
+      assert.equal(rendered.value.files.filter(value => value.path === "apps/web/app/layout.tsx").length, 1);
+      assert.equal(rendered.value.resolved.capabilities.some(value => value.identifier === "app-foundation"), profile === "app");
+      assert.equal(rendered.value.files.some(value => /app\/api\/.*contact/u.test(value.path)), false);
+      const absent = await core.renderSkeleton(selection, context);
+      assert.equal(absent.ok, true);
+      for (const path of ["package.json", "apps/web/package.json"]) {
+        assert.deepEqual(rendered.value.files.find(value => value.path === path).content, absent.value.files.find(value => value.path === path).content);
+      }
+      assert.equal(absent.value.files.some(value => value.path.includes("web3forms")), false);
+      assert.match(new TextDecoder().decode(rendered.value.files.find(value => value.path === "apps/web/.env.example").content), /NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=\n/u);
+      assert.doesNotMatch(JSON.stringify(rendered.value.project), /accessKey|00000000/u);
+    }
+  }
+});
+
+test("environment contact rendering refuses literal and malformed selections before resolving", async () => {
+  const context = core.createApplicationEnvironmentRenderingContext();
+  for (const value of [undefined, false, "private-sentinel", {}, settings]) {
+    const result = await core.renderSkeleton({ ...request("portfolio"), contactFormWeb3Forms: value }, context);
+    assert.equal(result.ok, false);
+    assert.equal(result.issues[0].code, "PROJECT_GENERATION_REQUEST_INVALID");
+    assert.doesNotMatch(JSON.stringify(result.issues), /private-sentinel|00000000/u);
+  }
+});
