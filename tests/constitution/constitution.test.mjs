@@ -519,7 +519,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.deepEqual(Object.keys(workflow.jobs), expectedJobIdentifiers);
   for (const identifier of ["builder-and-packages", "cli-jobs"]) {
     const job = workflow.jobs[identifier];
-    assert.equal(job["timeout-minutes"], 90);
+    assert.equal(job["timeout-minutes"], identifier === "builder-and-packages" ? 120 : 90);
     for (const property of ["if", "needs", "continue-on-error"]) {
       assert.equal(Object.hasOwn(job, property), false, identifier);
     }
