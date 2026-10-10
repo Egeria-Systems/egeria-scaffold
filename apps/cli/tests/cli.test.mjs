@@ -7897,7 +7897,6 @@ for (const cohort of lifecycleCohorts) for (const fixture of ["portfolio", "app-
 }
 
 
-<<<<<<< HEAD
 for (const cohort of [
   ...lifecycleCohorts,
 ]) test(`compiled ${cohort.label} generated sources retain exact recipes through infer doctor and diff`, async () => {
@@ -7918,7 +7917,9 @@ for (const cohort of [
       prepareLockfile: core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }).prepareLockfile,
       verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks } }),
     } });
-=======
+  }
+});
+
 const environmentAnalyticsOptions = ["--cloudflare-web-analytics", "--google-analytics-4", "--microsoft-clarity", "--microsoft-clarity-audience", "not-directed-to-minors", "--google-search-console", "--looker-studio"];
 const environmentAnalyticsSelection = {
   consent: { policy: "explicit-opt-in" },
@@ -7954,6 +7955,5 @@ test("environment analytics CLI admits exact selection-only lifecycle and reject
       assert.deepEqual(observed[0].settings, adding ? environmentAnalyticsSelection : undefined);
       assert.deepEqual(observed[0].renderingContext, core.createApplicationEnvironmentRenderingContext());
     }
->>>>>>> 8b078fc (Add analytics consent for application environments)
   }
 });
