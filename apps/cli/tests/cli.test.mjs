@@ -4660,8 +4660,10 @@ async function withGitFixture(name, run, options = {}) {
         }),
       );
     }
-    if (cohort !== undefined) await restoreVitestFiveTestGeneration(primary, cohort);
-    else await restoreRetainedTestGeneration(primary);
+    if (options.renderingContext === undefined) {
+      if (cohort !== undefined) await restoreVitestFiveTestGeneration(primary, cohort);
+      else await restoreRetainedTestGeneration(primary);
+    }
     if (options.preparePrimary !== undefined) {
       await options.preparePrimary(primary);
     }
