@@ -323,8 +323,8 @@ test(`${preparation} visual targets use exact production files, run non-update c
     inspectBrowser: async () => ({ synthetic: true }),
     inspectBuild: async () => ({ synthetic: true }),
     runAudit: async input => {
-      commands.push({ ...input, arguments: ["audit", "--audit-level", "moderate", "--json"] });
-      return { status: "passed", rawExitCode: 0 };
+      commands.push({ ...input, arguments: ["audit", "--audit-level", "info", "--json"] });
+      return { status: "passed", rawExitCode: 0, thresholdExitCode: 0 };
     },
     runCommand: async (input) => {
       commands.push(input);
@@ -342,10 +342,10 @@ test(`${preparation} visual targets use exact production files, run non-update c
   });
   if (preparation === "security") {
     assert.equal(result.project.sourceProject.schemaVersion, "1.0.0");
-    assert.equal(result.project.sourceProject.recipeVersion, "0.11.1");
+    assert.equal(result.project.sourceProject.recipeVersion, "0.11.2");
     assert.equal(result.project.targetProject.schemaVersion, "1.0.0");
-    assert.equal(result.project.targetProject.recipeVersion, "0.2.1");
-    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "fa8ce392f2da0c645f4e26a2eb788a431defab7d3e22fc5e01b8824f0cb2fc4b");
+    assert.equal(result.project.targetProject.recipeVersion, "0.2.2");
+    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "71c4d59802625006860409d6298e3bd13963089fc55260350ad4c262dd216067");
   }
   assert.equal(commands.filter(({ arguments: args }) => args.includes("test:visual")).length, 2);
   assert.equal(commands.some(({ arguments: args }) => args.some(value => value.includes("update-snapshots"))), false);
@@ -356,18 +356,30 @@ test(`${preparation} visual targets use exact production files, run non-update c
   await access(join(artifactDirectory, "reproduction/report.json"));
 });
 
-test("visual prerequisites retain a raw audit failure and continue only with its explicit exception disposition", async t => {
+test("visual prerequisites retain raw and threshold audit results and reject incoherent dispositions", async t => {
   const h = await harness(t);
   const spec = await readFile(new URL("../../packages/builder-core/templates/common/apps/web/tests/visual/home-visual.spec.ts", import.meta.url));
-  for (const accepted of [false, true]) {
-    const artifactDirectory = join(h.root, accepted ? "accepted" : "refused");
+  const cases = [
+    { disposition: { status: "passed", rawExitCode: 0, thresholdExitCode: 0 }, accepted: true },
+    { disposition: { status: "passed", rawExitCode: 1, thresholdExitCode: 0 }, accepted: true },
+    { disposition: { status: "accepted-with-security-exception", rawExitCode: 1, thresholdExitCode: 1 }, accepted: true },
+    { disposition: { status: "passed", rawExitCode: 0 }, accepted: false },
+    { disposition: { status: "passed", rawExitCode: 0, thresholdExitCode: 1 }, accepted: false },
+    { disposition: { status: "passed", rawExitCode: 1, thresholdExitCode: 1 }, accepted: false },
+    { disposition: { status: "passed", rawExitCode: 2, thresholdExitCode: 0 }, accepted: false },
+    { disposition: { status: "accepted-with-security-exception", rawExitCode: 1 }, accepted: false },
+    { disposition: { status: "accepted-with-security-exception", rawExitCode: 1, thresholdExitCode: 0 }, accepted: false },
+    { disposition: { status: "accepted-with-security-exception", rawExitCode: 0, thresholdExitCode: 1 }, accepted: false },
+    { disposition: { status: "refused", rawExitCode: 1, thresholdExitCode: 1 }, accepted: false, throws: true },
+  ];
+  for (const [index, { disposition, accepted, throws }] of cases.entries()) {
+    const artifactDirectory = join(h.root, `audit-${index}`);
     await mkdir(artifactDirectory);
     const commands = [];
     await assert.rejects(h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot: h.root, artifactDirectory }, {
       prepareProject: async () => ({ files: [{ path: "apps/web/tests/visual/home-visual.spec.ts", content: spec }], influencingFingerprints: [] }),
       runAudit: async () => {
-        const disposition = { status: accepted ? "accepted-with-security-exception" : "refused", rawExitCode: 1 };
-        if (!accepted) throw Object.assign(new Error("DEPENDENCY_AUDIT_FAILED"), { auditDisposition: disposition });
+        if (throws) throw Object.assign(new Error("DEPENDENCY_AUDIT_FAILED"), { auditDisposition: disposition });
         return disposition;
       },
       runCommand: async input => {
@@ -380,7 +392,7 @@ test("visual prerequisites retain a raw audit failure and continue only with its
     assert.equal(commands.some(args => args.includes("test:visual")), false);
     const failure = JSON.parse(await readFile(join(artifactDirectory, "failure/failure.json")));
     const audit = failure.checks.find(check => check.name === "dependency-audit");
-    assert.equal(audit.exitCode, 1);
-    assert.equal(audit.disposition.status, accepted ? "accepted-with-security-exception" : "refused");
+    assert.equal(audit.exitCode, disposition.rawExitCode);
+    assert.deepEqual(audit.disposition, disposition);
   }
 });

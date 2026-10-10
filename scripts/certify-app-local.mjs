@@ -99,7 +99,7 @@ function configurationFor(identifier, catalog) {
     profile: "app",
     requestedCapabilities: identifier === "app" ? [] : ["analytics", "booking-calendly", "multilingual"],
   }, catalog, profileRecipes);
-  if (!fixture || !resolved.ok || resolved.value.recipeVersion !== "0.2.1") {
+  if (!fixture || !resolved.ok || resolved.value.recipeVersion !== "0.2.2") {
     throw createError("CERTIFICATION_SUBJECT_INVALID");
   }
   const installed = createInstalledManifest(resolved.value);
@@ -114,10 +114,10 @@ function configurationFor(identifier, catalog) {
     expectedCapabilities: fixture.expectedCapabilities,
     expectedInstalledCapabilities: installed,
     expectedCapabilitySettings: fixture.expectedCapabilitySettings,
-    expectedRecipeVersion: "0.2.1", verifierIdentifier: identifier,
+    expectedRecipeVersion: "0.2.2", verifierIdentifier: identifier,
     expectedVerificationChecks: generatedChecks,
     verificationOptions: { includeVisual: false },
-    receipt: { identifier, recipeVersion: "0.2.1" },
+    receipt: { identifier, recipeVersion: "0.2.2" },
     createError, isCertificationError,
   };
 }

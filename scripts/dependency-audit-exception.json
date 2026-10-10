@@ -6,12 +6,12 @@
   "expiresAt": "2026-10-10T23:00:00Z",
   "classification": "accepted with user-approved security exception",
   "pnpmVersion": "11.20.0",
-  "approvedAt": "2026-10-04T17:56:32.862167+00:00",
+  "approvedAt": "2026-10-09T23:14:28.635445+00:00",
   "graphs": [
     {
       "id": "portfolio",
-      "lockSha256": "f352f1c09d7e0d09356994c5a6dc0252d84f6847866f91b4fd820437c8d33c9c",
-      "workspacePolicySha256": "c59528f3b93c1d811cd845d7f0d3f0a2d5bfa93c8e1873698561628389675c58",
+      "lockSha256": "59d219cbcc418b523b57d73a9afb46e507e184fe7e932fbe5aa12fc1ab60bf08",
+      "workspacePolicySha256": "e4c14914b5fdf5b2af3a0fc1468da5b1d5711c8d2629f98e568a3c90daaa28da",
       "eslintConfigPath": "apps/web/eslint.config.mjs",
       "eslintConfigSha256": "d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
       "advisoryFindings": [
@@ -113,8 +113,8 @@
     },
     {
       "id": "site",
-      "lockSha256": "0c6692871e22d6e67523939cf9f17c1c0f39149594ed9e491fa660378872a672",
-      "workspacePolicySha256": "c59528f3b93c1d811cd845d7f0d3f0a2d5bfa93c8e1873698561628389675c58",
+      "lockSha256": "027e2dfb6710d8f9316dddaf37627f72ec7465b27f787de39b1d918654712b8b",
+      "workspacePolicySha256": "e4c14914b5fdf5b2af3a0fc1468da5b1d5711c8d2629f98e568a3c90daaa28da",
       "eslintConfigPath": "apps/web/eslint.config.mjs",
       "eslintConfigSha256": "d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
       "advisoryFindings": [
@@ -216,8 +216,8 @@
     },
     {
       "id": "app-policy",
-      "lockSha256": "fa8ce392f2da0c645f4e26a2eb788a431defab7d3e22fc5e01b8824f0cb2fc4b",
-      "workspacePolicySha256": "fd3880d1f05928d91feeb3f1dbf788f6020fde1a8f4124ff3f07e8babf224ceb",
+      "lockSha256": "71c4d59802625006860409d6298e3bd13963089fc55260350ad4c262dd216067",
+      "workspacePolicySha256": "77ec2285337d983c1d84cbfa0bd8119216d95da10046cc7474ca85faca954ca9",
       "eslintConfigPath": "apps/web/eslint.config.mjs",
       "eslintConfigSha256": "d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
       "advisoryFindings": [
@@ -319,8 +319,8 @@
     },
     {
       "id": "foundation-policy",
-      "lockSha256": "2e97c7d7ac4d1f8072ebbee2a0d90e7fe2459484fa5e784281d5b66b0c2b56b3",
-      "workspacePolicySha256": "fd3880d1f05928d91feeb3f1dbf788f6020fde1a8f4124ff3f07e8babf224ceb",
+      "lockSha256": "f41dcc8dd8b8057bc8bddbcdad3e507efb58b03f2269cbe6bca15c65e67b65d0",
+      "workspacePolicySha256": "77ec2285337d983c1d84cbfa0bd8119216d95da10046cc7474ca85faca954ca9",
       "eslintConfigPath": "apps/web/eslint.config.mjs",
       "eslintConfigSha256": "d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
       "advisoryFindings": [
@@ -422,8 +422,8 @@
     },
     {
       "id": "persistence-policy",
-      "lockSha256": "886c4d66a47d0dea6d1856ab422b9c2c7865a62b58bd1a8d48adb6e490142e04",
-      "workspacePolicySha256": "503a9b68f51a1b60936d49a6915ea94b35821c721ac53302b99da59829525c3e",
+      "lockSha256": "60ec16a624d73976e52f6dd45041c514c578042d581514a62aeba01903f24683",
+      "workspacePolicySha256": "ecc4be331c65cfadc1fd27b6968d2b40e070c7c568ff026470720d5ab82c12ef",
       "eslintConfigPath": "apps/web/eslint.config.mjs",
       "eslintConfigSha256": "d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
       "advisoryFindings": [
@@ -525,8 +525,8 @@
     },
     {
       "id": "root",
-      "lockSha256": "1aed2f50a15fc98b218ff85e8b97a8d43ff0796cf2b6941d1fc7613e9ed31726",
-      "workspacePolicySha256": "24f63d784376b79bae75044955682f0119ad552e8e7f1720e84ac6d93f724db7",
+      "lockSha256": "a4f8fe878fa95cb22847084797ad0ce447f273050a6d431c9843933f0096d6dc",
+      "workspacePolicySha256": "ee3efaa1cd51a4f4a4f509fe096b66a32a064a92a5a490e80a5f22a0ed282a37",
       "eslintConfigPath": "proofs/nextjs-cloudflare/eslint.config.mjs",
       "eslintConfigSha256": "d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
       "advisoryFindings": [
@@ -628,12 +628,12 @@
     }
   ],
   "fixObservation": {
-    "observedAt": "2026-10-03T22:25:53.724581+00:00",
+    "observedAt": "2026-10-09T04:03:26.601Z",
     "packages": [
       {
         "name": "eslint-config-next",
         "url": "https://registry.npmjs.org/eslint-config-next",
-        "latest": "16.3.8",
+        "latest": "16.4.0",
         "knownVersions": [
           {
             "version": "16.3.6",
@@ -664,13 +664,28 @@
               "eslint-import-resolver-typescript": "^3.5.2"
             },
             "publishedAt": "2026-09-30T15:59:39.390Z"
+          },
+          {
+            "version": "16.4.0",
+            "dependencies": {
+              "globals": "16.4.0",
+              "typescript-eslint": "^8.56.0",
+              "eslint-plugin-react": "^7.37.0",
+              "eslint-plugin-import": "^2.32.0",
+              "eslint-plugin-jsx-a11y": "^6.10.0",
+              "@next/eslint-plugin-next": "16.4.0",
+              "eslint-plugin-react-hooks": "^7.1.0",
+              "eslint-import-resolver-node": "^0.3.6",
+              "eslint-import-resolver-typescript": "^3.5.2"
+            },
+            "publishedAt": "2026-10-06T18:26:44.970Z"
           }
         ]
       },
       {
         "name": "@next/eslint-plugin-next",
         "url": "https://registry.npmjs.org/%40next%2Feslint-plugin-next",
-        "latest": "16.3.8",
+        "latest": "16.4.0",
         "knownVersions": [
           {
             "version": "16.3.6",
@@ -687,6 +702,14 @@
               "@eslint-community/eslint-utils": "4.9.1"
             },
             "publishedAt": "2026-09-30T15:56:48.503Z"
+          },
+          {
+            "version": "16.4.0",
+            "dependencies": {
+              "fast-glob": "3.3.1",
+              "@eslint-community/eslint-utils": "4.9.1"
+            },
+            "publishedAt": "2026-10-06T18:23:40.171Z"
           }
         ]
       },

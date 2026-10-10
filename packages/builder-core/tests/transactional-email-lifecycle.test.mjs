@@ -5,7 +5,7 @@ import * as core from "../dist/index.js";
 import { inspectProject } from "../dist/diagnostics/project-inspection.js";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-import { createVitestFourProfileRecipes, createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createVitestFourProfileRecipes, createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes, createDependencySecurityProfileRecipes } from "../dist/profiles/profile-recipes.js";
 import { createGenerationRenderingContext, readVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
 
 const encoder = new TextEncoder();
@@ -17,6 +17,7 @@ const git = { ok: true, identity: { root, revision: "abcdef0123456789abcdef01234
 const cohorts = [
   { profiles: createVitestFiveProfileRecipes(), versions: { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" }, foundationLocks: { portfolio: "web-recipe-portfolio-foundation", site: "web-recipe-app-0.2.0", app: "web-recipe-app-0.2.0" }, persistenceLock: "web-application-persistence" },
   { profiles: createSecurityPatchedProfileRecipes(), versions: { portfolio: "0.11.1", site: "0.12.1", app: "0.2.1" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.1-foundation", site: "web-recipe-app-0.2.1", app: "web-recipe-app-0.2.1" }, persistenceLock: "web-recipe-app-0.2.1-persistence" },
+  { profiles: createDependencySecurityProfileRecipes(), versions: { portfolio: "0.11.2", site: "0.12.2", app: "0.2.2" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.2-foundation", site: "web-recipe-app-0.2.2", app: "web-recipe-app-0.2.2" }, persistenceLock: "web-recipe-app-0.2.2-persistence" },
 ];
 async function assertCohort(repo, cohort, profile, persistent = false) {
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -84,6 +85,32 @@ test("current profiles add email with explicit dependencies and persist state on
     assert.equal(state.value.origin.profile, profile);
     await assertCohort(repo, cohort, profile);
     assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.2.0");
+  }
+});
+
+test("email lifecycle preserves original and corrected security declarations", async () => {
+  for (const original of [true, false]) {
+    for (const [profile, persistent] of [["portfolio", false], ["site", false], ["app", false], ["app", true]]) {
+      const context = { ...createGenerationRenderingContext(persistent), profiles: createSecurityPatchedProfileRecipes(), ...(original ? { securityNextDeclaration: "original" } : {}) };
+      const repo = await repository(profile, { applicationPersistence: persistent, context });
+      const manifest = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
+      manifest.description = "Custom email project";
+      repo.files.set("apps/web/package.json", encoder.encode(JSON.stringify(manifest)));
+      const checks = persistent ? core.persistenceGenerationVerificationChecks : core.appGenerationVerificationChecks;
+      const expectedNext = original ? "16.3.3" : "16.3.6";
+      for (const operation of ["add", "remove"]) {
+        const { result } = await contactOperation(repo, operation, capability, undefined, checks);
+        assert.equal(result.ok, true, JSON.stringify(result));
+        const actual = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
+        assert.equal(actual.dependencies.next, expectedNext);
+        assert.equal(actual.description, manifest.description);
+        await assertCohort(repo, cohorts[1], profile, persistent);
+        const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value;
+        assert.equal(state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue(expectedNext));
+        assert.equal(state.installedCapabilities.some(({ identifier }) => identifier === capability), operation === "add");
+        assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
+      }
+    }
   }
 });
 

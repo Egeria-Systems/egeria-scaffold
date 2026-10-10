@@ -408,7 +408,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:d222cfa0584fae41d281a13a335190e015bbdb66d2578b34113db365fa13f0c2",
+      "fingerprint": "sha256:a01471d20ade5771d03251f5cc3bd7ed632154a7777792b7c35f9e12a42b4959",
       "fingerprintTarget": {
         "kind": "json-value",
         "pointer": "/dependencies/next"

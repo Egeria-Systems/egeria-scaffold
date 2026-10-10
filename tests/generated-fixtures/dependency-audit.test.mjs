@@ -54,6 +54,7 @@ test("all six admitted graphs preserve the actual failing audit and a separate e
     const receipt = await h.module.runDependencyAudit(h.input, { ...h.adapters, inspectInputs: async () => ({ graph, fingerprint: graph.lockSha256 }), runProcess: async input => { h.calls.push(input); return result; } });
     assert.equal(receipt.status, "accepted-with-security-exception");
     assert.equal(receipt.rawExitCode, 1);
+    assert.equal(receipt.thresholdExitCode, 1);
     assert.equal(receipt.graph, graph.id);
     assert.deepEqual(await readFile(join(h.input.artifactRoot, receipt.artifactDirectory, "stdout")), result.stdout);
     assert.deepEqual(await readFile(join(h.input.artifactRoot, receipt.artifactDirectory, "stderr")), result.stderr);
@@ -63,7 +64,7 @@ test("all six admitted graphs preserve the actual failing audit and a separate e
     assert.equal(JSON.parse(await readFile(join(h.input.artifactRoot, receipt.artifactDirectory, "disposition.json"))).status, receipt.status);
   }
   for (const call of h.calls) {
-    assert.deepEqual(call.arguments, ["audit", "--audit-level", "moderate", "--json"]);
+    assert.deepEqual(call.arguments, ["audit", "--audit-level", "info", "--json"]);
     assert.equal(call.cwd, h.input.cwd);
     assert.deepEqual(call.environment, h.input.environment);
     assert.equal(call.timeout, 1234);
@@ -87,7 +88,76 @@ test("ordinary audit success needs no security exception or network fix check", 
     });
     assert.equal(result.status, "passed");
     assert.equal(result.rawExitCode, 0);
+    assert.equal(result.thresholdExitCode, 0);
     assert.equal(result.graph, graph?.id ?? null);
+  }
+});
+
+for (const severity of ["low", "info"])
+test(`complete ${severity}-only audits preserve findings and raw exit without requiring an exception`, async t => {
+  const h = await fixture(t);
+  const report = reportFor(h.graph);
+  Object.assign(report.advisories["1240992"], { severity, module_name: "other-package", github_advisory_id: "GHSA-aaaa-bbbb-cccc" });
+  report.metadata.vulnerabilities.high = 0;
+  report.metadata.vulnerabilities[severity] = 1;
+  for (const graph of [h.graph, null]) {
+    const result = raw(1, report);
+    const receipt = await h.module.runDependencyAudit(h.input, {
+      ...h.adapters,
+      now: () => Date.parse("2030-01-01"),
+      readPolicy: async () => Buffer.from(JSON.stringify({ ...h.policy, status: "revoked" })),
+      isHosted: () => true,
+      inspectInputs: async () => ({ graph, fingerprint: "unchanged-inputs" }),
+      runProcess: async input => { h.calls.push(input); return result; },
+      fetchBytes: async () => assert.fail("below-threshold findings must not request exception metadata"),
+    });
+    assert.equal(receipt.status, "passed");
+    assert.equal(receipt.rawExitCode, 1);
+    assert.equal(receipt.thresholdExitCode, 0);
+    assert.equal(receipt.graph, graph?.id ?? null);
+    const directory = join(h.input.artifactRoot, receipt.artifactDirectory);
+    assert.deepEqual(await readFile(join(directory, "stdout")), result.stdout);
+    assert.deepEqual(await readFile(join(directory, "stderr")), result.stderr);
+    const process = JSON.parse(await readFile(join(directory, "process.json")));
+    assert.equal(process.exitCode, 1);
+    assert.deepEqual(process.arguments, ["audit", "--audit-level", "info", "--json"]);
+    const disposition = JSON.parse(await readFile(join(directory, "disposition.json")));
+    assert.equal(disposition.thresholdExitCode, 0);
+    assert.equal(Object.hasOwn(disposition, "advisory"), false);
+  }
+});
+
+test("braces plus any below-threshold advisory and filtered advisory counts remain refused", async t => {
+  const h = await fixture(t);
+  for (const severity of ["low", "info"])
+  for (const includeAdvisory of [false, true]) {
+    const report = reportFor(h.graph);
+    report.metadata.vulnerabilities[severity] = 1;
+    if (includeAdvisory) report.advisories["2"] = { ...report.advisories["1240992"], id: 2,
+      github_advisory_id: "GHSA-aaaa-bbbb-cccc", module_name: "other-package", severity };
+    const result = raw(1, report);
+    await assert.rejects(h.module.runDependencyAudit(h.input, {
+      ...h.adapters,
+      runProcess: async () => result,
+      fetchBytes: async () => assert.fail("extra or omitted findings must refuse before exception metadata"),
+    }), asyncError => asyncError.message === "DEPENDENCY_AUDIT_FAILED");
+  }
+});
+
+test("collection exit must agree with all findings even below the moderate threshold", async t => {
+  const h = await fixture(t);
+  for (const hasAdvisory of [false, true]) {
+    const report = reportFor(h.graph);
+    report.metadata.vulnerabilities.high = 0;
+    if (hasAdvisory) {
+      report.advisories["1240992"].severity = "low";
+      report.metadata.vulnerabilities.low = 1;
+    } else report.advisories = {};
+    await assert.rejects(h.module.runDependencyAudit(h.input, {
+      ...h.adapters,
+      runProcess: async () => raw(hasAdvisory ? 0 : 1, report),
+      fetchBytes: async () => assert.fail("inconsistent collection exits must refuse before metadata"),
+    }), /DEPENDENCY_AUDIT_FAILED/);
   }
 });
 
@@ -194,6 +264,11 @@ test("expiry, revocation, input drift and newly published fixes or parents refus
     { inspectInputs: async () => ({ graph: null, fingerprint: "unknown-pair" }) },
     { fetchBytes: async () => { throw new Error("offline"); } },
     { fetchBytes: async () => Buffer.from("{}") },
+    { fetchBytes: async url => {
+      const value = structuredClone(h.metadata.get(url));
+      value["dist-tags"].latest = "99.0.0";
+      return Buffer.from(JSON.stringify(value));
+    } },
     { fetchBytes: async url => {
       const value = structuredClone(h.metadata.get(url));
       value.versions["3.0.4"] = { name: value.name, version: "3.0.4" };

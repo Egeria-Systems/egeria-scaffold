@@ -11,8 +11,8 @@ const sharedPortfolioCapabilities = [
 ] as const;
 
 function createRecipes(input: Readonly<{
-  portfolio: "0.9.0" | "0.10.0" | "0.11.0" | "0.11.1" | "0.12.0";
-  site: "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.12.1" | "0.13.0";
+  portfolio: "0.9.0" | "0.10.0" | "0.11.0" | "0.11.1" | "0.11.2" | "0.12.0";
+  site: "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.12.1" | "0.12.2" | "0.13.0";
 }>): readonly ProfileRecipe[] {
   return [
     {
@@ -85,7 +85,19 @@ export function createSecurityPatchedProfileRecipes(): readonly ProfileRecipe[] 
   ];
 }
 
-export const profileRecipes: readonly ProfileRecipe[] = createSecurityPatchedProfileRecipes();
+export function createDependencySecurityProfileRecipes(): readonly ProfileRecipe[] {
+  return [
+    ...createRecipes({ portfolio: "0.11.2", site: "0.12.2" }),
+    {
+      identifier: "app",
+      schemaVersion: "1.0.0",
+      recipeVersion: "0.2.2",
+      defaultCapabilities: ["app-foundation", "site-routing"],
+    },
+  ];
+}
+
+export const profileRecipes: readonly ProfileRecipe[] = createDependencySecurityProfileRecipes();
 
 export function createApplicationEnvironmentProfileRecipes(): readonly ProfileRecipe[] {
   return [

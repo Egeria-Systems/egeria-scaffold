@@ -458,6 +458,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/apps/web/tsconfig.json",
       "common/apps/web/vitest.config.ts",
       "common/apps/web/wrangler.jsonc.template",
+      "common/dependency-security/pnpm-workspace.yaml",
       "common/docs/environments.md",
       "common/package.json.template",
       "common/pnpm-workspace.yaml",

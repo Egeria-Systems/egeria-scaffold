@@ -5,11 +5,11 @@ import { createGenerationRenderingContext } from "../dist/catalog/verified-packa
 import { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes } from "../dist/profiles/profile-recipes.js";
 const currentTransitionCohorts = [
   { label: "Vitest five", generation: "vitest-five", portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" },
-  { label: "Security", generation: "security", portfolio: "0.11.1", site: "0.12.1", app: "0.2.1" },
+  { label: "Original security", generation: "security", portfolio: "0.11.1", site: "0.12.1", app: "0.2.1" },
 ];
 const currentTransitionContexts = {
   "vitest-five": { ...createGenerationRenderingContext(), profiles: createVitestFiveProfileRecipes() },
-  security: { ...createGenerationRenderingContext(), profiles: createSecurityPatchedProfileRecipes() },
+  security: { ...createGenerationRenderingContext(), profiles: createSecurityPatchedProfileRecipes(), securityNextDeclaration: "original" },
 };
 
 import { deflateSync } from "node:zlib";
@@ -455,6 +455,14 @@ test("frozen visual inputs reject changed runtime or lockfile identities and ret
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier=>["analytics","booking-calendly","multilingual"].includes(identifier));
     const identity = {optionalCapabilities,influencingFingerprints:prepared.value.influencingFingerprints,targetLockfileFingerprint};
     assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok,true);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, optionalCapabilities: [...optionalCapabilities].reverse() }).ok, true);
+    for (const invalidSubset of [
+      [...optionalCapabilities, "unknown-capability"],
+      ...(optionalCapabilities.length ? [[...optionalCapabilities, optionalCapabilities[0]]] : [["none"]]),
+      ...(optionalCapabilities.length > 1 ? [[[...optionalCapabilities].sort().join("+")]] : []),
+    ]) {
+      assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, optionalCapabilities: invalidSubset }).ok, false, JSON.stringify(invalidSubset));
+    }
     for (const otherLock of lockFingerprints.filter(value => value !== targetLockfileFingerprint)) {
       assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, targetLockfileFingerprint: otherLock }).ok, false, "other cohorts cannot approve these inputs");
     }
@@ -472,6 +480,39 @@ test("frozen visual inputs reject changed runtime or lockfile identities and ret
     assert.equal(customized.ok,true);
     assert.equal(policy.verifyAppTransitionVisualInputRecord({...identity,influencingFingerprints:customized.value.influencingFingerprints}).ok,true);
   }
+  }
+});
+
+test("corrected security and successor transition inputs remain unadmitted for every optional subset", async () => {
+  const policy = await import("../dist/lifecycle/app-profile-transition.js");
+  const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
+  const validators = await loadAppTransitionContentValidators();
+  for (const generation of [
+    { context: { ...createGenerationRenderingContext(), profiles: createSecurityPatchedProfileRecipes() }, portfolio: "0.11.1", app: "0.2.1", next: "16.3.6", lock: "app-0.2.1" },
+    { context: createGenerationRenderingContext(), portfolio: "0.11.2", app: "0.2.2", next: "16.3.8", lock: "app-0.2.2" },
+  ]) for (let subset = 0; subset < 8; subset++) {
+    const request = {
+      ...policy.appTransitionVisualProject, packageVersions: core.verifiedCapabilityPackageVersions,
+      ...(subset & 1 ? { bookingCalendly: policy.appTransitionVisualBookingSettings } : {}),
+      ...(subset & 2 ? { multilingual: true } : {}),
+      ...(subset & 4 ? { analytics: policy.appTransitionVisualAnalyticsSettings } : {}),
+    };
+    const source = await core.renderSkeleton({ ...request, profile: "portfolio" }, generation.context);
+    const target = await core.renderSkeleton({ ...request, profile: "app" }, generation.context);
+    assert.equal(source.ok, true); assert.equal(target.ok, true);
+    assert.equal(source.value.project.recipeVersion, generation.portfolio);
+    assert.equal(target.value.project.recipeVersion, generation.app);
+    const prepared = policy.prepareAppProfileTransition({ source: source.value, target: target.value,
+      currentFiles: new Map(source.value.files.map(({ path, content }) => [path, content])), validators });
+    assert.equal(prepared.ok, true);
+    const manifest = JSON.parse(decoder.decode(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content));
+    assert.equal(manifest.dependencies.next, generation.next);
+    const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
+    const result = policy.verifyAppTransitionVisualInputRecord({ optionalCapabilities,
+      influencingFingerprints: prepared.value.influencingFingerprints,
+      targetLockfileFingerprint: core.fingerprintFileContent(new Uint8Array(await (await import("node:fs/promises")).readFile(new URL(`../lockfiles/web-recipe-${generation.lock}/pnpm-lock.yaml`, import.meta.url)))) });
+    assert.equal(result.ok, false);
+    assert.equal(result.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
   }
 });
 

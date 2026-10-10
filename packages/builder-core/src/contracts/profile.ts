@@ -7,6 +7,7 @@ export const profileRecipeVersionSchema = z.enum([
   "0.1.0",
   "0.2.0",
   "0.2.1",
+  "0.2.2",
   "0.3.0",
   "0.4.0",
   "0.5.0",
@@ -17,8 +18,10 @@ export const profileRecipeVersionSchema = z.enum([
   "0.10.0",
   "0.11.0",
   "0.11.1",
+  "0.11.2",
   "0.12.0",
   "0.12.1",
+  "0.12.2",
   "0.13.0",
 ]);
 

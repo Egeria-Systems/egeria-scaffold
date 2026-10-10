@@ -13,7 +13,7 @@ const policyUrl = new URL("../dependency-audit-exception.json", import.meta.url)
 const artifactRoot = fileURLToPath(new URL("../../generated-visual-artifacts/dependency-audit/", import.meta.url));
 const severities = ["info", "low", "moderate", "high", "critical"];
 const dependencyCounts = ["dependencies", "devDependencies", "optionalDependencies", "totalDependencies"];
-const auditArguments = Object.freeze(["audit", "--audit-level", "moderate", "--json"]);
+const auditArguments = Object.freeze(["audit", "--audit-level", "info", "--json"]);
 const hash = bytes => createHash("sha256").update(bytes).digest("hex");
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
 const integer = value => Number.isSafeInteger(value) && value >= 0;
@@ -49,15 +49,15 @@ function inspectReport(result, graph) {
   }
   if (!same(counts, metadata.vulnerabilities)) refuse();
   const thresholdFailure = counts.moderate + counts.high + counts.critical > 0;
-  if (result.exitCode !== (thresholdFailure ? 1 : 0)) refuse();
+  if (result.exitCode !== (advisories.length ? 1 : 0)) refuse();
   if (graph && !same(Object.fromEntries(dependencyCounts.map(key => [key, metadata[key]])), graph.dependencyCounts)) refuse();
-  if (!thresholdFailure) return "passed";
+  if (!thresholdFailure) return { status: "passed", thresholdExitCode: 0 };
   if (!graph || advisories.length !== 1) refuse();
   const advisory = advisories[0][1];
   if (advisory.github_advisory_id !== "GHSA-vfj7-8cjw-p6xm" || advisory.module_name !== "braces" || advisory.severity !== "high" ||
       advisory.vulnerable_versions !== "<=3.0.3" || !same(advisory.findings, graph.advisoryFindings) ||
       advisory.findings.some(finding => finding.version !== "3.0.3")) refuse();
-  return "exception-required";
+  return { status: "exception-required", thresholdExitCode: 1 };
 }
 
 function inside(root, path) {
@@ -219,7 +219,8 @@ export async function runDependencyAudit(input, injected = {}) {
     await save("process.json", JSON.stringify({ executable: input.executable, arguments: auditArguments, graph: graph?.id ?? null, startedAt,
       completedAt: adapters.now(), exitCode: result.exitCode, signal: result.signal ?? null, killed: result.killed === true, operationalError: result.operationalError === true,
       stdoutSha256: hash(result.stdout), stderrSha256: hash(result.stderr) }, null, 2));
-    let status = inspectReport(result, graph);
+    const assessment = inspectReport(result, graph);
+    let status = assessment.status;
     if (status === "exception-required") {
       requireActivePolicy(policy, startedAt);
       await checkCurrentPolicy(policy, policyBytes, adapters, observations);
@@ -232,7 +233,7 @@ export async function runDependencyAudit(input, injected = {}) {
     const after = await adapters.inspectInputs(input.cwd, policy);
     if (after.fingerprint !== before.fingerprint) refuse();
     if (status === "accepted-with-security-exception") requireActivePolicy(policy, adapters.now());
-    const disposition = { status, rawExitCode: result.exitCode, graph: graph?.id ?? null, policySha256,
+    const disposition = { status, rawExitCode: result.exitCode, thresholdExitCode: assessment.thresholdExitCode, graph: graph?.id ?? null, policySha256,
       ...(status === "accepted-with-security-exception" ? { advisory: policy.advisory, expiresAt: policy.expiresAt } : {}) };
     await save("metadata-observations.json", JSON.stringify(observations, null, 2));
     await save("disposition.json", JSON.stringify(disposition, null, 2));

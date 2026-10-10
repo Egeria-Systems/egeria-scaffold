@@ -7,7 +7,7 @@ import { createGenerationRenderingContext, verifiedCapabilityPackageVersions } f
 import { createInMemoryRepositoryReader } from "../dist/repository/repository-reader.js";
 const decoder = new TextDecoder();
 const request = { profile: "app", projectName: "test-app", displayName: "Test app", packageVersions: verifiedCapabilityPackageVersions };
-const { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+const { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes, createDependencySecurityProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
 const retainedContext = (persistence = false) => ({ ...createGenerationRenderingContext(persistence), profiles: createVitestFiveProfileRecipes() });
 const ordinary = (await renderSkeleton(request, retainedContext())).value;
 const persistent = (await renderSkeleton({ ...request, applicationPersistence: true }, retainedContext(true))).value;
@@ -65,13 +65,19 @@ test("historical and security dependency replacement refuses swapped source lock
   const cases = [
     { profiles: createVitestFiveProfileRecipes(), ordinary: "web-recipe-app-0.2.0", persistent: "web-application-persistence" },
     { profiles: createSecurityPatchedProfileRecipes(), ordinary: "web-recipe-app-0.2.1", persistent: "web-recipe-app-0.2.1-persistence" },
+    { profiles: createDependencySecurityProfileRecipes(), ordinary: "web-recipe-app-0.2.2", persistent: "web-recipe-app-0.2.2-persistence" },
   ];
-  for (const [index, cohort] of cases.entries()) {
-    const context = persistence => ({ ...createGenerationRenderingContext(persistence), profiles: cohort.profiles });
+  for (const [index, cohort] of cases.entries()) for (const original of index === 1 ? [false, true] : [false]) {
+    const context = persistence => ({ ...createGenerationRenderingContext(persistence), profiles: cohort.profiles, ...(original ? { securityNextDeclaration: "original" } : {}) });
     const currentOrdinary = await renderSkeleton(request, context(false));
     const currentPersistent = await renderSkeleton({ ...request, applicationPersistence: true }, context(true));
     assert.equal(currentOrdinary.ok, true);
     assert.equal(currentPersistent.ok, true);
+    const expectedNext = index === 0 || original ? "16.3.3" : index === 1 ? "16.3.6" : "16.3.8";
+    assert.equal(currentOrdinary.value.project.recipeVersion, index === 0 ? "0.2.0" : index === 1 ? "0.2.1" : "0.2.2");
+    assert.equal(currentPersistent.value.project.recipeVersion, currentOrdinary.value.project.recipeVersion);
+    assert.equal(manifest(currentOrdinary.value).dependencies.next, expectedNext);
+    assert.equal(manifest(currentPersistent.value).dependencies.next, expectedNext);
     for (const [sourceKind, targetKind, current, desired] of [
       ["ordinary", "persistent", currentOrdinary.value, currentPersistent.value],
       ["persistent", "ordinary", currentPersistent.value, currentOrdinary.value],
@@ -82,8 +88,12 @@ test("historical and security dependency replacement refuses swapped source lock
       assert.equal(actual.ok, true, JSON.stringify(actual));
       assert.equal(decoder.decode(actual.value.desired.files.find(file => file.path === "pnpm-lock.yaml").content), expectedTarget);
       assert.equal(actual.value.desired.project.recipeVersion, current.project.recipeVersion);
-      const swapped = await readFile(new URL(`../lockfiles/${cases[1 - index][sourceKind]}/pnpm-lock.yaml`, import.meta.url), "utf8");
-      for (const source of [swapped, expectedSource + "\n"]) {
+      assert.equal(manifest(actual.value.desired).dependencies.next, expectedNext);
+      const mismatched = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, value => ({ ...value, dependencies: { ...value.dependencies, next: expectedNext === "16.3.6" ? "16.3.3" : "16.3.6" } }), expectedSource) });
+      assert.equal(mismatched.ok, false);
+      const swapped = await Promise.all(cases.filter(other => other !== cohort).map(other =>
+        readFile(new URL(`../lockfiles/${other[sourceKind]}/pnpm-lock.yaml`, import.meta.url), "utf8")));
+      for (const source of [...swapped, expectedSource + "\n"]) {
         const refused = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, undefined, source) });
         assert.equal(refused.ok, false);
       }

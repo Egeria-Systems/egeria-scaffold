@@ -513,7 +513,7 @@ async function validateProjectIdentity(projectRoot, packet) {
   const analytics = project.capabilitySettings?.analytics;
   const standardsVersion = project.recipeVersion === "0.11.0"
     ? "0.4.0"
-    : (project.recipeVersion === "0.12.0" || project.recipeVersion === "0.12.1") ? "0.5.0" : undefined;
+    : (project.recipeVersion === "0.12.0" || project.recipeVersion === "0.12.1" || project.recipeVersion === "0.12.2") ? "0.5.0" : undefined;
   if (
     packageManifest.name !== packet.identifier ||
     webPackageManifest.name !== `${packet.identifier}-web` ||

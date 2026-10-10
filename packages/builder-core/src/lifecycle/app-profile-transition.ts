@@ -122,23 +122,20 @@ export function verifyAppTransitionVisualInputRecord(input: Readonly<{
   targetLockfileFingerprint: `sha256:${string}`;
   baselines?: readonly GeneratedFile[];
 }>): AppTransitionResult<Readonly<{ fingerprint: `sha256:${string}` }>> {
-  const record = input.targetLockfileFingerprint === appTransitionVisualInputRecord.targetLockfileFingerprint
-    ? appTransitionVisualInputRecord
-    : input.targetLockfileFingerprint === vitestFiveAppTransitionVisualInputRecord.targetLockfileFingerprint
-      ? vitestFiveAppTransitionVisualInputRecord
-      : input.targetLockfileFingerprint === securityPatchedAppTransitionVisualInputRecord.targetLockfileFingerprint
-        ? securityPatchedAppTransitionVisualInputRecord
-        : undefined;
-  if (record === undefined) return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
   const optionalCapabilities = [...input.optionalCapabilities].sort(compareText);
-  const key = optionalCapabilities.join("+") || "none";
-  const fingerprint = fingerprintJsonValue(input.influencingFingerprints);
   if (new Set(optionalCapabilities).size !== optionalCapabilities.length ||
-      !Object.hasOwn(record.subsets, key) ||
-      Reflect.get(record.subsets, key) !== fingerprint ||
-      input.targetLockfileFingerprint !== record.targetLockfileFingerprint) {
+      optionalCapabilities.some(identifier => !["analytics", "booking-calendly", "multilingual"].includes(identifier))) {
     return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
   }
+  const key = optionalCapabilities.join("+") || "none";
+  const fingerprint = fingerprintJsonValue(input.influencingFingerprints);
+  const record = [
+    appTransitionVisualInputRecord,
+    vitestFiveAppTransitionVisualInputRecord,
+    securityPatchedAppTransitionVisualInputRecord,
+  ].find(candidate => input.targetLockfileFingerprint === candidate.targetLockfileFingerprint &&
+    Object.hasOwn(candidate.subsets, key) && Reflect.get(candidate.subsets, key) === fingerprint);
+  if (record === undefined) return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
   const expectedBaselines = record.baselines[optionalCapabilities.includes("multilingual") ? "multilingual" : "monolingual"];
   if (input.baselines !== undefined) {
     const baselines = input.baselines;

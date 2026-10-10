@@ -290,15 +290,15 @@ async function prepareProject(root, subset) {
   const source = await core.renderSkeleton({ ...request, profile: "portfolio" });
   const target = await core.renderSkeleton({ ...request, profile: "app" });
   if (!source.ok || !target.ok) fail("VISUAL_RENDER_FAILED");
-  if (source.value.project.schemaVersion !== "1.0.0" || source.value.project.originProfile !== "portfolio" || source.value.project.recipeVersion !== "0.11.1" ||
-      target.value.project.schemaVersion !== "1.0.0" || target.value.project.originProfile !== "app" || target.value.project.recipeVersion !== "0.2.1") fail("VISUAL_RECIPE_IDENTITY_INVALID");
+  if (source.value.project.schemaVersion !== "1.0.0" || source.value.project.originProfile !== "portfolio" || source.value.project.recipeVersion !== "0.11.2" ||
+      target.value.project.schemaVersion !== "1.0.0" || target.value.project.originProfile !== "app" || target.value.project.recipeVersion !== "0.2.2") fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const prepared = policy.prepareAppProfileTransition({ source: source.value, target: target.value,
     currentFiles: new Map(source.value.files.map(({ path, content }) => [path, content])),
     validators: await validation.loadAppTransitionContentValidators() });
   if (!prepared.ok) fail("VISUAL_PREPARATION_FAILED");
   const manifest = JSON.parse(Buffer.from(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content).toString("utf8"));
   const version = lockfiles.resolveRecipeLockfileVersion(target.value.project, manifest);
-  if (version !== "app-0.2.1") fail("VISUAL_LOCKFILE_INVALID");
+  if (version !== "app-0.2.2") fail("VISUAL_LOCKFILE_INVALID");
   const lockfile = await filesystem.readFile(lockfiles.createRecipeLockfileUrl(version));
   return { request, sourceProject: source.value.project, targetProject: target.value.project,
     files: [...prepared.value.files, { path: "pnpm-lock.yaml", content: lockfile }], influencingFingerprints: prepared.value.influencingFingerprints };
@@ -479,8 +479,10 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
         const disposition = await audit({ executable: "pnpm", cwd: project, environment, timeout: 15 * 60 * 1000 });
         if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
         checks.push({ name, exitCode: disposition.rawExitCode, disposition });
-        if (!["passed", "accepted-with-security-exception"].includes(disposition.status) ||
-            disposition.rawExitCode !== (disposition.status === "passed" ? 0 : 1)) fail("VISUAL_PROJECT_CHECK_FAILED");
+        const auditAccepted = disposition.status === "passed"
+          ? disposition.thresholdExitCode === 0 && [0, 1].includes(disposition.rawExitCode)
+          : disposition.status === "accepted-with-security-exception" && disposition.thresholdExitCode === 1 && disposition.rawExitCode === 1;
+        if (!auditAccepted) fail("VISUAL_PROJECT_CHECK_FAILED");
       } catch (error) {
         if (error.auditDisposition) checks.push({ name, exitCode: error.auditDisposition.rawExitCode, disposition: error.auditDisposition });
         fail("VISUAL_PROJECT_CHECK_FAILED");
@@ -499,7 +501,7 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
     const commands = [
       ["frozen-install", ["install", "--frozen-lockfile", "--store-dir", support.store]],
       ["peer-dependencies", ["peers", "check"]],
-      ["dependency-audit", ["audit", "--audit-level", "moderate", "--json"]],
+      ["dependency-audit", ["audit", "--audit-level", "info", "--json"]],
       ["registry-signatures", ["audit", "signatures"]],
       ["lint", ["run", "lint"]],
       ["cloudflare-types", ["--dir", "apps/web", "run", "cf-typegen"]],

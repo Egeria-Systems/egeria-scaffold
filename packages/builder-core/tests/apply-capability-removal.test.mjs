@@ -5,10 +5,11 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
-import { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes, createDependencySecurityProfileRecipes } from "../dist/profiles/profile-recipes.js";
 const currentCohorts = [
   { label: "Vitest five", generation: "vitest-five", profiles: createVitestFiveProfileRecipes(), versions: { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" } },
   { label: "Security", generation: "security", profiles: createSecurityPatchedProfileRecipes(), versions: { portfolio: "0.11.1", site: "0.12.1", app: "0.2.1" } },
+  { label: "Dependency security", generation: "dependency-security", profiles: createDependencySecurityProfileRecipes(), versions: { portfolio: "0.11.2", site: "0.12.2", app: "0.2.2" } },
 ];
 
 

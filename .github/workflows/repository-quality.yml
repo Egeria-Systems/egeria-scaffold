@@ -179,8 +179,8 @@ jobs:
       - name: Test builder core
         run: pnpm run test:builder-core
 
-      - name: Test CLI
-        run: pnpm run test:cli
+      - name: Test CLI excluding jobs lifecycle
+        run: node --test --test-name-pattern='^(?!compiled (?:Vitest five|security) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$)' apps/cli/tests/*.test.mjs
 
       - name: Test public packages
         run: pnpm run test:packages
@@ -199,6 +199,44 @@ jobs:
 
       - name: Check release intent
         run: pnpm run check:package-release dependency-update origin/main || pnpm run check:package-release pull-request origin/main || pnpm exec changeset status --since origin/main
+
+  cli-jobs:
+    name: CLI jobs (${{ matrix.cohort }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: vitest-five
+            test-pattern: ^compiled Vitest five jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
+          - cohort: security
+            test-pattern: ^compiled security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build builder and packages
+        run: pnpm run build:builder
+
+      - name: Test CLI jobs lifecycle
+        env:
+          CLI_TEST_PATTERN: ${{ matrix.test-pattern }}
+        run: node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs
 
   generated-projects:
     needs: [scope]

@@ -513,7 +513,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     packageVersions: verifiedCapabilityPackageVersions,
   };
   const targetContext = input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery"
-    ? { ...createGenerationRenderingContext(
+    ? { ...snapshot.value.renderingContext, ...createGenerationRenderingContext(
         input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"),
         input.capability === "transactional-email-resend" || input.capability === "background-job-delivery" || snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0",
         input.capability === "background-job-delivery",

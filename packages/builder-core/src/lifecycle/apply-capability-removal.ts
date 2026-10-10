@@ -726,8 +726,8 @@ export async function applyCapabilityRemoval(input: Readonly<{
     ...(input.capability !== "transactional-email-resend" && controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
     ...(input.capability !== "contact-form-web3forms" && controls.project.value.capabilitySettings["contact-form-web3forms"] !== undefined ? { contactFormWeb3Forms: controls.project.value.capabilitySettings["contact-form-web3forms"] } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
-  }, input.capability === "background-job-delivery" ? { ...createGenerationRenderingContext(retainsPersistence, true, false), profiles: snapshot.value.profiles }
-    : input.capability === "application-persistence" ? { ...createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0"), profiles: snapshot.value.profiles } : snapshot.value.renderingContext);
+  }, input.capability === "background-job-delivery" ? { ...snapshot.value.renderingContext, ...createGenerationRenderingContext(retainsPersistence, true, false), profiles: snapshot.value.profiles }
+    : input.capability === "application-persistence" ? { ...snapshot.value.renderingContext, ...createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0"), profiles: snapshot.value.profiles } : snapshot.value.renderingContext);
   if (!desiredRender.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }

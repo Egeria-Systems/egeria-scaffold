@@ -9,6 +9,7 @@ import {
   createVitestFourProfileRecipes,
   createVitestFiveProfileRecipes,
   createSecurityPatchedProfileRecipes,
+  createDependencySecurityProfileRecipes,
   profileRecipes,
 } from "../profiles/profile-recipes.js";
 import { createCachingRepositoryReader } from "../repository/cache-reader.js";
@@ -16,6 +17,7 @@ import type { RepositoryReader } from "../repository/repository-reader.js";
 import { createInstalledManifest } from "../manifest/create-installed-manifest.js";
 import { resolveCapabilities } from "../resolution/resolve-capabilities.js";
 import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
+import { fingerprintJsonValue } from "../ownership/fingerprint.js";
 import { parseProjectYaml, parseStateJson } from "../state/codecs.js";
 import {
   applicationEnvironmentCatalogSnapshot,
@@ -48,7 +50,7 @@ export function createGenerationRenderingContext(
     catalogSnapshot: { ...((emailFoundation || backgroundJobs) ? { ...base, appFoundation: "0.2.0", transactionalEmailResend: "0.1.0" } as const : base),
       ...(backgroundJobs ? { backgroundJobDelivery: backgroundJobVersion, deploymentCloudflare: applicationPersistence ? "0.6.0" : "0.5.0" } as const : {}),
     },
-    profiles: createSecurityPatchedProfileRecipes(),
+    profiles: createDependencySecurityProfileRecipes(),
   };
 }
 
@@ -67,7 +69,10 @@ function selectInstalledRenderingContext(
   }
 
   const securityProfiles = createSecurityPatchedProfileRecipes();
-  const profiles = securityProfiles.some(({ identifier, recipeVersion }) =>
+  const dependencySecurityProfiles = createDependencySecurityProfileRecipes();
+  const profiles = dependencySecurityProfiles.some(({ identifier, recipeVersion }) =>
+    identifier === project.originProfile && recipeVersion === project.recipeVersion)
+    ? dependencySecurityProfiles : securityProfiles.some(({ identifier, recipeVersion }) =>
     identifier === project.originProfile && recipeVersion === project.recipeVersion)
     ? securityProfiles : createVitestFiveProfileRecipes();
   const currentRecipe = profiles.some(({ identifier, recipeVersion }) =>
@@ -130,14 +135,46 @@ type VerifiedProjectSnapshot<C = SkeletonRenderingContext | undefined> = Readonl
   renderingContext: C;
 }>;
 
+function selectInstalledSecurityNextDeclaration(
+  project: ProjectConfiguration,
+  state: InstalledState,
+  context: SkeletonRenderingContext,
+): ValidationResult<SkeletonRenderingContext> {
+  const invalid = (): ValidationResult<never> => ({
+    ok: false,
+    issues: [{ code: "PROJECT_INSPECTION_INVALID", path: ["state", "managedSurfaces"], context: { reason: "security-next-declaration" } }],
+  });
+  const managedSurfaces = state.managedSurfaces;
+  if (!Array.isArray(managedSurfaces)) return invalid();
+  const surfaces = state.managedSurfaces.filter(surface => surface.identifier === "builder-web-package-next" ||
+    (surface.path === "apps/web/package.json" && surface.fingerprintTarget.kind === "json-value" && surface.fingerprintTarget.pointer === "/dependencies/next"));
+  const surface = surfaces[0];
+  if (surfaces.length !== 1 || surface?.identifier !== "builder-web-package-next" ||
+      surface.path !== "apps/web/package.json" || surface.owner.kind !== "builder-kernel" ||
+      surface.ownership !== "merge-managed" || surface.mergeStrategy !== "json-property" ||
+      surface.fingerprintTarget.kind !== "json-value" || surface.fingerprintTarget.pointer !== "/dependencies/next") return invalid();
+  if (surface.fingerprint === fingerprintJsonValue("16.3.6")) return { ok: true, value: context };
+  const originalNext = project.originProfile === "portfolio" &&
+    !state.installedCapabilities.some(({ identifier }) => identifier === "app-foundation") ? "16.3.0" : "16.3.3";
+  return surface.fingerprint === fingerprintJsonValue(originalNext)
+    ? { ok: true, value: { ...context, securityNextDeclaration: "original" } }
+    : invalid();
+}
+
 export function createVerifiedProjectSnapshot(
   project: ProjectConfiguration | undefined,
   state: InstalledState | undefined,
 ): ValidationResult<VerifiedProjectSnapshot> {
-  const renderingContext =
+  let renderingContext =
     project !== undefined && state !== undefined
       ? selectInstalledRenderingContext(project, state)
       : undefined;
+  if (renderingContext !== undefined && project !== undefined && state !== undefined &&
+      createSecurityPatchedProfileRecipes().some(({ identifier, recipeVersion }) => identifier === project.originProfile && recipeVersion === project.recipeVersion)) {
+    const selected = selectInstalledSecurityNextDeclaration(project, state, renderingContext);
+    if (!selected.ok) return selected;
+    renderingContext = selected.value;
+  }
   const catalog = renderingContext === undefined
     ? createVerifiedCapabilityCatalog()
     : createCapabilityCatalogSnapshot(

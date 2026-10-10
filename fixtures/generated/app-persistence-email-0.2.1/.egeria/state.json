@@ -639,7 +639,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:4e824eb6621057d8bbcf84dd8ab707616492dd66e5ed634a82d5360a36be3fa2",
+      "fingerprint": "sha256:a01471d20ade5771d03251f5cc3bd7ed632154a7777792b7c35f9e12a42b4959",
       "fingerprintTarget": {
         "kind": "json-value",
         "pointer": "/dependencies/next"

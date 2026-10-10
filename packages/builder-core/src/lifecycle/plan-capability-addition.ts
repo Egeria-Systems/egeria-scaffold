@@ -565,13 +565,13 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 
   const state = inspection.inference.state.value;
   if (capabilityValue === "application-persistence" && (
-    project.originProfile !== "app" || (project.recipeVersion !== "0.2.0" && project.recipeVersion !== "0.2.1") ||
+    project.originProfile !== "app" || (project.recipeVersion !== "0.2.0" && project.recipeVersion !== "0.2.1" && project.recipeVersion !== "0.2.2") ||
     snapshot.value.renderingContext?.catalogSnapshot.standards !== "0.5.0"
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   if ((capabilityValue === "transactional-email-resend" || capabilityValue === "contact-form-web3forms" || capabilityValue === "background-job-delivery") && !(
-    (project.originProfile === "portfolio" && (project.recipeVersion === "0.11.0" || project.recipeVersion === "0.11.1")) ||
-    (project.originProfile === "site" && (project.recipeVersion === "0.12.0" || project.recipeVersion === "0.12.1")) ||
-    (project.originProfile === "app" && (project.recipeVersion === "0.2.0" || project.recipeVersion === "0.2.1"))
+    (project.originProfile === "portfolio" && (project.recipeVersion === "0.11.0" || project.recipeVersion === "0.11.1" || project.recipeVersion === "0.11.2")) ||
+    (project.originProfile === "site" && (project.recipeVersion === "0.12.0" || project.recipeVersion === "0.12.1" || project.recipeVersion === "0.12.2")) ||
+    (project.originProfile === "app" && (project.recipeVersion === "0.2.0" || project.recipeVersion === "0.2.1" || project.recipeVersion === "0.2.2"))
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   const capabilityInstalled =
     project.selectedCapabilities.includes(capabilityValue) ||
@@ -584,7 +584,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   }
 
   const targetContext = capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery"
-    ? { ...createGenerationRenderingContext(
+    ? { ...snapshot.value.renderingContext, ...createGenerationRenderingContext(
         capabilityValue === "application-persistence" || project.selectedCapabilities.includes("application-persistence"),
         capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery" || snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0",
         capabilityValue === "background-job-delivery",

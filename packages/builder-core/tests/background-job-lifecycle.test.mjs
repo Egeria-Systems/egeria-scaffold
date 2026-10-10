@@ -5,7 +5,7 @@ import * as core from "../dist/index.js";
 import { inspectProject } from "../dist/diagnostics/project-inspection.js";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-import { createVitestFourProfileRecipes, createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createVitestFourProfileRecipes, createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes, createDependencySecurityProfileRecipes } from "../dist/profiles/profile-recipes.js";
 import { createGenerationRenderingContext, readVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
 
 const encoder = new TextEncoder();
@@ -17,6 +17,7 @@ const git = { ok: true, identity: { root, revision: "abcdef0123456789abcdef01234
 const cohorts = [
   { profiles: createVitestFiveProfileRecipes(), versions: { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" }, foundationLocks: { portfolio: "web-recipe-portfolio-foundation", site: "web-recipe-app-0.2.0", app: "web-recipe-app-0.2.0" }, persistenceLock: "web-application-persistence" },
   { profiles: createSecurityPatchedProfileRecipes(), versions: { portfolio: "0.11.1", site: "0.12.1", app: "0.2.1" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.1-foundation", site: "web-recipe-app-0.2.1", app: "web-recipe-app-0.2.1" }, persistenceLock: "web-recipe-app-0.2.1-persistence" },
+  { profiles: createDependencySecurityProfileRecipes(), versions: { portfolio: "0.11.2", site: "0.12.2", app: "0.2.2" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.2-foundation", site: "web-recipe-app-0.2.2", app: "web-recipe-app-0.2.2" }, persistenceLock: "web-recipe-app-0.2.2-persistence" },
 ];
 async function assertCohort(repo, cohort, profile, persistent = false) {
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -105,10 +106,98 @@ async function add(repo, overrides={}) {
   const checks=core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.selectedCapabilities.includes("application-persistence")?core.persistenceGenerationVerificationChecks:core.appGenerationVerificationChecks;
   return core.applyCapabilityAddition({root,capability,approvedPlanFingerprint:planned.value.planFingerprint,reader:repo.reader,writer:repo.writer,inspectWorktree:async()=>git,inspectCreateTargets:async()=>({ok:true}),inspectExpectedChanges:async()=>({ok:true}),verifier:{verifyInIsolatedCopy:async()=>({ok:true,value:{checks}})},now:fixedNow,...overrides});
 }
+test("jobs dependency changes preserve original and corrected security declarations", async () => {
+  const cohort = cohorts[1];
+  for (const original of [true, false]) {
+    for (const [profile, persistent] of [["portfolio", false], ["site", false], ["app", false], ["app", true]]) {
+      const context = {
+        ...createGenerationRenderingContext(persistent),
+        profiles: createSecurityPatchedProfileRecipes(),
+        ...(original ? { securityNextDeclaration: "original" } : {}),
+      };
+      const repo = await repository(profile, { ...(persistent ? { applicationPersistence: true } : {}), context });
+      const expectedNext = original ? "16.3.3" : "16.3.6";
+      const added = await add(repo);
+      assert.equal(added.ok, true, JSON.stringify(added));
+      assert.equal(JSON.parse(decoder.decode(repo.files.get("apps/web/package.json"))).dependencies.next, expectedNext);
+      await assertCohort(repo, cohort, profile, persistent);
+      const removed = await remove(repo, await removalPlan(repo));
+      assert.equal(removed.ok, true, JSON.stringify(removed));
+      assert.equal(JSON.parse(decoder.decode(repo.files.get("apps/web/package.json"))).dependencies.next, expectedNext);
+      await assertCohort(repo, cohort, profile, persistent);
+      const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value;
+      assert.equal(state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue(expectedNext));
+      assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
+    }
+  }
+});
+
+test("security jobs planning and application refuse declaration drift before writes", async () => {
+  for (const mode of ["unknown-declaration", "origin-mismatch", "descriptor-mismatch", "manifest-drift", "lock-drift", "after-plan"]) {
+    const repo = await repository("portfolio", { profiles: createSecurityPatchedProfileRecipes() });
+    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.11.1");
+    const planned = mode === "after-plan" ? await core.planCapabilityAddition({ reader: repo.reader, git, capability }) : undefined;
+    if (planned !== undefined) assert.equal(planned.ok, true, JSON.stringify(planned));
+    if (mode === "unknown-declaration") {
+      const state = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
+      state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint = `sha256:${"a".repeat(64)}`;
+      repo.files.set(".egeria/state.json", encoder.encode(JSON.stringify(state)));
+    } else if (mode === "origin-mismatch" || mode === "descriptor-mismatch") {
+      const state = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
+      if (mode === "origin-mismatch") state.origin.recipeVersion = "0.11.0";
+      else state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version = "9.9.9";
+      repo.files.set(".egeria/state.json", encoder.encode(JSON.stringify(state)));
+    } else if (mode === "lock-drift") repo.files.set("pnpm-lock.yaml", encoder.encode(decoder.decode(repo.files.get("pnpm-lock.yaml")) + "\n"));
+    else {
+      const manifest = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
+      manifest.dependencies.next = "16.3.4";
+      repo.files.set("apps/web/package.json", encoder.encode(JSON.stringify(manifest)));
+    }
+    const result = mode === "after-plan"
+      ? await core.applyCapabilityAddition({ root, capability, approvedPlanFingerprint: planned.value.planFingerprint, reader: repo.reader, writer: repo.writer, inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }), verifier: { verifyInIsolatedCopy: async () => { throw new Error("verification must not run"); } } })
+      : await core.planCapabilityAddition({ reader: repo.reader, git, capability });
+    assert.equal(result.ok, false, mode);
+    assert.deepEqual(repo.writes, []);
+  }
+});
+
+test("security jobs removal refuses declaration and lock drift before writes", async () => {
+  for (const mode of ["unknown-declaration", "origin-mismatch", "descriptor-mismatch", "manifest-drift", "lock-drift", "after-plan"]) {
+    const repo = await repository("app", { backgroundJobDelivery: true, profiles: createSecurityPatchedProfileRecipes() });
+    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.2.1");
+    const prepared = await removalPlan(repo);
+    if (mode === "unknown-declaration") {
+      const state = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
+      state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint = `sha256:${"a".repeat(64)}`;
+      repo.files.set(".egeria/state.json", encoder.encode(JSON.stringify(state)));
+    } else if (mode === "origin-mismatch" || mode === "descriptor-mismatch") {
+      const state = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
+      if (mode === "origin-mismatch") state.origin.recipeVersion = "0.2.0";
+      else state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version = "9.9.9";
+      repo.files.set(".egeria/state.json", encoder.encode(JSON.stringify(state)));
+    } else if (mode === "lock-drift") repo.files.set("pnpm-lock.yaml", encoder.encode(decoder.decode(repo.files.get("pnpm-lock.yaml")) + "\n"));
+    else {
+      const manifest = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
+      manifest.dependencies.next = "16.3.4";
+      repo.files.set("apps/web/package.json", encoder.encode(JSON.stringify(manifest)));
+    }
+    const before = new Map(repo.files);
+    const result = mode === "after-plan"
+      ? await remove(repo, prepared, { verifier: { verifyInIsolatedCopy: async () => { throw new Error("verification must not run"); } } })
+      : await core.planCapabilityRemoval({ reader: repo.reader, git, capability, jobRemoval: prepared.jobRemoval, inspectRepositoryInventory: repo.inventory, now: fixedNow });
+    assert.equal(result.ok, false, mode);
+    assert.deepEqual(repo.writes, []);
+    assert.deepEqual(repo.files, before);
+  }
+});
+
 test("current jobs removal and re-add retain foundation, explicit email, persistence and exact migration identities", async()=>{
-  for(const cohort of cohorts) for(const profile of ["portfolio","site","app"]) for(const retainedVersion of ["0.1.0","0.2.0"]) {
+  for(const cohort of cohorts) for(const original of cohort.versions.app === "0.2.1" ? [false, true] : [false]) for(const profile of ["portfolio","site","app"]) for(const retainedVersion of ["0.1.0","0.2.0"]) {
     const persistent=profile==="app";
-    const repo=await repository(profile,{backgroundJobDelivery:true,transactionalEmailResend:true,...(persistent?{applicationPersistence:true}:{}),context:{...createGenerationRenderingContext(persistent,true,true,retainedVersion),profiles:cohort.profiles}});
+    const repo=await repository(profile,{backgroundJobDelivery:true,transactionalEmailResend:true,...(persistent?{applicationPersistence:true}:{}),context:{...createGenerationRenderingContext(persistent,true,true,retainedVersion),profiles:cohort.profiles,...(original?{securityNextDeclaration:"original"}:{})}});
+    const expectedNext = original || cohort.versions.app === "0.2.0" ? "16.3.3" : cohort.versions.app === "0.2.1" ? "16.3.6" : "16.3.8";
+    await assertCohort(repo, cohort, profile, persistent);
+    assert.equal(JSON.parse(decoder.decode(repo.files.get("apps/web/package.json"))).dependencies.next, expectedNext);
     const prepared=await removalPlan(repo);
     assert.equal(prepared.planned.capability.version,retainedVersion);
     assert.equal(prepared.planned.jobRemovalReport.recommendation,"ready-for-human-review");
@@ -118,6 +207,8 @@ test("current jobs removal and re-add retain foundation, explicit email, persist
     assert.equal(removed.value.migration,`remove-background-job-delivery-${retainedVersion.replaceAll(".","-")}`);
     await assertCohort(repo, cohort, profile, persistent);
     let state=core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value;
+    assert.equal(JSON.parse(decoder.decode(repo.files.get("apps/web/package.json"))).dependencies.next, expectedNext);
+    assert.equal(state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue(expectedNext));
     assert.equal(state.installedCapabilities.find(({identifier})=>identifier==="deployment-cloudflare").version,persistent?"0.4.0":"0.3.0");
     assert.equal(state.installedCapabilities.find(({identifier})=>identifier==="app-foundation").version,"0.2.0");
     assert.ok(state.installedCapabilities.some(({identifier})=>identifier==="transactional-email-resend"));
@@ -125,6 +216,8 @@ test("current jobs removal and re-add retain foundation, explicit email, persist
     const added=await add(repo);assert.equal(added.ok,true,JSON.stringify(added));assert.equal(added.value.migration,"add-background-job-delivery-0-2-0");
     await assertCohort(repo, cohort, profile, persistent);
     state=core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value;
+    assert.equal(JSON.parse(decoder.decode(repo.files.get("apps/web/package.json"))).dependencies.next, expectedNext);
+    assert.equal(state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue(expectedNext));
     assert.equal(state.installedCapabilities.find(({identifier})=>identifier===capability).version,"0.2.0");
     assert.deepEqual(repo.writes.slice(-2),[[".egeria/migrations.jsonl"],[".egeria/state.json"]]);
   }
