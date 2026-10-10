@@ -5114,18 +5114,19 @@ test("the compiled plan-upgrade command plans the exact production site edge wit
 });
 
 async function withAppTransitionFixture(profile, allOptionals, run, generation = "vitest-four") {
+  const generationRequest = {
+    profile,
+    ...appTransitionVisualProject,
+    ...(allOptionals ? {
+      bookingCalendly: appTransitionVisualBookingSettings,
+      multilingual: true,
+      analytics: appTransitionVisualAnalyticsSettings,
+    } : {}),
+  };
   await withGitFixture(profile, run, {
     branch: `app-transition-${profile}-${allOptionals ? "all-optionals" : "default"}-test`,
     generation,
-    generationRequest: {
-      profile,
-      ...appTransitionVisualProject,
-      ...(allOptionals ? {
-        bookingCalendly: appTransitionVisualBookingSettings,
-        multilingual: true,
-        analytics: appTransitionVisualAnalyticsSettings,
-      } : {}),
-    },
+    generationRequest,
     // Source setup uses real recipe lockfile preparation but injected verification.
     // The compiled apply command below uses the complete production verifier.
     verifier: {
@@ -5133,6 +5134,20 @@ async function withAppTransitionFixture(profile, allOptionals, run, generation =
       prepareLockfile: core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }).prepareLockfile,
     },
     async preparePrimary(root) {
+      if (generation === "security") {
+        const project = assertSuccess(core.parseProjectYaml(await readFile(join(root, ".egeria/project.yaml"), "utf8")));
+        const state = assertSuccess(core.parseStateJson(await readFile(join(root, ".egeria/state.json"), "utf8")));
+        const rendered = assertSuccess(await core.renderSkeleton({ ...generationRequest, packageVersions: core.verifiedCapabilityPackageVersions }, {
+          ...createGenerationRenderingContext(), profiles: createSecurityPatchedProfileRecipes(), securityNextDeclaration: "original",
+        }));
+        assert.deepEqual(rendered.project, project);
+        assert.deepEqual(core.createInstalledManifest(rendered.resolved), state.installedCapabilities);
+        const files = new Map(rendered.files.map(({ path, content }) => [path, content]));
+        for (const path of [".egeria/project.yaml", ".egeria/migrations.jsonl", "pnpm-lock.yaml"]) files.set(path, await readFile(join(root, path)));
+        const surfaces = assertSuccess(core.materializeInstalledSurfaces({ files, surfaces: [...rendered.surfaces, ...createBuilderStateSurfaces()] }));
+        await writeFile(join(root, "apps/web/package.json"), files.get("apps/web/package.json"));
+        await writeFile(join(root, ".egeria/state.json"), core.serializeStateJson({ ...state, managedSurfaces: surfaces }));
+      }
       const path = join(root, "README.md");
       await writeFile(path, `${await readFile(path, "utf8")}\nFictional client preservation note.\n`);
     },
@@ -7247,6 +7262,9 @@ test("the built entry emits one JSON line with exact process exits", async () =>
 for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site"]) {
   test(`compiled ${cohort.label} app transition from ${profile} completes production verification`, async () => {
     await withAppTransitionFixture(profile, false, async ({ linked }) => {
+      if (cohort.generation === "security") {
+        assert.equal(JSON.parse(await readFile(join(linked, "apps/web/package.json"), "utf8")).dependencies.next, profile === "portfolio" ? "16.3.0" : "16.3.3");
+      }
       const before = await gitRepositorySnapshot(linked);
       const planning = await executeBuilt(planProfileTransitionArguments(linked, "app"));
       assert.equal(planning.exitCode, 0, planning.stderr);
@@ -7261,6 +7279,9 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
       assert.deepEqual(state.origin, { profile: "app", recipeVersion: cohort.app });
       assert.deepEqual(state.lastSuccessfulVerification.checks, core.appProfileTransitionPersistedVerificationChecks);
       assert.equal(JSON.parse(await readFile(join(linked, "apps/web/package.json"), "utf8")).devDependencies.vitest, "5.0.0");
+      if (cohort.generation === "security") {
+        assert.equal(JSON.parse(await readFile(join(linked, "apps/web/package.json"), "utf8")).dependencies.next, "16.3.3");
+      }
       assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, `packages/builder-core/lockfiles/web-recipe-app-${cohort.app}/pnpm-lock.yaml`)));
       await assertExactInstalledAgreement(linked, { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } });
     }, cohort.generation);
