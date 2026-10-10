@@ -1583,7 +1583,7 @@ function createDescriptors(
     },
     {
       identifier: "booking-calendly",
-      version: "0.1.0",
+      version: applicationEnvironments ? "0.2.0" : "0.1.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "automatic",
@@ -1601,7 +1601,19 @@ function createDescriptors(
       threatReviewLevel: "elevated",
       platformResources: [],
       adapterSemanticRequirements: [],
-      ...projectEvidencePoints(bookingCalendlyEvidencePoints),
+      ...(applicationEnvironments ? {
+        environmentVariables: ["NEXT_PUBLIC_CALENDLY_URL"],
+        migrationPlanners: ["add-booking-calendly-0-2-0", "remove-booking-calendly-0-2-0"],
+      } : {}),
+      ...projectEvidencePoints([
+        ...bookingCalendlyEvidencePoints,
+        ...(applicationEnvironments ? [
+          createFileEvidencePoint("booking-calendly-french-content", "booking-calendly", "apps/web/content/fr-CA/booking-calendly.yaml", "application-owned"),
+          createFileEvidencePoint("booking-calendly-configuration-tests", "booking-calendly", "apps/web/tests/unit/booking-configuration.test.ts", "application-owned"),
+          createFileEvidencePoint("booking-calendly-availability-tests", "booking-calendly", "apps/web/tests/component/booking-availability.test.tsx", "application-owned"),
+          createFileEvidencePoint("booking-calendly-operator-guide", "booking-calendly", "docs/booking-calendly.md", "application-owned"),
+        ] : []),
+      ]),
       verificationPlan: [
         "typecheck",
         "next-build",
@@ -2110,7 +2122,7 @@ export function createCapabilityCatalogSnapshot(
   const catalogIssues: ContractIssue[] = [];
 
   const descriptors = createDescriptors(packageVersions, supportedSnapshot).filter((descriptor) =>
-    !applicationEnvironments || !["analytics", "booking-calendly", "application-persistence", "transactional-email-resend", "background-job-delivery"].includes(descriptor.identifier),
+    !applicationEnvironments || !["analytics", "application-persistence", "transactional-email-resend", "background-job-delivery"].includes(descriptor.identifier),
   );
   for (const [index, descriptor] of descriptors.entries()) {
     const parsed = capabilityDescriptorSchema.safeParse(descriptor);

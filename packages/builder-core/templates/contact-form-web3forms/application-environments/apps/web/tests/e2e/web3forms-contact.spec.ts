@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 const expectedAccessKey = process.env.CONTACT_TEST_EXPECTED_ACCESS_KEY ?? "";
 const configured = expectedAccessKey !== "";
@@ -7,17 +7,40 @@ if (configured && !/^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}
   throw new Error("CONTACT_TEST_EXPECTED_ACCESS_KEY:invalid");
 }
 
+const expectedBookingUrl = process.env.BOOKING_TEST_EXPECTED_URL ?? "";
+const audits = new WeakMap<BrowserContext, Awaited<ReturnType<typeof controlProviders>>>();
+test.use({ serviceWorkers: "block" });
+test.afterEach(async ({ context }, information) => {
+  const audit = audits.get(context);
+  if (audit === undefined) return;
+  await information.attach("provider-request-audit", { contentType: "application/json", body: JSON.stringify({ attempts: audit.attempts, unexpected: audit.unexpected }) });
+  expect(audit.unexpected).toEqual([]);
+  if (!configured) expect(audit.contactAttempts).toEqual([]);
+  if (expectedBookingUrl === "") expect(audit.bookingAttempts).toEqual([]);
+  if (!configured && expectedBookingUrl === "") expect(audit.attempts).toEqual([]);
+});
+
 async function controlProviders(page: Page, outcome = "accepted") {
   const requests: Record<string, unknown>[] = [];
   const scripts: string[] = [];
   const unexpected: string[] = [];
   const attempts: string[] = [];
-  await page.route("**/*", async route => {
+  const contactAttempts: string[] = [];
+  const bookingAttempts: string[] = [];
+  const baseURL = test.info().project.use.baseURL;
+  if (typeof baseURL !== "string") throw new Error("BASE_URL_REQUIRED");
+  const localOrigin = new URL(baseURL).origin;
+  await page.context().route("**/*", async route => {
     const request = route.request();
     const url = new URL(request.url());
-    if (["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) return route.continue();
-    attempts.push(url.origin + url.pathname);
+    if (url.origin === localOrigin) return route.continue();
+    attempts.push(url.href);
+    if (url.hostname === "calendly.com" || url.hostname === "www.calendly.com") bookingAttempts.push(url.href);
+    if (expectedBookingUrl !== "" && url.href === expectedBookingUrl && request.isNavigationRequest()) {
+      return route.fulfill({ contentType: "text/html", body: '<!doctype html><html lang="en"><head><title>Synthetic booking</title><link rel="icon" href="data:,"></head><body><main>Synthetic booking</main></body></html>' });
+    }
     if (url.origin === "https://js.hcaptcha.com" && url.pathname === "/1/api.js") {
+      contactAttempts.push(url.href);
       scripts.push(url.href);
       if (outcome === "blocked") return route.abort();
       // Delivering a script does not mean the SDK is ready. No real provider executes.
@@ -37,6 +60,7 @@ async function controlProviders(page: Page, outcome = "accepted") {
       ` });
     }
     if (url.href === "https://api.web3forms.com/submit") {
+      contactAttempts.push(url.href);
       requests.push(request.postDataJSON() as Record<string, unknown>);
       if (outcome === "unknown") return route.abort();
       return route.fulfill({ status: outcome === "rate-limited" ? 429 : outcome === "rejected" ? 400 : 200,
@@ -45,7 +69,9 @@ async function controlProviders(page: Page, outcome = "accepted") {
     unexpected.push(url.origin);
     return route.abort();
   });
-  return { requests, scripts, unexpected, attempts };
+  const audit = { requests, scripts, unexpected, attempts, contactAttempts, bookingAttempts };
+  audits.set(page.context(), audit);
+  return audit;
 }
 
 async function openForm(page: Page) {
@@ -178,7 +204,7 @@ test.describe("unavailable contact", () => {
       await expect(page.locator("#contact")).toBeVisible();
       expect((await new AxeBuilder({ page }).include("#contact-form").withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze()).violations).toEqual([]);
     }
-    expect(provider.attempts).toEqual([]);
+    expect(provider.contactAttempts).toEqual([]);
     expect(provider.scripts).toEqual([]);
     expect(provider.requests).toEqual([]);
   });
@@ -199,7 +225,7 @@ test.describe("unavailable contact", () => {
     }
     await expect(page.locator("#contact-form form, #contact-captcha")).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
-    expect(provider.attempts).toEqual([]);
+    expect(provider.contactAttempts).toEqual([]);
     expect(errors).toEqual([]);
   });
 });
