@@ -180,7 +180,7 @@ jobs:
         run: pnpm run test:builder-core
 
       - name: Test CLI excluding jobs lifecycle
-        run: node --test --test-name-pattern='^(?!compiled (?:Vitest five|security) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$)' apps/cli/tests/*.test.mjs
+        run: node --test --test-skip-pattern='^compiled (?:Vitest five|security) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$' apps/cli/tests/*.test.mjs
 
       - name: Test public packages
         run: pnpm run test:packages

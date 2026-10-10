@@ -649,7 +649,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       workflowCommands(job),
     ]),
   );
-  const nonJobsCommand = "node --test --test-name-pattern='^(?!compiled (?:Vitest five|security) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$)' apps/cli/tests/*.test.mjs";
+  const nonJobsCommand = "node --test --test-skip-pattern='^compiled (?:Vitest five|security) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$' apps/cli/tests/*.test.mjs";
   const jobsCommand = 'node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs';
   const cliJobs = workflow.jobs["cli-jobs"];
   assert.equal(cliJobs.name, "CLI jobs (${{ matrix.cohort }})");
