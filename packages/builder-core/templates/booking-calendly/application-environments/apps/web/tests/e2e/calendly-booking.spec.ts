@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type BrowserContext, type Request } from "@playwright/test";
+import { expect, test } from "./application-test";
+import { type BrowserContext, type Request } from "@playwright/test";
 
 const expectedUrl = process.env.BOOKING_TEST_EXPECTED_URL ?? "";
 const bookingMode = process.env.BOOKING_TEST_MODE;
@@ -21,7 +22,7 @@ async function controlProviders(context: BrowserContext, baseURL: unknown, block
   const unexpected: string[] = [];
   await context.route("**/*", async route => {
     const request = route.request();
-    if (new URL(request.url()).origin === localOrigin) return route.continue();
+    if (new URL(request.url()).origin === localOrigin) return route.fallback();
     attempts.push(request.url());
     if (configured && request.url() === expectedUrl && request.isNavigationRequest()) {
       requests.push(request);
@@ -39,7 +40,7 @@ async function controlProviders(context: BrowserContext, baseURL: unknown, block
 test.afterEach(async ({ context }, information) => {
   const audit = audits.get(context);
   if (audit === undefined) return;
-  await information.attach("provider-request-audit", { contentType: "application/json", body: JSON.stringify({ attempts: audit.attempts, unexpected: audit.unexpected }) });
+  if (!process.env.CF_ACCESS_CLIENT_ID) await information.attach("provider-request-audit", { contentType: "application/json", body: JSON.stringify({ attempts: audit.attempts, unexpected: audit.unexpected }) });
   expect(audit.unexpected).toEqual([]);
   if (!configured) expect(audit.attempts).toEqual([]);
 });
@@ -47,11 +48,11 @@ test.afterEach(async ({ context }, information) => {
 for (const locale of locales) {
   const path = locales.length === 1 ? "./" : `/${locale}`;
   test.describe(locale, () => {
-    test("unavailable booking stays local after interaction and at narrow width", async ({ page, context, baseURL }) => {
+    test("unavailable booking stays local after interaction and at narrow width", async ({ openApplicationPage, page, context, baseURL }) => {
       test.skip(configured);
       await controlProviders(context, baseURL);
       await page.setViewportSize({ width: 320, height: 800 });
-      await page.goto(path);
+      await openApplicationPage(page, path);
       const section = page.getByTestId("booking-unavailable");
       await section.scrollIntoViewIfNeeded();
       await expect(section).toContainText(locale === "fr-CA"
@@ -68,11 +69,11 @@ for (const locale of locales) {
       expect((await new AxeBuilder({ page }).include('[data-testid="booking-unavailable"]').withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze()).violations).toEqual([]);
     });
 
-    test("loads only through the configured interaction and preserves destination", async ({ page, context, baseURL }) => {
+    test("loads only through the configured interaction and preserves destination", async ({ openApplicationPage, page, context, baseURL }) => {
       test.skip(!configured);
       await page.setViewportSize({ width: 320, height: 200 });
       const audit = await controlProviders(context, baseURL);
-      await page.goto(path);
+      await openApplicationPage(page, path);
       const link = page.getByTestId("booking-link");
       await expect(link).toHaveAttribute("href", expectedUrl);
       await expect(page.getByTestId("booking-frame")).toHaveCount(0);
@@ -108,13 +109,14 @@ for (const locale of locales) {
       }
     });
 
-    test("ordinary navigation and unavailable copy survive without JavaScript", async ({ browser, baseURL }, information) => {
+    test("ordinary navigation and unavailable copy survive without JavaScript", async ({ browser, baseURL, openApplicationPage, applicationTransport }, information) => {
       if (typeof baseURL !== "string") throw new Error("BASE_URL_REQUIRED");
       const context = await browser.newContext({ baseURL, javaScriptEnabled: false, serviceWorkers: "block" });
       try {
+        await applicationTransport.installBrowserProtection(context);
         const audit = await controlProviders(context, baseURL);
         const page = await context.newPage();
-        await page.goto(path, { waitUntil: "domcontentloaded" });
+        await openApplicationPage(page, path);
         await expect(page.getByTestId("booking-frame")).toHaveCount(0);
         if (configured) {
           const link = page.getByTestId("booking-link");
@@ -128,34 +130,34 @@ for (const locale of locales) {
           expect(audit.attempts).toEqual([]);
         }
         expect(audit.unexpected).toEqual([]);
-        await information.attach("no-javascript-request-audit", { contentType: "application/json", body: JSON.stringify({ attempts: audit.attempts, unexpected: audit.unexpected }) });
+        if (!process.env.CF_ACCESS_CLIENT_ID) await information.attach("no-javascript-request-audit", { contentType: "application/json", body: JSON.stringify({ attempts: audit.attempts, unexpected: audit.unexpected }) });
       } finally { await context.close(); }
     });
 
-    test("inline fallback works without IntersectionObserver", async ({ page, context, baseURL }) => {
+    test("inline fallback works without IntersectionObserver", async ({ openApplicationPage, page, context, baseURL }) => {
       test.skip(!configured || bookingMode !== "inline");
       await controlProviders(context, baseURL);
       await page.addInitScript(() => Object.defineProperty(window, "IntersectionObserver", { configurable: true, value: undefined }));
-      await page.goto(path);
+      await openApplicationPage(page, path);
       await expect(page.getByTestId("booking-frame")).toHaveAttribute("src", expectedUrl);
       await page.getByTestId("booking-frame").scrollIntoViewIfNeeded();
       await expect.poll(() => audits.get(context)?.requests.length).toBeGreaterThan(0);
     });
 
-    test("popup falls back to navigation without native modal support", async ({ page, context, baseURL }) => {
+    test("popup falls back to navigation without native modal support", async ({ openApplicationPage, page, context, baseURL }) => {
       test.skip(!configured || bookingMode !== "popup");
       const audit = await controlProviders(context, baseURL);
       await page.addInitScript(() => Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: undefined }));
-      await page.goto(path);
+      await openApplicationPage(page, path);
       await Promise.all([page.waitForURL(expectedUrl), page.getByTestId("booking-link").click()]);
       expect(audit.requests).toHaveLength(1);
       expect(audit.requests[0]?.frame()).toBe(page.mainFrame());
     });
 
-    test("blocked embeds preserve ordinary anchor navigation", async ({ page, context, baseURL }) => {
+    test("blocked embeds preserve ordinary anchor navigation", async ({ openApplicationPage, page, context, baseURL }) => {
       test.skip(!configured || bookingMode === "link");
       const audit = await controlProviders(context, baseURL, true);
-      await page.goto(path);
+      await openApplicationPage(page, path);
       if (bookingMode === "inline") await page.getByTestId("booking-inline-region").scrollIntoViewIfNeeded();
       else await page.getByTestId("booking-link").click();
       await expect.poll(() => audit.requests.length).toBeGreaterThan(0);
@@ -167,11 +169,11 @@ for (const locale of locales) {
       expect(audit.requests.at(-1)?.frame()).toBe(page.mainFrame());
     });
 
-    test("configured booking fits 320px and passes selected axe checks", async ({ page, context, baseURL }) => {
+    test("configured booking fits 320px and passes selected axe checks", async ({ openApplicationPage, page, context, baseURL }) => {
       test.skip(!configured);
       await controlProviders(context, baseURL);
       await page.setViewportSize({ width: 320, height: 800 });
-      await page.goto(path);
+      await openApplicationPage(page, path);
       await page.getByTestId("booking-link").scrollIntoViewIfNeeded();
       if (bookingMode === "popup") await page.getByTestId("booking-link").click();
       const selector = bookingMode === "popup" ? '[data-testid="booking-dialog"]' : 'section[aria-labelledby="booking-heading"]';

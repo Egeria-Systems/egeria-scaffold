@@ -172,8 +172,8 @@ test("environment persistence removal requires reviewed evidence and permits exa
   assert.equal(removed.ok, true, JSON.stringify(removed));
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")), "2.0.0");
   assert.equal(state.ok, true, JSON.stringify(state));
-  assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.7.0");
-  assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.7.0");
+  assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.9.0");
+  assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.9.0");
   assert.ok(state.value.installedCapabilities.some(({ identifier }) => identifier === "multilingual"));
   assert.equal(repo.files.has("apps/web/src/configuration/application-database.ts"), false);
   const renderingContext = core.createApplicationEnvironmentRenderingContext();

@@ -1922,6 +1922,106 @@ export async function verifyGeneratedProjectForTesting(
   return verifySourcesWithAdapters(adapters, [source], options);
 }
 
+export function verifyApplicationEnvironmentProject(root) {
+  return verifyApplicationEnvironmentProjectForTesting(root, { createOwner: createGeneratedFixtureOwner, runCommand: defaultRunCommand });
+}
+
+export async function verifyApplicationEnvironmentProjectForTesting(root, adapters) {
+  if (typeof adapters?.createOwner !== "function" || typeof adapters.runCommand !== "function") fail("VERIFICATION_SETUP_FAILED");
+  const core = await import("../packages/builder-core/dist/index.js");
+  const { derivePnpmToolEnvironment } = await import("../packages/builder-core/dist/generation/verify-generated-project.js");
+  const toolEnvironment = await (adapters.derivePnpmToolEnvironment ?? derivePnpmToolEnvironment)("pnpm");
+  const fixedRoot = resolve(root);
+  const sourceBefore = await snapshotTree(fixedRoot);
+  const snapshot = await core.readVerifiedProjectSnapshot(core.createFileSystemRepositoryReader(fixedRoot), core.createApplicationEnvironmentRenderingContext());
+  const project = core.parseProjectYaml(await readFile(join(fixedRoot, ".egeria/project.yaml"), "utf8"), "2.0.0");
+  if (!snapshot.ok || !project.ok) fail("FIXTURE_STATE_INVALID");
+  const selected = project.value.selectedCapabilities;
+  const jobs = selected.includes("background-job-delivery");
+  const persistence = selected.includes("application-persistence");
+  const foundation = selected.includes("app-foundation");
+  const manifest = await readFile(join(fixedRoot, "apps/web/package.json"));
+  const lockfile = await readFile(join(fixedRoot, "pnpm-lock.yaml"));
+  const owner = await adapters.createOwner();
+  if (!(await pathIdentityMatches(owner))) fail("VERIFICATION_SETUP_FAILED");
+  const targets = [];
+  let pendingError;
+  try {
+    for (const target of ["development", "staging", "production"]) {
+      const validationRoot = join(owner.path, target + "-project");
+      const supportRoot = join(owner.path, target + "-support");
+      await cp(fixedRoot, validationRoot, { recursive: true, force: false, errorOnExist: true, dereference: false });
+      await mkdir(supportRoot, { mode: 0o700 });
+      const support = await createSupportPaths(supportRoot);
+      const revision = "a".repeat(40); // Explicit synthetic source identity, never a reviewed commit assertion.
+      const siteOrigin = `https://${target}.application-test.invalid`;
+      const environment = { ...createChildEnvironment(support), ...toolEnvironment, APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_SITE_URL: siteOrigin,
+        BUILD_SOURCE_REVISION: revision, WRANGLER_SEND_METRICS: "false", ...(target === "development" ? {} : { CLOUDFLARE_ENV: target }) };
+      if (selected.includes("contact-form-web3forms")) Object.assign(environment, { NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "00000000-0000-4000-8000-000000000001", CONTACT_TEST_EXPECTED_ACCESS_KEY: "00000000-0000-4000-8000-000000000001" });
+      if (selected.includes("booking-calendly")) Object.assign(environment, { NEXT_PUBLIC_CALENDLY_URL: "https://calendly.com/egeria-synthetic-nonproduction/intro", BOOKING_TEST_EXPECTED_URL: "https://calendly.com/egeria-synthetic-nonproduction/intro", BOOKING_TEST_MODE: project.value.capabilitySettings["booking-calendly"].mode, BOOKING_TEST_MULTILINGUAL: String(selected.includes("multilingual")) });
+      if (selected.includes("analytics")) {
+        const settings = project.value.capabilitySettings.analytics;
+        Object.assign(environment, { NEXT_PUBLIC_ANALYTICS_ENABLED: "false", ANALYTICS_TEST_BUILD_FLAG: "false", ANALYTICS_TEST_TARGET: target,
+          ANALYTICS_TEST_EXPECTED_SITE_ORIGIN: siteOrigin, ANALYTICS_TEST_EXPECTED_CLOUDFLARE_TOKEN: "", ANALYTICS_TEST_EXPECTED_GA4_ID: "", ANALYTICS_TEST_EXPECTED_CLARITY_ID: "", ANALYTICS_TEST_EXPECTED_VERIFICATION: "" });
+        if (settings.operationalIntegrations.googleSearchConsole !== undefined) {
+          environment.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION = "synthetic-verification-not-a-provider-token";
+          environment.ANALYTICS_TEST_EXPECTED_VERIFICATION = target === "production" ? environment.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION : "";
+        }
+      }
+      const commands = [];
+      const run = async (arguments_, failureCode) => {
+        const result = await runExpectedCommand(adapters.runCommand, { executable: "pnpm", arguments: arguments_, cwd: validationRoot, environment, timeout: commandTimeoutMilliseconds }, failureCode);
+        commands.push({ arguments: arguments_, status: "passed" });
+        return result;
+      };
+      if ((await run(["--version"], "PNPM_VERSION_INVALID")).trim() !== requiredPnpmVersion) fail("PNPM_VERSION_INVALID");
+      await run(["install", "--frozen-lockfile", "--store-dir", support.store], "FROZEN_INSTALL_FAILED");
+      await run(["--dir", "apps/web", "run", "browser:install"], "BROWSER_INSTALL_FAILED");
+      if (target === "development") {
+        await run(["run", "lint"], "LINT_FAILED");
+        if (persistence) await run(["--dir", "apps/web", "run", "cf-typegen"], "CLOUDFLARE_TYPE_GENERATION_FAILED");
+        await run(["run", "typecheck"], "TYPECHECK_FAILED");
+        await run(["run", "test:unit"], "UNIT_TESTS_FAILED");
+        await run(["run", "test:component"], "COMPONENT_TESTS_FAILED");
+        await run(["--dir", "apps/web", "run", "test:deployment-contracts"], "DEPLOYMENT_CONTRACTS_FAILED");
+        await run(["--dir", "apps/web", "run", "test:transport"], "TRANSPORT_CONTRACTS_FAILED");
+        await run(["--dir", "apps/web", "run", "test:e2e:dev"], "BROWSER_DEVELOPMENT_FAILED");
+      }
+      await run(["--dir", "apps/web", "run", target === "development" ? "check:environment" : "check:environment:deployment"], "APPLICATION_ENVIRONMENT_INVALID");
+      await run(["run", "build"], "NEXT_BUILD_FAILED");
+      await run(["--dir", "apps/web", "exec", "opennextjs-cloudflare", "build", "--skipNextBuild"], "OPENNEXT_BUILD_FAILED");
+      if (jobs) await run(["--dir", "apps/web", "exec", "wrangler", "deploy", "--dry-run", ...(target === "development" ? [] : ["--env", target]), "--outdir", ".open-next/jobs-bundle", "--metafile", ".open-next/jobs-inputs.json", "--x-provision=false", "--x-auto-create=false"], "JOB_BUNDLE_FAILED");
+      const artifact = mode => ["--dir", "apps/web", "run", "check:prepared-artifact", mode, target, revision, "--local"];
+      await run(artifact("record"), "PREPARED_ARTIFACT_FAILED");
+      const receiptPath = join(validationRoot, "apps/web/.open-next/prepared-artifact.json");
+      const receiptBefore = await readFile(receiptPath);
+      if (foundation) await run(["--dir", "apps/web", "run", "test:integration:cloudflare"], "WORKER_INTEGRATION_FAILED");
+      if (persistence) await run(["--dir", "apps/web", "run", "test:integration:bindings"], "BINDING_INTEGRATION_FAILED");
+      await run(artifact("verify"), "PREPARED_ARTIFACT_FAILED");
+      await run(["--dir", "apps/web", "run", "test:e2e:preview"], "BROWSER_PREVIEW_FAILED");
+      await run(artifact("verify"), "PREPARED_ARTIFACT_FAILED");
+      if (!(await readFile(receiptPath)).equals(receiptBefore)) fail("PREPARED_ARTIFACT_CHANGED");
+      targets.push({ target, sourceIdentity: { revision, synthetic: true }, publicOrigin: siteOrigin,
+        manifestSha256: fingerprint(manifest), lockfileSha256: fingerprint(lockfile), receiptSha256: fingerprint(receiptBefore),
+        environmentKeys: Object.keys(environment).sort(), commands });
+    }
+  } catch (error) { pendingError = error; }
+  finally {
+    try { if (JSON.stringify(await snapshotTree(fixedRoot)) !== JSON.stringify(sourceBefore)) pendingError = new GeneratedFixtureVerificationError("FIXTURE_SOURCE_CHANGED"); }
+    catch { pendingError = new GeneratedFixtureVerificationError("FIXTURE_SOURCE_CHANGED"); }
+    if (pendingError === undefined) {
+      if (!(await cleanupOwnedDirectory(owner))) pendingError = new GeneratedFixtureVerificationError("VERIFICATION_CLEANUP_FAILED");
+    } else if (await pathIdentityMatches(owner)) {
+      // Preserve only this identity-owned synthetic project and its failing receipt.
+      const failureCode = pendingError instanceof GeneratedFixtureVerificationError ? pendingError.code : "VERIFICATION_FAILED";
+      await writeFile(join(owner.path, "verification-failure.json"), JSON.stringify({ failureCode, completedTargets: targets, owner: { path: owner.path, device: String(owner.device), inode: String(owner.inode) } }, null, 2), { flag: "wx", mode: 0o600 });
+      pendingError.retainedEvidencePath = owner.path;
+    }
+  }
+  if (pendingError !== undefined) throw pendingError;
+  return { ok: true, targets, providerPolicy: "synthetic inputs and controlled browser requests only", liveAcceptance: false };
+}
+
 async function runMain() {
   try {
     const options = parseVerificationArguments(process.argv.slice(2));

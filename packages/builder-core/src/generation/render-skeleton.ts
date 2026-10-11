@@ -6,6 +6,7 @@ import {
   createCapabilityCatalogSnapshot,
   applicationPersistenceScripts,
   applicationEnvironmentScripts,
+  applicationEnvironmentVerificationScripts,
   persistenceDeploymentScripts,
   type CapabilityCatalogSnapshot,
   type CapabilityPackageVersions,
@@ -275,7 +276,7 @@ function enrichApplicationManifest(
     ...manifest,
     scripts: {
       ...manifest.scripts,
-      ...(applicationEnvironments ? applicationEnvironmentScripts : {}),
+      ...(applicationEnvironments ? { ...applicationEnvironmentScripts, ...applicationEnvironmentVerificationScripts } : {}),
       ...(foundation
         ? { "test:integration:cloudflare": "vitest run --config vitest.cloudflare.config.ts" }
         : {}),
@@ -479,7 +480,7 @@ export async function renderSkeleton(
   context?: SkeletonRenderingContext | ApplicationEnvironmentRenderingContext,
 ): Promise<ValidationResult<RenderedSkeleton<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration>>> {
   const applicationEnvironments = context !== undefined && "projectSchemaVersion" in context;
-  const environmentDescriptor = context?.catalogSnapshot.standards === "0.7.0" || context?.catalogSnapshot.standards === "0.8.0" || context?.catalogSnapshot.appFoundation === "0.3.0" || context?.catalogSnapshot.deploymentCloudflare === "0.7.0" || context?.catalogSnapshot.deploymentCloudflare === "0.8.0";
+  const environmentDescriptor = context?.catalogSnapshot.standards === "0.9.0" || context?.catalogSnapshot.standards === "0.10.0" || context?.catalogSnapshot.appFoundation === "0.3.0" || context?.catalogSnapshot.siteRouting === "0.5.0" || context?.catalogSnapshot.backgroundJobDelivery === "0.3.0" || ["0.9.0", "0.10.0", "0.11.0", "0.12.0"].includes(context?.catalogSnapshot.deploymentCloudflare ?? "");
   if ((applicationEnvironments || environmentDescriptor || (context !== undefined && "projectSchemaVersion" in context)) &&
       (!applicationEnvironments || !isApplicationEnvironmentRenderingContext(context))) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "unsupported-context");
@@ -487,8 +488,8 @@ export async function renderSkeleton(
   if (applicationEnvironments && Object.hasOwn(request, "contactFormWeb3Forms") && request.contactFormWeb3Forms !== true) {
     return generatedIssue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "contactFormWeb3Forms"], "invalid-selection");
   }
-  if (applicationEnvironments && request.backgroundJobDelivery === true) {
-    return generatedIssue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
+  if (applicationEnvironments && (request.backgroundJobDelivery === true) !== (context.catalogSnapshot.backgroundJobDelivery === "0.3.0")) {
+    return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "selection-mismatch");
   }
   if (applicationEnvironments && (request.applicationPersistence === true) !== (context.catalogSnapshot.applicationPersistence === "0.2.0")) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "selection-mismatch");
@@ -601,6 +602,44 @@ export async function renderSkeleton(
       ...(analytics.operationalIntegrations.googleSearchConsole === undefined ? [] : ["NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION="]),
       "",
     ].join("\n");
+    const publicInputs = [
+      ...(request.contactFormWeb3Forms === true ? ["NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY"] : []),
+      ...(request.bookingCalendly === undefined ? [] : ["NEXT_PUBLIC_CALENDLY_URL"]),
+      ...(analytics === undefined ? [] : ["NEXT_PUBLIC_ANALYTICS_ENABLED",
+        ...(analytics.providers.cloudflareWebAnalytics === undefined ? [] : ["NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN"]),
+        ...(analytics.providers.googleAnalytics4 === undefined ? [] : ["NEXT_PUBLIC_GA4_MEASUREMENT_ID"]),
+        ...(analytics.providers.microsoftClarity === undefined ? [] : ["NEXT_PUBLIC_CLARITY_PROJECT_ID"]),
+        ...(analytics.operationalIntegrations.googleSearchConsole === undefined ? [] : ["NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION"]),
+      ]),
+    ];
+    const workflowIndex = files.findIndex(file => file.path === ".github/workflows/deploy.yml");
+    const workflowFile = files[workflowIndex];
+    if (workflowFile !== undefined) {
+      const workflow = parseDocument(decoder.decode(workflowFile.content));
+      for (const job of ["verify-source", "staging", "production"]) {
+        const local = job === "verify-source";
+        const target = local ? "development" : job;
+        const publicValue = (key: string): string => local ? (key === "NEXT_PUBLIC_ANALYTICS_ENABLED" ? "false" : "") : "${{ vars." + key + " }}";
+        const set = (key: string, value: string): void => { workflow.setIn(["jobs", job, "env", key], value); };
+        for (const key of publicInputs) set(key, publicValue(key));
+        if (request.contactFormWeb3Forms === true) set("CONTACT_TEST_EXPECTED_ACCESS_KEY", publicValue("NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY"));
+        if (request.bookingCalendly !== undefined) {
+          set("BOOKING_TEST_EXPECTED_URL", publicValue("NEXT_PUBLIC_CALENDLY_URL"));
+          set("BOOKING_TEST_MODE", request.bookingCalendly.mode);
+          set("BOOKING_TEST_MULTILINGUAL", String(request.multilingual === true));
+        }
+        if (analytics !== undefined) {
+          set("ANALYTICS_TEST_BUILD_FLAG", publicValue("NEXT_PUBLIC_ANALYTICS_ENABLED"));
+          set("ANALYTICS_TEST_TARGET", target);
+          set("ANALYTICS_TEST_EXPECTED_SITE_ORIGIN", local ? "http://localhost:3000" : "${{ vars.NEXT_PUBLIC_SITE_URL }}");
+          for (const [expectation, input] of [
+            ["CLOUDFLARE_TOKEN", "NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN"], ["GA4_ID", "NEXT_PUBLIC_GA4_MEASUREMENT_ID"],
+            ["CLARITY_ID", "NEXT_PUBLIC_CLARITY_PROJECT_ID"], ["VERIFICATION", "NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION"],
+          ] as const) set(`ANALYTICS_TEST_EXPECTED_${expectation}`, publicInputs.includes(input) && (expectation !== "VERIFICATION" || target === "production") ? publicValue(input) : "");
+        }
+      }
+      files[workflowIndex] = { ...workflowFile, content: encoder.encode(workflow.toString()) };
+    }
     files.push(
       { path: "apps/web/.env.example", content: encoder.encode(`APPLICATION_ENVIRONMENT=development\nNEXT_PUBLIC_SITE_URL=http://localhost:3000\n${request.contactFormWeb3Forms === true ? "NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=\n" : ""}${request.bookingCalendly === undefined ? "" : "NEXT_PUBLIC_CALENDLY_URL=\n"}${analyticsExample}`) },
       { path: "apps/web/.dev.vars.example", content: encoder.encode("APPLICATION_ENVIRONMENT=development\nBETTER_STACK_INGESTING_HOST=\nBETTER_STACK_SOURCE_TOKEN=\n" + (request.transactionalEmailResend === true ? "RESEND_API_KEY=\nTRANSACTIONAL_EMAIL_FROM=\nTRANSACTIONAL_EMAIL_DOMAIN=\nTRANSACTIONAL_EMAIL_ALLOWED_RECIPIENTS=\n" : "")) },

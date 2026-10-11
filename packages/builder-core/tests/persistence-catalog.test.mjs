@@ -103,8 +103,8 @@ test("environment persistence resolves the complete app tuple without changing o
   assert.equal(resolved.ok, true, JSON.stringify(resolved));
   const versions = Object.fromEntries(resolved.value.capabilities.map(({ identifier, version }) => [identifier, version]));
   assert.equal(versions["application-persistence"], "0.2.0");
-  assert.equal(versions.standards, "0.8.0");
-  assert.equal(versions["deployment-cloudflare"], "0.8.0");
+  assert.equal(versions.standards, "0.10.0");
+  assert.equal(versions["deployment-cloudflare"], "0.10.0");
   assert.equal(versions["app-foundation"], "0.3.0");
   const persistence = result.value.find(({ identifier }) => identifier === "application-persistence");
   assert.equal(persistence.removalPolicy, "export-and-remove");
@@ -127,12 +127,12 @@ test("environment persistence resolves the complete app tuple without changing o
 
 test("environment persistence rejects partial and mixed snapshots at the catalog and rendering-context boundaries", () => {
   const context = createApplicationEnvironmentRenderingContext(true);
-  const exact = { standards: "0.8.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.8.0", applicationPersistence: "0.2.0", transactionalEmailResend: "0.2.0" };
+  const exact = { standards: "0.10.0", siteRouting: "0.5.0", appFoundation: "0.3.0", deploymentCloudflare: "0.10.0", applicationPersistence: "0.2.0", transactionalEmailResend: "0.2.0" };
   assert.deepEqual(context.catalogSnapshot, exact);
   assert.equal(isApplicationEnvironmentRenderingContext(context), true);
   for (const snapshot of [
-    { ...exact, standards: "0.7.0" },
-    { ...exact, deploymentCloudflare: "0.7.0" },
+    { ...exact, standards: "0.9.0" },
+    { ...exact, deploymentCloudflare: "0.9.0" },
     { ...exact, applicationPersistence: "0.1.0" },
     { ...exact, applicationPersistence: undefined },
     { ...exact, appFoundation: undefined },

@@ -598,7 +598,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     project.originProfile !== "app" || (input.renderingContext === undefined
       ? project.recipeVersion !== "0.2.0" && project.recipeVersion !== "0.2.2" && project.recipeVersion !== "0.2.3"
       : project.recipeVersion !== "0.3.0") ||
-    snapshot.value.renderingContext?.catalogSnapshot.standards !== (input.renderingContext === undefined ? "0.5.0" : "0.7.0")
+    snapshot.value.renderingContext?.catalogSnapshot.standards !== (input.renderingContext === undefined ? "0.5.0" : "0.9.0")
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   if (input.renderingContext === undefined && (capabilityValue === "transactional-email-resend" || capabilityValue === "contact-form-web3forms" || capabilityValue === "background-job-delivery") && !(
     (project.originProfile === "portfolio" && (project.recipeVersion === "0.11.0" || (project.recipeVersion === "0.11.2" || project.recipeVersion === "0.11.3"))) ||

@@ -451,7 +451,7 @@ test("environment observability generation preserves diagnostics isolation", { t
   const supportRoot = join(owner, "support");
   await mkdir(supportRoot);
   const support = await prepareLiveSupport(supportRoot);
-  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false", WRANGLER_LOG_PATH: join(owner, "wrangler.log") };
+  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), NEXT_PUBLIC_SITE_URL: "https://environment.example.test", BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false", WRANGLER_LOG_PATH: join(owner, "wrangler.log") };
   const commands = [];
   const receipts = [];
   const digest = bytes => createHash("sha256").update(bytes).digest("hex");
@@ -792,7 +792,7 @@ test("application environment generation validates real target builds and the sa
   const supportRoot = join(owner, "support");
   await mkdir(supportRoot);
   const support = await prepareLiveSupport(supportRoot);
-  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false" };
   async function run(name, arguments_, additions = {}) {
     const command = { name, arguments: arguments_, applicationEnvironment: additions.APPLICATION_ENVIRONMENT ?? "loaded-by-next-or-default" };
     try {
@@ -859,7 +859,7 @@ it("keeps the public build target and public values fixed when runtime configura
     await writeFile(join(app, ".env.local"), `APPLICATION_ENVIRONMENT=${target === "production" ? "staging" : target}\nNEXT_PUBLIC_SITE_URL=${selected}\nSERVER_ONLY_PROOF=server-secret-sentinel\n`);
     await writeFile(join(app, ".env.production"), "NEXT_PUBLIC_SITE_URL=https://other-target-public-sentinel.example\n");
     await writeFile(join(app, ".env.staging"), "NEXT_PUBLIC_SITE_URL=https://unloaded-staging-public-sentinel.example\n");
-    await run(`${target}-preflight`, ["--dir", "apps/web", "run", target === "development" ? "check:environment" : "check:environment:deployment"], { APPLICATION_ENVIRONMENT: target });
+    await run(`${target}-preflight`, ["--dir", "apps/web", "run", target === "development" ? "check:environment" : "check:environment:deployment"], { APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_SITE_URL: selected });
     const buildEnvironment = target === "production" ? { APPLICATION_ENVIRONMENT: target } : {};
     await run(`${target}-next`, ["--dir", "apps/web", "run", "build"], buildEnvironment);
     await run(`${target}-opennext`, ["--dir", "apps/web", "exec", "opennextjs-cloudflare", "build", "--skipNextBuild"], { APPLICATION_ENVIRONMENT: target });
@@ -885,7 +885,7 @@ test("environment contact builds freeze selected public values in controlled bro
   const supportRoot = join(owner, "support");
   await mkdir(supportRoot);
   const support = await prepareLiveSupport(supportRoot);
-  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), NEXT_PUBLIC_SITE_URL: "https://environment.example.test", BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false" };
   const commands = [];
   const artifacts = [];
   const destination = join(owner, "generated");
@@ -1024,7 +1024,7 @@ for (const [profile, bookingMode, contact, multilingual] of [
     const supportRoot = join(owner, "support");
     await mkdir(supportRoot);
     const support = await prepareLiveSupport(supportRoot);
-    const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+    const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), NEXT_PUBLIC_SITE_URL: "https://environment.example.test", BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false" };
     const commands = [];
     const artifacts = [];
     const destination = join(owner, "generated");
@@ -1175,7 +1175,7 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
     const supportRoot = join(owner, "support");
     await mkdir(supportRoot);
     const support = await prepareLiveSupport(supportRoot);
-    const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+    const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), NEXT_PUBLIC_SITE_URL: "https://environment.example.test", BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false" };
     const commands = [];
     const artifacts = [];
     const identifiersA = {
@@ -1413,8 +1413,8 @@ process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => pr
   assert.equal(removed.ok, true);
   assert.equal(removed.result.status, "verified-final-diff-approval-required");
   const removedState = JSON.parse(await readFile(join(linked, ".egeria/state.json"), "utf8"));
-  assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.7.0");
-  assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.7.0");
+  assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.9.0");
+  assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.9.0");
   assert.equal(removedState.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"), false);
   assert.equal(removedState.lastSuccessfulVerification.checks.includes("binding-integration"), false);
   await commitFixture("removed-persistence", linked);
@@ -1425,7 +1425,7 @@ process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => pr
   assert.equal(added.result.status, "verified-final-diff-approval-required");
   const finalState = JSON.parse(await readFile(join(linked, ".egeria/state.json"), "utf8"));
   assert.deepEqual(finalState.appliedMigrations, ["remove-application-persistence-0-2-0", "add-application-persistence-0-2-0"]);
-  for (const [identifier, version] of [["application-persistence", "0.2.0"], ["standards", "0.8.0"], ["deployment-cloudflare", "0.8.0"], ["app-foundation", "0.3.0"]]) assert.equal(finalState.installedCapabilities.find(capability => capability.identifier === identifier).version, version);
+  for (const [identifier, version] of [["application-persistence", "0.2.0"], ["standards", "0.10.0"], ["deployment-cloudflare", "0.10.0"], ["app-foundation", "0.3.0"]]) assert.equal(finalState.installedCapabilities.find(capability => capability.identifier === identifier).version, version);
   assert.ok(finalState.lastSuccessfulVerification.checks.includes("binding-integration"));
   assert.deepEqual(await readFile(join(linked, ".egeria/project.yaml")), initialProject);
   assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), initialLock);
@@ -1443,7 +1443,7 @@ test("environment email generation and lifecycle preserve recipient isolation", 
   const supportRoot = join(owner, "support");
   await mkdir(supportRoot);
   const support = await prepareLiveSupport(supportRoot);
-  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), NEXT_PUBLIC_SITE_URL: "https://environment.example.test", BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false" };
   const digest = bytes => createHash("sha256").update(bytes).digest("hex");
   async function command(label, executable, arguments_, cwd = owner, additions = {}) {
     try {
@@ -1470,7 +1470,7 @@ process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => pr
     assert.equal(versions["transactional-email-resend"], email ? "0.2.0" : undefined);
     assert.equal(versions["application-persistence"], persistence ? "0.2.0" : undefined);
     if (email || label.includes("remove")) assert.equal(versions["app-foundation"], "0.3.0");
-    assert.equal(versions["site-routing"], state.origin.profile === "portfolio" ? undefined : "0.4.0");
+    assert.equal(versions["site-routing"], state.origin.profile === "portfolio" ? undefined : "0.5.0");
     for (const operation of ["infer", "doctor"]) assert.equal((await cli(`${label}-${operation}`, [operation, "--directory", root])).ok, true);
     receipts.push({ label, root, versions, verification: state.lastSuccessfulVerification,
       projectSha256: digest(await readFile(join(root, ".egeria/project.yaml"))), lockSha256: digest(await readFile(join(root, "pnpm-lock.yaml"))) });
@@ -1641,3 +1641,27 @@ it("optional absence and invalid independent queue configuration cause no extern
   await command("independent-consumers", "pnpm", ["--dir", "apps/web", "run", "test:unit", "job-delivery.test.ts", "independent-email-jobs.test.ts"], workerProject);
   context.diagnostic(JSON.stringify({ owner, generationReceipts: receipts.length, builtTargets: artifactEvidence.length, transport: "intercepted-only", persistenceBindingChecks: "app generation and lifecycle receipts", jobsCandidateAdmitted: false }));
 });
+
+
+for (const [profile, selection] of [
+  ["portfolio", {}],
+  ["site", { multilingual: true, contactFormWeb3Forms: true, bookingCalendly: { mode: "popup" }, analytics: {
+    consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {},
+  } }],
+  ["app", { applicationPersistence: true, transactionalEmailResend: true }],
+]) {
+  test(`${profile} environment metadata and prepared artifacts retain identity across all targets`, { timeout: 90 * 60 * 1000 }, async context => {
+    const owner = await mkdtemp(join(tmpdir(), "egeria-environment-prepared-generation-"));
+    context.diagnostic(`Retained prepared target evidence: ${owner}`);
+    const result = assertSuccess(await generateProject({
+      request: { profile, projectName: `prepared-${profile}`, displayName: `Prepared ${profile}`, ...selection },
+      destination: join(owner, "project"), renderingContext: createApplicationEnvironmentRenderingContext(selection.applicationPersistence === true),
+      verifier: createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
+    }));
+    const { verifyApplicationEnvironmentProject } = await import("../../../scripts/verify-generated-skeletons.mjs");
+    const verification = await verifyApplicationEnvironmentProject(result.destination);
+    assert.deepEqual(verification.targets.map(({ target }) => target), ["development", "staging", "production"]);
+    assert.equal(new Set(verification.targets.map(({ receiptSha256 }) => receiptSha256)).size, 3);
+    await writeFile(join(owner, "prepared-target-evidence.json"), JSON.stringify(verification, null, 2));
+  });
+}

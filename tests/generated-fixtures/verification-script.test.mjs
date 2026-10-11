@@ -2050,3 +2050,54 @@ test("active fixture inspection independently refuses retained workspace policie
     await rm(owner, { recursive: true, force: true });
   }
 });
+
+
+test("candidate verification builds each target before recording and never rebuilds prepared output", async t => {
+  const core = await import("../../packages/builder-core/dist/index.js");
+  const harness = await import("../../scripts/verify-generated-skeletons.mjs");
+  assert.equal(typeof harness.verifyApplicationEnvironmentProjectForTesting, "function");
+  const parent = await mkdtemp(join(tmpdir(), "environment-verifier-contract-"));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  const generated = await core.generateProject({ request: { profile: "portfolio", projectName: "artifact-contract", displayName: "Artifact Contract" },
+    destination: join(parent, "source"), renderingContext: core.createApplicationEnvironmentRenderingContext(),
+    verifier: { ...core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }), verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: core.ordinaryGenerationVerificationChecks } }) } });
+  assert.equal(generated.ok, true, JSON.stringify(generated));
+  const calls = [];
+  const result = await harness.verifyApplicationEnvironmentProjectForTesting(generated.value.destination, {
+    createOwner: () => createKnownOwner(parent),
+    derivePnpmToolEnvironment: async executable => { assert.equal(executable, "pnpm"); return { VOLTA_HOME: "/synthetic/volta", VOLTA_FEATURE_PNPM: "1" }; },
+    runCommand: async input => {
+      calls.push(input);
+      if (input.arguments.includes("record")) {
+        await mkdir(join(input.cwd, "apps/web/.open-next"), { recursive: true });
+        await writeFile(join(input.cwd, "apps/web/.open-next/prepared-artifact.json"), JSON.stringify({ syntheticHarnessFixture: true, target: input.environment.APPLICATION_ENVIRONMENT }));
+      }
+      return input.arguments[0] === "--version" ? "11.20.0" : "";
+    },
+  });
+  assert.deepEqual(result.targets.map(value => value.target), ["development", "staging", "production"]);
+  for (const target of ["development", "staging", "production"]) {
+    const commands = calls.filter(value => value.environment.APPLICATION_ENVIRONMENT === target);
+    const record = commands.findIndex(value => value.arguments.includes("record"));
+    assert.ok(record > commands.findIndex(value => value.arguments.includes("--skipNextBuild")));
+    assert.ok(commands.slice(record + 1).some(value => value.arguments.includes("test:e2e:preview")));
+    assert.equal(commands.slice(record + 1).some(value => value.arguments.includes("build") || value.arguments.includes("test:e2e:dev")), false);
+    assert.equal(commands.every(value => value.environment.CF_ACCESS_CLIENT_SECRET === undefined && value.environment.CLOUDFLARE_API_TOKEN === undefined), true);
+    assert.equal(commands.every(value => value.environment.VOLTA_HOME === "/synthetic/volta" && value.environment.VOLTA_FEATURE_PNPM === "1"), true);
+    assert.equal(commands.some(value => value.arguments.includes("--remote") || value.arguments[0] === "audit"), false);
+  }
+  let retainedPath;
+  await assert.rejects(harness.verifyApplicationEnvironmentProjectForTesting(generated.value.destination, {
+    createOwner: async () => { const owner = await createKnownOwner(parent); retainedPath = owner.path; return owner; },
+    runCommand: async input => {
+      if (input.arguments.includes("record")) {
+        await mkdir(join(input.cwd, "apps/web/.open-next"), { recursive: true });
+        await writeFile(join(input.cwd, "apps/web/.open-next/prepared-artifact.json"), "synthetic-failing-receipt");
+      }
+      if (input.arguments.includes("test:e2e:preview")) throw new Error("synthetic-preview-failure");
+      return input.arguments[0] === "--version" ? "11.20.0" : "";
+    },
+  }), error => error.code === "BROWSER_PREVIEW_FAILED" && error.retainedEvidencePath === retainedPath);
+  assert.equal(await readFile(join(retainedPath, "development-project/apps/web/.open-next/prepared-artifact.json"), "utf8"), "synthetic-failing-receipt");
+  assert.equal(JSON.parse(await readFile(join(retainedPath, "verification-failure.json"))).failureCode, "BROWSER_PREVIEW_FAILED");
+});
