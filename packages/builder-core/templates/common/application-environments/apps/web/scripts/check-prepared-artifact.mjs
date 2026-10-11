@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { closeSync, constants, fstatSync, lstatSync, openSync, opendirSync, readSync, writeFileSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, openSync, opendirSync, readlinkSync, readSync, writeFileSync } from "node:fs";
+import { isBuiltin } from "node:module";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parseApplicationBuildId } from "../src/configuration/application-build.ts";
 
@@ -53,7 +54,20 @@ function bundleInputs(wrangler) {
     if (!path.startsWith(".open-next/jobs-bundle/") || relative(webRoot, resolve(path)) !== path) refuse("PREPARED_ARTIFACT_BUNDLE_INVALID");
     if (!lstatSync(path).isFile()) refuse("PREPARED_ARTIFACT_BUNDLE_INVALID");
   }
-  const paths = [...inputs, "package.json", "tsconfig.json", "../../package.json", "../../pnpm-lock.yaml", "../../pnpm-workspace.yaml"];
+  const builtinNamespace = "node-built-in-modules:";
+  const physicalInputs = inputs.filter(path => {
+    if (!path.startsWith(builtinNamespace)) return true;
+    const specifier = path.slice(builtinNamespace.length);
+    const input = metadata.inputs[path];
+    if (!isBuiltin(specifier) || !input || typeof input !== "object" || Array.isArray(input) ||
+        !Number.isSafeInteger(input.bytes) || input.bytes < 0 || input.format !== "cjs" ||
+        !Array.isArray(input.imports) || input.imports.length !== 1 ||
+        input.imports[0]?.path !== specifier || input.imports[0]?.kind !== "import-statement" ||
+        input.imports[0]?.external !== true) refuse("PREPARED_ARTIFACT_BUNDLE_INVALID");
+    // The complete metafile remains hashed; this native wrapper has no physical path.
+    return false;
+  });
+  const paths = [...physicalInputs, "package.json", "tsconfig.json", "../../package.json", "../../pnpm-lock.yaml", "../../pnpm-workspace.yaml"];
   for (const path of paths) {
     if (isAbsolute(path) || path.includes("\\") || path.includes(":" ) || path.length > 1024 || relative(webRoot, resolve(path)) !== path ||
         !(path === "worker.mjs" || path === "package.json" || path === "tsconfig.json" ||
@@ -77,9 +91,52 @@ function artifactConfiguration(config, target, absolute = false) {
   return { ...selected, main };
 }
 
+function validateArtifactSymlinks(symlinks, directories) {
+  const serverRoot = join(".open-next", "server-functions", "default");
+  const children = new Map([...directories].map(path => [path, []]));
+  const incoming = new Map([...directories].map(path => [path, 0]));
+  for (const path of directories) {
+    const parent = dirname(path);
+    if (directories.has(parent)) {
+      children.get(parent).push(path);
+      incoming.set(path, incoming.get(path) + 1);
+    }
+  }
+  for (const { path, target } of symlinks) {
+    const parent = dirname(path);
+    const destination = relative(resolve("."), resolve(parent, target));
+    if (!path.startsWith(`${serverRoot}${sep}`) || !relative(serverRoot, path).split(sep).includes("node_modules") ||
+        !destination.startsWith(`${serverRoot}${sep}`) || relative(parent, destination) !== target) refuse("PREPARED_ARTIFACT_PATH_INVALID");
+    let ancestor = destination;
+    while (ancestor !== serverRoot) {
+      if (!directories.has(ancestor)) refuse("PREPARED_ARTIFACT_PATH_INVALID");
+      ancestor = dirname(ancestor);
+    }
+    if (!directories.has(serverRoot)) refuse("PREPARED_ARTIFACT_PATH_INVALID");
+    children.get(parent).push(destination);
+    incoming.set(destination, incoming.get(destination) + 1);
+  }
+  // Include physical containment edges so ancestor and mutual-directory links
+  // cannot create cycles, without following or expanding any alias.
+  const pending = [...directories].filter(path => incoming.get(path) === 0);
+  let visited = 0;
+  while (pending.length > 0) {
+    const path = pending.pop();
+    visited += 1;
+    for (const child of children.get(path)) {
+      incoming.set(child, incoming.get(child) - 1);
+      if (incoming.get(child) === 0) pending.push(child);
+    }
+  }
+  if (visited !== directories.size) refuse("PREPARED_ARTIFACT_PATH_INVALID");
+}
+
 function inspectFiles(extraPaths) {
   const paths = [".next/BUILD_ID", ".next/required-server-files.json", "wrangler.jsonc", ...extraPaths];
   const pending = [".open-next"];
+  const directories = new Set(pending);
+  const symlinks = [];
+  let totalBytes = 0;
   let entries = paths.length + pending.length;
   while (pending.length > 0) {
     const parent = pending.pop();
@@ -94,15 +151,23 @@ function inspectFiles(extraPaths) {
         if (entries > maximumEntries) refuse("PREPARED_ARTIFACT_SIZE_INVALID");
         if (path.length > 1024) refuse("PREPARED_ARTIFACT_PATH_INVALID");
         const info = lstatSync(path);
-        if (info.isSymbolicLink()) refuse("PREPARED_ARTIFACT_PATH_INVALID");
-        if (info.isDirectory()) pending.push(path);
+        if (info.isSymbolicLink()) {
+          const bytes = readlinkSync(path, { encoding: "buffer" });
+          const target = bytes.toString("utf8");
+          if (bytes.length === 0 || bytes.length > 1024 || !Buffer.from(target, "utf8").equals(bytes) ||
+              isAbsolute(target) || target.includes("\\") || target.includes(":")) refuse("PREPARED_ARTIFACT_PATH_INVALID");
+          totalBytes += bytes.length;
+          if (totalBytes > maximumArtifactBytes) refuse("PREPARED_ARTIFACT_SIZE_INVALID");
+          symlinks.push({ path, target, bytes, info });
+        }
+        else if (info.isDirectory()) { directories.add(path); pending.push(path); }
         else if (info.isFile()) paths.push(path);
         else refuse("PREPARED_ARTIFACT_PATH_INVALID");
       }
     } finally { outputDirectory.closeSync(); }
   }
-  let totalBytes = 0;
-  return [...new Set(paths)].sort().map(path => {
+  validateArtifactSymlinks(symlinks, directories);
+  const files = [...new Set(paths)].sort().map(path => {
     const file = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     try {
       const before = fstatSync(file);
@@ -122,6 +187,13 @@ function inspectFiles(extraPaths) {
       return { path, sha256: hash.digest("hex") };
     } finally { closeSync(file); }
   });
+  for (const { path, bytes, info } of symlinks) {
+    const currentBytes = readlinkSync(path, { encoding: "buffer" });
+    const after = lstatSync(path);
+    if (!after.isSymbolicLink() || !bytes.equals(currentBytes) ||
+        ["dev", "ino", "mode", "size", "mtimeMs", "ctimeMs"].some(key => after[key] !== info[key])) refuse("PREPARED_ARTIFACT_CHANGED");
+  }
+  return { files, symlinks: symlinks.map(({ path, target }) => ({ path, target })).sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0) };
 }
 
 function validateReleaseSource(target, revision) {
@@ -157,9 +229,9 @@ function main() {
     if (remote.main !== wrangler.main) refuse("PREPARED_ARTIFACT_WORKER_UNSUPPORTED");
     inputs.push(".wrangler/application-database/wrangler.remote.json");
   }
-  const files = inspectFiles(inputs);
+  const { files, symlinks } = inspectFiles(inputs);
   if (!files.some(file => file.path === ".open-next/worker.js")) refuse("PREPARED_ARTIFACT_WORKER_UNSUPPORTED");
-  const receipt = { schemaVersion: 1, target, revision, buildId, files };
+  const receipt = { schemaVersion: 2, target, revision, buildId, files, symlinks };
   const serialized = `${JSON.stringify(receipt)}\n`;
   if (Buffer.byteLength(serialized) > maximumMetadataBytes) refuse("PREPARED_ARTIFACT_SIZE_INVALID");
   if (mode === "record") writeFileSync(receiptPath, serialized, { flag: "wx", mode: 0o600 });
