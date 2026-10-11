@@ -260,7 +260,7 @@ async function preparedJobsFixture(t) {
   await writeFile(join(root, ".open-next/jobs-bundle/worker.js"), "export default {};\n");
   await writeFile(join(root, ".open-next/jobs-bundle/build-id.txt"), `egeria-staging-${revision}`);
   await writeFile(join(root, ".open-next/jobs-inputs.json"), JSON.stringify({ inputs: Object.fromEntries(Object.keys(sources).map(path => [path, { bytes: 1, imports: [] }])), outputs: { ".open-next/jobs-bundle/worker.js": { entryPoint: "worker.mjs" } } }));
-  await writeFile(join(root, "wrangler.jsonc"), JSON.stringify({ main: "worker.mjs", assets: { directory: ".open-next/assets" }, rules: [{ type: "Text", globs: [".open-next/assets/BUILD_ID"], fallthrough: false }] }));
+  await writeFile(join(root, "wrangler.jsonc"), JSON.stringify({ main: "worker.mjs", assets: { directory: ".open-next/assets" }, rules: [{ type: "Text", globs: ["**/.open-next/assets/BUILD_ID"], fallthrough: false }] }));
   return root;
 }
 

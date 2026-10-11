@@ -478,7 +478,7 @@ async function verifyInIsolatedCopy(
 
   let workerIntegrationPresent: boolean;
   let bindingIntegrationPresent: boolean;
-  let applicationEnvironments = false;
+  let applicationEnvironments: boolean;
   let backgroundJobs = false;
   try {
     const manifest = JSON.parse(

@@ -165,7 +165,7 @@
     {
       "type": "Text",
       "globs": [
-        ".open-next/assets/BUILD_ID"
+        "**/.open-next/assets/BUILD_ID"
       ],
       "fallthrough": false
     }
