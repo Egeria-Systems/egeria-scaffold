@@ -1015,7 +1015,11 @@ export function createCliRunner(
     if (projectSchemaVersion === "2.0.0") {
       const parsed = parseCliArguments(arguments_, "2.0.0");
       if (!parsed.ok) return writeInvalidArguments(output);
-      const renderingContext = createApplicationEnvironmentRenderingContext(parsed.value.kind === "create" && parsed.value.applicationPersistence === true);
+      const renderingContext = createApplicationEnvironmentRenderingContext(
+        parsed.value.kind === "create" && parsed.value.applicationPersistence === true,
+        false,
+        parsed.value.kind === "create" && parsed.value.backgroundJobDelivery === true,
+      );
       if (parsed.value.kind === "plan-add") return runPlanAdd(parsed.value, output, dependencies, renderingContext);
       if (parsed.value.kind === "plan-remove") return runPlanRemove(parsed.value, output, dependencies, renderingContext);
       if (parsed.value.kind === "apply-add") return runApplyAdd(parsed.value, output, dependencies, renderingContext);

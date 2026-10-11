@@ -1,3 +1,4 @@
+import { readCompiledSiteOrigin } from "../src/configuration/site-origin";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
@@ -15,9 +16,11 @@ const searchVerification = analyticsConfiguration.ok
   ? analyticsConfiguration.configuration.googleSiteVerification
   : undefined;
 
-export const metadata: Metadata = searchVerification === undefined
-  ? {}
-  : { verification: { google: searchVerification } };
+export const metadata: Metadata = {
+  metadataBase: new URL(readCompiledSiteOrigin()),
+  ...(process.env.NEXT_PUBLIC_APPLICATION_ENVIRONMENT === "production" ? {} : { robots: { index: false, follow: false } }),
+  ...(searchVerification === undefined ? {} : { verification: { google: searchVerification } }),
+};
 
 export default async function RootLayout({
   children,

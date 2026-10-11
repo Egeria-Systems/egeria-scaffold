@@ -1,0 +1,256 @@
+name: Verify and release application
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_revision:
+        description: Exact reviewed main revision for both target builds
+        required: true
+        type: string
+
+permissions:
+  contents: read
+concurrency:
+  group: application-release
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  verify-source:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      options: --shm-size=1g
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      revision: {{githubSourceRevisionOutputExpression}}
+    env:
+      APPLICATION_ENVIRONMENT: development
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      BUILD_SOURCE_REVISION: {{githubExpectedRevisionExpression}}
+      EXPECTED_REVISION: {{githubExpectedRevisionExpression}}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - name: Check out frozen source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          ref: {{githubShaExpression}}
+          persist-credentials: false
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+      - name: Verify reviewed clean main revision
+        id: source
+        shell: bash
+        run: |
+          [[ "$EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || exit 1
+          [[ "$GITHUB_RUN_ATTEMPT" == "1" ]] || exit 1
+          [[ "$GITHUB_SHA" == "$EXPECTED_REVISION" ]] || exit 1
+          [[ "$(git rev-parse HEAD)" == "$EXPECTED_REVISION" ]] || exit 1
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]] || exit 1
+          echo "revision=$EXPECTED_REVISION" >> "$GITHUB_OUTPUT"
+      - name: Check native deployment protections
+        working-directory: apps/web
+        env:
+          GITHUB_TOKEN: {{githubTokenExpression}}
+        run: node scripts/check-deployment-protection.mjs preflight
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint generated project
+        run: pnpm run lint
+      - name: Typecheck generated project
+        run: pnpm run typecheck
+      - name: Test unit and component behavior
+        run: |
+          pnpm run test:unit
+          pnpm run test:component
+          pnpm --dir apps/web run test:deployment-contracts
+      - name: Install Chromium
+        run: pnpm --dir apps/web exec playwright install chromium
+      - name: Test development browser behavior and protected transport canaries
+        run: |
+          pnpm --dir apps/web run test:e2e:dev
+          pnpm --dir apps/web run test:transport
+      - name: Build local Worker for simulated binding checks
+        run: |
+          pnpm run build
+          pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild
+          pnpm --dir apps/web run --if-present test:integration:cloudflare
+  staging:
+    needs: verify-source
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      options: --shm-size=1g
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    environment:
+      name: staging
+      url: {{githubDeployUrlExpression}}
+    env:
+      APPLICATION_ENVIRONMENT: staging
+      CLOUDFLARE_ENV: staging
+      NEXT_PUBLIC_SITE_URL: {{githubSiteOriginExpression}}
+      BUILD_SOURCE_REVISION: {{githubVerifiedRevisionExpression}}
+      EXPECTED_REVISION: {{githubVerifiedRevisionExpression}}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - name: Check out frozen source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          ref: {{githubVerifiedRevisionExpression}}
+          persist-credentials: false
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+      - name: Verify reviewed clean main revision
+        id: source
+        shell: bash
+        run: |
+          [[ "$EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || exit 1
+          [[ "$GITHUB_RUN_ATTEMPT" == "1" ]] || exit 1
+          [[ "$GITHUB_SHA" == "$EXPECTED_REVISION" ]] || exit 1
+          [[ "$(git rev-parse HEAD)" == "$EXPECTED_REVISION" ]] || exit 1
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]] || exit 1
+          echo "revision=$EXPECTED_REVISION" >> "$GITHUB_OUTPUT"
+      - name: Check target build inputs
+        working-directory: apps/web
+        env:
+          TARGET_DEPLOY_URL: {{githubDeployUrlExpression}}
+        run: |
+          test "$NEXT_PUBLIC_SITE_URL" = "$TARGET_DEPLOY_URL"
+          node --experimental-strip-types scripts/check-application-environment.mjs --deployment
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm --dir apps/web exec playwright install chromium
+      - name: Prepare target application
+        run: |
+          pnpm run build
+          pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild
+      - name: Record prepared target artifact
+        run: pnpm --dir apps/web run check:prepared-artifact record "$APPLICATION_ENVIRONMENT" "$EXPECTED_REVISION"
+      - name: Test prepared local preview
+        run: |
+          pnpm --dir apps/web run check:prepared-artifact verify "$APPLICATION_ENVIRONMENT" "$EXPECTED_REVISION"
+          pnpm --dir apps/web run test:e2e:preview
+          pnpm --dir apps/web run check:prepared-artifact verify "$APPLICATION_ENVIRONMENT" "$EXPECTED_REVISION"
+      - name: Deploy prepared Cloudflare Worker
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_ACCOUNT_ID: {{githubCloudflareAccountIdExpression}}
+          CLOUDFLARE_API_TOKEN: {{githubCloudflareApiTokenExpression}}
+        run: |
+          pnpm run check:prepared-artifact verify "$APPLICATION_ENVIRONMENT" "$EXPECTED_REVISION"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          pnpm exec opennextjs-cloudflare deploy --env staging -- --x-provision=false --x-auto-create=false
+      - name: Check protected staging readiness and browser behavior
+        env:
+          DEPLOY_URL: {{githubDeployUrlExpression}}
+          CF_ACCESS_CLIENT_ID: {{githubAccessClientIdExpression}}
+          CF_ACCESS_CLIENT_SECRET: {{githubAccessClientSecretExpression}}
+        run: pnpm --dir apps/web run test:e2e:deployed
+  production:
+    needs: [verify-source, staging]
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      options: --shm-size=1g
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    environment:
+      name: production
+      url: {{githubDeployUrlExpression}}
+    env:
+      APPLICATION_ENVIRONMENT: production
+      CLOUDFLARE_ENV: production
+      NEXT_PUBLIC_SITE_URL: {{githubSiteOriginExpression}}
+      BUILD_SOURCE_REVISION: {{githubVerifiedRevisionExpression}}
+      EXPECTED_REVISION: {{githubVerifiedRevisionExpression}}
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - name: Check out frozen source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          ref: {{githubVerifiedRevisionExpression}}
+          persist-credentials: false
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+      - name: Verify reviewed clean main revision
+        id: source
+        shell: bash
+        run: |
+          [[ "$EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || exit 1
+          [[ "$GITHUB_RUN_ATTEMPT" == "1" ]] || exit 1
+          [[ "$GITHUB_SHA" == "$EXPECTED_REVISION" ]] || exit 1
+          [[ "$(git rev-parse HEAD)" == "$EXPECTED_REVISION" ]] || exit 1
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]] || exit 1
+          echo "revision=$EXPECTED_REVISION" >> "$GITHUB_OUTPUT"
+      - name: Recheck native protections and this run's human approval
+        working-directory: apps/web
+        env:
+          GITHUB_TOKEN: {{githubTokenExpression}}
+        run: node scripts/check-deployment-protection.mjs production
+      - name: Check target build inputs
+        working-directory: apps/web
+        env:
+          TARGET_DEPLOY_URL: {{githubDeployUrlExpression}}
+        run: |
+          test "$NEXT_PUBLIC_SITE_URL" = "$TARGET_DEPLOY_URL"
+          node --experimental-strip-types scripts/check-application-environment.mjs --deployment
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm --dir apps/web exec playwright install chromium
+      - name: Prepare target application
+        run: |
+          pnpm run build
+          pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild
+      - name: Record prepared target artifact
+        run: pnpm --dir apps/web run check:prepared-artifact record "$APPLICATION_ENVIRONMENT" "$EXPECTED_REVISION"
+      - name: Test prepared local preview
+        run: |
+          pnpm --dir apps/web run check:prepared-artifact verify "$APPLICATION_ENVIRONMENT" "$EXPECTED_REVISION"
+          pnpm --dir apps/web run test:e2e:preview
+          pnpm --dir apps/web run check:prepared-artifact verify "$APPLICATION_ENVIRONMENT" "$EXPECTED_REVISION"
+      - name: Deploy prepared Cloudflare Worker
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_ACCOUNT_ID: {{githubCloudflareAccountIdExpression}}
+          CLOUDFLARE_API_TOKEN: {{githubCloudflareApiTokenExpression}}
+        run: |
+          pnpm run check:prepared-artifact verify "$APPLICATION_ENVIRONMENT" "$EXPECTED_REVISION"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          pnpm exec opennextjs-cloudflare deploy --env production -- --x-provision=false --x-auto-create=false
+      - name: Check public production readiness and browser behavior
+        env:
+          DEPLOY_URL: {{githubDeployUrlExpression}}
+        run: pnpm --dir apps/web run test:e2e:deployed
