@@ -11,6 +11,28 @@ describe("application build identity", () => {
     expect(resolveApplicationBuild({ applicationEnvironment: undefined }, "local")).toEqual({ ok: true, value: { target: "development", siteOrigin: "http://localhost:3000" } });
   });
 
+  it("preserves revision-bound identity with absent or empty deployment IDs", () => {
+    for (const mode of ["local", "deployment"] as const) {
+      for (const deploymentId of [undefined, ""]) {
+        expect(resolveApplicationBuild({ ...input, deploymentId }, mode)).toEqual({ ok: true, value: { target: "staging", siteOrigin: input.siteUrl, buildId: `egeria-staging-${revision}` } });
+      }
+    }
+  });
+
+  it("preserves local defaults with absent or empty deployment IDs", () => {
+    for (const deploymentId of [undefined, ""]) {
+      expect(resolveApplicationBuild({ applicationEnvironment: undefined, deploymentId }, "local")).toEqual({ ok: true, value: { target: "development", siteOrigin: "http://localhost:3000" } });
+    }
+  });
+
+  it("rejects nonempty and non-string deployment IDs without coercion", () => {
+    for (const mode of ["local", "deployment"] as const) {
+      for (const deploymentId of ["override", " ", null, false, 0]) {
+        expect(resolveApplicationBuild({ ...input, deploymentId }, mode)).toEqual({ ok: false, issue: { field: "deploymentId", reason: "invalid" } });
+      }
+    }
+  });
+
   it("refuses release omissions, target disagreement and deployment overrides", () => {
     for (const changed of [{ sourceRevision: undefined }, { sourceRevision: "not-a-revision" }, { siteUrl: undefined }, { publicApplicationEnvironment: "production" }, { deploymentId: "override" }]) {
       expect(resolveApplicationBuild({ ...input, ...changed }, "deployment").ok).toBe(false);

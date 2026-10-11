@@ -19,7 +19,7 @@ export function resolveApplicationBuild(input: Readonly<{
   if (!target.ok) return target;
   const origin = resolveSiteOrigin({ target: target.value, value: input.siteUrl });
   if (!origin.ok) return origin;
-  if (input.deploymentId !== undefined) return { ok: false, issue: { field: "deploymentId", reason: "invalid" } };
+  if (input.deploymentId !== undefined && input.deploymentId !== "") return { ok: false, issue: { field: "deploymentId", reason: "invalid" } };
   const missing = input.sourceRevision === undefined || input.sourceRevision === "";
   if (missing && mode === "local") return { ok: true, value: { target: target.value, siteOrigin: origin.value } };
   if (typeof input.sourceRevision !== "string" || !/^[a-f0-9]{40}$/u.test(input.sourceRevision)) {
