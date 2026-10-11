@@ -145,7 +145,73 @@ test("prepared jobs receipt binds native metadata inputs and separately emitted 
   }
 });
 
-test("native bundle input discovery fails closed on escape, symlinks, virtual or missing inputs", async t => {
+function virtualBuiltinInput(specifier = "async_hooks") {
+  return { bytes: 66, imports: [{ path: specifier, kind: "import-statement", external: true }], format: "cjs" };
+}
+
+test("prepared jobs receipts accept native virtual builtins without requiring physical files", async t => {
+  for (const specifier of ["async_hooks", "node:fs/promises"]) {
+    const root = await preparedJobsFixture(t);
+    const metadataPath = join(root, ".open-next/jobs-inputs.json");
+    const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
+    metadata.inputs[`node-built-in-modules:${specifier}`] = virtualBuiltinInput(specifier);
+    await writeFile(metadataPath, JSON.stringify(metadata));
+    const record = check(root, "record");
+    assert.equal(record.status, 0, `${specifier}: ${record.stderr}`);
+    const receipt = JSON.parse(await readFile(join(root, ".open-next/prepared-artifact.json"), "utf8"));
+    assert.ok(receipt.files.some(file => file.path === ".open-next/jobs-inputs.json"));
+    assert.equal(check(root).status, 0);
+  }
+});
+
+test("prepared jobs receipts reject changes to otherwise valid virtual builtin metadata", async t => {
+  const root = await preparedJobsFixture(t);
+  const metadataPath = join(root, ".open-next/jobs-inputs.json");
+  const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
+  metadata.inputs["node-built-in-modules:async_hooks"] = virtualBuiltinInput();
+  await writeFile(metadataPath, JSON.stringify(metadata));
+  const record = check(root, "record");
+  assert.equal(record.status, 0, record.stderr);
+  const receiptPath = join(root, ".open-next/prepared-artifact.json");
+  const receipt = await readFile(receiptPath, "utf8");
+  metadata.inputs["node-built-in-modules:async_hooks"].bytes = 67;
+  await writeFile(metadataPath, JSON.stringify(metadata));
+  const verify = check(root);
+  assert.equal(verify.status, 1);
+  assert.ok(verify.stderr.includes("PREPARED_ARTIFACT_CHANGED"), verify.stderr);
+  assert.equal(await readFile(receiptPath, "utf8"), receipt);
+});
+
+test("native bundle virtual inputs require a real builtin and matching producer metadata", async t => {
+  const valid = virtualBuiltinInput();
+  for (const [input, value] of [
+    ["node-built-in-modules:not-a-node-builtin", virtualBuiltinInput("not-a-node-builtin")],
+    ["unknown:async_hooks", valid],
+    ["node-built-in-modules:", virtualBuiltinInput("")],
+    ...[null, [], "invalid", {},
+      { ...valid, bytes: -1 }, { ...valid, bytes: 1.5 },
+      { ...valid, bytes: Number.MAX_SAFE_INTEGER + 1 }, { ...valid, bytes: "66" },
+      { ...valid, format: "esm" },
+      { ...valid, imports: null }, { ...valid, imports: {} }, { ...valid, imports: [] },
+      { ...valid, imports: [null] }, { ...valid, imports: [...valid.imports, ...valid.imports] },
+      { ...valid, imports: [{ ...valid.imports[0], path: "fs" }] },
+      { ...valid, imports: [{ ...valid.imports[0], kind: "require-call" }] },
+      { ...valid, imports: [{ ...valid.imports[0], external: false }] },
+    ].map(value => ["node-built-in-modules:async_hooks", value]),
+  ]) {
+    const root = await preparedJobsFixture(t);
+    const metadataPath = join(root, ".open-next/jobs-inputs.json");
+    const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
+    metadata.inputs[input] = value;
+    await writeFile(metadataPath, JSON.stringify(metadata));
+    const record = check(root, "record");
+    assert.equal(record.status, 1, `${input}: ${JSON.stringify(value)}`);
+    assert.ok(record.stderr.includes("PREPARED_ARTIFACT_BUNDLE_INVALID"), record.stderr);
+    assert.equal(await access(join(root, ".open-next/prepared-artifact.json")).then(() => true, () => false), false);
+  }
+});
+
+test("native bundle input discovery fails closed on escape, symlinks, unknown virtual or missing inputs", async t => {
   for (const input of ["../../../outside.js", "src/missing.ts", "virtual:unknown", ".env.local", "src/linked/secret.ts"]) {
     const root = await preparedJobsFixture(t);
     const metadata = JSON.parse(await readFile(join(root, ".open-next/jobs-inputs.json"), "utf8"));
@@ -155,4 +221,130 @@ test("native bundle input discovery fails closed on escape, symlinks, virtual or
     assert.notEqual(check(root, "record").status, 0, input);
     assert.equal(await access(join(root, ".open-next/prepared-artifact.json")).then(() => true, () => false), false);
   }
+});
+
+const tracedServerRoot = ".open-next/server-functions/default";
+const tracedPackages = `${tracedServerRoot}/node_modules/.pnpm`;
+const tracedAliases = [
+  { path: `${tracedServerRoot}/apps/web/node_modules/next`, target: "../../../node_modules/.pnpm/next@1.0.0/node_modules/next" },
+  { path: `${tracedPackages}/next@1.0.0/node_modules/peer`, target: "../../peer@1.0.0/node_modules/peer" },
+  { path: `${tracedPackages}/node_modules/next`, target: "../next@1.0.0/node_modules/next" },
+];
+
+async function preparedLinkedFixture(t, jobs = false) {
+  const root = await (jobs ? preparedJobsFixture(t) : preparedFixture(t));
+  for (const path of [`${tracedPackages}/next@1.0.0/node_modules/next/index.js`, `${tracedPackages}/peer@1.0.0/node_modules/peer/index.js`]) {
+    await mkdir(dirname(join(root, path)), { recursive: true });
+    await writeFile(join(root, path), "export const dependency = 1;\n");
+  }
+  for (const { path, target } of tracedAliases) {
+    await mkdir(dirname(join(root, path)), { recursive: true });
+    await symlink(target, join(root, path));
+  }
+  return root;
+}
+
+test("prepared receipts preserve traced directory aliases and canonical content in plain and jobs artifacts", async t => {
+  for (const jobs of [false, true]) {
+    const root = await preparedLinkedFixture(t, jobs);
+    if (jobs) {
+      const path = join(root, ".open-next/jobs-inputs.json");
+      const metadata = JSON.parse(await readFile(path, "utf8"));
+      metadata.inputs["node-built-in-modules:async_hooks"] = virtualBuiltinInput();
+      await writeFile(path, JSON.stringify(metadata));
+    }
+    const record = check(root, "record");
+    assert.equal(record.status, 0, record.stderr);
+    const receiptPath = join(root, ".open-next/prepared-artifact.json");
+    const bytes = await readFile(receiptPath, "utf8");
+    const receipt = JSON.parse(bytes);
+    assert.deepEqual(receipt.symlinks, tracedAliases);
+    assert.equal(receipt.files.filter(file => file.path === `${tracedPackages}/next@1.0.0/node_modules/next/index.js`).length, 1);
+    assert.equal(receipt.files.some(file => file.path.includes("/node_modules/next/index.js") && file.path.startsWith(`${tracedServerRoot}/apps/`)), false);
+    assert.equal(check(root).status, 0);
+    assert.equal(await readFile(receiptPath, "utf8"), bytes);
+    assert.notEqual(check(root, "record").status, 0);
+    assert.equal(await readFile(receiptPath, "utf8"), bytes);
+  }
+});
+
+test("prepared receipts detect traced content and alias topology changes even between equal-content targets", async t => {
+  for (const change of ["content", "retarget", "add", "remove", "directory", "file", "receipt", "legacy"]) {
+    const root = await preparedLinkedFixture(t);
+    const record = check(root, "record");
+    assert.equal(record.status, 0, record.stderr);
+    const receiptPath = join(root, ".open-next/prepared-artifact.json");
+    const aliasPath = join(root, tracedAliases[2].path);
+    if (change === "content") await writeFile(join(root, `${tracedPackages}/next@1.0.0/node_modules/next/index.js`), "changed");
+    if (change === "retarget") { await rm(aliasPath); await symlink("../peer@1.0.0/node_modules/peer", aliasPath); }
+    if (change === "add") await symlink("../next@1.0.0/node_modules/next", join(root, `${tracedPackages}/node_modules/extra`));
+    if (["remove", "directory", "file"].includes(change)) await rm(aliasPath);
+    if (change === "directory") await mkdir(aliasPath);
+    if (change === "file") await writeFile(aliasPath, "ordinary file");
+    if (change === "receipt" || change === "legacy") {
+      const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+      if (change === "receipt") receipt.symlinks.pop();
+      else { receipt.schemaVersion = 1; delete receipt.symlinks; }
+      await writeFile(receiptPath, `${JSON.stringify(receipt)}\n`);
+    }
+    const beforeVerify = await readFile(receiptPath, "utf8");
+    const verify = check(root);
+    assert.equal(verify.status, 1, change);
+    assert.ok(verify.stderr.includes("PREPARED_ARTIFACT_CHANGED"), `${change}: ${verify.stderr}`);
+    assert.equal(await readFile(receiptPath, "utf8"), beforeVerify);
+  }
+});
+
+test("traced aliases refuse escapes, intermediate links, missing or file targets and directory cycles", async t => {
+  for (const change of ["absolute-internal", "absolute-external", "outside-artifact", "outside-project", "other-function", "missing", "file-target", "link-target", "link-parent", "alias-parent-traversal", "link-loop", "ancestor", "mutual-directories", "assets", "jobs-bundle", "other-location", "backslash", "colon"]) {
+    const root = await preparedLinkedFixture(t);
+    const aliasPath = join(root, tracedAliases[2].path);
+    await rm(aliasPath);
+    let target = "../next@1.0.0/node_modules/next";
+    if (change === "absolute-internal") target = join(root, tracedPackages, "next@1.0.0/node_modules/next");
+    if (change === "absolute-external") target = dirname(root);
+    if (change === "outside-artifact") { target = "../../../../../../outside"; await mkdir(join(root, "outside")); }
+    if (change === "outside-project") target = "../../../../../../../../outside";
+    if (change === "other-function") { target = "../../../../other"; await mkdir(join(root, ".open-next/server-functions/other")); }
+    if (change === "missing") target = "../missing/node_modules/package";
+    if (change === "file-target") target += "/index.js";
+    if (["link-target", "alias-parent-traversal", "link-loop"].includes(change)) {
+      await symlink(change === "link-loop" ? "next" : target, join(root, tracedPackages, "node_modules/alias"));
+      target = change === "alias-parent-traversal" ? "alias/../next" : "alias";
+    }
+    if (change === "link-parent") {
+      await symlink("next@1.0.0", join(root, tracedPackages, "package-alias"));
+      target = "../package-alias/node_modules/next";
+    }
+    if (change === "ancestor") target = "..";
+    if (change === "mutual-directories") {
+      for (const [name, peer] of [["cycle-a", "cycle-b"], ["cycle-b", "cycle-a"]]) {
+        await mkdir(join(root, tracedServerRoot, "node_modules", name));
+        await symlink(`../${peer}`, join(root, tracedServerRoot, "node_modules", name, "peer"));
+      }
+    }
+    if (["assets", "jobs-bundle", "other-location"].includes(change)) {
+      const parent = change === "other-location" ? ".open-next/server-functions/other/node_modules" : `.open-next/${change}`;
+      await mkdir(join(root, parent, "physical"), { recursive: true });
+      await symlink("physical", join(root, parent, "alias"));
+    }
+    if (change === "backslash") target = "..\\next";
+    if (change === "colon") target = "node:next";
+    await symlink(target, aliasPath);
+    const record = check(root, "record");
+    assert.equal(record.status, 1, change);
+    assert.ok(record.stderr.includes("PREPARED_ARTIFACT_PATH_INVALID"), `${change}: ${record.stderr}`);
+    assert.equal(await access(join(root, ".open-next/prepared-artifact.json")).then(() => true, () => false), false);
+  }
+});
+
+test("traced aliases count toward the artifact entry limit", async t => {
+  const root = await preparedLinkedFixture(t);
+  for (let index = 0; index < 4100; index += 1) {
+    await symlink("../next@1.0.0/node_modules/next", join(root, tracedPackages, "node_modules", `alias-${index}`));
+  }
+  const record = check(root, "record");
+  assert.equal(record.status, 1);
+  assert.ok(record.stderr.includes("PREPARED_ARTIFACT_SIZE_INVALID"), record.stderr);
+  assert.equal(await access(join(root, ".open-next/prepared-artifact.json")).then(() => true, () => false), false);
 });
