@@ -2364,6 +2364,13 @@ test("repository documentation has no broken local Markdown links", async () => 
   for (const markdownFile of markdownFiles) {
     const document = await readFile(markdownFile, "utf8");
     const links = document.matchAll(/\[[^\]]+\]\(([^)]+)\)/g);
+    const repositoryMarkdownPath = relative(repositoryRoot, markdownFile)
+      .split(sep)
+      .join("/");
+    const isApplicationEnvironmentGuide =
+      /^packages\/builder-core\/templates\/[^/]+\/application-environments\/docs\/[^/]+\.md$/u.test(
+        repositoryMarkdownPath,
+      );
 
     for (const [, destination] of links) {
       if (
@@ -2376,7 +2383,15 @@ test("repository documentation has no broken local Markdown links", async () => 
       }
 
       const [path] = destination.split("#", 1);
-      const target = resolve(dirname(markdownFile), decodeURI(path));
+      const decodedPath = decodeURI(path);
+      // Candidate guides share docs/environments.md after template composition.
+      const target =
+        isApplicationEnvironmentGuide && decodedPath === "environments.md"
+          ? resolve(
+              repositoryRoot,
+              "packages/builder-core/templates/common/docs/environments.md",
+            )
+          : resolve(dirname(markdownFile), decodedPath);
 
       if (!isInsideRepository(target)) {
         brokenLinks.push(
