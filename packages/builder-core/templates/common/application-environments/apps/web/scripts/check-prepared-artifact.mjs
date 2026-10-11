@@ -37,7 +37,7 @@ function readMetadata(path) {
 
 function bundleInputs(wrangler) {
   if (wrangler.main === ".open-next/worker.js") return [];
-  if (wrangler.main !== "worker.mjs" || JSON.stringify(wrangler.rules) !== JSON.stringify([{ type: "Text", globs: [".open-next/assets/BUILD_ID"], fallthrough: false }])) refuse("PREPARED_ARTIFACT_WORKER_UNSUPPORTED");
+  if (wrangler.main !== "worker.mjs" || JSON.stringify(wrangler.rules) !== JSON.stringify([{ type: "Text", globs: ["**/.open-next/assets/BUILD_ID"], fallthrough: false }])) refuse("PREPARED_ARTIFACT_WORKER_UNSUPPORTED");
   const webRoot = resolve(".");
   const repositoryRoot = resolve("../..");
   if (relative(repositoryRoot, webRoot) !== join("apps", "web")) refuse("PREPARED_ARTIFACT_PATH_INVALID");
@@ -86,7 +86,7 @@ function artifactConfiguration(config, target, absolute = false) {
   const selected = target === "development" ? config : { ...config, ...config.env?.[target] };
   const path = value => absolute ? resolve(value) : value;
   const main = selected.main === path(".open-next/worker.js") ? ".open-next/worker.js" : selected.main === path("worker.mjs") ? "worker.mjs" : undefined;
-  const rules = main === "worker.mjs" ? [{ type: "Text", globs: [".open-next/assets/BUILD_ID"], fallthrough: false }] : undefined;
+  const rules = main === "worker.mjs" ? [{ type: "Text", globs: ["**/.open-next/assets/BUILD_ID"], fallthrough: false }] : undefined;
   if (!main || selected.assets?.directory !== path(".open-next/assets") || JSON.stringify(selected.rules) !== JSON.stringify(rules)) refuse("PREPARED_ARTIFACT_WORKER_UNSUPPORTED");
   return { ...selected, main };
 }
