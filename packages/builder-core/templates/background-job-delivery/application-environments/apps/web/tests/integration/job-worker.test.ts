@@ -144,10 +144,10 @@ it("configuration preflight rejects a missing native DLQ before any deployment",
   const temporary = await mkdtemp(resolve(root, "preflight-"));
   await writeFile(resolve(temporary, "wrangler.jsonc"), JSON.stringify(config));
   const script = resolve(applicationRoot, "scripts/check-job-delivery.mjs");
-  expect((await run(process.execPath, [script, "local"], { cwd: temporary, env: { PATH: process.env.PATH, APPLICATION_ENVIRONMENT: "development" } })).stdout).toBe("JOB_CONFIGURATION_VALID\n");
+  expect((await run(process.execPath, [script, "local"], { cwd: temporary, env: { PATH: process.env.PATH, NODE_ENV: "test", APPLICATION_ENVIRONMENT: "development" } })).stdout).toBe("JOB_CONFIGURATION_VALID\n");
   delete config.queues.consumers[0].dead_letter_queue;
   await writeFile(resolve(temporary, "wrangler.jsonc"), JSON.stringify(config));
-  await expect(run(process.execPath, [script, "local"], { cwd: temporary, env: { PATH: process.env.PATH, APPLICATION_ENVIRONMENT: "development" } })).rejects.toMatchObject({ code: 1 });
+  await expect(run(process.execPath, [script, "local"], { cwd: temporary, env: { PATH: process.env.PATH, NODE_ENV: "test", APPLICATION_ENVIRONMENT: "development" } })).rejects.toMatchObject({ code: 1 });
 });
 
 
