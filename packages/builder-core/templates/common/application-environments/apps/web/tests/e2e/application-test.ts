@@ -7,7 +7,7 @@ type Fixtures = {
   openApplicationPage: OpenApplicationPage;
 };
 export const test = base.extend<Fixtures>({
-  applicationTransport: [async ({ context, baseURL, playwright }, use, testInfo) => {
+  applicationTransport: [async ({ context, baseURL, playwright }, provideFixture, testInfo) => {
     if (!baseURL) throw new Error("APPLICATION_TRANSPORT_ORIGIN_INVALID");
     const transport = await createApplicationTransport(baseURL, process.env, playwright.request);
     try {
@@ -21,12 +21,12 @@ export const test = base.extend<Fixtures>({
         await route.fulfill({ contentType: "text/html", body: '<!doctype html><html lang="en"><head><title>Synthetic scheduling</title><link rel="icon" href="data:,"></head><body><main>Synthetic scheduling</main></body></html>' });
       });
       if (process.env.DEPLOY_URL) await transport.waitForApplication();
-      await use(transport);
+      await provideFixture(transport);
       transport.assertBrowserRequests();
     } finally { await transport.dispose(); }
   }, { auto: true }],
-  getApplicationResponse: async ({ applicationTransport }, use) => { await use(applicationTransport.getApplicationResponse); },
-  openApplicationPage: async ({ applicationTransport }, use) => { await use(applicationTransport.openApplicationPage); },
+  getApplicationResponse: async ({ applicationTransport }, provideFixture) => { await provideFixture(applicationTransport.getApplicationResponse); },
+  openApplicationPage: async ({ applicationTransport }, provideFixture) => { await provideFixture(applicationTransport.openApplicationPage); },
 });
 export { expect };
 export type { OpenApplicationPage, Page };
