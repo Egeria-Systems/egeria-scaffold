@@ -78,10 +78,36 @@ test(`${protectedStaging ? "protected" : "unprotected"} browser denial covers re
     expect(page.url()).toBe(`${origin}/fr-CA`);
     await page.route(`${otherOrigin}/mock`, route => route.fulfill({ body: "controlled mock", contentType: "text/plain", headers: { "access-control-allow-origin": origin } }));
     expect(await page.evaluate(async url => (await fetch(url)).text(), `${otherOrigin}/mock`)).toBe("controlled mock");
-    for (const path of ["/absolute", "/relative"]) await expect(page.goto(origin + path)).rejects.toThrow();
+    for (const path of ["/absolute", "/relative"]) {
+      // An aborted navigation may commit an error document after goto rejects.
+      const redirectPage = await context.newPage();
+      try { await expect(redirectPage.goto(origin + path)).rejects.toThrow("net::ERR_BLOCKED_BY_CLIENT"); }
+      finally { await redirectPage.close(); }
+    }
     await transport.openApplicationPage(page, "/");
-    await page.evaluate(url => { window.open(url); void fetch(url).catch(() => {}); const socket = new WebSocket(url.replace("https:", "wss:")); socket.onerror = () => {}; }, otherOrigin);
-    await page.waitForTimeout(300);
+    const popupOpened = context.waitForEvent("page");
+    const popupRequestFailed = context.waitForEvent("requestfailed", request => request.url() === `${otherOrigin}/popup`);
+    await page.evaluate(url => { window.open(url); }, `${otherOrigin}/popup`);
+    const [popup, popupRequest] = await Promise.all([popupOpened, popupRequestFailed]);
+    try { expect(popupRequest.failure()?.errorText).toBe("net::ERR_BLOCKED_BY_CLIENT"); }
+    finally { await popup.close(); }
+    const [fetchRequest, fetchResult] = await Promise.all([
+      context.waitForEvent("requestfailed", request => request.url() === `${otherOrigin}/fetch`),
+      page.evaluate(async url => {
+        try { await fetch(url); return "unexpected-success"; }
+        catch { return "blocked"; }
+      }, `${otherOrigin}/fetch`),
+    ]);
+    expect(["net::ERR_BLOCKED_BY_CLIENT", "net::ERR_BLOCKED_BY_CLIENT.Inspector"]).toContain(fetchRequest.failure()?.errorText);
+    expect(fetchResult).toBe("blocked");
+    const socketResult = await page.evaluate(url => new Promise<{ opened: boolean; wasClean: boolean }>(resolve => {
+      const socket = new WebSocket(url);
+      let opened = false;
+      socket.onopen = () => { opened = true; socket.close(); };
+      socket.onerror = () => {};
+      socket.onclose = event => resolve({ opened, wasClean: event.wasClean });
+    }), `${otherOrigin.replace("https:", "wss:")}/socket`);
+    expect(socketResult).toEqual({ opened: false, wasClean: true });
     expect(externalRequests).toBe(0);
     expect(() => transport.assertBrowserRequests()).toThrow("APPLICATION_TRANSPORT_BROWSER_REQUEST_BLOCKED");
     expect(observed.every(value => value.authenticated === protectedStaging)).toBe(true);
