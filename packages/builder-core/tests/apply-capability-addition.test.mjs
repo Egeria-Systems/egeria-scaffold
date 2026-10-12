@@ -1272,7 +1272,7 @@ test("environment persistence addition verifies bindings before changing control
     const state = core.parseStateJson(repository.files.get(".egeria/state.json"), "2.0.0");
     assert.equal(state.ok, true);
     assert.deepEqual(state.value.appliedMigrations, ["add-application-persistence-0-2-0"]);
-    assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.8.0");
+    assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.10.0");
     for (const identifier of ["contact-form-web3forms", "booking-calendly", "multilingual"]) assert.ok(state.value.installedCapabilities.some(capability => capability.identifier === identifier));
     assert.deepEqual(repository.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
   }

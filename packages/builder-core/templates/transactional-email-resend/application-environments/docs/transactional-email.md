@@ -1,5 +1,7 @@
 # Transactional email
 
+The [common environment guide](environments.md) owns build origins, source identity, prepared artifacts and the protected release sequence.
+
 `TransactionalEmailSender` is a provider-neutral application port implemented by a Resend adapter. Supply `serverTransactionalEmailLayer` to the consuming server Effect. Creating the Layer or constructing a send does no provider work. The consuming delivery boundary executes its program once and supplies its request abort signal. This capability adds no public sending endpoint, business email template, contact submission, authentication flow, queue, database, retry scheduler or outbox.
 
 Each send requires one bare recipient address, a subject, plain text and a caller-supplied opaque idempotency key. An optional bare reply-to address and HTML body are supported. Display names, address lists and header control characters are refused. The adapter always uses the configured sender; callers cannot override it. Keys contain 1–256 ASCII letters, digits, dots, underscores, colons or hyphens and start with a letter or digit. Use a random opaque identifier, never an address, token or other personal information. Templates, localization, authorization, abuse prevention and business policy belong to the consuming use case.

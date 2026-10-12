@@ -6158,7 +6158,7 @@ test("Vitest five generation materializes each exact recipe without changing the
 
 const applicationEnvironmentContext = {
   projectSchemaVersion: "2.0.0",
-  catalogSnapshot: { standards: "0.7.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0", transactionalEmailResend: "0.2.0" },
+  catalogSnapshot: { standards: "0.9.0", siteRouting: "0.5.0", appFoundation: "0.3.0", deploymentCloudflare: "0.9.0", transactionalEmailResend: "0.2.0" },
   profiles: [
     { identifier: "portfolio", schemaVersion: "1.0.0", recipeVersion: "0.12.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability"] },
     { identifier: "site", schemaVersion: "1.0.0", recipeVersion: "0.13.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "site-routing"] },
@@ -6170,6 +6170,50 @@ async function renderApplicationEnvironment(profile, options = {}) {
   const core = await import("../dist/index.js");
   return core.renderSkeleton({ profile, projectName: "environment-example", displayName: "Environment Example", packageVersions: core.verifiedCapabilityPackageVersions, ...options }, applicationEnvironmentContext);
 }
+
+test("candidate README follows staged release controls while public README remains unchanged", async () => {
+  const core = await import("../dist/index.js");
+  const candidate = indexFiles(assertSuccess(await renderApplicationEnvironment("portfolio")).files).get("README.md");
+  assert.match(candidate, /APPLICATION_ENVIRONMENT=production NEXT_PUBLIC_SITE_URL=https:\/\/example.com DEPLOY_URL=https:\/\/example.com/u);
+  assert.match(candidate, /missing or unverifiable controls refuse deployment/u);
+  assert.doesNotMatch(candidate, /PLAYWRIGHT_DEPLOYED_URL/u);
+  const current = assertSuccess(await core.renderSkeleton({ profile: "portfolio", projectName: "readme-contract", displayName: "Readme Contract", packageVersions: core.verifiedCapabilityPackageVersions }));
+  assert.match(indexFiles(current.files).get("README.md"), /PLAYWRIGHT_DEPLOYED_URL/u);
+});
+
+test("environment build compositions bind target and revision while preserving native public origin replacement", async () => {
+  for (const analytics of [false, true]) for (const booking of [false, true]) for (const contact of [false, true]) {
+    const rendered = assertSuccess(await renderApplicationEnvironment("portfolio", {
+      ...(analytics ? { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } } : {}),
+      ...(booking ? { bookingCalendly: { mode: "link" } } : {}),
+      ...(contact ? { contactFormWeb3Forms: true } : {}),
+    }));
+    const root = await mkdtemp(join(tmpdir(), "environment-build-composition-"));
+    try {
+      for (const file of rendered.files.filter(({ path }) => path === "apps/web/next.config.ts" || path.startsWith("apps/web/src/configuration/") || path.startsWith("apps/web/src/integrations/"))) {
+        const destination = join(root, file.path); await mkdir(join(destination, ".."), { recursive: true }); await writeFile(destination, file.content);
+      }
+      const fixture = join(root, "apps/web/node_modules/@opennextjs/cloudflare");
+      await mkdir(fixture, { recursive: true });
+      await writeFile(join(fixture, "package.json"), JSON.stringify({ type: "module", exports: "./index.js" }));
+      await writeFile(join(fixture, "index.js"), "export function initOpenNextCloudflareForDev() {}\n");
+      const code = 'const { default: config } = await import("./next.config.ts"); console.log(JSON.stringify({ env: config.env, buildId: await config.generateBuildId?.() }));';
+      const revision = "a".repeat(40);
+      const env = { APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_SITE_URL: "https://release.example.test", BUILD_SOURCE_REVISION: revision,
+        NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_CALENDLY_URL: "https://calendly.com/example/consultation", NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "00000000-0000-4000-8000-000000000000" };
+      const invoke = environment => spawnSync(process.execPath, ["--input-type=module", "-e", code], { cwd: join(root, "apps/web"), env: environment, encoding: "utf8" });
+      const result = invoke(env);
+      assert.equal(result.status, 0, result.stderr);
+      const config = JSON.parse(result.stdout);
+      assert.equal(config.buildId, `egeria-staging-${revision}`);
+      assert.equal(config.env.NEXT_PUBLIC_APPLICATION_ENVIRONMENT, "staging");
+      assert.equal(Object.hasOwn(config.env, "NEXT_PUBLIC_SITE_URL"), false);
+      for (const invalid of [{ NEXT_PUBLIC_SITE_URL: "" }, { NEXT_PUBLIC_SITE_URL: "https://release.example.test/path" }, { BUILD_SOURCE_REVISION: "not-a-revision" }, { NEXT_DEPLOYMENT_ID: "override" }]) {
+        assert.equal(invoke({ ...env, ...invalid }).status, 1, JSON.stringify(invalid));
+      }
+    } finally { await rm(root, { recursive: true, force: true }); }
+  }
+});
 
 test("application environment rendering preserves profile identity and materializes common targets without optional providers", async () => {
   for (const [profile, recipeVersion] of [["portfolio", "0.12.0"], ["site", "0.13.0"], ["app", "0.3.0"]]) {
@@ -6198,6 +6242,46 @@ test("application environment rendering preserves profile identity and materiali
   }
 });
 
+test("environment routed output removes the competing origin and retains complete route ownership", async () => {
+  for (const profile of ["site", "app"]) for (const multilingual of [false, true]) {
+    const rendered = assertSuccess(await renderApplicationEnvironment(profile, multilingual ? { multilingual: true } : {}));
+    const paths = new Set(rendered.files.map(({ path }) => path));
+    assert.equal(paths.has("apps/web/content/en-CA/routing.yaml"), false);
+    assert.equal(rendered.surfaces.some(({ path }) => path === "apps/web/content/en-CA/routing.yaml"), false);
+    for (const path of ["apps/web/app/robots.ts", "apps/web/app/sitemap.ts", "apps/web/src/routing/read-routing-content.ts", "apps/web/src/routing/routing-content-schema.ts"]) {
+      assert.equal(paths.has(path), true, path);
+      assert.equal(rendered.surfaces.some(surface => surface.path === path && surface.owner.identifier === "site-routing"), true, path);
+    }
+    assert.equal(rendered.resolved.capabilities.find(({ identifier }) => identifier === "site-routing").version, "0.5.0");
+  }
+});
+
+test("environment deployment preflight requires origin and source identity in every service composition", async () => {
+  for (const analytics of [false, true]) for (const booking of [false, true]) for (const contact of [false, true]) {
+    const rendered = assertSuccess(await renderApplicationEnvironment("portfolio", {
+      ...(analytics ? { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } } : {}),
+      ...(booking ? { bookingCalendly: { mode: "link" } } : {}),
+      ...(contact ? { contactFormWeb3Forms: true } : {}),
+    }));
+    const root = await mkdtemp(join(tmpdir(), "environment-release-preflight-"));
+    try {
+      for (const file of rendered.files.filter(({ path }) => path.startsWith("apps/web/src/configuration/") || path.startsWith("apps/web/src/integrations/") || path === "apps/web/scripts/check-application-environment.mjs")) {
+        const destination = join(root, file.path); await mkdir(join(destination, ".."), { recursive: true }); await writeFile(destination, file.content);
+      }
+      const env = { APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_SITE_URL: "https://release.example.test", BUILD_SOURCE_REVISION: "a".repeat(40), NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_CALENDLY_URL: "https://calendly.com/example/consultation", NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "00000000-0000-4000-8000-000000000000" };
+      const invoke = environment => spawnSync(process.execPath, [join(root, "apps/web/scripts/check-application-environment.mjs"), "--deployment"], { env: environment, encoding: "utf8" });
+      for (const missing of ["NEXT_PUBLIC_SITE_URL", "BUILD_SOURCE_REVISION"]) {
+        const input = { ...env }; delete input[missing];
+        assert.equal(invoke(input).status, 1, missing);
+      }
+      for (const target of ["staging", "production"]) assert.equal(invoke({ ...env, APPLICATION_ENVIRONMENT: target }).status, 0);
+      const refused = invoke({ ...env, NEXT_PUBLIC_SITE_URL: "private-sentinel" });
+      assert.equal(refused.status, 1);
+      assert.doesNotMatch(refused.stdout + refused.stderr, /private-sentinel/u);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  }
+});
+
 test("application environment generated ignore rules protect actual build and runtime values while tracking examples", async () => {
   const rendered = assertSuccess(await renderApplicationEnvironment("app"));
   const root = await mkdtemp(join(tmpdir(), "application-environment-ignore-"));
@@ -6219,7 +6303,7 @@ test("application environment generated preflight rejects unsafe targets without
   const files = new Map(rendered.files.map(({ path, content }) => [path, content]));
   const root = await mkdtemp(join(tmpdir(), "application-environment-preflight-"));
   try {
-    for (const path of ["apps/web/src/configuration/application-environment.ts", "apps/web/scripts/check-application-environment.mjs"]) {
+    for (const path of ["apps/web/src/configuration/application-environment.ts", "apps/web/src/configuration/application-build.ts", "apps/web/src/configuration/site-origin.ts", "apps/web/scripts/check-application-environment.mjs"]) {
       const destination = join(root, path);
       await mkdir(join(destination, ".."), { recursive: true });
       await writeFile(destination, files.get(path));
@@ -6239,8 +6323,8 @@ test("application environment generated preflight rejects unsafe targets without
     for (const [args, env, code] of [
       [["--local"], {}, 0], [["--local"], { APPLICATION_ENVIRONMENT: "" }, 0],
       [["--deployment"], {}, 1], [["--deployment"], { APPLICATION_ENVIRONMENT: "development" }, 1],
-      [["--deployment"], { APPLICATION_ENVIRONMENT: "staging" }, 0],
-      [["--deployment"], { APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production" }, 0],
+      [["--deployment"], { APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_SITE_URL: "https://staging.example.test", BUILD_SOURCE_REVISION: "a".repeat(40) }, 0],
+      [["--deployment"], { APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_SITE_URL: "https://production.example.test", BUILD_SOURCE_REVISION: "a".repeat(40) }, 0],
       [["--local"], { APPLICATION_ENVIRONMENT: "private-sentinel" }, 1],
       [["--local"], { APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production" }, 1],
       [["--deployment"], { NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "staging" }, 1],
@@ -6253,11 +6337,11 @@ test("application environment generated preflight rejects unsafe targets without
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("application environment rendering refuses incomplete selections and mixed contexts", async () => {
+test("application environment rendering refuses selection disagreement and mixed contexts", async () => {
   for (const selection of [{ backgroundJobDelivery: true }]) {
     const result = await renderApplicationEnvironment("app", selection);
     assert.equal(result.ok, false);
-    assert.equal(result.issues[0].code, "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
+    assert.equal(result.issues[0].code, "APPLICATION_ENVIRONMENT_CONTEXT_INVALID");
   }
   const core = await import("../dist/index.js");
   const result = await core.renderSkeleton({ profile: "portfolio", projectName: "example", displayName: "Example", packageVersions: core.verifiedCapabilityPackageVersions }, { ...applicationEnvironmentContext, projectSchemaVersion: "1.0.0" });
@@ -6481,7 +6565,7 @@ async function withEnvironmentAnalyticsNextConfiguration(selection, analytics, c
   }));
   const root = await mkdtemp(join(tmpdir(), "analytics-next-configuration-"));
   try {
-    for (const file of rendered.files.filter(({ path }) => path === "apps/web/next.config.ts" || /(?:application-environment|booking-settings|contact-settings|analytics-configuration|analytics-settings)\.ts$/u.test(path))) {
+    for (const file of rendered.files.filter(({ path }) => path === "apps/web/next.config.ts" || /(?:application-environment|application-build|site-origin|booking-settings|contact-settings|analytics-configuration|analytics-settings)\.ts$/u.test(path))) {
       const destination = join(root, file.path);
       await mkdir(join(destination, ".."), { recursive: true });
       await writeFile(destination, file.content);
@@ -6575,13 +6659,13 @@ test("environment analytics Next configuration retains Clarity origin validation
       for (const target of ["staging", "production"]) {
         const missing = invoke({ APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_SITE_URL: "" });
         assert.equal(missing.status, 1);
-        assert.deepEqual(missing.value, { error: "ANALYTICS_CONFIGURATION_INVALID:NEXT_PUBLIC_SITE_URL:missing", initializations: 0 });
-        assert.equal(invoke({ APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_SITE_URL: "" }).status, 0);
+        assert.deepEqual(missing.value, { error: "APPLICATION_BUILD_INVALID:NEXT_PUBLIC_SITE_URL:missing", initializations: 0 });
+        assert.equal(invoke({ APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_SITE_URL: "" }).status, 1);
       }
       for (const enabled of ["false", "true"]) {
         const malformed = invoke({ NEXT_PUBLIC_ANALYTICS_ENABLED: enabled, NEXT_PUBLIC_SITE_URL: "https://qa.analytics-test.invalid/private-sentinel" });
         assert.equal(malformed.status, 1);
-        assert.deepEqual(malformed.value, { error: "ANALYTICS_CONFIGURATION_INVALID:NEXT_PUBLIC_SITE_URL:invalid", initializations: 0 });
+        assert.deepEqual(malformed.value, { error: "APPLICATION_BUILD_INVALID:NEXT_PUBLIC_SITE_URL:invalid", initializations: 0 });
       }
       for (const [target, siteUrl, expectedOrigin] of [
         ["staging", "https://qa.analytics-test.invalid:443/", "https://qa.analytics-test.invalid"],
@@ -6603,9 +6687,8 @@ test("environment analytics Next configuration retains Clarity origin validation
   }
   await withEnvironmentAnalyticsNextConfiguration(0, { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} }, async (invoke) => {
     const result = invoke({ NEXT_PUBLIC_SITE_URL: "not-an-origin", NEXT_PUBLIC_ANALYTICS_ENABLED: "TRUE" });
-    assert.equal(result.status, 0);
-    assert.equal(result.value.siteUrl, "not-an-origin");
-    assert.equal(result.value.env.NEXT_PUBLIC_ANALYTICS_ENABLED, "TRUE");
+    assert.equal(result.status, 1);
+    assert.deepEqual(result.value, { error: "APPLICATION_BUILD_INVALID:NEXT_PUBLIC_SITE_URL:invalid", initializations: 0 });
     const reader = invoke({ NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_SITE_URL: "not-an-origin", NEXT_PUBLIC_ANALYTICS_ENABLED: "TRUE" }, "reader");
     assert.equal(reader.value.ok, true);
     assert.equal(reader.value.configuration.collectionEnabled, false);
@@ -6621,7 +6704,7 @@ test("environment analytics Next configuration refuses invalid inputs before pla
         assert.equal(result.status, 1);
         assert.deepEqual(result.value, { error, initializations: 0 });
       };
-      refuse({ NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, "APPLICATION_ENVIRONMENT_INVALID:NEXT_PUBLIC_APPLICATION_ENVIRONMENT:mismatch");
+      refuse({ NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, "APPLICATION_BUILD_INVALID:NEXT_PUBLIC_APPLICATION_ENVIRONMENT:mismatch");
       if (composition & 1) refuse({ NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "", NEXT_PUBLIC_CALENDLY_URL: "private-sentinel", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, "CONTACT_CONFIGURATION_INVALID:NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY:missing");
       if (composition & 2) refuse({ NEXT_PUBLIC_CALENDLY_URL: "", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, "BOOKING_CONFIGURATION_INVALID:NEXT_PUBLIC_CALENDLY_URL:missing");
       refuse({ NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, "ANALYTICS_CONFIGURATION_INVALID:NEXT_PUBLIC_GA4_MEASUREMENT_ID:invalid");
@@ -6661,7 +6744,7 @@ test("environment booking validates generated destinations before process effect
     const rendered = assertSuccess(await renderApplicationEnvironment("portfolio", { bookingCalendly: { mode: "popup" }, ...(contact ? { contactFormWeb3Forms: true } : {}) }));
     const root = await mkdtemp(join(tmpdir(), "booking-environment-configuration-"));
     try {
-      for (const file of rendered.files.filter(({ path }) => path.endsWith("application-environment.ts") || path.endsWith("booking-settings.ts") || path.endsWith("contact-settings.ts") || path.endsWith("check-application-environment.mjs"))) {
+      for (const file of rendered.files.filter(({ path }) => path.endsWith("application-environment.ts") || path.endsWith("application-build.ts") || path.endsWith("site-origin.ts") || path.endsWith("booking-settings.ts") || path.endsWith("contact-settings.ts") || path.endsWith("check-application-environment.mjs"))) {
         const destination = join(root, file.path);
         await mkdir(join(destination, ".."), { recursive: true });
         await writeFile(destination, file.content);
@@ -6682,7 +6765,7 @@ test("environment booking validates generated destinations before process effect
       for (const target of ["development", "staging", "production"]) {
         for (const value of ["", "private-sentinel", destinationA]) {
           const result = spawnSync(process.execPath, [script, target === "development" ? "--local" : "--deployment"], { encoding: "utf8", env: {
-            APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_CALENDLY_URL: value,
+            APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_SITE_URL: "https://booking.example.test", BUILD_SOURCE_REVISION: "a".repeat(40), NEXT_PUBLIC_CALENDLY_URL: value,
             ...(contact ? { NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "00000000-0000-4000-8000-000000000001" } : {}),
           } });
           assert.equal(result.status, value === destinationA || (value === "" && target === "development") ? 0 : 1, result.stderr);
@@ -6710,7 +6793,7 @@ test("environment analytics preflight validates all compositions with field-only
         ...(selection & 2 ? { bookingCalendly: { mode: "popup" } } : {}),
       }));
       const root = await mkdtemp(join(tmpdir(), "analytics-environment-preflight-"));
-      for (const file of rendered.files.filter(({ path }) => /(?:application-environment|booking-settings|contact-settings|analytics-configuration|analytics-settings)\.ts$/u.test(path) || path.endsWith("check-application-environment.mjs"))) {
+      for (const file of rendered.files.filter(({ path }) => /(?:application-environment|application-build|site-origin|booking-settings|contact-settings|analytics-configuration|analytics-settings)\.ts$/u.test(path) || path.endsWith("check-application-environment.mjs"))) {
         const destination = join(root, file.path);
         await mkdir(join(destination, ".."), { recursive: true });
         await writeFile(destination, file.content);
@@ -6736,7 +6819,7 @@ test("environment analytics preflight validates all compositions with field-only
       check({ NEXT_PUBLIC_GA4_MEASUREMENT_ID: "" }, { code: "ANALYTICS_CONFIGURATION_INVALID", field: "NEXT_PUBLIC_GA4_MEASUREMENT_ID", reason: "missing" });
       check({}, undefined);
       check({ APPLICATION_ENVIRONMENT: "development", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "" }, undefined);
-      check({ NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "", NEXT_PUBLIC_CLARITY_PROJECT_ID: "", NEXT_PUBLIC_SITE_URL: "" }, undefined);
+      check({ NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "", NEXT_PUBLIC_CLARITY_PROJECT_ID: "", NEXT_PUBLIC_SITE_URL: "" }, { code: "APPLICATION_ENVIRONMENT_INVALID", field: "NEXT_PUBLIC_SITE_URL", reason: "missing" });
       check({ NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "private-sentinel" }, { code: "ANALYTICS_CONFIGURATION_INVALID", field: "NEXT_PUBLIC_GA4_MEASUREMENT_ID", reason: "invalid" });
       check({ APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: "" }, { code: "ANALYTICS_CONFIGURATION_INVALID", field: "NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION", reason: "missing" });
       check({ APPLICATION_ENVIRONMENT: "production" }, undefined);
@@ -6865,4 +6948,53 @@ test("environment observability credentials require a staging artifact at its ex
   assert.equal(requests[0].url, "https://staging.example.test/api/observability");
   assert.equal(requests[0].options.mode, "same-origin");
   assert.equal(requests[0].options.redirect, "error");
+});
+
+
+test("environment release workflows freeze one source then gate separate staging and production artifacts", async () => {
+  const core = await import("../dist/index.js");
+  const { createApplicationEnvironmentRenderingContext } = await import("../dist/catalog/verified-package-versions.js");
+  for (const persistence of [false, true]) for (const jobs of [false, true]) {
+    const result = assertSuccess(await core.renderSkeleton({ profile: "app", projectName: "release-example", displayName: "Release Example", packageVersions: core.verifiedCapabilityPackageVersions,
+      ...(persistence ? { applicationPersistence: true } : {}), ...(jobs ? { backgroundJobDelivery: true } : {}) }, createApplicationEnvironmentRenderingContext(persistence, false, jobs)));
+    const workflow = parseGeneratedYaml(result.files, ".github/workflows/deploy.yml");
+    assert.deepEqual(Object.keys(workflow.jobs), ["verify-source", "staging", "production"]);
+    assert.equal(workflow.jobs.staging.needs, "verify-source");
+    assert.deepEqual(workflow.jobs.production.needs, ["verify-source", "staging"]);
+    assert.equal(workflow.concurrency["cancel-in-progress"], false);
+    for (const target of ["staging", "production"]) {
+      const job = workflow.jobs[target];
+      assert.equal(job.environment.name, target);
+      assert.equal(job.env.APPLICATION_ENVIRONMENT, target);
+      assert.equal(job.steps[0].with.ref, "${{ needs.verify-source.outputs.revision }}");
+      assert.equal(job.permissions.contents, "read");
+      assert.equal(job.permissions.actions, target === "production" ? "read" : undefined);
+      assert.equal(Object.keys(job.env).some(key => /TOKEN|SECRET|KEY/u.test(key)), false);
+      const record = job.steps.findIndex(step => step.run?.includes("check:prepared-artifact record"));
+      const preview = job.steps.findIndex(step => step.run?.includes("test:e2e:preview"));
+      const deploy = job.steps.findIndex(step => step.env?.CLOUDFLARE_API_TOKEN);
+      assert.ok(record >= 0 && preview > record && deploy > preview);
+      for (const step of job.steps.slice(record + 1)) assert.equal(/(?:next build|run build|test:e2e:dev)/u.test(step.run ?? ""), false);
+      for (const step of job.steps) {
+        if (step.env?.CF_ACCESS_CLIENT_SECRET) { assert.equal(target, "staging"); assert.ok(job.steps.indexOf(step) > deploy); }
+        if (step.env?.CLOUDFLARE_API_TOKEN) assert.equal(step.name, "Deploy prepared Cloudflare Worker");
+        assert.equal(/db:migrate|d1 migrations|job-operator/u.test(step.run ?? ""), false);
+      }
+      assert.equal(job.steps.at(-1).run, "pnpm --dir apps/web run test:e2e:deployed");
+      if (persistence) {
+        assert.equal(job.concurrency.group, `application-database-${target}`);
+        assert.equal(job.concurrency["cancel-in-progress"], false);
+        assert.equal(workflow.on.workflow_dispatch.inputs[`expected_${target}_database_id`].required, true);
+      }
+      if (jobs) assert.equal(workflow.on.workflow_dispatch.inputs[`${target}_job_retention_reviewed`].type, "boolean");
+    }
+    const manifest = parseGeneratedJson(result.files, "apps/web/package.json");
+    assert.equal(manifest.scripts["check:prepared-artifact"], "node --experimental-strip-types scripts/check-prepared-artifact.mjs");
+    assert.ok(manifest.scripts["test:deployment-contracts"]);
+    const wrangler = parseGeneratedJson(result.files, "apps/web/wrangler.jsonc");
+    for (const target of ["staging", "production"]) {
+      assert.equal(wrangler.env[target].workers_dev, false);
+      assert.equal(wrangler.env[target].preview_urls, false);
+    }
+  }
 });

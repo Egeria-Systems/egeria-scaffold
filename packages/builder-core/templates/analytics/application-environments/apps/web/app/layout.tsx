@@ -1,3 +1,4 @@
+import { readCompiledSiteOrigin } from "../src/configuration/site-origin";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
@@ -20,6 +21,10 @@ const searchVerification = analyticsConfiguration.ok
   : undefined;
 
 export const metadata: Metadata = {
+  metadataBase: new URL(readCompiledSiteOrigin()),
+  ...(process.env.NEXT_PUBLIC_APPLICATION_ENVIRONMENT === "production" ? {} : { robots: { index: false, follow: false } }),
+  alternates: { canonical: "/" },
+
   title: contentMetadata.title,
   description: contentMetadata.description,
   ...(searchVerification === undefined

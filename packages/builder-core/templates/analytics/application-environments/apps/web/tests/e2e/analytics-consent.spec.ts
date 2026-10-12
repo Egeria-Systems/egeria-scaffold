@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type OpenApplicationPage } from "./application-test";
+import { type BrowserContext, type Page } from "@playwright/test";
 import { parse } from "yaml";
 
 import {
@@ -89,7 +90,7 @@ test.beforeEach(async ({ context, baseURL }) => {
   });
   await context.routeWebSocket("**/*", socket => {
     const url = new URL(socket.url());
-    if ((url.origin === "ws://127.0.0.1:3101" || url.origin === "ws://127.0.0.1:3100") && url.pathname === "/_next/hmr") {
+    if (!process.env.DEPLOY_URL && (url.origin === "ws://127.0.0.1:3101" || url.origin === "ws://127.0.0.1:3100") && url.pathname === "/_next/hmr") {
       socket.connectToServer();
     } else {
       audit.unexpected.push(url.href);
@@ -100,12 +101,17 @@ test.beforeEach(async ({ context, baseURL }) => {
     const request = route.request();
     const url = new URL(request.url());
     if (url.origin === appOrigin) {
-      if (appOrigin === transportOrigin || appOrigin === "http://127.0.0.1:3100") return route.continue();
-      // Only the exact synthetic app origin is fulfilled from the owned, fixed loopback server.
-      const response = await route.fetch({ url: `${transportOrigin}${url.pathname}${url.search}`, maxRedirects: 0 });
-      return route.fulfill({ response });
+      if (process.env.DEPLOY_URL) return route.fallback();
+      if (appOrigin === transportOrigin || appOrigin === "http://127.0.0.1:3100") return route.fallback();
     }
-    if (url.origin === transportOrigin) return route.continue(); // deliberate wrong-origin challenge
+    if (!process.env.DEPLOY_URL && (url.origin === appOrigin || url.origin === transportOrigin)) {
+      // Synthetic origins and the deliberate wrong-origin challenge use only the owned loopback server.
+      const response = await route.fetch({ url: `${transportOrigin}${url.pathname}${url.search}`, maxRedirects: 0, maxRetries: 0, timeout: 10000 });
+      try {
+        if ([301, 302, 303, 307, 308].includes(response.status())) { audit.unexpected.push(url.href); return await route.abort(); }
+        return await route.fulfill({ response });
+      } finally { await response.dispose(); }
+    }
     audit.attempts.push(url.href);
     const provider: AnalyticsProviderIdentifier | undefined =
       url.origin === "https://static.cloudflareinsights.com" || url.origin === "https://cloudflareinsights.com" ? "cloudflare-web-analytics" :
@@ -175,7 +181,7 @@ test.afterEach(async ({ context }, information) => {
   await context.unrouteAll({ behavior: "wait" });
   const audit = audits.get(context);
   if (audit === undefined) throw new Error("ANALYTICS_TEST_AUDIT_MISSING");
-  await information.attach("controlled-request-audit", { contentType: "application/json", body: JSON.stringify({
+  if (!process.env.CF_ACCESS_CLIENT_ID) await information.attach("controlled-request-audit", { contentType: "application/json", body: JSON.stringify({
     ...audit, requests: audit.requests.map(({ provider, script, url }) => ({ provider, script, url })), commands: audit.commands.map(({ provider, parameters }) => ({ provider, parameters })),
   }) });
   expect(audit.unexpected).toEqual([]);
@@ -203,8 +209,10 @@ async function readRecord(page: Page): Promise<AnalyticsConsentRecordV3> {
   expect(value).not.toBeNull();
   return JSON.parse(value ?? "null") as AnalyticsConsentRecordV3;
 }
-async function visit(page: Page, path: string) {
-  await page.goto(path);
+async function visit(page: Page, openApplicationPage: OpenApplicationPage, path: string) {
+  // Local synthetic origins are resolved by the bounded loopback interceptor above.
+  if (process.env.DEPLOY_URL) await openApplicationPage(page, path);
+  else await page.goto(path, { waitUntil: "networkidle" });
   if (bookingMode === "inline" && expectedBookingUrl !== "") {
     // The lazy inline frame changes layout; settle it before scrolling to consent controls.
     await page.getByTestId("booking-inline-region").scrollIntoViewIfNeeded();
@@ -262,8 +270,8 @@ async function focusWithTab(page: Page, locator: ReturnType<typeof action>) {
 }
 
 // Search-only selection has its own executed case, without provider-suite skips.
-test("metadata belongs only to the expected production property and first visit stays inactive", async ({ page }) => {
-  await visit(page, primaryPath);
+test("metadata belongs only to the expected production property and first visit stays inactive", async ({ openApplicationPage, page }) => {
+  await visit(page, openApplicationPage, primaryPath);
   const verification = page.locator('meta[name="google-site-verification"]');
   if (expectedVerification === "") await expect(verification).toHaveCount(0);
   else await expect(verification).toHaveAttribute("content", expectedVerification);
@@ -272,8 +280,8 @@ test("metadata belongs only to the expected production property and first visit 
 });
 
 if (declarations.length > 0) {
-  test("denial remains authoritative across queued grant events and reload", async ({ page }) => {
-    await visit(page, primaryPath);
+  test("denial remains authoritative across queued grant events and reload", async ({ openApplicationPage, page }) => {
+    await visit(page, openApplicationPage, primaryPath);
     await action(page, "decline").click();
     const events = await page.evaluate(({ key, granted, denied }) => new Promise<{
       trusted: boolean; grant: boolean; storedDenial: boolean; scripts: string[];
@@ -317,9 +325,9 @@ if (declarations.length > 0) {
     await assertProviders(page, []);
   });
 
-  test("an accepted saved grant obeys the compiled activation and destinations", async ({ page }) => {
+  test("an accepted saved grant obeys the compiled activation and destinations", async ({ openApplicationPage, page }) => {
     await preload(page, consentRecord());
-    await visit(page, primaryPath);
+    await visit(page, openApplicationPage, primaryPath);
     await expect(action(page, "manage")).toBeVisible();
     expect((await readRecord(page)).collectionContext).toEqual(expectedCollectionContext);
     await assertProviders(page, declarations.map(value => value.identifier));
@@ -327,9 +335,9 @@ if (declarations.length > 0) {
 
   if (active && settings.providers.googleAnalytics4 !== undefined && settings.providers.cloudflareWebAnalytics !== undefined) {
     for (const retainClarity of settings.providers.microsoftClarity === undefined ? [false] : [false, true]) {
-      test(`current stored denial reduces active providers before another event${retainClarity ? " while retaining Clarity" : ""}`, async ({ page }, information) => {
+      test(`current stored denial reduces active providers before another event${retainClarity ? " while retaining Clarity" : ""}`, async ({ openApplicationPage, page }, information) => {
         const retained: AnalyticsPurposeIdentifier[] = retainClarity ? ["consented-experience-analysis"] : [];
-        await visit(page, primaryPath);
+        await visit(page, openApplicationPage, primaryPath);
         await select(page, ["audience-measurement", ...retained]);
         await assertProviders(page, ["google-analytics-4", ...(retainClarity ? ["microsoft-clarity" as const] : [])]);
         const requestsBefore = auditFor(page).requests.length;
@@ -373,7 +381,7 @@ if (declarations.length > 0) {
         const source = await page.evaluate(key => sessionStorage.getItem(key), observationKey);
         expect(source).not.toBeNull();
         const observed = JSON.parse(source ?? "null");
-        await information.attach("first-storage-event", { contentType: "application/json", body: source ?? "null" });
+        if (!process.env.CF_ACCESS_CLIENT_ID) await information.attach("first-storage-event", { contentType: "application/json", body: source ?? "null" });
         expect(observed).toMatchObject({
           trusted: true, storedDenial: true,
           scripts: retainClarity ? ["analytics-microsoft-clarity"] : [],
@@ -396,16 +404,16 @@ if (declarations.length > 0) {
   }
 
   for (const declaration of declarations) {
-    test(`an isolated ${declaration.purpose} choice activates only its own provider`, async ({ page }) => {
-      await visit(page, primaryPath);
+    test(`an isolated ${declaration.purpose} choice activates only its own provider`, async ({ openApplicationPage, page }) => {
+      await visit(page, openApplicationPage, primaryPath);
       await select(page, [declaration.purpose]);
       await expect(action(page, "manage")).toBeVisible();
       await assertProviders(page, [declaration.identifier]);
     });
   }
 
-  test("repeated all-purpose grants do not duplicate scripts or reset provider defaults", async ({ page }) => {
-    await visit(page, primaryPath);
+  test("repeated all-purpose grants do not duplicate scripts or reset provider defaults", async ({ openApplicationPage, page }) => {
+    await visit(page, openApplicationPage, primaryPath);
     await action(page, "allow").click();
     await assertProviders(page, declarations.map(value => value.identifier));
     await action(page, "manage").click();
@@ -418,7 +426,7 @@ if (declarations.length > 0) {
   });
 
   for (const changed of ["activation", "target", "destination", "origin", "old-format", "expired"] as const) {
-    test(`a ${changed} record grants nothing and prompts again`, async ({ page }) => {
+    test(`a ${changed} record grants nothing and prompts again`, async ({ openApplicationPage, page }) => {
       const record = consentRecord(purposes, changed === "expired" ? new Date(Date.now() - 181 * 86_400_000) : new Date());
       const altered = structuredClone(record) as Record<string, unknown>;
       if (changed === "old-format") altered.schemaVersion = 2;
@@ -431,16 +439,16 @@ if (declarations.length > 0) {
         };
       }
       await preload(page, altered);
-      await visit(page, primaryPath);
+      await visit(page, openApplicationPage, primaryPath);
       await expect(action(page, "choose")).toBeVisible();
       await assertProviders(page, []);
     });
   }
 
-  test("withdrawal removes only this installation's cookies and reloads both pages without providers", async ({ context }) => {
+  test("withdrawal removes only this installation's cookies and reloads both pages without providers", async ({ context, openApplicationPage }) => {
     const first = await context.newPage();
     const second = await context.newPage();
-    await Promise.all([visit(first, primaryPath), visit(second, primaryPath)]);
+    await Promise.all([visit(first, openApplicationPage, primaryPath), visit(second, openApplicationPage, primaryPath)]);
     await Promise.all([expect(action(first, "choose")).toBeVisible(), expect(action(second, "choose")).toBeVisible()]);
     const initial = declarations[0];
     if (initial === undefined) throw new Error("ANALYTICS_TEST_PROVIDER_MISSING");
@@ -469,9 +477,9 @@ if (declarations.length > 0) {
   });
 
   for (const { locale, path } of routes) {
-    test(`keyboard controls, disabled explanation, axe and narrow reflow work in ${locale}`, async ({ page }) => {
+    test(`keyboard controls, disabled explanation, axe and narrow reflow work in ${locale}`, async ({ openApplicationPage, page }) => {
       await page.setViewportSize({ width: 320, height: 800 });
-      await visit(page, path);
+      await visit(page, openApplicationPage, path);
       await expect(action(page, "choose")).toBeVisible();
       await expect(page.getByText(localeText(locale, "collectionDisabledNotice"))).toHaveCount(active ? 0 : 1);
       await focusWithTab(page, action(page, "choose"));
@@ -490,8 +498,8 @@ if (declarations.length > 0) {
       await expect(page.locator("html")).toHaveAttribute("lang", locale);
     });
 
-    if (active) test(`failed storage retains an honest incomplete choice in ${locale}`, async ({ page }) => {
-      await visit(page, path);
+    if (active) test(`failed storage retains an honest incomplete choice in ${locale}`, async ({ openApplicationPage, page }) => {
+      await visit(page, openApplicationPage, path);
       const initial = declarations.filter(value => value.identifier !== "cloudflare-web-analytics");
       await select(page, initial.map(value => value.purpose));
       await assertProviders(page, initial.map(value => value.identifier));
@@ -514,9 +522,9 @@ if (declarations.length > 0) {
     });
   }
 
-  if (active && settings.providers.microsoftClarity !== undefined && expectedSiteOrigin !== "http://127.0.0.1:3101") {
-    test("a different browser origin refuses the entire collection set", async ({ page }) => {
-      await visit(page, `http://127.0.0.1:3101${primaryPath}`);
+  if (!process.env.DEPLOY_URL && active && settings.providers.microsoftClarity !== undefined && expectedSiteOrigin !== "http://127.0.0.1:3101") {
+    test("a different browser origin refuses the entire collection set", async ({ openApplicationPage, page }) => {
+      await visit(page, openApplicationPage, `http://127.0.0.1:3101${primaryPath}`);
       await action(page, "allow").click();
       await expect(action(page, "manage")).toBeVisible();
       await assertProviders(page, []);
@@ -524,8 +532,8 @@ if (declarations.length > 0) {
   }
 }
 
-if (contactSelected || bookingSelected) test("contact and booking remain usable after analytics choices", async ({ page }) => {
-  await visit(page, primaryPath);
+if (contactSelected || bookingSelected) test("contact and booking remain usable after analytics choices", async ({ openApplicationPage, page }) => {
+  await visit(page, openApplicationPage, primaryPath);
   if (declarations.length > 0) {
     await action(page, "decline").click();
     await action(page, "manage").click();
