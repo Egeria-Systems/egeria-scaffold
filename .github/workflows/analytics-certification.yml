@@ -59,7 +59,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up pnpm and Node.js
-        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4
         with:
           version: 11.20.0
           runtime: node@22.23.2
@@ -276,7 +276,7 @@ jobs:
 
       - name: Upload Web Analytics identity
         if: always() && env.CERTIFICATION_MODE == 'exercise'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: analytics-certification-site-identity-${{ github.sha }}
           path: ${{ runner.temp }}/analytics-certification-evidence/site-identity.json
@@ -428,7 +428,7 @@ jobs:
 
       - name: Upload Worker identity
         if: always() && env.CERTIFICATION_MODE == 'exercise'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: analytics-certification-worker-identity-${{ github.sha }}
           path: ${{ runner.temp }}/analytics-certification-evidence/worker-identity.json
@@ -563,7 +563,7 @@ jobs:
 
       - name: Upload app build evidence
         if: env.CERTIFICATION_MODE == 'exercise'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: analytics-certification-app-build-${{ github.sha }}
           path: ${{ runner.temp }}/analytics-certification-evidence/app-build.json
@@ -571,7 +571,7 @@ jobs:
           retention-days: 7
 
       - name: Upload redacted receipt
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: analytics-certification-${{ env.CERTIFICATION_MODE }}-receipt
           path: ${{ runner.temp }}/analytics-certification-receipt.json
