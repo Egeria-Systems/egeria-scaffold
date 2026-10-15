@@ -33,7 +33,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up pnpm and Node.js
-        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
+        uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4
         with:
           version: 11.20.0
           runtime: node@22.23.2
@@ -117,7 +117,7 @@ jobs:
           pnpm --dir "$CERTIFICATION_ROOT/apps/web" exec playwright test --config playwright.deployed.config.ts --project chromium --retries 0 tests/e2e/site-quality.spec.ts tests/e2e/site-routing.spec.ts
 
       - name: Upload preparation receipt
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: web3forms-preparation-receipt
           path: ${{ runner.temp }}/web3forms-preparation-receipt.json
