@@ -249,8 +249,8 @@ test("application environment generation rejects incomplete malformed and mismat
 });
 
 for (const [profile, expectedLock] of [
-  ["portfolio", "portfolio-0.11.2-foundation"],
-  ["site", "app-0.2.2"],
+  ["portfolio", "portfolio-0.11.3-foundation"],
+  ["site", "app-0.2.3"],
 ]) {
   test(`environment ${profile} email foundation prepares the matching security lock`, async () => {
     for (const transactionalEmailResend of [true, false]) {

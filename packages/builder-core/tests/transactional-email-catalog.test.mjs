@@ -102,7 +102,7 @@ test("environment email selection preserves exact profile identity and independe
     const manifest = JSON.parse(file("apps/web/package.json"));
     assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
     assert.equal(manifest.dependencies.resend, undefined);
-    assert.equal(resolveRecipeLockfileVersion(project, manifest), persistence ? "app-0.2.2-persistence" : { portfolio: "portfolio-0.11.2-foundation", site: "app-0.2.2", app: "app-0.3.0" }[profile]);
+    assert.equal(resolveRecipeLockfileVersion(project, manifest), persistence ? "app-0.2.3-persistence" : { portfolio: "portfolio-0.11.3-foundation", site: "app-0.2.3", app: "app-0.3.0" }[profile]);
     for (const name of ["RESEND_API_KEY", "TRANSACTIONAL_EMAIL_FROM", "TRANSACTIONAL_EMAIL_DOMAIN", "TRANSACTIONAL_EMAIL_ALLOWED_RECIPIENTS"]) {
       assert.ok(file("apps/web/.dev.vars.example").includes(`${name}=\n`));
       assert.equal(file("apps/web/.env.example").includes(name), false);
