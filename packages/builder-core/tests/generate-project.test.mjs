@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   chmod,
   cp,
@@ -412,14 +413,14 @@ test("persistence lock selection requires the exact compatible optional packages
   assert.equal(recipeLockfiles.createRecipeLockfileUrl("application-persistence").pathname, resolve(packageRoot, "lockfiles/web-application-persistence/pnpm-lock.yaml"));
 });
 
-test("environment persistence prepares the existing security lock with complete manifest agreement", async () => {
+test("environment persistence uses matching dependency locks and preserves retained cohorts", async () => {
   const rendered = assertSuccess(await core.renderSkeleton({
     profile: "app", projectName: "environment-persistence", displayName: "Environment Persistence",
     applicationPersistence: true, packageVersions: core.verifiedCapabilityPackageVersions,
   }, core.createApplicationEnvironmentRenderingContext(true)));
   const manifestBytes = rendered.files.find(({ path }) => path === "apps/web/package.json").content;
   const manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
-  const bytes = await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.2-persistence/pnpm-lock.yaml"));
+  const bytes = await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.3-persistence/pnpm-lock.yaml"));
   const lock = parseYaml(bytes.toString("utf8"));
   for (const [importer, path] of [[".", "package.json"], ["apps/web", "apps/web/package.json"]]) {
     const actual = JSON.parse(new TextDecoder().decode(rendered.files.find(file => file.path === path).content));
@@ -429,9 +430,17 @@ test("environment persistence prepares the existing security lock with complete 
   }
   const workspace = parseYaml(new TextDecoder().decode(rendered.files.find(({ path }) => path === "pnpm-workspace.yaml").content));
   assert.deepEqual(lock.overrides, workspace.overrides);
+  const patchHashes = Object.fromEntries(Object.entries(workspace.patchedDependencies).map(([name, path]) => {
+    const patch = rendered.files.find(file => file.path === path);
+    assert.ok(patch, `Rendered patch ${path} exists`);
+    return [name, createHash("sha256").update(patch.content).digest("hex")];
+  }));
+  assert.deepEqual(lock.patchedDependencies, patchHashes);
   assert.equal(rendered.project.recipeVersion, "0.3.0");
   assert.equal(manifest.dependencies.next, "16.3.8");
-  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, manifest), "app-0.2.2-persistence");
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, manifest), "app-0.2.3-persistence");
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: "0.2.2" }, manifest), "app-0.2.2-persistence");
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: "0.2.3" }, manifest), "app-0.2.3-persistence");
   for (const [section, key] of [
     ["dependencies", "next"], ["dependencies", "effect"], ["dependencies", "drizzle-orm"],
     ["devDependencies", "eslint-config-next"], ["devDependencies", "vitest"],
@@ -445,6 +454,7 @@ test("environment persistence prepares the existing security lock with complete 
     { originProfile: "portfolio", recipeVersion: "0.12.0" },
     { originProfile: "site", recipeVersion: "0.13.0" },
     { originProfile: "app", recipeVersion: "0.2.0" },
+    { originProfile: "app", recipeVersion: "0.2.1" },
     { originProfile: "app", recipeVersion: "unknown" },
   ]) assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), undefined);
   await withTestRoot(async root => {

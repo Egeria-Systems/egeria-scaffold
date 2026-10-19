@@ -102,7 +102,7 @@ test("historical and security dependency replacement refuses swapped source lock
 });
 
 test("environment persistence dependency changes preserve custom members and reuse both exact locks", async () => {
-  const environmentLock = async persistent => readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.2-persistence" : "web-recipe-app-0.3.0"}/pnpm-lock.yaml`, import.meta.url), "utf8");
+  const environmentLock = async persistent => readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.3-persistence" : "web-recipe-app-0.3.0"}/pnpm-lock.yaml`, import.meta.url), "utf8");
   const ordinaryCandidate = (await renderSkeleton(request, createApplicationEnvironmentRenderingContext())).value;
   const persistentCandidate = (await renderSkeleton({ ...request, applicationPersistence: true }, createApplicationEnvironmentRenderingContext(true))).value;
   for (const [current, desired, removing] of [[ordinaryCandidate, persistentCandidate, false], [persistentCandidate, ordinaryCandidate, true]]) {
