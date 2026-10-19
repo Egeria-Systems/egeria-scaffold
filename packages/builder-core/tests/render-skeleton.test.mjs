@@ -6257,12 +6257,24 @@ test("application environment generated ignore rules protect actual build and ru
   try {
     const ignore = rendered.files.find(({ path }) => path === ".gitignore");
     await writeFile(join(root, ".gitignore"), ignore.content);
-    assert.equal(spawnSync("git", ["init", "--quiet", root], { encoding: "utf8" }).status, 0);
+    const gitIsolationDirectory = join(root, "git-isolation");
+    await mkdir(gitIsolationDirectory);
+    const gitEnvironment = {
+      PATH: process.env.PATH,
+      GIT_CONFIG_NOSYSTEM: "1",
+      GIT_CONFIG_GLOBAL: join(gitIsolationDirectory, "config"),
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "core.excludesFile",
+      GIT_CONFIG_VALUE_0: join(gitIsolationDirectory, "ignore"),
+      GIT_TEMPLATE_DIR: gitIsolationDirectory,
+      GIT_TERMINAL_PROMPT: "0",
+    };
+    assert.equal(spawnSync("git", ["init", "--quiet", root], { encoding: "utf8", env: gitEnvironment }).status, 0);
     for (const path of ["apps/web/.env.local", "apps/web/.env.production", "apps/web/.dev.vars", "apps/web/.dev.vars.staging"]) {
-      assert.equal(spawnSync("git", ["check-ignore", "--no-index", path], { cwd: root, encoding: "utf8" }).status, 0, path);
+      assert.equal(spawnSync("git", ["check-ignore", "--no-index", path], { cwd: root, encoding: "utf8", env: gitEnvironment }).status, 0, path);
     }
     for (const path of ["apps/web/.env.example", "apps/web/.dev.vars.example"]) {
-      assert.equal(spawnSync("git", ["check-ignore", "--no-index", path], { cwd: root, encoding: "utf8" }).status, 1, path);
+      assert.equal(spawnSync("git", ["check-ignore", "--no-index", path], { cwd: root, encoding: "utf8", env: gitEnvironment }).status, 1, path);
     }
   } finally { await rm(root, { recursive: true, force: true }); }
 });

@@ -511,7 +511,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.deepEqual(Object.keys(workflow.jobs), expectedJobIdentifiers);
   for (const identifier of ["builder-and-packages", "cli-jobs"]) {
     const job = workflow.jobs[identifier];
-    assert.equal(job["timeout-minutes"], 90);
+    assert.equal(job["timeout-minutes"], identifier === "builder-and-packages" ? 180 : 90);
     for (const property of ["if", "needs", "continue-on-error"]) {
       assert.equal(Object.hasOwn(job, property), false, identifier);
     }
@@ -767,7 +767,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   for (const [identifier, job] of Object.entries(workflow.jobs)) {
     assert.equal(job["runs-on"], "ubuntu-24.04", identifier);
     assert.equal(typeof job["timeout-minutes"], "number", identifier);
-    const maximumMinutes = ["generated-projects", "builder-and-packages", "cli-jobs"].includes(identifier) ? 90 : 45;
+    const maximumMinutes = identifier === "builder-and-packages" ? 180 : ["generated-projects", "cli-jobs"].includes(identifier) ? 90 : 45;
     assert.ok(job["timeout-minutes"] > 0 && job["timeout-minutes"] <= maximumMinutes);
   }
   for (const identifier of jobsWithCheckout) {
