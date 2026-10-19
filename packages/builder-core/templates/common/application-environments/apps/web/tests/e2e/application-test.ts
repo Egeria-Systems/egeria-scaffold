@@ -1,4 +1,5 @@
 import { test as base, expect, type Page } from "@playwright/test";
+import { readDevelopmentTransportMode } from "../../scripts/browser-development-server";
 import { assertTransportDiagnostics, createApplicationTransport, type OpenApplicationPage, type ResponseOptions, type ApplicationResponse } from "./application-transport";
 
 type Fixtures = {
@@ -9,7 +10,8 @@ type Fixtures = {
 export const test = base.extend<Fixtures>({
   applicationTransport: [async ({ context, baseURL, playwright }, provideFixture, testInfo) => {
     if (!baseURL) throw new Error("APPLICATION_TRANSPORT_ORIGIN_INVALID");
-    const transport = await createApplicationTransport(baseURL, process.env, playwright.request);
+    const mode = readDevelopmentTransportMode(baseURL, testInfo.config.metadata, testInfo.config.webServer);
+    const transport = await createApplicationTransport(baseURL, process.env, playwright.request, mode);
     try {
       assertTransportDiagnostics(transport.settings, testInfo.project.use);
       await transport.installBrowserProtection(context);

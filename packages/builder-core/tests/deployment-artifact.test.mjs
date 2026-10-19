@@ -2,12 +2,153 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { access, copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { createServer } from "node:http";
+import { createConnection } from "node:net";
+import { EventEmitter } from "node:events";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 
 const templates = new URL("../templates/", import.meta.url);
 const revision = "1234567890abcdef1234567890abcdef12345678";
+
+async function developmentResponseServer(t, handler) {
+  const { BrowserDevelopmentResponse: Response } = await import(new URL("common/application-environments/apps/web/scripts/browser-development-server.ts", templates));
+  const server = createServer({ ServerResponse: Response }, handler);
+  await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
+  t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
+  return headers => new Promise((resolve, reject) => {
+    const socket = createConnection({ host: "127.0.0.1", port: server.address().port });
+    const chunks = [];
+    socket.setTimeout(2000, () => { socket.destroy(); reject(new Error("Response did not settle")); });
+    socket.on("data", chunk => chunks.push(chunk));
+    socket.on("error", error => { if (error.code !== "ECONNRESET") reject(error); });
+    socket.on("close", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    socket.on("connect", () => socket.end(`GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n${headers}\r\n`));
+  });
+}
+
+test("development response barrier refuses browser redirects before any wire output", async t => {
+  for (const status of [301, 302, 303, 307, 308]) {
+    for (const writer of ["writeHead", "writeHeader", "write", "end", "flushHeaders"]) {
+      await t.test(`${status} via ${writer}`, async t => {
+        const request = await developmentResponseServer(t, (incoming, response) => {
+          delete incoming.headers["sec-fetch-dest"];
+          delete incoming.headers["sec-fetch-mode"];
+          response.setHeader("Location", "http://127.0.0.1:1/forbidden");
+          if (writer === "writeHead" || writer === "writeHeader") response[writer](status);
+          else { response.statusCode = status; if (writer === "write") response.write("body"); else response[writer](); }
+          response.end();
+        });
+        for (const headers of ["Sec-Fetch-Dest: document\r\n", "Sec-Fetch-Mode: \r\n"]) {
+          assert.equal(await request(headers), "", "A browser redirect must never reach the wire");
+        }
+        assert.match(await request(""), new RegExp(`^HTTP/1.1 ${status} `), "Metadata-free API redirects remain available");
+      });
+    }
+  }
+});
+
+test("development response barrier normalizes status once and preserves allowed streaming", async t => {
+  let coercions = 0;
+  const refused = await developmentResponseServer(t, (_incoming, response) => {
+    response.writeHead({ valueOf: () => { coercions++; return coercions === 1 ? 307.9 : 200; } }, { Location: "/target" });
+    response.end();
+  });
+  assert.equal(await refused("Sec-Fetch-Dest: document\r\n"), "");
+  assert.equal(coercions, 1);
+  const allowed = await developmentResponseServer(t, (_incoming, response) => {
+    response.writeHead(200, "Allowed", { "Content-Type": "text/plain", "X-Owned": "stream" });
+    response.flushHeaders(); response.write("first"); response.end("second");
+  });
+  const wire = await allowed("Sec-Fetch-Dest: document\r\n");
+  assert.match(wire, /^HTTP\/1.1 200 Allowed\r\n/u);
+  assert.match(wire, /X-Owned: stream\r\n/u);
+  assert.match(wire, /5\r\nfirst\r\n6\r\nsecond\r\n0\r\n/u);
+});
+
+function developmentShutdownProcess(body) {
+  return spawnSync(process.execPath, ["--input-type=module", "--eval", `
+    import assert from "node:assert/strict";
+    import { createServer } from "node:http";
+    import { setImmediate as nextTurn } from "node:timers/promises";
+    import { mock } from "node:test";
+    import { runDevelopmentServer } from ${JSON.stringify(new URL("common/application-environments/apps/web/scripts/browser-development-server.ts", templates).href)};
+    ${body}
+  `], { encoding: "utf8", timeout: 5000, env: { PATH: process.env.PATH, CI: "true", COREPACK_ENABLE_NETWORK: "0", COREPACK_ENABLE_DOWNLOAD_PROMPT: "0",
+    pnpm_config_verify_deps_before_run: "error", pnpm_config_enable_global_virtual_store: "false" } });
+}
+
+test("development shutdown waits for delayed preparation and subsequent cleanup", () => {
+  const result = developmentShutdownProcess(`
+    const events = [];
+    let finishPreparation, finishCleanup, settled = false;
+    const preparation = new Promise(resolve => { finishPreparation = resolve; });
+    const cleanup = new Promise(resolve => { finishCleanup = resolve; });
+    const running = runDevelopmentServer(createServer(), {
+      prepare: async () => { await preparation; events.push("initialized"); },
+      close: async () => { events.push("cleanup-started"); await cleanup; events.push("cleanup-finished"); },
+      getRequestHandler: () => { throw new Error("Must not listen after shutdown"); },
+    }).then(() => { settled = true; });
+    await nextTurn(); process.emit("SIGTERM"); await nextTurn();
+    assert.deepEqual(events, [], "Cleanup cannot precede later initialization");
+    finishPreparation(); await nextTurn();
+    assert.deepEqual(events, ["initialized", "cleanup-started"]);
+    assert.equal(settled, false, "Startup must await shutdown completion");
+    finishCleanup(); await running;
+    assert.deepEqual(events, ["initialized", "cleanup-started", "cleanup-finished"]);
+    assert.equal(process.listenerCount("SIGINT"), 0);
+    assert.equal(process.listenerCount("SIGTERM"), 0);
+  `);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test("development shutdown retains delayed startup and cleanup failures", () => {
+  const result = developmentShutdownProcess(`
+    let rejectPreparation;
+    const preparation = new Promise((_resolve, reject) => { rejectPreparation = reject; });
+    const events = [];
+    const running = runDevelopmentServer(createServer(), {
+      prepare: async () => { try { await preparation; } finally { events.push("preparation-settled"); } },
+      close: async () => { events.push("cleanup"); throw new Error("cleanup-sentinel"); },
+      getRequestHandler: () => { throw new Error("Must not listen"); },
+    }).catch(error => error);
+    await nextTurn(); process.emit("SIGTERM"); await nextTurn();
+    assert.deepEqual(events, []);
+    rejectPreparation(new Error("startup-sentinel"));
+    const error = await running;
+    const messages = value => [value.message, ...(value.errors ?? []).flatMap(messages)];
+    assert.ok(messages(error).includes("startup-sentinel"));
+    assert.ok(messages(error).includes("cleanup-sentinel"));
+    assert.deepEqual(events, ["preparation-settled", "cleanup"]);
+    process.exitCode = 0;
+  `);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test("development shutdown deadline covers stalled preparation and cleanup", () => {
+  for (const stage of ["preparation", "cleanup-after-rejection"]) {
+    const result = developmentShutdownProcess(`
+      mock.timers.enable({ apis: ["setTimeout"] });
+      let rejectPreparation;
+      const preparation = new Promise((_resolve, reject) => { rejectPreparation = reject; });
+      void runDevelopmentServer(createServer(), {
+        prepare: () => preparation,
+        close: () => ${stage === "preparation" ? "Promise.resolve()" : "new Promise(() => {})"},
+        getRequestHandler: () => { throw new Error("Must not listen"); },
+      }).catch(error => { console.error(error); process.exitCode = 2; });
+      await nextTurn(); process.emit("SIGTERM"); await nextTurn();
+      ${stage === "preparation" ? "" : 'rejectPreparation(new Error("startup-before-deadline")); await nextTurn();'}
+      mock.timers.tick(14999); console.log("deadline-still-active");
+      mock.timers.tick(1); console.log("deadline-was-lost");
+    `);
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /deadline-still-active/u);
+    assert.doesNotMatch(result.stdout, /deadline-was-lost/u);
+    assert.match(result.stderr, /BROWSER_DEVELOPMENT_SHUTDOWN_TIMEOUT/u);
+    if (stage === "cleanup-after-rejection") assert.match(result.stderr, /startup-before-deadline/u);
+  }
+});
 
 async function configurationFixture(t, artifact = false, jobs = false) {
   const temporary = await mkdtemp(join(tmpdir(), "deployment-artifact-"));
@@ -222,7 +363,7 @@ test("protected API transport confines credentials and rejects unsafe redirects 
   await transport.dispose();
 });
 
-test("browser transport refuses redirects in every mode without continuing a browser request", async () => {
+test("default browser transport refuses redirects without continuing a browser request", async () => {
   const { createApplicationTransport } = await import(new URL("common/application-environments/apps/web/tests/e2e/application-transport.ts", templates));
   for (const target of ["development", "staging", "production"]) {
     const origin = target === "development" ? "http://localhost:3000" : "https://application.example.test";
@@ -243,6 +384,154 @@ test("browser transport refuses redirects in every mode without continuing a bro
     assert.throws(() => transport.assertBrowserRequests(), /APPLICATION_TRANSPORT_BROWSER_REQUEST_BLOCKED/u);
     await transport.dispose();
   }
+});
+
+test("native development admission requires the complete owned server pairing", async () => {
+  const { readDevelopmentTransportMode, guardedDevelopmentServer } = await import(new URL("common/application-environments/apps/web/scripts/browser-development-server.ts", templates));
+  const origin = "http://127.0.0.1:3100";
+  const metadata = { applicationTransport: "guarded-next-development" };
+  assert.equal(readDevelopmentTransportMode(origin, metadata, guardedDevelopmentServer), "guarded-next-development");
+  assert.equal(readDevelopmentTransportMode(origin, {}, { command: "pnpm run preview", url: origin }), undefined);
+  for (const [baseURL, meta, server] of [
+    [origin, {}, guardedDevelopmentServer], [origin, { applicationTransport: "unknown" }, guardedDevelopmentServer],
+    ["https://127.0.0.1:3100", metadata, guardedDevelopmentServer], [origin, metadata, null],
+    [origin, metadata, [guardedDevelopmentServer]], [origin, metadata, { ...guardedDevelopmentServer, reuseExistingServer: true }],
+    [origin, metadata, { ...guardedDevelopmentServer, command: "pnpm run dev" }],
+    [origin, metadata, { ...guardedDevelopmentServer, url: "http://localhost:3100" }],
+    [origin, metadata, { ...guardedDevelopmentServer, cwd: "/another/project" }],
+  ]) assert.throws(() => readDevelopmentTransportMode(baseURL, meta, server), /DEVELOPMENT_CONFIG_INVALID/u);
+});
+
+test("guarded native transport continues only validated same-origin requests and owns its pending requests", async () => {
+  const { createApplicationTransport } = await import(new URL("common/application-environments/apps/web/tests/e2e/application-transport.ts", templates));
+  const origin = "http://127.0.0.1:3100";
+  const request = { newContext: async () => ({ dispose: async () => {} }) };
+  for (const [baseURL, environment, mode] of [["https://example.test", {}, "guarded-next-development"],
+    [origin, { DEPLOY_URL: origin }, "guarded-next-development"], [origin, { CF_ACCESS_CLIENT_ID: "id" }, "guarded-next-development"],
+    [origin, {}, "unknown"]]) {
+    await assert.rejects(createApplicationTransport(baseURL, environment, request, mode), /APPLICATION_TRANSPORT_/u);
+  }
+  const transport = await createApplicationTransport(origin, {}, request, "guarded-next-development");
+  const context = new EventEmitter();
+  let handler;
+  context.routeWebSocket = async () => {};
+  context.route = async (_pattern, value) => { handler = value; };
+  const calls = [];
+  const response = { status: () => 200, dispose: async () => {} };
+  const route = incoming => ({ request: () => incoming, continue: async (...args) => { assert.deepEqual(args, []); calls.push("continue"); },
+    fetch: async () => { calls.push("fetch"); return response; }, fulfill: async () => { calls.push("fulfill"); }, abort: async () => { calls.push("abort"); } });
+  await transport.installBrowserProtection(context);
+  for (const [navigation, resourceType, expected] of [[true, "document", ["continue"]], [false, "fetch", ["continue"]], [false, "document", ["continue"]]]) {
+    calls.length = 0;
+    const incoming = { url: () => origin, isNavigationRequest: () => navigation, resourceType: () => resourceType, headers: () => ({}) };
+    await handler(route(incoming));
+    context.emit("requestfinished", incoming);
+    assert.deepEqual(calls, expected);
+  }
+  transport.assertBrowserRequests();
+  calls.length = 0;
+  await handler(route({ url: () => "http://127.0.0.1:1/external" }));
+  assert.deepEqual(calls, ["abort"]);
+  assert.throws(() => transport.assertBrowserRequests(), /BROWSER_REQUEST_BLOCKED/u);
+  await transport.dispose();
+  assert.equal(context.listenerCount("requestfinished"), 0);
+  assert.equal(context.listenerCount("requestfailed"), 0);
+});
+
+test("native request failure and deadline stay sticky while disposing only owned listeners", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { createApplicationTransport } = await import(new URL("common/application-environments/apps/web/tests/e2e/application-transport.ts", templates));
+  for (const outcome of ["failure", "timeout", "first-popup-timeout"]) {
+    const context = new EventEmitter();
+    let handler, pageCloses = 0, contextCloses = 0;
+    const incoming = { url: () => "http://127.0.0.1:3100", isNavigationRequest: () => true, resourceType: () => "document",
+      frame: () => { if (outcome === "first-popup-timeout") throw new Error("No frame yet"); return { page: () => ({ close: async () => { pageCloses++; } }) }; } };
+    context.routeWebSocket = async () => {};
+    context.route = async (_pattern, value) => { handler = value; };
+    context.close = async () => { contextCloses++; };
+    const unrelated = () => {};
+    context.on("requestfinished", unrelated);
+    const transport = await createApplicationTransport("http://127.0.0.1:3100", {}, { newContext: async () => ({ dispose: async () => {} }) }, "guarded-next-development");
+    await transport.installBrowserProtection(context);
+    await handler({ request: () => incoming, continue: async () => {} });
+    if (outcome === "failure") context.emit("requestfailed", incoming);
+    else { t.mock.timers.tick(9999); transport.assertBrowserRequests(); t.mock.timers.tick(1); }
+    assert.throws(() => transport.assertBrowserRequests(), /BROWSER_REQUEST_BLOCKED/u);
+    assert.equal(pageCloses, outcome === "timeout" ? 1 : 0);
+    assert.equal(contextCloses, outcome === "first-popup-timeout" ? 1 : 0);
+    await transport.dispose();
+    assert.deepEqual(context.listeners("requestfinished"), [unrelated]);
+    assert.equal(context.listenerCount("requestfailed"), 0);
+  }
+});
+
+test("native fetch cancellation requires successful headers and preserves every other failure", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { createApplicationTransport } = await import(new URL("common/application-environments/apps/web/tests/e2e/application-transport.ts", templates));
+  const cases = [
+    { name: "fetch abort after 200", status: 200, allowed: true },
+    { name: "fetch abort after 202", status: 202, allowed: true },
+    { name: "fetch abort after 299", status: 299, allowed: true },
+    { name: "abort before headers" },
+    { name: "informational response", status: 199 },
+    { name: "redirect response", status: 300 },
+    { name: "denied response", status: 403 },
+    { name: "server error response", status: 500 },
+    { name: "document abort", status: 202, resourceType: "document" },
+    { name: "script abort", status: 202, resourceType: "script" },
+    { name: "non-abort failure", status: 202, error: "net::ERR_CONNECTION_RESET" },
+    { name: "another request response", status: 202, unrelatedResponse: true },
+    { name: "prior failure stays sticky", status: 202, priorFailure: true },
+    { name: "successful headers retain deadline", status: 202, hang: true },
+    { name: "finished request clears deadline", status: 202, finished: true, allowed: true },
+  ];
+  for (const scenario of cases) await t.test(scenario.name, async () => {
+    const context = new EventEmitter();
+    let handler, pageCloses = 0;
+    const incoming = { url: () => "http://127.0.0.1:3100/resource", resourceType: () => scenario.resourceType ?? "fetch",
+      failure: () => ({ errorText: scenario.error ?? "net::ERR_ABORTED" }), frame: () => ({ page: () => ({ close: async () => { pageCloses++; } }) }) };
+    context.routeWebSocket = async () => {};
+    context.route = async (_pattern, value) => { handler = value; };
+    const unrelatedListener = () => {};
+    context.on("response", unrelatedListener);
+    const transport = await createApplicationTransport("http://127.0.0.1:3100", {}, { newContext: async () => ({ dispose: async () => {} }) }, "guarded-next-development");
+    try {
+      await transport.installBrowserProtection(context);
+      const route = request => ({ request: () => request, continue: async () => {} });
+      if (scenario.priorFailure) {
+        const prior = { ...incoming };
+        await handler(route(prior)); context.emit("requestfailed", prior);
+      }
+      await handler(route(incoming));
+      if (scenario.status !== undefined) context.emit("response", { request: () => scenario.unrelatedResponse ? { ...incoming } : incoming, status: () => scenario.status });
+      if (scenario.hang) {
+        t.mock.timers.tick(9999); transport.assertBrowserRequests(); t.mock.timers.tick(1);
+      } else {
+        context.emit(scenario.finished ? "requestfinished" : "requestfailed", incoming);
+        t.mock.timers.tick(10000);
+      }
+      if (scenario.allowed) transport.assertBrowserRequests();
+      else assert.throws(() => transport.assertBrowserRequests(), /BROWSER_REQUEST_BLOCKED/u);
+      assert.equal(pageCloses, scenario.hang ? 1 : 0);
+    } finally { await transport.dispose(); }
+    assert.deepEqual(context.listeners("response"), [unrelatedListener]);
+    assert.equal(context.listenerCount("requestfinished"), 0);
+    assert.equal(context.listenerCount("requestfailed"), 0);
+  });
+});
+
+test("guarded development rendering is candidate-only with standards ownership", async () => {
+  const core = await import("../dist/index.js");
+  const request = { profile: "portfolio", projectName: "guarded-development", displayName: "Guarded Development", packageVersions: core.verifiedCapabilityPackageVersions };
+  const candidate = await core.renderSkeleton(request, core.createApplicationEnvironmentRenderingContext());
+  const current = await core.renderSkeleton(request);
+  assert.equal(candidate.ok, true); assert.equal(current.ok, true);
+  for (const path of ["apps/web/scripts/browser-development-server.ts", "apps/web/playwright.dev.config.ts"]) {
+    assert.equal(candidate.value.surfaces.find(surface => surface.path === path)?.owner.identifier, "standards");
+    assert.equal(Buffer.from(candidate.value.files.find(file => file.path === path).content).toString("utf8"), await readFile(new URL(`common/application-environments/${path}`, templates), "utf8"));
+  }
+  assert.equal(current.value.files.some(file => file.path === "apps/web/scripts/browser-development-server.ts"), false);
+  assert.equal(Buffer.from(current.value.files.find(file => file.path === "apps/web/playwright.dev.config.ts").content).toString("utf8"), await readFile(new URL("common/apps/web/playwright.dev.config.ts", templates), "utf8"));
 });
 
 

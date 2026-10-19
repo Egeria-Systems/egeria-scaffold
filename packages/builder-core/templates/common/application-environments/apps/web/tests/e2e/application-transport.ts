@@ -1,4 +1,5 @@
-import type { APIRequest, APIResponse, BrowserContext, Page, PlaywrightTestOptions } from "@playwright/test";
+import type { APIRequest, APIResponse, BrowserContext, Page, PlaywrightTestOptions, Request, Response } from "@playwright/test";
+import { guardedDevelopmentMode } from "../../scripts/browser-development-server.ts";
 
 export type ResponseOptions = Readonly<{ acceptLanguage?: string; redirect?: "manual" | "same-origin" }>;
 export type ApplicationResponse = Pick<APIResponse, "status" | "ok" | "headers" | "text" | "json" | "url">;
@@ -30,13 +31,15 @@ export function assertTransportDiagnostics(settings: ReturnType<typeof readTrans
       use.extraHTTPHeaders !== undefined || use.storageState !== undefined || use.contextOptions?.recordHar !== undefined)) fail("DIAGNOSTICS_FORBIDDEN");
 }
 
-export async function createApplicationTransport(baseURL: string, environment: Environment, request: APIRequest) {
+export async function createApplicationTransport(baseURL: string, environment: Environment, request: APIRequest, mode?: typeof guardedDevelopmentMode) {
   const settings = readTransportSettings(baseURL, environment);
+  if (mode !== undefined && (mode !== guardedDevelopmentMode || !settings.origin.startsWith("http:") || environment.DEPLOY_URL !== undefined)) fail("DEVELOPMENT_MODE_INVALID");
   const accessHeaders: Record<string, string> = settings.protectedStaging ? {
     "CF-Access-Client-Id": environment.CF_ACCESS_CLIENT_ID!, "CF-Access-Client-Secret": environment.CF_ACCESS_CLIENT_SECRET!,
   } : {};
   const context = await request.newContext();
   let browserFailure = false;
+  const browserCleanups: (() => void)[] = [];
   function destination(value: string, base = settings.origin): URL {
     let url: URL;
     try { url = new URL(value, base); } catch { return fail("DESTINATION_INVALID"); }
@@ -80,6 +83,29 @@ export async function createApplicationTransport(baseURL: string, environment: E
     catch { return fail("NAVIGATION_FAILED"); }
   };
   const installBrowserProtection = async (browser: BrowserContext) => {
+    const pending = new Map<Request, { timer: ReturnType<typeof setTimeout>; successfulFetchResponse: boolean }>();
+    const settled = (request: Request) => { const state = pending.get(request); if (state) { clearTimeout(state.timer); pending.delete(request); } };
+    const responded = (response: Response) => {
+      const request = response.request();
+      const state = pending.get(request);
+      const status = response.status();
+      if (state && request.resourceType() === "fetch" && status >= 200 && status < 300) state.successfulFetchResponse = true;
+    };
+    const failed = (request: Request) => {
+      const state = pending.get(request);
+      if (state && !(state.successfulFetchResponse && request.resourceType() === "fetch" && request.failure()?.errorText === "net::ERR_ABORTED")) browserFailure = true;
+      settled(request);
+    };
+    if (mode === guardedDevelopmentMode) {
+      browser.on("response", responded);
+      browser.on("requestfinished", settled);
+      browser.on("requestfailed", failed);
+      browserCleanups.push(() => {
+        browser.off("response", responded); browser.off("requestfinished", settled); browser.off("requestfailed", failed);
+        for (const state of pending.values()) clearTimeout(state.timer);
+        pending.clear();
+      });
+    }
     await browser.routeWebSocket("**/*", route => {
       const url = new URL(route.url());
       const origin = settings.origin.replace(/^http/u, "ws");
@@ -89,11 +115,24 @@ export async function createApplicationTransport(baseURL: string, environment: E
     await browser.route("**/*", async route => {
       let response: APIResponse | undefined;
       try {
-        destination(route.request().url());
+        const incoming = route.request();
+        destination(incoming.url());
+        if (mode === guardedDevelopmentMode) {
+          const timer = setTimeout(() => {
+            pending.delete(incoming); browserFailure = true;
+            // This bounds a hung request; redirect safety belongs to the server response barrier.
+            let page: Page | undefined;
+            try { page = incoming.frame().page(); } catch { /* A first popup request may not have a frame yet. */ }
+            void (page ? page.close() : browser.close()).catch(() => {});
+          }, 10000);
+          pending.set(incoming, { timer, successfulFetchResponse: false });
+          await route.continue();
+          return;
+        }
         response = await route.fetch({ headers: { ...route.request().headers(), ...accessHeaders }, maxRedirects: 0, maxRetries: 0, timeout: 10000 });
         if (redirects.has(response.status())) fail("BROWSER_REDIRECT_FORBIDDEN");
         await route.fulfill({ response });
-      } catch { browserFailure = true; await route.abort("blockedbyclient").catch(() => {}); }
+      } catch { settled(route.request()); browserFailure = true; await route.abort("blockedbyclient").catch(() => {}); }
       finally { await response?.dispose(); }
     });
   };
@@ -106,5 +145,6 @@ export async function createApplicationTransport(baseURL: string, environment: E
     fail("READINESS_FAILED");
   };
   return { settings, getApplicationResponse, openApplicationPage, installBrowserProtection, waitForApplication,
-    assertBrowserRequests: () => { if (browserFailure) fail("BROWSER_REQUEST_BLOCKED"); }, dispose: () => context.dispose() };
+    assertBrowserRequests: () => { if (browserFailure) fail("BROWSER_REQUEST_BLOCKED"); },
+    dispose: async () => { for (const cleanup of browserCleanups) cleanup(); await context.dispose(); } };
 }

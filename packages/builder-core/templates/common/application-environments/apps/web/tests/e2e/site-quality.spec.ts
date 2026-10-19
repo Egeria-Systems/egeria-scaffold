@@ -131,7 +131,12 @@ test("uses the configured origin and target for every emitted page metadata", as
   for (const path of await discoverContentPaths(page, openApplicationPage)) {
     await openApplicationPage(page, path);
     const pathname = new URL(page.url()).pathname;
-    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", new URL(pathname, origin).href);
+    const canonical = page.locator('link[rel="canonical"]');
+    await expect(canonical).toHaveCount(1);
+    await expect.poll(async () => {
+      const href = await canonical.getAttribute("href");
+      try { return href === null ? null : new URL(href).href; } catch { return null; }
+    }).toBe(new URL(pathname, origin).href);
     for (const href of await page.locator('link[rel="alternate"][hreflang]').evaluateAll(elements => elements.map(element => element.getAttribute("href")))) {
       expect(new URL(href!).origin).toBe(origin);
     }

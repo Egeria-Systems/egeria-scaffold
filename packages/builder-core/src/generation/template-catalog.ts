@@ -474,6 +474,7 @@ export function createTemplateCatalog(
     for (const path of ["apps/web/tests/unit/observability-environment.test.ts", "docs/observability.md", "apps/web/src/configuration/site-origin.ts", "apps/web/src/configuration/application-build.ts",
       "apps/web/tests/unit/site-origin.test.ts", "apps/web/tests/unit/application-build.test.ts",
       "apps/web/scripts/check-prepared-artifact.mjs", "apps/web/scripts/check-deployment-protection.mjs",
+      "apps/web/scripts/browser-development-server.ts",
       "apps/web/tests/scripts/prepared-artifact.test.mjs", "apps/web/tests/scripts/deployment-protection.test.mjs",
       "apps/web/tests/e2e/application-test.ts", "apps/web/tests/e2e/application-transport.ts",
       "apps/web/tests/transport/application-transport.spec.ts", "apps/web/playwright.transport.config.ts"]) {
@@ -619,7 +620,7 @@ export function createTemplateCatalog(
     }
     const common = [
       "common/.github/workflows/deploy.yml.template", "common/apps/web/tests/e2e/site-quality.spec.ts",
-      "common/apps/web/playwright.config.shared.ts", "common/apps/web/playwright.deployed.config.ts", "common/apps/web/playwright.preview.config.ts",
+      "common/apps/web/playwright.config.shared.ts", "common/apps/web/playwright.deployed.config.ts", "common/apps/web/playwright.preview.config.ts", "common/apps/web/playwright.dev.config.ts",
       "common/apps/web/next.config.ts", "common/apps/web/wrangler.jsonc.template", "common/apps/web/AGENTS.md.template",
       "common/apps/web/src/infrastructure/cloudflare/observability-context.ts",
       "common/apps/web/src/infrastructure/observability/server-reporter.ts",

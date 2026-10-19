@@ -318,6 +318,7 @@ function createDescriptors(
       ...([
         ["site-origin-tests", "tests/unit/site-origin.test.ts"], ["application-build-tests", "tests/unit/application-build.test.ts"],
         ["prepared-artifact-check", "scripts/check-prepared-artifact.mjs"], ["deployment-protection-check", "scripts/check-deployment-protection.mjs"],
+        ["browser-development-server", "scripts/browser-development-server.ts"],
         ["prepared-artifact-tests", "tests/scripts/prepared-artifact.test.mjs"], ["deployment-protection-tests", "tests/scripts/deployment-protection.test.mjs"],
         ["application-test-fixture", "tests/e2e/application-test.ts"], ["application-test-transport", "tests/e2e/application-transport.ts"],
         ["application-transport-tests", "tests/transport/application-transport.spec.ts"], ["application-transport-config", "playwright.transport.config.ts"],
