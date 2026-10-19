@@ -464,7 +464,10 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "scope",
     "builder-and-packages",
     "cli-jobs",
+    "cli-lifecycle",
     "generated-projects",
+    "generated-fixtures",
+    "generated-jobs",
     "app-transition-visuals",
     "compatibility-proof",
     "dependency-review",
@@ -509,10 +512,10 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "cancel-in-progress": true,
   });
   assert.deepEqual(Object.keys(workflow.jobs), expectedJobIdentifiers);
-  for (const identifier of ["builder-and-packages", "cli-jobs"]) {
+  for (const identifier of ["builder-and-packages", "cli-jobs", "cli-lifecycle"]) {
     const job = workflow.jobs[identifier];
-    assert.equal(job["timeout-minutes"], identifier === "builder-and-packages" ? 180 : 90);
-    for (const property of ["if", "needs", "continue-on-error"]) {
+    assert.equal(job["timeout-minutes"], identifier === "builder-and-packages" ? 180 : identifier === "cli-lifecycle" ? 45 : 90);
+    for (const property of ["if", "needs", "continue-on-error", "concurrency"]) {
       assert.equal(Object.hasOwn(job, property), false, identifier);
     }
     for (const step of job.steps) {
@@ -641,7 +644,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       workflowCommands(job),
     ]),
   );
-  const nonJobsCommand = "node --test --test-skip-pattern='^compiled (?:Vitest five|dependency-security|literal-lint) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$' apps/cli/tests/*.test.mjs";
+  const nonJobsCommand = 'node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/*.test.mjs';
   const jobsCommand = 'node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs';
   const cliJobs = workflow.jobs["cli-jobs"];
   assert.equal(cliJobs.name, "CLI jobs (${{ matrix.cohort }})");
@@ -666,9 +669,75 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.ok(cliJobs.steps.findIndex(({ uses }) => uses?.startsWith("pnpm/setup@")) <
     cliJobs.steps.findIndex(({ run }) => run === "pnpm install --frozen-lockfile"));
   assert.equal(
-    workflow.jobs["builder-and-packages"].steps.find(({ name }) => name === "Test CLI excluding jobs lifecycle")?.run,
+    workflow.jobs["builder-and-packages"].steps.find(({ name }) => name === "Test CLI excluding dedicated lifecycle jobs")?.run,
     nonJobsCommand,
   );
+  const lifecycle = workflow.jobs["cli-lifecycle"];
+  assert.equal(lifecycle.name, "CLI lifecycle (${{ matrix.group }})");
+  assert.deepEqual(lifecycle.strategy, {
+    "fail-fast": false,
+    matrix: {
+      include: [
+        { group: "app-optionals", "test-pattern": "^compiled (?:retained|current|dependency-security|literal-lint) app optional lifecycle completes production verification$" },
+        { group: "email", "test-pattern": "^compiled (?:Vitest five|dependency-security|literal-lint) email lifecycle on (?:portfolio|site) verifies and retains its foundation$" },
+        { group: "hosted-contact", "test-pattern": "^compiled (?:Vitest five|dependency-security|literal-lint) Web3Forms lifecycle on (?:portfolio|app) preserves composition and re-adds safely$" },
+      ],
+    },
+  });
+  assert.deepEqual(lifecycle.steps.filter(({ run }) => run).map(({ run }) => run), [
+    "pnpm install --frozen-lockfile",
+    "pnpm run build:builder",
+    jobsCommand,
+  ]);
+  assert.deepEqual(lifecycle.steps.find(({ run }) => run === jobsCommand).env, {
+    CLI_TEST_PATTERN: "${{ matrix.test-pattern }}",
+  });
+  const mainCliStep = workflow.jobs["builder-and-packages"].steps.find(
+    ({ run }) => run === nonJobsCommand,
+  );
+  const jobsUnion = "^compiled (?:Vitest five|dependency-security|literal-lint) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$";
+  const skipPattern = [jobsUnion, ...lifecycle.strategy.matrix.include.map(
+    (group) => group["test-pattern"],
+  )].map((pattern) => `(?:${pattern})`).join("|");
+  assert.deepEqual(mainCliStep.env, { CLI_TEST_SKIP_PATTERN: skipPattern });
+  const selectors = [...cliJobs.strategy.matrix.include, ...lifecycle.strategy.matrix.include]
+    .map((group) => new RegExp(group["test-pattern"], "u"));
+  const skipSelector = new RegExp(mainCliStep.env.CLI_TEST_SKIP_PATTERN, "u");
+  const cohorts = ["Vitest five", "dependency-security", "literal-lint"];
+  const dedicatedNames = [
+    ...cohorts.flatMap((cohort) => ["portfolio", "app-persistence-email"].map(
+      (profile) => `compiled ${cohort} jobs lifecycle on ${profile} completes production verification`,
+    )),
+    ...["retained", "current", "dependency-security", "literal-lint"].map(
+      (cohort) => `compiled ${cohort} app optional lifecycle completes production verification`,
+    ),
+    ...cohorts.flatMap((cohort) => ["portfolio", "site"].map(
+      (profile) => `compiled ${cohort} email lifecycle on ${profile} verifies and retains its foundation`,
+    )),
+    ...cohorts.flatMap((cohort) => ["portfolio", "app"].map(
+      (profile) => `compiled ${cohort} Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`,
+    )),
+  ];
+  assert.equal(new Set(dedicatedNames).size, 22);
+  assert.deepEqual(selectors.map((selector) => dedicatedNames.filter(
+    (name) => selector.test(name),
+  ).length), [2, 2, 2, 4, 6, 6]);
+  for (const name of dedicatedNames) {
+    assert.equal(selectors.filter((selector) => selector.test(name)).length, 1, name);
+    assert.equal(skipSelector.test(name), true, name);
+  }
+  const remainderNames = [
+    "parses a project configuration",
+    ...dedicatedNames.map((name) => `${name} with extra coverage`),
+    ...dedicatedNames.map((name) => name.replace(/^compiled [\s\S]+? (jobs|app optional|email|Web3Forms) lifecycle/u, "compiled future $1 lifecycle")),
+    ...dedicatedNames.filter((name) => name.includes(" on ")).map(
+      (name) => name.replace(/ on [\w-]+ /u, " on future-profile "),
+    ),
+  ];
+  for (const name of remainderNames) {
+    assert.equal(selectors.some((selector) => selector.test(name)), false, name);
+    assert.equal(skipSelector.test(name), false, name);
+  }
   for (const command of [
     "pnpm run test:constitution",
     "pnpm run check:semantic-naming",
@@ -688,25 +757,37 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     commandsByJob["builder-and-packages"],
     /test:generated-fixtures|verify:generated-skeletons|nextjs-cloudflare-proof/u,
   );
-  for (const command of [
-    "pnpm run test:generated-fixtures",
-    "pnpm run verify:generated-visuals",
-  ]) {
-    assert.match(
-      commandsByJob["generated-projects"],
-      new RegExp(escapeRegularExpression(command), "u"),
-    );
+  const generatedCommands = {
+    "generated-projects": ["pnpm run build:builder", "pnpm run verify:generated-visuals"],
+    "generated-fixtures": ["pnpm run build:builder", "pnpm run test:generated-fixtures"],
+    "generated-jobs": ["pnpm run test:generated-jobs"],
+  };
+  for (const [identifier, commands] of Object.entries(generatedCommands)) {
+    const job = workflow.jobs[identifier];
+    assert.equal(job.if, "needs.scope.outputs.generated-projects == 'true'", identifier);
+    assert.deepEqual(job.needs, ["scope"], identifier);
+    assert.deepEqual(job.container, workflow.jobs["generated-projects"].container, identifier);
+    assert.equal(job["timeout-minutes"], identifier === "generated-projects" ? 90 : 45);
+    for (const property of ["continue-on-error", "strategy", "concurrency"]) {
+      assert.equal(Object.hasOwn(job, property), false, identifier);
+    }
+    const checkout = job.steps.find(({ uses }) => uses?.startsWith("actions/checkout@"));
+    assert.deepEqual(checkout.with, { "persist-credentials": false }, identifier);
+    assert.deepEqual(job.steps.filter(({ run }) => run).map(({ run }) => run), [
+      "pnpm install --frozen-lockfile", ...commands,
+    ], identifier);
+    for (const step of job.steps.filter(({ run }) => run)) {
+      assert.equal(Object.hasOwn(step, "if"), false, identifier);
+      assert.equal(Object.hasOwn(step, "continue-on-error"), false, identifier);
+    }
+    if (identifier !== "generated-projects") {
+      assert.equal(job.steps.some(({ uses }) => uses?.startsWith("actions/upload-artifact@")), false);
+    }
+    const command = commands.at(-1);
+    const owners = Object.entries(workflow.jobs).flatMap(([owner, candidate]) =>
+      candidate.steps.filter(({ run }) => run === command).map(() => owner));
+    assert.deepEqual(owners, [identifier]);
   }
-  assert.doesNotMatch(
-    commandsByJob["generated-projects"],
-    /verify:generated-skeletons|--update-snapshots/u,
-  );
-  assert.equal(
-    workflow.jobs["generated-projects"].steps.filter(
-      ({ run }) => run === "pnpm run verify:generated-visuals",
-    ).length,
-    1,
-  );
   const generatedProjectSteps = workflow.jobs["generated-projects"].steps;
   const visualVerificationIndex = generatedProjectSteps.findIndex(
     ({ run }) => run === "pnpm run verify:generated-visuals",
@@ -722,6 +803,22 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     with: {
       name: "generated-visual-failure-artifacts",
       path: "generated-visual-artifacts/",
+      "if-no-files-found": "ignore",
+      "include-hidden-files": false,
+      "retention-days": 7,
+    },
+  });
+  const auditIndex = generatedProjectSteps.findIndex(
+    ({ name }) => name === "Retain raw dependency audits and security exception dispositions",
+  );
+  assert.ok(auditIndex > visualVerificationIndex);
+  assert.deepEqual(generatedProjectSteps[auditIndex], {
+    name: "Retain raw dependency audits and security exception dispositions",
+    if: "always()",
+    uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    with: {
+      name: "generated-dependency-audits",
+      path: "generated-visual-artifacts/dependency-audit/",
       "if-no-files-found": "ignore",
       "include-hidden-files": false,
       "retention-days": 7,
@@ -753,14 +850,20 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "scope",
     "builder-and-packages",
     "cli-jobs",
+    "cli-lifecycle",
     "generated-projects",
+    "generated-fixtures",
+    "generated-jobs",
     "app-transition-visuals",
     "compatibility-proof",
   ];
   const jobsWithToolchain = [
     "builder-and-packages",
     "cli-jobs",
+    "cli-lifecycle",
     "generated-projects",
+    "generated-fixtures",
+    "generated-jobs",
     "app-transition-visuals",
     "compatibility-proof",
   ];
@@ -781,7 +884,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     );
     assert.equal(checkout?.with?.["persist-credentials"], false, identifier);
   }
-  for (const identifier of ["scope", "builder-and-packages", "cli-jobs"]) {
+  for (const identifier of ["scope", "builder-and-packages", "cli-jobs", "cli-lifecycle"]) {
     const checkout = workflow.jobs[identifier].steps.find(({ uses }) =>
       uses?.startsWith("actions/checkout@"),
     );
@@ -802,6 +905,10 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       cache: false,
       install: false,
     });
+    const steps = workflow.jobs[identifier].steps;
+    assert.ok(steps.indexOf(setup) < steps.findIndex(
+      ({ run }) => run === "pnpm install --frozen-lockfile",
+    ), identifier);
     assert.ok(
       workflow.jobs[identifier].steps.some(
         ({ run }) => run === "pnpm install --frozen-lockfile",
@@ -924,7 +1031,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       name: "incomplete non-jobs selector",
       mutateWorkflow(candidate) {
         candidate.jobs["builder-and-packages"].steps.find(
-          ({ name }) => name === "Test CLI excluding jobs lifecycle",
+          ({ name }) => name === "Test CLI excluding dedicated lifecycle jobs",
         ).run = "node --test --test-name-pattern='^parser' apps/cli/tests/*.test.mjs";
       },
     },
@@ -977,6 +1084,124 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       },
     },
   ];
+  negativeCases.push(
+    {
+      name: "omitted lifecycle group",
+      mutateWorkflow(candidate) { candidate.jobs["cli-lifecycle"].strategy.matrix.include.pop(); },
+    },
+    {
+      name: "overlapping lifecycle selectors",
+      mutateWorkflow(candidate) {
+        const groups = candidate.jobs["cli-lifecycle"].strategy.matrix.include;
+        groups[1]["test-pattern"] = groups[0]["test-pattern"];
+      },
+    },
+    ...[".*", "^compiled current app optional lifecycle completes production verification$"].map((pattern) => ({
+      name: `incorrect main complement ${pattern}`,
+      mutateWorkflow(candidate) {
+        candidate.jobs["builder-and-packages"].steps.find(
+          ({ name }) => name === "Test CLI excluding dedicated lifecycle jobs",
+        ).env.CLI_TEST_SKIP_PATTERN = pattern;
+      },
+    })),
+  );
+  for (const identifier of ["cli-lifecycle", "generated-projects", "generated-fixtures", "generated-jobs"]) {
+    for (const [property, value] of [["needs", ["builder-and-packages"]], ["if", "false"],
+      ["continue-on-error", true], ["concurrency", "shared-verification"]]) {
+      negativeCases.push({
+        name: `${identifier} unsafe ${property}`,
+        mutateWorkflow(candidate) { candidate.jobs[identifier][property] = value; },
+      });
+    }
+    for (const step of workflow.jobs[identifier].steps.filter(({ run }) => run)) {
+      negativeCases.push({
+        name: `${identifier} missing ${step.name}`,
+        mutateWorkflow(candidate) {
+          candidate.jobs[identifier].steps = candidate.jobs[identifier].steps.filter(
+            ({ name }) => name !== step.name,
+          );
+        },
+      });
+      for (const [property, value] of [["if", "false"], ["continue-on-error", true]]) {
+        negativeCases.push({
+          name: `${identifier} ${property} on ${step.name}`,
+          mutateWorkflow(candidate) {
+            candidate.jobs[identifier].steps.find(({ name }) => name === step.name)[property] = value;
+          },
+        });
+      }
+    }
+    negativeCases.push({
+      name: `${identifier} missing setup`,
+      mutateWorkflow(candidate) {
+        candidate.jobs[identifier].steps = candidate.jobs[identifier].steps.filter(
+          ({ uses }) => !uses?.startsWith("pnpm/setup@"),
+        );
+      },
+    });
+  }
+  for (const identifier of ["cli-jobs", "cli-lifecycle"]) {
+    negativeCases.push({
+      name: `${identifier} cancels sibling verification`,
+      mutateWorkflow(candidate) { candidate.jobs[identifier].strategy["fail-fast"] = true; },
+    }, {
+      name: `${identifier} shallow retained-fixture history`,
+      mutateWorkflow(candidate) {
+        candidate.jobs[identifier].steps.find(
+          ({ uses }) => uses?.startsWith("actions/checkout@"),
+        ).with["fetch-depth"] = 1;
+      },
+    });
+  }
+  for (const identifier of ["generated-projects", "generated-fixtures", "generated-jobs"]) {
+    negativeCases.push({
+      name: `${identifier} duplicate verification`,
+      mutateWorkflow(candidate) {
+        const steps = candidate.jobs[identifier].steps;
+        steps.push(structuredClone(steps.filter(({ run }) => run).at(-1)));
+      },
+    });
+  }
+  for (const identifier of ["generated-fixtures", "generated-jobs"]) {
+    for (const [property, value] of [["image", "untrusted:latest"], ["options", "--shm-size=64m"]]) {
+      negativeCases.push({
+        name: `${identifier} wrong ${property}`,
+        mutateWorkflow(candidate) { candidate.jobs[identifier].container[property] = value; },
+      });
+    }
+    negativeCases.push({
+      name: `${identifier} wrong command owner`,
+      mutateWorkflow(candidate) {
+        const steps = candidate.jobs[identifier].steps;
+        candidate.jobs["generated-projects"].steps.push(steps.pop());
+      },
+    });
+  }
+  for (const artifactName of ["generated-dependency-audits", "generated-visual-failure-artifacts"]) {
+    const findArtifact = (candidate) => candidate.jobs["generated-projects"].steps.find(
+      ({ with: settings }) => settings?.name === artifactName,
+    );
+    negativeCases.push({
+      name: `${artifactName} moved to another runner`,
+      mutateWorkflow(candidate) {
+        const artifact = findArtifact(candidate);
+        candidate.jobs["generated-fixtures"].steps.push(artifact);
+        candidate.jobs["generated-projects"].steps = candidate.jobs["generated-projects"].steps.filter(
+          (step) => step !== artifact,
+        );
+      },
+    });
+    negativeCases.push({
+      name: `${artifactName} wrong upload condition`,
+      mutateWorkflow(candidate) { findArtifact(candidate).if = "success()"; },
+    });
+    for (const [property, value] of [["path", "wrong/"], ["retention-days", 90], ["include-hidden-files", true]]) {
+      negativeCases.push({
+        name: `${artifactName} wrong ${property}`,
+        mutateWorkflow(candidate) { findArtifact(candidate).with[property] = value; },
+      });
+    }
+  }
   for (const { name, mutateSource, mutateWorkflow } of negativeCases) {
     const candidate = structuredClone(workflow);
     mutateWorkflow?.(candidate);
@@ -997,7 +1222,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
   );
   assert.ok(buildIndex >= 0 && buildIndex < packageTestIndex);
   const cliTestIndex = builderSteps.findIndex(
-    ({ name }) => name === "Test CLI excluding jobs lifecycle",
+    ({ name }) => name === "Test CLI excluding dedicated lifecycle jobs",
   );
   assert.ok(buildIndex < cliTestIndex && cliTestIndex < packageTestIndex);
   assert.deepEqual(builderSteps.slice(cliTestIndex + 1).map(({ name }) => name), [
@@ -1022,6 +1247,11 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
     rootManifest.scripts["verify:generated-visuals"],
     "node scripts/verify-generated-skeletons.mjs --visual",
   );
+  const coreManifest = JSON.parse(await readRepositoryFile("packages/builder-core/package.json"));
+  assert.equal(rootManifest.scripts["test:generated-jobs"],
+    "pnpm --filter @egeria-systems/builder-core run build && pnpm --filter @egeria-systems/builder-core run test:generated-jobs");
+  assert.equal(coreManifest.scripts["test:generated-jobs"],
+    "node --test tests/background-job-generation.integration.mjs");
   const kernelCommands = rootManifest.scripts["verify:builder-kernel"].split(" && ");
   assert.ok(
     kernelCommands.indexOf("pnpm run build:builder") <
