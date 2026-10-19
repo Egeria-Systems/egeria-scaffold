@@ -41,7 +41,6 @@ for (const [profile, selection] of [
 ]) {
   test(`${profile} environment jobs prepare all targets with independent selected services ${JSON.stringify(selection)}`, { timeout: 90 * 60 * 1000 }, async context => {
     const owner = await mkdtemp(join(tmpdir(), "egeria-environment-jobs-generation-"));
-    context.diagnostic(`Retained local jobs evidence: ${owner}`);
     const renderingContext = createApplicationEnvironmentRenderingContext(selection.applicationPersistence === true, false, true);
     const result = await generateProject({
       request: { profile, projectName: `jobs-${profile}`, displayName: `Jobs ${profile}`, backgroundJobDelivery: true, ...selection },
@@ -55,7 +54,13 @@ for (const [profile, selection] of [
     assert.equal(versions["application-persistence"], selection.applicationPersistence ? "0.2.0" : undefined);
     assert.equal(versions["transactional-email-resend"], selection.transactionalEmailResend ? "0.2.0" : undefined);
     const { verifyApplicationEnvironmentProject } = await import("../../../scripts/verify-generated-skeletons.mjs");
-    const verification = await verifyApplicationEnvironmentProject(result.value.destination);
+    let verification;
+    try {
+      verification = await verifyApplicationEnvironmentProject(result.value.destination);
+    } catch (error) {
+      if (error.verificationFailure !== undefined) context.diagnostic(JSON.stringify(error.verificationFailure));
+      throw error;
+    }
     assert.deepEqual(verification.targets.map(({ target }) => target), ["development", "staging", "production"]);
     await writeFile(join(owner, "prepared-target-evidence.json"), JSON.stringify(verification, null, 2));
   });

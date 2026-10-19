@@ -24,6 +24,7 @@ import {
   generatedFixtureContracts,
   inspectGeneratedFixture,
   parseVerificationArguments,
+  verifyApplicationEnvironmentProjectForTesting,
   verifyGeneratedProjectForTesting,
   verifyGeneratedSkeletonsForTesting as verifySkeletons,
 } from "../../scripts/verify-generated-skeletons.mjs";
@@ -2100,4 +2101,132 @@ test("candidate verification builds each target before recording and never rebui
   }), error => error.code === "BROWSER_PREVIEW_FAILED" && error.retainedEvidencePath === retainedPath);
   assert.equal(await readFile(join(retainedPath, "development-project/apps/web/.open-next/prepared-artifact.json"), "utf8"), "synthetic-failing-receipt");
   assert.equal(JSON.parse(await readFile(join(retainedPath, "verification-failure.json"))).failureCode, "BROWSER_PREVIEW_FAILED");
+});
+
+async function createEnvironmentFailureFixture(context, email = false) {
+  const core = await import("../../packages/builder-core/dist/index.js");
+  const parent = await mkdtemp(join(tmpdir(), "environment-failure-contract-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const generated = await core.generateProject({
+    request: { profile: "app", projectName: "failure-contract", displayName: "Failure Contract",
+      backgroundJobDelivery: true, applicationPersistence: true, ...(email ? { transactionalEmailResend: true } : {}) },
+    destination: join(parent, "source"), renderingContext: core.createApplicationEnvironmentRenderingContext(true, false, true),
+    verifier: { ...core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
+      verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: core.persistenceGenerationVerificationChecks } }) },
+  });
+  assert.equal(generated.ok, true, JSON.stringify(generated));
+  return { parent, source: generated.value.destination };
+}
+
+async function recordSyntheticEnvironmentReceipt(input) {
+  if (input.arguments.includes("record")) {
+    await mkdir(join(input.cwd, "apps/web/.open-next"), { recursive: true });
+    await writeFile(join(input.cwd, "apps/web/.open-next/prepared-artifact.json"), `synthetic-${input.environment.APPLICATION_ENVIRONMENT}-receipt`);
+  }
+  return input.arguments[0] === "--version" ? "11.20.0" : "";
+}
+
+test("application environment preview failures retain sanitized diagnostics and the failing target", async context => {
+  for (const email of [false, true]) {
+    const { parent, source } = await createEnvironmentFailureFixture(context, email);
+    const sourceBefore = await readFile(join(source, ".egeria/state.json"));
+    const artifactRoot = join(parent, "reports");
+    const syntheticHome = ["", "Users", "PRIVATE_USER", "source"].join("/");
+    let owner;
+    let failure;
+    await assert.rejects(verifyApplicationEnvironmentProjectForTesting(source, {
+      createOwner: async () => { owner = await createKnownOwner(parent); return owner; },
+      derivePnpmToolEnvironment: async () => ({}),
+      runCommand: async input => {
+        if (input.environment.APPLICATION_ENVIRONMENT === "staging" && input.arguments.includes("test:e2e:preview")) {
+          const logs = previewLogDirectory(input.environment.HOME);
+          await mkdir(logs, { recursive: true });
+          await writeFile(join(logs, "wrangler-2026-09-13_12-01-00.log"), "Error in ProxyController: Error inside ProxyWorker\nNetwork connection lost. Authorization: Bearer PRIVATE_TOKEN");
+          await mkdir(join(input.cwd, "apps/web/playwright-report"), { recursive: true });
+          await writeFile(join(input.cwd, "apps/web/playwright-report/index.html"), "PRIVATE_REPORT_CONTENT");
+          throw Object.assign(new Error("PRIVATE_CAUSE"), {
+            code: 7, signal: "SIGTERM", killed: true,
+            stdout: `PRIVATE_STDOUT ${syntheticHome}`, stderr: "ECONNREFUSED Cookie: PRIVATE_COOKIE",
+          });
+        }
+        return recordSyntheticEnvironmentReceipt(input);
+      },
+      captureVisualArtifacts: input => captureVisualFailureArtifactsForTesting({ ...input, artifactRoot }),
+    }), error => { failure = error; return error.code === "BROWSER_PREVIEW_FAILED"; });
+    assert.equal(failure.verificationFailure?.target, "staging");
+    assert.deepEqual(failure.verificationFailure.services, { jobs: true, persistence: true, email });
+    assert.equal(failure.verificationFailure.profile, "app");
+    assert.equal(failure.verificationFailure.code, "BROWSER_PREVIEW_FAILED");
+    const diagnostics = failure.verificationFailure.previewDiagnostics;
+    assert.deepEqual(diagnostics.process, { exitCode: 7, signal: "SIGTERM", killed: true, outputLimitExceeded: false });
+    assert.deepEqual(diagnostics.stderr.indicators, ["connection-refused"]);
+    assert.deepEqual(diagnostics.wrangler, { status: "inspected", logsInspected: 1,
+      indicators: ["proxy-worker-error", "network-connection-lost"] });
+    assert.equal(failure.retainedEvidencePath, owner.path);
+    const retained = JSON.parse(await readFile(join(owner.path, "verification-failure.json"), "utf8"));
+    assert.deepEqual(retained.verificationFailure, failure.verificationFailure);
+    assert.deepEqual(retained.completedTargets.map(({ target }) => target), ["development"]);
+    assert.equal(retained.owner.path, owner.path);
+    assert.equal((await lstat(join(owner.path, "verification-failure.json"))).mode & 0o777, 0o600);
+    assert.equal(await readFile(join(owner.path, "staging-project/apps/web/.open-next/prepared-artifact.json"), "utf8"), "synthetic-staging-receipt");
+    assert.deepEqual(await readFile(join(source, ".egeria/state.json")), sourceBefore);
+    const reports = await readdir(artifactRoot);
+    assert.equal(reports.length, 1);
+    const report = join(artifactRoot, reports[0]);
+    const failureReport = await readFile(join(report, "failure.json"), "utf8");
+    assert.deepEqual(JSON.parse(failureReport), { code: "BROWSER_PREVIEW_FAILED",
+      fixture: email ? "application-environment-app-jobs-persistence-email-staging" : "application-environment-app-jobs-persistence-no-email-staging" });
+    const previewReport = await readFile(join(report, "preview-diagnostics.json"), "utf8");
+    assert.deepEqual(JSON.parse(previewReport), diagnostics);
+    const publicContent = JSON.stringify(failure.verificationFailure) + failureReport + previewReport;
+    assert.doesNotMatch(publicContent, /PRIVATE_|Authorization|Cookie|Bearer|\/Users\/|retainedEvidencePath|owner|environmentKeys|arguments|stack|cause/u);
+    assert.equal(publicContent.includes(parent), false);
+    assert.equal(await readFile(join(report, "playwright-report/index.html"), "utf8"), "PRIVATE_REPORT_CONTENT");
+  }
+});
+
+test("application environment retention failures preserve the primary verification error", async context => {
+  for (const refusal of ["write", "export", "identity", "source"]) {
+    const { parent, source } = await createEnvironmentFailureFixture(context);
+    let owner;
+    let failure;
+    let exports = 0;
+    await assert.rejects(verifyApplicationEnvironmentProjectForTesting(source, {
+      createOwner: async () => {
+        owner = await createKnownOwner(parent);
+        if (refusal === "write") await writeFile(join(owner.path, "verification-failure.json"), "preserved-existing-evidence");
+        return owner;
+      },
+      derivePnpmToolEnvironment: async () => ({}),
+      runCommand: async input => {
+        if (input.arguments.includes("test:e2e:preview")) {
+          if (refusal === "identity") owner.inode += 1n;
+          if (refusal === "source") await writeFile(join(source, "unexpected-source-change"), "synthetic change");
+          throw new Error("PRIVATE_PREVIEW_CAUSE");
+        }
+        return recordSyntheticEnvironmentReceipt(input);
+      },
+      captureVisualArtifacts: async () => {
+        exports++;
+        if (refusal === "export") throw new Error("PRIVATE_EXPORT_CAUSE");
+      },
+    }), error => { failure = error; return true; });
+    const primaryCode = refusal === "source" ? "FIXTURE_SOURCE_CHANGED" : "BROWSER_PREVIEW_FAILED";
+    assert.equal(failure.code, primaryCode, refusal);
+    assert.equal(failure.message, `Generated fixture verification failed: ${primaryCode}`, refusal);
+    assert.equal(failure.verificationFailure?.code, primaryCode, refusal);
+    assert.equal(failure.verificationFailure.target, "development", refusal);
+    assert.doesNotMatch(JSON.stringify(failure.verificationFailure), /PRIVATE_|\/Users\/|owner|stack|cause/u);
+    assert.equal(exports, ["identity", "source"].includes(refusal) ? 0 : 1, refusal);
+    if (refusal === "export") {
+      assert.equal(failure.verificationFailure.artifactExportCode, "VISUAL_ARTIFACT_EXPORT_FAILED");
+      assert.equal(failure.retainedEvidencePath, owner.path);
+    }
+    if (["write", "identity"].includes(refusal)) {
+      assert.equal(failure.verificationFailure.evidenceRetentionCode, "VERIFICATION_EVIDENCE_RETENTION_FAILED");
+      assert.equal(failure.retainedEvidencePath, undefined);
+    }
+    if (refusal === "write") assert.equal(await readFile(join(owner.path, "verification-failure.json"), "utf8"), "preserved-existing-evidence");
+    if (refusal === "source") assert.equal(failure.verificationFailure.previewDiagnostics, undefined);
+  }
 });

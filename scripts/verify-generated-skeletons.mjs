@@ -1923,11 +1923,16 @@ export async function verifyGeneratedProjectForTesting(
 }
 
 export function verifyApplicationEnvironmentProject(root) {
-  return verifyApplicationEnvironmentProjectForTesting(root, { createOwner: createGeneratedFixtureOwner, runCommand: defaultRunCommand });
+  return verifyApplicationEnvironmentProjectForTesting(root, {
+    createOwner: createGeneratedFixtureOwner,
+    runCommand: defaultRunCommand,
+    captureVisualArtifacts: captureVisualFailureArtifacts,
+  });
 }
 
 export async function verifyApplicationEnvironmentProjectForTesting(root, adapters) {
-  if (typeof adapters?.createOwner !== "function" || typeof adapters.runCommand !== "function") fail("VERIFICATION_SETUP_FAILED");
+  if (typeof adapters?.createOwner !== "function" || typeof adapters.runCommand !== "function" ||
+    (adapters.captureVisualArtifacts !== undefined && typeof adapters.captureVisualArtifacts !== "function")) fail("VERIFICATION_SETUP_FAILED");
   const core = await import("../packages/builder-core/dist/index.js");
   const { derivePnpmToolEnvironment } = await import("../packages/builder-core/dist/generation/verify-generated-project.js");
   const toolEnvironment = await (adapters.derivePnpmToolEnvironment ?? derivePnpmToolEnvironment)("pnpm");
@@ -1937,17 +1942,21 @@ export async function verifyApplicationEnvironmentProjectForTesting(root, adapte
   const project = core.parseProjectYaml(await readFile(join(fixedRoot, ".egeria/project.yaml"), "utf8"), "2.0.0");
   if (!snapshot.ok || !project.ok) fail("FIXTURE_STATE_INVALID");
   const selected = project.value.selectedCapabilities;
+  const profile = project.value.originProfile;
   const jobs = selected.includes("background-job-delivery");
   const persistence = selected.includes("application-persistence");
+  const email = selected.includes("transactional-email-resend");
   const foundation = selected.includes("app-foundation");
   const manifest = await readFile(join(fixedRoot, "apps/web/package.json"));
   const lockfile = await readFile(join(fixedRoot, "pnpm-lock.yaml"));
   const owner = await adapters.createOwner();
   if (!(await pathIdentityMatches(owner))) fail("VERIFICATION_SETUP_FAILED");
   const targets = [];
+  let activeTarget = null;
   let pendingError;
   try {
     for (const target of ["development", "staging", "production"]) {
+      activeTarget = target;
       const validationRoot = join(owner.path, target + "-project");
       const supportRoot = join(owner.path, target + "-support");
       await cp(fixedRoot, validationRoot, { recursive: true, force: false, errorOnExist: true, dereference: false });
@@ -2011,11 +2020,41 @@ export async function verifyApplicationEnvironmentProjectForTesting(root, adapte
     catch { pendingError = new GeneratedFixtureVerificationError("FIXTURE_SOURCE_CHANGED"); }
     if (pendingError === undefined) {
       if (!(await cleanupOwnedDirectory(owner))) pendingError = new GeneratedFixtureVerificationError("VERIFICATION_CLEANUP_FAILED");
-    } else if (await pathIdentityMatches(owner)) {
-      // Preserve only this identity-owned synthetic project and its failing receipt.
+    } else {
       const failureCode = pendingError instanceof GeneratedFixtureVerificationError ? pendingError.code : "VERIFICATION_FAILED";
-      await writeFile(join(owner.path, "verification-failure.json"), JSON.stringify({ failureCode, completedTargets: targets, owner: { path: owner.path, device: String(owner.device), inode: String(owner.inode) } }, null, 2), { flag: "wx", mode: 0o600 });
-      pendingError.retainedEvidencePath = owner.path;
+      const verificationFailure = {
+        code: failureCode, profile, target: activeTarget, services: { jobs, persistence, email },
+        ...(failureCode === "BROWSER_PREVIEW_FAILED" && pendingError.previewDiagnostics !== undefined
+          ? { previewDiagnostics: pendingError.previewDiagnostics } : {}),
+      };
+      if (await pathIdentityMatches(owner)) {
+        if (failureCode === "BROWSER_PREVIEW_FAILED" && adapters.captureVisualArtifacts !== undefined) {
+          try {
+            await adapters.captureVisualArtifacts({
+              failureCode,
+              identifier: `application-environment-${profile}-${jobs ? "jobs" : "web"}-${persistence ? "persistence" : "stateless"}-${email ? "email" : "no-email"}-${activeTarget}`,
+              validationRoot: join(owner.path, activeTarget + "-project"),
+              previewDiagnostics: verificationFailure.previewDiagnostics,
+            });
+          } catch {
+            pendingError.artifactExportCode = "VISUAL_ARTIFACT_EXPORT_FAILED";
+            verificationFailure.artifactExportCode = pendingError.artifactExportCode;
+          }
+        }
+        try {
+          // The owner identity and completed commands stay in private local evidence.
+          await writeFile(join(owner.path, "verification-failure.json"), JSON.stringify({
+            failureCode, verificationFailure, completedTargets: targets,
+            owner: { path: owner.path, device: String(owner.device), inode: String(owner.inode) },
+          }, null, 2), { flag: "wx", mode: 0o600 });
+          pendingError.retainedEvidencePath = owner.path;
+        } catch {
+          verificationFailure.evidenceRetentionCode = "VERIFICATION_EVIDENCE_RETENTION_FAILED";
+        }
+      } else {
+        verificationFailure.evidenceRetentionCode = "VERIFICATION_EVIDENCE_RETENTION_FAILED";
+      }
+      pendingError.verificationFailure = verificationFailure;
     }
   }
   if (pendingError !== undefined) throw pendingError;

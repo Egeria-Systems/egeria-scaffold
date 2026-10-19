@@ -467,6 +467,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "cli-lifecycle",
     "generated-projects",
     "generated-fixtures",
+    "generated-jobs-profiles",
     "generated-jobs",
     "app-transition-visuals",
     "compatibility-proof",
@@ -757,10 +758,74 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     commandsByJob["builder-and-packages"],
     /test:generated-fixtures|verify:generated-skeletons|nextjs-cloudflare-proof/u,
   );
+  const generatedJobsCommand = 'node --test --test-name-pattern="$GENERATED_JOBS_TEST_PATTERN" packages/builder-core/tests/background-job-generation.integration.mjs';
+  const generatedJobs = workflow.jobs["generated-jobs-profiles"];
+  assert.equal(generatedJobs.name, "Generated jobs (${{ matrix.profile }})");
+  assert.deepEqual(generatedJobs.strategy, {
+    "fail-fast": false,
+    "max-parallel": 3,
+    matrix: { include: [
+      { profile: "portfolio", "test-pattern": String.raw`^portfolio (?:jobs generation verifies its actual runtime before persisting confirmed state|environment jobs prepare all targets with independent selected services \{\})$` },
+      { profile: "site", "test-pattern": String.raw`^site (?:jobs generation verifies its actual runtime before persisting confirmed state|environment jobs prepare all targets with independent selected services \{"transactionalEmailResend":true,"multilingual":true\})$` },
+      { profile: "app", "test-pattern": String.raw`^app (?:jobs generation verifies its actual runtime before persisting confirmed state|environment jobs prepare all targets with independent selected services \{"applicationPersistence":true(?:,"transactionalEmailResend":true)?\})$` },
+    ] },
+  });
+  const generatedJobNames = [
+    "portfolio jobs generation verifies its actual runtime before persisting confirmed state",
+    "site jobs generation verifies its actual runtime before persisting confirmed state",
+    "app jobs generation verifies its actual runtime before persisting confirmed state",
+    "portfolio environment jobs prepare all targets with independent selected services {}",
+    'site environment jobs prepare all targets with independent selected services {"transactionalEmailResend":true,"multilingual":true}',
+    'app environment jobs prepare all targets with independent selected services {"applicationPersistence":true}',
+    'app environment jobs prepare all targets with independent selected services {"applicationPersistence":true,"transactionalEmailResend":true}',
+  ];
+  const generatedJobSelectors = generatedJobs.strategy.matrix.include.map(row => new RegExp(row["test-pattern"], "u"));
+  assert.deepEqual(generatedJobSelectors.map(selector => generatedJobNames.filter(name => selector.test(name)).length), [2, 2, 3]);
+  for (const name of generatedJobNames) {
+    assert.equal(generatedJobSelectors.filter(selector => selector.test(name)).length, 1, name);
+    assert.equal(generatedJobSelectors.some(selector => selector.test(`${name} extra`)), false, name);
+    assert.equal(generatedJobSelectors.some(selector => selector.test(`prefix ${name}`)), false, name);
+  }
+  for (const name of [
+    "unknown jobs generation verifies its actual runtime before persisting confirmed state",
+    "app environment jobs prepare all targets with independent selected services {}",
+    'app environment jobs prepare all targets with independent selected services {"applicationPersistence":false}',
+    'site environment jobs prepare all targets with independent selected services {"transactionalEmailResend":true}',
+  ]) assert.equal(generatedJobSelectors.some(selector => selector.test(name)), false, name);
+  assert.deepEqual(generatedJobs.steps.find(({ run }) => run === generatedJobsCommand)?.env, {
+    GENERATED_JOBS_TEST_PATTERN: "${{ matrix.test-pattern }}",
+  });
+  const jobsUpload = generatedJobs.steps.find(({ name }) => name === "Upload generated jobs failure reports");
+  assert.ok(generatedJobs.steps.indexOf(jobsUpload) > generatedJobs.steps.findIndex(({ run }) => run === generatedJobsCommand));
+  assert.deepEqual(jobsUpload, {
+    name: "Upload generated jobs failure reports",
+    if: "failure()",
+    uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    with: {
+      name: "generated-jobs-${{ matrix.profile }}-failure-reports-attempt-${{ github.run_attempt }}",
+      path: "generated-visual-artifacts/application-environment-${{ matrix.profile }}-*/failure.json\ngenerated-visual-artifacts/application-environment-${{ matrix.profile }}-*/preview-diagnostics.json\n",
+      "if-no-files-found": "ignore", "include-hidden-files": false, "retention-days": 7,
+    },
+  });
+  const aggregate = workflow.jobs["generated-jobs"];
+  assert.deepEqual(Object.keys(aggregate).sort(), ["if", "name", "needs", "runs-on", "steps", "timeout-minutes"]);
+  assert.equal(aggregate.name, "generated-jobs");
+  assert.deepEqual(aggregate.needs, ["scope", "generated-jobs-profiles"]);
+  assert.equal(aggregate.if, "${{ always() }}");
+  assert.equal(aggregate["timeout-minutes"], 2);
+  assert.equal(aggregate.steps.length, 1);
+  assert.deepEqual(Object.keys(aggregate.steps[0]).sort(), ["env", "name", "run", "shell"]);
+  assert.equal(aggregate.steps[0].shell, "bash");
+  assert.equal(typeof aggregate.steps[0].run, "string");
+  assert.deepEqual(aggregate.steps[0].env, {
+    SCOPE_RESULT: "${{ needs.scope.result }}",
+    GENERATED_REQUIRED: "${{ needs.scope.outputs.generated-projects }}",
+    PROFILE_RESULT: "${{ needs.generated-jobs-profiles.result }}",
+  });
   const generatedCommands = {
     "generated-projects": ["pnpm run build:builder", "pnpm run verify:generated-visuals"],
     "generated-fixtures": ["pnpm run build:builder", "pnpm run test:generated-fixtures"],
-    "generated-jobs": ["pnpm run test:generated-jobs"],
+    "generated-jobs-profiles": ["pnpm --filter @egeria-systems/builder-core run build", generatedJobsCommand],
   };
   for (const [identifier, commands] of Object.entries(generatedCommands)) {
     const job = workflow.jobs[identifier];
@@ -768,7 +833,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     assert.deepEqual(job.needs, ["scope"], identifier);
     assert.deepEqual(job.container, workflow.jobs["generated-projects"].container, identifier);
     assert.equal(job["timeout-minutes"], identifier === "generated-projects" ? 90 : 45);
-    for (const property of ["continue-on-error", "strategy", "concurrency"]) {
+    for (const property of ["continue-on-error", "concurrency", ...(identifier === "generated-jobs-profiles" ? [] : ["strategy"])]) {
       assert.equal(Object.hasOwn(job, property), false, identifier);
     }
     const checkout = job.steps.find(({ uses }) => uses?.startsWith("actions/checkout@"));
@@ -780,7 +845,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       assert.equal(Object.hasOwn(step, "if"), false, identifier);
       assert.equal(Object.hasOwn(step, "continue-on-error"), false, identifier);
     }
-    if (identifier !== "generated-projects") {
+    if (!["generated-projects", "generated-jobs-profiles"].includes(identifier)) {
       assert.equal(job.steps.some(({ uses }) => uses?.startsWith("actions/upload-artifact@")), false);
     }
     const command = commands.at(-1);
@@ -853,7 +918,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "cli-lifecycle",
     "generated-projects",
     "generated-fixtures",
-    "generated-jobs",
+    "generated-jobs-profiles",
     "app-transition-visuals",
     "compatibility-proof",
   ];
@@ -863,7 +928,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "cli-lifecycle",
     "generated-projects",
     "generated-fixtures",
-    "generated-jobs",
+    "generated-jobs-profiles",
     "app-transition-visuals",
     "compatibility-proof",
   ];
@@ -1105,7 +1170,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       },
     })),
   );
-  for (const identifier of ["cli-lifecycle", "generated-projects", "generated-fixtures", "generated-jobs"]) {
+  for (const identifier of ["cli-lifecycle", "generated-projects", "generated-fixtures", "generated-jobs-profiles"]) {
     for (const [property, value] of [["needs", ["builder-and-packages"]], ["if", "false"],
       ["continue-on-error", true], ["concurrency", "shared-verification"]]) {
       negativeCases.push({
@@ -1153,7 +1218,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       },
     });
   }
-  for (const identifier of ["generated-projects", "generated-fixtures", "generated-jobs"]) {
+  for (const identifier of ["generated-projects", "generated-fixtures", "generated-jobs-profiles"]) {
     negativeCases.push({
       name: `${identifier} duplicate verification`,
       mutateWorkflow(candidate) {
@@ -1162,7 +1227,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       },
     });
   }
-  for (const identifier of ["generated-fixtures", "generated-jobs"]) {
+  for (const identifier of ["generated-fixtures", "generated-jobs-profiles"]) {
     for (const [property, value] of [["image", "untrusted:latest"], ["options", "--shm-size=64m"]]) {
       negativeCases.push({
         name: `${identifier} wrong ${property}`,
@@ -1173,7 +1238,9 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       name: `${identifier} wrong command owner`,
       mutateWorkflow(candidate) {
         const steps = candidate.jobs[identifier].steps;
-        candidate.jobs["generated-projects"].steps.push(steps.pop());
+        const command = steps.filter(({ run }) => run).at(-1);
+        steps.splice(steps.indexOf(command), 1);
+        candidate.jobs["generated-projects"].steps.push(command);
       },
     });
   }
@@ -1201,6 +1268,24 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
         mutateWorkflow(candidate) { findArtifact(candidate).with[property] = value; },
       });
     }
+  }
+  const findJobsUpload = candidate => candidate.jobs["generated-jobs-profiles"].steps.find(({ name }) => name === "Upload generated jobs failure reports");
+  for (const [name, mutate] of [
+    ["missing profile", job => job.strategy.matrix.include.pop()],
+    ["overlapping profiles", job => { job.strategy.matrix.include[1]["test-pattern"] = job.strategy.matrix.include[0]["test-pattern"]; }],
+    ["broadened profile", job => { job.strategy.matrix.include[0]["test-pattern"] = ".*"; }],
+    ["empty profile selection", job => { job.strategy.matrix.include[0]["test-pattern"] = "^$"; }],
+    ["cancelled siblings", job => { job.strategy["fail-fast"] = true; }],
+    ["unbounded parallelism", job => { delete job.strategy["max-parallel"]; }],
+    ["unfiltered command", job => { job.steps.find(({ name }) => name === "Verify fresh jobs runtime generation").run = "pnpm run test:generated-jobs"; }],
+    ["missing upload", job => { job.steps.pop(); }],
+  ]) negativeCases.push({ name: `generated jobs ${name}`, mutateWorkflow(candidate) { mutate(candidate.jobs["generated-jobs-profiles"]); } });
+  for (const [property, value] of [["name", "shared-jobs-report"], ["path", "generated-visual-artifacts/"], ["retention-days", 90], ["include-hidden-files", true]]) {
+    negativeCases.push({ name: `generated jobs unsafe artifact ${property}`, mutateWorkflow(candidate) { findJobsUpload(candidate).with[property] = value; } });
+  }
+  negativeCases.push({ name: "generated jobs non-failure upload", mutateWorkflow(candidate) { findJobsUpload(candidate).if = "success()"; } });
+  for (const [property, value] of [["name", "renamed-check"], ["if", "success()"], ["needs", ["scope"]], ["continue-on-error", true]]) {
+    negativeCases.push({ name: `generated jobs aggregate unsafe ${property}`, mutateWorkflow(candidate) { candidate.jobs["generated-jobs"][property] = value; } });
   }
   for (const { name, mutateSource, mutateWorkflow } of negativeCases) {
     const candidate = structuredClone(workflow);
@@ -1263,6 +1348,33 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
     "utf8",
   );
   assert.match(bookingWorkflow, /run test:unit[\s\S]+run test:component[\s\S]+Deploy certification Worker/u);
+});
+
+test("generated jobs aggregate rejects incomplete selected verification", async () => {
+  const workflow = parse(await readRepositoryFile(".github/workflows/repository-quality.yml"));
+  const aggregate = workflow.jobs["generated-jobs"];
+  assert.equal(aggregate.steps.length, 1);
+  const command = aggregate.steps[0].run;
+  for (const scope of ["success", "failure", "cancelled", "skipped", "", "unknown"]) {
+    for (const required of ["true", "false", "", "unknown"]) {
+      for (const profiles of ["success", "failure", "cancelled", "skipped", "", "unknown"]) {
+        const input = `${scope}:${required}:${profiles}`;
+        const expectedSuccess = ["success:true:success", "success:false:skipped"].includes(input);
+        let exitCode = 0;
+        try {
+          await execFileAsync("bash", ["-c", command], {
+            cwd: repositoryRoot, timeout: 3000, maxBuffer: 16 * 1024,
+            env: { PATH: process.env.PATH, SCOPE_RESULT: scope, GENERATED_REQUIRED: required, PROFILE_RESULT: profiles },
+          });
+        } catch (error) {
+          assert.equal(error.killed, false, input);
+          assert.equal(typeof error.code, "number", input);
+          exitCode = error.code;
+        }
+        assert.equal(exitCode === 0, expectedSuccess, input);
+      }
+    }
+  }
 });
 
 test("repository quality scope classification executes fail-safe Git behavior", async (context) => {
