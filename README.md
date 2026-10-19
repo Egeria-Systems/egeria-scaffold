@@ -4,7 +4,7 @@ Egeria Scaffold builds versioned, materialized Next.js recipes for Egeria System
 
 ## Current implementation status
 
-Builder-core implements fourteen admission capability descriptors and three generation recipes: `portfolio@0.11.2`, `site@0.12.2`, and `app@0.2.2`. App project/state parsing, rendering, and atomic state-last generation retain the complete production-site experience and independent Calendly, multilingual, and analytics choices. The generated app uses the bounded server-only `effect@4.0.0-rc.112` runtime and conditional integration verification against the whole built Worker. The [capability model](docs/architecture/capability-model.md#accepted-app-architecture-boundary) owns those runtime and verification boundaries. [ADR-0015](docs/adr/0015-vitest-five-generation.md) owns the new Vitest 5 generation and dependency security successors and finite retained Vitest 5/Vitest 4 selection. Existing materialized repositories retain their supported diagnostics and lifecycle operations; this change adds no automatic Vitest migration.
+Builder-core implements fourteen admission capability descriptors and three generation recipes: `portfolio@0.11.3`, `site@0.12.3`, and `app@0.2.3`. App project/state parsing, rendering, and atomic state-last generation retain the complete production-site experience and independent Calendly, multilingual, and analytics choices. The generated app uses the bounded server-only `effect@4.0.0-rc.112` runtime and conditional integration verification against the whole built Worker. The [capability model](docs/architecture/capability-model.md#accepted-app-architecture-boundary) owns those runtime and verification boundaries. [ADR-0015](docs/adr/0015-vitest-five-generation.md) owns the new Vitest 5 generation and dependency security successors and finite retained Vitest 5/Vitest 4 selection. Existing materialized repositories retain their supported diagnostics and lifecycle operations; this change adds no automatic Vitest migration.
 
 The CLI exposes portfolio, site, and app creation through the existing generation boundary. Exact app optional-capability addition/removal uses the existing planners and state-last executors under their ordinary ownership, reference, Git, and approval preconditions. Incoming app transition planning and fingerprint-gated execution follow the [capability model](docs/architecture/capability-model.md#incoming-app-transition-execution), with the existing CLI commands accepting `site` or `app` targets; app upgrades remain unsupported. The default and all-optionals app fixtures plus the persistence fixture use the [retained-fixture verification boundary](docs/architecture/capability-model.md#representative-immutable-app-fixtures). Five unchanged admission subjects retain accepted certification; the new persistence and changed standards `0.6.0`/deployment `0.4.0` subjects remain pending separate certification under [current certification coverage](docs/architecture/capability-model.md#certification-coverage). Historical evidence cannot certify changed subjects. The [program roadmap](docs/roadmaps/program-roadmap.md) owns separate certification and successor gates. Command results establish only the boundaries actually exercised, not deployment, provider confirmation, production readiness, translation or visual quality, human accessibility, or WCAG conformance.
 
@@ -14,7 +14,7 @@ Optional `contact-form-web3forms@0.1.0` adds a home-page contact form on current
 
 Optional `transactional-email-resend@0.1.0` is selected with `create --transactional-email-resend` or the existing add/remove commands on current portfolio, site and app recipes. It adds the required server foundation while preserving profile identity. Email removal retains that foundation. See the [email boundary](docs/architecture/capability-model.md#transactional-email-boundary) for controlled tests, runtime configuration, provider handoff and reviewed source removal. Selection creates no public sending endpoint or provider resource.
 
-The exact default recipe is `app@0.2.2 = app-foundation@0.1.0 + site-routing@0.4.0`, preserving the complete production-site experience defined by [ADR-0013](docs/adr/0013-convergent-app-profile.md) and versioned by ADR-0015. [ADR-0014](docs/adr/0014-selective-effect-application-runtime.md) confines direct Effect use to generated application, infrastructure, composition, and delivery server modules. Builder-core, CLI, domain, presentation, client, and content remain Effect-free; there is no public Effect wrapper or facade package. The foundation introduces no database, queue, email provider, identity, payments, storage, or invented CRUD.
+The exact default recipe is `app@0.2.3 = app-foundation@0.1.0 + site-routing@0.4.0`, preserving the complete production-site experience defined by [ADR-0013](docs/adr/0013-convergent-app-profile.md) and versioned by ADR-0015. [ADR-0014](docs/adr/0014-selective-effect-application-runtime.md) confines direct Effect use to generated application, infrastructure, composition, and delivery server modules. Builder-core, CLI, domain, presentation, client, and content remain Effect-free; there is no public Effect wrapper or facade package. The foundation introduces no database, queue, email provider, identity, payments, storage, or invented CRUD.
 
 Optional `--background-job-delivery` adds bounded dispatch, Queue consumption and terminal-failure contracts to current portfolio/site/app generation through the shared primary Worker. It selects foundation without implicit persistence. See the [jobs boundary](docs/architecture/capability-model.md#background-job-delivery-boundary) for handler obligations, pending certification and exact reviewed lifecycle and bounded operator replay/drain tooling.
 
@@ -24,10 +24,10 @@ Fresh app generation covers all eight subsets of independent `booking-calendly@0
 
 | Generation | Source | Target |
 | --- | --- | --- |
-| Current | `portfolio@0.11.2` | `app@0.2.2` |
-| Current | `site@0.12.2` | `app@0.2.2` |
-| Retained | `portfolio@0.11.1` | `app@0.2.1` |
-| Retained | `site@0.12.1` | `app@0.2.1` |
+| Current | `portfolio@0.11.3` | `app@0.2.3` |
+| Current | `site@0.12.3` | `app@0.2.3` |
+| Retained | `portfolio@0.11.2` | `app@0.2.2` |
+| Retained | `site@0.12.2` | `app@0.2.2` |
 | Retained | `portfolio@0.11.0` | `app@0.2.0` |
 | Retained | `site@0.12.0` | `app@0.2.0` |
 | Retained | `portfolio@0.10.0` | `app@0.1.0` |

@@ -128,7 +128,7 @@ function measuredEvidence(mode = "exercise") {
       schemaVersion: "1.0.0",
       headSha: exactRevision,
       profile: "app",
-      recipeVersion: "0.2.2",
+      recipeVersion: "0.2.3",
       workerIntegration: { executed: ["app-analytics"], skipped: [] },
       appBuildEvidence: [{
         fixture: "app-analytics",
@@ -616,7 +616,7 @@ test("analytics candidate preparation executes the current recipe guard and dete
     },
   };
   const verifyAdmission = async (program) => {
-    for (const recipeVersion of ["0.2.2", "0.2.1", "0.2.0", "0.3.0"]) {
+    for (const recipeVersion of ["0.2.3", "0.2.2", "0.2.1", "0.2.0", "0.3.0"]) {
       await writeFile(join(directory, "analytics-certification-infer.json"), JSON.stringify({
         result: { state: { kind: "valid", value: {
           origin: { profile: "app", recipeVersion },
@@ -634,7 +634,7 @@ test("analytics candidate preparation executes the current recipe guard and dete
       assert.equal(result.signal, null);
       assert.equal(result.stdout, "");
       assert.equal(result.stderr, "");
-      assert.equal(result.status, recipeVersion === "0.2.2" ? 0 : 1, recipeVersion);
+      assert.equal(result.status, recipeVersion === "0.2.3" ? 0 : 1, recipeVersion);
     }
   };
   try {
@@ -645,7 +645,7 @@ test("analytics candidate preparation executes the current recipe guard and dete
     await writeFile(join(settingsDirectory, "analytics-settings.ts"),
       `import type { AnalyticsSettings } from "./analytics-provider-contract";\n\nexport const analyticsSettings = ${JSON.stringify(settings)} as const satisfies AnalyticsSettings;\n`);
     await verifyAdmission(source);
-    const staleGuard = source.replace('recipeVersion !== "0.2.2"', 'recipeVersion !== "0.2.1"');
+    const staleGuard = source.replace('recipeVersion !== "0.2.3"', 'recipeVersion !== "0.2.2"');
     assert.notEqual(staleGuard, source);
     await assert.rejects(() => verifyAdmission(staleGuard), {
       code: "ERR_ASSERTION", actual: 1, expected: 0,
@@ -1248,6 +1248,7 @@ test("the redacted receipt is derived only from reconciled private measurements"
     ["site build", (value) => { value.appBuild.profile = "site"; }],
     ["historical app recipe", (value) => { value.appBuild.recipeVersion = "0.2.0"; }],
     ["prior security app recipe", (value) => { value.appBuild.recipeVersion = "0.2.1"; }],
+    ["prior dependency security app recipe", (value) => { value.appBuild.recipeVersion = "0.2.2"; }],
     ["environment candidate recipe", (value) => { value.appBuild.recipeVersion = "0.3.0"; }],
     ["different build revision", (value) => { value.appBuild.headSha = "f".repeat(40); }],
     ["skipped Worker integration", (value) => { value.appBuild.workerIntegration = { executed: [], skipped: ["app-analytics"] }; }],

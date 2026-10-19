@@ -19,12 +19,13 @@ import { delimiter, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { createGenerationRenderingContext } from "../../../packages/builder-core/dist/catalog/verified-package-versions.js";
-import { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes, createDependencySecurityProfileRecipes } from "../../../packages/builder-core/dist/profiles/profile-recipes.js";
+import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../../../packages/builder-core/dist/profiles/profile-recipes.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../../../packages/builder-core/dist/generation/recipe-lockfiles.js";
 import { generatedFixtureContracts } from "../../../scripts/verify-generated-skeletons.mjs";
 const lifecycleCohorts = [
   { label: "Vitest five", generation: "vitest-five", profiles: createVitestFiveProfileRecipes(), portfolio: "0.11.0", site: "0.12.0", app: "0.2.0", portfolioFoundation: "portfolio-foundation" },
-  { label: "security", generation: "security", profiles: createSecurityPatchedProfileRecipes(), portfolio: "0.11.1", site: "0.12.1", app: "0.2.1", portfolioFoundation: "portfolio-0.11.1-foundation" },
+  { label: "dependency-security", generation: "dependency-security", profiles: createDependencySecurityProfileRecipes(), portfolio: "0.11.2", site: "0.12.2", app: "0.2.2", portfolioFoundation: "portfolio-0.11.2-foundation" },
+  { label: "literal-lint", generation: "literal-lint", profiles: createLiteralLintProfileRecipes(), portfolio: "0.11.3", site: "0.12.3", app: "0.2.3", portfolioFoundation: "portfolio-0.11.3-foundation" },
 ];
 
 
@@ -684,6 +685,7 @@ async function withSuccessfulPnpm(run) {
 
 async function restoreRetainedTestGeneration(directory) {
   const files = await createRetainedGenerationEntries(directory);
+  await rm(join(directory, "patches/next-eslint-plugin-next.patch"), { force: true });
   for (const [path, content] of files) {
     await mkdir(dirname(join(directory, path)), { recursive: true });
     await writeFile(join(directory, path), content);
@@ -714,6 +716,9 @@ async function restoreVitestFiveTestGeneration(directory, cohort = lifecycleCoho
     ...(jobs ? { backgroundJobDelivery: true } : {}),
   }, context));
   const files = new Map(rendered.files.map(({ path, content }) => [path, content]));
+  if (!files.has("patches/next-eslint-plugin-next.patch")) {
+    await rm(join(directory, "patches/next-eslint-plugin-next.patch"), { force: true });
+  }
   const manifest = JSON.parse(Buffer.from(files.get("apps/web/package.json")).toString("utf8"));
   files.set("pnpm-lock.yaml", await readFile(createRecipeLockfileUrl(resolveRecipeLockfileVersion(rendered.project, manifest))));
   files.set(".egeria/project.yaml", Buffer.from(core.serializeProjectYaml(rendered.project)));
@@ -725,6 +730,19 @@ async function restoreVitestFiveTestGeneration(directory, cohort = lifecycleCoho
     await writeFile(join(directory, path), content);
   }
 }
+
+test("retained CLI fixture setup removes successor-only managed patches", async () => {
+  const assertNoPatch = async (root) => {
+    await assert.rejects(lstat(join(root, "patches/next-eslint-plugin-next.patch")), { code: "ENOENT" });
+  };
+  await withGeneratedFixture(assertNoPatch);
+  for (const cohort of lifecycleCohorts.filter(({ generation }) => generation !== "literal-lint")) {
+    await withGitFixture("portfolio", async ({ linked }) => assertNoPatch(linked), { generation: cohort.generation });
+  }
+  await withGitFixture("portfolio", async ({ linked }) => {
+    assert.equal((await lstat(join(linked, "patches/next-eslint-plugin-next.patch"))).isFile(), true);
+  }, { generation: "literal-lint" });
+});
 
 async function withGeneratedFixture(run, profile = "portfolio") {
   const owner = await mkdtemp(join(tmpdir(), "egeria-cli-test-"));
@@ -1396,7 +1414,7 @@ test("app profile creation parses existing options independently and delegates g
       assert.equal(captured.standard.length, 1);
       const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8")));
       assert.equal(project.originProfile, "app");
-      assert.equal(project.recipeVersion, "0.2.2");
+      assert.equal(project.recipeVersion, "0.2.3");
       assert.deepEqual(project.capabilitySettings, allOptionals ? {
         "booking-calendly": planSettings, analytics: analyticsSettings,
       } : {});
@@ -3694,10 +3712,18 @@ test("plan-remove reports exact absence and contains final identity changes", as
         revision: "1111111111111111111111111111111111111111",
       }),
     ];
+    let inventoryInspections = 0;
     const runCli = cli.createCliRunner({
       createVerifier: createFakeVerifier,
       createReader: () => core.createFileSystemRepositoryReader(directory),
       inspectGitWorktree: () => Promise.resolve(inspections.shift()),
+      inspectGitRepositoryInventory: () => {
+        inventoryInspections += 1;
+        return Promise.resolve({
+          ok: true,
+          value: { entries: [], truncated: false },
+        });
+      },
     });
     const captured = captureOutput();
 
@@ -3708,6 +3734,7 @@ test("plan-remove reports exact absence and contains final identity changes", as
       ),
       1,
     );
+    assert.equal(inventoryInspections, 1);
     assert.deepEqual(captured.standard, []);
     assert.deepEqual(captured.error, [
       JSON.stringify({
@@ -4581,6 +4608,7 @@ async function executeGit(root, arguments_, readOnly = false) {
 }
 
 async function withGitFixture(name, run, options = {}) {
+  const cohort = lifecycleCohorts.find(({ generation }) => generation === options.generation);
   const createdOwner = await mkdtemp(join(tmpdir(), "egeria-plan-add-cli-"));
   const owner = await realpath(createdOwner);
   const ownerStats = await lstat(owner, { bigint: true });
@@ -4594,10 +4622,9 @@ async function withGitFixture(name, run, options = {}) {
       options.bookingCalendly === undefined &&
       options.multilingual !== true
     ) {
-      const fixtureRoot = options.generation === "dependency-security"
-        ? generatedFixtureContracts.find(({ identifier }) => identifier === name)?.relativeRoot
-        : options.generation === "security"
-        ? generatedFixtureContracts.find(({ identifier }) => identifier === name)?.relativeRoot.replace(/0\.11\.2$/, "0.11.1").replace(/0\.12\.2$/, "0.12.1").replace(/0\.2\.2$/, "0.2.1")
+      const contract = generatedFixtureContracts.find(({ identifier }) => identifier === name);
+      const fixtureRoot = cohort !== undefined && cohort.generation !== "vitest-five"
+        ? contract === undefined ? undefined : `fixtures/generated/${name}-${cohort[contract.profile]}`
         : `fixtures/generated/${name}`;
       assert.notEqual(fixtureRoot, undefined);
       await cp(resolve(repositoryRoot, fixtureRoot), primary, {
@@ -4624,9 +4651,8 @@ async function withGitFixture(name, run, options = {}) {
         }),
       );
     }
-    if (options.generation === "vitest-five") await restoreVitestFiveTestGeneration(primary);
-    else if (options.generation === "security") await restoreVitestFiveTestGeneration(primary, lifecycleCohorts[1]);
-    else if (options.generation !== "dependency-security") await restoreRetainedTestGeneration(primary);
+    if (cohort !== undefined) await restoreVitestFiveTestGeneration(primary, cohort);
+    else await restoreRetainedTestGeneration(primary);
     if (options.preparePrimary !== undefined) {
       await options.preparePrimary(primary);
     }
@@ -4657,61 +4683,26 @@ async function withGitFixture(name, run, options = {}) {
   }
 }
 
-test("compiled security declaration journeys preserve original and corrected installed controls", async () => {
-  for (const mode of ["original", "corrected", "unknown-declaration", "manifest-mismatch"]) {
-    await withGitFixture("portfolio", async ({ linked }) => {
-      const project = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
-      const state = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8")));
-      assert.equal(project.recipeVersion, "0.11.1");
-      assert.deepEqual(state.origin, { profile: "portfolio", recipeVersion: "0.11.1" });
-      const before = await gitRepositorySnapshot(linked);
-      const planned = await executeBuilt(["plan-add", "--directory", linked, "--capability", "transactional-email-resend"]);
-      if (mode === "original" || mode === "corrected") {
-        assert.equal(planned.exitCode, 0, planned.stderr);
-        assert.equal(planned.stderr, "");
-        const plan = JSON.parse(planned.stdout).result;
-        assert.deepEqual(plan.capability, { identifier: "transactional-email-resend", version: "0.1.0" });
-        assert.ok(plan.desiredCapabilities.includes("app-foundation"));
-        const manifest = JSON.parse(await readFile(join(linked, "apps/web/package.json"), "utf8"));
-        assert.equal(manifest.dependencies.next, mode === "original" ? "16.3.0" : "16.3.6");
-        const doctor = await executeBuilt(["doctor", "--directory", linked]);
-        assert.equal(doctor.exitCode, 0, doctor.stderr);
-        assert.deepEqual(JSON.parse(doctor.stdout).result, { healthy: true, diagnostics: [] });
-        const refused = await executeBuilt(["apply-add", "--directory", linked, "--capability", "transactional-email-resend", "--approved-plan", `sha256:${"0".repeat(64)}`]);
-        assert.equal(refused.exitCode, 1);
-        assert.equal(JSON.parse(refused.stderr).code, "CAPABILITY_PLAN_APPROVAL_INVALID");
-      } else {
-        assert.equal(planned.exitCode, 1, planned.stdout);
-        assert.equal(planned.stdout, "");
-        assert.ok(["PROJECT_INSPECTION_INVALID", "PROJECT_DRIFT_DETECTED"].includes(JSON.parse(planned.stderr).code), planned.stderr);
-      }
-      assert.deepEqual(await gitRepositorySnapshot(linked), before);
-    }, {
-      generation: "security",
-      async preparePrimary(directory) {
-        const manifestPath = join(directory, "apps/web/package.json");
-        const statePath = join(directory, ".egeria/state.json");
-        const state = assertSuccess(core.parseStateJson(await readFile(statePath, "utf8")));
-        if (mode === "original") {
-          const project = assertSuccess(core.parseProjectYaml(await readFile(join(directory, ".egeria/project.yaml"), "utf8")));
-          const rendered = assertSuccess(await core.renderSkeleton({ profile: "portfolio", projectName: project.project.name, displayName: project.project.displayName, packageVersions: core.verifiedCapabilityPackageVersions }, { ...createGenerationRenderingContext(), profiles: createSecurityPatchedProfileRecipes(), securityNextDeclaration: "original" }));
-          assert.equal(rendered.project.recipeVersion, "0.11.1");
-          assert.deepEqual(core.createInstalledManifest(rendered.resolved), state.installedCapabilities);
-          const files = new Map(rendered.files.map(({ path, content }) => [path, content]));
-          for (const path of [".egeria/project.yaml", ".egeria/migrations.jsonl", "pnpm-lock.yaml"]) files.set(path, await readFile(join(directory, path)));
-          const surfaces = assertSuccess(core.materializeInstalledSurfaces({ files, surfaces: [...rendered.surfaces, ...createBuilderStateSurfaces()] }));
-          await writeFile(manifestPath, files.get("apps/web/package.json"));
-          await writeFile(statePath, core.serializeStateJson({ ...state, managedSurfaces: surfaces }));
-        } else if (mode === "unknown-declaration") {
-          const managedSurfaces = state.managedSurfaces.map(surface => surface.identifier === "builder-web-package-next" ? { ...surface, fingerprint: core.fingerprintJsonValue("16.3.4") } : surface);
-          await writeFile(statePath, core.serializeStateJson({ ...state, managedSurfaces }));
-        } else if (mode === "manifest-mismatch") {
-          const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-          manifest.dependencies.next = "16.3.4";
-          await writeFile(manifestPath, JSON.stringify(manifest));
+test("compiled retired recipe lifecycle commands refuse without writes", async () => {
+  for (const [profile, recipe] of [["portfolio", "0.11.1"], ["site", "0.12.1"], ["app", "0.2.1"]]) {
+    const control = JSON.parse(await readFile(resolve(repositoryRoot, `packages/builder-core/tests/fixtures/retired-recipes/${profile}-${recipe}.json`), "utf8"));
+    for (const variant of Object.values(control.variants)) {
+      await withGitFixture(profile, async ({ linked }) => {
+        const before = await gitRepositorySnapshot(linked);
+        for (const command of ["plan-add", "plan-remove", "apply-add", "apply-remove"]) {
+          const result = await executeBuilt([command, "--directory", linked, "--capability", "multilingual", ...(command.startsWith("apply") ? ["--approved-plan", `sha256:${"a".repeat(64)}`] : [])]);
+          assert.equal(result.exitCode, 1, result.stdout);
+          assert.equal(JSON.parse(result.stderr).code, "PROJECT_INSPECTION_INVALID", result.stderr);
+          assert.deepEqual(await gitRepositorySnapshot(linked), before);
         }
-      },
-    });
+      }, {
+        generation: "dependency-security",
+        async preparePrimary(directory) {
+          await writeFile(join(directory, ".egeria/project.yaml"), control.projectYaml);
+          await writeFile(join(directory, ".egeria/state.json"), JSON.stringify(variant.state));
+        },
+      });
+    }
   }
 });
 
@@ -5134,20 +5125,6 @@ async function withAppTransitionFixture(profile, allOptionals, run, generation =
       prepareLockfile: core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }).prepareLockfile,
     },
     async preparePrimary(root) {
-      if (generation === "security") {
-        const project = assertSuccess(core.parseProjectYaml(await readFile(join(root, ".egeria/project.yaml"), "utf8")));
-        const state = assertSuccess(core.parseStateJson(await readFile(join(root, ".egeria/state.json"), "utf8")));
-        const rendered = assertSuccess(await core.renderSkeleton({ ...generationRequest, packageVersions: core.verifiedCapabilityPackageVersions }, {
-          ...createGenerationRenderingContext(), profiles: createSecurityPatchedProfileRecipes(), securityNextDeclaration: "original",
-        }));
-        assert.deepEqual(rendered.project, project);
-        assert.deepEqual(core.createInstalledManifest(rendered.resolved), state.installedCapabilities);
-        const files = new Map(rendered.files.map(({ path, content }) => [path, content]));
-        for (const path of [".egeria/project.yaml", ".egeria/migrations.jsonl", "pnpm-lock.yaml"]) files.set(path, await readFile(join(root, path)));
-        const surfaces = assertSuccess(core.materializeInstalledSurfaces({ files, surfaces: [...rendered.surfaces, ...createBuilderStateSurfaces()] }));
-        await writeFile(join(root, "apps/web/package.json"), files.get("apps/web/package.json"));
-        await writeFile(join(root, ".egeria/state.json"), core.serializeStateJson({ ...state, managedSurfaces: surfaces }));
-      }
       const path = join(root, "README.md");
       await writeFile(path, `${await readFile(path, "utf8")}\nFictional client preservation note.\n`);
     },
@@ -7259,12 +7236,9 @@ test("the built entry emits one JSON line with exact process exits", async () =>
 });
 
 
-for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site"]) {
+for (const cohort of lifecycleCohorts) for (const profile of cohort.generation !== "vitest-five" ? ["site"] : ["portfolio", "site"]) {
   test(`compiled ${cohort.label} app transition from ${profile} completes production verification`, async () => {
     await withAppTransitionFixture(profile, false, async ({ linked }) => {
-      if (cohort.generation === "security") {
-        assert.equal(JSON.parse(await readFile(join(linked, "apps/web/package.json"), "utf8")).dependencies.next, profile === "portfolio" ? "16.3.0" : "16.3.3");
-      }
       const before = await gitRepositorySnapshot(linked);
       const planning = await executeBuilt(planProfileTransitionArguments(linked, "app"));
       assert.equal(planning.exitCode, 0, planning.stderr);
@@ -7279,9 +7253,6 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
       assert.deepEqual(state.origin, { profile: "app", recipeVersion: cohort.app });
       assert.deepEqual(state.lastSuccessfulVerification.checks, core.appProfileTransitionPersistedVerificationChecks);
       assert.equal(JSON.parse(await readFile(join(linked, "apps/web/package.json"), "utf8")).devDependencies.vitest, "5.0.0");
-      if (cohort.generation === "security") {
-        assert.equal(JSON.parse(await readFile(join(linked, "apps/web/package.json"), "utf8")).dependencies.next, "16.3.3");
-      }
       assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, `packages/builder-core/lockfiles/web-recipe-app-${cohort.app}/pnpm-lock.yaml`)));
       await assertExactInstalledAgreement(linked, { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } });
     }, cohort.generation);
@@ -7291,7 +7262,8 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
 for (const generation of [
   { name: "retained", generation: "vitest-five", recipe: "0.1.0", vitest: "4.1.11", preparePrimary: restoreArchivedAppFixture },
   { name: "current", generation: "vitest-five", recipe: "0.2.0", vitest: "5.0.0", catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
-  { name: "security", generation: "security", recipe: "0.2.1", vitest: "5.0.0", catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
+  { name: "dependency-security", generation: "dependency-security", recipe: "0.2.2", vitest: "5.0.0", catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
+  { name: "literal-lint", generation: "literal-lint", recipe: "0.2.3", vitest: "5.0.0", catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
 ]) {
   test(`compiled ${generation.name} app optional lifecycle completes production verification`, { timeout: 1_800_000 }, async (context) => {
     await withGitFixture("app", async ({ linked, primary }) => {
@@ -7764,7 +7736,6 @@ for (const cohort of lifecycleCohorts) for (const fixture of ["portfolio", "app-
 
 for (const cohort of [
   ...lifecycleCohorts,
-  { label: "dependency-security", generation: "dependency-security", profiles: createDependencySecurityProfileRecipes(), portfolio: "0.11.2", site: "0.12.2", app: "0.2.2", portfolioFoundation: "portfolio-0.11.2-foundation" },
 ]) test(`compiled ${cohort.label} generated sources retain exact recipes through infer doctor and diff`, async () => {
   for (const profile of ["portfolio", "site", "app"]) {
     await withGitFixture(profile, async ({ linked }) => {

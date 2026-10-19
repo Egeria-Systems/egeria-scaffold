@@ -101,19 +101,20 @@ export const vitestFiveAppTransitionVisualInputRecord = Object.freeze({
     "analytics+booking-calendly+multilingual": "sha256:3baacdc7a131838d5a5a3431e71beb7788550500c852002864e2e60f89da90a2",
   }),
 });
-// Fixed security-recipe inputs; acceptance still requires exact-manifest review.
-export const securityPatchedAppTransitionVisualInputRecord = Object.freeze({
-  targetLockfileFingerprint: "sha256:fa8ce392f2da0c645f4e26a2eb788a431defab7d3e22fc5e01b8824f0cb2fc4b",
+// Fixed literal-root candidate only. Exact-manifest visual review is still
+// required; this candidate is deliberately excluded from admitted records.
+export const literalLintAppTransitionVisualInputCandidate = Object.freeze({
+  targetLockfileFingerprint: "sha256:34be78bdb6d3f8a2b1c02cd2f58fadff1d3a90b14395da5ff5a2c9c72bddfbe6",
   baselines: appTransitionVisualInputRecord.baselines,
   subsets: Object.freeze({
-    "none": "sha256:7eff583b73d1d1e1228f178880df2b18fddc3c41b1c6c23e978217e6c4a2f85c",
-    "analytics": "sha256:3c43c3717d2c73b671ac7eccbaf8e2e3c260915ab0bbcd80ed77beeda0e3b7fb",
-    "booking-calendly": "sha256:5a72911349b2dd066617e0d95e7c6a17e3ba59746f7eb74034d9d9b2473013c7",
-    "analytics+booking-calendly": "sha256:c0245422d9a38a6025f42b67b031da0712f8ec91a8be1e2ff22467a0795234a3",
-    "multilingual": "sha256:bc97938a606983554689f8987f09ca7aa337e059db2f3a30807a7292ef288afe",
-    "analytics+multilingual": "sha256:52f9456ce9dcd50fb37d3dbc1cdb71cdca23c7f1b2a1ff47950ccb641e1e7806",
-    "booking-calendly+multilingual": "sha256:9f5fcb246893c0da55990fbe8ed69c104161b879816083653ce5dec08ba42c80",
-    "analytics+booking-calendly+multilingual": "sha256:c80de7e01a484d56cfdb9a819cf6605bec29eba5af395b425accf2d868f208e0",
+    "none": "sha256:3a2979a5a0c1ebce2def160497fb16e56689240c05a87c6e8845c3205c6764cb",
+    "analytics": "sha256:c388c978c756309e2a6c2313505b50736b384f92112dcb5bcf7d93ecec5f446c",
+    "booking-calendly": "sha256:70f07ab1f3f482462c174423cbcf52547b887c7c9e30d20bf1520a11f190dc86",
+    "analytics+booking-calendly": "sha256:abb2ad7f31d7726b2d424792cd99ded5301188f13302e57d5f4d964ae1cd6075",
+    "multilingual": "sha256:32d777c649e67ddf3fb1e639be6ec224f5829ba18b7ff1103da058edbd4dec77",
+    "analytics+multilingual": "sha256:b09fa78d1f49b5c9269193c18c48b9858e3bcb8a41b1e7d65857a8aa2bd44fd3",
+    "booking-calendly+multilingual": "sha256:1d849f7e9a843d4ebf01eee9814e2cf280660abf30aec04278730774d4b6d234",
+    "analytics+booking-calendly+multilingual": "sha256:743f8334dd26261a81ed31c6fb2d9f07af359f9f7258d0f926aa7c4ba6a89f24",
   }),
 });
 export function verifyAppTransitionVisualInputRecord(input: Readonly<{
@@ -132,7 +133,6 @@ export function verifyAppTransitionVisualInputRecord(input: Readonly<{
   const record = [
     appTransitionVisualInputRecord,
     vitestFiveAppTransitionVisualInputRecord,
-    securityPatchedAppTransitionVisualInputRecord,
   ].find(candidate => input.targetLockfileFingerprint === candidate.targetLockfileFingerprint &&
     Object.hasOwn(candidate.subsets, key) && Reflect.get(candidate.subsets, key) === fingerprint);
   if (record === undefined) return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");

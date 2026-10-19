@@ -271,7 +271,8 @@ async function runInjectedRollback(projectRoot, statusMode) {
   await writeFile(
     wrapperPath,
     `#!/bin/sh
-if [ "$1" = "status" ]; then
+if [ "$1" = "status" ] ||
+   { [ "$1" = "--no-optional-locks" ] && [ "$2" = "status" ]; }; then
   count="$(cat "$ROLLBACK_STATUS_COUNTER" 2>/dev/null || printf '0')"
   count="$((count + 1))"
   printf '%s\n' "$count" > "$ROLLBACK_STATUS_COUNTER"
@@ -557,12 +558,15 @@ test("the adapter accepts exact generation identities and refuses mixed or unsup
   const identities = [
     { recipe: "0.11.0", standards: "0.4.0", stateRecipe: "0.11.0", accepted: true },
     { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.12.0", accepted: true },
-    { recipe: "0.12.1", standards: "0.5.0", stateRecipe: "0.12.1", accepted: true },
+    { recipe: "0.12.1", standards: "0.5.0", stateRecipe: "0.12.1", accepted: false },
     { recipe: "0.12.1", standards: "0.4.0", stateRecipe: "0.12.1", accepted: false },
     { recipe: "0.12.1", standards: "0.5.0", stateRecipe: "0.12.0", accepted: false },
     { recipe: "0.12.2", standards: "0.5.0", stateRecipe: "0.12.2", accepted: true },
     { recipe: "0.12.2", standards: "0.4.0", stateRecipe: "0.12.2", accepted: false },
     { recipe: "0.12.2", standards: "0.5.0", stateRecipe: "0.12.0", accepted: false },
+    { recipe: "0.12.3", standards: "0.5.0", stateRecipe: "0.12.3", accepted: true },
+    { recipe: "0.12.3", standards: "0.4.0", stateRecipe: "0.12.3", accepted: false },
+    { recipe: "0.12.3", standards: "0.5.0", stateRecipe: "0.12.2", accepted: false },
     { recipe: "0.11.0", standards: "0.5.0", stateRecipe: "0.11.0", accepted: false },
     { recipe: "0.12.0", standards: "0.4.0", stateRecipe: "0.12.0", accepted: false },
     { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.11.0", accepted: false },

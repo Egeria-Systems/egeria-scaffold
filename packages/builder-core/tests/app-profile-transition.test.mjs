@@ -2,14 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
-import { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../dist/profiles/profile-recipes.js";
 const currentTransitionCohorts = [
   { label: "Vitest five", generation: "vitest-five", portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" },
-  { label: "Original security", generation: "security", portfolio: "0.11.1", site: "0.12.1", app: "0.2.1" },
 ];
 const currentTransitionContexts = {
   "vitest-five": { ...createGenerationRenderingContext(), profiles: createVitestFiveProfileRecipes() },
-  security: { ...createGenerationRenderingContext(), profiles: createSecurityPatchedProfileRecipes(), securityNextDeclaration: "original" },
 };
 
 import { deflateSync } from "node:zlib";
@@ -435,7 +433,6 @@ test("frozen visual inputs reject changed runtime or lockfile identities and ret
   const cohorts = [
     { context: retainedRenderingContext, lock: "app-0.1.0" },
     { context: currentTransitionContexts["vitest-five"], lock: "app-0.2.0" },
-    { context: currentTransitionContexts.security, lock: "app-0.2.1" },
   ];
   const lockFingerprints = await Promise.all(cohorts.map(async ({ lock }) => core.fingerprintFileContent(new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${lock}/pnpm-lock.yaml`, import.meta.url))))));
   for (const [cohortIndex, cohort] of cohorts.entries()) {
@@ -483,13 +480,25 @@ test("frozen visual inputs reject changed runtime or lockfile identities and ret
   }
 });
 
-test("corrected security and successor transition inputs remain unadmitted for every optional subset", async () => {
+test("current visual candidate freezes exact inputs while successor transitions remain unadmitted", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const validators = await loadAppTransitionContentValidators();
+  const candidate = policy.literalLintAppTransitionVisualInputCandidate;
+  assert.ok(candidate, "current visual input candidate must be frozen before review");
+  assert.equal(Object.isFrozen(candidate), true);
+  assert.equal(Object.isFrozen(candidate.subsets), true);
+  assert.equal(Object.isFrozen(candidate.baselines), true);
+  for (const [group, prefix] of [["monolingual", ""], ["multilingual", "multilingual-"]]) {
+    const baselines = await Promise.all(["desktop", "mobile"].map(async viewport =>
+      core.fingerprintFileContent(new Uint8Array(await readFile(new URL(`../templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-${prefix}home-${viewport}-chromium-linux.png`, import.meta.url))))));
+    assert.deepEqual(candidate.baselines[group], baselines);
+    assert.equal(Object.isFrozen(candidate.baselines[group]), true);
+  }
+  const currentSubsetKeys = [];
   for (const generation of [
-    { context: { ...createGenerationRenderingContext(), profiles: createSecurityPatchedProfileRecipes() }, portfolio: "0.11.1", app: "0.2.1", next: "16.3.6", lock: "app-0.2.1" },
-    { context: createGenerationRenderingContext(), portfolio: "0.11.2", app: "0.2.2", next: "16.3.8", lock: "app-0.2.2" },
+    { context: { ...createGenerationRenderingContext(), profiles: createDependencySecurityProfileRecipes() }, portfolio: "0.11.2", app: "0.2.2", next: "16.3.8", lock: "app-0.2.2" },
+    { context: { ...createGenerationRenderingContext(), profiles: createLiteralLintProfileRecipes() }, portfolio: "0.11.3", app: "0.2.3", next: "16.3.8", lock: "app-0.2.3" },
   ]) for (let subset = 0; subset < 8; subset++) {
     const request = {
       ...policy.appTransitionVisualProject, packageVersions: core.verifiedCapabilityPackageVersions,
@@ -508,12 +517,19 @@ test("corrected security and successor transition inputs remain unadmitted for e
     const manifest = JSON.parse(decoder.decode(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content));
     assert.equal(manifest.dependencies.next, generation.next);
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
+    const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${generation.lock}/pnpm-lock.yaml`, import.meta.url))));
+    if (generation.app === "0.2.3") {
+      const key = [...optionalCapabilities].sort().join("+") || "none";
+      currentSubsetKeys.push(key);
+      assert.equal(candidate.targetLockfileFingerprint, targetLockfileFingerprint);
+      assert.equal(candidate.subsets[key], core.fingerprintJsonValue(prepared.value.influencingFingerprints));
+    }
     const result = policy.verifyAppTransitionVisualInputRecord({ optionalCapabilities,
-      influencingFingerprints: prepared.value.influencingFingerprints,
-      targetLockfileFingerprint: core.fingerprintFileContent(new Uint8Array(await (await import("node:fs/promises")).readFile(new URL(`../lockfiles/web-recipe-${generation.lock}/pnpm-lock.yaml`, import.meta.url)))) });
+      influencingFingerprints: prepared.value.influencingFingerprints, targetLockfileFingerprint });
     assert.equal(result.ok, false);
     assert.equal(result.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
   }
+  assert.deepEqual(Object.keys(candidate.subsets).sort(), currentSubsetKeys.sort());
 });
 
 // Construct complete PNGs with valid chunk CRCs, changing only pixel data.
@@ -555,5 +571,17 @@ for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming ap
       assert.deepEqual(result.value.requiredApprovals, ["transform", "verified-final-diff"]);
       assert.deepEqual(f.source.project.capabilitySettings, f.target.project.capabilitySettings);
     }
+  }
+});
+
+test("literal lint transitions require exact same-cohort endpoints", async () => {
+  const { resolveSupportedProfileTransition } = await import("../dist/lifecycle/supported-profile-transitions.js");
+  for (const [profile, recipeVersion] of [["portfolio", "0.11.3"], ["site", "0.12.3"]]) {
+    const edge = resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion: "0.2.3" });
+    assert.equal(edge.ok, true);
+    assert.deepEqual(edge.value.source, { profile, recipeVersion });
+    assert.deepEqual(edge.value.target, { profile: "app", recipeVersion: "0.2.3" });
+    assert.equal(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion: "0.2.2" }).ok, false);
+    assert.equal(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion.replace(/3$/u, "2"), toProfile: "app", toRecipeVersion: "0.2.3" }).ok, false);
   }
 });

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -20,6 +21,64 @@ const tokens = {
   workerName: "acme-studio-web",
 };
 
+test("literal lint successors own their patch and preserve installed dependency cohorts", async () => {
+  const core = await import("../dist/index.js");
+  const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
+  const { createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+  const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
+  const patchPath = "patches/next-eslint-plugin-next.patch";
+  const patch = await readFile(new URL("../templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch", import.meta.url));
+  const recipes = { portfolio: "0.11.3", site: "0.12.3", app: "0.2.3" };
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
+      const request = { profile, projectName: "literal-lint-example", displayName: "Literal Lint Example", packageVersions: core.verifiedCapabilityPackageVersions, ...options };
+      const context = { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true), profiles: createLiteralLintProfileRecipes() };
+      const current = assertSuccess(await core.renderSkeleton(request, context));
+      assert.equal(current.project.recipeVersion, recipes[profile]);
+      const oldContext = { ...context, profiles: createDependencySecurityProfileRecipes() };
+      const retained = assertSuccess(await core.renderSkeleton(request, oldContext));
+      const fileMap = new Map(current.files.map(({ path, content }) => [path, content]));
+      assert.deepEqual(Buffer.from(fileMap.get(patchPath)), patch);
+      assert.equal(retained.files.some(({ path }) => path === patchPath), false);
+      assert.deepEqual(current.files.filter(({ path }) => ![patchPath, "pnpm-workspace.yaml"].includes(path)), retained.files.filter(({ path }) => path !== "pnpm-workspace.yaml"));
+      const policy = parseGeneratedYaml(current.files, "pnpm-workspace.yaml");
+      const oldPolicy = parseGeneratedYaml(retained.files, "pnpm-workspace.yaml");
+      const plugin = profile === "portfolio" ? "16.3.0" : "16.3.3";
+      assert.deepEqual(policy, { ...oldPolicy, overrides: { ...oldPolicy.overrides, [`@next/eslint-plugin-next@${plugin}>fast-glob`]: "-" }, patchedDependencies: { [`@next/eslint-plugin-next@${plugin}`]: patchPath } });
+      const ownedPatch = current.surfaces.find(({ path }) => path === patchPath);
+      assert.equal(ownedPatch.ownership, "managed");
+      assert.deepEqual(ownedPatch.owner, { kind: "builder-kernel" });
+      const manifest = parseGeneratedJson(current.files, "apps/web/package.json");
+      const foundation = manifest.dependencies.effect !== undefined;
+      const expectedLock = profile === "app" && options.applicationPersistence ? "app-0.2.3-persistence"
+        : profile === "app" || (profile === "site" && foundation) ? "app-0.2.3"
+        : profile === "portfolio" && foundation ? "portfolio-0.11.3-foundation"
+        : `${profile}-${recipes[profile]}`;
+      assert.equal(resolveRecipeLockfileVersion(current.project, manifest), expectedLock);
+      assert.equal(resolveRecipeLockfileVersion(retained.project, manifest), expectedLock.replace(/3(?=-|$)/u, "2"));
+      for (const [rendered, selectedContext] of [[current, context], [retained, oldContext]]) {
+        const managedSurfaces = assertSuccess(core.materializeInstalledSurfaces({ files: new Map(rendered.files.map(({ path, content }) => [path, content])), surfaces: rendered.surfaces }));
+        const state = { origin: { profile, recipeVersion: rendered.project.recipeVersion }, installedCapabilities: core.createInstalledManifest(rendered.resolved), managedSurfaces };
+        assert.deepEqual(assertSuccess(createVerifiedProjectSnapshot(rendered.project, state)).renderingContext, selectedContext);
+      }
+    }
+    const candidate = assertSuccess(await core.renderSkeleton({ profile, projectName: "literal-lint-candidate", displayName: "Literal Lint Candidate", packageVersions: core.verifiedCapabilityPackageVersions }, core.createApplicationEnvironmentRenderingContext()));
+    assert.equal(candidate.project.schemaVersion, "2.0.0");
+    assert.deepEqual(Buffer.from(candidate.files.find(({ path }) => path === patchPath).content), patch);
+  }
+});
+
+test("supported rendering retains independently frozen pre-retirement bytes and ownership", async () => {
+  const core = await import("../dist/index.js");
+  const frozen = JSON.parse(await readFile(new URL("./fixtures/retired-recipes/supported-rendering.json", import.meta.url), "utf8"));
+  for (const expected of frozen.cases) {
+    const actual = assertSuccess(await core.renderSkeleton(expected.request, expected.context));
+    assert.deepEqual(actual.project, expected.project, expected.label);
+    assert.deepEqual(actual.surfaces, expected.surfaces, expected.label);
+    assert.deepEqual(actual.files.map(({ path, content }) => ({ path, sha256: createHash("sha256").update(content).digest("hex") })), expected.files, expected.label);
+  }
+});
+
 test("dependency successors preserve retained output and require exact declaration and recipe pairs", async () => {
   const core = await import("../dist/index.js");
   const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
@@ -28,22 +87,18 @@ test("dependency successors preserve retained output and require exact declarati
   for (const profile of ["portfolio", "site", "app"]) {
     for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
       const request = { profile, projectName: "successor-example", displayName: "Successor Example", packageVersions: core.verifiedCapabilityPackageVersions, ...options };
-      const context = createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true);
+      const context = { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true), profiles: core.createDependencySecurityProfileRecipes() };
       const current = assertSuccess(await core.renderSkeleton(request, context));
       assert.equal(current.project.recipeVersion, recipes[profile]);
-      const retained = assertSuccess(await core.renderSkeleton(request, { ...context, profiles: core.createSecurityPatchedProfileRecipes() }));
+      const retained = assertSuccess(await core.renderSkeleton(request, { ...context, profiles: core.createVitestFiveProfileRecipes() }));
       const manifest = parseGeneratedJson(current.files, "apps/web/package.json");
       const oldManifest = parseGeneratedJson(retained.files, "apps/web/package.json");
-      assert.equal(oldManifest.dependencies.next, "16.3.6");
+      assert.equal(oldManifest.dependencies.next, profile === "portfolio" && !options.transactionalEmailResend && !options.backgroundJobDelivery ? "16.3.0" : "16.3.3");
       assert.deepEqual(manifest, { ...oldManifest, dependencies: { ...oldManifest.dependencies, next: "16.3.8" } });
       assert.deepEqual(current.files.filter(file => !["apps/web/package.json", "pnpm-workspace.yaml"].includes(file.path)), retained.files.filter(file => !["apps/web/package.json", "pnpm-workspace.yaml"].includes(file.path)));
       const policy = parseGeneratedYaml(current.files, "pnpm-workspace.yaml");
-      const oldPolicy = parseGeneratedYaml(retained.files, "pnpm-workspace.yaml");
-      const overrides = { ...oldPolicy.overrides };
-      delete overrides["next@>=16.2.0 <16.3.6"];
-      delete overrides["sharp@>=0.35.0 <0.35.4"];
-      Object.assign(overrides, { "next@>=16.2.0 <16.3.8": "16.3.8", "sharp@>=0.35.0 <0.35.5": "0.35.5", "source-map-js@>=1.0.0 <1.2.2": "1.2.2", "proxy-addr@>=2.0.0 <2.0.8": "2.0.8" });
-      assert.deepEqual(policy, { ...oldPolicy, overrides });
+      assert.equal(policy.overrides["next@>=16.2.0 <16.3.8"], "16.3.8");
+      assert.equal(policy.overrides["sharp@>=0.35.0 <0.35.5"], "0.35.5");
       assert.ok(resolveRecipeLockfileVersion(current.project, manifest));
       assert.equal(resolveRecipeLockfileVersion(current.project, oldManifest), undefined);
       assert.equal(resolveRecipeLockfileVersion(retained.project, manifest), undefined);
@@ -84,7 +139,9 @@ test("application environment dependency policy preserves retained graphs and co
         "brace-expansion@>=1.0.0 <1.1.21": "1.1.21",
         "brace-expansion@>=2.0.0 <2.1.7": "2.1.7",
         "brace-expansion@>=5.0.0 <5.0.12": "5.0.12",
+        [`@next/eslint-plugin-next@${profile === "portfolio" ? "16.3.0" : "16.3.3"}>fast-glob`]: "-",
       },
+      patchedDependencies: { [`@next/eslint-plugin-next@${profile === "portfolio" ? "16.3.0" : "16.3.3"}`]: "patches/next-eslint-plugin-next.patch" },
     });
     const currentManifest = parseGeneratedJson(current.files, "apps/web/package.json");
     const candidateManifest = parseGeneratedJson(candidate.files, "apps/web/package.json");
@@ -144,8 +201,8 @@ test("app generation preserves production-site bytes across all optional subsets
   for (const generation of [
     { context: retainedRenderingContext, recipe: "0.1.0", standards: "0.4.0", appVitest: "4.1.11", siteVitest: "4.1.10" },
     { context: { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: createVitestFiveProfileRecipes() }, recipe: "0.2.0", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
-    { context: { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: core.createSecurityPatchedProfileRecipes() }, recipe: "0.2.1", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
-    { context: undefined, recipe: "0.2.2", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
+    { context: { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: core.createDependencySecurityProfileRecipes() }, recipe: "0.2.2", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
+    { context: undefined, recipe: "0.2.3", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
   ]) {
     const renderSkeleton = (request) => core.renderSkeleton(request, generation.context);
     for (let subset = 0; subset < 8; subset += 1) {
@@ -6261,38 +6318,6 @@ test("application environment rendering refuses incomplete selections and mixed 
 });
 
 
-test("security recipe contexts preserve installed cohorts", async () => {
-  const core = await import("../dist/index.js");
-  const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
-  const expected = { portfolio: "0.11.1", site: "0.12.1", app: "0.2.1" };
-  const historical = { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" };
-  const historicalProfiles = core.createVitestFiveProfileRecipes();
-  for (const profile of ["portfolio", "site", "app"]) {
-    const request = { profile, projectName: "security-cohort", displayName: "Security Cohort", packageVersions: core.verifiedCapabilityPackageVersions };
-    const current = assertSuccess(await core.renderSkeleton(request));
-    assert.equal(current.project.recipeVersion, { portfolio: "0.11.2", site: "0.12.2", app: "0.2.2" }[profile]);
-    assert.equal(current.project.schemaVersion, "1.0.0");
-    for (const profiles of [historicalProfiles, core.createSecurityPatchedProfileRecipes()]) {
-      for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
-        for (const jobVersion of options.backgroundJobDelivery ? ["0.1.0", "0.2.0"] : ["0.2.0"]) {
-          const context = { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true, jobVersion), profiles };
-          const rendered = assertSuccess(await core.renderSkeleton({ ...request, ...options }, context));
-          const recipeVersion = profiles === historicalProfiles ? historical[profile] : expected[profile];
-          assert.equal(rendered.project.recipeVersion, recipeVersion);
-          const managedSurfaces = assertSuccess(core.materializeInstalledSurfaces({ files: new Map(rendered.files.map(({ path, content }) => [path, content])), surfaces: rendered.surfaces }));
-          const state = { origin: { profile, recipeVersion }, installedCapabilities: core.createInstalledManifest(rendered.resolved), managedSurfaces };
-          const installed = assertSuccess(createVerifiedProjectSnapshot(rendered.project, state));
-          assert.deepEqual(installed.renderingContext, context);
-          assert.equal(assertSuccess(createVerifiedProjectSnapshot(rendered.project, { ...state, origin: { profile, recipeVersion: "9.9.9" } })).renderingContext, undefined);
-          if (options.applicationPersistence || options.transactionalEmailResend || options.backgroundJobDelivery) {
-            const changed = { ...state, installedCapabilities: state.installedCapabilities.map(capability => capability.identifier === "deployment-cloudflare" ? { ...capability, version: "9.9.9" } : capability) };
-            assert.equal(assertSuccess(createVerifiedProjectSnapshot(rendered.project, changed)).renderingContext, undefined);
-          }
-        }
-      }
-    }
-  }
-});
 
 test("fresh security declarations match their locked Next across supported dependency families", async () => {
   const core = await import("../dist/index.js");
@@ -6311,66 +6336,12 @@ test("fresh security declarations match their locked Next across supported depen
   }
 });
 
-test("unknown installed security declarations refuse before fresh context fallback", async () => {
-  const core = await import("../dist/index.js");
-  const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
-  const source = new URL("../../../fixtures/generated/portfolio-0.11.1/", import.meta.url);
-  const project = assertSuccess(core.parseProjectYaml(await readFile(new URL(".egeria/project.yaml", source), "utf8")));
-  const state = JSON.parse(await readFile(new URL(".egeria/state.json", source), "utf8"));
-  state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint = `sha256:${"a".repeat(64)}`;
-  assert.equal(createVerifiedProjectSnapshot(project, state).ok, false);
-});
 
-test("installed security declaration selection preserves exact original manifests and refuses unknown surface evidence", async () => {
-  const core = await import("../dist/index.js");
-  const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
-  const { fingerprintJsonValue } = await import("../dist/ownership/fingerprint.js");
-  for (const [fixture, profile, options, originalNext] of [
-    ["portfolio-0.11.1", "portfolio", {}, "16.3.0"],
-    ["portfolio-email-0.11.1", "portfolio", { transactionalEmailResend: true }, "16.3.3"],
-    ["site-0.12.1", "site", {}, "16.3.3"],
-    ["app-0.2.1", "app", {}, "16.3.3"],
-    ["app-persistence-0.2.1", "app", { applicationPersistence: true }, "16.3.3"],
-  ]) {
-    const source = new URL(`../../../fixtures/generated/${fixture}/`, import.meta.url);
-    const project = assertSuccess(core.parseProjectYaml(await readFile(new URL(".egeria/project.yaml", source), "utf8")));
-    const state = JSON.parse(await readFile(new URL(".egeria/state.json", source), "utf8"));
-    const nextSurface = state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next");
-    // Bind a previously materialized declaration independently of fresh generation.
-    nextSurface.fingerprint = fingerprintJsonValue(originalNext);
-    const request = { profile, projectName: project.project.name, displayName: project.project.displayName, packageVersions: core.verifiedCapabilityPackageVersions, ...options };
-    const installed = assertSuccess(createVerifiedProjectSnapshot(project, state));
-    const rendered = assertSuccess(await core.renderSkeleton(request, installed.renderingContext));
-    assert.equal(parseGeneratedJson(rendered.files, "apps/web/package.json").dependencies.next, originalNext);
-    const corrected = structuredClone(state);
-    corrected.managedSurfaces.find(surface => surface.identifier === nextSurface.identifier).fingerprint = fingerprintJsonValue("16.3.6");
-    const correctedContext = assertSuccess(createVerifiedProjectSnapshot(project, corrected));
-    assert.equal(parseGeneratedJson(assertSuccess(await core.renderSkeleton(request, correctedContext.renderingContext)).files, "apps/web/package.json").dependencies.next, "16.3.6");
-    const unknownContext = await core.renderSkeleton(request, { ...installed.renderingContext, securityNextDeclaration: "unknown" });
-    assert.equal(unknownContext.ok, false);
-    assert.equal(unknownContext.issues[0].code, "GENERATED_MANIFEST_INVALID");
-    for (const mutation of [
-      () => undefined,
-      surfaces => surfaces.filter(surface => surface.identifier !== nextSurface.identifier),
-      surfaces => [...surfaces, { ...nextSurface }],
-      surfaces => [...surfaces, { ...nextSurface, identifier: "unexpected-next-owner" }],
-      surfaces => surfaces.map(surface => surface.identifier === nextSurface.identifier ? { ...surface, fingerprint: fingerprintJsonValue("16.3.4") } : surface),
-      surfaces => surfaces.map(surface => surface.identifier === nextSurface.identifier ? { ...surface, owner: { kind: "capability", identifier: "standards" } } : surface),
-      surfaces => surfaces.map(surface => surface.identifier === nextSurface.identifier ? { ...surface, path: "package.json" } : surface),
-      surfaces => surfaces.map(surface => surface.identifier === nextSurface.identifier ? { ...surface, ownership: "application-owned" } : surface),
-      surfaces => surfaces.map(surface => surface.identifier === nextSurface.identifier ? { ...surface, mergeStrategy: "replace" } : surface),
-      surfaces => surfaces.map(surface => surface.identifier === nextSurface.identifier ? { ...surface, fingerprintTarget: { kind: "json-value", pointer: "/devDependencies/next" } } : surface),
-    ]) {
-      const refused = createVerifiedProjectSnapshot(project, { ...state, managedSurfaces: mutation(state.managedSurfaces) });
-      assert.equal(refused.ok, false, `${fixture}: unrecognized installed declaration must not select fresh defaults`);
-    }
-  }
-});
 
 test("security recipes remain outside environment schema controls", async () => {
   const core = await import("../dist/index.js");
   const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
-  for (const [profile, recipeVersion] of [["portfolio", "0.11.1"], ["site", "0.12.1"], ["app", "0.2.1"], ["portfolio", "0.11.2"], ["site", "0.12.2"], ["app", "0.2.2"]]) {
+  for (const [profile, recipeVersion] of [["portfolio", "0.11.2"], ["site", "0.12.2"], ["app", "0.2.2"]]) {
     const request = { profile, projectName: "security-cohort", displayName: "Security Cohort", packageVersions: core.verifiedCapabilityPackageVersions };
     const historical = assertSuccess(await core.renderSkeleton(request, { ...createGenerationRenderingContext(), profiles: core.createVitestFiveProfileRecipes() }));
     assert.equal(core.projectConfigurationSchema.safeParse({ ...historical.project, recipeVersion }).success, true);

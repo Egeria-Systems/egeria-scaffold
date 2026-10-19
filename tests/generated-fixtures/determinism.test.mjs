@@ -182,7 +182,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
       fixture.expectedFiles,
     );
     const state = core.installedStateSchema.parse(JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8")));
-    assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.2.2" });
+    assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.2.3" });
     assert.equal(state.managedSurfaces.length, rendered.value.surfaces.length + 3);
     for (const surface of rendered.value.surfaces) {
       const installed = state.managedSurfaces.find(({ identifier }) => identifier === surface.identifier);
@@ -195,7 +195,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
     assert.equal(foundation.managedSurfaces.length, 17 + 2, "seventeen files and two package members");
     assert.deepEqual(foundation.managedSurfaces.filter(({ fingerprintTarget }) => fingerprintTarget.kind === "json-value")
       .map(({ fingerprintTarget }) => fingerprintTarget.pointer).sort(), ["/dependencies/effect", "/scripts/test:integration:cloudflare"]);
-    assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, fixture.expectedApplicationPersistenceVersion ? "packages/builder-core/lockfiles/web-recipe-app-0.2.2-persistence/pnpm-lock.yaml" : "packages/builder-core/lockfiles/web-recipe-app-0.2.2/pnpm-lock.yaml")));
+    assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, fixture.expectedApplicationPersistenceVersion ? "packages/builder-core/lockfiles/web-recipe-app-0.2.3-persistence/pnpm-lock.yaml" : "packages/builder-core/lockfiles/web-recipe-app-0.2.3/pnpm-lock.yaml")));
     const wrangler = JSON.parse(await readFile(join(root, "apps/web/wrangler.jsonc"), "utf8"));
     assert.ok(wrangler.compatibility_flags.includes("enable_request_signal"));
     assert.equal(state.managedSurfaces.find(({ path }) => path === "apps/web/wrangler.jsonc").owner.identifier, "deployment-cloudflare");

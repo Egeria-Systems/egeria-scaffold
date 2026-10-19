@@ -1,3 +1,4 @@
+import { isLiteralLintProfileRecipe } from "../profiles/profile-recipes.js";
 import { readFile } from "node:fs/promises";
 import { parseDocument } from "yaml";
 
@@ -82,7 +83,6 @@ export type RenderedSkeleton<P = ProjectConfiguration> = Readonly<{
 export type SkeletonRenderingContext = Readonly<{
   catalogSnapshot: CapabilityCatalogSnapshot;
   profiles: readonly ProfileRecipe[];
-  securityNextDeclaration?: "original";
 }>;
 
 export type ApplicationEnvironmentRenderingContext = SkeletonRenderingContext & Readonly<{ projectSchemaVersion: "2.0.0" }>;
@@ -228,7 +228,6 @@ function enrichApplicationManifest(
   persistence: boolean,
   foundation: boolean,
   applicationEnvironments: boolean,
-  securityNextDeclaration?: unknown,
 ): ValidationResult<readonly GeneratedFile[]> {
   const manifestIndex = files.findIndex(
     ({ path }) => path === "apps/web/package.json",
@@ -267,16 +266,11 @@ function enrichApplicationManifest(
     );
   }
 
-  const securityRecipe = (profile === "portfolio" && recipeVersion === "0.11.1") ||
-    (profile === "site" && recipeVersion === "0.12.1") || (profile === "app" && recipeVersion === "0.2.1");
-  if (securityNextDeclaration !== undefined && (!securityRecipe || securityNextDeclaration !== "original")) {
-    return generatedIssue("GENERATED_MANIFEST_INVALID", ["context"], "unsupported-declaration-context");
-  }
-  const dependencySecurity = applicationEnvironments || (profile === "portfolio" && recipeVersion === "0.11.2") ||
+  const literalLintRoots = applicationEnvironments || isLiteralLintProfileRecipe(profile, recipeVersion);
+  const dependencySecurity = literalLintRoots || (profile === "portfolio" && recipeVersion === "0.11.2") ||
     (profile === "site" && recipeVersion === "0.12.2") || (profile === "app" && recipeVersion === "0.2.2");
-  const correctedNext = securityRecipe && securityNextDeclaration !== "original";
-  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.1" || recipeVersion === "0.2.2" || (applicationEnvironments && recipeVersion === "0.3.0"));
-  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.1" || recipeVersion === "0.12.2" || (applicationEnvironments && recipeVersion === "0.13.0")));
+  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.2" || recipeVersion === "0.2.3" || (applicationEnvironments && recipeVersion === "0.3.0"));
+  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.2" || recipeVersion === "0.12.3" || (applicationEnvironments && recipeVersion === "0.13.0")));
   const enrichedManifest = {
     ...manifest,
     scripts: {
@@ -290,7 +284,7 @@ function enrichApplicationManifest(
     dependencies: {
       ...manifest.dependencies,
       "@egeria-systems/observability": packageVersions.observability,
-      ...(dependencySecurity ? { next: "16.3.8" } : correctedNext ? { next: "16.3.6" } : (productionSite || foundation) ? { next: "16.3.3" } : {}),
+      ...(dependencySecurity ? { next: "16.3.8" } : (productionSite || foundation) ? { next: "16.3.3" } : {}),
       ...(foundation ? { effect: "4.0.0-rc.112" } : {}),
       ...(persistence ? { "drizzle-orm": "0.45.2" } : {}),
     },
@@ -321,11 +315,20 @@ function enrichApplicationManifest(
     if (applicationEnvironments && file.path === "README.md") {
       return { path: file.path, content: encoder.encode(`${decoder.decode(file.content)}\nSee [Application environments](docs/environments.md) for build inputs, runtime targets and local recovery.\n`) };
     }
-    if (foundation && file.path === "pnpm-workspace.yaml") {
-      const workspace = parseDocument(decoder.decode(file.content));
-      workspace.setIn(["allowBuilds", "msgpackr-extract"], false);
-      if (persistence) workspace.setIn(["overrides", "@esbuild-kit/core-utils>esbuild"], "0.25.4");
-      return { path: file.path, content: encoder.encode(workspace.toString()) };
+    if ((foundation || literalLintRoots) && file.path === "pnpm-workspace.yaml") {
+      let workspaceSource = decoder.decode(file.content);
+      if (foundation) {
+        const workspace = parseDocument(workspaceSource);
+        workspace.setIn(["allowBuilds", "msgpackr-extract"], false);
+        if (persistence) workspace.setIn(["overrides", "@esbuild-kit/core-utils>esbuild"], "0.25.4");
+        workspaceSource = workspace.toString();
+      }
+      if (literalLintRoots) {
+        const plugin = `@next/eslint-plugin-next@${profile === "portfolio" ? "16.3.0" : "16.3.3"}`;
+        workspaceSource = workspaceSource.replace("overrides:\n", `overrides:\n  "${plugin}>fast-glob": "-"\n`);
+        workspaceSource += `\npatchedDependencies:\n  "${plugin}": "patches/next-eslint-plugin-next.patch"\n`;
+      }
+      return { path: file.path, content: encoder.encode(workspaceSource) };
     }
     return file;
   });
@@ -361,8 +364,9 @@ function createPackageSurface(
   );
 }
 
-function createBuilderSurfaces(applicationEnvironments: boolean): readonly ManagedSurfaceDescriptor[] {
+function createBuilderSurfaces(applicationEnvironments: boolean, literalLintRoots: boolean): readonly ManagedSurfaceDescriptor[] {
   return [
+    ...(literalLintRoots ? [createFileSurface("builder-literal-lint-roots-patch", "patches/next-eslint-plugin-next.patch", "managed")] : []),
     ...(applicationEnvironments ? [
       createFileSurface("builder-application-environment-guide", "docs/environments.md", "application-owned"),
       createFileSurface("builder-build-environment-example", "apps/web/.env.example", "application-owned"),
@@ -464,7 +468,7 @@ function createDesiredSurfaces(
 ): readonly ManagedSurfaceDescriptor[] {
   return [
     ...resolved.capabilities.flatMap(({ managedSurfaces }) => managedSurfaces),
-    ...createBuilderSurfaces(applicationEnvironments),
+    ...createBuilderSurfaces(applicationEnvironments, applicationEnvironments || isLiteralLintProfileRecipe(resolved.profile, resolved.recipeVersion)),
   ].sort((left, right) => compareText(left.identifier, right.identifier));
 }
 
@@ -599,7 +603,6 @@ export async function renderSkeleton(
     request.applicationPersistence === true,
     resolutionResult.value.capabilities.some(({ identifier }) => identifier === "app-foundation"),
     applicationEnvironments,
-    renderingContext.securityNextDeclaration,
   );
   if (!manifestResult.ok) {
     return manifestResult;

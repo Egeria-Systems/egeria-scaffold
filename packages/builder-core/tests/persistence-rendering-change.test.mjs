@@ -7,7 +7,7 @@ import { createGenerationRenderingContext, verifiedCapabilityPackageVersions } f
 import { createInMemoryRepositoryReader } from "../dist/repository/repository-reader.js";
 const decoder = new TextDecoder();
 const request = { profile: "app", projectName: "test-app", displayName: "Test app", packageVersions: verifiedCapabilityPackageVersions };
-const { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes, createDependencySecurityProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+const { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
 const retainedContext = (persistence = false) => ({ ...createGenerationRenderingContext(persistence), profiles: createVitestFiveProfileRecipes() });
 const ordinary = (await renderSkeleton(request, retainedContext())).value;
 const persistent = (await renderSkeleton({ ...request, applicationPersistence: true }, retainedContext(true))).value;
@@ -64,17 +64,17 @@ test("persistence refuses a changed root dependency graph before replacing its l
 test("historical and security dependency replacement refuses swapped source locks", async () => {
   const cases = [
     { profiles: createVitestFiveProfileRecipes(), ordinary: "web-recipe-app-0.2.0", persistent: "web-application-persistence" },
-    { profiles: createSecurityPatchedProfileRecipes(), ordinary: "web-recipe-app-0.2.1", persistent: "web-recipe-app-0.2.1-persistence" },
     { profiles: createDependencySecurityProfileRecipes(), ordinary: "web-recipe-app-0.2.2", persistent: "web-recipe-app-0.2.2-persistence" },
+    { profiles: createLiteralLintProfileRecipes(), ordinary: "web-recipe-app-0.2.3", persistent: "web-recipe-app-0.2.3-persistence" },
   ];
-  for (const [index, cohort] of cases.entries()) for (const original of index === 1 ? [false, true] : [false]) {
-    const context = persistence => ({ ...createGenerationRenderingContext(persistence), profiles: cohort.profiles, ...(original ? { securityNextDeclaration: "original" } : {}) });
+  for (const [index, cohort] of cases.entries()) {
+    const context = persistence => ({ ...createGenerationRenderingContext(persistence), profiles: cohort.profiles });
     const currentOrdinary = await renderSkeleton(request, context(false));
     const currentPersistent = await renderSkeleton({ ...request, applicationPersistence: true }, context(true));
     assert.equal(currentOrdinary.ok, true);
     assert.equal(currentPersistent.ok, true);
-    const expectedNext = index === 0 || original ? "16.3.3" : index === 1 ? "16.3.6" : "16.3.8";
-    assert.equal(currentOrdinary.value.project.recipeVersion, index === 0 ? "0.2.0" : index === 1 ? "0.2.1" : "0.2.2");
+    const expectedNext = index === 0 ? "16.3.3" : "16.3.8";
+    assert.equal(currentOrdinary.value.project.recipeVersion, ["0.2.0", "0.2.2", "0.2.3"][index]);
     assert.equal(currentPersistent.value.project.recipeVersion, currentOrdinary.value.project.recipeVersion);
     assert.equal(manifest(currentOrdinary.value).dependencies.next, expectedNext);
     assert.equal(manifest(currentPersistent.value).dependencies.next, expectedNext);

@@ -4,9 +4,9 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
-import { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../dist/profiles/profile-recipes.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-const currentCohorts = [createVitestFiveProfileRecipes(), createSecurityPatchedProfileRecipes()];
+const currentCohorts = [createVitestFiveProfileRecipes(), createDependencySecurityProfileRecipes(), createLiteralLintProfileRecipes()];
 
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -1607,9 +1607,9 @@ test("capability removal plan fingerprint binds its review requirements", async 
 });
 
 
-test("security cohort refuses managed drift and surviving references without mutation", async () => {
+test("current cohort refuses managed drift and surviving references without mutation", async () => {
   for (const profile of ["portfolio", "site"]) for (const mode of ["managed-drift", "surviving-reference"]) {
-    const entries = await installedEntries(profile, { profiles: createSecurityPatchedProfileRecipes() });
+    const entries = await installedEntries(profile, { profiles: createDependencySecurityProfileRecipes() });
     if (mode === "managed-drift") entries.set("apps/web/package.json", "changed managed manifest\n");
     else entries.set("apps/web/src/custom-booking.ts", 'import { CalendlyBooking } from "./integrations/booking-calendly/calendly-booking";\n');
     const before = [...entries];

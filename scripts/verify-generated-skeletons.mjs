@@ -108,6 +108,7 @@ const portfolioFiles = Object.freeze([
   "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
   "package.json",
+  "patches/next-eslint-plugin-next.patch",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
 ].sort(codePointCompare));
@@ -393,7 +394,7 @@ export const generatedFixtureContracts = Object.freeze([
       displayName: "Acme Portfolio",
     }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/portfolio-0.11.2",
+    relativeRoot: "fixtures/generated/portfolio-0.11.3",
     expectedFiles: portfolioFiles,
     expectedCapabilities: Object.freeze([
       "standards",
@@ -402,7 +403,7 @@ export const generatedFixtureContracts = Object.freeze([
       "deployment-cloudflare",
       "observability",
     ]),
-    expectedRecipeVersion: "0.11.2",
+    expectedRecipeVersion: "0.11.3",
     expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
@@ -412,7 +413,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 106,
+    expectedSurfaces: 107,
     visualRegression: true,
   }),
   Object.freeze({
@@ -427,7 +428,7 @@ export const generatedFixtureContracts = Object.freeze([
       bookingCalendly: portfolioCalendlySettings["booking-calendly"],
     }),
     expectedCapabilitySettings: portfolioCalendlySettings,
-    relativeRoot: "fixtures/generated/portfolio-calendly-0.11.2",
+    relativeRoot: "fixtures/generated/portfolio-calendly-0.11.3",
     expectedFiles: Object.freeze([
       ...portfolioFiles.filter(
         (path) => path !== "apps/web/app/page.tsx",
@@ -442,7 +443,7 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "booking-calendly",
     ]),
-    expectedRecipeVersion: "0.11.2",
+    expectedRecipeVersion: "0.11.3",
     expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
@@ -452,7 +453,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedBookingCalendlyVersion: "0.1.0",
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 111,
+    expectedSurfaces: 112,
     visualRegression: true,
   }),
   Object.freeze({
@@ -466,7 +467,7 @@ export const generatedFixtureContracts = Object.freeze([
       displayName: "Acme Site",
     }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/site-0.12.2",
+    relativeRoot: "fixtures/generated/site-0.12.3",
     expectedFiles: Object.freeze([
       ...portfolioFiles,
       ...siteRoutingFiles,
@@ -479,7 +480,7 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "site-routing",
     ]),
-    expectedRecipeVersion: "0.12.2",
+    expectedRecipeVersion: "0.12.3",
     expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
@@ -489,7 +490,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 123,
+    expectedSurfaces: 124,
     visualRegression: true,
   }),
   Object.freeze({
@@ -504,7 +505,7 @@ export const generatedFixtureContracts = Object.freeze([
       multilingual: true,
     }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/site-multilingual-0.12.2",
+    relativeRoot: "fixtures/generated/site-multilingual-0.12.3",
     expectedFiles: Object.freeze([
       ...portfolioFiles,
       ...siteRoutingFiles,
@@ -519,7 +520,7 @@ export const generatedFixtureContracts = Object.freeze([
       "site-routing",
       "multilingual",
     ]),
-    expectedRecipeVersion: "0.12.2",
+    expectedRecipeVersion: "0.12.3",
     expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
@@ -529,7 +530,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: "0.1.0",
-    expectedSurfaces: 139,
+    expectedSurfaces: 140,
     visualRegression: false,
   }),
   Object.freeze({
@@ -545,7 +546,7 @@ export const generatedFixtureContracts = Object.freeze([
       multilingual: true,
     }),
     expectedCapabilitySettings: siteAnalyticsSettings,
-    relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.2",
+    relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.3",
     expectedFiles: Object.freeze([
       ...portfolioFiles,
       ...siteRoutingFiles,
@@ -562,7 +563,7 @@ export const generatedFixtureContracts = Object.freeze([
       "analytics",
       "multilingual",
     ]),
-    expectedRecipeVersion: "0.12.2",
+    expectedRecipeVersion: "0.12.3",
     expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
@@ -572,7 +573,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: "0.1.0",
     expectedMultilingualVersion: "0.1.0",
-    expectedSurfaces: 154,
+    expectedSurfaces: 155,
     visualRegression: false,
   }),
   Object.freeze({
@@ -584,7 +585,7 @@ export const generatedFixtureContracts = Object.freeze([
       profile: "app", projectName: "acme-app", displayName: "Acme App",
     }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/app-0.2.2",
+    relativeRoot: "fixtures/generated/app-0.2.3",
     expectedFiles: Object.freeze([
       ...portfolioFiles, ...siteRoutingFiles, ...appFoundationFiles,
     ].sort(codePointCompare)),
@@ -592,7 +593,7 @@ export const generatedFixtureContracts = Object.freeze([
       "standards", "deployment-cloudflare", "content-files", "section-composition",
       "observability", "app-foundation", "site-routing",
     ]),
-    expectedRecipeVersion: "0.2.2",
+    expectedRecipeVersion: "0.2.3",
     expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
@@ -603,7 +604,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 142,
+    expectedSurfaces: 143,
     visualRegression: true,
   }),
   Object.freeze({
@@ -622,7 +623,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedCapabilitySettings: Object.freeze({
       ...siteAnalyticsSettings, ...portfolioCalendlySettings,
     }),
-    relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.2",
+    relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.3",
     expectedFiles: Object.freeze([
       ...portfolioFiles.filter((path) => !bookingCalendlyFiles.includes(path)),
       ...siteRoutingFiles, ...appFoundationFiles, ...bookingCalendlyFiles,
@@ -633,7 +634,7 @@ export const generatedFixtureContracts = Object.freeze([
       "observability", "app-foundation", "site-routing", "analytics",
       "booking-calendly", "multilingual",
     ]),
-    expectedRecipeVersion: "0.2.2",
+    expectedRecipeVersion: "0.2.3",
     expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
@@ -644,7 +645,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedBookingCalendlyVersion: "0.1.0",
     expectedAnalyticsVersion: "0.1.0",
     expectedMultilingualVersion: "0.1.0",
-    expectedSurfaces: 178,
+    expectedSurfaces: 179,
     visualRegression: false,
   }),
   Object.freeze({
@@ -654,13 +655,13 @@ export const generatedFixtureContracts = Object.freeze([
     displayName: "Acme App Persistence",
     createArguments: createArguments({ profile: "app", projectName: "acme-app-persistence", displayName: "Acme App Persistence", applicationPersistence: true }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/app-persistence-0.2.2",
+    relativeRoot: "fixtures/generated/app-persistence-0.2.3",
     expectedFiles: Object.freeze([...portfolioFiles, ...siteRoutingFiles, ...appFoundationFiles, ...applicationPersistenceFiles].sort(codePointCompare)),
     expectedCapabilities: Object.freeze([
       "standards", "deployment-cloudflare", "content-files", "section-composition",
       "observability", "app-foundation", "site-routing", "application-persistence",
     ]),
-    expectedRecipeVersion: "0.2.2",
+    expectedRecipeVersion: "0.2.3",
     expectedStandardsVersion: "0.6.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
@@ -672,36 +673,36 @@ export const generatedFixtureContracts = Object.freeze([
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 161,
+    expectedSurfaces: 162,
     visualRegression: false,
   }),
   Object.freeze({
     identifier: "portfolio-email", profile: "portfolio", projectName: "acme-portfolio-email", displayName: "Acme Portfolio Email",
     createArguments: createArguments({ profile: "portfolio", projectName: "acme-portfolio-email", displayName: "Acme Portfolio Email", transactionalEmailResend: true }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/portfolio-email-0.11.2",
+    relativeRoot: "fixtures/generated/portfolio-email-0.11.3",
     expectedFiles: Object.freeze([...portfolioFiles, ...appFoundationFiles, ...transactionalEmailFiles].sort(codePointCompare)),
     expectedCapabilities: Object.freeze(["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "app-foundation", "transactional-email-resend"]),
-    expectedRecipeVersion: "0.11.2", expectedStandardsVersion: "0.5.0",
+    expectedRecipeVersion: "0.11.3", expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
     expectedDeploymentCloudflareVersion: "0.3.0", expectedAppFoundationVersion: "0.2.0",
     expectedTransactionalEmailVersion: "0.1.0", expectedApplicationPersistenceVersion: null,
     expectedSiteRoutingVersion: null, expectedBookingCalendlyVersion: null,
-    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 134, visualRegression: false,
+    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 135, visualRegression: false,
   }),
   Object.freeze({
     identifier: "app-persistence-email", profile: "app", projectName: "acme-app-persistence-email", displayName: "Acme App Persistence Email",
     createArguments: createArguments({ profile: "app", projectName: "acme-app-persistence-email", displayName: "Acme App Persistence Email", transactionalEmailResend: true, applicationPersistence: true }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/app-persistence-email-0.2.2",
+    relativeRoot: "fixtures/generated/app-persistence-email-0.2.3",
     expectedFiles: Object.freeze([...portfolioFiles, ...appFoundationFiles, ...siteRoutingFiles, ...applicationPersistenceFiles, ...transactionalEmailFiles].sort(codePointCompare)),
     expectedCapabilities: Object.freeze(["standards", "deployment-cloudflare", "content-files", "section-composition", "observability", "app-foundation", "site-routing", "application-persistence", "transactional-email-resend"]),
-    expectedRecipeVersion: "0.2.2", expectedStandardsVersion: "0.6.0",
+    expectedRecipeVersion: "0.2.3", expectedStandardsVersion: "0.6.0",
     expectedObservabilityVersion: "0.3.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
     expectedDeploymentCloudflareVersion: "0.4.0", expectedAppFoundationVersion: "0.2.0",
     expectedTransactionalEmailVersion: "0.1.0", expectedApplicationPersistenceVersion: "0.1.0",
     expectedSiteRoutingVersion: "0.4.0", expectedBookingCalendlyVersion: null,
-    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 170, visualRegression: false,
+    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 171, visualRegression: false,
   }),
   Object.freeze({
     identifier: "site-contact-form",
@@ -710,10 +711,10 @@ export const generatedFixtureContracts = Object.freeze([
     displayName: "Acme Site Contact",
     createArguments: createArguments({ profile: "site", projectName: "acme-site-contact-form", displayName: "Acme Site Contact", contactFormWeb3Forms: contactSettings }),
     expectedCapabilitySettings: Object.freeze({ "contact-form-web3forms": contactSettings }),
-    relativeRoot: "fixtures/generated/site-contact-form-0.12.2",
+    relativeRoot: "fixtures/generated/site-contact-form-0.12.3",
     expectedFiles: Object.freeze([...portfolioFiles, ...siteRoutingFiles, ...contactFiles].sort(codePointCompare)),
     expectedCapabilities: Object.freeze(["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "site-routing", "contact-form-web3forms"]),
-    expectedRecipeVersion: "0.12.2",
+    expectedRecipeVersion: "0.12.3",
     expectedStandardsVersion: "0.5.0",
     expectedObservabilityVersion: "0.3.0",
     expectedContentFilesVersion: "0.4.0",
@@ -724,7 +725,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
     expectedContactFormVersion: "0.1.0",
-    expectedSurfaces: 137,
+    expectedSurfaces: 138,
     visualRegression: false,
   }),
 ]);
@@ -767,7 +768,7 @@ const requiredPublicPackages = [
   },
 ];
 
-const expectedWorkspacePolicy = `packages:
+const expectedWorkspacePolicy = (pluginVersion) => `packages:
   - "apps/*"
 
 pmOnFail: error
@@ -810,6 +811,7 @@ minimumReleaseAgeExclude:
 resolutionMode: time-based
 
 overrides:
+  "@next/eslint-plugin-next@${pluginVersion}>fast-glob": "-"
   "fast-uri@": 3.1.8
   "js-yaml@>=4.0.0 <4.3.2": 4.3.2
   "miniflare>undici": 7.29.1
@@ -829,15 +831,19 @@ allowBuilds:
   esbuild: true
   unrs-resolver: true
   workerd: true
+
+patchedDependencies:
+  "@next/eslint-plugin-next@${pluginVersion}": "patches/next-eslint-plugin-next.patch"
 `;
 
-const expectedLockfilePreamble = `lockfileVersion: '9.0'
+const expectedLockfilePreamble = (pluginVersion) => `lockfileVersion: '9.0'
 
 settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
 overrides:
+  '@next/eslint-plugin-next@${pluginVersion}>fast-glob': '-'
   fast-uri@: 3.1.8
   js-yaml@>=4.0.0 <4.3.2: 4.3.2
   miniflare>undici: 7.29.1
@@ -850,6 +856,9 @@ overrides:
   sharp@>=0.35.0 <0.35.5: 0.35.5
   source-map-js@>=1.0.0 <1.2.2: 1.2.2
   proxy-addr@>=2.0.0 <2.0.8: 2.0.8
+
+patchedDependencies:
+  '@next/eslint-plugin-next@${pluginVersion}': 0d97aaca566ae4a55bd76e0176c30db196d7707e852a9e76deb2eb3668dc55aa
 
 importers:
 `;
@@ -1202,10 +1211,12 @@ async function inspectFixture(root, contract) {
     fail("FIXTURE_WORKSPACE_POLICY_INVALID");
   }
   const persistence = contract.expectedApplicationPersistenceVersion === "0.1.0";
+  const pluginVersion = contract.profile === "portfolio" ? "16.3.0" : "16.3.3";
+  const workspacePolicyTemplate = expectedWorkspacePolicy(pluginVersion);
   const workspacePolicyBase = persistence
-    ? expectedWorkspacePolicy.replace("\nallowBuilds:\n", '  "@esbuild-kit/core-utils>esbuild": 0.25.4\n\nallowBuilds:\n') : expectedWorkspacePolicy;
+    ? workspacePolicyTemplate.replace("\nallowBuilds:\n", '  "@esbuild-kit/core-utils>esbuild": 0.25.4\n\nallowBuilds:\n') : workspacePolicyTemplate;
   const expectedPolicy = contract.expectedAppFoundationVersion !== undefined
-    ? `${workspacePolicyBase}  msgpackr-extract: false\n`
+    ? workspacePolicyBase.replace("\n\npatchedDependencies:", "\n  msgpackr-extract: false\n\npatchedDependencies:")
     : workspacePolicyBase;
   if (workspacePolicy !== expectedPolicy) {
     fail("FIXTURE_WORKSPACE_POLICY_INVALID");
@@ -1217,7 +1228,8 @@ async function inspectFixture(root, contract) {
   } catch {
     fail("FIXTURE_LOCKFILE_INVALID");
   }
-  const lockfilePreamble = persistence ? expectedLockfilePreamble.replace("\n\nimporters:", "\n  '@esbuild-kit/core-utils>esbuild': 0.25.4\n\nimporters:") : expectedLockfilePreamble;
+  const lockfileTemplate = expectedLockfilePreamble(pluginVersion);
+  const lockfilePreamble = persistence ? lockfileTemplate.replace("\n\npatchedDependencies:", "\n  '@esbuild-kit/core-utils>esbuild': 0.25.4\n\npatchedDependencies:") : lockfileTemplate;
   if (
     !lockfile.startsWith(lockfilePreamble) ||
     (lockfile.match(/^overrides:/gmu) ?? []).length !== 1 ||
@@ -1246,14 +1258,14 @@ async function inspectFixture(root, contract) {
     fail("FIXTURE_EFFECT_BOUNDARY_INVALID");
   }
   const expectedLockFingerprint = persistence
-    ? "60ec16a624d73976e52f6dd45041c514c578042d581514a62aeba01903f24683"
+    ? "614a1fb0749961408df5a43f98e954ed53a176a5e11ab4b15bfea44cee7e1b2e"
     : contract.profile === "portfolio"
       ? contract.expectedAppFoundationVersion === undefined
-        ? "59d219cbcc418b523b57d73a9afb46e507e184fe7e932fbe5aa12fc1ab60bf08"
-        : "f41dcc8dd8b8057bc8bddbcdad3e507efb58b03f2269cbe6bca15c65e67b65d0"
+        ? "c5eeb3d5558316ff17796c16144b6a790262752bb3387213c68aacee7015f964"
+        : "bfba6f05f604016235621e1034dcf3acd0a209b5ba1258d94f1d291942023679"
       : contract.expectedAppFoundationVersion === undefined
-        ? "027e2dfb6710d8f9316dddaf37627f72ec7465b27f787de39b1d918654712b8b"
-        : "71c4d59802625006860409d6298e3bd13963089fc55260350ad4c262dd216067";
+        ? "4da6002dc857fbd8682b7c5ac446836b89a016527276cde894babe1d9f65cf4b"
+        : "34be78bdb6d3f8a2b1c02cd2f58fadff1d3a90b14395da5ff5a2c9c72bddfbe6";
   if (fingerprint(lockfile) !== expectedLockFingerprint) {
     fail("FIXTURE_LOCKFILE_INVALID");
   }

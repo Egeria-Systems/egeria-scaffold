@@ -295,7 +295,7 @@ test("app generation requires its complete verification vector before state or d
         assert.equal(await exists(destination), false);
       } else {
         const generated = assertSuccess(result);
-        assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.2.2" });
+        assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.2.3" });
         assert.equal(JSON.parse(await readFile(join(destination, "apps/web/package.json"), "utf8")).dependencies.next, "16.3.8");
         assert.equal(generated.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.3.8"));
         assert.deepEqual(generated.state.lastSuccessfulVerification.checks,
@@ -376,7 +376,7 @@ test("persistence generation requires binding checks before state or destination
         assert.equal(await exists(destination), false);
       } else {
         const generated = assertSuccess(result);
-        assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.2.2" });
+        assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.2.3" });
         assert.equal(JSON.parse(await readFile(join(destination, "apps/web/package.json"), "utf8")).dependencies.next, "16.3.8");
         assert.equal(generated.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.3.8"));
         assert.deepEqual(generated.state.lastSuccessfulVerification.checks, ["contracts", "pre-state-inference", ...checks, "post-state-inference"]);
@@ -438,6 +438,7 @@ const portfolioRenderedPaths = [
   "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
   "package.json",
+  "patches/next-eslint-plugin-next.patch",
   "pnpm-workspace.yaml",
 ];
 const siteRenderedPaths = [
@@ -1413,11 +1414,11 @@ test("portfolio and site generation writes exact state-last repositories", async
       });
       assert.equal(
         generated.state.origin.recipeVersion,
-        profile === "portfolio" ? "0.11.2" : "0.12.2",
+        profile === "portfolio" ? "0.11.3" : "0.12.3",
       );
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 106 : 123,
+        profile === "portfolio" ? 107 : 124,
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -1707,7 +1708,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
       accepted.state.installedCapabilities,
       core.createInstalledManifest(resolved),
     );
-    assert.equal(accepted.state.managedSurfaces.length, 111);
+    assert.equal(accepted.state.managedSurfaces.length, 112);
     assert.equal(
       accepted.state.managedSurfaces.filter(
         ({ owner }) =>
@@ -2243,18 +2244,18 @@ test("public generation validates and projects contact settings before writes", 
 
 test("security lock selection requires complete exact recipe manifests", async () => {
   for (const [profile, options, expected] of [
-    ["portfolio", {}, "portfolio-0.11.2"],
-    ["site", {}, "site-0.12.2"],
-    ["app", {}, "app-0.2.2"],
-    ["app", { applicationPersistence: true }, "app-0.2.2-persistence"],
-    ["portfolio", { transactionalEmailResend: true }, "portfolio-0.11.2-foundation"],
-    ["site", { transactionalEmailResend: true }, "app-0.2.2"],
+    ["portfolio", {}, "portfolio-0.11.3"],
+    ["site", {}, "site-0.12.3"],
+    ["app", {}, "app-0.2.3"],
+    ["app", { applicationPersistence: true }, "app-0.2.3-persistence"],
+    ["portfolio", { transactionalEmailResend: true }, "portfolio-0.11.3-foundation"],
+    ["site", { transactionalEmailResend: true }, "app-0.2.3"],
   ]) {
     const rendered = assertSuccess(await core.renderSkeleton({ profile, projectName: "security-graph", displayName: "Security Graph", packageVersions: core.verifiedCapabilityPackageVersions, ...options }));
     const manifestBytes = rendered.files.find(({ path }) => path === "apps/web/package.json").content;
     const manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, { portfolio: "0.11.2", site: "0.12.2", app: "0.2.2" }[profile]);
+    assert.equal(rendered.project.recipeVersion, { portfolio: "0.11.3", site: "0.12.3", app: "0.2.3" }[profile]);
     assert.equal(manifest.dependencies.next, "16.3.8");
     assert.equal(manifest.devDependencies["eslint-config-next"], profile === "portfolio" ? "16.3.0" : "16.3.3");
     assert.equal(manifest.devDependencies.vitest, "5.0.0");

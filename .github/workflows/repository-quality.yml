@@ -180,7 +180,7 @@ jobs:
         run: pnpm run test:builder-core
 
       - name: Test CLI excluding jobs lifecycle
-        run: node --test --test-skip-pattern='^compiled (?:Vitest five|security) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$' apps/cli/tests/*.test.mjs
+        run: node --test --test-skip-pattern='^compiled (?:Vitest five|dependency-security|literal-lint) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$' apps/cli/tests/*.test.mjs
 
       - name: Test public packages
         run: pnpm run test:packages
@@ -210,8 +210,10 @@ jobs:
         include:
           - cohort: vitest-five
             test-pattern: ^compiled Vitest five jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
-          - cohort: security
-            test-pattern: ^compiled security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
+          - cohort: dependency-security
+            test-pattern: ^compiled dependency-security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
+          - cohort: literal-lint
+            test-pattern: ^compiled literal-lint jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -328,11 +330,11 @@ jobs:
 
       - name: Generate draft app transition visual review candidates
         if: github.event_name == 'pull_request' && github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --candidates
+        run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.3
 
       - name: Compare all app transition visual subsets
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals
+        run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.3
 
       - name: Retain raw dependency audits and security exception dispositions
         if: always()

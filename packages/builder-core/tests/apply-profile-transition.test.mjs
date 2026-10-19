@@ -19,16 +19,16 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
-import { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../dist/profiles/profile-recipes.js";
 const currentTransitionCohorts = [
   { label: "Vitest five", generation: "vitest-five", portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" },
-  { label: "Original security", generation: "security", portfolio: "0.11.1", site: "0.12.1", app: "0.2.1" },
   { label: "Dependency security", generation: "dependency-security", site: "0.12.2", app: "0.2.2" },
+  { label: "Literal lint roots", generation: "literal-lint", site: "0.12.3", app: "0.2.3" },
 ];
 const currentTransitionContexts = {
   "vitest-five": { ...createGenerationRenderingContext(), profiles: createVitestFiveProfileRecipes() },
-  security: { ...createGenerationRenderingContext(), profiles: createSecurityPatchedProfileRecipes(), securityNextDeclaration: "original" },
-  "dependency-security": createGenerationRenderingContext(),
+  "dependency-security": { ...createGenerationRenderingContext(), profiles: createDependencySecurityProfileRecipes() },
+  "literal-lint": { ...createGenerationRenderingContext(), profiles: createLiteralLintProfileRecipes() },
 };
 
 import { parseDocument } from "yaml";
@@ -2043,7 +2043,7 @@ test("filesystem-backed portfolio-to-site transition rejects an ancestor swap du
 
 
 for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming app execution preserves all subsets with exact state-last receipts`, async () => {
-  for (const profile of cohort.generation === "dependency-security" ? ["site"] : ["portfolio", "site"]) {
+  for (const profile of cohort.generation !== "vitest-five" ? ["site"] : ["portfolio", "site"]) {
     for (let subset = 0; subset < 8; subset++) {
       const source = await appTransitionSource(profile, subset, cohort.generation);
       const repository = createRepository(source);
@@ -2069,7 +2069,7 @@ for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming ap
       assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.0");
       assert.deepEqual(state.value.lastSuccessfulVerification.checks, core.appProfileTransitionPersistedVerificationChecks);
       assert.equal(JSON.parse(decode(repository.files.get("apps/web/package.json"))).devDependencies.vitest, "5.0.0");
-      assert.equal(JSON.parse(decode(repository.files.get("apps/web/package.json"))).dependencies.next, cohort.generation === "dependency-security" ? "16.3.8" : "16.3.3");
+      assert.equal(JSON.parse(decode(repository.files.get("apps/web/package.json"))).dependencies.next, cohort.generation !== "vitest-five" ? "16.3.8" : "16.3.3");
       assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, `lockfiles/web-recipe-app-${cohort.app}/pnpm-lock.yaml`))));
       for (const { path, kind } of plan.dispositions) if (kind === "preserve-file") assert.deepEqual(repository.files.get(path), source.get(path), path);
       assertExactChangedPaths(repository.files, snapshotFiles(source), execution.result.value.changedPaths);

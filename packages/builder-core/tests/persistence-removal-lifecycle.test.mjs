@@ -11,7 +11,7 @@ import { stringifyCanonicalJson } from "../dist/serialization/canonical-json.js"
 import { persistenceGenerationVerificationChecks } from "../dist/contracts/generation-verification.js";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-import { createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes, createDependencySecurityProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../dist/profiles/profile-recipes.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -26,8 +26,8 @@ const fingerprint = (value) => digest(stringifyCanonicalJson(value));
 
 const cohorts = [
   { profiles: createVitestFiveProfileRecipes(), recipe: "0.2.0", appLock: "web-recipe-app-0.2.0" },
-  { profiles: createSecurityPatchedProfileRecipes(), recipe: "0.2.1", appLock: "web-recipe-app-0.2.1" },
   { profiles: createDependencySecurityProfileRecipes(), recipe: "0.2.2", appLock: "web-recipe-app-0.2.2" },
+  { profiles: createLiteralLintProfileRecipes(), recipe: "0.2.3", appLock: "web-recipe-app-0.2.3" },
 ];
 
 async function repository(options = {}) {
@@ -202,41 +202,6 @@ test("persistence removal requires evidence review and restores the default app 
 
 });
 
-test("persistence lifecycle preserves original and corrected security declarations", async () => {
-  for (const original of [true, false]) for (const transactionalEmailResend of [false, true]) {
-    const context = { ...createGenerationRenderingContext(true, transactionalEmailResend), profiles: createSecurityPatchedProfileRecipes(), ...(original ? { securityNextDeclaration: "original" } : {}) };
-    const repo = await repository({ transactionalEmailResend, context });
-    const manifest = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
-    manifest.description = "Custom persistence project";
-    repo.files.set("apps/web/package.json", encoder.encode(JSON.stringify(manifest)));
-    const expectedNext = original ? "16.3.3" : "16.3.6";
-    const evidence = removalEvidence(repo);
-    const planned = await plan(repo, evidence);
-    assert.equal(planned.ok, true, JSON.stringify(planned));
-    const removed = await apply(repo, planned.value, evidence);
-    assert.equal(removed.ok, true, JSON.stringify(removed));
-    const assertInstalled = async (persistent) => {
-      const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value;
-      const project = core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value;
-      const actual = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
-      assert.equal(actual.dependencies.next, expectedNext);
-      assert.equal(actual.description, manifest.description);
-      assert.equal(state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, fingerprint(expectedNext));
-      assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.2.1" });
-      assert.equal(project.recipeVersion, "0.2.1");
-      assert.equal(state.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"), persistent);
-      assert.equal(state.installedCapabilities.some(({ identifier }) => identifier === "transactional-email-resend"), transactionalEmailResend);
-      assert.deepEqual(repo.files.get("pnpm-lock.yaml"), new Uint8Array(await readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.1-persistence" : "web-recipe-app-0.2.1"}/pnpm-lock.yaml`, import.meta.url))));
-      assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
-    };
-    await assertInstalled(false);
-    const readdPlan = await core.planCapabilityAddition({ reader: repo.reader, git, capability: "application-persistence" });
-    assert.equal(readdPlan.ok, true, JSON.stringify(readdPlan));
-    const readded = await core.applyCapabilityAddition({ root, capability: "application-persistence", approvedPlanFingerprint: readdPlan.value.planFingerprint, reader: repo.reader, writer: repo.writer, inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }), verifier: { verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: persistenceGenerationVerificationChecks } }) } });
-    assert.equal(readded.ok, true, JSON.stringify(readded));
-    await assertInstalled(true);
-  }
-});
 
 test("machine-ready persistence removal never writes without complete human dispositions", async () => {
   const repo = await repository();

@@ -415,58 +415,58 @@ test("fixture inspection accepts only the exact portable generated trees", async
       {
         identifier: "portfolio",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-0.11.2",
+        relativeRoot: "fixtures/generated/portfolio-0.11.3",
       },
       {
         identifier: "portfolio-calendly",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-calendly-0.11.2",
+        relativeRoot: "fixtures/generated/portfolio-calendly-0.11.3",
       },
       {
         identifier: "site",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-0.12.2",
+        relativeRoot: "fixtures/generated/site-0.12.3",
       },
       {
         identifier: "site-multilingual",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-0.12.2",
+        relativeRoot: "fixtures/generated/site-multilingual-0.12.3",
       },
       {
         identifier: "site-multilingual-analytics",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.2",
+        relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.3",
       },
       {
         identifier: "app",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-0.2.2",
+        relativeRoot: "fixtures/generated/app-0.2.3",
       },
       {
         identifier: "app-all-optional-integrations",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.2",
+        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.3",
       },
       {
         identifier: "app-persistence", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-0.2.2",
+        relativeRoot: "fixtures/generated/app-persistence-0.2.3",
       },
       {
         identifier: "portfolio-email", profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-email-0.11.2",
+        relativeRoot: "fixtures/generated/portfolio-email-0.11.3",
       },
       {
         identifier: "app-persistence-email", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-email-0.2.2",
+        relativeRoot: "fixtures/generated/app-persistence-email-0.2.3",
       },
-      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.12.2" },
+      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.12.3" },
     ],
   );
 
   for (const contract of generatedFixtureContracts) {
     assert.equal(
       contract.expectedRecipeVersion,
-      contract.profile === "app" ? "0.2.2" : contract.profile === "site" ? "0.12.2" : "0.11.2",
+      contract.profile === "app" ? "0.2.3" : contract.profile === "site" ? "0.12.3" : "0.11.3",
     );
     assert.equal(contract.expectedStandardsVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.6.0" : "0.5.0");
     assert.equal(contract.expectedObservabilityVersion, "0.3.0");
@@ -495,18 +495,18 @@ test("fixture inspection accepts only the exact portable generated trees", async
     assert.equal(
       contract.expectedSurfaces,
       contract.identifier === "portfolio-calendly"
-        ? 111
+        ? 112
         : contract.identifier === "portfolio"
-          ? 106
+          ? 107
           : contract.identifier === "site"
-            ? 123
+            ? 124
             : contract.identifier === "site-multilingual"
-              ? 139
-              : contract.identifier === "app" ? 142
-                : contract.identifier === "app-all-optional-integrations" ? 178
-                  : contract.identifier === "app-persistence" ? 161
-                    : contract.identifier === "portfolio-email" ? 134
-                      : contract.identifier === "app-persistence-email" ? 170 : contract.identifier === "site-contact-form" ? 137 : 154,
+              ? 140
+              : contract.identifier === "app" ? 143
+                : contract.identifier === "app-all-optional-integrations" ? 179
+                  : contract.identifier === "app-persistence" ? 162
+                    : contract.identifier === "portfolio-email" ? 135
+                      : contract.identifier === "app-persistence-email" ? 171 : contract.identifier === "site-contact-form" ? 138 : 155,
     );
     assert.equal(
       contract.visualRegression,
@@ -546,13 +546,13 @@ test("fixture inspection accepts only the exact portable generated trees", async
   const analyticsSite = generatedFixtureContracts.find(
     ({ identifier }) => identifier === "site-multilingual-analytics",
   );
-  assert.equal(basePortfolio.expectedFiles.length, 57);
-  assert.equal(site.expectedFiles.length, 74);
-  assert.equal(multilingualSite.expectedFiles.length, 90);
-  assert.equal(analyticsSite.expectedFiles.length, 105);
+  assert.equal(basePortfolio.expectedFiles.length, 58);
+  assert.equal(site.expectedFiles.length, 75);
+  assert.equal(multilingualSite.expectedFiles.length, 91);
+  assert.equal(analyticsSite.expectedFiles.length, 106);
   assert.equal(
     calendlyPortfolio.expectedFiles.length,
-    57 - 1 + 6,
+    58 - 1 + 6,
     "six booking sources replace one common home destination and add five distinct paths",
   );
   assert.deepEqual(calendlyPortfolio.createArguments, [
@@ -2019,11 +2019,14 @@ test("live verification maps the prepared OpenNext transform failure", async () 
 
 
 test("active fixture inspection refuses retained dependency cohorts", async () => {
-  for (const { identifier } of generatedFixtureContracts) {
-    await expectFixtureError(
-      () => inspectGeneratedFixture(resolve(repositoryRoot, "fixtures/generated", identifier), identifier),
-      "FIXTURE_MANIFEST_INVALID",
-    );
+  for (const { identifier, profile } of generatedFixtureContracts) {
+    const retainedRecipe = profile === "portfolio" ? "0.11.2" : profile === "site" ? "0.12.2" : "0.2.2";
+    for (const root of [identifier, `${identifier}-${retainedRecipe}`]) {
+      await expectFixtureError(
+        () => inspectGeneratedFixture(resolve(repositoryRoot, "fixtures/generated", root), identifier),
+        "FIXTURE_INVENTORY_INVALID",
+      );
+    }
   }
 });
 

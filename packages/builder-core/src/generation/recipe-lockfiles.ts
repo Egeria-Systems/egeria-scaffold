@@ -1,4 +1,6 @@
-type RecipeLockfileVersion = "0.8.0" | "0.9.0" | "0.10.0" | "app-0.1.0" | "portfolio-0.11.0" | "site-0.12.0" | "app-0.2.0" | "portfolio-0.12.0" | "site-0.13.0" | "app-0.3.0" | "application-persistence" | "portfolio-foundation" | "portfolio-0.11.1" | "site-0.12.1" | "app-0.2.1" | "app-0.2.1-persistence" | "portfolio-0.11.1-foundation" | "portfolio-0.11.2" | "site-0.12.2" | "app-0.2.2" | "app-0.2.2-persistence" | "portfolio-0.11.2-foundation";
+import { isLiteralLintProfileRecipe } from "../profiles/profile-recipes.js";
+
+type RecipeLockfileVersion = "0.8.0" | "0.9.0" | "0.10.0" | "app-0.1.0" | "portfolio-0.11.0" | "site-0.12.0" | "app-0.2.0" | "portfolio-0.12.0" | "site-0.13.0" | "app-0.3.0" | "application-persistence" | "portfolio-foundation" | "portfolio-0.11.2" | "site-0.12.2" | "app-0.2.2" | "app-0.2.2-persistence" | "portfolio-0.11.2-foundation" | "portfolio-0.11.3" | "portfolio-0.11.3-foundation" | "site-0.12.3" | "app-0.2.3" | "app-0.2.3-persistence";
 
 export type RecipeLockfileIdentity = Readonly<{
   originProfile: string;
@@ -26,69 +28,66 @@ export function resolveRecipeLockfileVersion(
   const next = dependencies.next;
   const eslintConfigNext = devDependencies["eslint-config-next"];
   const vitest = devDependencies.vitest;
+  const literalLintRoots = isLiteralLintProfileRecipe(identity.originProfile, identity.recipeVersion);
   const successor = (identity.originProfile === "portfolio" && identity.recipeVersion === "0.11.2") ||
     (identity.originProfile === "site" && identity.recipeVersion === "0.12.2") ||
     (identity.originProfile === "app" && identity.recipeVersion === "0.2.2");
   const environment = (identity.originProfile === "portfolio" && identity.recipeVersion === "0.12.0") ||
     (identity.originProfile === "site" && identity.recipeVersion === "0.13.0") ||
     (identity.originProfile === "app" && identity.recipeVersion === "0.3.0");
-  if (successor || environment) {
+  if (literalLintRoots || successor || environment) {
     if (next !== "16.3.8" || vitest !== "5.0.0" ||
         eslintConfigNext !== (identity.originProfile === "portfolio" ? "16.3.0" : "16.3.3")) return undefined;
     const foundation = dependencies.effect !== undefined;
     if ((foundation && dependencies.effect !== "4.0.0-rc.112") ||
         (identity.originProfile === "app" && !foundation)) return undefined;
     if (dependencies["drizzle-orm"] !== undefined || devDependencies["drizzle-kit"] !== undefined) {
-      return successor && identity.originProfile === "app" && dependencies["drizzle-orm"] === "0.45.2" &&
+      return (literalLintRoots || successor) && identity.originProfile === "app" && dependencies["drizzle-orm"] === "0.45.2" &&
         devDependencies["drizzle-kit"] === "0.31.10" && devDependencies["@cloudflare/workers-types"] === "5.20260730.1"
-        ? "app-0.2.2-persistence" : undefined;
+        ? literalLintRoots ? "app-0.2.3-persistence" : "app-0.2.2-persistence" : undefined;
     }
     if (environment) {
       if (identity.originProfile === "app") return "app-0.3.0";
       if (foundation) return undefined;
       return identity.originProfile === "portfolio" ? "portfolio-0.12.0" : "site-0.13.0";
     }
+    if (literalLintRoots) {
+      if (identity.originProfile === "app" || (identity.originProfile === "site" && foundation)) return "app-0.2.3";
+      return identity.originProfile === "portfolio"
+        ? foundation ? "portfolio-0.11.3-foundation" : "portfolio-0.11.3"
+        : "site-0.12.3";
+    }
     if (identity.originProfile === "app" || (identity.originProfile === "site" && foundation)) return "app-0.2.2";
     return identity.originProfile === "portfolio"
       ? foundation ? "portfolio-0.11.2-foundation" : "portfolio-0.11.2"
       : "site-0.12.2";
   }
-  const correctedNext = next === "16.3.6" && (
-    (identity.originProfile === "portfolio" && identity.recipeVersion === "0.11.1") ||
-    (identity.originProfile === "site" && identity.recipeVersion === "0.12.1") ||
-    (identity.originProfile === "app" && identity.recipeVersion === "0.2.1")
-  );
   if (dependencies["drizzle-orm"] !== undefined || devDependencies["drizzle-kit"] !== undefined) {
-    return identity.originProfile === "app" && (identity.recipeVersion === "0.2.0" || identity.recipeVersion === "0.2.1") &&
-      (next === "16.3.3" || correctedNext) && eslintConfigNext === "16.3.3" && vitest === "5.0.0" &&
+    return identity.originProfile === "app" && (identity.recipeVersion === "0.2.0") &&
+      next === "16.3.3" && eslintConfigNext === "16.3.3" && vitest === "5.0.0" &&
       dependencies.effect === "4.0.0-rc.112" && dependencies["drizzle-orm"] === "0.45.2" &&
       devDependencies["drizzle-kit"] === "0.31.10" &&
       devDependencies["@cloudflare/workers-types"] === "5.20260730.1"
-        ? identity.recipeVersion === "0.2.1" ? "app-0.2.1-persistence" : "application-persistence" : undefined;
+        ? "application-persistence" : undefined;
   }
   if (vitest === "5.0.0") {
     if (identity.originProfile === "app") {
-      if ((next !== "16.3.3" && !correctedNext) || eslintConfigNext !== "16.3.3" || dependencies.effect !== "4.0.0-rc.112") return undefined;
-      if (identity.recipeVersion === "0.2.1") return "app-0.2.1";
+      if (next !== "16.3.3" || eslintConfigNext !== "16.3.3" || dependencies.effect !== "4.0.0-rc.112") return undefined;
       return identity.recipeVersion === "0.2.0" ? "app-0.2.0" : undefined;
     }
     if (dependencies.effect !== undefined) {
       if (dependencies.effect !== "4.0.0-rc.112") return undefined;
-      if (identity.originProfile === "portfolio" && (next === "16.3.3" || correctedNext) && eslintConfigNext === "16.3.0") {
-        if (identity.recipeVersion === "0.11.1") return "portfolio-0.11.1-foundation";
+      if (identity.originProfile === "portfolio" && next === "16.3.3" && eslintConfigNext === "16.3.0") {
         return identity.recipeVersion === "0.11.0" ? "portfolio-foundation" : undefined;
       }
-      if (identity.originProfile !== "site" || (next !== "16.3.3" && !correctedNext) || eslintConfigNext !== "16.3.3") return undefined;
-      if (identity.recipeVersion === "0.12.1") return "app-0.2.1";
+      if (identity.originProfile !== "site" || next !== "16.3.3" || eslintConfigNext !== "16.3.3") return undefined;
       return identity.recipeVersion === "0.12.0" ? "app-0.2.0" : undefined;
     }
     if (identity.originProfile === "portfolio") {
-      if ((next !== "16.3.0" && !correctedNext) || eslintConfigNext !== "16.3.0") return undefined;
-      if (identity.recipeVersion === "0.11.1") return "portfolio-0.11.1";
+      if (next !== "16.3.0" || eslintConfigNext !== "16.3.0") return undefined;
       return identity.recipeVersion === "0.11.0" ? "portfolio-0.11.0" : undefined;
     }
-    if (identity.originProfile !== "site" || (next !== "16.3.3" && !correctedNext) || eslintConfigNext !== "16.3.3") return undefined;
-    if (identity.recipeVersion === "0.12.1") return "site-0.12.1";
+    if (identity.originProfile !== "site" || next !== "16.3.3" || eslintConfigNext !== "16.3.3") return undefined;
     return identity.recipeVersion === "0.12.0" ? "site-0.12.0" : undefined;
   }
   if (identity.originProfile === "app") {

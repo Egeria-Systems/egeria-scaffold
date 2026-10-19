@@ -1,3 +1,4 @@
+import { isLiteralLintProfileRecipe } from "../profiles/profile-recipes.js";
 import { backgroundJobFiles, backgroundJobOperationFiles } from "../catalog/capability-catalog.js";
 import type { ContractIssue, ValidationResult } from "../contracts/result.js";
 import type { ProfileIdentifier } from "../contracts/profile.js";
@@ -349,7 +350,7 @@ function remapSourceIssue(
 export function createTemplateCatalog(
   profile: ProfileIdentifier,
   includeBookingCalendly = false,
-  recipeVersion = profile === "app" ? "0.2.2" : profile === "site" ? "0.12.2" : "0.11.2",
+  recipeVersion = profile === "app" ? "0.2.3" : profile === "site" ? "0.12.3" : "0.11.3",
   includeMultilingual = false,
   includeAnalytics = false,
   includeApplicationPersistence = false,
@@ -360,25 +361,28 @@ export function createTemplateCatalog(
   backgroundJobVersion: "0.1.0" | "0.2.0" = "0.2.0",
   applicationEnvironments = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
-  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.1" || recipeVersion === "0.2.2" || (applicationEnvironments && recipeVersion === "0.3.0"));
-  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.1" || recipeVersion === "0.12.2" || (applicationEnvironments && recipeVersion === "0.13.0")));
-  const securityPatched = (profile === "portfolio" && recipeVersion === "0.11.1") ||
-    (profile === "site" && recipeVersion === "0.12.1") ||
-    (profile === "app" && recipeVersion === "0.2.1");
-  const dependencySecurity = applicationEnvironments || (profile === "portfolio" && recipeVersion === "0.11.2") ||
+  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.2" || recipeVersion === "0.2.3" || (applicationEnvironments && recipeVersion === "0.3.0"));
+  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.2" || recipeVersion === "0.12.3" || (applicationEnvironments && recipeVersion === "0.13.0")));
+  const literalLintRoots = applicationEnvironments || isLiteralLintProfileRecipe(profile, recipeVersion);
+  const dependencySecurity = literalLintRoots || (profile === "portfolio" && recipeVersion === "0.11.2") ||
     (profile === "site" && recipeVersion === "0.12.2") || (profile === "app" && recipeVersion === "0.2.2");
-  const vitestFive = dependencySecurity || (profile === "portfolio" && (recipeVersion === "0.11.0" || recipeVersion === "0.11.1")) ||
-    (profile === "site" && (recipeVersion === "0.12.0" || recipeVersion === "0.12.1")) ||
-    (profile === "app" && (recipeVersion === "0.2.0" || recipeVersion === "0.2.1"));
+  const vitestFive = dependencySecurity || (profile === "portfolio" && (recipeVersion === "0.11.0")) ||
+    (profile === "site" && (recipeVersion === "0.12.0")) ||
+    (profile === "app" && (recipeVersion === "0.2.0"));
   const sources = [
+    ...(literalLintRoots ? [{
+      source: "common/literal-lint-roots/patches/next-eslint-plugin-next.patch",
+      destinationSource: "common/patches/next-eslint-plugin-next.patch",
+      contentKind: "text" as const,
+    }] : []),
     ...(applicationEnvironments ? textTemplateSources([
       "common/apps/web/src/configuration/application-environment.ts",
       "common/apps/web/scripts/check-application-environment.mjs",
       "common/apps/web/tests/unit/application-environment.test.ts",
       "common/docs/environments.md",
     ]) : []),
-    ...commonTemplateSources.map(entry => (dependencySecurity || securityPatched) && entry.source === "common/pnpm-workspace.yaml"
-      ? { ...entry, source: dependencySecurity ? "common/dependency-security/pnpm-workspace.yaml" : "common/security-patched/pnpm-workspace.yaml", destinationSource: entry.source }
+    ...commonTemplateSources.map(entry => dependencySecurity && entry.source === "common/pnpm-workspace.yaml"
+      ? { ...entry, source: "common/dependency-security/pnpm-workspace.yaml", destinationSource: entry.source }
       : vitestFive && [
       "common/apps/web/package.json.template",
       "common/apps/web/tests/setup/component.ts",

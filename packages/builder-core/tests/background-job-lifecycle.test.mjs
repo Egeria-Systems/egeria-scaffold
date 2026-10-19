@@ -5,7 +5,7 @@ import * as core from "../dist/index.js";
 import { inspectProject } from "../dist/diagnostics/project-inspection.js";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-import { createVitestFourProfileRecipes, createVitestFiveProfileRecipes, createSecurityPatchedProfileRecipes, createDependencySecurityProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createVitestFourProfileRecipes, createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../dist/profiles/profile-recipes.js";
 import { createGenerationRenderingContext, readVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
 
 const encoder = new TextEncoder();
@@ -16,8 +16,8 @@ const git = { ok: true, identity: { root, revision: "abcdef0123456789abcdef01234
 
 const cohorts = [
   { profiles: createVitestFiveProfileRecipes(), versions: { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" }, foundationLocks: { portfolio: "web-recipe-portfolio-foundation", site: "web-recipe-app-0.2.0", app: "web-recipe-app-0.2.0" }, persistenceLock: "web-application-persistence" },
-  { profiles: createSecurityPatchedProfileRecipes(), versions: { portfolio: "0.11.1", site: "0.12.1", app: "0.2.1" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.1-foundation", site: "web-recipe-app-0.2.1", app: "web-recipe-app-0.2.1" }, persistenceLock: "web-recipe-app-0.2.1-persistence" },
   { profiles: createDependencySecurityProfileRecipes(), versions: { portfolio: "0.11.2", site: "0.12.2", app: "0.2.2" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.2-foundation", site: "web-recipe-app-0.2.2", app: "web-recipe-app-0.2.2" }, persistenceLock: "web-recipe-app-0.2.2-persistence" },
+  { profiles: createLiteralLintProfileRecipes(), versions: { portfolio: "0.11.3", site: "0.12.3", app: "0.2.3" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.3-foundation", site: "web-recipe-app-0.2.3", app: "web-recipe-app-0.2.3" }, persistenceLock: "web-recipe-app-0.2.3-persistence" },
 ];
 async function assertCohort(repo, cohort, profile, persistent = false) {
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -106,36 +106,37 @@ async function add(repo, overrides={}) {
   const checks=core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.selectedCapabilities.includes("application-persistence")?core.persistenceGenerationVerificationChecks:core.appGenerationVerificationChecks;
   return core.applyCapabilityAddition({root,capability,approvedPlanFingerprint:planned.value.planFingerprint,reader:repo.reader,writer:repo.writer,inspectWorktree:async()=>git,inspectCreateTargets:async()=>({ok:true}),inspectExpectedChanges:async()=>({ok:true}),verifier:{verifyInIsolatedCopy:async()=>({ok:true,value:{checks}})},now:fixedNow,...overrides});
 }
-test("jobs dependency changes preserve original and corrected security declarations", async () => {
-  const cohort = cohorts[1];
-  for (const original of [true, false]) {
-    for (const [profile, persistent] of [["portfolio", false], ["site", false], ["app", false], ["app", true]]) {
-      const context = {
-        ...createGenerationRenderingContext(persistent),
-        profiles: createSecurityPatchedProfileRecipes(),
-        ...(original ? { securityNextDeclaration: "original" } : {}),
-      };
-      const repo = await repository(profile, { ...(persistent ? { applicationPersistence: true } : {}), context });
-      const expectedNext = original ? "16.3.3" : "16.3.6";
-      const added = await add(repo);
-      assert.equal(added.ok, true, JSON.stringify(added));
-      assert.equal(JSON.parse(decoder.decode(repo.files.get("apps/web/package.json"))).dependencies.next, expectedNext);
-      await assertCohort(repo, cohort, profile, persistent);
-      const removed = await remove(repo, await removalPlan(repo));
-      assert.equal(removed.ok, true, JSON.stringify(removed));
-      assert.equal(JSON.parse(decoder.decode(repo.files.get("apps/web/package.json"))).dependencies.next, expectedNext);
-      await assertCohort(repo, cohort, profile, persistent);
-      const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value;
-      assert.equal(state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue(expectedNext));
-      assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
+
+test("retired controls invalidate approved jobs plans before writes or verification", async () => {
+  for (const [profile, recipe] of [["portfolio", "0.11.1"], ["site", "0.12.1"], ["app", "0.2.1"]]) {
+    const control = JSON.parse(await readFile(new URL(`./fixtures/retired-recipes/${profile}-${recipe}.json`, import.meta.url), "utf8"));
+    for (const operation of ["add", "remove"]) for (const variant of Object.values(control.variants)) {
+      const repo = await repository(profile, { backgroundJobDelivery: operation === "remove", profiles: createDependencySecurityProfileRecipes() });
+      const planned = operation === "add"
+        ? await core.planCapabilityAddition({ reader: repo.reader, git, capability })
+        : await removalPlan(repo);
+      if (operation === "add") assert.equal(planned.ok, true, JSON.stringify(planned));
+      repo.files.set(".egeria/project.yaml", encoder.encode(control.projectYaml));
+      repo.files.set(".egeria/state.json", encoder.encode(JSON.stringify(variant.state)));
+      const before = new Map(repo.files);
+      let verificationCalls = 0;
+      const verifier = { async verifyInIsolatedCopy() { verificationCalls++; return { ok: false }; } };
+      const result = operation === "add"
+        ? await core.applyCapabilityAddition({ root, capability, approvedPlanFingerprint: planned.value.planFingerprint, reader: repo.reader, writer: repo.writer, inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }), verifier })
+        : await core.applyCapabilityRemoval({ root, capability, approvedPlanFingerprint: planned.planned.planFingerprint, jobRemoval: planned.jobRemoval, jobRemovalHumanReview: planned.jobRemovalHumanReview, reader: repo.reader, writer: repo.writer, inspectWorktree: async () => git, inspectExpectedChanges: async () => ({ ok: true }), inspectRepositoryInventory: repo.inventory, verifier, now: fixedNow });
+      assert.equal(result.ok, false);
+      assert.ok(["PROJECT_INSPECTION_INVALID", "PROJECT_STATE_INCOMPATIBLE"].includes(result.code), JSON.stringify(result));
+      assert.equal(verificationCalls, 0);
+      assert.deepEqual(repo.writes, []);
+      assert.deepEqual(repo.files, before);
     }
   }
 });
 
-test("security jobs planning and application refuse declaration drift before writes", async () => {
+test("current jobs planning and application refuse declaration drift before writes", async () => {
   for (const mode of ["unknown-declaration", "origin-mismatch", "descriptor-mismatch", "manifest-drift", "lock-drift", "after-plan"]) {
-    const repo = await repository("portfolio", { profiles: createSecurityPatchedProfileRecipes() });
-    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.11.1");
+    const repo = await repository("portfolio", { profiles: createDependencySecurityProfileRecipes() });
+    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.11.2");
     const planned = mode === "after-plan" ? await core.planCapabilityAddition({ reader: repo.reader, git, capability }) : undefined;
     if (planned !== undefined) assert.equal(planned.ok, true, JSON.stringify(planned));
     if (mode === "unknown-declaration") {
@@ -161,10 +162,10 @@ test("security jobs planning and application refuse declaration drift before wri
   }
 });
 
-test("security jobs removal refuses declaration and lock drift before writes", async () => {
+test("current jobs removal refuses declaration and lock drift before writes", async () => {
   for (const mode of ["unknown-declaration", "origin-mismatch", "descriptor-mismatch", "manifest-drift", "lock-drift", "after-plan"]) {
-    const repo = await repository("app", { backgroundJobDelivery: true, profiles: createSecurityPatchedProfileRecipes() });
-    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.2.1");
+    const repo = await repository("app", { backgroundJobDelivery: true, profiles: createDependencySecurityProfileRecipes() });
+    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.2.2");
     const prepared = await removalPlan(repo);
     if (mode === "unknown-declaration") {
       const state = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -192,10 +193,10 @@ test("security jobs removal refuses declaration and lock drift before writes", a
 });
 
 test("current jobs removal and re-add retain foundation, explicit email, persistence and exact migration identities", async()=>{
-  for(const cohort of cohorts) for(const original of cohort.versions.app === "0.2.1" ? [false, true] : [false]) for(const profile of ["portfolio","site","app"]) for(const retainedVersion of ["0.1.0","0.2.0"]) {
+  for(const cohort of cohorts) for(const profile of ["portfolio","site","app"]) for(const retainedVersion of ["0.1.0","0.2.0"]) {
     const persistent=profile==="app";
-    const repo=await repository(profile,{backgroundJobDelivery:true,transactionalEmailResend:true,...(persistent?{applicationPersistence:true}:{}),context:{...createGenerationRenderingContext(persistent,true,true,retainedVersion),profiles:cohort.profiles,...(original?{securityNextDeclaration:"original"}:{})}});
-    const expectedNext = original || cohort.versions.app === "0.2.0" ? "16.3.3" : cohort.versions.app === "0.2.1" ? "16.3.6" : "16.3.8";
+    const repo=await repository(profile,{backgroundJobDelivery:true,transactionalEmailResend:true,...(persistent?{applicationPersistence:true}:{}),context:{...createGenerationRenderingContext(persistent,true,true,retainedVersion),profiles:cohort.profiles}});
+    const expectedNext = cohort.versions.app === "0.2.0" ? "16.3.3" : "16.3.8";
     await assertCohort(repo, cohort, profile, persistent);
     assert.equal(JSON.parse(decoder.decode(repo.files.get("apps/web/package.json"))).dependencies.next, expectedNext);
     const prepared=await removalPlan(repo);
