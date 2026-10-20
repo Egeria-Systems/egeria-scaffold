@@ -1,5 +1,5 @@
 import { createBrowserQualityConfig } from "./playwright.config.shared";
-const baseURL = "http://127.0.0.1:3101";
+const baseURL = "http://localhost:3101";
 const target = process.env.APPLICATION_ENVIRONMENT;
 if (!["development", "staging", "production"].includes(target ?? "")) throw new Error("APPLICATION_ENVIRONMENT_INVALID");
 const selection = target === "development" ? "" : ` --env ${target}`;

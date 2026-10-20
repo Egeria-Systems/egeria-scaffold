@@ -6940,6 +6940,7 @@ test("environment release workflows freeze one source then gate separate staging
   for (const persistence of [false, true]) for (const jobs of [false, true]) await context.test(`persistence=${persistence}, jobs=${jobs}`, async () => {
     const result = assertSuccess(await core.renderSkeleton({ profile: "app", projectName: "release-example", displayName: "Release Example", packageVersions: core.verifiedCapabilityPackageVersions,
       ...(persistence ? { applicationPersistence: true } : {}), ...(jobs ? { backgroundJobDelivery: true } : {}) }, createApplicationEnvironmentRenderingContext(persistence, false, jobs)));
+    assert.match(indexFiles(result.files).get("apps/web/playwright.preview.config.ts"), /http:\/\/localhost:3101/u);
     const workflow = parseGeneratedYaml(result.files, ".github/workflows/deploy.yml");
     assert.deepEqual(Object.keys(workflow.jobs), ["verify-source", "staging", "production"]);
     assert.equal(workflow.jobs.staging.needs, "verify-source");
