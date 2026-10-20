@@ -24,6 +24,8 @@ Composition reads runtime configuration and validates credential shape and sende
 
 Reviewed removal binds source ownership, preservation/ejection decisions, surviving references, exact plan inputs and provider/credential/retention dispositions. It changes source only. Existing isolated guarded writes, verification, re-inference, migration append and state-last persistence remain mandatory. Provider accounts, keys, DNS, retained messages and source recovery remain separate operations.
 
+[ADR-0015's dependency security successors](0015-vitest-five-generation.md#dependency-security-successors) extend this same optional contract and lifecycle eligibility to the corresponding schema-1 patch recipes. Prior decisions, descriptor versions, capability settings, dependencies, removal rules and historical behavior remain unchanged; no migration or additional capability transition is introduced.
+
 ## Consequences
 
 The broader foundation and new email descriptor are new pending certification subjects; existing exact receipts remain historical evidence for their original subjects. Controlled provider tests and local workerd evidence establish exercised adapter behavior, not live-provider certification or inbox delivery. The [capability model](../architecture/capability-model.md#transactional-email-boundary) owns lifecycle limits; the [program roadmap](../roadmaps/program-roadmap.md#one-time-2026-09-19-transactional-email-implementation-exception) owns sequencing and the separate integration gate.

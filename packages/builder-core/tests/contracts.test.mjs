@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -10,6 +10,17 @@ const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const builtEntry = resolve(packageRoot, "dist/index.js");
 const contracts = await import(pathToFileURL(builtEntry));
+
+test("retired recipe controls refuse raw project and state admission", async () => {
+  const root = resolve(packageRoot, "tests/fixtures/retired-recipes");
+  for (const name of (await readdir(root)).filter(name => name !== "supported-rendering.json")) {
+    const control = JSON.parse(await readFile(resolve(root, name), "utf8"));
+    assert.equal(contracts.parseProjectYaml(control.projectYaml).ok, false, name);
+    for (const [variant, value] of Object.entries(control.variants)) {
+      assert.equal(contracts.parseStateJson(JSON.stringify(value.state)).ok, false, `${name}: ${variant}`);
+    }
+  }
+});
 const surfaceTargets = await import(
   pathToFileURL(resolve(packageRoot, "dist/contracts/surface-target.js"))
 );
@@ -20,7 +31,9 @@ const schemaArtifactNames = [
   "migration-record.schema.json",
   "profile.schema.json",
   "project.schema.json",
+  "project-environment.schema.json",
   "state.schema.json",
+  "state-environment.schema.json",
 ];
 
 const schemaArtifactRootIdentifiers = {
@@ -31,7 +44,9 @@ const schemaArtifactRootIdentifiers = {
     "urn:egeria-systems:schema:migration-record:1.0.0",
   "profile.schema.json": "urn:egeria-systems:schema:profile:1.0.0",
   "project.schema.json": "urn:egeria-systems:schema:project:1.0.0",
+  "project-environment.schema.json": "urn:egeria-systems:schema:project:2.0.0",
   "state.schema.json": "urn:egeria-systems:schema:state:1.0.0",
+  "state-environment.schema.json": "urn:egeria-systems:schema:state:2.0.0",
 };
 
 function resolveSchemaArtifactRoot(artifactName, artifact) {
@@ -225,6 +240,8 @@ const profileTransitionVerificationChecks = [
 const readableRecipeVersions = [
   "0.1.0",
   "0.2.0",
+  "0.2.2",
+  "0.2.3",
   "0.3.0",
   "0.4.0",
   "0.5.0",
@@ -234,7 +251,11 @@ const readableRecipeVersions = [
   "0.9.0",
   "0.10.0",
   "0.11.0",
+  "0.11.2",
+  "0.11.3",
   "0.12.0",
+  "0.12.2",
+  "0.12.3",
 ];
 
 const validState = {
@@ -556,7 +577,7 @@ test("project configuration is strict and materializes safe capability identifie
     ...validProject,
     secret: "must-not-exist",
   });
-  for (const recipeVersion of ["0.13.0", "0.10", "latest"]) {
+  for (const recipeVersion of ["0.14.0", "0.10", "latest"]) {
     assertRejects(contracts.projectConfigurationSchema, {
       ...validProject,
       recipeVersion,
@@ -645,7 +666,7 @@ test("app generation verification requires the exact Worker receipt and preserve
     lastSuccessfulVerification: { kind: "generation", checks: generationChecks },
   });
   for (const profile of ["portfolio", "site"]) {
-    for (const recipeVersion of readableRecipeVersions) {
+    for (const recipeVersion of readableRecipeVersions.filter(version => version !== "0.2.2" && version !== "0.2.3")) {
       const historicalChecks = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0"]
         .includes(recipeVersion) ? legacyVerificationChecks : currentVerificationChecks;
       assertAccepts(contracts.installedStateSchema, {
@@ -660,7 +681,7 @@ test("app generation verification requires the exact Worker receipt and preserve
       });
     }
   }
-  for (const recipeVersion of readableRecipeVersions.filter((version) => version !== "0.1.0" && version !== "0.2.0")) {
+  for (const recipeVersion of readableRecipeVersions.filter((version) => version !== "0.1.0" && version !== "0.2.0" && version !== "0.2.2" && version !== "0.2.3")) {
     assertRejects(contracts.installedStateSchema, {
       ...appState,
       origin: { profile: "app", recipeVersion },
@@ -1350,7 +1371,7 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
   ]) {
     assert.deepEqual(
       recipeVersionSchema.enum,
-      readableRecipeVersions,
+      [...readableRecipeVersions, "0.13.0"],
       `${artifactName} must retain every readable recipe version`,
     );
   }
@@ -1513,10 +1534,125 @@ test("the schema generator checks artifacts without rewriting them", async () =>
 
 
 test("Vitest five app receipts require Worker integration for generation and each supported lifecycle", () => {
-  for (const recipeVersion of ["0.1.0", "0.2.0"]) {
+  for (const recipeVersion of ["0.1.0", "0.2.0", "0.2.2", "0.2.3"]) {
     for (const [kind, checks] of [["generation", [...currentVerificationChecks.slice(0, -1), "worker-integration", "post-state-inference"]], ["capability-addition", contracts.appCapabilityAdditionPersistedVerificationChecks], ["capability-removal", contracts.appCapabilityRemovalPersistedVerificationChecks], ["profile-transition", contracts.appProfileTransitionPersistedVerificationChecks]]) {
       assertAccepts(contracts.installedStateSchema, { ...validState, origin: { profile: "app", recipeVersion }, lastSuccessfulVerification: { kind, checks } });
       assertRejects(contracts.installedStateSchema, { ...validState, origin: { profile: "app", recipeVersion }, lastSuccessfulVerification: { kind, checks: checks.filter(check => check !== "worker-integration") } });
     }
+  }
+});
+
+const environmentProject = {
+  ...validProject,
+  schemaVersion: "2.0.0",
+  recipeVersion: "0.12.0",
+  selectedCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "analytics", "booking-calendly", "contact-form-web3forms"],
+  capabilitySettings: {
+    analytics: {
+      consent: { policy: "explicit-opt-in" },
+      providers: { googleAnalytics4: true, microsoftClarity: { audience: "not-directed-to-minors" } },
+      operationalIntegrations: { lookerStudio: { connector: "google-analytics-4" } },
+    },
+    "booking-calendly": { mode: "popup" },
+  },
+};
+
+test("application environment project parser requires exact selection-only schema without changing public parsing", () => {
+  const parsed = contracts.parseProjectYaml(JSON.stringify(environmentProject), "2.0.0");
+  assert.equal(parsed.ok, true, JSON.stringify(parsed));
+  assert.deepEqual(parsed.value, environmentProject);
+  assert.equal(contracts.parseProjectYaml(JSON.stringify(environmentProject)).ok, false);
+  assert.equal(contracts.parseProjectYaml(JSON.stringify(validProject), "2.0.0").ok, false);
+  assert.equal(contracts.parseProjectYaml(JSON.stringify(validProject)).ok, true);
+  assert.equal(contracts.parseProjectYaml(contracts.serializeProjectYaml(parsed.value), "2.0.0").ok, true);
+});
+
+test("application environment selection refuses literal destinations, unknown fields and invalid dependency settings", () => {
+  const mutations = [
+    (project) => { project.capabilitySettings.analytics.providers.googleAnalytics4 = { measurementId: "G-SECRET123456" }; },
+    (project) => { project.capabilitySettings.analytics.providers.cloudflareWebAnalytics = { siteToken: "private-sentinel" }; },
+    (project) => { project.capabilitySettings.analytics.providers.microsoftClarity.projectId = "private-sentinel"; },
+    (project) => { project.capabilitySettings.analytics.operationalIntegrations.googleSearchConsole = { verificationToken: "private-sentinel" }; },
+    (project) => { project.capabilitySettings["booking-calendly"].destination = "https://calendly.com/private-sentinel/intro"; },
+    (project) => { project.capabilitySettings["contact-form-web3forms"] = { accessKey: "private-sentinel" }; },
+    (project) => { project.capabilitySettings["contact-form-web3forms"] = {}; },
+    (project) => { project.applicationEnvironment = "production"; },
+    (project) => { project.recipeVersion = "0.11.0"; },
+    (project) => { project.originProfile = "site"; },
+    (project) => { project.capabilitySettings.analytics.providers.googleAnalytics4 = false; },
+    (project) => { delete project.capabilitySettings.analytics.providers.googleAnalytics4; },
+    (project) => { project.capabilitySettings.analytics.providers.microsoftClarity.audience = "all"; },
+    (project) => { project.selectedCapabilities = project.selectedCapabilities.filter((value) => value !== "analytics"); },
+    (project) => { delete project.capabilitySettings["booking-calendly"]; },
+  ];
+  for (const mutate of mutations) {
+    const invalid = structuredClone(environmentProject);
+    mutate(invalid);
+    const result = contracts.parseProjectYaml(JSON.stringify(invalid), "2.0.0");
+    assert.equal(result.ok, false, JSON.stringify(invalid));
+    assert.doesNotMatch(JSON.stringify(result), /private-sentinel|SECRET123456/u);
+  }
+  const emptyProviders = structuredClone(environmentProject);
+  emptyProviders.capabilitySettings.analytics = { consent: { policy: "explicit-opt-in" }, providers: {}, operationalIntegrations: {} };
+  assert.equal(contracts.parseProjectYaml(JSON.stringify(emptyProviders), "2.0.0").ok, false);
+  emptyProviders.capabilitySettings.analytics.operationalIntegrations.googleSearchConsole = true;
+  assert.equal(contracts.parseProjectYaml(JSON.stringify(emptyProviders), "2.0.0").ok, true);
+});
+
+const environmentState = {
+  ...validState,
+  schemaVersion: "2.0.0",
+  projectSchemaVersion: "2.0.0",
+  origin: { profile: "portfolio", recipeVersion: "0.12.0" },
+  installedCapabilities: [
+    ["standards", "0.7.0"], ["content-files", "0.4.0"], ["section-composition", "0.3.0"],
+    ["deployment-cloudflare", "0.7.0"], ["observability", "0.3.0"],
+  ].map(([identifier, version]) => ({ ...validState.installedCapabilities[0], identifier, version })),
+};
+
+test("application environment state parsing enforces the exact candidate tuple and verification vector", () => {
+  const result = contracts.parseStateJson(JSON.stringify(environmentState), "2.0.0");
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.value, environmentState);
+  assert.equal(contracts.parseStateJson(JSON.stringify(environmentState)).ok, false);
+  assert.equal(contracts.parseStateJson(JSON.stringify(validState), "2.0.0").ok, false);
+  assert.equal(contracts.parseStateJson(contracts.serializeStateJson(result.value), "2.0.0").ok, true);
+  for (const mutate of [
+    (state) => { state.projectSchemaVersion = "1.0.0"; },
+    (state) => { state.installedCapabilities[0].version = "0.5.0"; },
+    (state) => { state.installedCapabilities.pop(); },
+    (state) => { state.installedCapabilities.push({ ...state.installedCapabilities[0], identifier: "unknown" }); },
+    (state) => { state.origin.recipeVersion = "0.11.0"; },
+    (state) => { state.origin.profile = "site"; state.origin.recipeVersion = "0.13.0"; },
+    (state) => { state.lastSuccessfulVerification.checks = legacyVerificationChecks; },
+  ]) {
+    const invalid = structuredClone(environmentState); mutate(invalid);
+    assert.equal(contracts.parseStateJson(JSON.stringify(invalid), "2.0.0").ok, false);
+  }
+  const localized = structuredClone(environmentState);
+  localized.installedCapabilities.push({ ...localized.installedCapabilities[0], identifier: "multilingual", version: "0.1.0" });
+  assert.equal(contracts.parseStateJson(JSON.stringify(localized), "2.0.0").ok, true);
+});
+
+test("application environment catalog admits only the complete common tuple with owned target surfaces", () => {
+  const snapshot = { standards: "0.7.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0" };
+  const result = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, snapshot);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.value.map(({ identifier }) => identifier).sort(), ["app-foundation", "content-files", "deployment-cloudflare", "multilingual", "observability", "section-composition", "site-routing", "standards"]);
+  const deployment = result.value.find(({ identifier }) => identifier === "deployment-cloudflare");
+  assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/src/configuration/application-environment.ts"));
+  assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/scripts/check-application-environment.mjs"));
+  assert.ok(result.value.find(({ identifier }) => identifier === "app-foundation").managedSurfaces.some(({ path }) => path === "apps/web/src/infrastructure/cloudflare/application-environment.ts"));
+  for (const mutation of [{ standards: "0.5.0" }, { deploymentCloudflare: "0.3.0" }, { appFoundation: "0.2.0" }, { siteRouting: "0.3.0" }, { applicationPersistence: "0.1.0" }, { transactionalEmailResend: "0.1.0" }, { backgroundJobDelivery: "0.1.0" }, { arbitrary: true }]) {
+    assert.equal(contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, { ...snapshot, ...mutation }).ok, false);
+  }
+});
+
+
+test("current public state recipes retain exact verification vectors", () => {
+  for (const [profile, recipeVersion] of [["portfolio", "0.11.2"], ["site", "0.12.2"], ["portfolio", "0.11.3"], ["site", "0.12.3"]]) {
+    const state = { ...validState, origin: { profile, recipeVersion } };
+    assertAccepts(contracts.installedStateSchema, state);
+    assertRejects(contracts.installedStateSchema, { ...state, lastSuccessfulVerification: { kind: "generation", checks: legacyVerificationChecks } });
   }
 });

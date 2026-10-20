@@ -141,14 +141,20 @@ export type ProfileTransitionExecutionResult =
           fromProfile: "portfolio" | "site";
           fromRecipeVersion: string;
           toProfile: "site" | "app";
-          toRecipeVersion: "0.10.0" | "0.1.0" | "0.2.0";
+          toRecipeVersion: "0.10.0" | "0.1.0" | "0.2.0" | "0.2.2" | "0.2.3";
         }>;
         migration:
           | typeof historicalMigrationIdentifier
           | "transition-portfolio-0-10-0-to-app-0-1-0"
           | "transition-site-0-11-0-to-app-0-1-0"
           | "transition-portfolio-0-11-0-to-app-0-2-0"
-          | "transition-site-0-12-0-to-app-0-2-0";
+          | "transition-site-0-12-0-to-app-0-2-0"
+          | "transition-portfolio-0-11-1-to-app-0-2-1"
+          | "transition-site-0-12-1-to-app-0-2-1"
+          | "transition-portfolio-0-11-2-to-app-0-2-2"
+          | "transition-site-0-12-2-to-app-0-2-2"
+          | "transition-portfolio-0-11-3-to-app-0-2-3"
+          | "transition-site-0-12-3-to-app-0-2-3";
         changedPaths: readonly string[];
         verificationChecks:
           | typeof profileTransitionVerificationChecks
@@ -824,7 +830,15 @@ export async function applyProfileTransition(input: Readonly<{
   const plan = planResult.value;
   const app = plan.target.profile === "app";
   const migrationIdentifier = app
-    ? plan.target.recipeVersion === "0.2.0"
+    ? plan.target.recipeVersion === "0.2.3"
+      ? plan.source.profile === "portfolio"
+        ? "transition-portfolio-0-11-3-to-app-0-2-3"
+        : "transition-site-0-12-3-to-app-0-2-3"
+      : plan.target.recipeVersion === "0.2.2"
+      ? plan.source.profile === "portfolio"
+        ? "transition-portfolio-0-11-2-to-app-0-2-2"
+        : "transition-site-0-12-2-to-app-0-2-2"
+      : plan.target.recipeVersion === "0.2.0"
       ? plan.source.profile === "portfolio"
         ? "transition-portfolio-0-11-0-to-app-0-2-0"
         : "transition-site-0-12-0-to-app-0-2-0"
@@ -1007,7 +1021,7 @@ export async function applyProfileTransition(input: Readonly<{
   const targetCatalog = createCapabilityCatalogSnapshot(
     verifiedCapabilityPackageVersions,
     app
-      ? plan.target.recipeVersion === "0.2.0"
+      ? plan.target.recipeVersion === "0.2.0" || plan.target.recipeVersion === "0.2.2" || plan.target.recipeVersion === "0.2.3"
         ? vitestFiveCapabilityCatalogSnapshot
         : vitestFourCapabilityCatalogSnapshot
       : { standards: "0.4.0" },

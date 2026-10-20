@@ -5,7 +5,7 @@ import * as core from "../dist/index.js";
 import { inspectProject } from "../dist/diagnostics/project-inspection.js";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-import { createVitestFourProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createVitestFourProfileRecipes, createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../dist/profiles/profile-recipes.js";
 import { createGenerationRenderingContext, readVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
 
 const encoder = new TextEncoder();
@@ -14,8 +14,24 @@ const capability = "transactional-email-resend";
 const root = "/generated/email-lifecycle";
 const git = { ok: true, identity: { root, revision: "abcdef0123456789abcdef0123456789abcdef01", attachedRef: "refs/heads/email-lifecycle", gitDirectory: "/generated/.git/worktrees/email-lifecycle", commonDirectory: "/generated/.git" } };
 
+const cohorts = [
+  { profiles: createVitestFiveProfileRecipes(), versions: { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" }, foundationLocks: { portfolio: "web-recipe-portfolio-foundation", site: "web-recipe-app-0.2.0", app: "web-recipe-app-0.2.0" }, persistenceLock: "web-application-persistence" },
+  { profiles: createDependencySecurityProfileRecipes(), versions: { portfolio: "0.11.2", site: "0.12.2", app: "0.2.2" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.2-foundation", site: "web-recipe-app-0.2.2", app: "web-recipe-app-0.2.2" }, persistenceLock: "web-recipe-app-0.2.2-persistence" },
+  { profiles: createLiteralLintProfileRecipes(), versions: { portfolio: "0.11.3", site: "0.12.3", app: "0.2.3" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.3-foundation", site: "web-recipe-app-0.2.3", app: "web-recipe-app-0.2.3" }, persistenceLock: "web-recipe-app-0.2.3-persistence" },
+];
+async function assertCohort(repo, cohort, profile, persistent = false) {
+  const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
+  const project = core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml")));
+  assert.equal(state.ok, true, JSON.stringify(state));
+  assert.equal(project.ok, true, JSON.stringify(project));
+  assert.deepEqual(state.value.origin, { profile, recipeVersion: cohort.versions[profile] });
+  assert.equal(project.value.recipeVersion, cohort.versions[profile]);
+  assert.deepEqual(repo.files.get("pnpm-lock.yaml"), new Uint8Array(await readFile(new URL(`../lockfiles/${persistent ? cohort.persistenceLock : cohort.foundationLocks[profile]}/pnpm-lock.yaml`, import.meta.url))));
+}
+
 async function repository(profile = "portfolio", options = {}) {
-  const rendered = await core.renderSkeleton({ profile, projectName: "email-lifecycle", displayName: "Email lifecycle", packageVersions: core.verifiedCapabilityPackageVersions, ...options }, options.context);
+  const context = options.context ?? { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true || options.backgroundJobDelivery === true, options.backgroundJobDelivery === true), profiles: options.profiles ?? createVitestFiveProfileRecipes() };
+  const rendered = await core.renderSkeleton({ profile, projectName: "email-lifecycle", displayName: "Email lifecycle", packageVersions: core.verifiedCapabilityPackageVersions, ...options }, context);
   assert.equal(rendered.ok, true, JSON.stringify(rendered));
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, content]));
   const manifest = JSON.parse(decoder.decode(files.get("apps/web/package.json")));
@@ -57,8 +73,8 @@ async function addition(repo, selectedCapability = capability, overrides = {}) {
 }
 
 test("current profiles add email with explicit dependencies and persist state only after verification", async () => {
-  for (const profile of ["portfolio", "site", "app"]) {
-    const repo = await repository(profile);
+  for (const cohort of cohorts) for (const profile of ["portfolio", "site", "app"]) {
+    const repo = await repository(profile, { profiles: cohort.profiles });
     const { planned, result } = await addition(repo);
     assert.equal(result.ok, true, JSON.stringify(result));
     assert.ok(planned.desiredCapabilities.includes("app-foundation"));
@@ -67,9 +83,11 @@ test("current profiles add email with explicit dependencies and persist state on
     const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
     assert.equal(state.ok, true, JSON.stringify(state));
     assert.equal(state.value.origin.profile, profile);
+    await assertCohort(repo, cohort, profile);
     assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.2.0");
   }
 });
+
 
 test("failed verification retains the source prefix without recording successful email installation", async () => {
   const repo = await repository();
@@ -83,8 +101,8 @@ test("failed verification retains the source prefix without recording successful
 });
 
 test("email removal declares separate operator review and retains foundation on all profiles", async () => {
-  for (const profile of ["portfolio", "site", "app"]) {
-    const repo = await repository(profile, { transactionalEmailResend: true });
+  for (const cohort of cohorts) for (const profile of ["portfolio", "site", "app"]) {
+    const repo = await repository(profile, { transactionalEmailResend: true, profiles: cohort.profiles });
     const planned = await core.planCapabilityRemoval({ reader: repo.reader, git, capability, inspectRepositoryInventory: repo.inventory });
     assert.equal(planned.ok, true, JSON.stringify(planned));
     assert.ok(planned.value.desiredCapabilities.includes("app-foundation"));
@@ -98,6 +116,11 @@ test("email removal declares separate operator review and retains foundation on 
     assert.ok(project.selectedCapabilities.includes("app-foundation"));
     assert.equal(project.selectedCapabilities.includes(capability), false);
     assert.equal(project.originProfile, profile);
+    await assertCohort(repo, cohort, profile);
+    const readded = await addition(repo);
+    assert.equal(readded.result.ok, true, JSON.stringify(readded.result));
+    await assertCohort(repo, cohort, profile);
+    assert.deepEqual(core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value.appliedMigrations, ["remove-transactional-email-resend-0-1-0", "add-transactional-email-resend-0-1-0"]);
   }
 });
 
@@ -137,21 +160,22 @@ test("foundation installation preserves custom manifest members and rejects a mi
 
 test("email and persistence compose in either addition order", async () => {
   const verifier = { verifyInIsolatedCopy: async () => ({ ok: true, value: { checks: core.persistenceGenerationVerificationChecks } }) };
-  for (const emailFirst of [false, true]) {
-    const repo = await repository("app", emailFirst ? { transactionalEmailResend: true } : { applicationPersistence: true });
+  for (const cohort of cohorts) for (const emailFirst of [false, true]) {
+    const repo = await repository("app", { ...(emailFirst ? { transactionalEmailResend: true } : { applicationPersistence: true }), profiles: cohort.profiles });
     const { result } = await addition(repo, emailFirst ? "application-persistence" : capability, { verifier });
     assert.equal(result.ok, true, JSON.stringify(result));
     const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
     assert.equal(state.ok, true, JSON.stringify(state));
     assert.ok(state.value.installedCapabilities.some(({ identifier }) => identifier === capability));
     assert.ok(state.value.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"));
+    await assertCohort(repo, cohort, "app", true);
     assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.2.0");
   }
 });
 
 test("other optional additions preserve email and the retained foundation", async () => {
-  for (const emailInstalled of [true, false]) {
-    const repo = await repository("portfolio", emailInstalled ? { transactionalEmailResend: true } : { context: createGenerationRenderingContext(false, true) });
+  for (const cohort of cohorts) for (const emailInstalled of [true, false]) {
+    const repo = await repository("portfolio", { ...(emailInstalled ? { transactionalEmailResend: true } : { context: { ...createGenerationRenderingContext(false, true), profiles: cohort.profiles } }), profiles: cohort.profiles });
     const { result } = await addition(repo, "multilingual");
     assert.equal(result.ok, true, JSON.stringify(result));
     const project = core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value;

@@ -5,6 +5,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
+import { generatedFixtureContracts } from "../../scripts/verify-generated-skeletons.mjs";
+const fixtureRoot = identifier => generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot;
 
 import { certifyAppLocalForTesting } from "../../scripts/certify-app-local.mjs";
 import { certifyFreshScaffoldForTesting } from "../../scripts/lib/certify-fresh-scaffold.mjs";
@@ -48,7 +50,7 @@ const fixedChecks = [
   "component-tests", "next-build", "opennext-build", "browser-install",
   "browser-development", "browser-preview",
 ];
-const fixtureState = JSON.parse(await readFile(join(repositoryRoot, "fixtures/generated/app/.egeria/state.json"), "utf8"));
+const fixtureState = JSON.parse(await readFile(join(repositoryRoot, fixtureRoot("app"), ".egeria/state.json"), "utf8"));
 
 class TestCertificationError extends Error {
   constructor(code) { super(code); this.code = code; }
@@ -59,7 +61,7 @@ const configuration = {
   createArguments: [], capabilityIdentifier: "app-foundation", capabilityVersion: "0.1.0",
   expectedCapabilities: fixtureState.installedCapabilities.map(({ identifier }) => identifier),
   expectedInstalledCapabilities: fixtureState.installedCapabilities,
-  expectedCapabilitySettings: {}, expectedRecipeVersion: "0.2.0", verifierIdentifier: "app",
+  expectedCapabilitySettings: {}, expectedRecipeVersion: "0.2.3", verifierIdentifier: "app",
   expectedVerificationChecks: fixedChecks,
   createError: code => new TestCertificationError(code),
   isCertificationError: error => error instanceof TestCertificationError,
@@ -97,7 +99,7 @@ function adaptersFor({ changeInference, changeProject, changeVerification, failC
       if (command === "create") {
         root = input.arguments[input.arguments.indexOf("--directory") + 1];
         identifier = input.arguments.includes("--multilingual") ? "app-all-optional-integrations" : "app";
-        await cp(join(repositoryRoot, "fixtures/generated", identifier), root, { recursive: true, errorOnExist: true, force: false });
+        await cp(join(repositoryRoot, fixtureRoot(identifier)), root, { recursive: true, errorOnExist: true, force: false });
         if (changeProject) {
           const projectPath = join(root, ".egeria/project.yaml");
           await writeFile(projectPath, changeProject(await readFile(projectPath, "utf8")));
@@ -136,6 +138,10 @@ test("fresh app runner contracts reject incomplete or wrong installed identity b
     result => { result.state.value.installedCapabilities.pop(); },
     result => { result.state.value.installedCapabilities.push(result.state.value.installedCapabilities[0]); },
     result => { result.state.value.origin.recipeVersion = "0.1.0"; },
+    result => { result.state.value.origin.recipeVersion = "0.2.0"; },
+    result => { result.state.value.origin.recipeVersion = "0.2.1"; },
+    result => { result.state.value.origin.recipeVersion = "0.2.2"; },
+    result => { result.state.value.origin.recipeVersion = "0.3.0"; },
     result => { result.capabilities.pop(); },
     result => { result.capabilities[0].category = "partial"; },
     result => { result.capabilities.push({ identifier: "analytics", category: "probable", probes: [] }); },
@@ -156,6 +162,10 @@ test("fresh app runner contracts retain actual separate Worker and build evidenc
 test("fresh app runner contracts reject project selection and settings disagreement", async () => {
   for (const changeProject of [
     source => source.replace("originProfile: app", "originProfile: site"),
+    source => source.replace("recipeVersion: 0.2.3", "recipeVersion: 0.2.0"),
+    source => source.replace("recipeVersion: 0.2.3", "recipeVersion: 0.2.1"),
+    source => source.replace("recipeVersion: 0.2.3", "recipeVersion: 0.2.2"),
+    source => source.replace("recipeVersion: 0.2.3", "recipeVersion: 0.3.0"),
     source => source.replace("capabilitySettings: {}", "capabilitySettings:\n  booking-calendly:\n    destination: https://calendly.com/example/intro\n    mode: popup"),
     source => source.replace("  - site-routing\n", ""),
   ]) {
@@ -183,7 +193,7 @@ test("local runner contracts attribute default app journeys only to the retained
   });
   assert.deepEqual(result.freshScaffolds.map(({ identifier }) => identifier), ["app", "app-all-optional-integrations"]);
   for (const fresh of result.freshScaffolds) {
-    assert.equal(fresh.recipeVersion, "0.2.0");
+    assert.equal(fresh.recipeVersion, "0.2.3");
     assert.deepEqual(fresh.workerIntegration, { executed: [fresh.identifier], skipped: [] });
     assert.deepEqual(fresh.appBuildEvidence, [buildEvidence(fresh.identifier)]);
     assert.equal(fresh.installedCapabilities[0].version, "0.5.0");

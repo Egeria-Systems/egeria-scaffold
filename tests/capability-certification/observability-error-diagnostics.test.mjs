@@ -14,6 +14,8 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
+import { generatedFixtureContracts } from "../../scripts/verify-generated-skeletons.mjs";
+const generatedFixtureRoot = identifier => generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot;
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
@@ -39,8 +41,8 @@ const exactSubject = Object.freeze({
   behaviorContractDigest:
     "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43",
 });
-const appProjectSource = await readFile(resolve(repositoryRoot, "fixtures/generated/app/.egeria/project.yaml"), "utf8");
-const appState = JSON.parse(await readFile(resolve(repositoryRoot, "fixtures/generated/app/.egeria/state.json"), "utf8"));
+const appProjectSource = await readFile(resolve(repositoryRoot, generatedFixtureRoot("app"), ".egeria/project.yaml"), "utf8");
+const appState = JSON.parse(await readFile(resolve(repositoryRoot, generatedFixtureRoot("app"), ".egeria/state.json"), "utf8"));
 const installedCapabilities = appState.installedCapabilities;
 const appBuildEvidence = [{
   fixture: "app",
@@ -244,7 +246,7 @@ function commandOutput(command, version = "0.3.0") {
           kind: "valid",
           value: {
             installedCapabilities: installedCapabilities.map(capability => capability.identifier === "observability" ? { ...capability, version } : { ...capability }),
-            origin: { profile: "app", recipeVersion: "0.2.0" },
+            origin: { profile: "app", recipeVersion: "0.2.3" },
           },
         },
         capabilities: installedCapabilities.map(({ identifier }) => ({ identifier, category: "confirmed" })),
@@ -268,7 +270,7 @@ function commandOutput(command, version = "0.3.0") {
   throw new Error("unexpected command");
 }
 
-async function createRunnerAdapters({ recipeVersion = "0.2.0" } = {}) {
+async function createRunnerAdapters({ recipeVersion = "0.2.3" } = {}) {
   let projectRoot;
   const commands = [];
   const adapters = {
@@ -283,7 +285,7 @@ async function createRunnerAdapters({ recipeVersion = "0.2.0" } = {}) {
         await mkdir(join(projectRoot, ".egeria"), { recursive: true });
         await writeFile(
           join(projectRoot, ".egeria/project.yaml"),
-          appProjectSource.replace("recipeVersion: 0.2.0", `recipeVersion: ${recipeVersion}`),
+          appProjectSource.replace("recipeVersion: 0.2.3", `recipeVersion: ${recipeVersion}`),
           "utf8",
         );
       }
@@ -633,7 +635,7 @@ test("the current app runner retains complete identity and actual Worker and Eff
     version: "0.3.0",
     profile: "app",
     subject: exactSubject,
-    recipeVersion: "0.2.0",
+    recipeVersion: "0.2.3",
     evidenceRevision: exactRevision,
     cleanup: "identity-checked",
     installedCapabilities,
@@ -695,6 +697,9 @@ test("the current app runner refuses incomplete installed identity before runtim
     value => { value.result.state.value.installedCapabilities.push({ identifier: "analytics", version: "0.1.0" }); },
     value => { value.result.state.value.installedCapabilities[0].version = "0.4.0"; },
     value => { value.result.state.value.origin.profile = "portfolio"; },
+    value => { value.result.state.value.origin.recipeVersion = "0.2.0"; },
+    value => { value.result.state.value.origin.recipeVersion = "0.2.2"; },
+    value => { value.result.state.value.origin.recipeVersion = "0.3.0"; },
     value => { value.result.capabilities[0].category = "unconfirmed"; },
   ]) {
     const { adapters } = await createRunnerAdapters();
@@ -733,7 +738,7 @@ test("the current app runner binds clean ordinary source before and after execut
 
 test("deployment candidate validation requires the complete current app identity", async () => {
   const { validateObservabilityDeploymentCandidate } = await loadModule(runnerPath);
-  const manifest = JSON.parse(await readFile(resolve(repositoryRoot, "fixtures/generated/app/apps/web/package.json"), "utf8"));
+  const manifest = JSON.parse(await readFile(resolve(repositoryRoot, generatedFixtureRoot("app"), "apps/web/package.json"), "utf8"));
   const candidate = {
     revision: exactRevision, projectSource: appProjectSource, manifest,
     infer: commandOutput("infer"), doctor: commandOutput("doctor"), diff: commandOutput("diff"),
@@ -741,17 +746,19 @@ test("deployment candidate validation requires the complete current app identity
   const accepted = validateObservabilityDeploymentCandidate(candidate);
   assert.equal(accepted.ok, true);
   assert.equal(accepted.profile, "app");
-  assert.equal(accepted.recipeVersion, "0.2.0");
+  assert.equal(accepted.recipeVersion, "0.2.3");
   assert.deepEqual(accepted.subject, exactSubject);
   assert.equal(accepted.revision, exactRevision);
   for (const mutate of [
     value => { value.projectSource = value.projectSource.replace("originProfile: app", "originProfile: portfolio"); },
-    value => { value.projectSource = value.projectSource.replace("recipeVersion: 0.2.0", "recipeVersion: 0.1.0"); },
+    value => { value.projectSource = value.projectSource.replace("recipeVersion: 0.2.3", "recipeVersion: 0.1.0"); },
+    value => { value.projectSource = value.projectSource.replace("recipeVersion: 0.2.3", "recipeVersion: 0.2.2"); },
     value => { value.projectSource += "unexpected: true\n"; },
     value => { value.infer.result.state.value.installedCapabilities.pop(); },
     value => { value.infer.result.state.value.installedCapabilities.push({ identifier: "analytics", version: "0.1.0" }); },
     value => { value.infer.result.state.value.installedCapabilities[0].version = "0.4.0"; },
     value => { value.infer.result.state.value.origin.recipeVersion = "0.1.0"; },
+    value => { value.infer.result.state.value.origin.recipeVersion = "0.2.2"; },
     value => { value.infer.result.capabilities[0].category = "unconfirmed"; },
     value => { value.doctor.ok = false; },
     value => { value.doctor.result.healthy = false; },

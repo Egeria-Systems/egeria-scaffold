@@ -12,7 +12,7 @@ const privateRoots = Object.freeze([
   "docs/review-packets/",
   "docs/superpowers/",
 ]);
-const trackedAcceptedReceipts = Object.freeze([
+const trackedAcceptedArtifacts = Object.freeze([
   "docs/implementation-evidence/2026-08-16-observability-error-diagnostics-certification-receipt.md",
   "docs/implementation-evidence/2026-08-18-generated-cloudflare-deployment-certification-receipt.md",
   "docs/implementation-evidence/2026-08-20-generated-visual-regression-certification-receipt.md",
@@ -33,6 +33,29 @@ const trackedAcceptedReceipts = Object.freeze([
   "docs/implementation-evidence/2026-09-15-deployment-cloudflare-app-certification-receipt.md",
   "docs/implementation-evidence/2026-09-15-observability-app-certification-receipt.md",
   "docs/implementation-evidence/2026-09-23-web3forms-certification-receipt.md",
+  "docs/implementation-evidence/retired-recipe-visuals/app-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/app-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/app-all-optional-integrations-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/app-all-optional-integrations-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/app-persistence-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/app-persistence-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/app-persistence-email-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/app-persistence-email-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/portfolio-calendly-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/portfolio-calendly-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/portfolio-email-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/portfolio-email-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/site-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/site-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/site-contact-form-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/site-contact-form-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-analytics-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-analytics-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+  "docs/implementation-evidence/retired-recipe-visuals/transition-inputs.json",
 ]);
 const syntheticMacHome = (...segments) =>
   ["", "Users", ...segments, ""].join("/");
@@ -96,7 +119,7 @@ test("personal home-directory detection covers supported platform forms", () => 
   assert.deepEqual(detectPersonalHomePaths("docs/private-workflow.md"), []);
 });
 
-test("private workflow artifact roots keep only accepted content-safe receipts tracked", async () => {
+test("private workflow artifact roots keep only accepted content-safe artifacts tracked", async () => {
   const trackedPaths = await listTrackedPaths();
 
   for (const root of privateRoots) {
@@ -112,17 +135,17 @@ test("private workflow artifact roots keep only accepted content-safe receipts t
     );
     assert.deepEqual(
       trackedWithinRoot,
-      root === "docs/implementation-evidence/" ? trackedAcceptedReceipts : [],
+      root === "docs/implementation-evidence/" ? trackedAcceptedArtifacts : [],
       root,
     );
   }
 
-  for (const trackedAcceptedReceipt of trackedAcceptedReceipts) {
+  for (const trackedAcceptedArtifact of trackedAcceptedArtifacts) {
     await assert.rejects(
       () =>
         execFileAsync(
           "git",
-          ["check-ignore", "--quiet", "--no-index", trackedAcceptedReceipt],
+          ["check-ignore", "--quiet", "--no-index", trackedAcceptedArtifact],
           { cwd: repositoryRoot },
         ),
       (error) => Number(error.code) === 1,

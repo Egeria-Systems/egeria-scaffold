@@ -3,6 +3,11 @@ import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
+import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
+import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
+const currentCohorts = [createVitestFiveProfileRecipes(), createDependencySecurityProfileRecipes(), createLiteralLintProfileRecipes()];
+
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
@@ -96,7 +101,7 @@ async function installedEntries(profile, options = {}) {
     ...(bookingSettings === undefined ? {} : { bookingCalendly: bookingSettings }),
     ...(options.multilingual === true ? { multilingual: true } : {}),
     ...(options.analytics === undefined ? {} : { analytics: options.analytics }),
-  });
+  }, { ...createGenerationRenderingContext(), profiles: options.profiles ?? createVitestFiveProfileRecipes() });
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
 
   const byteFiles = new Map(
@@ -106,7 +111,7 @@ async function installedEntries(profile, options = {}) {
     "pnpm-lock.yaml",
     new Uint8Array(
       await readFile(
-        resolve(repositoryRoot, `fixtures/generated/${profile}/pnpm-lock.yaml`),
+        createRecipeLockfileUrl(resolveRecipeLockfileVersion(rendered.value.project, JSON.parse(decoder.decode(byteFiles.get("apps/web/package.json"))))),
       ),
     ),
   );
@@ -1034,8 +1039,8 @@ async function postRemovalEntriesWithEjection(path, surfaceOverrides = {}) {
 }
 
 test("capability removal plan is exact and read-only for portfolio and site", async () => {
-  for (const profile of ["portfolio", "site"]) {
-    const result = await planFromEntries(await installedEntries(profile));
+  for (const profiles of currentCohorts) for (const profile of ["portfolio", "site"]) {
+    const result = await planFromEntries(await installedEntries(profile, { profiles }));
     assert.equal(result.ok, true, JSON.stringify(result.issues));
     assert.match(result.value.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
     assert.deepEqual(
@@ -1599,4 +1604,17 @@ test("capability removal plan fingerprint binds its review requirements", async 
       plan: { ...plan, reviewRequirements: [] },
     }),
   );
+});
+
+
+test("current cohort refuses managed drift and surviving references without mutation", async () => {
+  for (const profile of ["portfolio", "site"]) for (const mode of ["managed-drift", "surviving-reference"]) {
+    const entries = await installedEntries(profile, { profiles: createDependencySecurityProfileRecipes() });
+    if (mode === "managed-drift") entries.set("apps/web/package.json", "changed managed manifest\n");
+    else entries.set("apps/web/src/custom-booking.ts", 'import { CalendlyBooking } from "./integrations/booking-calendly/calendly-booking";\n');
+    const before = [...entries];
+    const result = await planFromEntries(entries);
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.deepEqual([...entries], before);
+  }
 });

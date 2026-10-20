@@ -1,0 +1,143 @@
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { constants } from "node:fs";
+import { lstat, mkdir, open, readdir, realpath } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const webRoot = await realpath(path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."));
+const filesInvalid = "APPLICATION_DATABASE_FILES_INVALID";
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function requireCondition(condition, code) {
+  if (!condition) throw new Error(code);
+}
+
+async function readRegularFile(filePath) {
+  const file = await open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const status = await file.stat();
+    requireCondition(status.isFile() && status.size <= 1024 * 1024, filesInvalid);
+    return await file.readFile();
+  } finally {
+    await file.close();
+  }
+}
+
+async function readMigrationSet() {
+  const directory = path.join(webRoot, "migrations");
+  const status = await lstat(directory).catch((error) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (status !== undefined) requireCondition(status.isDirectory() && !status.isSymbolicLink(), filesInvalid);
+  const entries = status === undefined ? [] : await readdir(directory, { withFileTypes: true });
+  requireCondition(entries.every((entry) => !entry.isSymbolicLink()), filesInvalid);
+  const names = entries.filter((entry) => entry.name.endsWith(".sql")).map((entry) => entry.name).sort();
+  const migrations = [];
+  for (const name of names) {
+    const bytes = await readRegularFile(path.join(directory, name));
+    migrations.push([name, createHash("sha256").update(bytes).digest("hex")]);
+  }
+  return {
+    migrationCount: migrations.length,
+    migrationSetSha256: createHash("sha256").update(JSON.stringify(migrations)).digest("hex"),
+  };
+}
+
+async function readConfiguration() {
+  // This managed JSONC file deliberately uses strict JSON; no eval or text substitution.
+  const config = JSON.parse((await readRegularFile(path.join(webRoot, "wrangler.jsonc"))).toString("utf8"));
+  const environments = [config, config.env?.staging, config.env?.production];
+  requireCondition(config.main === ".open-next/worker.js" && environments.every((environment) =>
+    environment?.assets?.directory === ".open-next/assets" &&
+    environment.assets.binding === "ASSETS" &&
+    environment.version_metadata?.binding === "CF_VERSION_METADATA" &&
+    environment.d1_databases?.length === 1 &&
+    environment.d1_databases[0].binding === "APP_DB" &&
+    environment.d1_databases[0].migrations_dir === "./migrations" &&
+    environment.d1_databases[0].migrations_table === "d1_migrations" &&
+    environment.d1_databases[0].remote !== true &&
+    environment.d1_databases[0].preview_database_id === undefined &&
+    environment.d1_databases[0].migrations_pattern === undefined
+  ), "APPLICATION_DATABASE_CONFIGURATION_INVALID");
+  requireCondition(config.d1_databases[0].database_id === "application-database-local" &&
+    config.env.staging.d1_databases[0].database_id === "application-database-staging-unconfigured" &&
+    config.env.production.d1_databases[0].database_id === "application-database-production-unconfigured" &&
+    new Set(environments.map((environment) => environment.name)).size === 3 &&
+    new Set(environments.map((environment) => environment.d1_databases[0].database_name)).size === 3,
+  "APPLICATION_DATABASE_CONFIGURATION_INVALID");
+  return config;
+}
+
+function checkRemoteInputs(mode, migrationSet) {
+  const environment = process.env.APPLICATION_DATABASE_ENVIRONMENT;
+  requireCondition(environment === "staging" || environment === "production", "APPLICATION_DATABASE_ENVIRONMENT_INVALID");
+  const stagingId = process.env.STAGING_APPLICATION_DATABASE_ID;
+  const productionId = process.env.PRODUCTION_APPLICATION_DATABASE_ID;
+  requireCondition(uuid.test(stagingId ?? "") && uuid.test(productionId ?? ""), "APPLICATION_DATABASE_IDS_REQUIRED");
+  requireCondition(stagingId.toLowerCase() !== productionId.toLowerCase(), "APPLICATION_DATABASE_IDS_NOT_ISOLATED");
+  const selectedId = environment === "staging" ? stagingId : productionId;
+  requireCondition(process.env.EXPECTED_DATABASE_ID?.toLowerCase() === selectedId.toLowerCase(), "APPLICATION_DATABASE_TARGET_MISMATCH");
+  const revision = process.env.EXPECTED_REVISION;
+  requireCondition(/^[0-9a-f]{40}$/.test(revision ?? "") &&
+    process.env.GITHUB_REF === "refs/heads/main" && process.env.GITHUB_SHA === revision,
+  "APPLICATION_DATABASE_REVISION_MISMATCH");
+  const checkedOutRevision = execFileSync("git", ["rev-parse", "HEAD"], { cwd: webRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  requireCondition(checkedOutRevision === revision, "APPLICATION_DATABASE_REVISION_MISMATCH");
+  requireCondition(process.env.MIGRATION_SET_SHA256 === migrationSet.migrationSetSha256, "APPLICATION_DATABASE_MIGRATIONS_CHANGED");
+  const sourceStatus = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: webRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  requireCondition(sourceStatus === "", "APPLICATION_DATABASE_SOURCE_CHANGED");
+  if (mode === "remote-migrate") {
+    requireCondition(migrationSet.migrationCount > 0, "APPLICATION_DATABASE_NO_MIGRATIONS");
+    const reference = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,199}$/;
+    requireCondition(reference.test(process.env.SOURCE_REVIEW_REFERENCE ?? "") &&
+      reference.test(process.env.RECOVERY_POINT_REFERENCE ?? ""), "APPLICATION_DATABASE_REVIEW_REQUIRED");
+  }
+  return { stagingId, productionId };
+}
+
+async function writeRemoteConfiguration(config, ids) {
+  const environments = [config, config.env.staging, config.env.production];
+  config.main = path.join(webRoot, config.main);
+  delete config.$schema;
+  for (const environment of environments) {
+    environment.assets.directory = path.join(webRoot, environment.assets.directory);
+    environment.d1_databases[0].migrations_dir = path.join(webRoot, "migrations");
+  }
+  config.env.staging.d1_databases[0].database_id = ids.stagingId;
+  config.env.production.d1_databases[0].database_id = ids.productionId;
+  let directory = webRoot;
+  for (const segment of [".wrangler", "application-database"]) {
+    directory = path.join(directory, segment);
+    await mkdir(directory).catch((error) => { if (error.code !== "EEXIST") throw error; });
+    const status = await lstat(directory);
+    requireCondition(status.isDirectory() && !status.isSymbolicLink(), filesInvalid);
+  }
+  const destination = path.join(directory, "wrangler.remote.json");
+  const file = await open(destination, constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
+  try {
+    const status = await file.stat();
+    requireCondition(status.isFile() && status.nlink === 1, filesInvalid);
+    await file.truncate(0);
+    await file.writeFile(`${JSON.stringify(config, null, 2)}\n`);
+  } finally {
+    await file.close();
+  }
+}
+
+try {
+  const [mode, ...extra] = process.argv.slice(2);
+  requireCondition(extra.length === 0 && ["local", "migration-hash", "remote-deploy", "remote-migrate"].includes(mode), "APPLICATION_DATABASE_MODE_INVALID");
+  const config = await readConfiguration();
+  const migrationSet = await readMigrationSet();
+  if (mode.startsWith("remote-")) {
+    const ids = checkRemoteInputs(mode, migrationSet);
+    await writeRemoteConfiguration(config, ids);
+  }
+  process.stdout.write(`${JSON.stringify({ ok: true, mode, ...migrationSet })}\n`);
+} catch (error) {
+  const code = /^APPLICATION_DATABASE_[A-Z_]+$/.test(error?.message ?? "") ? error.message : filesInvalid;
+  process.stderr.write(`${JSON.stringify({ ok: false, code })}\n`);
+  process.exitCode = 1;
+}

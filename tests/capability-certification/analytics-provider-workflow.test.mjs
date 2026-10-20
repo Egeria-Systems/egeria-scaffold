@@ -128,7 +128,7 @@ function measuredEvidence(mode = "exercise") {
       schemaVersion: "1.0.0",
       headSha: exactRevision,
       profile: "app",
-      recipeVersion: "0.2.0",
+      recipeVersion: "0.2.3",
       workerIntegration: { executed: ["app-analytics"], skipped: [] },
       appBuildEvidence: [{
         fixture: "app-analytics",
@@ -582,6 +582,77 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
       { input: source, encoding: "utf8" },
     );
     assert.equal(parsed.status, 0, parsed.stderr);
+  }
+});
+
+test("analytics candidate preparation executes the current recipe guard and detects stale recipe admission", async () => {
+  const workflowSource = await readFile(workflowPath, "utf8");
+  const workflow = parseYaml(workflowSource);
+  const step = workflow.jobs.certify.steps.find(
+    ({ name }) => name === "Verify and prepare analytics candidate",
+  );
+  const source = /node --input-type=module -e '\n([\s\S]*?)\n\s*'/u.exec(step.run)?.[1];
+  assert.equal(typeof source, "string");
+  const directory = await mkdtemp(join(tmpdir(), "analytics-candidate-admission-"));
+  const candidate = join(directory, "candidate");
+  const environment = {
+    RUNNER_TEMP: directory,
+    CERTIFICATION_ROOT: candidate,
+    GOOGLE_ANALYTICS_MEASUREMENT_ID: "G-SYNTHETIC123",
+    MICROSOFT_CLARITY_PROJECT_ID: "synthetic-clarity",
+    GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN: "synthetic-verification-token",
+  };
+  const settingsDirectory = join(candidate, "apps/web/src/integrations/analytics");
+  const settings = {
+    consent: { policy: "explicit-opt-in" },
+    providers: {
+      cloudflareWebAnalytics: { siteToken: "synthetic-public-site-token" },
+      googleAnalytics4: { measurementId: environment.GOOGLE_ANALYTICS_MEASUREMENT_ID },
+      microsoftClarity: { projectId: environment.MICROSOFT_CLARITY_PROJECT_ID, audience: "not-directed-to-minors" },
+    },
+    operationalIntegrations: {
+      googleSearchConsole: { verificationToken: environment.GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN },
+      lookerStudio: { connector: "google-analytics-4" },
+    },
+  };
+  const verifyAdmission = async (program) => {
+    for (const recipeVersion of ["0.2.3", "0.2.2", "0.2.1", "0.2.0", "0.3.0"]) {
+      await writeFile(join(directory, "analytics-certification-infer.json"), JSON.stringify({
+        result: { state: { kind: "valid", value: {
+          origin: { profile: "app", recipeVersion },
+          installedCapabilities: [
+            { identifier: "app-foundation", version: "0.1.0" },
+            { identifier: "analytics", version: "0.1.0" },
+            { identifier: "multilingual", version: "0.1.0" },
+          ],
+        } } },
+      }));
+      const result = spawnSync(process.execPath, ["--input-type=module", "--eval", program], {
+        cwd: directory, encoding: "utf8", env: environment, timeout: 10_000, maxBuffer: 32_768,
+      });
+      assert.equal(result.error, undefined);
+      assert.equal(result.signal, null);
+      assert.equal(result.stdout, "");
+      assert.equal(result.stderr, "");
+      assert.equal(result.status, recipeVersion === "0.2.3" ? 0 : 1, recipeVersion);
+    }
+  };
+  try {
+    await mkdir(settingsDirectory, { recursive: true });
+    await writeFile(join(directory, "analytics-certification-doctor.json"), JSON.stringify({ result: { healthy: true, diagnostics: [] } }));
+    await writeFile(join(directory, "analytics-certification-diff.json"), JSON.stringify({ result: { equal: true, differences: [] } }));
+    await writeFile(join(directory, "analytics-certification-site-token"), settings.providers.cloudflareWebAnalytics.siteToken);
+    await writeFile(join(settingsDirectory, "analytics-settings.ts"),
+      `import type { AnalyticsSettings } from "./analytics-provider-contract";\n\nexport const analyticsSettings = ${JSON.stringify(settings)} as const satisfies AnalyticsSettings;\n`);
+    await verifyAdmission(source);
+    const staleGuard = source.replace('recipeVersion !== "0.2.3"', 'recipeVersion !== "0.2.2"');
+    assert.notEqual(staleGuard, source);
+    await assert.rejects(() => verifyAdmission(staleGuard), {
+      code: "ERR_ASSERTION", actual: 1, expected: 0,
+    });
+    assert.equal(await readFile(workflowPath, "utf8"), workflowSource);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
   }
 });
 
@@ -1175,6 +1246,10 @@ test("the redacted receipt is derived only from reconciled private measurements"
     ["prior subject", (value) => { value.context.subject.behaviorContractDigest = "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378"; }],
     ["missing app build", (value) => { value.appBuild = null; }],
     ["site build", (value) => { value.appBuild.profile = "site"; }],
+    ["historical app recipe", (value) => { value.appBuild.recipeVersion = "0.2.0"; }],
+    ["prior security app recipe", (value) => { value.appBuild.recipeVersion = "0.2.1"; }],
+    ["prior dependency security app recipe", (value) => { value.appBuild.recipeVersion = "0.2.2"; }],
+    ["environment candidate recipe", (value) => { value.appBuild.recipeVersion = "0.3.0"; }],
     ["different build revision", (value) => { value.appBuild.headSha = "f".repeat(40); }],
     ["skipped Worker integration", (value) => { value.appBuild.workerIntegration = { executed: [], skipped: ["app-analytics"] }; }],
     ["wrong Effect version", (value) => { value.appBuild.appBuildEvidence[0].effect.version = "0.0.0"; }],

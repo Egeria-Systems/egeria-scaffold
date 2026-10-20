@@ -1563,6 +1563,10 @@ async function copyCertificationRuntime(cleanRoot) {
     "scripts/check-capability-certification.mjs",
   );
   await copyFile(checkScript, cleanCheckScript);
+  await copyFile(
+    join(repositoryRoot, "packages/builder-core/package.json"),
+    join(cleanRoot, "packages/builder-core/package.json"),
+  );
   await cp(builderCoreDistPath, join(cleanRoot, "packages/builder-core/dist"), {
     recursive: true,
   });
@@ -3795,8 +3799,13 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
     }],
   };
   try {
-    for (const invalidRuntime of [false, true]) {
+    for (const [recipeVersion, invalidRuntime, expectedErrorCode] of [
+      ["0.2.3", false, undefined],
+      ["0.2.3", true, "CERTIFICATION_RUNTIME_EVIDENCE_INVALID"],
+      ["0.2.2", false, "CAPABILITY_ADDITION_INFERENCE_INVALID"],
+    ]) {
       commands.length = 0;
+      verifiedRoot = undefined;
       const execution = certifyBookingCalendlyForTesting(
         { calendlyUrl: "https://calendly.com/example/intro" },
         {
@@ -3874,7 +3883,7 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
                   state: {
                     kind: "valid",
                     value: {
-                      origin: { profile: "app", recipeVersion: "0.2.0" },
+                      origin: { profile: "app", recipeVersion },
                       installedCapabilities: [
                         { identifier: "standards", version: "0.5.0" },
                         { identifier: "deployment-cloudflare", version: "0.3.0" },
@@ -3926,8 +3935,9 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
         },
       );
 
-      if (invalidRuntime) {
-        await assert.rejects(execution, error => error?.code === "CERTIFICATION_RUNTIME_EVIDENCE_INVALID");
+      if (expectedErrorCode) {
+        await assert.rejects(execution, error => error?.code === expectedErrorCode);
+        if (expectedErrorCode === "CAPABILITY_ADDITION_INFERENCE_INVALID") assert.equal(verifiedRoot, undefined);
         assert.equal(await pathExists(ownedPath), false);
         continue;
       }

@@ -1,3 +1,4 @@
+import { isLiteralLintProfileRecipe } from "../profiles/profile-recipes.js";
 import { backgroundJobFiles, backgroundJobOperationFiles } from "../catalog/capability-catalog.js";
 import type { ContractIssue, ValidationResult } from "../contracts/result.js";
 import type { ProfileIdentifier } from "../contracts/profile.js";
@@ -349,7 +350,7 @@ function remapSourceIssue(
 export function createTemplateCatalog(
   profile: ProfileIdentifier,
   includeBookingCalendly = false,
-  recipeVersion = profile === "app" ? "0.2.0" : profile === "site" ? "0.12.0" : "0.11.0",
+  recipeVersion = profile === "app" ? "0.2.3" : profile === "site" ? "0.12.3" : "0.11.3",
   includeMultilingual = false,
   includeAnalytics = false,
   includeApplicationPersistence = false,
@@ -358,14 +359,31 @@ export function createTemplateCatalog(
   includeWeb3Forms = false,
   includeBackgroundJobs = false,
   backgroundJobVersion: "0.1.0" | "0.2.0" = "0.2.0",
+  applicationEnvironments = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
-  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0");
-  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0"));
-  const vitestFive = (profile === "portfolio" && recipeVersion === "0.11.0") ||
-    (profile === "site" && recipeVersion === "0.12.0") ||
-    (profile === "app" && recipeVersion === "0.2.0");
+  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.2" || recipeVersion === "0.2.3" || (applicationEnvironments && recipeVersion === "0.3.0"));
+  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.2" || recipeVersion === "0.12.3" || (applicationEnvironments && recipeVersion === "0.13.0")));
+  const literalLintRoots = applicationEnvironments || isLiteralLintProfileRecipe(profile, recipeVersion);
+  const dependencySecurity = literalLintRoots || (profile === "portfolio" && recipeVersion === "0.11.2") ||
+    (profile === "site" && recipeVersion === "0.12.2") || (profile === "app" && recipeVersion === "0.2.2");
+  const vitestFive = dependencySecurity || (profile === "portfolio" && (recipeVersion === "0.11.0")) ||
+    (profile === "site" && (recipeVersion === "0.12.0")) ||
+    (profile === "app" && (recipeVersion === "0.2.0"));
   const sources = [
-    ...commonTemplateSources.map(entry => vitestFive && [
+    ...(literalLintRoots ? [{
+      source: "common/literal-lint-roots/patches/next-eslint-plugin-next.patch",
+      destinationSource: "common/patches/next-eslint-plugin-next.patch",
+      contentKind: "text" as const,
+    }] : []),
+    ...(applicationEnvironments ? textTemplateSources([
+      "common/apps/web/src/configuration/application-environment.ts",
+      "common/apps/web/scripts/check-application-environment.mjs",
+      "common/apps/web/tests/unit/application-environment.test.ts",
+      "common/docs/environments.md",
+    ]) : []),
+    ...commonTemplateSources.map(entry => dependencySecurity && entry.source === "common/pnpm-workspace.yaml"
+      ? { ...entry, source: "common/dependency-security/pnpm-workspace.yaml", destinationSource: entry.source }
+      : vitestFive && [
       "common/apps/web/package.json.template",
       "common/apps/web/tests/setup/component.ts",
       "common/pnpm-workspace.yaml",
@@ -452,10 +470,32 @@ export function createTemplateCatalog(
       { source: `deployment-cloudflare/background-job-delivery/.github/workflows/deploy${includeApplicationPersistence ? ".persistence" : ""}.yml.template`, destinationSource: "common/.github/workflows/deploy.yml.template", contentKind: "text" as const },
     ] : []),
   ];
+  if (applicationEnvironments && (app || includeFoundation)) {
+    sources.push({
+      source: "app-foundation/application-environments/apps/web/src/infrastructure/cloudflare/application-environment.ts",
+      destinationSource: "app-foundation/apps/web/src/infrastructure/cloudflare/application-environment.ts",
+      contentKind: "text",
+    });
+  }
+  const selectedSources = sources.map((entry) => {
+    if (!applicationEnvironments) return entry;
+    const common = ["common/apps/web/next.config.ts", "common/apps/web/wrangler.jsonc.template"].includes(entry.source);
+    const foundation = [
+      "app-foundation/apps/web/src/composition/server-health.ts",
+      "app-foundation/apps/web/src/delivery/health-route.ts",
+      "app-foundation/apps/web/app/api/health/route.ts",
+      "app-foundation/apps/web/tests/unit/health-route.test.ts",
+      "app-foundation/apps/web/tests/integration/health-worker.test.ts",
+      "app-foundation/apps/web/docs/application-boundaries.md",
+    ].includes(entry.source);
+    return common || foundation
+      ? { ...entry, source: entry.source.replace(common ? "common/" : "app-foundation/", common ? "common/application-environments/" : "app-foundation/application-environments/"), destinationSource: entry.source }
+      : entry;
+  });
   const destinations = new Set<string>();
   const entries: TemplateCatalogEntry[] = [];
 
-  for (const [index, { source, destinationSource, contentKind }] of sources.entries()) {
+  for (const [index, { source, destinationSource, contentKind }] of selectedSources.entries()) {
     const destinationResult = deriveTemplateDestination(
       destinationSource ?? source,
     );

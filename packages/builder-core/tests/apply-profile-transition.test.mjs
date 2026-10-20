@@ -18,6 +18,19 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
+import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
+import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../dist/profiles/profile-recipes.js";
+const currentTransitionCohorts = [
+  { label: "Vitest five", generation: "vitest-five", portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" },
+  { label: "Dependency security", generation: "dependency-security", site: "0.12.2", app: "0.2.2" },
+  { label: "Literal lint roots", generation: "literal-lint", site: "0.12.3", app: "0.2.3" },
+];
+const currentTransitionContexts = {
+  "vitest-five": { ...createGenerationRenderingContext(), profiles: createVitestFiveProfileRecipes() },
+  "dependency-security": { ...createGenerationRenderingContext(), profiles: createDependencySecurityProfileRecipes() },
+  "literal-lint": { ...createGenerationRenderingContext(), profiles: createLiteralLintProfileRecipes() },
+};
+
 import { parseDocument } from "yaml";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
 import {
@@ -433,11 +446,11 @@ async function appTransitionSource(profile, subset = 0, generation = "vitest-fou
     ...(subset & 1 ? { bookingCalendly: appTransitionVisualBookingSettings } : {}),
     ...(subset & 2 ? { multilingual: true } : {}),
     ...(subset & 4 ? { analytics: appTransitionVisualAnalyticsSettings } : {}),
-  }, generation === "vitest-four" ? retainedRenderingContext : undefined);
+  }, generation === "vitest-four" ? retainedRenderingContext : currentTransitionContexts[generation]);
   assert.equal(rendered.ok, true, JSON.stringify(rendered));
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, bytes(content)]));
   files.set("pnpm-lock.yaml", bytes(await readFile(resolve(packageRoot,
-    `lockfiles/web-recipe-${generation === "vitest-four" ? (profile === "portfolio" ? "0.10.0" : "0.9.0") : (profile === "portfolio" ? "portfolio-0.11.0" : "site-0.12.0")}/pnpm-lock.yaml`))));
+    `lockfiles/web-recipe-${generation === "vitest-four" ? (profile === "portfolio" ? "0.10.0" : "0.9.0") : `${profile}-${currentTransitionCohorts.find(cohort => cohort.generation === generation)[profile]}`}/pnpm-lock.yaml`))));
   files.set(".egeria/project.yaml", bytes(core.serializeProjectYaml(rendered.value.project)));
   files.set(".egeria/migrations.jsonl", bytes(""));
   const surfaces = core.materializeInstalledSurfaces({
@@ -2029,10 +2042,10 @@ test("filesystem-backed portfolio-to-site transition rejects an ancestor swap du
 });
 
 
-test("Vitest five incoming app execution preserves all subsets with exact state-last receipts", async () => {
-  for (const profile of ["portfolio", "site"]) {
+for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming app execution preserves all subsets with exact state-last receipts`, async () => {
+  for (const profile of cohort.generation !== "vitest-five" ? ["site"] : ["portfolio", "site"]) {
     for (let subset = 0; subset < 8; subset++) {
-      const source = await appTransitionSource(profile, subset, "vitest-five");
+      const source = await appTransitionSource(profile, subset, cohort.generation);
       const repository = createRepository(source);
       const plan = await approvedAppPlan(repository.reader);
       const execution = await invokeApply(repository, {
@@ -2048,17 +2061,38 @@ test("Vitest five incoming app execution preserves all subsets with exact state-
       });
       assert.equal(execution.result.ok, true, JSON.stringify(execution.result));
       assert.equal(execution.result.value.status, "verified-final-diff-approval-required");
-      assert.equal(execution.result.value.migration, profile === "portfolio" ? "transition-portfolio-0-11-0-to-app-0-2-0" : "transition-site-0-12-0-to-app-0-2-0");
+      assert.equal(execution.result.value.migration, `transition-${profile}-${cohort[profile].replaceAll(".", "-")}-to-app-${cohort.app.replaceAll(".", "-")}`);
       assert.deepEqual(repository.writes.map(batch => batch.map(({ path }) => path)), [plan.actions.map(({ path }) => path), [".egeria/project.yaml"], [".egeria/migrations.jsonl"], [".egeria/state.json"]]);
       const state = core.parseStateJson(decode(repository.files.get(".egeria/state.json")));
       assert.equal(state.ok, true);
-      assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.2.0" });
+      assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: cohort.app });
       assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.0");
       assert.deepEqual(state.value.lastSuccessfulVerification.checks, core.appProfileTransitionPersistedVerificationChecks);
       assert.equal(JSON.parse(decode(repository.files.get("apps/web/package.json"))).devDependencies.vitest, "5.0.0");
-      assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.0/pnpm-lock.yaml"))));
+      assert.equal(JSON.parse(decode(repository.files.get("apps/web/package.json"))).dependencies.next, cohort.generation !== "vitest-five" ? "16.3.8" : "16.3.3");
+      assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, `lockfiles/web-recipe-app-${cohort.app}/pnpm-lock.yaml`))));
       for (const { path, kind } of plan.dispositions) if (kind === "preserve-file") assert.deepEqual(repository.files.get(path), source.get(path), path);
       assertExactChangedPaths(repository.files, snapshotFiles(source), execution.result.value.changedPaths);
     }
   }
+});
+
+
+test("successor portfolio execution refuses unadmitted visual inputs before writes or verification", async () => {
+  const source = await loadEntries(resolve(repositoryRoot, "fixtures/generated/portfolio-0.11.2"));
+  const repository = createRepository(source);
+  const result = await core.applyProfileTransition({
+    root: git.identity.root,
+    toProfile: "app",
+    approvedPlanFingerprint: `sha256:${"0".repeat(64)}`,
+    reader: repository.reader,
+    writer: repository.writer,
+    inspectWorktree: async () => git,
+    inspectCreateTargets: async () => ({ ok: true }),
+    inspectExpectedChanges: async () => ({ ok: true }),
+    verifier: { async verifyInIsolatedCopy() { throw new Error("unadmitted transition must not verify"); } },
+  });
+  assertFailure(result, { code: "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED", phase: "precondition", recovery: "not-required" });
+  assert.deepEqual(repository.writes, []);
+  assert.deepEqual(repository.files, source);
 });

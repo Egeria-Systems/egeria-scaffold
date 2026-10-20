@@ -574,3 +574,15 @@ test("app transition planning reaches content and visual eligibility after exact
   assert.equal(result.ok, false);
   assert.equal(result.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
 });
+
+
+test("successor portfolio transition refuses missing exact visual admission without mutation", async () => {
+  for (const recipeVersion of ["0.11.2", "0.11.3"]) {
+    const entries = await loadEntries(resolve(repositoryRoot, `fixtures/generated/portfolio-${recipeVersion}`));
+    const project = core.parseProjectYaml(text(entries, ".egeria/project.yaml"));
+    assert.equal(project.ok, true);
+    assert.equal(project.value.recipeVersion, recipeVersion);
+    const result = await planFromEntries(entries, { toProfile: "app" });
+    assertFailure(result, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
+  }
+});

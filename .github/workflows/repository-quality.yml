@@ -82,6 +82,8 @@ jobs:
             "scripts/verify-generated-skeletons.mjs"
             "scripts/verify-app-transition-visuals.mjs"
             "scripts/lib/isolated-process.mjs"
+            "scripts/lib/dependency-audit.mjs"
+            "scripts/dependency-audit-exception.json"
             "tests/generated-fixtures/**"
           )
           compatibility_paths=(
@@ -143,7 +145,7 @@ jobs:
 
   builder-and-packages:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -177,8 +179,10 @@ jobs:
       - name: Test builder core
         run: pnpm run test:builder-core
 
-      - name: Test CLI
-        run: pnpm run test:cli
+      - name: Test CLI excluding dedicated lifecycle jobs
+        env:
+          CLI_TEST_SKIP_PATTERN: (?:^compiled (?:Vitest five|dependency-security|literal-lint) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$)|(?:^compiled (?:retained|current|dependency-security|literal-lint) app optional lifecycle completes production verification$)|(?:^compiled (?:Vitest five|dependency-security|literal-lint) email lifecycle on (?:portfolio|site) verifies and retains its foundation$)|(?:^compiled (?:Vitest five|dependency-security|literal-lint) Web3Forms lifecycle on (?:portfolio|app) preserves composition and re-adds safely$)
+        run: node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/*.test.mjs
 
       - name: Test public packages
         run: pnpm run test:packages
@@ -197,6 +201,86 @@ jobs:
 
       - name: Check release intent
         run: pnpm run check:package-release dependency-update origin/main || pnpm run check:package-release pull-request origin/main || pnpm exec changeset status --since origin/main
+
+  cli-jobs:
+    name: CLI jobs (${{ matrix.cohort }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: vitest-five
+            test-pattern: ^compiled Vitest five jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
+          - cohort: dependency-security
+            test-pattern: ^compiled dependency-security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
+          - cohort: literal-lint
+            test-pattern: ^compiled literal-lint jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build builder and packages
+        run: pnpm run build:builder
+
+      - name: Test CLI jobs lifecycle
+        env:
+          CLI_TEST_PATTERN: ${{ matrix.test-pattern }}
+        run: node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs
+
+  cli-lifecycle:
+    name: CLI lifecycle (${{ matrix.group }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: app-optionals
+            test-pattern: ^compiled (?:retained|current|dependency-security|literal-lint) app optional lifecycle completes production verification$
+          - group: email
+            test-pattern: ^compiled (?:Vitest five|dependency-security|literal-lint) email lifecycle on (?:portfolio|site) verifies and retains its foundation$
+          - group: hosted-contact
+            test-pattern: ^compiled (?:Vitest five|dependency-security|literal-lint) Web3Forms lifecycle on (?:portfolio|app) preserves composition and re-adds safely$
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build builder and packages
+        run: pnpm run build:builder
+
+      - name: Test CLI lifecycle
+        env:
+          CLI_TEST_PATTERN: ${{ matrix.test-pattern }}
+        run: node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs
 
   generated-projects:
     needs: [scope]
@@ -226,14 +310,18 @@ jobs:
       - name: Build production generator
         run: pnpm run build:builder
 
-      - name: Test generated fixture contracts and determinism
-        run: pnpm run test:generated-fixtures
-
-      - name: Verify fresh jobs runtime generation
-        run: pnpm run test:generated-jobs
-
       - name: Verify generated visual regressions
         run: pnpm run verify:generated-visuals
+
+      - name: Retain raw dependency audits and security exception dispositions
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: generated-dependency-audits
+          path: generated-visual-artifacts/dependency-audit/
+          if-no-files-found: ignore
+          include-hidden-files: false
+          retention-days: 7
 
       - name: Upload generated visual failure artifacts
         if: failure()
@@ -244,6 +332,65 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: false
           retention-days: 7
+
+  generated-fixtures:
+    needs: [scope]
+    if: needs.scope.outputs.generated-projects == 'true'
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      options: --shm-size=1g
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build production generator
+        run: pnpm run build:builder
+
+      - name: Test generated fixture contracts and determinism
+        run: pnpm run test:generated-fixtures
+
+  generated-jobs:
+    needs: [scope]
+    if: needs.scope.outputs.generated-projects == 'true'
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      options: --shm-size=1g
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
+        with:
+          version: 11.20.0
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify fresh jobs runtime generation
+        run: pnpm run test:generated-jobs
 
   app-transition-visuals:
     needs: [scope]
@@ -278,11 +425,21 @@ jobs:
 
       - name: Generate draft app transition visual review candidates
         if: github.event_name == 'pull_request' && github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --candidates
+        run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.3
 
       - name: Compare all app transition visual subsets
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals
+        run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.3
+
+      - name: Retain raw dependency audits and security exception dispositions
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: app-transition-dependency-audits
+          path: generated-visual-artifacts/dependency-audit/
+          if-no-files-found: ignore
+          include-hidden-files: false
+          retention-days: 7
 
       - name: Upload app transition visual evidence
         if: failure() || (github.event_name == 'pull_request' && github.event.pull_request.draft)

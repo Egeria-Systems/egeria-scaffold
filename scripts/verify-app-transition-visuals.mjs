@@ -8,6 +8,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
+import { runDependencyAudit } from "./lib/dependency-audit.mjs";
 import { cleanupOwnedDirectory, createIsolatedProcessEnvironment, isolatedProcessOptions, pathIdentityMatches, readPathIdentity } from "./lib/isolated-process.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -53,10 +54,16 @@ function safeRelative(path) {
 
 export function parseAppTransitionVisualArguments(arguments_) {
   const values = arguments_[0] === "--" ? arguments_.slice(1) : arguments_;
-  if (values.length === 0) return { mode: "compare" };
-  if (values.length === 1 && values[0] === "--candidates") return { mode: "candidates" };
-  if (values.length === 1) {
-    const match = /^--promote-reviewed-manifest-sha256=([a-f0-9]{64})$/.exec(values[0]);
+  const recipeArguments = values.filter(value => value.startsWith("--app-recipe-version="));
+  if (recipeArguments.length > 1) fail("VISUAL_ARGUMENT_INVALID");
+  const recipeVersion = recipeArguments[0]?.slice("--app-recipe-version=".length);
+  if (recipeVersion !== undefined && !["0.2.2", "0.2.3"].includes(recipeVersion)) fail("VISUAL_ARGUMENT_INVALID");
+  const modes = values.filter(value => !recipeArguments.includes(value));
+  const recipe = recipeVersion === undefined ? {} : { recipeVersion };
+  if (modes.length === 0) return { mode: "compare", ...recipe };
+  if (modes.length === 1 && modes[0] === "--candidates") return { mode: "candidates", ...recipe };
+  if (modes.length === 1 && recipeVersion === undefined) {
+    const match = /^--promote-reviewed-manifest-sha256=([a-f0-9]{64})$/.exec(modes[0]);
     if (match) return { mode: "promote", digest: match[1] };
   }
   return fail("VISUAL_ARGUMENT_INVALID");
@@ -117,7 +124,8 @@ async function snapshotSource(root) {
   const paths = [...new Set(stdout.split("\0").filter(Boolean))].filter((path) => !excluded.has(path) && (
     ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".npmrc"].includes(path) ||
     /^packages\/builder-core\/(src\/|templates\/|lockfiles\/|scripts\/|package.json$|tsconfig)/.test(path) ||
-    path === "scripts/verify-app-transition-visuals.mjs" || path === "scripts/lib/isolated-process.mjs"
+    ["scripts/verify-app-transition-visuals.mjs", "scripts/lib/isolated-process.mjs",
+      "scripts/lib/dependency-audit.mjs", "scripts/dependency-audit-exception.json"].includes(path)
   )).sort();
   const files = [];
   for (const path of paths) files.push({ path, sha256: digest(await boundedRead(filesystem, root, path)) });
@@ -210,6 +218,7 @@ async function promote(options, adapters) {
 }
 
 export async function verifyAppTransitionVisuals(options, injected = {}) {
+  if (options.recipeVersion !== undefined && (!["0.2.2", "0.2.3"].includes(options.recipeVersion) || options.mode === "promote")) fail("VISUAL_ARGUMENT_INVALID");
   if (!["candidates", "compare", "promote"].includes(options.mode) || (options.mode === "promote" && !/^[a-f0-9]{64}$/.test(options.digest))) fail("VISUAL_ARGUMENT_INVALID");
   const root = injected.repositoryRoot ?? repositoryRoot;
   const adapters = { filesystem, repositoryRoot: root, inspectEnvironment, snapshotSource: () => snapshotSource(root), executeCase,
@@ -237,7 +246,7 @@ export async function verifyAppTransitionVisuals(options, injected = {}) {
       if (options.mode === "compare") {
         for (const asset of assets.filter(({ group }) => (group === "multilingual") === subset.includes("multilingual"))) baselines[asset.viewport] = await boundedRead(fs, root, asset.templatePath);
       }
-      const value = await adapters.executeCase({ subset, mode: options.mode, baselines, artifactDirectory, repositoryRoot: root });
+      const value = await adapters.executeCase({ subset, mode: options.mode, baselines, artifactDirectory, repositoryRoot: root, recipeVersion: options.recipeVersion });
       if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
       if (!value.project?.files?.length || !value.influencingFingerprints?.length) fail("VISUAL_INPUT_IDENTITY_MISSING");
       const images = {};
@@ -273,7 +282,8 @@ export async function verifyAppTransitionVisuals(options, injected = {}) {
   }
 }
 
-async function prepareProject(root, subset) {
+async function prepareProject(root, subset, recipeVersion = "0.2.2") {
+  if (!["0.2.2", "0.2.3"].includes(recipeVersion)) fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const core = await import(pathToFileURL(join(root, "packages/builder-core/dist/index.js")));
   const policy = await import(pathToFileURL(join(root, "packages/builder-core/dist/lifecycle/app-profile-transition.js")));
   const validation = await import(pathToFileURL(join(root, "packages/builder-core/dist/lifecycle/app-transition-content-validation.js")));
@@ -285,16 +295,21 @@ async function prepareProject(root, subset) {
     ...(subset.includes("booking-calendly") ? { bookingCalendly: policy.appTransitionVisualBookingSettings } : {}),
     ...(subset.includes("multilingual") ? { multilingual: true } : {}),
   };
-  const source = await core.renderSkeleton({ ...request, profile: "portfolio" });
-  const target = await core.renderSkeleton({ ...request, profile: "app" });
+  const { createGenerationRenderingContext } = await import(pathToFileURL(join(root, "packages/builder-core/dist/catalog/verified-package-versions.js")));
+  const recipes = await import(pathToFileURL(join(root, "packages/builder-core/dist/profiles/profile-recipes.js")));
+  const context = { ...createGenerationRenderingContext(), profiles: recipeVersion === "0.2.3" ? recipes.createLiteralLintProfileRecipes() : recipes.createDependencySecurityProfileRecipes() };
+  const source = await core.renderSkeleton({ ...request, profile: "portfolio" }, context);
+  const target = await core.renderSkeleton({ ...request, profile: "app" }, context);
   if (!source.ok || !target.ok) fail("VISUAL_RENDER_FAILED");
+  if (source.value.project.schemaVersion !== "1.0.0" || source.value.project.originProfile !== "portfolio" || source.value.project.recipeVersion !== (recipeVersion === "0.2.3" ? "0.11.3" : "0.11.2") ||
+      target.value.project.schemaVersion !== "1.0.0" || target.value.project.originProfile !== "app" || target.value.project.recipeVersion !== recipeVersion) fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const prepared = policy.prepareAppProfileTransition({ source: source.value, target: target.value,
     currentFiles: new Map(source.value.files.map(({ path, content }) => [path, content])),
     validators: await validation.loadAppTransitionContentValidators() });
   if (!prepared.ok) fail("VISUAL_PREPARATION_FAILED");
   const manifest = JSON.parse(Buffer.from(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content).toString("utf8"));
   const version = lockfiles.resolveRecipeLockfileVersion(target.value.project, manifest);
-  if (version !== "app-0.2.0") fail("VISUAL_LOCKFILE_INVALID");
+  if (version !== `app-${recipeVersion}`) fail("VISUAL_LOCKFILE_INVALID");
   const lockfile = await filesystem.readFile(lockfiles.createRecipeLockfileUrl(version));
   return { request, sourceProject: source.value.project, targetProject: target.value.project,
     files: [...prepared.value.files, { path: "pnpm-lock.yaml", content: lockfile }], influencingFingerprints: prepared.value.influencingFingerprints };
@@ -314,7 +329,7 @@ export function createAppTransitionVisualSpec(source, multilingual) {
     // Playwright's pixel comparator can ignore antialiasing differences even
     // at zero tolerance. Stabilize retained actual bytes independently of the
     // expected image; exact reproduction and baseline checks remain separate.
-    result = result.replace(assertion, `  try {\n${assertion}\n  } finally {\n    let previousCapture: Buffer = Buffer.alloc(0);\n    let captureAttempt = 0;\n    await expect.poll(async () => {\n      const actual = await page.screenshot({ path: testInfo.outputPath(\`${viewport}-capture-\${captureAttempt++}.png\`), animations: "disabled", caret: "hide", scale: "css" });\n      const unchanged = previousCapture.equals(actual);\n      previousCapture = actual;\n      return unchanged;\n    }, { timeout: 5_000 }).toBe(true);\n    await writeFile(testInfo.outputPath("${viewport}-captured.png"), previousCapture);\n  }`);
+    result = result.replace(assertion, `  let previousCapture: Buffer = Buffer.alloc(0);\n  let captureAttempt = 0;\n  await expect.poll(async () => {\n    const actual = await page.screenshot({ path: testInfo.outputPath(\`${viewport}-capture-\${captureAttempt++}.png\`), animations: "disabled", caret: "hide", scale: "css" });\n    const unchanged = previousCapture.equals(actual);\n    previousCapture = actual;\n    return unchanged;\n  }, { timeout: 5_000 }).toBe(true);\n  await writeFile(testInfo.outputPath("${viewport}-captured.png"), previousCapture);\n${assertion}`);
   }
   // Every exercised provider remains intercepted. Unexpected external traffic
   // fails the visual proof instead of contacting a live provider.
@@ -447,9 +462,12 @@ async function retainBrowserArtifacts(fs, project, destination) {
 }
 
 export async function executeAppTransitionVisualCase(input, injected = {}) {
+  if (input.recipeVersion !== undefined && !["0.2.2", "0.2.3"].includes(input.recipeVersion)) fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const fs = injected.filesystem ?? filesystem;
   const command = injected.runCommand ?? runCommand;
-  const prepared = await (injected.prepareProject ?? prepareProject)(input.repositoryRoot, input.subset);
+  if (injected.runCommand && typeof injected.runAudit !== "function") fail("VISUAL_AUDIT_ADAPTER_INVALID");
+  const audit = injected.runAudit ?? runDependencyAudit;
+  const prepared = await (injected.prepareProject ?? prepareProject)(input.repositoryRoot, input.subset, input.recipeVersion);
   const root = await fs.mkdtemp(join(tmpdir(), "egeria-app-transition-visual-"));
   const identity = await readPathIdentity(root);
   await fs.chmod(root, 0o700);
@@ -468,6 +486,21 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
   let build;
   async function checked(name, arguments_) {
     if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
+    if (name === "dependency-audit") {
+      try {
+        const disposition = await audit({ executable: "pnpm", cwd: project, environment, timeout: 15 * 60 * 1000 });
+        if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
+        checks.push({ name, exitCode: disposition.rawExitCode, disposition });
+        const auditAccepted = disposition.status === "passed"
+          ? disposition.thresholdExitCode === 0 && [0, 1].includes(disposition.rawExitCode)
+          : disposition.status === "accepted-with-security-exception" && disposition.thresholdExitCode === 1 && disposition.rawExitCode === 1;
+        if (!auditAccepted) fail("VISUAL_PROJECT_CHECK_FAILED");
+      } catch (error) {
+        if (error.auditDisposition) checks.push({ name, exitCode: error.auditDisposition.rawExitCode, disposition: error.auditDisposition });
+        fail("VISUAL_PROJECT_CHECK_FAILED");
+      }
+      return;
+    }
     const result = await command({ executable: "pnpm", arguments: arguments_, cwd: project, environment });
     if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
     await writeExclusive(fs, input.artifactDirectory, `${name}.log`, `${result.stdout}\n${result.stderr}`);
@@ -480,7 +513,7 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
     const commands = [
       ["frozen-install", ["install", "--frozen-lockfile", "--store-dir", support.store]],
       ["peer-dependencies", ["peers", "check"]],
-      ["dependency-audit", ["audit", "--audit-level", "moderate"]],
+      ["dependency-audit", ["audit", "--audit-level", "info", "--json"]],
       ["registry-signatures", ["audit", "signatures"]],
       ["lint", ["run", "lint"]],
       ["cloudflare-types", ["--dir", "apps/web", "run", "cf-typegen"]],
