@@ -34,9 +34,10 @@ beforeAll(async () => {
   });
   restoreFetch = () => spy.mockRestore();
   const configuration = JSON.parse(await readFile("wrangler.jsonc", "utf8"));
-  const workers: TestHarnessOptions["workers"] = ["matching", "mismatched"].map((environment) => {
+  const workers: TestHarnessOptions["workers"] = await Promise.all(["matching", "mismatched"].map(async (environment) => {
     const selected = target === "development" ? configuration : configuration.env[target];
-    return { config: {
+    const configPath = resolve(root, `jobs-${environment}.jsonc`);
+    await writeFile(configPath, JSON.stringify({
       name: `jobs-${environment}`, main: resolve(applicationRoot, "tests/integration/fixtures/job-worker.mjs"),
       compatibility_date: configuration.compatibility_date, compatibility_flags: configuration.compatibility_flags,
       assets: { directory: resolve(applicationRoot, ".open-next/assets"), binding: "ASSETS" },
@@ -47,8 +48,10 @@ beforeAll(async () => {
         ...selected.queues.consumers,
         { queue: selected.vars.JOB_DEAD_LETTER_QUEUE_NAME, max_batch_size: 10, max_batch_timeout: 0.1, max_retries: 0 },
       ] },
-    } };
-  });
+    }), { flag: "wx", mode: 0o600 });
+    // Target vars and queues are already selected; keep synthetic Worker names stable.
+    return { configPath, env: "" };
+  }));
   harness = createTestHarness({ root, workers });
   await harness.listen();
 });
