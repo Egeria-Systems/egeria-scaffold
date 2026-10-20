@@ -276,7 +276,7 @@ export async function verifyAppTransitionVisuals(options, injected = {}) {
     return { status: manifest.status, manifestPath, manifestSha256: digest(bytes), assets: representatives };
   } catch (error) {
     const sourceUnchanged = same(source, await adapters.snapshotSource());
-    if (await pathIdentityMatches(identity)) await writeExclusive(fs, run, "failure.json", json({ code: /^VISUAL_[A-Z_]+$/.test(error.message) ? error.message : "VISUAL_VERIFICATION_FAILED", sourceUnchanged, cases }));
+    if (await pathIdentityMatches(identity)) await writeExclusive(fs, run, "failure.json", json({ code: /^VISUAL_[A-Z_]+$/.test(error.message) ? error.message : "VISUAL_VERIFICATION_FAILED", sourceUnchanged, cases, ...(error.failureRecordUnavailable ? { failureRecordUnavailable: true } : {}) }));
     if (!sourceUnchanged) fail("VISUAL_SOURCE_CHANGED");
     throw error;
   }
@@ -442,7 +442,7 @@ async function retainBrowserArtifacts(fs, project, destination) {
       if (entry.isSymbolicLink()) fail("VISUAL_PATH_UNSAFE");
       if (entry.isDirectory()) { await visit(child); continue; }
       if (!entry.isFile()) fail("VISUAL_ARTIFACT_INVALID");
-      if (!/\.(png|json|txt|md)$/.test(entry.name)) continue;
+      if (entry.name !== "trace.zip" && !/\.(png|json|txt|md)$/.test(entry.name)) continue;
       const content = await boundedRead(fs, project, child);
       total += content.length;
       if (total > 16 * 1024 * 1024) fail("VISUAL_ARTIFACT_LIMIT");
@@ -501,7 +501,10 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
       }
       return;
     }
-    const result = await command({ executable: "pnpm", arguments: arguments_, cwd: project, environment });
+    const commandEnvironment = name === "browser-preview"
+      ? { ...environment, DEBUG: "pw:webserver" }
+      : environment;
+    const result = await command({ executable: "pnpm", arguments: arguments_, cwd: project, environment: commandEnvironment });
     if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
     await writeExclusive(fs, input.artifactDirectory, `${name}.log`, `${result.stdout}\n${result.stderr}`);
     checks.push({ name, exitCode: result.exitCode });
@@ -565,10 +568,14 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
     }
     return { images: captures, project: { request: prepared.request, sourceProject: prepared.sourceProject, targetProject: prepared.targetProject, files: expectedFiles, browser, build, rootIdentity: { device: String(identity.device), inode: String(identity.inode), birthtimeNanoseconds: String(identity.birthtimeNanoseconds) } }, influencingFingerprints: prepared.influencingFingerprints, checks };
   } catch (error) {
-    if (await pathIdentityMatches(identity)) {
-      const failureRoot = await safePath(fs, input.artifactDirectory, "failure", { directories: true });
-      const artifacts = await retainBrowserArtifacts(fs, project, failureRoot);
-      await writeExclusive(fs, failureRoot, "failure.json", json({ code: /^VISUAL_[A-Z_]+$/.test(error.message) ? error.message : "VISUAL_VERIFICATION_FAILED", checks, artifacts }));
+    try {
+      if (await pathIdentityMatches(identity)) {
+        const failureRoot = await safePath(fs, input.artifactDirectory, "failure", { directories: true });
+        const artifacts = await retainBrowserArtifacts(fs, project, failureRoot);
+        await writeExclusive(fs, failureRoot, "failure.json", json({ code: /^VISUAL_[A-Z_]+$/.test(error.message) ? error.message : "VISUAL_VERIFICATION_FAILED", checks, artifacts }));
+      }
+    } catch {
+      error.failureRecordUnavailable = true;
     }
     throw error;
   } finally {
@@ -589,7 +596,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     process.stdout.write(json(await verifyAppTransitionVisuals(parseAppTransitionVisualArguments(process.argv.slice(2)))));
   } catch (error) {
-    process.stderr.write(json({ ok: false, code: /^VISUAL_[A-Z_]+$/.test(error.message) ? error.message : "VISUAL_VERIFICATION_FAILED", ...(error.writtenPaths ? { writtenPaths: error.writtenPaths } : {}) }));
+    process.stderr.write(json({ ok: false, code: /^VISUAL_[A-Z_]+$/.test(error.message) ? error.message : "VISUAL_VERIFICATION_FAILED", ...(error.writtenPaths ? { writtenPaths: error.writtenPaths } : {}), ...(error.failureRecordUnavailable ? { failureRecordUnavailable: true } : {}) }));
     process.exitCode = 1;
   }
 }

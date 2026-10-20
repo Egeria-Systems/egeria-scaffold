@@ -12,8 +12,44 @@ import { createGenerationRenderingContext, verifiedCapabilityPackageVersions } f
 import { createVitestFiveProfileRecipes } from "../dist/profiles/profile-recipes.js";
 
 import { createCapabilityCatalogSnapshot } from "../dist/catalog/capability-catalog.js";
+import { createApplicationEnvironmentRenderingContext, isApplicationEnvironmentRenderingContext } from "../dist/catalog/verified-package-versions.js";
 
 const request = (profile, extra = {}) => ({ profile, projectName: "jobs-example", displayName: "Jobs example", packageVersions: verifiedCapabilityPackageVersions, ...extra });
+
+test("application environment catalog admits exactly the four deployment compositions", () => {
+  for (const [persistence, jobs, standards, deployment] of [
+    [false, false, "0.9.0", "0.9.0"],
+    [true, false, "0.10.0", "0.10.0"],
+    [false, true, "0.9.0", "0.11.0"],
+    [true, true, "0.10.0", "0.12.0"],
+  ]) {
+    const context = createApplicationEnvironmentRenderingContext(persistence, false, jobs);
+    assert.equal(isApplicationEnvironmentRenderingContext(context), true);
+    assert.equal(context.catalogSnapshot.standards, standards);
+    assert.equal(context.catalogSnapshot.deploymentCloudflare, deployment);
+    assert.equal(context.catalogSnapshot.siteRouting, "0.5.0");
+    assert.equal(context.catalogSnapshot.backgroundJobDelivery, jobs ? "0.3.0" : undefined);
+    const result = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, context.catalogSnapshot);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const descriptor = result.value.find(({ identifier }) => identifier === "background-job-delivery");
+    assert.equal(descriptor?.version, jobs ? "0.3.0" : undefined);
+    if (jobs) {
+      assert.deepEqual(descriptor.migrationPlanners, []);
+      assert.ok(descriptor.managedSurfaces.some(({ path }) => path === "apps/web/scripts/job-operator.mjs"));
+      assert.ok(descriptor.removalAndRecoveryRequirements.includes("unsupported-lifecycle-refusal"));
+    }
+    for (const changed of [
+      { standards: persistence ? "0.9.0" : "0.10.0" },
+      { deploymentCloudflare: deployment === "0.9.0" ? "0.11.0" : "0.9.0" },
+      { siteRouting: "0.4.0" },
+      { backgroundJobDelivery: jobs ? "0.2.0" : "0.3.0" },
+    ]) {
+      const mixed = { ...context, catalogSnapshot: { ...context.catalogSnapshot, ...changed } };
+      assert.equal(isApplicationEnvironmentRenderingContext(mixed), false, JSON.stringify(changed));
+      assert.equal(createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, mixed.catalogSnapshot).ok, false, JSON.stringify(changed));
+    }
+  }
+});
 
 test("optional jobs preserves current profile recipes and installs no implicit persistence", async () => {
   for (const profile of ["portfolio", "site", "app"]) {
@@ -34,6 +70,41 @@ test("optional jobs preserves current profile recipes and installs no implicit p
     assert.ok(config.queues.consumers[0].dead_letter_queue);
     assert.notEqual(config.env.staging.queues.consumers[0].queue, config.env.production.queues.consumers[0].queue);
     assert.equal(files.some(({path}) => path.startsWith("apps/jobs/")), false);
+  }
+});
+
+test("application environment jobs render matching manifests and independent service selections", async () => {
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (const persistence of profile === "app" ? [false, true] : [false]) {
+      for (const email of [false, true]) {
+        const context = createApplicationEnvironmentRenderingContext(persistence, false, true);
+        const result = await renderSkeleton(request(profile, {
+          backgroundJobDelivery: true,
+          ...(persistence ? { applicationPersistence: true } : {}),
+          ...(email ? { transactionalEmailResend: true } : {}),
+        }), context);
+        assert.equal(result.ok, true, JSON.stringify(result));
+        const { project, resolved, files } = result.value;
+        assert.equal(project.schemaVersion, "2.0.0");
+        assert.equal(project.selectedCapabilities.includes("application-persistence"), persistence);
+        assert.equal(project.selectedCapabilities.includes("transactional-email-resend"), email);
+        assert.equal(resolved.capabilities.find(({ identifier }) => identifier === "background-job-delivery").version, "0.3.0");
+        assert.equal(resolved.capabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.3.0");
+        const generated = new Map(files.map(({ path, content }) => [path, new TextDecoder().decode(content)]));
+        const manifest = JSON.parse(generated.get("apps/web/package.json"));
+        assert.ok(resolveRecipeLockfileVersion(project, manifest));
+        assert.ok(generated.has("apps/web/scripts/job-operator.mjs"));
+        assert.match(generated.get("apps/web/worker.mjs"), /\.open-next\/assets\/BUILD_ID/u);
+        assert.equal(new Set(files.map(({ path }) => path)).size, files.length);
+        const wrangler = JSON.parse(generated.get("apps/web/wrangler.jsonc"));
+        assert.equal(wrangler.main, "worker.mjs");
+        assert.equal(wrangler.vars.APPLICATION_ENVIRONMENT, "development");
+        for (const target of ["staging", "production"]) {
+          assert.equal(wrangler.env[target].vars.APPLICATION_ENVIRONMENT, target);
+          assert.equal(wrangler.env[target].vars.JOB_ENVIRONMENT, target);
+        }
+      }
+    }
   }
 });
 

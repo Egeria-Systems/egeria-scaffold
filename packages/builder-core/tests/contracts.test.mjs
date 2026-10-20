@@ -1605,8 +1605,8 @@ const environmentState = {
   projectSchemaVersion: "2.0.0",
   origin: { profile: "portfolio", recipeVersion: "0.12.0" },
   installedCapabilities: [
-    ["standards", "0.7.0"], ["content-files", "0.4.0"], ["section-composition", "0.3.0"],
-    ["deployment-cloudflare", "0.7.0"], ["observability", "0.4.0"],
+    ["standards", "0.9.0"], ["content-files", "0.4.0"], ["section-composition", "0.3.0"],
+    ["deployment-cloudflare", "0.9.0"], ["observability", "0.4.0"],
   ].map(([identifier, version]) => ({ ...validState.installedCapabilities[0], identifier, version })),
 };
 
@@ -1615,8 +1615,8 @@ test("environment persistence state requires the complete optional tuple and bin
     ...environmentState,
     origin: { profile: "app", recipeVersion: "0.3.0" },
     installedCapabilities: [
-      ["standards", "0.8.0"], ["content-files", "0.4.0"], ["section-composition", "0.3.0"],
-      ["deployment-cloudflare", "0.8.0"], ["observability", "0.4.0"], ["site-routing", "0.4.0"],
+      ["standards", "0.10.0"], ["content-files", "0.4.0"], ["section-composition", "0.3.0"],
+      ["deployment-cloudflare", "0.10.0"], ["observability", "0.4.0"], ["site-routing", "0.5.0"],
       ["app-foundation", "0.3.0"], ["application-persistence", "0.2.0"],
     ].map(([identifier, version]) => ({ ...validState.installedCapabilities[0], identifier, version })),
     lastSuccessfulVerification: { kind: "generation", checks: [
@@ -1667,10 +1667,24 @@ test("application environment state parsing enforces the exact candidate tuple a
 });
 
 test("application environment catalog admits only the complete common tuple with owned target surfaces", () => {
-  const snapshot = { standards: "0.7.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0", transactionalEmailResend: "0.2.0" };
+  const snapshot = { standards: "0.9.0", siteRouting: "0.5.0", appFoundation: "0.3.0", deploymentCloudflare: "0.9.0", transactionalEmailResend: "0.2.0" };
   const result = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, snapshot);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(result.value.map(({ identifier }) => identifier).sort(), ["analytics", "app-foundation", "booking-calendly", "contact-form-web3forms", "content-files", "deployment-cloudflare", "multilingual", "observability", "section-composition", "site-routing", "standards", "transactional-email-resend"]);
+  for (const persistence of [false, true]) for (const jobs of [false, true]) {
+    const context = contracts.createApplicationEnvironmentRenderingContext(persistence, false, jobs);
+    const candidate = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, context.catalogSnapshot);
+    assert.equal(candidate.ok, true, JSON.stringify(candidate));
+    const standards = candidate.value.find(({ identifier }) => identifier === "standards");
+    assert.equal(standards.version, persistence ? "0.10.0" : "0.9.0");
+    assert.deepEqual(standards.environmentVariables, ["DEPLOY_URL", "EXPECTED_REVISION"]);
+    assert.deepEqual(standards.secrets, ["CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET", "GITHUB_TOKEN"]);
+  }
+  const publicCatalog = contracts.createCapabilityCatalog(contracts.verifiedCapabilityPackageVersions);
+  assert.equal(publicCatalog.ok, true, JSON.stringify(publicCatalog));
+  const publicStandards = publicCatalog.value.find(({ identifier }) => identifier === "standards");
+  assert.deepEqual(publicStandards.environmentVariables, ["PLAYWRIGHT_DEPLOYED_URL"]);
+  assert.deepEqual(publicStandards.secrets, []);
   const deployment = result.value.find(({ identifier }) => identifier === "deployment-cloudflare");
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/src/configuration/application-environment.ts"));
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/scripts/check-application-environment.mjs"));
@@ -1742,7 +1756,7 @@ test("environment email state requires exact foundation and complete Worker veri
   for (const [profile, recipeVersion] of [["portfolio", "0.12.0"], ["site", "0.13.0"], ["app", "0.3.0"]]) {
     const state = structuredClone(environmentState);
     state.origin = { profile, recipeVersion };
-    for (const [identifier, version] of [["app-foundation", "0.3.0"], ["transactional-email-resend", "0.2.0"], ...(profile === "portfolio" ? [] : [["site-routing", "0.4.0"]])]) {
+    for (const [identifier, version] of [["app-foundation", "0.3.0"], ["transactional-email-resend", "0.2.0"], ...(profile === "portfolio" ? [] : [["site-routing", "0.5.0"]])]) {
       state.installedCapabilities.push({ ...state.installedCapabilities[0], identifier, version });
     }
     state.lastSuccessfulVerification = { kind: "generation", checks: [

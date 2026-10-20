@@ -11,6 +11,7 @@ import {
   opendir,
   readFile,
   readdir,
+  realpath,
   writeFile,
 } from "node:fs/promises";
 import { constants as operatingSystemConstants, tmpdir } from "node:os";
@@ -1462,6 +1463,11 @@ const previewDiagnosticIndicators = [
   ["network-connection-lost", /Network connection lost\./u],
   ["connection-refused", /\b(?:ECONNREFUSED|ERR_CONNECTION_REFUSED)\b/u],
   ["wrangler-error", /✘\s*\[ERROR\]/u],
+  ["broken-pipe", /\b(?:EPIPE|Broken pipe)\b/u],
+  ["webserver-started", /\bpw:webserver\s+Process started\b/u],
+  ["webserver-ready", /\bpw:webserver\s+WebServer available\b/u],
+  ["webserver-teardown-started", /\bpw:webserver\s+Terminating the WebServer\b/u],
+  ["webserver-teardown-finished", /\bpw:webserver\s+Terminated the WebServer\b/u],
 ];
 
 function inspectPreviewOutput(value) {
@@ -1470,9 +1476,14 @@ function inspectPreviewOutput(value) {
   const bytes = Buffer.byteLength(value);
   if (bytes > isolatedProcessOptions.maxBuffer) return { status: "refused" };
   const text = stripVTControlCharacters(value.toString());
+  const observations = previewDiagnosticIndicators
+    .map(([identifier, pattern]) => ({ identifier, position: text.search(pattern) }))
+    .filter(({ position }) => position !== -1);
   return {
     status: "inspected", bytes,
-    indicators: previewDiagnosticIndicators.filter(([, pattern]) => pattern.test(text)).map(([identifier]) => identifier),
+    indicators: observations.map(({ identifier }) => identifier),
+    // First recognized matches within this stream; not a complete event timeline.
+    firstOccurrences: [...observations].sort((left, right) => left.position - right.position).map(({ identifier }) => identifier),
   };
 }
 
@@ -1544,12 +1555,163 @@ async function inspectPreviewLogs(home, before) {
   }
 }
 
+const previewTestFiles = new Map([
+  "site-quality", "site-routing", "multilingual-routing", "analytics-consent", "calendly-booking", "web3forms-contact",
+].map(name => [`${name}.spec.ts`, `apps/web/tests/e2e/${name}.spec.ts`]));
+const previewFailureSiteFiles = new Map([
+  ...previewTestFiles,
+  ["application-test.ts", "apps/web/tests/e2e/application-test.ts"],
+  ["application-transport.ts", "apps/web/tests/e2e/application-transport.ts"],
+]);
+const previewTransportCodes = new Set([
+  "ORIGIN_INVALID", "CREDENTIALS_INVALID", "DEBUG_FORBIDDEN", "DIAGNOSTICS_FORBIDDEN", "DEVELOPMENT_MODE_INVALID",
+  "DESTINATION_INVALID", "REQUEST_FAILED", "REDIRECT_INVALID", "REDIRECT_LIMIT", "NAVIGATION_FAILED",
+  "BROWSER_REDIRECT_FORBIDDEN", "READINESS_FAILED", "BROWSER_REQUEST_BLOCKED",
+].map(code => `APPLICATION_TRANSPORT_${code}`));
+const previewTestResultCategories = Object.freeze({
+  passed: "none", failed: "test-failed", timedOut: "test-timeout", skipped: "none", interrupted: "interrupted",
+});
+const previewTestResultLimit = 128;
+
+async function preparePreviewTestReport(owner, supportIdentity, validationRoot, sourceRoot) {
+  try {
+    const directories = [owner, supportIdentity];
+    for (const root of [validationRoot, sourceRoot]) {
+      let path = root;
+      for (const part of ["", "apps", "web", "tests", "e2e"]) {
+        path = join(path, part);
+        directories.push(await readPathIdentity(path));
+      }
+    }
+    if (!(await Promise.all(directories.map(pathIdentityMatches))).every(Boolean)) return undefined;
+    const testRoot = (await realpath(join(validationRoot, "apps/web/tests/e2e"))).replaceAll("\\", "/");
+    const reportPath = join(supportIdentity.path, "preview-results.json");
+    try { await lstat(reportPath); return undefined; }
+    catch (error) { if (error?.code !== "ENOENT") return undefined; }
+    return { reportPath, testRoot, directories };
+  } catch { return undefined; }
+}
+
+async function readPreviewDiagnosticFile(path, openFile = open) {
+  const before = await lstat(path);
+  if (!before.isFile() || before.isSymbolicLink() || before.size > isolatedProcessOptions.maxBuffer) throw new Error();
+  const handle = await openFile(path, fileConstants.O_RDONLY | fileConstants.O_NOFOLLOW | fileConstants.O_NONBLOCK);
+  const unchanged = stats => stats.isFile() && stats.dev === before.dev && stats.ino === before.ino &&
+    stats.size === before.size && stats.mtimeMs === before.mtimeMs && stats.ctimeMs === before.ctimeMs;
+  try {
+    if (!unchanged(await handle.stat())) throw new Error();
+    const content = Buffer.alloc(before.size);
+    const result = await handle.read(content, 0, content.length, 0);
+    if (result.bytesRead !== content.length || !unchanged(await handle.stat()) || !unchanged(await lstat(path))) throw new Error();
+    return content;
+  } finally { await handle.close(); }
+}
+
+const previewResponseDisposalErrors = new Map([
+  ["Target page, context or browser has been closed", "target-closed"],
+  ["Test ended.", "test-ended"],
+  ["Response has been disposed", "response-disposed"],
+]);
+
+function projectPreviewFailureSite(result, testRoot, sources) {
+  const projected = {};
+  const location = result.errorLocation;
+  if (typeof location?.file === "string" && Number.isInteger(location.line) && location.line > 0 &&
+    Number.isInteger(location.column) && location.column > 0) {
+    const file = location.file.replaceAll("\\", "/");
+    for (const [name, source] of sources) {
+      if (file !== `${testRoot}/${name}`) continue;
+      const line = source.lines[location.line - 1];
+      if (typeof line === "string" && location.column <= line.length) {
+        projected.errorLocation = { file: source.file, line: location.line, column: location.column };
+        if (name === "application-transport.ts" && ["failed", "timedOut"].includes(result.status) &&
+            /^\s*finally \{ await response\??\.dispose\(\); \}$/u.test(line)) {
+          const message = result.error?.message;
+          if (typeof message !== "string") projected.responseDisposalError = "unavailable";
+          else {
+            const reason = stripVTControlCharacters(message).split(/\r?\n/u, 1)[0]
+              .replace(/^Error: /u, "").replace(/^apiResponse\.dispose: /u, "");
+            projected.responseDisposalError = previewResponseDisposalErrors.get(reason) ??
+              (/^Test timeout of [1-9]\d*ms exceeded\.$/u.test(reason) ? "test-timeout" : "unclassified");
+          }
+        }
+      }
+      break;
+    }
+  }
+  const code = result.error?.message;
+  if (sources.has("application-transport.ts") && previewTransportCodes.has(code)) projected.transportCode = code;
+  return projected;
+}
+
+function projectPreviewTestReport(report, testRoot, sources) {
+  if (report?.config?.version !== "1.62.1" || typeof report.config.rootDir !== "string" ||
+    report.config.rootDir.replaceAll("\\", "/") !== testRoot || !Array.isArray(report.suites) ||
+    !Array.isArray(report.errors) || report.errors.length > previewTestResultLimit) throw new Error();
+  const cases = [];
+  let resultCount = 0;
+  const pending = [...report.suites].reverse();
+  while (pending.length > 0) {
+    const suite = pending.pop();
+    if (!suite || !Array.isArray(suite.specs) || (suite.suites !== undefined && !Array.isArray(suite.suites))) throw new Error();
+    for (const spec of suite.specs) {
+      const source = previewTestFiles.has(spec?.file) ? sources.get(spec.file) : undefined;
+      const line = source?.lines[spec.line - 1];
+      if (!source || !Number.isInteger(spec.line) || spec.line < 1 || !Number.isInteger(spec.column) || spec.column < 1 ||
+        typeof line !== "string" || line.slice(0, spec.column - 1).trim() !== "" ||
+        !/^test\(/u.test(line.slice(spec.column - 1)) || !Array.isArray(spec.tests) || spec.tests.length === 0) throw new Error();
+      for (const test of spec.tests) {
+        if (!["expected", "unexpected", "flaky", "skipped"].includes(test?.status) || !Array.isArray(test.results)) throw new Error();
+        const selected = test.status === "unexpected" || test.status === "flaky";
+        if (test.results.length > 2 || (selected && test.results.length === 0)) throw new Error();
+        const results = test.results.map((result, retry) => {
+          if (result?.retry !== retry || !Object.hasOwn(previewTestResultCategories, result.status)) throw new Error();
+          return { retry, status: result.status, category: previewTestResultCategories[result.status],
+            ...(selected ? projectPreviewFailureSite(result, testRoot, sources) : {}) };
+        });
+        if (selected) {
+          resultCount += results.length;
+          if (resultCount > previewTestResultLimit) throw new Error();
+          cases.push({ file: source.file, line: spec.line, column: spec.column, outcome: test.status, results });
+        }
+      }
+    }
+    pending.push(...(suite.suites ?? []).toReversed());
+  }
+  return { status: "inspected", globalErrorCount: report.errors.length, cases };
+}
+
+async function inspectPreviewTestReport({ prepared, validationRoot, sourceRoot, sourceSnapshot, openReport }) {
+  if (prepared === undefined) return { status: "refused" };
+  try {
+    if (!(await Promise.all(prepared.directories.map(pathIdentityMatches))).every(Boolean)) throw new Error();
+    let content;
+    try { content = await readPreviewDiagnosticFile(prepared.reportPath, openReport); }
+    catch (error) { if (error?.code === "ENOENT") return { status: "absent" }; throw error; }
+    const sources = new Map();
+    for (const [name, file] of previewFailureSiteFiles) {
+      const entry = sourceSnapshot.find(item => item.path === file);
+      if (entry === undefined) continue;
+      const original = await readPreviewDiagnosticFile(join(sourceRoot, file));
+      const copied = await readPreviewDiagnosticFile(join(validationRoot, file));
+      if (fingerprint(original) !== entry.fingerprint || fingerprint(copied) !== entry.fingerprint) throw new Error();
+      sources.set(name, { file, lines: original.toString("utf8").split(/\r?\n/u) });
+    }
+    const result = projectPreviewTestReport(JSON.parse(content), prepared.testRoot, sources);
+    if (!(await Promise.all(prepared.directories.map(pathIdentityMatches))).every(Boolean)) throw new Error();
+    return result;
+  } catch { return { status: "refused" }; }
+}
+
 async function runExpectedCommand(runCommand, input, failureCode) {
   const logsBefore = failureCode === "BROWSER_PREVIEW_FAILED"
     ? await snapshotPreviewLogs(input.environment.HOME)
     : undefined;
+  const commandInput = failureCode === "BROWSER_PREVIEW_FAILED"
+    ? { ...input, environment: { ...input.environment, DEBUG: "pw:webserver" } }
+    : input;
   try {
-    return await runCommand(input);
+    return await runCommand(commandInput);
   } catch (cause) {
     const error = new GeneratedFixtureVerificationError(failureCode);
     if (logsBefore !== undefined) {
@@ -1920,6 +2082,159 @@ export async function verifyGeneratedProjectForTesting(
   );
   const source = await sourceForRoot(root, contract);
   return verifySourcesWithAdapters(adapters, [source], options);
+}
+
+export function verifyApplicationEnvironmentProject(root) {
+  return verifyApplicationEnvironmentProjectForTesting(root, {
+    createOwner: createGeneratedFixtureOwner,
+    runCommand: defaultRunCommand,
+    captureVisualArtifacts: captureVisualFailureArtifacts,
+  });
+}
+
+export async function verifyApplicationEnvironmentProjectForTesting(root, adapters) {
+  if (typeof adapters?.createOwner !== "function" || typeof adapters.runCommand !== "function" ||
+    (adapters.captureVisualArtifacts !== undefined && typeof adapters.captureVisualArtifacts !== "function") ||
+    (adapters.openPreviewReport !== undefined && typeof adapters.openPreviewReport !== "function")) fail("VERIFICATION_SETUP_FAILED");
+  const core = await import("../packages/builder-core/dist/index.js");
+  const { derivePnpmToolEnvironment } = await import("../packages/builder-core/dist/generation/verify-generated-project.js");
+  const toolEnvironment = await (adapters.derivePnpmToolEnvironment ?? derivePnpmToolEnvironment)("pnpm");
+  const fixedRoot = resolve(root);
+  const sourceBefore = await snapshotTree(fixedRoot);
+  const snapshot = await core.readVerifiedProjectSnapshot(core.createFileSystemRepositoryReader(fixedRoot), core.createApplicationEnvironmentRenderingContext());
+  const project = core.parseProjectYaml(await readFile(join(fixedRoot, ".egeria/project.yaml"), "utf8"), "2.0.0");
+  if (!snapshot.ok || !project.ok) fail("FIXTURE_STATE_INVALID");
+  const selected = project.value.selectedCapabilities;
+  const profile = project.value.originProfile;
+  const jobs = selected.includes("background-job-delivery");
+  const persistence = selected.includes("application-persistence");
+  const email = selected.includes("transactional-email-resend");
+  const foundation = selected.includes("app-foundation");
+  const manifest = await readFile(join(fixedRoot, "apps/web/package.json"));
+  const lockfile = await readFile(join(fixedRoot, "pnpm-lock.yaml"));
+  const owner = await adapters.createOwner();
+  if (!(await pathIdentityMatches(owner))) fail("VERIFICATION_SETUP_FAILED");
+  const targets = [];
+  let activeTarget = null;
+  let pendingError;
+  try {
+    for (const target of ["development", "staging", "production"]) {
+      activeTarget = target;
+      const validationRoot = join(owner.path, target + "-project");
+      const supportRoot = join(owner.path, target + "-support");
+      await cp(fixedRoot, validationRoot, { recursive: true, force: false, errorOnExist: true, dereference: false });
+      await mkdir(supportRoot, { mode: 0o700 });
+      const supportIdentity = await readPathIdentity(supportRoot);
+      const support = await createSupportPaths(supportRoot);
+      const revision = "a".repeat(40); // Explicit synthetic source identity, never a reviewed commit assertion.
+      const siteOrigin = `https://${target}.application-test.invalid`;
+      const environment = { ...createChildEnvironment(support), ...toolEnvironment, APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_SITE_URL: siteOrigin,
+        BUILD_SOURCE_REVISION: revision, WRANGLER_SEND_METRICS: "false", ...(target === "development" ? {} : { CLOUDFLARE_ENV: target }) };
+      if (selected.includes("contact-form-web3forms")) Object.assign(environment, { NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "00000000-0000-4000-8000-000000000001", CONTACT_TEST_EXPECTED_ACCESS_KEY: "00000000-0000-4000-8000-000000000001" });
+      if (selected.includes("booking-calendly")) Object.assign(environment, { NEXT_PUBLIC_CALENDLY_URL: "https://calendly.com/egeria-synthetic-nonproduction/intro", BOOKING_TEST_EXPECTED_URL: "https://calendly.com/egeria-synthetic-nonproduction/intro", BOOKING_TEST_MODE: project.value.capabilitySettings["booking-calendly"].mode, BOOKING_TEST_MULTILINGUAL: String(selected.includes("multilingual")) });
+      if (selected.includes("analytics")) {
+        const settings = project.value.capabilitySettings.analytics;
+        Object.assign(environment, { NEXT_PUBLIC_ANALYTICS_ENABLED: "false", ANALYTICS_TEST_BUILD_FLAG: "false", ANALYTICS_TEST_TARGET: target,
+          ANALYTICS_TEST_EXPECTED_SITE_ORIGIN: siteOrigin, ANALYTICS_TEST_EXPECTED_CLOUDFLARE_TOKEN: "", ANALYTICS_TEST_EXPECTED_GA4_ID: "", ANALYTICS_TEST_EXPECTED_CLARITY_ID: "", ANALYTICS_TEST_EXPECTED_VERIFICATION: "" });
+        if (settings.operationalIntegrations.googleSearchConsole !== undefined) {
+          environment.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION = "synthetic-verification-not-a-provider-token";
+          environment.ANALYTICS_TEST_EXPECTED_VERIFICATION = target === "production" ? environment.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION : "";
+        }
+      }
+      const commands = [];
+      const run = async (arguments_, failureCode, commandEnvironment = environment) => {
+        const result = await runExpectedCommand(adapters.runCommand, { executable: "pnpm", arguments: arguments_, cwd: validationRoot, environment: commandEnvironment, timeout: commandTimeoutMilliseconds }, failureCode);
+        commands.push({ arguments: arguments_, status: "passed" });
+        return result;
+      };
+      if ((await run(["--version"], "PNPM_VERSION_INVALID")).trim() !== requiredPnpmVersion) fail("PNPM_VERSION_INVALID");
+      await run(["install", "--frozen-lockfile", "--store-dir", support.store], "FROZEN_INSTALL_FAILED");
+      await run(["--dir", "apps/web", "run", "browser:install"], "BROWSER_INSTALL_FAILED");
+      if (target === "development") {
+        await run(["run", "lint"], "LINT_FAILED");
+        if (persistence) await run(["--dir", "apps/web", "run", "cf-typegen"], "CLOUDFLARE_TYPE_GENERATION_FAILED");
+        await run(["run", "typecheck"], "TYPECHECK_FAILED");
+        await run(["run", "test:unit"], "UNIT_TESTS_FAILED");
+        await run(["run", "test:component"], "COMPONENT_TESTS_FAILED");
+        await run(["--dir", "apps/web", "run", "test:deployment-contracts"], "DEPLOYMENT_CONTRACTS_FAILED");
+        await run(["--dir", "apps/web", "run", "test:transport"], "TRANSPORT_CONTRACTS_FAILED");
+        await run(["--dir", "apps/web", "run", "test:e2e:dev"], "BROWSER_DEVELOPMENT_FAILED");
+      }
+      await run(["--dir", "apps/web", "run", target === "development" ? "check:environment" : "check:environment:deployment"], "APPLICATION_ENVIRONMENT_INVALID");
+      await run(["run", "build"], "NEXT_BUILD_FAILED");
+      await run(["--dir", "apps/web", "exec", "opennextjs-cloudflare", "build", "--skipNextBuild"], "OPENNEXT_BUILD_FAILED");
+      if (jobs) await run(["--dir", "apps/web", "exec", "wrangler", "deploy", "--dry-run", ...(target === "development" ? [] : ["--env", target]), "--outdir", ".open-next/jobs-bundle", "--metafile", ".open-next/jobs-inputs.json", "--x-provision=false", "--x-auto-create=false"], "JOB_BUNDLE_FAILED");
+      const artifact = mode => ["--dir", "apps/web", "run", "check:prepared-artifact", mode, target, revision, "--local"];
+      await run(artifact("record"), "PREPARED_ARTIFACT_FAILED");
+      const receiptPath = join(validationRoot, "apps/web/.open-next/prepared-artifact.json");
+      const receiptBefore = await readFile(receiptPath);
+      if (foundation) await run(["--dir", "apps/web", "run", "test:integration:cloudflare"], "WORKER_INTEGRATION_FAILED");
+      if (persistence) await run(["--dir", "apps/web", "run", "test:integration:bindings"], "BINDING_INTEGRATION_FAILED");
+      await run(artifact("verify"), "PREPARED_ARTIFACT_FAILED");
+      const preparedReport = await preparePreviewTestReport(owner, supportIdentity, validationRoot, fixedRoot);
+      try {
+        await run(["--dir", "apps/web", "run", "test:e2e:preview", ...(preparedReport === undefined ? [] : ["--reporter=list,html,json"])],
+          "BROWSER_PREVIEW_FAILED", preparedReport === undefined ? environment : { ...environment,
+            PLAYWRIGHT_JSON_OUTPUT_FILE: preparedReport.reportPath,
+            PLAYWRIGHT_HTML_OPEN: "never", PLAYWRIGHT_HTML_OUTPUT_DIR: join(validationRoot, "apps/web/playwright-report"),
+          });
+      } catch (error) {
+        error.previewDiagnostics = { ...error.previewDiagnostics, playwright: await inspectPreviewTestReport({
+          prepared: preparedReport, validationRoot, sourceRoot: fixedRoot, sourceSnapshot: sourceBefore, openReport: adapters.openPreviewReport,
+        }) };
+        throw error;
+      }
+      await run(artifact("verify"), "PREPARED_ARTIFACT_FAILED");
+      if (!(await readFile(receiptPath)).equals(receiptBefore)) fail("PREPARED_ARTIFACT_CHANGED");
+      targets.push({ target, sourceIdentity: { revision, synthetic: true }, publicOrigin: siteOrigin,
+        manifestSha256: fingerprint(manifest), lockfileSha256: fingerprint(lockfile), receiptSha256: fingerprint(receiptBefore),
+        environmentKeys: Object.keys(environment).sort(), commands });
+    }
+  } catch (error) { pendingError = error; }
+  finally {
+    try { if (JSON.stringify(await snapshotTree(fixedRoot)) !== JSON.stringify(sourceBefore)) pendingError = new GeneratedFixtureVerificationError("FIXTURE_SOURCE_CHANGED"); }
+    catch { pendingError = new GeneratedFixtureVerificationError("FIXTURE_SOURCE_CHANGED"); }
+    if (pendingError === undefined) {
+      if (!(await cleanupOwnedDirectory(owner))) pendingError = new GeneratedFixtureVerificationError("VERIFICATION_CLEANUP_FAILED");
+    } else {
+      const failureCode = pendingError instanceof GeneratedFixtureVerificationError ? pendingError.code : "VERIFICATION_FAILED";
+      const verificationFailure = {
+        code: failureCode, profile, target: activeTarget, services: { jobs, persistence, email },
+        ...(failureCode === "BROWSER_PREVIEW_FAILED" && pendingError.previewDiagnostics !== undefined
+          ? { previewDiagnostics: pendingError.previewDiagnostics } : {}),
+      };
+      if (await pathIdentityMatches(owner)) {
+        if (failureCode === "BROWSER_PREVIEW_FAILED" && adapters.captureVisualArtifacts !== undefined) {
+          try {
+            await adapters.captureVisualArtifacts({
+              failureCode,
+              identifier: `application-environment-${profile}-${jobs ? "jobs" : "web"}-${persistence ? "persistence" : "stateless"}-${email ? "email" : "no-email"}-${activeTarget}`,
+              validationRoot: join(owner.path, activeTarget + "-project"),
+              previewDiagnostics: verificationFailure.previewDiagnostics,
+            });
+          } catch {
+            pendingError.artifactExportCode = "VISUAL_ARTIFACT_EXPORT_FAILED";
+            verificationFailure.artifactExportCode = pendingError.artifactExportCode;
+          }
+        }
+        try {
+          // The owner identity and completed commands stay in private local evidence.
+          await writeFile(join(owner.path, "verification-failure.json"), JSON.stringify({
+            failureCode, verificationFailure, completedTargets: targets,
+            owner: { path: owner.path, device: String(owner.device), inode: String(owner.inode) },
+          }, null, 2), { flag: "wx", mode: 0o600 });
+          pendingError.retainedEvidencePath = owner.path;
+        } catch {
+          verificationFailure.evidenceRetentionCode = "VERIFICATION_EVIDENCE_RETENTION_FAILED";
+        }
+      } else {
+        verificationFailure.evidenceRetentionCode = "VERIFICATION_EVIDENCE_RETENTION_FAILED";
+      }
+      pendingError.verificationFailure = verificationFailure;
+    }
+  }
+  if (pendingError !== undefined) throw pendingError;
+  return { ok: true, targets, providerPolicy: "synthetic inputs and controlled browser requests only", liveAcceptance: false };
 }
 
 async function runMain() {

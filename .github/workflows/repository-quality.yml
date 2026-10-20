@@ -364,7 +364,8 @@ jobs:
       - name: Test generated fixture contracts and determinism
         run: pnpm run test:generated-fixtures
 
-  generated-jobs:
+  generated-jobs-profiles:
+    name: Generated jobs (${{ matrix.group }})
     needs: [scope]
     if: needs.scope.outputs.generated-projects == 'true'
     runs-on: ubuntu-24.04
@@ -372,6 +373,26 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
       options: --shm-size=1g
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - group: portfolio
+            profile: portfolio
+            test-pattern: '^portfolio (?:jobs generation verifies its actual runtime before persisting confirmed state|environment jobs prepare all targets with independent selected services \{\})$'
+          - group: site
+            profile: site
+            test-pattern: '^site (?:jobs generation verifies its actual runtime before persisting confirmed state|environment jobs prepare all targets with independent selected services \{"transactionalEmailResend":true,"multilingual":true\})$'
+          - group: app-runtime
+            profile: app
+            test-pattern: '^app jobs generation verifies its actual runtime before persisting confirmed state$'
+          - group: app-environment-persistence
+            profile: app
+            test-pattern: '^app environment jobs prepare all targets with independent selected services \{"applicationPersistence":true\}$'
+          - group: app-environment-persistence-email
+            profile: app
+            test-pattern: '^app environment jobs prepare all targets with independent selected services \{"applicationPersistence":true,"transactionalEmailResend":true\}$'
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -389,8 +410,44 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build production generator
+        run: pnpm --filter @egeria-systems/builder-core run build
+
       - name: Verify fresh jobs runtime generation
-        run: pnpm run test:generated-jobs
+        env:
+          GENERATED_JOBS_TEST_PATTERN: ${{ matrix.test-pattern }}
+        run: node --test --test-name-pattern="$GENERATED_JOBS_TEST_PATTERN" packages/builder-core/tests/background-job-generation.integration.mjs
+
+      - name: Upload generated jobs failure reports
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: generated-jobs-${{ matrix.group }}-failure-reports-attempt-${{ github.run_attempt }}
+          path: |
+            generated-visual-artifacts/application-environment-${{ matrix.profile }}-*/failure.json
+            generated-visual-artifacts/application-environment-${{ matrix.profile }}-*/preview-diagnostics.json
+          if-no-files-found: ignore
+          include-hidden-files: false
+          retention-days: 7
+
+  generated-jobs:
+    name: generated-jobs
+    needs: [scope, generated-jobs-profiles]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require complete selected jobs verification
+        shell: bash
+        env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          GENERATED_REQUIRED: ${{ needs.scope.outputs.generated-projects }}
+          PROFILE_RESULT: ${{ needs.generated-jobs-profiles.result }}
+        run: |
+          case "$SCOPE_RESULT:$GENERATED_REQUIRED:$PROFILE_RESULT" in
+            success:true:success|success:false:skipped) exit 0 ;;
+            *) printf '%s\n' 'Generated jobs verification did not complete successfully.' >&2; exit 1 ;;
+          esac
 
   app-transition-visuals:
     needs: [scope]

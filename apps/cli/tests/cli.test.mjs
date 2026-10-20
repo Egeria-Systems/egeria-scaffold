@@ -1260,8 +1260,8 @@ test("environment persistence creation reaches installed state through the gener
     const state = assertSuccess(core.parseStateJson(await readFile(join(destination, ".egeria/state.json"), "utf8"), "2.0.0"));
     assert.equal(project.selectedCapabilities.includes("application-persistence"), true);
     assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence")?.version, "0.2.0");
-    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards")?.version, "0.8.0");
-    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version, "0.8.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards")?.version, "0.10.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version, "0.10.0");
   } finally {
     await rm(owner, { recursive: true, force: false });
   }
@@ -7614,7 +7614,7 @@ test("application environment compiled CLI refuses inputs before dependencies an
     for (const suffix of [["--application-persistence"], ["--background-job-delivery"]]) {
       const result = await runEnvironmentCliProcess([...base, ...suffix], true);
       assert.equal(result.exitCode, 1, JSON.stringify(result));
-      assert.equal(JSON.parse(result.stderr).issues[0].code, suffix[0] === "--application-persistence" ? "CAPABILITY_UNSUPPORTED" : "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
+      assert.equal(JSON.parse(result.stderr).issues[0].code, suffix[0] === "--application-persistence" ? "CAPABILITY_UNSUPPORTED" : "DESTINATION_EXISTS");
       assert.doesNotMatch(result.stderr, /sentinel/u);
     }
     assert.deepEqual(await listTree(owner), before);
@@ -8077,4 +8077,37 @@ test("environment email CLI preserves exact selection without literal runtime co
       assert.equal(observed[0].settings, undefined);
     }
   }
+});
+
+
+test("application environment CLI generates exact jobs compositions with simulated state-last verification", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "environment-jobs-cli-"));
+  try {
+    for (const [profile, persistence, email] of [["portfolio", false, false], ["site", false, true], ["app", true, false], ["app", true, true]]) {
+      const destination = join(owner, `${profile}-${persistence}-${email}`);
+      let verifications = 0;
+      const verifier = {
+        prepareLockfile: core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }).prepareLockfile,
+        async verifyInIsolatedCopy(root) {
+          verifications++;
+          await assert.rejects(readFile(join(root, ".egeria/state.json")), { code: "ENOENT" });
+          return { ok: true, value: { checks: persistence ? core.persistenceGenerationVerificationChecks : core.appGenerationVerificationChecks } };
+        },
+      };
+      const output = captureOutput();
+      const run = cli.createCliRunner({ createVerifier: () => verifier }, "2.0.0");
+      const result = await run(["create", "--profile", profile, "--name", "jobs-environment", "--display-name", "Jobs Environment", "--directory", destination,
+        "--background-job-delivery", ...(persistence ? ["--application-persistence"] : []), ...(email ? ["--transactional-email-resend"] : [])], output.output);
+      assert.equal(result, 0, JSON.stringify(output));
+      assert.equal(verifications, 1);
+      const state = assertSuccess(core.parseStateJson(await readFile(join(destination, ".egeria/state.json"), "utf8"), "2.0.0"));
+      const versions = Object.fromEntries(state.installedCapabilities.map(({ identifier, version }) => [identifier, version]));
+      assert.equal(versions.standards, persistence ? "0.10.0" : "0.9.0");
+      assert.equal(versions["deployment-cloudflare"], persistence ? "0.12.0" : "0.11.0");
+      assert.equal(versions["background-job-delivery"], "0.3.0");
+      assert.equal(versions["app-foundation"], "0.3.0");
+      assert.equal(versions["application-persistence"], persistence ? "0.2.0" : undefined);
+      assert.equal(versions["transactional-email-resend"], email ? "0.2.0" : undefined);
+    }
+  } finally { await rm(owner, { recursive: true, force: true }); }
 });

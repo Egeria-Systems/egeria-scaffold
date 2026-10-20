@@ -358,7 +358,7 @@ export function createTemplateCatalog(
   includeTransactionalEmail = false,
   includeWeb3Forms = false,
   includeBackgroundJobs = false,
-  backgroundJobVersion: "0.1.0" | "0.2.0" = "0.2.0",
+  backgroundJobVersion: "0.1.0" | "0.2.0" | "0.3.0" = "0.2.0",
   applicationEnvironments = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.2" || recipeVersion === "0.2.3" || (applicationEnvironments && recipeVersion === "0.3.0"));
@@ -455,11 +455,11 @@ export function createTemplateCatalog(
       !includeBackgroundJobs || destinationSource === undefined || !["common/apps/web/wrangler.jsonc.template", "common/.github/workflows/deploy.yml.template"].includes(destinationSource))] : []),
     ...(includeBackgroundJobs ? [
       ...backgroundJobFiles.map(({ path }) => ({
-        source: `background-job-delivery/${backgroundJobVersion === "0.2.0" && ["docs/background-job-delivery.md", "apps/web/tests/integration/job-worker.test.ts", "apps/web/tests/integration/fixtures/job-worker.mjs"].includes(path) ? "operations/" : ""}${path}`,
+        source: `background-job-delivery/${backgroundJobVersion !== "0.1.0" && ["docs/background-job-delivery.md", "apps/web/tests/integration/job-worker.test.ts", "apps/web/tests/integration/fixtures/job-worker.mjs"].includes(path) ? "operations/" : ""}${path}`,
         destinationSource: `background-job-delivery/${path}`,
         contentKind: "text" as const,
       })),
-      ...(backgroundJobVersion === "0.2.0" ? backgroundJobOperationFiles.map(({ path }) => ({
+      ...(backgroundJobVersion !== "0.1.0" ? backgroundJobOperationFiles.map(({ path }) => ({
         source: `background-job-delivery/operations/${path}`,
         destinationSource: `background-job-delivery/${path}`,
         contentKind: "text" as const,
@@ -471,7 +471,13 @@ export function createTemplateCatalog(
     ] : []),
   ];
   if (applicationEnvironments) {
-    for (const path of ["apps/web/tests/unit/observability-environment.test.ts", "docs/observability.md"]) {
+    for (const path of ["apps/web/tests/unit/observability-environment.test.ts", "docs/observability.md", "apps/web/src/configuration/site-origin.ts", "apps/web/src/configuration/application-build.ts",
+      "apps/web/tests/unit/site-origin.test.ts", "apps/web/tests/unit/application-build.test.ts",
+      "apps/web/scripts/check-prepared-artifact.mjs", "apps/web/scripts/check-deployment-protection.mjs",
+      "apps/web/scripts/browser-development-server.ts",
+      "apps/web/tests/scripts/prepared-artifact.test.mjs", "apps/web/tests/scripts/deployment-protection.test.mjs",
+      "apps/web/tests/e2e/application-test.ts", "apps/web/tests/e2e/application-transport.ts",
+      "apps/web/tests/transport/application-transport.spec.ts", "apps/web/playwright.transport.config.ts"]) {
       sources.push({ source: `common/application-environments/${path}`, destinationSource: `common/${path}`, contentKind: "text" });
     }
   }
@@ -507,8 +513,37 @@ export function createTemplateCatalog(
       sources.push({ source: `analytics/application-environments/${path}`, destinationSource: `analytics/${path}`, contentKind: "text" });
     }
   }
-  const selectedSources = sources.map((entry) => {
+  const selectedSources = sources.filter(entry => !applicationEnvironments || entry.source !== "site/apps/web/content/en-CA/routing.yaml").map((entry) => {
     if (!applicationEnvironments) return entry;
+    if ([
+      "common/README.md.template", "common/apps/web/app/layout.tsx", "multilingual/apps/web/app/layout.tsx",
+      "booking-calendly/docs/booking-calendly.md",
+      "contact-form-web3forms/apps/web/app/layout.tsx", "contact-form-web3forms/apps/web/app/layout.multilingual.tsx",
+      "site/apps/web/src/routing/read-routing-content.ts", "site/apps/web/src/routing/routing-content-schema.ts",
+      "site/apps/web/tests/unit/routing-content.test.ts", "site/apps/web/app/robots.ts",
+      "site/apps/web/tests/e2e/site-routing.spec.ts.template", "multilingual/site/apps/web/tests/e2e/site-routing.spec.ts.template",
+      "multilingual/apps/web/tests/e2e/multilingual-routing.spec.ts",
+      "site/apps/web/app/about/production-page.tsx", "site/apps/web/app/work/featured/page.tsx",
+    ].includes(entry.source)) {
+      const separator = entry.source.indexOf("/");
+      return { ...entry, source: `${entry.source.slice(0, separator)}/application-environments${entry.source.slice(separator)}`, destinationSource: entry.destinationSource ?? entry.source };
+    }
+    if (includeBackgroundJobs) {
+      const jobSource = entry.source.replace("background-job-delivery/operations/", "background-job-delivery/");
+      if (jobSource.startsWith("deployment-cloudflare/background-job-delivery/")) {
+        return { ...entry, source: jobSource.replace("background-job-delivery/", "background-job-delivery/application-environments/") };
+      }
+      if ([
+        "background-job-delivery/apps/web/src/infrastructure/cloudflare/job-delivery.ts",
+        "background-job-delivery/apps/web/src/composition/server-jobs.ts",
+        "background-job-delivery/apps/web/tests/unit/job-delivery.test.ts",
+        "background-job-delivery/apps/web/tests/integration/job-worker.test.ts",
+        "background-job-delivery/apps/web/tests/integration/fixtures/job-worker.mjs",
+        "background-job-delivery/docs/background-job-delivery.md",
+      ].includes(jobSource)) {
+        return { ...entry, source: jobSource.replace("background-job-delivery/", "background-job-delivery/application-environments/"), destinationSource: entry.destinationSource ?? jobSource };
+      }
+    }
     if (includeTransactionalEmail && [
       "transactional-email-resend/apps/web/src/infrastructure/resend/transactional-email-sender.ts",
       "transactional-email-resend/apps/web/tests/unit/resend-transactional-email-sender.test.ts",
@@ -584,6 +619,8 @@ export function createTemplateCatalog(
       }
     }
     const common = [
+      "common/.github/workflows/deploy.yml.template", "common/apps/web/tests/e2e/site-quality.spec.ts",
+      "common/apps/web/playwright.config.shared.ts", "common/apps/web/playwright.deployed.config.ts", "common/apps/web/playwright.preview.config.ts", "common/apps/web/playwright.dev.config.ts",
       "common/apps/web/next.config.ts", "common/apps/web/wrangler.jsonc.template", "common/apps/web/AGENTS.md.template",
       "common/apps/web/src/infrastructure/cloudflare/observability-context.ts",
       "common/apps/web/src/infrastructure/observability/server-reporter.ts",

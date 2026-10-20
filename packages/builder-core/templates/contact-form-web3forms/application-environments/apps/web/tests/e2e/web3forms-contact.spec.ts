@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type OpenApplicationPage } from "./application-test";
+import { type BrowserContext, type Page } from "@playwright/test";
 
 const expectedAccessKey = process.env.CONTACT_TEST_EXPECTED_ACCESS_KEY ?? "";
 const configured = expectedAccessKey !== "";
@@ -13,7 +14,7 @@ test.use({ serviceWorkers: "block" });
 test.afterEach(async ({ context }, information) => {
   const audit = audits.get(context);
   if (audit === undefined) return;
-  await information.attach("provider-request-audit", { contentType: "application/json", body: JSON.stringify({ attempts: audit.attempts, unexpected: audit.unexpected }) });
+  if (!process.env.CF_ACCESS_CLIENT_ID) await information.attach("provider-request-audit", { contentType: "application/json", body: JSON.stringify({ attempts: audit.attempts, unexpected: audit.unexpected }) });
   expect(audit.unexpected).toEqual([]);
   if (!configured) expect(audit.contactAttempts).toEqual([]);
   if (expectedBookingUrl === "") expect(audit.bookingAttempts).toEqual([]);
@@ -33,7 +34,7 @@ async function controlProviders(page: Page, outcome = "accepted") {
   await page.context().route("**/*", async route => {
     const request = route.request();
     const url = new URL(request.url());
-    if (url.origin === localOrigin) return route.continue();
+    if (url.origin === localOrigin) return route.fallback();
     attempts.push(url.href);
     if (url.hostname === "calendly.com" || url.hostname === "www.calendly.com") bookingAttempts.push(url.href);
     if (expectedBookingUrl !== "" && url.href === expectedBookingUrl && request.isNavigationRequest()) {
@@ -74,8 +75,8 @@ async function controlProviders(page: Page, outcome = "accepted") {
   return audit;
 }
 
-async function openForm(page: Page) {
-  await page.goto("./");
+async function openForm(page: Page, openApplicationPage: OpenApplicationPage) {
+  await openApplicationPage(page, "./");
   const form = page.locator("#contact-form form");
   await expect(form).toBeVisible();
   return form;
@@ -96,9 +97,9 @@ async function solve(page: Page) {
 test.describe("configured contact", () => {
   test.skip(!configured);
 
-test("explicit challenge, single submission, acknowledgement and accessible recovery", async ({ page }) => {
+test("explicit challenge, single submission, acknowledgement and accessible recovery", async ({ openApplicationPage, page }) => {
   const provider = await controlProviders(page);
-  const form = await openForm(page);
+  const form = await openForm(page, openApplicationPage);
   expect(provider.scripts).toEqual([]);
   await form.locator('button[type="submit"]').click();
   await expect(page.locator("#contact-name")).toBeFocused();
@@ -127,9 +128,9 @@ test("explicit challenge, single submission, acknowledgement and accessible reco
 });
 
 for (const outcome of ["rejected", "rate-limited", "unknown"]) {
-  test(`${outcome} preserves fields and requires a fresh challenge`, async ({ page }) => {
+  test(`${outcome} preserves fields and requires a fresh challenge`, async ({ openApplicationPage, page }) => {
     const provider = await controlProviders(page, outcome);
-    const form = await openForm(page); await fill(page); await solve(page);
+    const form = await openForm(page, openApplicationPage); await fill(page); await solve(page);
     await form.locator('button[type="submit"]').click();
     await expect(page.locator("#contact-form").getByRole("status")).toBeFocused();
     await expect(page.locator("#contact-message")).toHaveValue("Controlled contact verification");
@@ -140,10 +141,10 @@ for (const outcome of ["rejected", "rate-limited", "unknown"]) {
   });
 }
 
-test("blocked challenge fails closed with fallback and 320px reflow", async ({ page }) => {
+test("blocked challenge fails closed with fallback and 320px reflow", async ({ openApplicationPage, page }) => {
   const provider = await controlProviders(page, "blocked");
   await page.setViewportSize({ width: 320, height: 800 });
-  const form = await openForm(page); await fill(page);
+  const form = await openForm(page, openApplicationPage); await fill(page);
   await page.locator("#contact-captcha button").click();
   await form.locator('button[type="submit"]').click();
   await expect(page.locator("#contact-captcha")).toBeFocused();
@@ -154,11 +155,11 @@ test("blocked challenge fails closed with fallback and 320px reflow", async ({ p
 });
 
 
-test("home navigation and locale changes dispose the form without loading providers", async ({ page }) => {
+test("home navigation and locale changes dispose the form without loading providers", async ({ openApplicationPage, page }) => {
   const provider = await controlProviders(page);
   const errors: string[] = [];
   page.on("pageerror", error => errors.push(error.name));
-  await openForm(page);
+  await openForm(page, openApplicationPage);
   const home = page.url();
   const about = page.locator('a[href$="/about"]').first();
   if (await about.count() > 0) {
@@ -168,7 +169,7 @@ test("home navigation and locale changes dispose the form without loading provid
     await expect(page.locator("#contact-form form")).toBeVisible();
   }
   if (new URL(home).pathname.startsWith("/en-CA")) {
-    await page.goto("/fr-CA");
+    await openApplicationPage(page, "/fr-CA");
     await expect(page.locator("#contact-form h2")).toHaveText("Envoyer un message");
     await fill(page); await solve(page);
     await page.locator('#contact-form button[type="submit"]').click();
@@ -186,12 +187,12 @@ test("home navigation and locale changes dispose the form without loading provid
 test.describe("unavailable contact", () => {
   test.skip(configured);
 
-  test("home and both selected languages retain accessible fallback without provider attempts", async ({ page }) => {
+  test("home and both selected languages retain accessible fallback without provider attempts", async ({ openApplicationPage, page }) => {
     const provider = await controlProviders(page);
-    await page.goto("./");
+    await openApplicationPage(page, "./");
     const localized = new URL(page.url()).pathname.startsWith("/en-CA");
     for (const language of localized ? ["en-CA", "fr-CA"] : ["en-CA"]) {
-      if (localized) await page.goto(`/${language}`);
+      if (localized) await openApplicationPage(page, `/${language}`);
       const section = page.locator("#contact-form");
       await expect(section).toBeVisible();
       await expect(section.locator("form, input, textarea, button, iframe")).toHaveCount(0);
@@ -209,12 +210,12 @@ test.describe("unavailable contact", () => {
     expect(provider.requests).toEqual([]);
   });
 
-  test("navigation and narrow reflow never activate unavailable contact", async ({ page }) => {
+  test("navigation and narrow reflow never activate unavailable contact", async ({ openApplicationPage, page }) => {
     const provider = await controlProviders(page);
     const errors: string[] = [];
     page.on("pageerror", error => errors.push(error.name));
     await page.setViewportSize({ width: 320, height: 800 });
-    await page.goto("./");
+    await openApplicationPage(page, "./");
     await expect(page.locator("#contact-form")).toBeVisible();
     const about = page.locator('a[href$="/about"]').first();
     if (await about.count() > 0) {
@@ -230,9 +231,9 @@ test.describe("unavailable contact", () => {
   });
 });
 
-test("non-home routes never mount contact", async ({ page }) => {
+test("non-home routes never mount contact", async ({ openApplicationPage, page }) => {
   const provider = await controlProviders(page);
-  await page.goto("./missing-contact-route");
+  await openApplicationPage(page, "./missing-contact-route");
   await expect(page.locator("#contact-form")).toHaveCount(0);
   expect(provider.attempts).toEqual([]);
   expect(provider.scripts).toEqual([]);

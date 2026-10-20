@@ -146,6 +146,31 @@ test("application environment generation preserves state-last verification and s
   }
 });
 
+test("application environment jobs state reconstructs its exact installed deployment context", async () => {
+  for (const persistence of [false, true]) {
+    await withTestRoot(async owner => {
+      const checks = persistence
+        ? [...generatedChecks.slice(0, 3), "cloudflare-types", ...generatedChecks.slice(3), "worker-integration", "binding-integration"]
+        : [...generatedChecks, "worker-integration"];
+      const verifier = createFakeVerifier({ verify: async () => ({ ok: true, value: { checks } }) });
+      const context = core.createApplicationEnvironmentRenderingContext(persistence, false, true);
+      const result = assertSuccess(await core.generateProject({
+        request: { profile: "app", projectName: "jobs-environment", displayName: "Jobs Environment", backgroundJobDelivery: true, ...(persistence ? { applicationPersistence: true } : {}) },
+        destination: join(owner, "jobs-environment"), verifier: verifier.verifier, renderingContext: context,
+      }));
+      const reader = core.createFileSystemRepositoryReader(result.destination);
+      const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(reader, core.createApplicationEnvironmentRenderingContext()));
+      assert.deepEqual(snapshot.renderingContext, core.createApplicationEnvironmentRenderingContext(persistence, true, true));
+      assert.deepEqual(await core.doctorRepository({ reader, catalog: snapshot.catalog, profiles: snapshot.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
+      for (const [identifier, version] of [["background-job-delivery", "0.2.0"], ["deployment-cloudflare", persistence ? "0.10.0" : "0.9.0"], ["site-routing", "0.4.0"]]) {
+        const mixed = { ...result.state, installedCapabilities: result.state.installedCapabilities.map(capability => capability.identifier === identifier ? { ...capability, version } : capability) };
+        assert.equal(core.parseStateJson(JSON.stringify(mixed), "2.0.0").ok, false);
+      }
+      assert.deepEqual(verifier.calls, ["prepare-lockfile", "verify-isolated-copy"]);
+    });
+  }
+});
+
 test("environment analytics generation verifies and infers the selected candidate on every profile", async () => {
   const context = core.createApplicationEnvironmentRenderingContext();
   const analytics = { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} };
@@ -221,7 +246,7 @@ test("environment contact generation preserves exact installed state for every p
   }
 });
 
-test("application environment generation rejects incomplete malformed and mismatched selections before destination inspection", async () => {
+test("application environment generation rejects malformed and mismatched selections before destination inspection", async () => {
   await withTestRoot(async (owner) => {
     const before = await snapshotFileBytes(owner);
     for (const selection of [
@@ -240,7 +265,7 @@ test("application environment generation rejects incomplete malformed and mismat
       });
       assert.equal(result.ok, false);
       const malformed = JSON.stringify(selection).includes("secret-sentinel");
-      assert.equal(result.issues[0].code, malformed ? "PROJECT_GENERATION_REQUEST_INVALID" : selection.applicationPersistence ? "APPLICATION_ENVIRONMENT_CONTEXT_INVALID" : "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
+      assert.equal(result.issues[0].code, malformed ? "PROJECT_GENERATION_REQUEST_INVALID" : "APPLICATION_ENVIRONMENT_CONTEXT_INVALID");
       assert.equal(JSON.stringify(result).includes("secret-sentinel"), false);
       assert.deepEqual(verifier.calls, []);
     }
@@ -271,6 +296,9 @@ for (const [profile, expectedLock] of [
             ...publicManifest.scripts,
             "check:environment": "node scripts/check-application-environment.mjs --local",
             "check:environment:deployment": "node scripts/check-application-environment.mjs --deployment",
+            "check:prepared-artifact": "node --experimental-strip-types scripts/check-prepared-artifact.mjs",
+            "test:deployment-contracts": "node --experimental-strip-types --test tests/scripts/prepared-artifact.test.mjs tests/scripts/deployment-protection.test.mjs",
+            "test:transport": "playwright test --config playwright.transport.config.ts",
           },
         } : publicManifest);
         for (const section of ["dependencies", "devDependencies", "optionalDependencies"]) {
