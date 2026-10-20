@@ -760,14 +760,16 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   );
   const generatedJobsCommand = 'node --test --test-name-pattern="$GENERATED_JOBS_TEST_PATTERN" packages/builder-core/tests/background-job-generation.integration.mjs';
   const generatedJobs = workflow.jobs["generated-jobs-profiles"];
-  assert.equal(generatedJobs.name, "Generated jobs (${{ matrix.profile }})");
+  assert.equal(generatedJobs.name, "Generated jobs (${{ matrix.group }})");
   assert.deepEqual(generatedJobs.strategy, {
     "fail-fast": false,
     "max-parallel": 3,
     matrix: { include: [
-      { profile: "portfolio", "test-pattern": String.raw`^portfolio (?:jobs generation verifies its actual runtime before persisting confirmed state|environment jobs prepare all targets with independent selected services \{\})$` },
-      { profile: "site", "test-pattern": String.raw`^site (?:jobs generation verifies its actual runtime before persisting confirmed state|environment jobs prepare all targets with independent selected services \{"transactionalEmailResend":true,"multilingual":true\})$` },
-      { profile: "app", "test-pattern": String.raw`^app (?:jobs generation verifies its actual runtime before persisting confirmed state|environment jobs prepare all targets with independent selected services \{"applicationPersistence":true(?:,"transactionalEmailResend":true)?\})$` },
+      { group: "portfolio", profile: "portfolio", "test-pattern": String.raw`^portfolio (?:jobs generation verifies its actual runtime before persisting confirmed state|environment jobs prepare all targets with independent selected services \{\})$` },
+      { group: "site", profile: "site", "test-pattern": String.raw`^site (?:jobs generation verifies its actual runtime before persisting confirmed state|environment jobs prepare all targets with independent selected services \{"transactionalEmailResend":true,"multilingual":true\})$` },
+      { group: "app-runtime", profile: "app", "test-pattern": "^app jobs generation verifies its actual runtime before persisting confirmed state$" },
+      { group: "app-environment-persistence", profile: "app", "test-pattern": String.raw`^app environment jobs prepare all targets with independent selected services \{"applicationPersistence":true\}$` },
+      { group: "app-environment-persistence-email", profile: "app", "test-pattern": String.raw`^app environment jobs prepare all targets with independent selected services \{"applicationPersistence":true,"transactionalEmailResend":true\}$` },
     ] },
   });
   const generatedJobNames = [
@@ -780,7 +782,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     'app environment jobs prepare all targets with independent selected services {"applicationPersistence":true,"transactionalEmailResend":true}',
   ];
   const generatedJobSelectors = generatedJobs.strategy.matrix.include.map(row => new RegExp(row["test-pattern"], "u"));
-  assert.deepEqual(generatedJobSelectors.map(selector => generatedJobNames.filter(name => selector.test(name)).length), [2, 2, 3]);
+  assert.deepEqual(generatedJobSelectors.map(selector => generatedJobNames.filter(name => selector.test(name)).length), [2, 2, 1, 1, 1]);
   for (const name of generatedJobNames) {
     assert.equal(generatedJobSelectors.filter(selector => selector.test(name)).length, 1, name);
     assert.equal(generatedJobSelectors.some(selector => selector.test(`${name} extra`)), false, name);
@@ -802,7 +804,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     if: "failure()",
     uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     with: {
-      name: "generated-jobs-${{ matrix.profile }}-failure-reports-attempt-${{ github.run_attempt }}",
+      name: "generated-jobs-${{ matrix.group }}-failure-reports-attempt-${{ github.run_attempt }}",
       path: "generated-visual-artifacts/application-environment-${{ matrix.profile }}-*/failure.json\ngenerated-visual-artifacts/application-environment-${{ matrix.profile }}-*/preview-diagnostics.json\n",
       "if-no-files-found": "ignore", "include-hidden-files": false, "retention-days": 7,
     },
@@ -1273,6 +1275,8 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
   for (const [name, mutate] of [
     ["missing profile", job => job.strategy.matrix.include.pop()],
     ["overlapping profiles", job => { job.strategy.matrix.include[1]["test-pattern"] = job.strategy.matrix.include[0]["test-pattern"]; }],
+    ["overlapping app selections", job => { job.strategy.matrix.include[4]["test-pattern"] = job.strategy.matrix.include[3]["test-pattern"]; }],
+    ["duplicate app group", job => { job.strategy.matrix.include[4].group = job.strategy.matrix.include[3].group; }],
     ["broadened profile", job => { job.strategy.matrix.include[0]["test-pattern"] = ".*"; }],
     ["empty profile selection", job => { job.strategy.matrix.include[0]["test-pattern"] = "^$"; }],
     ["cancelled siblings", job => { job.strategy["fail-fast"] = true; }],

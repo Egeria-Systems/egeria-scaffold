@@ -1463,6 +1463,11 @@ const previewDiagnosticIndicators = [
   ["network-connection-lost", /Network connection lost\./u],
   ["connection-refused", /\b(?:ECONNREFUSED|ERR_CONNECTION_REFUSED)\b/u],
   ["wrangler-error", /✘\s*\[ERROR\]/u],
+  ["broken-pipe", /\b(?:EPIPE|Broken pipe)\b/u],
+  ["webserver-started", /\bpw:webserver\s+Process started\b/u],
+  ["webserver-ready", /\bpw:webserver\s+WebServer available\b/u],
+  ["webserver-teardown-started", /\bpw:webserver\s+Terminating the WebServer\b/u],
+  ["webserver-teardown-finished", /\bpw:webserver\s+Terminated the WebServer\b/u],
 ];
 
 function inspectPreviewOutput(value) {
@@ -1471,9 +1476,14 @@ function inspectPreviewOutput(value) {
   const bytes = Buffer.byteLength(value);
   if (bytes > isolatedProcessOptions.maxBuffer) return { status: "refused" };
   const text = stripVTControlCharacters(value.toString());
+  const observations = previewDiagnosticIndicators
+    .map(([identifier, pattern]) => ({ identifier, position: text.search(pattern) }))
+    .filter(({ position }) => position !== -1);
   return {
     status: "inspected", bytes,
-    indicators: previewDiagnosticIndicators.filter(([, pattern]) => pattern.test(text)).map(([identifier]) => identifier),
+    indicators: observations.map(({ identifier }) => identifier),
+    // First recognized matches within this stream; not a complete event timeline.
+    firstOccurrences: [...observations].sort((left, right) => left.position - right.position).map(({ identifier }) => identifier),
   };
 }
 
@@ -1597,6 +1607,12 @@ async function readPreviewDiagnosticFile(path, openFile = open) {
   } finally { await handle.close(); }
 }
 
+const previewResponseDisposalErrors = new Map([
+  ["Target page, context or browser has been closed", "target-closed"],
+  ["Test ended.", "test-ended"],
+  ["Response has been disposed", "response-disposed"],
+]);
+
 function projectPreviewFailureSite(result, testRoot, sources) {
   const projected = {};
   const location = result.errorLocation;
@@ -1608,6 +1624,17 @@ function projectPreviewFailureSite(result, testRoot, sources) {
       const line = source.lines[location.line - 1];
       if (typeof line === "string" && location.column <= line.length) {
         projected.errorLocation = { file: source.file, line: location.line, column: location.column };
+        if (name === "application-transport.ts" && ["failed", "timedOut"].includes(result.status) &&
+            /^\s*finally \{ await response\??\.dispose\(\); \}$/u.test(line)) {
+          const message = result.error?.message;
+          if (typeof message !== "string") projected.responseDisposalError = "unavailable";
+          else {
+            const reason = stripVTControlCharacters(message).split(/\r?\n/u, 1)[0]
+              .replace(/^Error: /u, "").replace(/^apiResponse\.dispose: /u, "");
+            projected.responseDisposalError = previewResponseDisposalErrors.get(reason) ??
+              (/^Test timeout of [1-9]\d*ms exceeded\.$/u.test(reason) ? "test-timeout" : "unclassified");
+          }
+        }
       }
       break;
     }
@@ -1680,8 +1707,11 @@ async function runExpectedCommand(runCommand, input, failureCode) {
   const logsBefore = failureCode === "BROWSER_PREVIEW_FAILED"
     ? await snapshotPreviewLogs(input.environment.HOME)
     : undefined;
+  const commandInput = failureCode === "BROWSER_PREVIEW_FAILED"
+    ? { ...input, environment: { ...input.environment, DEBUG: "pw:webserver" } }
+    : input;
   try {
-    return await runCommand(input);
+    return await runCommand(commandInput);
   } catch (cause) {
     const error = new GeneratedFixtureVerificationError(failureCode);
     if (logsBefore !== undefined) {

@@ -1308,6 +1308,7 @@ test("preview diagnostics retain process and new server evidence without raw out
         return owner;
       },
       async runCommand(input) {
+        assert.equal(input.environment.DEBUG, input.arguments.at(-1) === "test:e2e:preview" ? "pw:webserver" : undefined);
         const logs = previewLogDirectory(input.environment.HOME);
         if (input.arguments.at(-1) === "test:e2e:dev") {
           await mkdir(logs, { recursive: true });
@@ -1391,6 +1392,37 @@ function previewLogDirectory(home) {
     : process.platform === "win32" ? "AppData/Roaming/xdg.config" : ".config";
   return join(home, configuration, ".wrangler/logs");
 }
+
+
+test("preview diagnostics retain only first recognized observations within each stream", async () => {
+  const result = await inspectFailedPreviewDiagnostics({
+    async failPreview(input) {
+      assert.equal(input.environment.DEBUG, "pw:webserver");
+      throw Object.assign(new Error("PRIVATE_CAUSE"), { code: 1, stdout: "PRIVATE_STDOUT",
+        stderr: [
+          "\u001b[35mpw:webserver\u001b[0m Process started +0ms",
+          "pw:webserver WebServer available +1ms",
+          "[WebServer] Error inside ProxyWorker PRIVATE_TOKEN",
+          "[WebServer] EPIPE PRIVATE_PATH",
+          "pw:webserver Terminating the WebServer +2ms",
+          "[WebServer] Error inside ProxyWorker PRIVATE_REPEATED",
+          "pw:webserver Terminated the WebServer +1ms",
+          "Authorization: Bearer PRIVATE_TOKEN Cookie: PRIVATE_COOKIE",
+        ].join("\n"),
+      });
+    },
+  });
+  assert.deepEqual(result.diagnostics.stderr.indicators, [
+    "proxy-worker-error", "broken-pipe", "webserver-started", "webserver-ready",
+    "webserver-teardown-started", "webserver-teardown-finished",
+  ]);
+  assert.deepEqual(result.diagnostics.stderr.firstOccurrences, [
+    "webserver-started", "webserver-ready", "proxy-worker-error", "broken-pipe",
+    "webserver-teardown-started", "webserver-teardown-finished",
+  ]);
+  assert.deepEqual(result.diagnostics.stdout.firstOccurrences, []);
+  assert.equal(result.primaryError.code, "BROWSER_PREVIEW_FAILED");
+});
 
 test("preview diagnostics inspect the native Wrangler log directory", async () => {
   const result = await inspectFailedPreviewDiagnostics({
@@ -1790,6 +1822,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         assert.deepEqual(Object.keys(input.environment).sort(), [
           ...inheritedKeys,
           ...(process.platform === "darwin" ? ["__CF_USER_TEXT_ENCODING"] : []),
+          ...(input.arguments.at(-1) === "test:e2e:preview" ? ["DEBUG"] : []),
           "CI",
           "HOME",
           "NEXT_TELEMETRY_DISABLED",
@@ -2428,6 +2461,69 @@ test("application environment preview failure sites retain only exact emitted tr
     ...unknownMessages.map(() => [{ ...oldResult,
       errorLocation: { file: "apps/web/tests/e2e/application-transport.ts", line: 8, column: 1 } }]),
   ]);
+});
+
+
+test("application environment preview disposal diagnostics publish closed categories at bound operations", async context => {
+  const examples = [
+    ["apiResponse.dispose: Target page, context or browser has been closed", "target-closed"],
+    ["Error: apiResponse.dispose: Test ended.\nPRIVATE_STACK", "test-ended"],
+    ["apiResponse.dispose: Test timeout of 30000ms exceeded.", "test-timeout"],
+    ["Response has been disposed", "response-disposed"],
+    ["apiResponse.dispose: PRIVATE_FAILURE", "unclassified"],
+    ["PRIVATE_PREFIX Target page, context or browser has been closed", "unclassified"],
+    ["apiResponse.dispose: Test ended. PRIVATE_SUFFIX", "unclassified"],
+    [undefined, "unavailable"],
+    [42, "unavailable"],
+  ];
+  let publicDiagnostics;
+  const { diagnostics, previewInput } = await failPreviewWithReport(context, async ({ report, input }) => {
+    const lines = (await readFile(join(input.cwd, "apps/web/tests/e2e/application-transport.ts"), "utf8")).split(/\r?\n/u);
+    const line = lines.findIndex(value => value.trim() === "finally { await response?.dispose(); }") + 1;
+    assert.ok(line > 0);
+    const errorLocation = { file: report.config.rootDir + "/application-transport.ts", line,
+      column: lines[line - 1].indexOf("dispose") + 1 };
+    const spec = report.suites[0].specs[0];
+    const failed = spec.tests[0];
+    spec.tests = examples.map(([message]) => ({ ...failed, results: [{
+      ...failed.results[0], errorLocation, error: { message, stack: "PRIVATE_STACK" },
+      errors: [{ message: "PRIVATE_SECONDARY" }],
+    }] }));
+    await writeFile(input.environment.PLAYWRIGHT_JSON_OUTPUT_FILE, JSON.stringify(report));
+  }, {
+    captureVisualArtifacts: async input => {
+      const artifactRoot = join(dirname(dirname(input.validationRoot)), "reports");
+      await captureVisualFailureArtifactsForTesting({ ...input, artifactRoot });
+      publicDiagnostics = await readFile(join(artifactRoot, (await readdir(artifactRoot))[0], "preview-diagnostics.json"), "utf8");
+    },
+  });
+  assert.equal(previewInput.environment.DEBUG, "pw:webserver");
+  assert.deepEqual(diagnostics.cases.map(value => value.results[0].responseDisposalError), examples.map(([, category]) => category));
+  assert.deepEqual(JSON.parse(publicDiagnostics).playwright, diagnostics);
+  assert.doesNotMatch(publicDiagnostics, /PRIVATE_|message|stack|attachments|https?:|file:|\/Users\/|\/tmp\//u);
+});
+
+test("application environment preview disposal diagnostics require a failing bound operation and primary error", async context => {
+  const { diagnostics } = await failPreviewWithReport(context, async ({ report, input }) => {
+    const lines = (await readFile(join(input.cwd, "apps/web/tests/e2e/application-transport.ts"), "utf8")).split(/\r?\n/u);
+    const line = lines.findIndex(value => value.trim() === "finally { await response?.dispose(); }") + 1;
+    assert.ok(line > 0);
+    const location = { file: report.config.rootDir + "/application-transport.ts", line, column: 1 };
+    const spec = report.suites[0].specs[0];
+    const failed = spec.tests[0];
+    const attempt = { ...failed.results[0], errorLocation: location, error: { message: "apiResponse.dispose: Test ended." } };
+    spec.tests = [
+      { ...failed, results: [{ ...attempt, errorLocation: { ...location, line: 8 } }] },
+      { ...failed, results: [{ ...attempt, errorLocation: { ...location, file: report.config.rootDir + "/site-quality.spec.ts", line: 46 } }] },
+      { ...failed, results: [{ ...attempt, errorLocation: { ...location, file: "/PRIVATE_FOREIGN/application-transport.ts" } }] },
+      { ...failed, results: [{ ...attempt, errorLocation: { ...location, column: 0 } }] },
+      { ...failed, results: [{ ...attempt, status: "passed" }] },
+      { ...failed, results: [{ ...attempt, error: undefined, errors: [attempt.error] }] },
+    ];
+    await writeFile(input.environment.PLAYWRIGHT_JSON_OUTPUT_FILE, JSON.stringify(report));
+  });
+  assert.deepEqual(diagnostics.cases.map(value => value.results[0].responseDisposalError),
+    [undefined, undefined, undefined, undefined, undefined, "unavailable"]);
 });
 
 test("application environment preview failure sites preserve old results when metadata is unavailable", async context => {
