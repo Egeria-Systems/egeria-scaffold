@@ -11,6 +11,7 @@ import {
   opendir,
   readFile,
   readdir,
+  realpath,
   writeFile,
 } from "node:fs/promises";
 import { constants as operatingSystemConstants, tmpdir } from "node:os";
@@ -1544,6 +1545,106 @@ async function inspectPreviewLogs(home, before) {
   }
 }
 
+const previewTestFiles = new Map([
+  "site-quality", "site-routing", "multilingual-routing", "analytics-consent", "calendly-booking", "web3forms-contact",
+].map(name => [`${name}.spec.ts`, `apps/web/tests/e2e/${name}.spec.ts`]));
+const previewTestResultCategories = Object.freeze({
+  passed: "none", failed: "test-failed", timedOut: "test-timeout", skipped: "none", interrupted: "interrupted",
+});
+const previewTestResultLimit = 128;
+
+async function preparePreviewTestReport(owner, supportIdentity, validationRoot, sourceRoot) {
+  try {
+    const directories = [owner, supportIdentity];
+    for (const root of [validationRoot, sourceRoot]) {
+      let path = root;
+      for (const part of ["", "apps", "web", "tests", "e2e"]) {
+        path = join(path, part);
+        directories.push(await readPathIdentity(path));
+      }
+    }
+    if (!(await Promise.all(directories.map(pathIdentityMatches))).every(Boolean)) return undefined;
+    const testRoot = (await realpath(join(validationRoot, "apps/web/tests/e2e"))).replaceAll("\\", "/");
+    const reportPath = join(supportIdentity.path, "preview-results.json");
+    try { await lstat(reportPath); return undefined; }
+    catch (error) { if (error?.code !== "ENOENT") return undefined; }
+    return { reportPath, testRoot, directories };
+  } catch { return undefined; }
+}
+
+async function readPreviewDiagnosticFile(path, openFile = open) {
+  const before = await lstat(path);
+  if (!before.isFile() || before.isSymbolicLink() || before.size > isolatedProcessOptions.maxBuffer) throw new Error();
+  const handle = await openFile(path, fileConstants.O_RDONLY | fileConstants.O_NOFOLLOW | fileConstants.O_NONBLOCK);
+  const unchanged = stats => stats.isFile() && stats.dev === before.dev && stats.ino === before.ino &&
+    stats.size === before.size && stats.mtimeMs === before.mtimeMs && stats.ctimeMs === before.ctimeMs;
+  try {
+    if (!unchanged(await handle.stat())) throw new Error();
+    const content = Buffer.alloc(before.size);
+    const result = await handle.read(content, 0, content.length, 0);
+    if (result.bytesRead !== content.length || !unchanged(await handle.stat()) || !unchanged(await lstat(path))) throw new Error();
+    return content;
+  } finally { await handle.close(); }
+}
+
+function projectPreviewTestReport(report, testRoot, sources) {
+  if (report?.config?.version !== "1.62.1" || typeof report.config.rootDir !== "string" ||
+    report.config.rootDir.replaceAll("\\", "/") !== testRoot || !Array.isArray(report.suites) ||
+    !Array.isArray(report.errors) || report.errors.length > previewTestResultLimit) throw new Error();
+  const cases = [];
+  let resultCount = 0;
+  const pending = [...report.suites].reverse();
+  while (pending.length > 0) {
+    const suite = pending.pop();
+    if (!suite || !Array.isArray(suite.specs) || (suite.suites !== undefined && !Array.isArray(suite.suites))) throw new Error();
+    for (const spec of suite.specs) {
+      const source = sources.get(spec?.file);
+      const line = source?.lines[spec.line - 1];
+      if (!source || !Number.isInteger(spec.line) || spec.line < 1 || !Number.isInteger(spec.column) || spec.column < 1 ||
+        typeof line !== "string" || line.slice(0, spec.column - 1).trim() !== "" ||
+        !/^test\(/u.test(line.slice(spec.column - 1)) || !Array.isArray(spec.tests) || spec.tests.length === 0) throw new Error();
+      for (const test of spec.tests) {
+        if (!["expected", "unexpected", "flaky", "skipped"].includes(test?.status) || !Array.isArray(test.results)) throw new Error();
+        const selected = test.status === "unexpected" || test.status === "flaky";
+        if (test.results.length > 2 || (selected && test.results.length === 0)) throw new Error();
+        const results = test.results.map((result, retry) => {
+          if (result?.retry !== retry || !Object.hasOwn(previewTestResultCategories, result.status)) throw new Error();
+          return { retry, status: result.status, category: previewTestResultCategories[result.status] };
+        });
+        if (selected) {
+          resultCount += results.length;
+          if (resultCount > previewTestResultLimit) throw new Error();
+          cases.push({ file: source.file, line: spec.line, column: spec.column, outcome: test.status, results });
+        }
+      }
+    }
+    pending.push(...(suite.suites ?? []).toReversed());
+  }
+  return { status: "inspected", globalErrorCount: report.errors.length, cases };
+}
+
+async function inspectPreviewTestReport({ prepared, validationRoot, sourceRoot, sourceSnapshot, openReport }) {
+  if (prepared === undefined) return { status: "refused" };
+  try {
+    if (!(await Promise.all(prepared.directories.map(pathIdentityMatches))).every(Boolean)) throw new Error();
+    let content;
+    try { content = await readPreviewDiagnosticFile(prepared.reportPath, openReport); }
+    catch (error) { if (error?.code === "ENOENT") return { status: "absent" }; throw error; }
+    const sources = new Map();
+    for (const [name, file] of previewTestFiles) {
+      const entry = sourceSnapshot.find(item => item.path === file);
+      if (entry === undefined) continue;
+      const original = await readPreviewDiagnosticFile(join(sourceRoot, file));
+      const copied = await readPreviewDiagnosticFile(join(validationRoot, file));
+      if (fingerprint(original) !== entry.fingerprint || fingerprint(copied) !== entry.fingerprint) throw new Error();
+      sources.set(name, { file, lines: original.toString("utf8").split(/\r?\n/u) });
+    }
+    const result = projectPreviewTestReport(JSON.parse(content), prepared.testRoot, sources);
+    if (!(await Promise.all(prepared.directories.map(pathIdentityMatches))).every(Boolean)) throw new Error();
+    return result;
+  } catch { return { status: "refused" }; }
+}
+
 async function runExpectedCommand(runCommand, input, failureCode) {
   const logsBefore = failureCode === "BROWSER_PREVIEW_FAILED"
     ? await snapshotPreviewLogs(input.environment.HOME)
@@ -1932,7 +2033,8 @@ export function verifyApplicationEnvironmentProject(root) {
 
 export async function verifyApplicationEnvironmentProjectForTesting(root, adapters) {
   if (typeof adapters?.createOwner !== "function" || typeof adapters.runCommand !== "function" ||
-    (adapters.captureVisualArtifacts !== undefined && typeof adapters.captureVisualArtifacts !== "function")) fail("VERIFICATION_SETUP_FAILED");
+    (adapters.captureVisualArtifacts !== undefined && typeof adapters.captureVisualArtifacts !== "function") ||
+    (adapters.openPreviewReport !== undefined && typeof adapters.openPreviewReport !== "function")) fail("VERIFICATION_SETUP_FAILED");
   const core = await import("../packages/builder-core/dist/index.js");
   const { derivePnpmToolEnvironment } = await import("../packages/builder-core/dist/generation/verify-generated-project.js");
   const toolEnvironment = await (adapters.derivePnpmToolEnvironment ?? derivePnpmToolEnvironment)("pnpm");
@@ -1961,6 +2063,7 @@ export async function verifyApplicationEnvironmentProjectForTesting(root, adapte
       const supportRoot = join(owner.path, target + "-support");
       await cp(fixedRoot, validationRoot, { recursive: true, force: false, errorOnExist: true, dereference: false });
       await mkdir(supportRoot, { mode: 0o700 });
+      const supportIdentity = await readPathIdentity(supportRoot);
       const support = await createSupportPaths(supportRoot);
       const revision = "a".repeat(40); // Explicit synthetic source identity, never a reviewed commit assertion.
       const siteOrigin = `https://${target}.application-test.invalid`;
@@ -1978,8 +2081,8 @@ export async function verifyApplicationEnvironmentProjectForTesting(root, adapte
         }
       }
       const commands = [];
-      const run = async (arguments_, failureCode) => {
-        const result = await runExpectedCommand(adapters.runCommand, { executable: "pnpm", arguments: arguments_, cwd: validationRoot, environment, timeout: commandTimeoutMilliseconds }, failureCode);
+      const run = async (arguments_, failureCode, commandEnvironment = environment) => {
+        const result = await runExpectedCommand(adapters.runCommand, { executable: "pnpm", arguments: arguments_, cwd: validationRoot, environment: commandEnvironment, timeout: commandTimeoutMilliseconds }, failureCode);
         commands.push({ arguments: arguments_, status: "passed" });
         return result;
       };
@@ -2007,7 +2110,19 @@ export async function verifyApplicationEnvironmentProjectForTesting(root, adapte
       if (foundation) await run(["--dir", "apps/web", "run", "test:integration:cloudflare"], "WORKER_INTEGRATION_FAILED");
       if (persistence) await run(["--dir", "apps/web", "run", "test:integration:bindings"], "BINDING_INTEGRATION_FAILED");
       await run(artifact("verify"), "PREPARED_ARTIFACT_FAILED");
-      await run(["--dir", "apps/web", "run", "test:e2e:preview"], "BROWSER_PREVIEW_FAILED");
+      const preparedReport = await preparePreviewTestReport(owner, supportIdentity, validationRoot, fixedRoot);
+      try {
+        await run(["--dir", "apps/web", "run", "test:e2e:preview", ...(preparedReport === undefined ? [] : ["--reporter=list,html,json"])],
+          "BROWSER_PREVIEW_FAILED", preparedReport === undefined ? environment : { ...environment,
+            PLAYWRIGHT_JSON_OUTPUT_FILE: preparedReport.reportPath,
+            PLAYWRIGHT_HTML_OPEN: "never", PLAYWRIGHT_HTML_OUTPUT_DIR: join(validationRoot, "apps/web/playwright-report"),
+          });
+      } catch (error) {
+        error.previewDiagnostics = { ...error.previewDiagnostics, playwright: await inspectPreviewTestReport({
+          prepared: preparedReport, validationRoot, sourceRoot: fixedRoot, sourceSnapshot: sourceBefore, openReport: adapters.openPreviewReport,
+        }) };
+        throw error;
+      }
       await run(artifact("verify"), "PREPARED_ARTIFACT_FAILED");
       if (!(await readFile(receiptPath)).equals(receiptBefore)) fail("PREPARED_ARTIFACT_CHANGED");
       targets.push({ target, sourceIdentity: { revision, synthetic: true }, publicOrigin: siteOrigin,
