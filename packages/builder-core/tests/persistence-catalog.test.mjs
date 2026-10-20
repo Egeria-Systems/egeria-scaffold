@@ -120,14 +120,14 @@ test("environment persistence resolves the complete app tuple without changing o
   for (const profile of ["portfolio", "site"]) {
     assert.equal(resolveCapabilities({ profile, requestedCapabilities: ["application-persistence"] }, result.value, context.profiles).ok, false);
   }
-  for (const identifier of ["transactional-email-resend", "background-job-delivery"]) {
+  for (const identifier of ["background-job-delivery"]) {
     assert.equal(resolveCapabilities({ profile: "app", requestedCapabilities: [identifier] }, result.value, context.profiles).ok, false);
   }
 });
 
 test("environment persistence rejects partial and mixed snapshots at the catalog and rendering-context boundaries", () => {
   const context = createApplicationEnvironmentRenderingContext(true);
-  const exact = { standards: "0.8.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.8.0", applicationPersistence: "0.2.0" };
+  const exact = { standards: "0.8.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.8.0", applicationPersistence: "0.2.0", transactionalEmailResend: "0.2.0" };
   assert.deepEqual(context.catalogSnapshot, exact);
   assert.equal(isApplicationEnvironmentRenderingContext(context), true);
   for (const snapshot of [
