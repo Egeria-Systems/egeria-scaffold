@@ -9,6 +9,8 @@ import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import type { ProfileIdentifier, ProfileRecipe } from "../contracts/profile.js";
 import {
   analyticsSettingsSchema,
+  applicationEnvironmentAnalyticsSettingsSchema,
+  type ApplicationEnvironmentAnalyticsSettings,
   type AnalyticsSettings,
   type ProjectConfiguration,
   type ApplicationEnvironmentProjectConfiguration,
@@ -52,9 +54,9 @@ export type CapabilityAdditionPlan = Readonly<{
   baseRevision: string;
   profile: ProfileIdentifier;
   capability: Readonly<{
-    identifier: "analytics" | "multilingual" | "application-persistence" | "transactional-email-resend";
+    identifier: "multilingual" | "application-persistence" | "transactional-email-resend";
     version: "0.1.0";
-  }> | Readonly<{ identifier: "contact-form-web3forms" | "booking-calendly"; version: "0.1.0" | "0.2.0" }>
+  }> | Readonly<{ identifier: "analytics" | "contact-form-web3forms" | "booking-calendly"; version: "0.1.0" | "0.2.0" }>
     | Readonly<{ identifier: "background-job-delivery"; version: "0.2.0" }>;
   settings:
     | Readonly<{
@@ -172,7 +174,7 @@ function sameOrderedValues(
 
 function fingerprintPlan(input: Readonly<{
   plan: CapabilityAdditionPlanBody;
-  settings: AnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings | null;
+  settings: AnalyticsSettings | ApplicationEnvironmentAnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings | null;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   persistenceSnapshot?: string;
 }>): `sha256:${string}` {
@@ -511,13 +513,13 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
-  settings?: AnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings;
+  settings?: AnalyticsSettings | ApplicationEnvironmentAnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings;
   renderingContext?: ApplicationEnvironmentRenderingContext;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
   if (input.renderingContext !== undefined && (
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    (capabilityValue !== "contact-form-web3forms" && capabilityValue !== "booking-calendly") ||
+    (capabilityValue !== "contact-form-web3forms" && capabilityValue !== "booking-calendly" && capabilityValue !== "analytics") ||
     (capabilityValue === "contact-form-web3forms" && input.settings !== undefined)
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
 
@@ -533,6 +535,8 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
 
+  const environmentAnalyticsSettings = input.renderingContext !== undefined && capabilityValue === "analytics"
+    ? applicationEnvironmentAnalyticsSettingsSchema.safeParse(input.settings) : undefined;
   const environmentBookingSettings = input.renderingContext !== undefined && capabilityValue === "booking-calendly"
     ? applicationEnvironmentBookingSettingsSchema.safeParse(input.settings) : undefined;
   const settingsResult = input.renderingContext === undefined && capabilityValue === "booking-calendly"
@@ -540,10 +544,11 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     : undefined;
   const contactSettingsResult = input.renderingContext === undefined && capabilityValue === "contact-form-web3forms"
     ? web3FormsContactSettingsSchema.safeParse(input.settings) : undefined;
-  const analyticsSettingsResult = capabilityValue === "analytics"
+  const analyticsSettingsResult = input.renderingContext === undefined && capabilityValue === "analytics"
     ? analyticsSettingsSchema.safeParse(input.settings)
     : undefined;
   if (
+    (environmentAnalyticsSettings !== undefined && !environmentAnalyticsSettings.success) ||
     (environmentBookingSettings !== undefined && !environmentBookingSettings.success) ||
     (settingsResult !== undefined && !settingsResult.success) ||
     (contactSettingsResult !== undefined && !contactSettingsResult.success) ||
@@ -552,6 +557,10 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   ) {
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
+
+  const parsedAnalyticsSettings = environmentAnalyticsSettings?.success === true
+    ? environmentAnalyticsSettings.data
+    : analyticsSettingsResult?.success === true ? analyticsSettingsResult.data : undefined;
 
   const snapshot = input.renderingContext === undefined
     ? await readVerifiedProjectSnapshot(input.reader)
@@ -636,6 +645,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   const environmentProject = project.schemaVersion === "2.0.0" ? project : undefined;
   const environmentRenderRequest = {
     ...commonRenderRequest,
+    ...(environmentProject?.capabilitySettings.analytics === undefined ? {} : { analytics: environmentProject.capabilitySettings.analytics }),
     ...(environmentProject?.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: environmentProject.capabilitySettings["booking-calendly"] }),
     ...(project.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
   };
@@ -690,6 +700,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     ...environmentRenderRequest,
     ...(capabilityValue === "contact-form-web3forms" ? { contactFormWeb3Forms: true as const } : {}),
     ...(environmentBookingSettings?.success ? { bookingCalendly: environmentBookingSettings.data } : {}),
+    ...(environmentAnalyticsSettings?.success ? { analytics: environmentAnalyticsSettings.data } : {}),
   }, input.renderingContext);
 
   if (!desiredResult.ok) {
@@ -729,31 +740,31 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       status: "approval-required",
       baseRevision: input.git.identity.revision,
       profile: project.originProfile,
-      capability: capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly"
+      capability: capabilityValue === "analytics" || capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly"
         ? { identifier: capabilityValue, version: input.renderingContext === undefined ? "0.1.0" : "0.2.0" }
         : capabilityValue === "background-job-delivery"
           ? { identifier: capabilityValue, version: "0.2.0" }
           : { identifier: capabilityValue, version: "0.1.0" },
       settings:
-        analyticsSettingsResult?.success === true
+        parsedAnalyticsSettings !== undefined
           ? {
-              consentPolicy: analyticsSettingsResult.data.consent.policy,
+              consentPolicy: parsedAnalyticsSettings.consent.policy,
               providers: [
-                ...(analyticsSettingsResult.data.providers.cloudflareWebAnalytics === undefined
+                ...(parsedAnalyticsSettings.providers.cloudflareWebAnalytics === undefined
                   ? []
                   : ["cloudflare-web-analytics" as const]),
-                ...(analyticsSettingsResult.data.providers.googleAnalytics4 === undefined
+                ...(parsedAnalyticsSettings.providers.googleAnalytics4 === undefined
                   ? []
                   : ["google-analytics-4" as const]),
-                ...(analyticsSettingsResult.data.providers.microsoftClarity === undefined
+                ...(parsedAnalyticsSettings.providers.microsoftClarity === undefined
                   ? []
                   : ["microsoft-clarity" as const]),
               ],
               operationalIntegrations: [
-                ...(analyticsSettingsResult.data.operationalIntegrations.googleSearchConsole === undefined
+                ...(parsedAnalyticsSettings.operationalIntegrations.googleSearchConsole === undefined
                   ? []
                   : ["google-search-console" as const]),
-                ...(analyticsSettingsResult.data.operationalIntegrations.lookerStudio === undefined
+                ...(parsedAnalyticsSettings.operationalIntegrations.lookerStudio === undefined
                   ? []
                   : ["looker-studio" as const]),
               ],
@@ -803,12 +814,10 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       planFingerprint: fingerprintPlan({
         plan,
         settings:
-          analyticsSettingsResult?.success === true
-            ? analyticsSettingsResult.data
-            : environmentBookingSettings?.success === true ? environmentBookingSettings.data
+          parsedAnalyticsSettings ?? (environmentBookingSettings?.success === true ? environmentBookingSettings.data
             : settingsResult?.success === true
               ? settingsResult.data
-              : contactSettingsResult?.success === true ? contactSettingsResult.data : null,
+              : contactSettingsResult?.success === true ? contactSettingsResult.data : null),
         git: input.git,
         ...(persistenceSnapshot === undefined ? {} : { persistenceSnapshot }),
       }),
@@ -820,7 +829,7 @@ export async function planCapabilityAddition(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
-  settings?: AnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings;
+  settings?: AnalyticsSettings | ApplicationEnvironmentAnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings;
   renderingContext?: ApplicationEnvironmentRenderingContext;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   return planCapabilityAdditionUnchecked(input);
