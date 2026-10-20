@@ -42,9 +42,9 @@ export function resolveRecipeLockfileVersion(
     if ((foundation && dependencies.effect !== "4.0.0-rc.112") ||
         (identity.originProfile === "app" && !foundation)) return undefined;
     if (dependencies["drizzle-orm"] !== undefined || devDependencies["drizzle-kit"] !== undefined) {
-      return (literalLintRoots || successor) && identity.originProfile === "app" && dependencies["drizzle-orm"] === "0.45.2" &&
+      return identity.originProfile === "app" && dependencies["drizzle-orm"] === "0.45.2" &&
         devDependencies["drizzle-kit"] === "0.31.10" && devDependencies["@cloudflare/workers-types"] === "5.20260730.1"
-        ? literalLintRoots ? "app-0.2.3-persistence" : "app-0.2.2-persistence" : undefined;
+        ? (literalLintRoots || environment) ? "app-0.2.3-persistence" : "app-0.2.2-persistence" : undefined;
     }
     if (environment) {
       if (identity.originProfile === "app") return "app-0.3.0";
