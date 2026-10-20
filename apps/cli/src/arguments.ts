@@ -125,9 +125,12 @@ export type ApplicationEnvironmentCliCommand =
       contactFormWeb3Forms?: true;
     }>
   | Readonly<{ kind: "infer" | "doctor"; directory: string }>
-  | (Extract<CliCommand, { kind: "plan-add" | "apply-add" | "plan-remove" | "apply-remove" }> & Readonly<{
-      capability: "contact-form-web3forms";
-      settings?: never;
+  | (Readonly<{ kind: "plan-add"; directory: string }> | Readonly<{ kind: "apply-add"; directory: string; approvedPlanFingerprint: string }>) & (
+      Readonly<{ capability: "contact-form-web3forms"; settings?: never }> |
+      Readonly<{ capability: "booking-calendly"; settings: ApplicationEnvironmentBookingSettings }>
+    )
+  | (Extract<CliCommand, { kind: "plan-remove" | "apply-remove" }> & Readonly<{
+      capability: "contact-form-web3forms" | "booking-calendly";
       persistenceRemovalPath?: never;
       persistenceRemovalHumanReviewPath?: never;
     }>);
@@ -460,7 +463,7 @@ function parseAdd(
   kind: "plan-add" | "apply-add",
   arguments_: readonly string[],
   schemaVersion: "1.0.0" | "2.0.0",
-): ValidationResult<CliCommand> {
+): ValidationResult<CliCommand | ApplicationEnvironmentCliCommand> {
   try {
     const applying = kind === "apply-add";
     const { values, tokens } = parseArgs({
@@ -480,12 +483,13 @@ function parseAdd(
     });
     const directory = values.directory;
     const capability = values.capability;
-    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms") return invalidArguments();
+    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms" && capability !== "booking-calendly") return invalidArguments();
     const approvedPlanFingerprint = values["approved-plan"];
     const settings = calendlyBookingSettingsSchema.safeParse({
       destination: values["calendly-url"],
       mode: values["calendly-mode"],
     });
+    const environmentSettings = applicationEnvironmentBookingSettingsSchema.safeParse({ mode: values["calendly-mode"] });
     const analyticsSettings = parseAnalyticsSettings(values);
     const calendlySelection = capability === "booking-calendly";
     const analyticsSelection = capability === "analytics";
@@ -494,7 +498,7 @@ function parseAdd(
     const multilingualSelection = capability === "multilingual";
     const persistenceSelection = capability === "application-persistence";
     const capabilityOptions = calendlySelection
-      ? ["calendly-url", "calendly-mode"]
+      ? schemaVersion === "2.0.0" ? ["calendly-mode"] : ["calendly-url", "calendly-mode"]
       : analyticsSelection
         ? selectedAnalyticsOptions(values)
         : contactSelection && schemaVersion === "1.0.0" ? ["web3forms-access-key"] : [];
@@ -510,18 +514,29 @@ function parseAdd(
       !validDirectory(directory) ||
       (!analyticsSelection && !calendlySelection &&
         !multilingualSelection && !persistenceSelection && !contactSelection && capability !== "transactional-email-resend" && capability !== "background-job-delivery") ||
-      (calendlySelection && !settings.success) ||
+      (calendlySelection && !(schemaVersion === "2.0.0" ? environmentSettings.success : settings.success)) ||
       (contactSelection && schemaVersion === "1.0.0" && !contactSettings.success) ||
       (analyticsSelection && analyticsSettings?.success !== true)
     ) {
       return invalidArguments();
     }
 
+    if (schemaVersion === "2.0.0") {
+      const selection = capability === "booking-calendly" && environmentSettings.success
+        ? { capability, settings: environmentSettings.data } as const
+        : { capability: "contact-form-web3forms" } as const;
+      if (kind === "apply-add") {
+        if (!validApprovedPlanFingerprint(approvedPlanFingerprint)) return invalidArguments();
+        return { ok: true, value: { kind, directory, ...selection, approvedPlanFingerprint } };
+      }
+      return { ok: true, value: { kind, directory, ...selection } };
+    }
+
     const parsedSettings = calendlySelection && settings.success
       ? { settings: settings.data }
       : analyticsSelection && analyticsSettings?.success === true
         ? { settings: analyticsSettings.data }
-        : contactSelection && schemaVersion === "1.0.0" && contactSettings.success ? { settings: contactSettings.data } : {};
+        : contactSelection && contactSettings.success ? { settings: contactSettings.data } : {};
 
     if (kind === "apply-add") {
       if (!validApprovedPlanFingerprint(approvedPlanFingerprint)) {
@@ -574,7 +589,7 @@ function parseRemove(
     });
     const directory = values.directory;
     const capability = values.capability;
-    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms") return invalidArguments();
+    if (schemaVersion === "2.0.0" && capability !== "contact-form-web3forms" && capability !== "booking-calendly") return invalidArguments();
     const approvedPlanFingerprint = values["approved-plan"];
     const persistenceSelection = capability === "application-persistence";
     const jobSelection = capability === "background-job-delivery";
