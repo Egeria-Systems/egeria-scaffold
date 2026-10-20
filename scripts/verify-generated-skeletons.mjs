@@ -1548,6 +1548,16 @@ async function inspectPreviewLogs(home, before) {
 const previewTestFiles = new Map([
   "site-quality", "site-routing", "multilingual-routing", "analytics-consent", "calendly-booking", "web3forms-contact",
 ].map(name => [`${name}.spec.ts`, `apps/web/tests/e2e/${name}.spec.ts`]));
+const previewFailureSiteFiles = new Map([
+  ...previewTestFiles,
+  ["application-test.ts", "apps/web/tests/e2e/application-test.ts"],
+  ["application-transport.ts", "apps/web/tests/e2e/application-transport.ts"],
+]);
+const previewTransportCodes = new Set([
+  "ORIGIN_INVALID", "CREDENTIALS_INVALID", "DEBUG_FORBIDDEN", "DIAGNOSTICS_FORBIDDEN", "DEVELOPMENT_MODE_INVALID",
+  "DESTINATION_INVALID", "REQUEST_FAILED", "REDIRECT_INVALID", "REDIRECT_LIMIT", "NAVIGATION_FAILED",
+  "BROWSER_REDIRECT_FORBIDDEN", "READINESS_FAILED", "BROWSER_REQUEST_BLOCKED",
+].map(code => `APPLICATION_TRANSPORT_${code}`));
 const previewTestResultCategories = Object.freeze({
   passed: "none", failed: "test-failed", timedOut: "test-timeout", skipped: "none", interrupted: "interrupted",
 });
@@ -1587,6 +1597,26 @@ async function readPreviewDiagnosticFile(path, openFile = open) {
   } finally { await handle.close(); }
 }
 
+function projectPreviewFailureSite(result, testRoot, sources) {
+  const projected = {};
+  const location = result.errorLocation;
+  if (typeof location?.file === "string" && Number.isInteger(location.line) && location.line > 0 &&
+    Number.isInteger(location.column) && location.column > 0) {
+    const file = location.file.replaceAll("\\", "/");
+    for (const [name, source] of sources) {
+      if (file !== `${testRoot}/${name}`) continue;
+      const line = source.lines[location.line - 1];
+      if (typeof line === "string" && location.column <= line.length) {
+        projected.errorLocation = { file: source.file, line: location.line, column: location.column };
+      }
+      break;
+    }
+  }
+  const code = result.error?.message;
+  if (sources.has("application-transport.ts") && previewTransportCodes.has(code)) projected.transportCode = code;
+  return projected;
+}
+
 function projectPreviewTestReport(report, testRoot, sources) {
   if (report?.config?.version !== "1.62.1" || typeof report.config.rootDir !== "string" ||
     report.config.rootDir.replaceAll("\\", "/") !== testRoot || !Array.isArray(report.suites) ||
@@ -1598,7 +1628,7 @@ function projectPreviewTestReport(report, testRoot, sources) {
     const suite = pending.pop();
     if (!suite || !Array.isArray(suite.specs) || (suite.suites !== undefined && !Array.isArray(suite.suites))) throw new Error();
     for (const spec of suite.specs) {
-      const source = sources.get(spec?.file);
+      const source = previewTestFiles.has(spec?.file) ? sources.get(spec.file) : undefined;
       const line = source?.lines[spec.line - 1];
       if (!source || !Number.isInteger(spec.line) || spec.line < 1 || !Number.isInteger(spec.column) || spec.column < 1 ||
         typeof line !== "string" || line.slice(0, spec.column - 1).trim() !== "" ||
@@ -1609,7 +1639,8 @@ function projectPreviewTestReport(report, testRoot, sources) {
         if (test.results.length > 2 || (selected && test.results.length === 0)) throw new Error();
         const results = test.results.map((result, retry) => {
           if (result?.retry !== retry || !Object.hasOwn(previewTestResultCategories, result.status)) throw new Error();
-          return { retry, status: result.status, category: previewTestResultCategories[result.status] };
+          return { retry, status: result.status, category: previewTestResultCategories[result.status],
+            ...(selected ? projectPreviewFailureSite(result, testRoot, sources) : {}) };
         });
         if (selected) {
           resultCount += results.length;
@@ -1631,7 +1662,7 @@ async function inspectPreviewTestReport({ prepared, validationRoot, sourceRoot, 
     try { content = await readPreviewDiagnosticFile(prepared.reportPath, openReport); }
     catch (error) { if (error?.code === "ENOENT") return { status: "absent" }; throw error; }
     const sources = new Map();
-    for (const [name, file] of previewTestFiles) {
+    for (const [name, file] of previewFailureSiteFiles) {
       const entry = sourceSnapshot.find(item => item.path === file);
       if (entry === undefined) continue;
       const original = await readPreviewDiagnosticFile(join(sourceRoot, file));

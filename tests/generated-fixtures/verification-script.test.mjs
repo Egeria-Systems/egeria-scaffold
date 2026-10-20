@@ -2305,6 +2305,7 @@ async function failPreviewWithReport(context, writeReport, options = {}) {
     createOwner: async () => { owner = await (options.createOwner ?? createKnownOwner)(parent); return owner; },
     derivePnpmToolEnvironment: async () => ({}),
     openPreviewReport: options.openReport,
+    captureVisualArtifacts: options.captureVisualArtifacts,
     runCommand: async input => {
       if (input.arguments.includes("test:e2e:preview")) {
         previewInput = input;
@@ -2320,6 +2321,200 @@ async function failPreviewWithReport(context, writeReport, options = {}) {
   assert.equal(JSON.stringify(failure.verificationFailure).includes(parent), false);
   return { failure, owner, previewInput, diagnostics: failure.verificationFailure.previewDiagnostics.playwright };
 }
+
+
+test("application environment preview failure sites retain one validated location per selected attempt", async context => {
+  const { diagnostics } = await failPreviewWithReport(context, async ({ report, input }) => {
+    const spec = report.suites[0].specs[0];
+    const failed = spec.tests[0];
+    const attempt = failed.results[0];
+    const location = (file, line, column) => ({ file: `${report.config.rootDir}/${file}`, line, column });
+    const secondary = { message: "PRIVATE_SECONDARY", location: location("application-test.ts", 27, 7) };
+    const first = { ...attempt, errorLocation: location("site-quality.spec.ts", 46, 3),
+      errors: [secondary], error: { message: "PRIVATE_PRIMARY", cause: secondary }, steps: [secondary] };
+    const retry = { ...attempt, retry: 1, errorLocation: location("application-transport.ts", 8, 1) };
+    spec.tests = [
+      { ...failed, results: [first, retry] },
+      { ...failed, status: "flaky", results: [first,
+        { ...attempt, retry: 1, status: "passed", errorLocation: location("application-test.ts", 27, 7) }] },
+      { ...failed, status: "expected", results: [{ ...first, status: "passed" }] },
+      { ...failed, status: "skipped", results: [{ ...first, status: "skipped" }] },
+    ];
+    await writeFile(input.environment.PLAYWRIGHT_JSON_OUTPUT_FILE, JSON.stringify(report));
+  });
+  const first = { retry: 0, status: "failed", category: "test-failed",
+    errorLocation: { file: "apps/web/tests/e2e/site-quality.spec.ts", line: 46, column: 3 } };
+  assert.deepEqual(diagnostics, { status: "inspected", globalErrorCount: 0, cases: [
+    { file: "apps/web/tests/e2e/site-quality.spec.ts", line: 105, column: 1, outcome: "unexpected", results: [first,
+      { retry: 1, status: "failed", category: "test-failed",
+        errorLocation: { file: "apps/web/tests/e2e/application-transport.ts", line: 8, column: 1 } }] },
+    { file: "apps/web/tests/e2e/site-quality.spec.ts", line: 105, column: 1, outcome: "flaky", results: [first,
+      { retry: 1, status: "passed", category: "none",
+        errorLocation: { file: "apps/web/tests/e2e/application-test.ts", line: 27, column: 7 } }] },
+  ] });
+});
+
+test("application environment preview failure sites export only closed public metadata", async context => {
+  let publicDiagnostics;
+  let invalidLocationCount;
+  const { failure, diagnostics } = await failPreviewWithReport(context, async ({ report, input }) => {
+    const spec = report.suites[0].specs[0];
+    const failed = spec.tests[0];
+    const attempt = failed.results[0];
+    const file = `${report.config.rootDir}/site-quality.spec.ts`;
+    const location = { file, line: 46, column: 3 };
+    const invalidLocations = [
+      ...["/PRIVATE_FOREIGN/site-quality.spec.ts", "site-quality.spec.ts", "apps/web/tests/e2e/site-quality.spec.ts",
+        `${report.config.rootDir}/../e2e/site-quality.spec.ts`, `${report.config.rootDir}/./site-quality.spec.ts`,
+        `${report.config.rootDir}/%73ite-quality.spec.ts`, `${report.config.rootDir}/site-quality.spec.ts/extra`,
+        `${report.config.rootDir}/unbound.spec.ts`, `file://${file}`, "https://PRIVATE_HOST/site-quality.spec.ts",
+      ].map(file => ({ ...location, file })),
+      ...[0, -1, 1.5, 100000, Number.MAX_VALUE, "46"].map(line => ({ ...location, line })),
+      ...[0, -1, 1.5, 100000, Number.MAX_VALUE, "3"].map(column => ({ ...location, column })),
+    ];
+    invalidLocationCount = invalidLocations.length;
+    spec.tests = [
+      { ...failed, results: [{ ...attempt, errorLocation: { ...location, snippet: "PRIVATE_SNIPPET", url: "https://PRIVATE_HOST" },
+        error: { message: "APPLICATION_TRANSPORT_REQUEST_FAILED", stack: "PRIVATE_STACK", cause: "PRIVATE_CAUSE" } }] },
+      ...invalidLocations.map(errorLocation => ({ ...failed, results: [{ ...attempt, errorLocation }] })),
+    ];
+    await writeFile(input.environment.PLAYWRIGHT_JSON_OUTPUT_FILE, JSON.stringify(report));
+  }, {
+    captureVisualArtifacts: async input => {
+      const artifactRoot = join(dirname(dirname(input.validationRoot)), "reports");
+      await captureVisualFailureArtifactsForTesting({ ...input, artifactRoot });
+      const reportRoot = join(artifactRoot, (await readdir(artifactRoot))[0]);
+      publicDiagnostics = await readFile(join(reportRoot, "preview-diagnostics.json"), "utf8");
+    },
+  });
+  const oldResult = { retry: 0, status: "failed", category: "test-failed" };
+  assert.deepEqual(diagnostics.cases.map(value => value.results), [
+    [{ ...oldResult, errorLocation: { file: "apps/web/tests/e2e/site-quality.spec.ts", line: 46, column: 3 },
+      transportCode: "APPLICATION_TRANSPORT_REQUEST_FAILED" }],
+    ...Array.from({ length: invalidLocationCount }, () => [oldResult]),
+  ]);
+  assert.equal(failure.verificationFailure.artifactExportCode, undefined);
+  assert.deepEqual(JSON.parse(publicDiagnostics), failure.verificationFailure.previewDiagnostics);
+  assert.doesNotMatch(publicDiagnostics + JSON.stringify(failure.verificationFailure), /PRIVATE_|rootDir|snippet|stack|cause|https?:|file:|\/Users\/|\/private\/|\/tmp\//u);
+});
+
+test("application environment preview failure sites retain only exact emitted transport identifiers", async context => {
+  const codes = [
+    "APPLICATION_TRANSPORT_ORIGIN_INVALID", "APPLICATION_TRANSPORT_CREDENTIALS_INVALID",
+    "APPLICATION_TRANSPORT_DEBUG_FORBIDDEN", "APPLICATION_TRANSPORT_DIAGNOSTICS_FORBIDDEN",
+    "APPLICATION_TRANSPORT_DEVELOPMENT_MODE_INVALID", "APPLICATION_TRANSPORT_DESTINATION_INVALID",
+    "APPLICATION_TRANSPORT_REQUEST_FAILED", "APPLICATION_TRANSPORT_REDIRECT_INVALID", "APPLICATION_TRANSPORT_REDIRECT_LIMIT",
+    "APPLICATION_TRANSPORT_NAVIGATION_FAILED", "APPLICATION_TRANSPORT_BROWSER_REDIRECT_FORBIDDEN",
+    "APPLICATION_TRANSPORT_READINESS_FAILED", "APPLICATION_TRANSPORT_BROWSER_REQUEST_BLOCKED",
+  ];
+  const unknownMessages = ["APPLICATION_TRANSPORT_UNKNOWN", " APPLICATION_TRANSPORT_REQUEST_FAILED",
+    "APPLICATION_TRANSPORT_REQUEST_FAILED\n", "Error: APPLICATION_TRANSPORT_REQUEST_FAILED",
+    "PRIVATE_PREFIX_APPLICATION_TRANSPORT_REQUEST_FAILED", "APPLICATION_TRANSPORT_REQUEST_FAILED_PRIVATE_SUFFIX", "PRIVATE_PRIMARY"];
+  const { diagnostics } = await failPreviewWithReport(context, async ({ report, input }) => {
+    const spec = report.suites[0].specs[0];
+    const failed = spec.tests[0];
+    const attempt = failed.results[0];
+    spec.tests = [...codes, ...unknownMessages].map((message, index) => ({ ...failed, results: [{ ...attempt,
+      error: { message, cause: { message: "APPLICATION_TRANSPORT_REQUEST_FAILED" } },
+      errors: [{ message: "APPLICATION_TRANSPORT_REQUEST_FAILED" }],
+      errorLocation: index < codes.length ? { file: "/PRIVATE_UNKNOWN", line: 8, column: 1 }
+        : { file: `${report.config.rootDir}/application-transport.ts`, line: 8, column: 1 },
+    }] }));
+    await writeFile(input.environment.PLAYWRIGHT_JSON_OUTPUT_FILE, JSON.stringify(report));
+  });
+  const oldResult = { retry: 0, status: "failed", category: "test-failed" };
+  assert.deepEqual(diagnostics.cases.map(value => value.results), [
+    ...codes.map(transportCode => [{ ...oldResult, transportCode }]),
+    ...unknownMessages.map(() => [{ ...oldResult,
+      errorLocation: { file: "apps/web/tests/e2e/application-transport.ts", line: 8, column: 1 } }]),
+  ]);
+});
+
+test("application environment preview failure sites preserve old results when metadata is unavailable", async context => {
+  const metadata = [{}, { errorLocation: null, error: null }, { errorLocation: [], error: [] },
+    { errorLocation: "PRIVATE_LOCATION", error: "APPLICATION_TRANSPORT_REQUEST_FAILED" },
+    { errorLocation: 42, error: { message: 42 } }, { errorLocation: {}, error: {} },
+    { errorLocation: { file: null, line: 1, column: 1 }, error: { message: ["APPLICATION_TRANSPORT_REQUEST_FAILED"] } },
+    { errorLocation: { file: "/PRIVATE_UNKNOWN", line: 1, column: 1 }, error: { message: "APPLICATION_TRANSPORT_UNKNOWN" } }];
+  const { diagnostics, failure } = await failPreviewWithReport(context, async ({ report, input }) => {
+    const spec = report.suites[0].specs[0];
+    const failed = spec.tests[0];
+    spec.tests = metadata.map(value => ({ ...failed, results: [{ retry: 0, status: "failed", ...value,
+      errors: [{ message: "APPLICATION_TRANSPORT_REQUEST_FAILED", location: { file: `${report.config.rootDir}/application-test.ts`, line: 27, column: 7 } }],
+    }] }));
+    report.errors = [{ message: "PRIVATE_GLOBAL" }];
+    await writeFile(input.environment.PLAYWRIGHT_JSON_OUTPUT_FILE, JSON.stringify(report));
+  });
+  assert.equal(failure.verificationFailure.code, "BROWSER_PREVIEW_FAILED");
+  assert.deepEqual(diagnostics, { status: "inspected", globalErrorCount: 1, cases: metadata.map(() => ({
+    file: "apps/web/tests/e2e/site-quality.spec.ts", line: 105, column: 1, outcome: "unexpected",
+    results: [{ retry: 0, status: "failed", category: "test-failed" }],
+  })) });
+});
+
+test("application environment preview failure sites accept canonical locations behind a known source alias", async context => {
+  const { diagnostics } = await failPreviewWithReport(context, async ({ report, input }) => {
+    const spec = report.suites[0].specs[0];
+    const failed = spec.tests[0];
+    const physical = `${report.config.rootDir}/application-test.ts`;
+    const alias = join(input.cwd, "apps/web/tests/e2e/application-test.ts");
+    assert.notEqual(physical, alias);
+    spec.tests = [physical, physical.replaceAll("/", "\\"), alias,
+      `${report.config.rootDir}/./application-test.ts`, `${report.config.rootDir}/../e2e/application-test.ts`,
+    ].map(file => ({ ...failed, results: [{ ...failed.results[0], errorLocation: { file, line: 27, column: 7 } }] }));
+    await writeFile(input.environment.PLAYWRIGHT_JSON_OUTPUT_FILE, JSON.stringify(report));
+  }, {
+    createOwner: async parent => {
+      const physical = join(parent, "physical-owners");
+      const alias = join(parent, "owner-alias");
+      await mkdir(physical);
+      await symlink(physical, alias, "dir");
+      return createKnownOwner(alias);
+    },
+  });
+  const oldResult = { retry: 0, status: "failed", category: "test-failed" };
+  const located = { ...oldResult, errorLocation: { file: "apps/web/tests/e2e/application-test.ts", line: 27, column: 7 } };
+  assert.deepEqual(diagnostics.cases.map(value => value.results), [[located], [located], [oldResult], [oldResult], [oldResult]]);
+});
+
+test("application environment preview failure sites refuse bound helper drift without replacing the primary failure", async context => {
+  for (const helper of ["application-test.ts", "application-transport.ts"]) {
+    for (const changedCopy of [false, true]) {
+      const { diagnostics, failure } = await failPreviewWithReport(context, async ({ report, input }) => {
+        const attempt = report.suites[0].specs[0].tests[0].results[0];
+        attempt.errorLocation = { file: `${report.config.rootDir}/application-transport.ts`, line: 8, column: 1 };
+        attempt.error = { message: "APPLICATION_TRANSPORT_REQUEST_FAILED" };
+        await writeFile(input.environment.PLAYWRIGHT_JSON_OUTPUT_FILE, JSON.stringify(report));
+        if (changedCopy) await writeFile(join(input.cwd, "apps/web/tests/e2e", helper), "PRIVATE_CHANGED_HELPER");
+      });
+      assert.equal(failure.verificationFailure.code, "BROWSER_PREVIEW_FAILED");
+      if (changedCopy) assert.deepEqual(diagnostics, { status: "refused" }, helper);
+      else assert.deepEqual(diagnostics.cases[0].results, [{ retry: 0, status: "failed", category: "test-failed",
+        errorLocation: { file: "apps/web/tests/e2e/application-transport.ts", line: 8, column: 1 },
+        transportCode: "APPLICATION_TRANSPORT_REQUEST_FAILED" }]);
+    }
+    const { parent, source } = await createEnvironmentFailureFixture(context);
+    let exports = 0;
+    let failure;
+    await assert.rejects(verifyApplicationEnvironmentProjectForTesting(source, {
+      createOwner: () => createKnownOwner(parent),
+      derivePnpmToolEnvironment: async () => ({}),
+      runCommand: async input => {
+        if (input.arguments.includes("test:e2e:preview")) {
+          await writeFile(input.environment.PLAYWRIGHT_JSON_OUTPUT_FILE, JSON.stringify(await syntheticPreviewTestReport(input.cwd)));
+          await writeFile(join(source, "apps/web/tests/e2e", helper), "PRIVATE_CHANGED_HELPER");
+          throw new Error("PRIVATE_PREVIEW_CAUSE");
+        }
+        return recordSyntheticEnvironmentReceipt(input);
+      },
+      captureVisualArtifacts: async () => { exports++; },
+    }), error => { failure = error; return true; });
+    assert.equal(failure.code, "FIXTURE_SOURCE_CHANGED", helper);
+    assert.equal(failure.verificationFailure.code, "FIXTURE_SOURCE_CHANGED", helper);
+    assert.equal(failure.verificationFailure.previewDiagnostics, undefined, helper);
+    assert.equal(exports, 0, helper);
+  }
+});
 
 test("application environment preview reports preserve retries and global errors without inferred causes", async context => {
   const { diagnostics } = await failPreviewWithReport(context, async ({ report, input }) => {
