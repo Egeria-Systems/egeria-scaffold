@@ -41,6 +41,7 @@ for (const [profile, selection] of [
 ]) {
   test(`${profile} environment jobs prepare all targets with independent selected services ${JSON.stringify(selection)}`, { timeout: 90 * 60 * 1000 }, async context => {
     const owner = await mkdtemp(join(tmpdir(), "egeria-environment-jobs-generation-"));
+    context.diagnostic(`Retained environment jobs owner: ${owner}`);
     const renderingContext = createApplicationEnvironmentRenderingContext(selection.applicationPersistence === true, false, true);
     const result = await generateProject({
       request: { profile, projectName: `jobs-${profile}`, displayName: `Jobs ${profile}`, backgroundJobDelivery: true, ...selection },

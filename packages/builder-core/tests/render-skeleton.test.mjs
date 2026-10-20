@@ -6934,10 +6934,10 @@ test("environment observability credentials require a staging artifact at its ex
 });
 
 
-test("environment release workflows freeze one source then gate separate staging and production artifacts", async () => {
+test("environment release workflows freeze one source then gate separate staging and production artifacts", async context => {
   const core = await import("../dist/index.js");
   const { createApplicationEnvironmentRenderingContext } = await import("../dist/catalog/verified-package-versions.js");
-  for (const persistence of [false, true]) for (const jobs of [false, true]) {
+  for (const persistence of [false, true]) for (const jobs of [false, true]) await context.test(`persistence=${persistence}, jobs=${jobs}`, async () => {
     const result = assertSuccess(await core.renderSkeleton({ profile: "app", projectName: "release-example", displayName: "Release Example", packageVersions: core.verifiedCapabilityPackageVersions,
       ...(persistence ? { applicationPersistence: true } : {}), ...(jobs ? { backgroundJobDelivery: true } : {}) }, createApplicationEnvironmentRenderingContext(persistence, false, jobs)));
     const workflow = parseGeneratedYaml(result.files, ".github/workflows/deploy.yml");
@@ -6949,6 +6949,7 @@ test("environment release workflows freeze one source then gate separate staging
       const job = workflow.jobs[target];
       assert.equal(job.environment.name, target);
       assert.equal(job.env.APPLICATION_ENVIRONMENT, target);
+      assert.equal(job.env.CLOUDFLARE_ENV, target);
       assert.equal(job.steps[0].with.ref, "${{ needs.verify-source.outputs.revision }}");
       assert.equal(job.permissions.contents, "read");
       assert.equal(job.permissions.actions, target === "production" ? "read" : undefined);
@@ -6975,9 +6976,12 @@ test("environment release workflows freeze one source then gate separate staging
     assert.equal(manifest.scripts["check:prepared-artifact"], "node --experimental-strip-types scripts/check-prepared-artifact.mjs");
     assert.ok(manifest.scripts["test:deployment-contracts"]);
     const wrangler = parseGeneratedJson(result.files, "apps/web/wrangler.jsonc");
+    assert.equal(wrangler.name, "release-example-local");
+    assert.equal(wrangler.env.staging.name, "release-example-staging");
+    assert.equal(wrangler.env.production.name, "release-example");
     for (const target of ["staging", "production"]) {
       assert.equal(wrangler.env[target].workers_dev, false);
       assert.equal(wrangler.env[target].preview_urls, false);
     }
-  }
+  });
 });

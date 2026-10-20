@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import { createConnection } from "node:net";
 import { EventEmitter } from "node:events";
 import { dirname, join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
 const templates = new URL("../templates/", import.meta.url);
@@ -153,7 +153,7 @@ test("development shutdown deadline covers stalled preparation and cleanup", () 
 async function configurationFixture(t, artifact = false, jobs = false) {
   const temporary = await mkdtemp(join(tmpdir(), "deployment-artifact-"));
   t.after(() => rm(temporary, { recursive: true, force: true }));
-  const root = jobs ? join(temporary, "apps/web") : temporary;
+  const root = jobs ? join(temporary, "project/apps/web") : temporary;
   await mkdir(root, { recursive: true });
   const files = [
     ["common/apps/web/src/configuration/application-environment.ts", "src/configuration/application-environment.ts"],
@@ -325,7 +325,7 @@ test("prepared recording bounds metadata and total output entries, including emp
 
 
 test("generated deployment protection checks refuse unsafe native release configurations", () => {
-  const result = spawnSync(process.execPath, ["--test", new URL("common/application-environments/apps/web/tests/scripts/deployment-protection.test.mjs", templates).pathname], { encoding: "utf8", timeout: 30000, env: { PATH: process.env.PATH, CI: "true", pnpm_config_verify_deps_before_run: "error" } });
+  const result = spawnSync(process.execPath, ["--test", fileURLToPath(new URL("common/application-environments/apps/web/tests/scripts/deployment-protection.test.mjs", templates))], { encoding: "utf8", timeout: 30000, env: { PATH: process.env.PATH, CI: "true", pnpm_config_verify_deps_before_run: "error" } });
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
@@ -566,14 +566,40 @@ test("prepared jobs receipt binds native metadata inputs and separately emitted 
   }
 });
 
-test("native bundle input discovery fails closed on escape, symlinks, virtual or missing inputs", async t => {
-  for (const input of ["../../../outside.js", "src/missing.ts", "virtual:unknown", ".env.local", "src/linked/secret.ts"]) {
-    const root = await preparedJobsFixture(t);
+test("native bundle input discovery refuses existing forbidden files and virtual inputs", async t => {
+  for (const [input, refusal] of [
+    ["../../../outside.js", "PREPARED_ARTIFACT_BUNDLE_INVALID"],
+    ["virtual:unknown", "PREPARED_ARTIFACT_BUNDLE_INVALID"],
+    [".env.local", "PREPARED_ARTIFACT_BUNDLE_INVALID"],
+    ["src/linked/secret.ts", "PREPARED_ARTIFACT_PATH_INVALID"],
+  ]) await t.test(input, async context => {
+    const root = await preparedJobsFixture(context);
+    if (input === "src/linked/secret.ts") {
+      await writeFile(join(root, "src/application/secret.ts"), "synthetic-secret-never-print");
+      await symlink(join(root, "src/application"), join(root, "src/linked"));
+    } else if (input !== "virtual:unknown") {
+      await writeFile(join(root, input), "synthetic-secret-never-print");
+    }
+    if (input !== "virtual:unknown") assert.equal(await readFile(join(root, input), "utf8"), "synthetic-secret-never-print");
     const metadata = JSON.parse(await readFile(join(root, ".open-next/jobs-inputs.json"), "utf8"));
     metadata.inputs[input] = { bytes: 1, imports: [] };
     await writeFile(join(root, ".open-next/jobs-inputs.json"), JSON.stringify(metadata));
-    if (input.includes("linked")) await symlink(join(root, "src/application"), join(root, "src/linked"));
-    assert.notEqual(check(root, "record").status, 0, input);
+    const result = check(root, "record");
+    assert.equal(result.status, 1, input);
+    assert.deepEqual(JSON.parse(result.stderr), { code: refusal });
+    assert.doesNotMatch(result.stdout + result.stderr, /ENOENT|synthetic-secret-never-print/u);
     assert.equal(await access(join(root, ".open-next/prepared-artifact.json")).then(() => true, () => false), false);
-  }
+  });
+});
+
+test("native bundle input discovery refuses a missing permitted source without a receipt", async t => {
+  const root = await preparedJobsFixture(t);
+  const metadata = JSON.parse(await readFile(join(root, ".open-next/jobs-inputs.json"), "utf8"));
+  assert.equal(await access(join(root, "src/missing.ts")).then(() => true, () => false), false);
+  metadata.inputs["src/missing.ts"] = { bytes: 1, imports: [] };
+  await writeFile(join(root, ".open-next/jobs-inputs.json"), JSON.stringify(metadata));
+  const result = check(root, "record");
+  assert.equal(result.status, 1);
+  assert.deepEqual(JSON.parse(result.stderr), { code: "PREPARED_ARTIFACT_INVALID" });
+  assert.equal(await access(join(root, ".open-next/prepared-artifact.json")).then(() => true, () => false), false);
 });

@@ -1671,6 +1671,20 @@ test("application environment catalog admits only the complete common tuple with
   const result = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, snapshot);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(result.value.map(({ identifier }) => identifier).sort(), ["analytics", "app-foundation", "booking-calendly", "contact-form-web3forms", "content-files", "deployment-cloudflare", "multilingual", "observability", "section-composition", "site-routing", "standards", "transactional-email-resend"]);
+  for (const persistence of [false, true]) for (const jobs of [false, true]) {
+    const context = contracts.createApplicationEnvironmentRenderingContext(persistence, false, jobs);
+    const candidate = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, context.catalogSnapshot);
+    assert.equal(candidate.ok, true, JSON.stringify(candidate));
+    const standards = candidate.value.find(({ identifier }) => identifier === "standards");
+    assert.equal(standards.version, persistence ? "0.10.0" : "0.9.0");
+    assert.deepEqual(standards.environmentVariables, ["DEPLOY_URL", "EXPECTED_REVISION"]);
+    assert.deepEqual(standards.secrets, ["CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET", "GITHUB_TOKEN"]);
+  }
+  const publicCatalog = contracts.createCapabilityCatalog(contracts.verifiedCapabilityPackageVersions);
+  assert.equal(publicCatalog.ok, true, JSON.stringify(publicCatalog));
+  const publicStandards = publicCatalog.value.find(({ identifier }) => identifier === "standards");
+  assert.deepEqual(publicStandards.environmentVariables, ["PLAYWRIGHT_DEPLOYED_URL"]);
+  assert.deepEqual(publicStandards.secrets, []);
   const deployment = result.value.find(({ identifier }) => identifier === "deployment-cloudflare");
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/src/configuration/application-environment.ts"));
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/scripts/check-application-environment.mjs"));

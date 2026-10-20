@@ -1299,7 +1299,8 @@ function createDescriptors(
         "jsdom",
         "vitest",
       ],
-      environmentVariables: applicationEnvironments ? ["DEPLOY_URL", "CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET", "GITHUB_TOKEN", "EXPECTED_REVISION"] : ["PLAYWRIGHT_DEPLOYED_URL"],
+      environmentVariables: applicationEnvironments ? ["DEPLOY_URL", "EXPECTED_REVISION"] : ["PLAYWRIGHT_DEPLOYED_URL"],
+      secrets: applicationEnvironments ? ["CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET", "GITHUB_TOKEN"] : [],
       externalDomains: [
         "cdn.playwright.dev",
         "playwright.download.prss.microsoft.com",

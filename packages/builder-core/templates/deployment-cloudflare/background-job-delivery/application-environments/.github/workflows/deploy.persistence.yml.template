@@ -132,6 +132,7 @@ jobs:
       cancel-in-progress: false
     env:
       APPLICATION_ENVIRONMENT: staging
+      CLOUDFLARE_ENV: staging
       NEXT_PUBLIC_SITE_URL: {{githubSiteOriginExpression}}
       BUILD_SOURCE_REVISION: {{githubVerifiedRevisionExpression}}
       EXPECTED_REVISION: {{githubVerifiedRevisionExpression}}
@@ -235,6 +236,7 @@ jobs:
       cancel-in-progress: false
     env:
       APPLICATION_ENVIRONMENT: production
+      CLOUDFLARE_ENV: production
       NEXT_PUBLIC_SITE_URL: {{githubSiteOriginExpression}}
       BUILD_SOURCE_REVISION: {{githubVerifiedRevisionExpression}}
       EXPECTED_REVISION: {{githubVerifiedRevisionExpression}}
