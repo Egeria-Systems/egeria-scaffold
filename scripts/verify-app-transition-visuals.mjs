@@ -1,10 +1,10 @@
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import * as filesystem from "node:fs/promises";
 import { constants } from "node:fs";
 import { createRequire } from "node:module";
-import { tmpdir, freemem, cpus } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
@@ -27,505 +27,8 @@ const historicalHashes = Object.freeze({
 export const appTransitionVisualToolchain = Object.freeze({
   platform: "linux", architecture: "x64", node: "22.23.2", pnpm: "11.20.0",
   playwright: "1.62.1", browserRevision: "1234", browserVersion: "151.0.7922.34",
+  image: "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
 });
-
-function freezeRuntimePolicy(value) {
-  for (const child of Object.values(value)) if (child && typeof child === "object") freezeRuntimePolicy(child);
-  return Object.freeze(value);
-}
-
-export const appTransitionRuntimePolicy = freezeRuntimePolicy({
-  base: {
-    reference: "mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
-    index: "sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
-    platform: "sha256:c091b21d9fae78c76e85cd4356431e9b018402f172a214fc7d7a5e9a7e29d8ac",
-  },
-  dockerfile: "FROM --platform=linux/amd64 mcr.microsoft.com/playwright@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e\nUSER 0:0\nCOPY [\"libc6_2.39-0ubuntu8.9_amd64.deb\", \"libc-bin_2.39-0ubuntu8.9_amd64.deb\", \"zlib1g_1%3a1.3.dfsg-3.1ubuntu2.2_amd64.deb\", \"/tmp/patched-runtime-packages/\"]\nRUN DEBIAN_FRONTEND=noninteractive dpkg --install /tmp/patched-runtime-packages/libc6_2.39-0ubuntu8.9_amd64.deb /tmp/patched-runtime-packages/libc-bin_2.39-0ubuntu8.9_amd64.deb /tmp/patched-runtime-packages/zlib1g_1%3a1.3.dfsg-3.1ubuntu2.2_amd64.deb \\\n    && dpkg --audit > /tmp/patched-runtime-dpkg-audit.txt \\\n    && test ! -s /tmp/patched-runtime-dpkg-audit.txt \\\n    && apt-get check\nUSER 1001:1001\n",
-  dockerfileSha256: "84e13c8a72b7a3692778e4b9819649b578d4c6029b13e717d72d5fb83373c3e6",
-  packages: [
-    { name: "libc-bin", before: "2.39-0ubuntu8.7", version: "2.39-0ubuntu8.9", filename: "libc-bin_2.39-0ubuntu8.9_amd64.deb", bytes: 682164, sha256: "066398a06ef1a218d4109461d4c636eafe83322ad19b179de9ef7af42b3fec58", url: "https://archive.ubuntu.com/ubuntu/pool/main/g/glibc/libc-bin_2.39-0ubuntu8.9_amd64.deb" },
-    { name: "libc6", before: "2.39-0ubuntu8.7", version: "2.39-0ubuntu8.9", filename: "libc6_2.39-0ubuntu8.9_amd64.deb", bytes: 3264314, sha256: "ff5557d99b51f761c4b7c92368b9cc45565eda17df9bf9eb4b134d09825008be", url: "https://archive.ubuntu.com/ubuntu/pool/main/g/glibc/libc6_2.39-0ubuntu8.9_amd64.deb" },
-    { name: "zlib1g", before: "1:1.3.dfsg-3.1ubuntu2.1", version: "1:1.3.dfsg-3.1ubuntu2.2", filename: "zlib1g_1%3a1.3.dfsg-3.1ubuntu2.2_amd64.deb", bytes: 62988, sha256: "84b9cf5752b29c9f92c27cd4c4ba9bbcc70b5ccf9b1b515421a28ae23212e273", url: "https://archive.ubuntu.com/ubuntu/pool/main/z/zlib/zlib1g_1.3.dfsg-3.1ubuntu2.2_amd64.deb" },
-  ],
-  security: { user: "1001:1001", readOnlyRoot: true, capDrop: ["ALL"], noNewPrivileges: true, network: "bridge", ports: 0,
-    shmBytes: 1073741824, memoryBytes: 6442450944, swapBytes: 6442450944, cpus: 4, pids: 512,
-    mountRoles: ["workspace", "scratch", "node", "pnpm", "receipt"] },
-});
-export const appTransitionRuntimePolicySha256 = digest(json(appTransitionRuntimePolicy));
-const runtimeReceiptPath = "/run/app-transition-runtime.json";
-const runtimeScratchPath = "/tmp/app-transition-runtime";
-const runtimeSha256 = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
-const runtimeImageId = value => typeof value === "string" && /^sha256:[a-f0-9]{64}$/.test(value);
-function runtimeKeys(value, keys) {
-  if (!value || typeof value !== "object" || Array.isArray(value) || !same(Object.keys(value).sort(), [...keys].sort())) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-}
-function runtimeShims(value) {
-  try { if (typeof value === "string" && same(JSON.parse(value), { node: false })) return value; } catch {}
-  fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-}
-
-export function validateAppTransitionRuntimeReceipt(bytes, expected = {}) {
-  try {
-    if (!Buffer.isBuffer(bytes) || bytes.length > 65536) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    const receipt = JSON.parse(bytes.toString("utf8"));
-    if (!bytes.equals(Buffer.from(json(receipt)))) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    runtimeKeys(receipt, ["schemaVersion", "policySha256", "sourceRevision", "image", "packages", "tools", "security"]);
-    if (receipt.schemaVersion !== 1 || receipt.policySha256 !== appTransitionRuntimePolicySha256 || !/^[a-f0-9]{40}$/.test(receipt.sourceRevision)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    const { image, packages, tools, security } = receipt;
-    runtimeKeys(image, ["engineId", "baseIndex", "basePlatform", "baseLayers", "layers"]);
-    if (!runtimeImageId(image.engineId) || image.baseIndex !== appTransitionRuntimePolicy.base.index || image.basePlatform !== appTransitionRuntimePolicy.base.platform || !Array.isArray(image.baseLayers) || !Array.isArray(image.layers) || image.baseLayers.length !== 7 || image.layers.length !== 9 || !image.layers.every(runtimeImageId) || !same(image.layers.slice(0, 7), image.baseLayers)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    runtimeKeys(packages, ["beforeCount", "afterCount", "beforeSha256", "afterSha256", "changes", "buildExitCode"]);
-    const changes = appTransitionRuntimePolicy.packages.map(({ name, before, version }) => ({ name, before, version, architecture: "amd64", status: "install ok installed" }));
-    if (packages.beforeCount !== 514 || packages.afterCount !== 514 || !runtimeSha256(packages.beforeSha256) || !runtimeSha256(packages.afterSha256) || !same(packages.changes, changes) || packages.buildExitCode !== 0) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    runtimeKeys(tools, ["node", "pnpm"]); runtimeKeys(tools.node, ["version", "sha256"]); runtimeKeys(tools.pnpm, ["version", "sha256", "closure", "globalShims"]);
-    runtimeKeys(tools.pnpm.closure, ["sha256", "files", "bytes"]);
-    if (tools.node.version !== appTransitionVisualToolchain.node || tools.pnpm.version !== appTransitionVisualToolchain.pnpm || ![tools.node.sha256, tools.pnpm.sha256, tools.pnpm.closure.sha256].every(runtimeSha256) || !Number.isInteger(tools.pnpm.closure.files) || tools.pnpm.closure.files < 2 || tools.pnpm.closure.files > 1024 || !Number.isInteger(tools.pnpm.closure.bytes) || tools.pnpm.closure.bytes < 1 || tools.pnpm.closure.bytes > 256 * 1024 * 1024 || !same(security, appTransitionRuntimePolicy.security)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    runtimeShims(tools.pnpm.globalShims);
-    const receiptSha256 = digest(bytes);
-    const observed = { imageId: image.engineId, sourceRevision: receipt.sourceRevision, receiptSha256,
-      nodeSha256: tools.node.sha256, pnpmSha256: tools.pnpm.sha256, closureSha256: tools.pnpm.closure.sha256 };
-    if (Object.entries(expected).some(([key, value]) => !(key in observed) || observed[key] !== value)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    return { receipt, receiptSha256 };
-  } catch { fail("VISUAL_ENVIRONMENT_UNSUPPORTED"); }
-}
-
-export async function readAppTransitionRuntimeReceipt(path, expected = {}) {
-  let handle;
-  try {
-    handle = await filesystem.open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-    const before = await handle.stat();
-    if (!before.isFile() || before.nlink !== 1 || before.uid !== process.getuid() || (before.mode & 0o777) !== 0o600 || before.size > 65536) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    const buffer = Buffer.alloc(65537); let length = 0;
-    while (length < buffer.length) {
-      const result = await handle.read(buffer, length, buffer.length - length, null);
-      if (result.bytesRead === 0) break;
-      length += result.bytesRead;
-    }
-    const bytes = buffer.subarray(0, length);
-    const after = await filesystem.lstat(path); const held = await handle.stat();
-    if (after.isSymbolicLink() || ![after, held].every(stat => stat.dev === before.dev && stat.ino === before.ino && stat.size === before.size && stat.mtimeMs === before.mtimeMs && stat.ctimeMs === before.ctimeMs) || bytes.length !== before.size) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    return validateAppTransitionRuntimeReceipt(bytes, expected);
-  } catch { fail("VISUAL_ENVIRONMENT_UNSUPPORTED"); }
-  finally { await handle?.close(); }
-}
-
-export async function inspectAppTransitionRuntimeExecutable(path) {
-  try {
-    const stat = await filesystem.lstat(path);
-    if (!stat.isFile() || stat.isSymbolicLink() || !(stat.mode & 0o100)) fail("VISUAL_TOOLCHAIN_INVALID");
-    const bytes = await boundedRead(filesystem, dirname(path), path.split(sep).at(-1), 256 * 1024 * 1024);
-    if (bytes.length < 64 || !bytes.subarray(0, 7).equals(Buffer.from([127, 69, 76, 70, 2, 1, 1])) || ![2, 3].includes(bytes.readUInt16LE(16)) || bytes.readUInt16LE(18) !== 62) fail("VISUAL_TOOLCHAIN_INVALID");
-    return digest(bytes);
-  } catch { fail("VISUAL_TOOLCHAIN_INVALID"); }
-}
-
-export async function inspectAppTransitionPnpmClosure(directory) {
-  try {
-    const root = await filesystem.lstat(directory);
-    if (!root.isDirectory() || root.isSymbolicLink()) fail("VISUAL_TOOLCHAIN_INVALID");
-    const entries = []; let total = 0;
-    async function visit(path) {
-      if (!safeRelative(path)) fail("VISUAL_TOOLCHAIN_INVALID");
-      const absolute = join(directory, path); const before = await filesystem.lstat(absolute);
-      if (before.isSymbolicLink()) fail("VISUAL_TOOLCHAIN_INVALID");
-      if (before.isDirectory()) {
-        for (const name of (await filesystem.readdir(absolute)).sort()) await visit(`${path}/${name}`);
-      } else {
-        if (!before.isFile() || (before.nlink !== 1 && !(path === "pnpm" && before.nlink <= 4)) || entries.length >= 1024 || before.size > 256 * 1024 * 1024 - total || (path === "pnpm" && !(before.mode & 0o100))) fail("VISUAL_TOOLCHAIN_INVALID");
-        const content = await boundedRead(filesystem, directory, path, 256 * 1024 * 1024 - total);
-        const after = await filesystem.lstat(absolute);
-        if (after.ctimeMs !== before.ctimeMs || after.ino !== before.ino || after.dev !== before.dev) fail("VISUAL_TOOLCHAIN_INVALID");
-        entries.push({ path, bytes: content.length, sha256: digest(content), mode: before.mode & 0o777 }); total += content.length;
-      }
-    }
-    await visit("pnpm"); await visit("dist");
-    if (entries.length < 2 || !entries.some(({ path }) => path.startsWith("dist/"))) fail("VISUAL_TOOLCHAIN_INVALID");
-    entries.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
-    return { entries, sha256: digest(json(entries)), files: entries.length, bytes: total };
-  } catch { fail("VISUAL_TOOLCHAIN_INVALID"); }
-}
-
-export async function stageAppTransitionPnpmClosure(source, destination) {
-  const before = await inspectAppTransitionPnpmClosure(source);
-  await filesystem.mkdir(destination, { mode: 0o700 });
-  for (const entry of before.entries) {
-    const target = await safePath(filesystem, destination, entry.path, { create: true });
-    const content = await boundedRead(filesystem, source, entry.path, entry.bytes);
-    if (digest(content) !== entry.sha256) fail("VISUAL_TOOLCHAIN_INVALID");
-    await writeExclusive(filesystem, destination, entry.path, content);
-    await filesystem.chmod(target, entry.mode);
-  }
-  if (!same(before, await inspectAppTransitionPnpmClosure(source)) || !same(before, await inspectAppTransitionPnpmClosure(destination))) fail("VISUAL_TOOLCHAIN_INVALID");
-  return before;
-}
-
-export function createAppTransitionRuntimeInvocation(input) {
-  try {
-    if (!same(Object.keys(input).sort(), ["repositoryRoot", "scratchRoot", "nodeExecutable", "pnpmDirectory", "receiptPath", "imageId", "arguments"].sort())) fail("VISUAL_RUNTIME_INVOCATION_INVALID");
-    const paths = [input.repositoryRoot, input.scratchRoot, input.nodeExecutable, input.pnpmDirectory, input.receiptPath];
-    if (!paths.every(path => typeof path === "string" && isAbsolute(path) && resolve(path) === path && !/[\\,\r\n\0]/.test(path)) || new Set(paths).size !== 5 || !runtimeImageId(input.imageId) || !Array.isArray(input.arguments)) fail("VISUAL_RUNTIME_INVOCATION_INVALID");
-    const options = parseAppTransitionVisualArguments(input.arguments);
-    if (options.mode === "promote" || options.recipeVersion !== "0.2.3") fail("VISUAL_RUNTIME_INVOCATION_INVALID");
-    const create = ["create", "--platform=linux/amd64", "--user=1001:1001", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--read-only", "--network=bridge", "--shm-size=1g", "--memory=6g", "--memory-swap=6g", "--cpus=4", "--pids-limit=512", "--workdir=/workspace"];
-    const targets = ["/workspace", runtimeScratchPath, "/opt/app-visual-tools/node", "/opt/app-visual-tools/pnpm", runtimeReceiptPath];
-    paths.forEach((path, index) => create.push("--mount", `type=bind,source=${path},target=${targets[index]}${index > 1 ? ",readonly" : ""}`));
-    create.push(input.imageId, "/bin/sleep", "infinity");
-    return { create, install: ["pnpm", "install", "--frozen-lockfile", "--store-dir", join(runtimeScratchPath, "store")], command: ["pnpm", "run", "verify:app-transition-visuals", "--", ...input.arguments] };
-  } catch { fail("VISUAL_RUNTIME_INVOCATION_INVALID"); }
-}
-
-export function inspectAppTransitionPackageDelta(beforeText, afterText) {
-  try {
-    function inventory(text) {
-      if (typeof text !== "string" || Buffer.byteLength(text) > 4 * 1024 * 1024) fail("VISUAL_RUNTIME_PACKAGES_INVALID");
-      const values = text.trim().split(/\n\s*\n/).map(paragraph => {
-        const fields = new Map([...paragraph.matchAll(/^([A-Za-z-]+): (.*)$/gm)].map(([, key, value]) => [key, value]));
-        const record = { name: fields.get("Package"), version: fields.get("Version"), architecture: fields.get("Architecture"), status: fields.get("Status") };
-        if (Object.values(record).some(value => typeof value !== "string" || !value)) fail("VISUAL_RUNTIME_PACKAGES_INVALID");
-        return record;
-      }).sort((left, right) => `${left.name}:${left.architecture}` < `${right.name}:${right.architecture}` ? -1 : 1);
-      if (values.length !== 514 || new Set(values.map(({ name, architecture }) => `${name}:${architecture}`)).size !== 514) fail("VISUAL_RUNTIME_PACKAGES_INVALID");
-      return values;
-    }
-    const before = inventory(beforeText); const after = inventory(afterText); const changes = [];
-    for (let index = 0; index < before.length; index++) {
-      const previous = before[index]; const current = after[index];
-      if (previous.name !== current.name || previous.architecture !== current.architecture || previous.status !== current.status) fail("VISUAL_RUNTIME_PACKAGES_INVALID");
-      if (previous.version !== current.version) changes.push({ name: previous.name, before: previous.version, version: current.version, architecture: current.architecture, status: current.status });
-    }
-    if (!same(changes, appTransitionRuntimePolicy.packages.map(({ name, before, version }) => ({ name, before, version, architecture: "amd64", status: "install ok installed" })))) fail("VISUAL_RUNTIME_PACKAGES_INVALID");
-    return { beforeCount: before.length, afterCount: after.length, beforeSha256: digest(json(before)), afterSha256: digest(json(after)), changes, buildExitCode: 0 };
-  } catch { fail("VISUAL_RUNTIME_PACKAGES_INVALID"); }
-}
-
-export async function runHostedAppTransitionCommand(input) {
-  const { executable, arguments: arguments_, cwd, environment, logDirectory, signal } = input;
-  const maximumBytes = input.maximumBytes ?? 64 * 1024 * 1024;
-  if (process.platform === "win32" || !Number.isInteger(maximumBytes) || maximumBytes < 1 || maximumBytes > 64 * 1024 * 1024 || !Number.isFinite(input.timeout) || input.timeout < 1 || input.timeout > 43 * 60 * 1000) fail("VISUAL_RUNTIME_COMMAND_INVALID");
-  const stem = randomUUID(); const stdout = []; const stderr = []; let bytes = 0; let timedOut = false; let overflow = false; let aborted = false; let spawnFailed = false;
-  let finished = false; let terminationRequested = false; let streamsClosed = false; let escalationPerformed = false; let drainTimedOut = false; let observedExit; let escalationTimer; let drainTimer; let exitDrainTimer; let complete;
-  const terminationSignals = [];
-  const child = spawn(executable, arguments_, { cwd, env: environment, shell: false, detached: true, stdio: ["ignore", "pipe", "pipe"] });
-  const processGroupId = Number.isInteger(child.pid) && child.pid > 0 && child.pid !== process.pid ? child.pid : null;
-  function signalOwnedGroup(value) {
-    if (processGroupId === null) { terminationSignals.push({ signal: value, status: "unavailable" }); return; }
-    try { process.kill(-processGroupId, value); terminationSignals.push({ signal: value, status: "sent" }); }
-    catch (error) { terminationSignals.push({ signal: value, status: error.code === "ESRCH" ? "gone" : "failed" }); }
-  }
-  function terminate() {
-    if (terminationRequested || finished) return;
-    terminationRequested = true;
-    signalOwnedGroup("SIGTERM");
-    escalationTimer = setTimeout(() => {
-      if (finished) return;
-      signalOwnedGroup("SIGKILL"); escalationPerformed = true;
-      if (streamsClosed) { complete(false); return; }
-      drainTimer = setTimeout(() => { drainTimedOut = true; complete(true); }, 1000);
-    }, 250);
-  }
-  function capture(chunks, value) {
-    if (finished) return;
-    const available = maximumBytes - bytes; const kept = value.subarray(0, Math.max(0, available));
-    if (kept.length) chunks.push(kept);
-    bytes += kept.length;
-    if (value.length > available) { overflow = true; terminate(); }
-  }
-  child.stdout.on("data", value => capture(stdout, value)); child.stderr.on("data", value => capture(stderr, value));
-  const timeout = setTimeout(() => { timedOut = true; terminate(); }, input.timeout);
-  const abort = () => { aborted = true; terminate(); };
-  const native = await new Promise(resolve => {
-    complete = forced => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timeout); clearTimeout(escalationTimer); clearTimeout(drainTimer); clearTimeout(exitDrainTimer);
-      signal?.removeEventListener("abort", abort);
-      if (forced) { child.stdout.destroy(); child.stderr.destroy(); child.unref(); }
-      resolve(observedExit ?? { exitCode: null, signal: null });
-    };
-    child.on("error", () => { spawnFailed = true; terminate(); });
-    child.on("exit", (exitCode, signal) => {
-      observedExit = { exitCode, signal };
-      if (!terminationRequested && !finished) exitDrainTimer = setTimeout(terminate, 250);
-    });
-    child.on("close", () => {
-      streamsClosed = true;
-      if (!terminationRequested || escalationPerformed) complete(false);
-    });
-    signal?.addEventListener("abort", abort, { once: true }); if (signal?.aborted) abort();
-  });
-  const captureComplete = !overflow && !drainTimedOut;
-  const output = { stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr) }; let captureExitCode = 0;
-  for (const [name, content] of Object.entries(output)) {
-    try { await filesystem.writeFile(join(logDirectory, `${stem}.${name}.log`), content, { flag: "wx", mode: 0o600 }); }
-    catch { captureExitCode = 1; }
-  }
-  const result = { ...native, processGroupId, terminationRequested, terminationSignals, drainTimedOut, captureComplete,
-    exitObserved: observedExit !== undefined, captureId: stem, captureExitCode, timedOut, overflow, aborted, spawnFailed,
-    success: native.exitCode === 0 && native.signal === null && captureExitCode === 0 && captureComplete && !terminationRequested && !timedOut && !aborted && !spawnFailed,
-    stdout: output.stdout.toString("utf8"), stderr: output.stderr.toString("utf8"), bytes };
-  try { await filesystem.writeFile(join(logDirectory, `${stem}.status.json`), json({ executable, arguments: arguments_, cwd, ...native,
-    processGroupId, terminationRequested, terminationSignals, drainTimedOut, captureComplete, exitObserved: observedExit !== undefined,
-    captureId: stem, captureExitCode, timedOut, overflow, aborted, spawnFailed, bytes }), { flag: "wx", mode: 0o600 }); }
-  catch { result.captureExitCode = 1; result.success = false; }
-  return result;
-}
-
-function appTransitionCommandEvidence(stage, result) {
-  return { stage, captureId: result.captureId ?? null, exitCode: result.exitCode ?? null, signal: result.signal ?? null,
-    captureExitCode: result.captureExitCode ?? 1, captureComplete: result.captureComplete === true,
-    drainTimedOut: result.drainTimedOut === true, timedOut: result.timedOut === true, overflow: result.overflow === true,
-    aborted: result.aborted === true };
-}
-
-export async function finishAppTransitionHostedRuntime(input) {
-  if (typeof input.containerId !== "string" || input.containerId.length !== 64 || !/^[a-f0-9]{64}$/.test(input.containerId)) fail("VISUAL_RUNTIME_INVOCATION_INVALID");
-  const deadline = performance.now() + 30000;
-  const command = input.runCommand ?? runHostedAppTransitionCommand;
-  const commands = []; const capture = { mainBytes: input.mainCapture?.bytes ?? 0, mainAborted: input.mainCapture?.signal?.aborted === true, teardownBytes: 0 };
-  async function attempt(stage, arguments_, cap, maximumBytes) {
-    const timeout = Math.floor(Math.min(cap, deadline - performance.now() - 2000));
-    let result;
-    try {
-      if (timeout <= 0) fail("VISUAL_RUNTIME_STOP_UNKNOWN");
-      result = await command({ executable: "docker", arguments: arguments_, cwd: input.cwd, environment: input.environment,
-        logDirectory: input.logDirectory, timeout, maximumBytes });
-    } catch {
-      result = { success: false, exitCode: null, signal: null, captureExitCode: 1, captureComplete: false, bytes: 0 };
-    }
-    capture.teardownBytes += result.bytes ?? 0;
-    commands.push(appTransitionCommandEvidence(stage, result));
-    return result;
-  }
-  const stop = await attempt("derived-stop", ["stop", "--timeout=10", input.containerId], 15000, 256 * 1024);
-  const inspection = await attempt("stopped-inspect", ["inspect", input.containerId], 10000, 768 * 1024);
-  let stopped = null;
-  if (inspection.success) {
-    try {
-      const state = JSON.parse(inspection.stdout)[0].State;
-      if (state.Running === false && state.Pid === 0 && Number.isInteger(state.ExitCode) && typeof state.OOMKilled === "boolean")
-        stopped = { running: false, pid: 0, exitCode: state.ExitCode, oomKilled: state.OOMKilled };
-    } catch {}
-  }
-  capture.mainAborted = input.mainCapture?.signal?.aborted === true;
-  const mainFailure = input.failure ?? (capture.mainAborted ? input.mainCapture.signal.reason ?? new Error("VISUAL_RUNTIME_COMMAND_FAILED") : undefined);
-  const failure = mainFailure ?? (stopped === null ? new Error("VISUAL_RUNTIME_STOP_UNKNOWN") : !stop.success ? new Error("VISUAL_RUNTIME_STOP_FAILED") : undefined);
-  return { failure, stopped, commands, capture };
-}
-
-export function validateAppTransitionRuntimeEntry(environment, expected) {
-  if (expected.script !== "node scripts/verify-app-transition-visuals.mjs") fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  const markers = ["npm_lifecycle_event", "npm_package_json", "PNPM_SCRIPT_SRC_DIR", "npm_lifecycle_script", "npm_execpath"];
-  if (environment.pnpm_config_verify_deps_before_run === "error" && markers.every(key => environment[key] === undefined)) return { kind: "direct" };
-  let options;
-  try { options = parseAppTransitionVisualArguments(expected.arguments); } catch { fail("VISUAL_ENVIRONMENT_UNSUPPORTED"); }
-  if (options.mode === "promote" || options.recipeVersion !== "0.2.3") fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  const lifecycleScript = `${expected.script}${expected.arguments.length ? ` ${expected.arguments.join(" ")}` : ""}`;
-  if (environment.pnpm_config_verify_deps_before_run !== "false" ||
-      environment.npm_lifecycle_event !== "verify:app-transition-visuals" || environment.npm_package_json !== join(expected.repositoryRoot, "package.json") ||
-      environment.PNPM_SCRIPT_SRC_DIR !== expected.repositoryRoot || environment.npm_lifecycle_script !== lifecycleScript || environment.npm_execpath !== expected.pnpmExecutable) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  return { kind: "canonical-lifecycle" };
-}
-
-async function inspectRuntimeFilesystem() {
-  const root = await filesystem.mkdtemp(join(runtimeScratchPath, "qualification-"));
-  await filesystem.chmod(root, 0o700); const identity = await readPathIdentity(root);
-  try {
-    await writeExclusive(filesystem, root, "case-a", "lower"); await writeExclusive(filesystem, root, "case-A", "upper");
-    const lower = await filesystem.lstat(join(root, "case-a")); const upper = await filesystem.lstat(join(root, "case-A"));
-    await filesystem.link(join(root, "case-a"), join(root, "hardlink"));
-    await filesystem.symlink("case-a", join(root, "link"));
-    const linked = await filesystem.lstat(join(root, "hardlink")); const symbolic = await filesystem.lstat(join(root, "link"));
-    const observed = { uid: process.getuid(), gid: process.getgid(), directoryMode: (await filesystem.lstat(root)).mode & 0o777,
-      fileModes: [lower.mode & 0o777, upper.mode & 0o777], caseDistinct: lower.ino !== upper.ino,
-      hardlinkIdentity: linked.ino === lower.ino, symbolicLinkObserved: symbolic.isSymbolicLink() };
-    process.stdout.write(json({ runtimeFilesystem: observed }));
-    if (observed.uid !== 1001 || observed.gid !== 1001 || observed.directoryMode !== 0o700 || observed.fileModes.some(mode => mode !== 0o600) || !observed.caseDistinct || !observed.hardlinkIdentity || !observed.symbolicLinkObserved) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  } finally { await cleanupOwnedDirectory(identity); }
-}
-
-export async function inspectAppTransitionHostedEnvironment() {
-  if (process.platform !== "linux" || process.arch !== "x64" || process.versions.node !== appTransitionVisualToolchain.node || process.getuid() !== 1001 || process.getgid() !== 1001 || process.env.GITHUB_ACTIONS !== "true") fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  const shims = runtimeShims(process.env.PNPM_CONFIG_GLOBAL_SHIMS);
-  const release = await filesystem.readFile("/etc/os-release", "utf8");
-  if (!/^VERSION_CODENAME=noble$/m.test(release)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  await filesystem.access("/.dockerenv");
-  const source = await execute("git", ["-c", "safe.directory=/workspace", "rev-parse", "HEAD"], { ...isolatedProcessOptions, cwd: repositoryRoot });
-  const nodeSha256 = await inspectAppTransitionRuntimeExecutable("/opt/app-visual-tools/node");
-  const pnpmSha256 = await inspectAppTransitionRuntimeExecutable("/opt/app-visual-tools/pnpm/pnpm");
-  const closure = await inspectAppTransitionPnpmClosure("/opt/app-visual-tools/pnpm");
-  const expected = { imageId: process.env.EGERIA_VISUAL_IMAGE, receiptSha256: process.env.EGERIA_VISUAL_RUNTIME_RECEIPT_SHA256,
-    sourceRevision: source.stdout.trim(), nodeSha256, pnpmSha256, closureSha256: closure.sha256 };
-  if (!runtimeImageId(expected.imageId) || !runtimeSha256(expected.receiptSha256)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  const runtime = await readAppTransitionRuntimeReceipt(runtimeReceiptPath, expected);
-  const manifest = JSON.parse((await boundedRead(filesystem, repositoryRoot, "package.json", 1024 * 1024)).toString("utf8"));
-  validateAppTransitionRuntimeEntry(process.env, { repositoryRoot, pnpmExecutable: "/opt/app-visual-tools/pnpm/pnpm", script: manifest.scripts?.["verify:app-transition-visuals"], arguments: process.argv.slice(2) });
-  if (runtime.receipt.tools.pnpm.globalShims !== shims || runtime.receipt.tools.pnpm.closure.files !== closure.files || runtime.receipt.tools.pnpm.closure.bytes !== closure.bytes) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  const version = await execute("pnpm", ["--version"], { ...isolatedProcessOptions, env: createIsolatedProcessEnvironment({ HOME: join(runtimeScratchPath, "home"), PNPM_CONFIG_GLOBAL_SHIMS: shims, pnpm_config_verify_deps_before_run: "error" }) });
-  if (version.stdout.trim() !== appTransitionVisualToolchain.pnpm) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  for (const name of ["home", "temporary", "cache", "store", "pnpmHome"]) {
-    const path = join(runtimeScratchPath, name); const stat = await filesystem.lstat(path);
-    if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== 1001 || (stat.mode & 0o777) !== 0o700) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  }
-  await inspectRuntimeFilesystem();
-  return { ...appTransitionVisualToolchain, runtime };
-}
-
-export async function runHostedAppTransitionVisuals(input) {
-  const { arguments: arguments_, repositoryRoot: root, nodeExecutable, pnpmBinDirectory } = input;
-  if (!same(Object.keys(input).sort(), ["arguments", "repositoryRoot", "nodeExecutable", "pnpmBinDirectory"].sort()) || process.platform !== "linux" || process.arch !== "x64" || process.getuid() !== 1001 || process.getgid() !== 1001 || process.versions.node !== appTransitionVisualToolchain.node) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  const options = parseAppTransitionVisualArguments(arguments_);
-  if (options.mode === "promote" || options.recipeVersion !== "0.2.3") fail("VISUAL_RUNTIME_INVOCATION_INVALID");
-  const shims = runtimeShims(process.env.PNPM_CONFIG_GLOBAL_SHIMS);
-  const rootStat = await filesystem.lstat(root);
-  if (!rootStat.isDirectory() || rootStat.isSymbolicLink() || rootStat.uid !== 1001 || await filesystem.realpath(root) !== root || await filesystem.realpath(nodeExecutable) !== nodeExecutable) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  const privateRoot = await filesystem.mkdtemp(join(process.env.RUNNER_TEMP ?? tmpdir(), "app-transition-runtime-"));
-  await filesystem.chmod(privateRoot, 0o700);
-  const scratch = join(privateRoot, "scratch"); const logs = join(privateRoot, "native"); const context = join(privateRoot, "context");
-  for (const path of [scratch, logs, context]) await filesystem.mkdir(path, { mode: 0o700 });
-  const support = {};
-  for (const name of ["home", "temporary", "cache", "store", "pnpmHome"]) { support[name] = join(scratch, name); await filesystem.mkdir(support[name], { mode: 0o700 }); }
-  await writeExclusive(filesystem, scratch, "user.npmrc", "");
-  const environment = createIsolatedProcessEnvironment({ HOME: support.home, TMPDIR: support.temporary, XDG_CACHE_HOME: support.cache });
-  const deadline = performance.now() + 43 * 60 * 1000; const producerDeadline = performance.now() + 10 * 60 * 1000;
-  let derivedId; let baselineId; let imageId; let runtime; let dockerRoot; let capturedBytes = 0; let stopped; let failure; let capture;
-  const records = []; const resources = []; const controller = new AbortController(); let monitor; let measuring = false; let lastMeasurement = performance.now();
-  const deadlineTimer = setTimeout(() => controller.abort(new Error("VISUAL_RUNTIME_COMMAND_FAILED")), 43 * 60 * 1000);
-  async function measure(minimum) {
-    const facts = [];
-    for (const [role, path] of [["workspace", root], ["scratch", scratch], ...(dockerRoot ? [["docker", dockerRoot]] : [])]) {
-      const stat = await filesystem.statfs(path, { bigint: true }); const available = Number(stat.bavail * stat.bsize);
-      facts.push({ role, available });
-    }
-    const observed = { at: Date.now(), filesystems: facts, memoryFree: freemem(), cpus: cpus().length };
-    resources.push(observed); lastMeasurement = performance.now();
-    if (facts.some(({ available }) => available < minimum)) fail("VISUAL_RUNTIME_CAPACITY_INSUFFICIENT");
-    return observed;
-  }
-  async function native(stage, executable, args, cap = 30000, producing = true) {
-    const remaining = (producing ? Math.min(deadline, producerDeadline) : deadline) - performance.now();
-    if (remaining <= 0 || capturedBytes >= 64 * 1024 * 1024) fail("VISUAL_RUNTIME_COMMAND_FAILED");
-    const result = await runHostedAppTransitionCommand({ executable, arguments: args, cwd: root, environment, logDirectory: logs,
-      timeout: Math.max(1, Math.min(cap, remaining)), maximumBytes: 64 * 1024 * 1024 - capturedBytes, signal: controller.signal });
-    capturedBytes += result.bytes;
-    records.push(appTransitionCommandEvidence(stage, result));
-    if (!result.success) fail("VISUAL_RUNTIME_COMMAND_FAILED");
-    return result.stdout.trim();
-  }
-  async function docker(stage, args, cap, producing) { return native(stage, "docker", args, cap, producing); }
-  try {
-    const initial = await measure(12.5 * 1024 ** 3);
-    if (initial.memoryFree < 6 * 1024 ** 3) fail("VISUAL_RUNTIME_CAPACITY_INSUFFICIENT");
-    dockerRoot = await docker("docker-storage", ["info", "--format", "{{.DockerRootDir}}"]);
-    await measure(12.5 * 1024 ** 3);
-    monitor = setInterval(async () => {
-      if (measuring) { if (performance.now() - lastMeasurement > 5000) controller.abort(new Error("VISUAL_RUNTIME_CAPACITY_INSUFFICIENT")); return; }
-      measuring = true;
-      try { await measure(2 * 1024 ** 3); } catch { controller.abort(new Error("VISUAL_RUNTIME_CAPACITY_INSUFFICIENT")); } finally { measuring = false; }
-    }, 1000);
-    const sourceRevision = await native("source", "git", ["rev-parse", "HEAD"]);
-    if (!/^[a-f0-9]{40}$/.test(sourceRevision) || await native("clean-source", "git", ["status", "--porcelain"])) fail("VISUAL_SOURCE_CHANGED");
-    const pnpmDirectory = join(privateRoot, "pnpm"); const closure = await stageAppTransitionPnpmClosure(pnpmBinDirectory, pnpmDirectory);
-    await writeExclusive(filesystem, privateRoot, "pnpm-closure.json", json(closure));
-    const tools = { node: { version: (await native("node-version", nodeExecutable, ["--version"], 10000)).replace(/^v/, ""), sha256: await inspectAppTransitionRuntimeExecutable(nodeExecutable) },
-      pnpm: { version: await native("pnpm-host-version", join(pnpmDirectory, "pnpm"), ["--version"], 10000), sha256: closure.entries.find(({ path }) => path === "pnpm").sha256,
-        closure: { sha256: closure.sha256, files: closure.files, bytes: closure.bytes }, globalShims: shims } };
-    if (await inspectAppTransitionRuntimeExecutable(join(pnpmDirectory, "pnpm")) !== tools.pnpm.sha256) fail("VISUAL_TOOLCHAIN_INVALID");
-    if (tools.node.version !== appTransitionVisualToolchain.node || tools.pnpm.version !== appTransitionVisualToolchain.pnpm || digest(appTransitionRuntimePolicy.dockerfile) !== appTransitionRuntimePolicy.dockerfileSha256) fail("VISUAL_TOOLCHAIN_INVALID");
-    for (const item of appTransitionRuntimePolicy.packages) {
-      const timeout = Math.floor(Math.min(120000, producerDeadline - performance.now())); if (timeout <= 0) fail("VISUAL_RUNTIME_COMMAND_FAILED");
-      const response = await fetch(item.url, { redirect: "error", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(timeout)]) });
-      if (!response.ok) fail("VISUAL_RUNTIME_PACKAGES_INVALID");
-      const chunks = []; let size = 0;
-      for await (const chunk of response.body) { size += chunk.length; if (size > item.bytes) fail("VISUAL_RUNTIME_PACKAGES_INVALID"); chunks.push(chunk); }
-      const bytes = Buffer.concat(chunks);
-      if (size !== item.bytes || digest(bytes) !== item.sha256) fail("VISUAL_RUNTIME_PACKAGES_INVALID");
-      await writeExclusive(filesystem, context, item.filename, bytes);
-      const fields = await native("package-identity", "dpkg-deb", ["--show", "--showformat=${Package}\t${Version}\t${Architecture}", join(context, item.filename)]);
-      if (fields !== `${item.name}\t${item.version}\tamd64`) fail("VISUAL_RUNTIME_PACKAGES_INVALID");
-    }
-    await writeExclusive(filesystem, context, "Dockerfile", appTransitionRuntimePolicy.dockerfile);
-    await docker("base-pull", ["pull", "--platform=linux/amd64", appTransitionRuntimePolicy.base.reference], 600000);
-    const index = JSON.parse(await docker("base-index", ["buildx", "imagetools", "inspect", "--raw", appTransitionRuntimePolicy.base.reference]));
-    if (index.manifests?.filter(({ platform }) => platform.os === "linux" && platform.architecture === "amd64").map(({ digest }) => digest).join() !== appTransitionRuntimePolicy.base.platform) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    const base = JSON.parse(await docker("base-image", ["image", "inspect", appTransitionRuntimePolicy.base.reference]))[0];
-    if (base.Os !== "linux" || base.Architecture !== "amd64" || base.RootFS?.Layers?.length !== 7) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    baselineId = await docker("inert-base-create", ["create", "--platform=linux/amd64", appTransitionRuntimePolicy.base.reference]);
-    if (!/^[a-f0-9]{64}$/.test(baselineId)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    await docker("base-inventory", ["cp", `${baselineId}:/var/lib/dpkg/status`, join(privateRoot, "base-status")]);
-    const iid = join(privateRoot, "image-id");
-    await docker("patched-image-build", ["buildx", "build", "--platform=linux/amd64", "--network=none", "--load", "--iidfile", iid, context], 600000);
-    const builtReference = (await filesystem.readFile(iid, "utf8")).trim(); if (!runtimeImageId(builtReference)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    const image = JSON.parse(await docker("patched-image", ["image", "inspect", builtReference]))[0];
-    imageId = image.Id;
-    if (!runtimeImageId(imageId) || image.Os !== "linux" || image.Architecture !== "amd64" || image.RootFS?.Layers?.length !== 9 || !same(image.RootFS.Layers.slice(0, 7), base.RootFS.Layers) || image.Config.User !== "1001:1001") fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-    const receiptPath = join(privateRoot, "receipt.json"); const receiptHandle = await filesystem.open(receiptPath, "wx", 0o600);
-    try {
-      const invocation = createAppTransitionRuntimeInvocation({ repositoryRoot: root, scratchRoot: scratch, nodeExecutable, pnpmDirectory, receiptPath, imageId, arguments: arguments_ });
-      derivedId = await docker("derived-create", invocation.create);
-      if (!/^[a-f0-9]{64}$/.test(derivedId)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-      const actual = JSON.parse(await docker("derived-inspect", ["inspect", derivedId]))[0]; const config = actual.HostConfig;
-      const expectedMounts = [[root, "/workspace", true], [scratch, runtimeScratchPath, true], [nodeExecutable, "/opt/app-visual-tools/node", false], [pnpmDirectory, "/opt/app-visual-tools/pnpm", false], [receiptPath, runtimeReceiptPath, false]];
-      if (actual.Image !== imageId || actual.Config.User !== "1001:1001" || actual.State.Running || actual.State.Pid !== 0 || !config.ReadonlyRootfs || !same(config.CapDrop, ["ALL"]) || !config.SecurityOpt?.includes("no-new-privileges") || config.NetworkMode !== "bridge" || config.ShmSize !== 1073741824 || config.Memory !== 6442450944 || config.MemorySwap !== 6442450944 || config.NanoCpus !== 4000000000 || config.PidsLimit !== 512 || config.Privileged || config.PublishAllPorts || Object.keys(config.PortBindings ?? {}).length || actual.Mounts.length !== 5 || expectedMounts.some(([source, target, writable]) => !actual.Mounts.some(mount => mount.Type === "bind" && mount.Source === source && mount.Destination === target && mount.RW === writable))) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-      await docker("derived-inventory", ["cp", `${derivedId}:/var/lib/dpkg/status`, join(privateRoot, "derived-status")]);
-      const packages = inspectAppTransitionPackageDelta(await filesystem.readFile(join(privateRoot, "base-status"), "utf8"), await filesystem.readFile(join(privateRoot, "derived-status"), "utf8"));
-      const receipt = { schemaVersion: 1, policySha256: appTransitionRuntimePolicySha256, sourceRevision,
-        image: { engineId: imageId, baseIndex: appTransitionRuntimePolicy.base.index, basePlatform: appTransitionRuntimePolicy.base.platform, baseLayers: base.RootFS.Layers, layers: image.RootFS.Layers }, packages, tools, security: appTransitionRuntimePolicy.security };
-      const bytes = Buffer.from(json(receipt)); runtime = validateAppTransitionRuntimeReceipt(bytes);
-      await receiptHandle.writeFile(bytes); await receiptHandle.sync();
-      const guestSupport = Object.fromEntries(Object.keys(support).map(name => [name, join(runtimeScratchPath, name)]));
-      const guestEnvironment = { ...appTransitionOwnedEnvironment(guestSupport, join(runtimeScratchPath, "user.npmrc")),
-        PATH: "/opt/app-visual-tools/pnpm:/opt/app-visual-tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-        LANG: "C.UTF-8", EGERIA_VISUAL_IMAGE: imageId, EGERIA_VISUAL_RUNTIME_RECEIPT_SHA256: runtime.receiptSha256,
-        GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "safe.directory", GIT_CONFIG_VALUE_0: "/workspace" };
-      const exec = ["exec", "--user=1001:1001", derivedId, "/usr/bin/env", "-i", ...Object.entries(guestEnvironment).map(([key, value]) => `${key}=${value}`)];
-      await docker("derived-start", ["start", derivedId]);
-      await docker("guest-qualification", [...exec, "node", "--input-type=module", "-e", 'import {inspectAppTransitionHostedEnvironment} from "/workspace/scripts/verify-app-transition-visuals.mjs"; await inspectAppTransitionHostedEnvironment();'], 120000);
-      await docker("root-frozen-install", [...exec, ...invocation.install], 900000, false);
-      const node = await docker("installed-node", [...exec, "pnpm", "exec", "node", "--version"], 10000, false);
-      if (node !== `v${appTransitionVisualToolchain.node}`) fail("VISUAL_TOOLCHAIN_INVALID");
-      await measure(7 * 1024 ** 3);
-      await docker("canonical-visuals", [...exec, ...invocation.command], 43 * 60 * 1000, false);
-    } finally { await receiptHandle.close(); }
-  } catch (error) { failure = controller.signal.aborted ? controller.signal.reason : error; }
-  finally {
-    clearInterval(monitor); clearTimeout(deadlineTimer);
-    if (derivedId) {
-      const completion = await finishAppTransitionHostedRuntime({ containerId: derivedId, failure,
-        mainCapture: { bytes: capturedBytes, signal: controller.signal }, cwd: root, environment, logDirectory: logs });
-      failure = completion.failure; stopped = completion.stopped; capture = completion.capture;
-      records.push(...completion.commands);
-    }
-    const summary = { schemaVersion: 1, status: failure ? "failed" : "completed", code: failure ? (/^VISUAL_[A-Z_]+$/.test(failure.message) ? failure.message : "VISUAL_RUNTIME_FAILED") : null,
-      ...(runtime ? { runtime } : {}), ...(imageId ? { imageId } : {}), baselineNeverStarted: true, resources, commands: records, capture: capture ?? null, stop: stopped ?? null };
-    await writeExclusive(filesystem, privateRoot, "native-summary.json", json({ ...summary, derivedId: derivedId ?? null, baselineId: baselineId ?? null }));
-    const destination = await safePath(filesystem, root, artifactRoot, { directories: true });
-    await writeExclusive(filesystem, destination, `runtime-${randomUUID()}.json`, json(summary));
-  }
-  if (failure) throw failure;
-  return { status: "completed", imageId, runtime };
-}
-
-function appTransitionOwnedEnvironment(support, userConfig) {
-  return createIsolatedProcessEnvironment({ HOME: support.home, USERPROFILE: support.home,
-    TMPDIR: support.temporary, TMP: support.temporary, TEMP: support.temporary, XDG_CACHE_HOME: support.cache,
-    PNPM_HOME: support.pnpmHome, npm_config_store_dir: support.store,
-    NPM_CONFIG_USERCONFIG: userConfig, NPM_CONFIG_REGISTRY: "https://registry.npmjs.org/",
-    pnpm_config_verify_deps_before_run: "error", PNPM_CONFIG_GLOBAL_SHIMS: runtimeShims(process.env.PNPM_CONFIG_GLOBAL_SHIMS ?? '{"node":false}'),
-    CI: "true", GITHUB_ACTIONS: "true", NEXT_TELEMETRY_DISABLED: "1", WRANGLER_SEND_METRICS: "false",
-    PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright" });
-}
-
-async function prepareAppTransitionBuilder(root, command) {
-  const owned = await filesystem.mkdtemp(join(tmpdir(), "egeria-app-transition-builder-"));
-  await filesystem.chmod(owned, 0o700); const identity = await readPathIdentity(owned);
-  try {
-    const support = {};
-    for (const name of ["home", "temporary", "cache", "store", "pnpmHome"]) support[name] = await safePath(filesystem, owned, name, { directories: true });
-    await writeExclusive(filesystem, owned, "user.npmrc", "");
-    const result = await command({ executable: "pnpm", arguments: ["--filter", "@egeria-systems/builder-core", "run", "build"], cwd: root, environment: appTransitionOwnedEnvironment(support, join(owned, "user.npmrc")) });
-    if (result.exitCode !== 0) fail("VISUAL_BUILDER_BUILD_FAILED");
-  } finally { await cleanupOwnedDirectory(identity); }
-}
 
 const subsets = Object.freeze(Array.from({ length: 8 }, (_, bits) =>
   ["analytics", "booking-calendly", "multilingual"].filter((_, index) => bits & (1 << index))));
@@ -643,7 +146,16 @@ async function snapshotSource(root) {
 }
 
 async function inspectEnvironment() {
-  return inspectAppTransitionHostedEnvironment();
+  if (process.platform !== "linux" || process.arch !== "x64" || process.versions.node !== appTransitionVisualToolchain.node) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
+  const { stdout } = await execute("pnpm", ["--version"], isolatedProcessOptions);
+  if (stdout.trim() !== appTransitionVisualToolchain.pnpm) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
+  const release = await filesystem.readFile("/etc/os-release", "utf8");
+  if (!/^VERSION_CODENAME=noble$/m.test(release)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
+  await filesystem.access("/.dockerenv");
+  // OCI identity is verified by the invoking Docker command or pinned CI job;
+  // it cannot be independently discovered from a container filesystem.
+  if (process.env.EGERIA_VISUAL_IMAGE !== appTransitionVisualToolchain.image) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
+  return appTransitionVisualToolchain;
 }
 
 async function promote(options, adapters) {
@@ -665,8 +177,7 @@ async function promote(options, adapters) {
   if (matches.length !== 1) fail("VISUAL_REVIEWED_MANIFEST_MISSING");
   const { path, bytes } = matches[0];
   const manifest = JSON.parse(bytes.toString("utf8"));
-  if (!Buffer.from(json(manifest)).equals(bytes) || manifest.schemaVersion !== 2 || manifest.status !== "candidates" || !same(manifest.toolchain, appTransitionVisualToolchain) || manifest.cases.length !== 8 || manifest.assets.length !== 4 || !same(manifest.cases.map(({ subset }) => subset), subsets)) fail("VISUAL_MANIFEST_INVALID");
-  try { runtimeKeys(manifest.runtime, ["receipt", "receiptSha256"]); validateAppTransitionRuntimeReceipt(Buffer.from(json(manifest.runtime.receipt)), { receiptSha256: manifest.runtime.receiptSha256, sourceRevision: manifest.source.revision }); } catch { fail("VISUAL_MANIFEST_INVALID"); }
+  if (!Buffer.from(json(manifest)).equals(bytes) || manifest.schemaVersion !== 1 || manifest.status !== "candidates" || !same(manifest.toolchain, appTransitionVisualToolchain) || manifest.cases.length !== 8 || manifest.assets.length !== 4 || !same(manifest.cases.map(({ subset }) => subset), subsets)) fail("VISUAL_MANIFEST_INVALID");
   if (!same(await adapters.snapshotSource(), manifest.source)) fail("VISUAL_SOURCE_CHANGED");
   const approved = [];
   for (let index = 0; index < assets.length; index += 1) {
@@ -711,15 +222,15 @@ export async function verifyAppTransitionVisuals(options, injected = {}) {
   if (!["candidates", "compare", "promote"].includes(options.mode) || (options.mode === "promote" && !/^[a-f0-9]{64}$/.test(options.digest))) fail("VISUAL_ARGUMENT_INVALID");
   const root = injected.repositoryRoot ?? repositoryRoot;
   const adapters = { filesystem, repositoryRoot: root, inspectEnvironment, snapshotSource: () => snapshotSource(root), executeCase,
-    prepareBuilder: () => prepareAppTransitionBuilder(root, injected.runCommand ?? runCommand), ...injected };
+    prepareBuilder: async () => {
+      const result = await runCommand({ executable: "pnpm", arguments: ["--filter", "@egeria-systems/builder-core", "run", "build"], cwd: root, environment: createIsolatedProcessEnvironment() });
+      if (result.exitCode !== 0) fail("VISUAL_BUILDER_BUILD_FAILED");
+    }, ...injected };
   if (options.mode === "promote") return promote(options, adapters);
-  const { runtime, ...toolchain } = await adapters.inspectEnvironment();
-  if (!same(toolchain, appTransitionVisualToolchain) || !runtime) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
-  runtimeKeys(runtime, ["receipt", "receiptSha256"]);
-  validateAppTransitionRuntimeReceipt(Buffer.from(json(runtime.receipt)), { receiptSha256: runtime.receiptSha256 });
+  const toolchain = await adapters.inspectEnvironment();
+  if (!same(toolchain, appTransitionVisualToolchain)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
   await adapters.prepareBuilder();
   const source = await adapters.snapshotSource();
-  if (source.revision !== runtime.receipt.sourceRevision) fail("VISUAL_SOURCE_CHANGED");
   const fs = adapters.filesystem;
   const runPath = `${artifactRoot}/${randomUUID()}`;
   const run = await safePath(fs, root, runPath, { directories: true });
@@ -758,7 +269,7 @@ export async function verifyAppTransitionVisuals(options, injected = {}) {
     }
     if (!same(source, await adapters.snapshotSource())) fail("VISUAL_SOURCE_CHANGED");
     if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
-    const manifest = { schemaVersion: 2, runtime, status: options.mode === "candidates" ? "candidates" : "compared", source, toolchain, cases, assets: representatives };
+    const manifest = { schemaVersion: 1, status: options.mode === "candidates" ? "candidates" : "compared", source, toolchain, cases, assets: representatives };
     const bytes = Buffer.from(json(manifest));
     const manifestPath = `${runPath}/${options.mode === "candidates" ? "candidate" : "comparison"}-manifest.json`;
     await writeExclusive(fs, root, manifestPath, bytes);
@@ -962,9 +473,9 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
   await fs.chmod(root, 0o700);
   const project = await safePath(fs, root, "project", { directories: true });
   const support = {};
-  for (const name of ["home", "temporary", "cache", "store", "pnpmHome"]) support[name] = await safePath(fs, root, name, { directories: true });
+  for (const name of ["home", "temporary", "cache", "store"]) support[name] = await safePath(fs, root, name, { directories: true });
   await writeExclusive(fs, root, "user.npmrc", "");
-  const environment = appTransitionOwnedEnvironment(support, join(root, "user.npmrc"));
+  const environment = createIsolatedProcessEnvironment({ HOME: support.home, USERPROFILE: support.home, TMPDIR: support.temporary, TMP: support.temporary, TEMP: support.temporary, XDG_CACHE_HOME: support.cache, NPM_CONFIG_USERCONFIG: join(root, "user.npmrc"), NPM_CONFIG_REGISTRY: "https://registry.npmjs.org/", PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright" });
   const files = new Map(prepared.files.map(({ path, content }) => [path, content]));
   const specPath = "apps/web/tests/visual/home-visual.spec.ts";
   files.set(specPath, Buffer.from(createAppTransitionVisualSpec(Buffer.from(files.get(specPath)).toString("utf8"), input.subset.includes("multilingual"))));

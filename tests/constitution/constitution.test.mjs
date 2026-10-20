@@ -611,23 +611,18 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.equal(workflow.jobs["app-transition-visuals"].if,
     "needs.scope.outputs.generated-projects == 'true'");
   assert.deepEqual(workflow.jobs["app-transition-visuals"].needs, ["scope"]);
-  const visualJob = workflow.jobs["app-transition-visuals"];
-  assert.equal(visualJob.container, undefined);
-  assert.equal(visualJob.env?.EGERIA_VISUAL_IMAGE, undefined);
-  const visualCalls = visualJob.steps.filter(({ run }) => run?.includes("await runHostedAppTransitionVisuals({"));
-  assert.equal(visualCalls.length, 2);
-  const comparisonCall = visualCalls.find(({ run }) => run.includes('arguments: ["--app-recipe-version=0.2.3"]'));
-  const candidateCall = visualCalls.find(({ run }) => run.includes('arguments: ["--candidates", "--app-recipe-version=0.2.3"]'));
-  assert.equal(comparisonCall.if, "github.event_name != 'pull_request' || !github.event.pull_request.draft");
-  assert.equal(candidateCall.if, "github.event_name == 'pull_request' && github.event.pull_request.draft");
-  for (const call of visualCalls) {
-    assert.equal(call.env.APP_VISUAL_PNPM_BIN, "${{ steps.visual-tools.outputs.bin-dest }}");
-    assert.match(call.run, /pnpmBinDirectory: process\.env\.APP_VISUAL_PNPM_BIN/u);
-    assert.match(call.run, /nodeExecutable: await realpath\(process\.execPath\)/u);
-    assert.doesNotMatch(call.run, /injected|runAudit|runCommand|inspectEnvironment/u);
-  }
-  assert.equal(visualJob.steps.find(({ uses }) => uses?.startsWith("pnpm/setup@")).id, "visual-tools");
-  assert.equal(visualJob.steps.some(({ run }) => run === "pnpm install --frozen-lockfile"), false);
+  assert.deepEqual(workflow.jobs["app-transition-visuals"].container,
+    workflow.jobs["generated-projects"].container);
+  assert.equal(workflow.jobs["app-transition-visuals"].env.EGERIA_VISUAL_IMAGE,
+    workflow.jobs["app-transition-visuals"].container.image);
+  assert.equal(workflow.jobs["app-transition-visuals"].steps.filter(
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.3").length, 1);
+  assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.3").if,
+    "github.event_name != 'pull_request' || !github.event.pull_request.draft");
+  assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.3").if,
+    "github.event_name == 'pull_request' && github.event.pull_request.draft");
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
     ({ uses }) => uses?.startsWith("actions/checkout@")).with.ref,
     "${{ github.event.pull_request.head.sha || github.sha }}");
@@ -911,10 +906,15 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       install: false,
     });
     const steps = workflow.jobs[identifier].steps;
-    const dependencyStep = steps.findIndex(({ run }) => identifier === "app-transition-visuals"
-      ? run?.includes("await runHostedAppTransitionVisuals({")
-      : run === "pnpm install --frozen-lockfile");
-    assert.ok(dependencyStep > steps.indexOf(setup), identifier);
+    assert.ok(steps.indexOf(setup) < steps.findIndex(
+      ({ run }) => run === "pnpm install --frozen-lockfile",
+    ), identifier);
+    assert.ok(
+      workflow.jobs[identifier].steps.some(
+        ({ run }) => run === "pnpm install --frozen-lockfile",
+      ),
+      identifier,
+    );
   }
 
   const dependencySteps = workflow.jobs["dependency-review"].steps;
