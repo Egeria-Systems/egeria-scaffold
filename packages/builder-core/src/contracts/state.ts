@@ -299,15 +299,15 @@ function validateStateVerification(
     const hasFoundation = state.schemaVersion === "2.0.0"
       ? state.installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.3.0")
       : (state.origin.profile === "app" &&
-      (state.origin.recipeVersion === "0.1.0" || state.origin.recipeVersion === "0.2.0" || (state.origin.recipeVersion === "0.2.2" || state.origin.recipeVersion === "0.2.3"))) ||
-      (((state.origin.profile === "portfolio" && (state.origin.recipeVersion === "0.11.0" || (state.origin.recipeVersion === "0.11.2" || state.origin.recipeVersion === "0.11.3"))) ||
-        (state.origin.profile === "site" && (state.origin.recipeVersion === "0.12.0" || (state.origin.recipeVersion === "0.12.2" || state.origin.recipeVersion === "0.12.3")))) &&
+      (state.origin.recipeVersion === "0.1.0" || state.origin.recipeVersion === "0.2.0" || (state.origin.recipeVersion === "0.2.2" || (state.origin.recipeVersion === "0.2.3" || state.origin.recipeVersion === "0.2.4")))) ||
+      (((state.origin.profile === "portfolio" && (state.origin.recipeVersion === "0.11.0" || (state.origin.recipeVersion === "0.11.2" || (state.origin.recipeVersion === "0.11.3" || state.origin.recipeVersion === "0.11.4")))) ||
+        (state.origin.profile === "site" && (state.origin.recipeVersion === "0.12.0" || (state.origin.recipeVersion === "0.12.2" || (state.origin.recipeVersion === "0.12.3" || state.origin.recipeVersion === "0.12.4"))))) &&
         state.installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.2.0"));
     const hasPersistence = state.installedCapabilities.some(
       ({ identifier }) => identifier === "application-persistence",
     );
     const supportsPersistence = state.origin.profile === "app" &&
-      (state.origin.recipeVersion === "0.2.0" || (state.origin.recipeVersion === "0.2.2" || state.origin.recipeVersion === "0.2.3"));
+      (state.origin.recipeVersion === "0.2.0" || (state.origin.recipeVersion === "0.2.2" || (state.origin.recipeVersion === "0.2.3" || state.origin.recipeVersion === "0.2.4")));
     const expectedChecks = state.lastSuccessfulVerification.kind ===
       "capability-addition"
       ? hasPersistence
@@ -336,9 +336,9 @@ function validateStateVerification(
                 state.origin.recipeVersion === "0.9.0" ||
                 state.origin.recipeVersion === "0.10.0" ||
                 state.origin.recipeVersion === "0.11.0" ||
-                (state.origin.recipeVersion === "0.11.2" || state.origin.recipeVersion === "0.11.3") ||
+                (state.origin.recipeVersion === "0.11.2" || (state.origin.recipeVersion === "0.11.3" || state.origin.recipeVersion === "0.11.4")) ||
                 state.origin.recipeVersion === "0.12.0" ||
-                (state.origin.recipeVersion === "0.12.2" || state.origin.recipeVersion === "0.12.3")
+                (state.origin.recipeVersion === "0.12.2" || (state.origin.recipeVersion === "0.12.3" || state.origin.recipeVersion === "0.12.4"))
               ? currentVerificationChecks
               : legacyVerificationChecks;
 

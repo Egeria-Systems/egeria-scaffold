@@ -242,6 +242,7 @@ const readableRecipeVersions = [
   "0.2.0",
   "0.2.2",
   "0.2.3",
+  "0.2.4",
   "0.3.0",
   "0.4.0",
   "0.5.0",
@@ -253,9 +254,11 @@ const readableRecipeVersions = [
   "0.11.0",
   "0.11.2",
   "0.11.3",
+  "0.11.4",
   "0.12.0",
   "0.12.2",
   "0.12.3",
+  "0.12.4",
 ];
 
 const validState = {
@@ -666,7 +669,7 @@ test("app generation verification requires the exact Worker receipt and preserve
     lastSuccessfulVerification: { kind: "generation", checks: generationChecks },
   });
   for (const profile of ["portfolio", "site"]) {
-    for (const recipeVersion of readableRecipeVersions.filter(version => version !== "0.2.2" && version !== "0.2.3")) {
+    for (const recipeVersion of readableRecipeVersions.filter(version => version !== "0.2.2" && version !== "0.2.3" && version !== "0.2.4")) {
       const historicalChecks = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0", "0.6.0"]
         .includes(recipeVersion) ? legacyVerificationChecks : currentVerificationChecks;
       assertAccepts(contracts.installedStateSchema, {
@@ -681,7 +684,7 @@ test("app generation verification requires the exact Worker receipt and preserve
       });
     }
   }
-  for (const recipeVersion of readableRecipeVersions.filter((version) => version !== "0.1.0" && version !== "0.2.0" && version !== "0.2.2" && version !== "0.2.3")) {
+  for (const recipeVersion of readableRecipeVersions.filter((version) => version !== "0.1.0" && version !== "0.2.0" && version !== "0.2.2" && version !== "0.2.3" && version !== "0.2.4")) {
     assertRejects(contracts.installedStateSchema, {
       ...appState,
       origin: { profile: "app", recipeVersion },
@@ -1534,7 +1537,7 @@ test("the schema generator checks artifacts without rewriting them", async () =>
 
 
 test("Vitest five app receipts require Worker integration for generation and each supported lifecycle", () => {
-  for (const recipeVersion of ["0.1.0", "0.2.0", "0.2.2", "0.2.3"]) {
+  for (const recipeVersion of ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.4"]) {
     for (const [kind, checks] of [["generation", [...currentVerificationChecks.slice(0, -1), "worker-integration", "post-state-inference"]], ["capability-addition", contracts.appCapabilityAdditionPersistedVerificationChecks], ["capability-removal", contracts.appCapabilityRemovalPersistedVerificationChecks], ["profile-transition", contracts.appProfileTransitionPersistedVerificationChecks]]) {
       assertAccepts(contracts.installedStateSchema, { ...validState, origin: { profile: "app", recipeVersion }, lastSuccessfulVerification: { kind, checks } });
       assertRejects(contracts.installedStateSchema, { ...validState, origin: { profile: "app", recipeVersion }, lastSuccessfulVerification: { kind, checks: checks.filter(check => check !== "worker-integration") } });
@@ -1650,7 +1653,7 @@ test("application environment catalog admits only the complete common tuple with
 
 
 test("current public state recipes retain exact verification vectors", () => {
-  for (const [profile, recipeVersion] of [["portfolio", "0.11.2"], ["site", "0.12.2"], ["portfolio", "0.11.3"], ["site", "0.12.3"]]) {
+  for (const [profile, recipeVersion] of [["portfolio", "0.11.2"], ["site", "0.12.2"], ["portfolio", "0.11.3"], ["site", "0.12.3"], ["portfolio", "0.11.4"], ["site", "0.12.4"]]) {
     const state = { ...validState, origin: { profile, recipeVersion } };
     assertAccepts(contracts.installedStateSchema, state);
     assertRejects(contracts.installedStateSchema, { ...state, lastSuccessfulVerification: { kind: "generation", checks: legacyVerificationChecks } });

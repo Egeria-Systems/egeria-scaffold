@@ -181,7 +181,7 @@ jobs:
 
       - name: Test CLI excluding dedicated lifecycle jobs
         env:
-          CLI_TEST_SKIP_PATTERN: (?:^compiled (?:Vitest five|dependency-security|literal-lint) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$)|(?:^compiled (?:retained|current|dependency-security|literal-lint) app optional lifecycle completes production verification$)|(?:^compiled (?:Vitest five|dependency-security|literal-lint) email lifecycle on (?:portfolio|site) verifies and retains its foundation$)|(?:^compiled (?:Vitest five|dependency-security|literal-lint) Web3Forms lifecycle on (?:portfolio|app) preserves composition and re-adds safely$)
+          CLI_TEST_SKIP_PATTERN: (?:^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$)|(?:^compiled (?:retained|current|dependency-security|literal-lint|vite-security) app optional lifecycle completes production verification$)|(?:^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) email lifecycle on (?:portfolio|site) verifies and retains its foundation$)|(?:^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) Web3Forms lifecycle on (?:portfolio|app) preserves composition and re-adds safely$)
         run: node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/*.test.mjs
 
       - name: Test public packages
@@ -216,6 +216,8 @@ jobs:
             test-pattern: ^compiled dependency-security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
           - cohort: literal-lint
             test-pattern: ^compiled literal-lint jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
+          - cohort: vite-security
+            test-pattern: ^compiled vite-security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -251,11 +253,11 @@ jobs:
       matrix:
         include:
           - group: app-optionals
-            test-pattern: ^compiled (?:retained|current|dependency-security|literal-lint) app optional lifecycle completes production verification$
+            test-pattern: ^compiled (?:retained|current|dependency-security|literal-lint|vite-security) app optional lifecycle completes production verification$
           - group: email
-            test-pattern: ^compiled (?:Vitest five|dependency-security|literal-lint) email lifecycle on (?:portfolio|site) verifies and retains its foundation$
+            test-pattern: ^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) email lifecycle on (?:portfolio|site) verifies and retains its foundation$
           - group: hosted-contact
-            test-pattern: ^compiled (?:Vitest five|dependency-security|literal-lint) Web3Forms lifecycle on (?:portfolio|app) preserves composition and re-adds safely$
+            test-pattern: ^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) Web3Forms lifecycle on (?:portfolio|app) preserves composition and re-adds safely$
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -425,11 +427,11 @@ jobs:
 
       - name: Generate draft app transition visual review candidates
         if: github.event_name == 'pull_request' && github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.3
+        run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.4
 
       - name: Compare all app transition visual subsets
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.3
+        run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.4
 
       - name: Retain raw dependency audits and security exception dispositions
         if: always()

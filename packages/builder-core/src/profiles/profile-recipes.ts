@@ -11,8 +11,8 @@ const sharedPortfolioCapabilities = [
 ] as const;
 
 function createRecipes(input: Readonly<{
-  portfolio: "0.9.0" | "0.10.0" | "0.11.0" | "0.11.2" | "0.11.3" | "0.12.0";
-  site: "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.12.2" | "0.12.3" | "0.13.0";
+  portfolio: "0.9.0" | "0.10.0" | "0.11.0" | "0.11.2" | "0.11.3" | "0.11.4" | "0.12.0";
+  site: "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.12.2" | "0.12.3" | "0.12.4" | "0.13.0";
 }>): readonly ProfileRecipe[] {
   return [
     {
@@ -97,13 +97,31 @@ export function createLiteralLintProfileRecipes(): readonly ProfileRecipe[] {
   ];
 }
 
+export function createViteSecurityProfileRecipes(): readonly ProfileRecipe[] {
+  return [
+    ...createRecipes({ portfolio: "0.11.4", site: "0.12.4" }),
+    {
+      identifier: "app",
+      schemaVersion: "1.0.0",
+      recipeVersion: "0.2.4",
+      defaultCapabilities: ["app-foundation", "site-routing"],
+    },
+  ];
+}
+
+export function isViteSecurityProfileRecipe(profile: string, recipeVersion: string): boolean {
+  return (profile === "portfolio" && recipeVersion === "0.11.4") ||
+    (profile === "site" && recipeVersion === "0.12.4") ||
+    (profile === "app" && recipeVersion === "0.2.4");
+}
+
 export function isLiteralLintProfileRecipe(profile: string, recipeVersion: string): boolean {
-  return (profile === "portfolio" && recipeVersion === "0.11.3") ||
+  return isViteSecurityProfileRecipe(profile, recipeVersion) || (profile === "portfolio" && recipeVersion === "0.11.3") ||
     (profile === "site" && recipeVersion === "0.12.3") ||
     (profile === "app" && recipeVersion === "0.2.3");
 }
 
-export const profileRecipes: readonly ProfileRecipe[] = createLiteralLintProfileRecipes();
+export const profileRecipes: readonly ProfileRecipe[] = createViteSecurityProfileRecipes();
 
 export function createApplicationEnvironmentProfileRecipes(): readonly ProfileRecipe[] {
   return [

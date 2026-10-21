@@ -220,7 +220,7 @@ function requireInference(value) {
   if (
     value.result?.state?.kind !== "valid" ||
     value.result?.state?.value?.origin?.profile !== "app" ||
-    value.result?.state?.value?.origin?.recipeVersion !== "0.2.3" ||
+    value.result?.state?.value?.origin?.recipeVersion !== "0.2.4" ||
     !Array.isArray(installedCapabilities) ||
     !installedCapabilities.some(
       ({ identifier, version }) =>

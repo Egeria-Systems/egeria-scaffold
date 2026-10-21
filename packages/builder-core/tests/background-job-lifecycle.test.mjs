@@ -5,7 +5,7 @@ import * as core from "../dist/index.js";
 import { inspectProject } from "../dist/diagnostics/project-inspection.js";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-import { createVitestFourProfileRecipes, createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createVitestFourProfileRecipes, createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes, createViteSecurityProfileRecipes } from "../dist/profiles/profile-recipes.js";
 import { createGenerationRenderingContext, readVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
 
 const encoder = new TextEncoder();
@@ -18,6 +18,7 @@ const cohorts = [
   { profiles: createVitestFiveProfileRecipes(), versions: { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" }, foundationLocks: { portfolio: "web-recipe-portfolio-foundation", site: "web-recipe-app-0.2.0", app: "web-recipe-app-0.2.0" }, persistenceLock: "web-application-persistence" },
   { profiles: createDependencySecurityProfileRecipes(), versions: { portfolio: "0.11.2", site: "0.12.2", app: "0.2.2" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.2-foundation", site: "web-recipe-app-0.2.2", app: "web-recipe-app-0.2.2" }, persistenceLock: "web-recipe-app-0.2.2-persistence" },
   { profiles: createLiteralLintProfileRecipes(), versions: { portfolio: "0.11.3", site: "0.12.3", app: "0.2.3" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.3-foundation", site: "web-recipe-app-0.2.3", app: "web-recipe-app-0.2.3" }, persistenceLock: "web-recipe-app-0.2.3-persistence" },
+  { profiles: createViteSecurityProfileRecipes(), versions: { portfolio: "0.11.4", site: "0.12.4", app: "0.2.4" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.4-foundation", site: "web-recipe-app-0.2.4", app: "web-recipe-app-0.2.4" }, persistenceLock: "web-recipe-app-0.2.4-persistence" },
 ];
 async function assertCohort(repo, cohort, profile, persistent = false) {
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));

@@ -10,6 +10,7 @@ import {
   createVitestFiveProfileRecipes,
   createDependencySecurityProfileRecipes,
   createLiteralLintProfileRecipes,
+  createViteSecurityProfileRecipes,
   profileRecipes,
 } from "../profiles/profile-recipes.js";
 import { createCachingRepositoryReader } from "../repository/cache-reader.js";
@@ -49,7 +50,7 @@ export function createGenerationRenderingContext(
     catalogSnapshot: { ...((emailFoundation || backgroundJobs) ? { ...base, appFoundation: "0.2.0", transactionalEmailResend: "0.1.0" } as const : base),
       ...(backgroundJobs ? { backgroundJobDelivery: backgroundJobVersion, deploymentCloudflare: applicationPersistence ? "0.6.0" : "0.5.0" } as const : {}),
     },
-    profiles: createLiteralLintProfileRecipes(),
+    profiles: createViteSecurityProfileRecipes(),
   };
 }
 
@@ -67,9 +68,12 @@ function selectInstalledRenderingContext(
     return undefined;
   }
 
+  const viteSecurityProfiles = createViteSecurityProfileRecipes();
   const literalLintProfiles = createLiteralLintProfileRecipes();
   const dependencySecurityProfiles = createDependencySecurityProfileRecipes();
-  const profiles = literalLintProfiles.some(({ identifier, recipeVersion }) =>
+  const profiles = viteSecurityProfiles.some(({ identifier, recipeVersion }) =>
+    identifier === project.originProfile && recipeVersion === project.recipeVersion)
+    ? viteSecurityProfiles : literalLintProfiles.some(({ identifier, recipeVersion }) =>
     identifier === project.originProfile && recipeVersion === project.recipeVersion)
     ? literalLintProfiles : dependencySecurityProfiles.some(({ identifier, recipeVersion }) =>
     identifier === project.originProfile && recipeVersion === project.recipeVersion)

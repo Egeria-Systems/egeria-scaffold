@@ -19,13 +19,15 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
-import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes, createViteSecurityProfileRecipes } from "../dist/profiles/profile-recipes.js";
 const currentTransitionCohorts = [
+  { label: "Vite security", generation: "vite-security", portfolio: "0.11.4", site: "0.12.4", app: "0.2.4" },
   { label: "Vitest five", generation: "vitest-five", portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" },
   { label: "Dependency security", generation: "dependency-security", site: "0.12.2", app: "0.2.2" },
-  { label: "Literal lint roots", generation: "literal-lint", site: "0.12.3", app: "0.2.3" },
+  { label: "Literal lint roots", generation: "literal-lint", portfolio: "0.11.3", site: "0.12.3", app: "0.2.3" },
 ];
 const currentTransitionContexts = {
+  "vite-security": { ...createGenerationRenderingContext(), profiles: createViteSecurityProfileRecipes() },
   "vitest-five": { ...createGenerationRenderingContext(), profiles: createVitestFiveProfileRecipes() },
   "dependency-security": { ...createGenerationRenderingContext(), profiles: createDependencySecurityProfileRecipes() },
   "literal-lint": { ...createGenerationRenderingContext(), profiles: createLiteralLintProfileRecipes() },
@@ -2095,4 +2097,36 @@ test("successor portfolio execution refuses unadmitted visual inputs before writ
   assertFailure(result, { code: "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED", phase: "precondition", recovery: "not-required" });
   assert.deepEqual(repository.writes, []);
   assert.deepEqual(repository.files, source);
+});
+
+test("Vite security and retained portfolio inputs and mixed controls refuse before any write", async () => {
+  const cases = [
+    { generation: "literal-lint", profile: "portfolio", code: "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED" },
+    { generation: "vite-security", profile: "portfolio", code: "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED" },
+    { generation: "vite-security", profile: "portfolio", stateRecipe: "0.11.3", code: "PROJECT_STATE_INCOMPATIBLE" },
+    { generation: "literal-lint", profile: "portfolio", stateRecipe: "0.11.4", code: "PROJECT_STATE_INCOMPATIBLE" },
+    { generation: "vite-security", profile: "site", stateRecipe: "0.12.3", code: "PROJECT_STATE_INCOMPATIBLE" },
+    { generation: "literal-lint", profile: "site", stateRecipe: "0.12.4", code: "PROJECT_STATE_INCOMPATIBLE" },
+    { generation: "vite-security", profile: "portfolio", stateRecipe: "9.9.9", code: "PROJECT_STATE_INCOMPATIBLE" },
+    { generation: "vite-security", profile: "site", stateRecipe: "9.9.9", code: "PROJECT_STATE_INCOMPATIBLE" },
+  ];
+  for (const entry of cases) {
+    const source = await appTransitionSource(entry.profile, 0, entry.generation);
+    if (entry.stateRecipe) {
+      const state = JSON.parse(decode(source.get(".egeria/state.json")));
+      state.origin.recipeVersion = entry.stateRecipe;
+      source.set(".egeria/state.json", bytes(JSON.stringify(state)));
+    }
+    const repository = createRepository(source);
+    const result = await core.applyProfileTransition({
+      root: git.identity.root, toProfile: "app", approvedPlanFingerprint: "sha256:" + "0".repeat(64),
+      reader: repository.reader, writer: repository.writer,
+      inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }),
+      inspectExpectedChanges: async () => ({ ok: true }),
+      verifier: { async verifyInIsolatedCopy() { throw new Error("refused transition must not verify"); } },
+    });
+    assertFailure(result, { code: entry.code, phase: "precondition", recovery: "not-required" });
+    assert.deepEqual(repository.writes, []);
+    assert.deepEqual(repository.files, source);
+  }
 });

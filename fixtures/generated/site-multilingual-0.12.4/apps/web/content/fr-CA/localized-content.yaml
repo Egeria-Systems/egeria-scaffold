@@ -1,0 +1,108 @@
+metadata:
+  title: "Acme Site Multilingual"
+  description: Un site Web public de plusieurs pages.
+accessibility:
+  skipToContent: Passer au contenu
+  navigationLabel: Navigation principale
+navigation:
+  - href: /fr-CA
+    label: Accueil
+  - href: /fr-CA/about
+    label: À propos
+  - href: /fr-CA/work/featured
+    label: Travaux
+localeSwitch:
+  label: English
+pages:
+  home:
+    metadata:
+      title: "Acme Site Multilingual"
+      description: Un site Web public de plusieurs pages.
+    sections:
+      - id: introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: "Acme Site Multilingual"
+          summary: Un point de départ clair pour ce site Web.
+      - id: welcome
+        type: text
+        variant: default
+        enabled: true
+        content:
+          heading: Bienvenue
+          body: Découvrez les travaux, le parcours et les façons de communiquer.
+      - id: contact
+        type: call-to-action
+        variant: default
+        enabled: true
+        content:
+          heading: Communiquez avec nous
+          summary: Entamons une conversation sur votre prochain projet.
+          label: Envoyer un courriel
+          href: mailto:hello@example.com
+  about:
+    metadata:
+      title: À propos
+      description: Découvrez la pratique derrière le travail.
+    sections:
+      - id: about-introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: À propos
+          summary: Une approche pratique du travail numérique réfléchi.
+      - id: about-practice
+        type: text
+        variant: default
+        enabled: true
+        content:
+          heading: La pratique
+          body: Des objectifs clairs, une réalisation accessible et des systèmes maintenables orientent chaque mandat.
+  workFeatured:
+    metadata:
+      title: Travaux en vedette
+      description: Une sélection de travaux représentatifs.
+    sections:
+      - id: featured-work-introduction
+        type: hero
+        variant: default
+        enabled: true
+        content:
+          heading: Travaux en vedette
+          summary: Une sélection de travaux représentatifs.
+      - id: featured-work
+        type: project-list
+        variant: default
+        enabled: true
+        content:
+          heading: Travaux en vedette
+          projects:
+            - title: Projet exemple
+              summary: Un projet représentatif qui démontre une réalisation ciblée.
+              href: https://example.com/work/example-project
+notFound:
+  metadata:
+    title: Page introuvable
+    description: La page demandée est introuvable.
+  sections:
+    - id: missing-page
+      type: hero
+      variant: default
+      enabled: true
+      content:
+        heading: Page introuvable
+        summary: Vérifiez l’adresse ou utilisez la navigation pour continuer.
+booking:
+  heading: Réserver une conversation
+  summary: Choisissez un moment qui vous convient.
+  linkLabel: Planifier avec Calendly
+  frameTitle: Page de planification Calendly
+  popupHeading: Choisir un moment
+  closeLabel: Fermer la planification
+error:
+  heading: Une erreur s’est produite
+  summary: Nous n’avons pas pu terminer cette page. Veuillez réessayer.
+  retryLabel: Réessayer

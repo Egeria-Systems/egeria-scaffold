@@ -3800,8 +3800,8 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
   };
   try {
     for (const [recipeVersion, invalidRuntime, expectedErrorCode] of [
-      ["0.2.3", false, undefined],
-      ["0.2.3", true, "CERTIFICATION_RUNTIME_EVIDENCE_INVALID"],
+      ["0.2.4", false, undefined],
+      ["0.2.4", true, "CERTIFICATION_RUNTIME_EVIDENCE_INVALID"],
       ["0.2.2", false, "CAPABILITY_ADDITION_INFERENCE_INVALID"],
     ]) {
       commands.length = 0;

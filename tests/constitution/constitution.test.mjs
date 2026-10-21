@@ -616,12 +616,12 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.equal(workflow.jobs["app-transition-visuals"].env.EGERIA_VISUAL_IMAGE,
     workflow.jobs["app-transition-visuals"].container.image);
   assert.equal(workflow.jobs["app-transition-visuals"].steps.filter(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.3").length, 1);
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.4").length, 1);
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.3").if,
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.4").if,
     "github.event_name != 'pull_request' || !github.event.pull_request.draft");
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.3").if,
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.4").if,
     "github.event_name == 'pull_request' && github.event.pull_request.draft");
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
     ({ uses }) => uses?.startsWith("actions/checkout@")).with.ref,
@@ -655,6 +655,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
         { cohort: "vitest-five", "test-pattern": "^compiled Vitest five jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$" },
         { cohort: "dependency-security", "test-pattern": "^compiled dependency-security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$" },
         { cohort: "literal-lint", "test-pattern": "^compiled literal-lint jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$" },
+        { cohort: "vite-security", "test-pattern": "^compiled vite-security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$" },
       ],
     },
   });
@@ -678,9 +679,9 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "fail-fast": false,
     matrix: {
       include: [
-        { group: "app-optionals", "test-pattern": "^compiled (?:retained|current|dependency-security|literal-lint) app optional lifecycle completes production verification$" },
-        { group: "email", "test-pattern": "^compiled (?:Vitest five|dependency-security|literal-lint) email lifecycle on (?:portfolio|site) verifies and retains its foundation$" },
-        { group: "hosted-contact", "test-pattern": "^compiled (?:Vitest five|dependency-security|literal-lint) Web3Forms lifecycle on (?:portfolio|app) preserves composition and re-adds safely$" },
+        { group: "app-optionals", "test-pattern": "^compiled (?:retained|current|dependency-security|literal-lint|vite-security) app optional lifecycle completes production verification$" },
+        { group: "email", "test-pattern": "^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) email lifecycle on (?:portfolio|site) verifies and retains its foundation$" },
+        { group: "hosted-contact", "test-pattern": "^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) Web3Forms lifecycle on (?:portfolio|app) preserves composition and re-adds safely$" },
       ],
     },
   });
@@ -695,7 +696,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const mainCliStep = workflow.jobs["builder-and-packages"].steps.find(
     ({ run }) => run === nonJobsCommand,
   );
-  const jobsUnion = "^compiled (?:Vitest five|dependency-security|literal-lint) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$";
+  const jobsUnion = "^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$";
   const skipPattern = [jobsUnion, ...lifecycle.strategy.matrix.include.map(
     (group) => group["test-pattern"],
   )].map((pattern) => `(?:${pattern})`).join("|");
@@ -703,12 +704,12 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const selectors = [...cliJobs.strategy.matrix.include, ...lifecycle.strategy.matrix.include]
     .map((group) => new RegExp(group["test-pattern"], "u"));
   const skipSelector = new RegExp(mainCliStep.env.CLI_TEST_SKIP_PATTERN, "u");
-  const cohorts = ["Vitest five", "dependency-security", "literal-lint"];
+  const cohorts = ["Vitest five", "dependency-security", "literal-lint", "vite-security"];
   const dedicatedNames = [
     ...cohorts.flatMap((cohort) => ["portfolio", "app-persistence-email"].map(
       (profile) => `compiled ${cohort} jobs lifecycle on ${profile} completes production verification`,
     )),
-    ...["retained", "current", "dependency-security", "literal-lint"].map(
+    ...["retained", "current", "dependency-security", "literal-lint", "vite-security"].map(
       (cohort) => `compiled ${cohort} app optional lifecycle completes production verification`,
     ),
     ...cohorts.flatMap((cohort) => ["portfolio", "site"].map(
@@ -718,10 +719,10 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       (profile) => `compiled ${cohort} Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`,
     )),
   ];
-  assert.equal(new Set(dedicatedNames).size, 22);
+  assert.equal(new Set(dedicatedNames).size, 29);
   assert.deepEqual(selectors.map((selector) => dedicatedNames.filter(
     (name) => selector.test(name),
-  ).length), [2, 2, 2, 4, 6, 6]);
+  ).length), [2, 2, 2, 2, 5, 8, 8]);
   for (const name of dedicatedNames) {
     assert.equal(selectors.filter((selector) => selector.test(name)).length, 1, name);
     assert.equal(skipSelector.test(name), true, name);
@@ -1466,7 +1467,7 @@ test("the workspace declares the approved proof root and install policy", async 
 
   assert.equal(
     workspace,
-    "packages:\n  - \"apps/*\"\n  - \"packages/*\"\n  - \"proofs/*\"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  \"@next/eslint-plugin-next@16.3.5>fast-glob\": \"-\"\n  \"next@>=16.2.0 <16.3.8\": 16.3.8\n  \"brace-expansion@>=1.0.0 <1.1.21\": 1.1.21\n  \"brace-expansion@>=2.0.0 <2.1.7\": 2.1.7\n  \"brace-expansion@>=5.0.0 <5.0.12\": 5.0.12\n  \"js-yaml@>=4.0.0 <4.3.2\": 4.3.2\n  \"miniflare>undici\": 7.29.1\n  \"qs@\": 6.16.0\n  \"sharp@>=0.35.0 <0.35.5\": 0.35.5\n  \"source-map-js@>=1.0.0 <1.2.2\": 1.2.2\n  \"proxy-addr@>=2.0.0 <2.0.8\": 2.0.8\n\n  \"shell-quote@>=1.8.4 <1.11.0\": 1.11.0\n\nallowBuilds:\n  \"@parcel/watcher\": true\n  \"@swc/core\": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n\npatchedDependencies:\n  \"@next/eslint-plugin-next@16.3.5\": \"packages/builder-core/templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch\"\n",
+    "packages:\n  - \"apps/*\"\n  - \"packages/*\"\n  - \"proofs/*\"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  \"vite@>=8.2.0 <8.2.4\": 8.2.4\n  \"launch-editor@2.14.1\": 2.14.2\n  \"vite@8.2.4>rolldown\": 1.2.5\n  \"vite@8.2.4>postcss\": 8.5.26\n  \"@next/eslint-plugin-next@16.3.5>fast-glob\": \"-\"\n  \"next@>=16.2.0 <16.3.8\": 16.3.8\n  \"brace-expansion@>=1.0.0 <1.1.21\": 1.1.21\n  \"brace-expansion@>=2.0.0 <2.1.7\": 2.1.7\n  \"brace-expansion@>=5.0.0 <5.0.12\": 5.0.12\n  \"js-yaml@>=4.0.0 <4.3.2\": 4.3.2\n  \"miniflare>undici\": 7.29.1\n  \"qs@\": 6.16.0\n  \"sharp@>=0.35.0 <0.35.5\": 0.35.5\n  \"source-map-js@>=1.0.0 <1.2.2\": 1.2.2\n  \"proxy-addr@>=2.0.0 <2.0.8\": 2.0.8\n\n  \"shell-quote@>=1.8.4 <1.11.0\": 1.11.0\n\nallowBuilds:\n  \"@parcel/watcher\": true\n  \"@swc/core\": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n\npatchedDependencies:\n  \"@next/eslint-plugin-next@16.3.5\": \"packages/builder-core/templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch\"\n",
   );
 });
 
@@ -2837,7 +2838,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     packageOwnership,
-    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.3[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.4[^\n]+require separate certification/iu,
   );
   assert.match(
     programRoadmap,
@@ -2857,7 +2858,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     rootInstructions,
-    /Builder-core supports `app@0\.2\.3` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
+    /Builder-core supports `app@0\.2\.4` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
   );
   for (const instructions of [builderInstructions, cliInstructions]) {
     assert.match(
@@ -3168,7 +3169,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.3[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
+    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.4[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
   );
 });
 
@@ -3763,7 +3764,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /generation-executable recipes are `portfolio@0\.11\.3`, `site@0\.12\.3`, and `app@0\.2\.3`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
+    /generation-executable recipes are `portfolio@0\.11\.4`, `site@0\.12\.4`, and `app@0\.2\.4`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
   );
   assert.match(
     capabilityModel,
@@ -4967,7 +4968,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     packageOwnership,
-    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.3[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.4[^\n]+require separate certification/iu,
   );
   assert.match(
     builderCoreReadme,

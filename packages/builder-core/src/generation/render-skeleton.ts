@@ -1,4 +1,4 @@
-import { isLiteralLintProfileRecipe } from "../profiles/profile-recipes.js";
+import { isLiteralLintProfileRecipe, isViteSecurityProfileRecipe } from "../profiles/profile-recipes.js";
 import { readFile } from "node:fs/promises";
 import { parseDocument } from "yaml";
 
@@ -269,8 +269,8 @@ function enrichApplicationManifest(
   const literalLintRoots = applicationEnvironments || isLiteralLintProfileRecipe(profile, recipeVersion);
   const dependencySecurity = literalLintRoots || (profile === "portfolio" && recipeVersion === "0.11.2") ||
     (profile === "site" && recipeVersion === "0.12.2") || (profile === "app" && recipeVersion === "0.2.2");
-  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.2" || recipeVersion === "0.2.3" || (applicationEnvironments && recipeVersion === "0.3.0"));
-  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.2" || recipeVersion === "0.12.3" || (applicationEnvironments && recipeVersion === "0.13.0")));
+  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.2" || recipeVersion === "0.2.3" || recipeVersion === "0.2.4" || (applicationEnvironments && recipeVersion === "0.3.0"));
+  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.2" || recipeVersion === "0.12.3" || recipeVersion === "0.12.4" || (applicationEnvironments && recipeVersion === "0.13.0")));
   const enrichedManifest = {
     ...manifest,
     scripts: {
@@ -327,6 +327,10 @@ function enrichApplicationManifest(
         const plugin = `@next/eslint-plugin-next@${profile === "portfolio" ? "16.3.0" : "16.3.3"}`;
         workspaceSource = workspaceSource.replace("overrides:\n", `overrides:\n  "${plugin}>fast-glob": "-"\n`);
         workspaceSource += `\npatchedDependencies:\n  "${plugin}": "patches/next-eslint-plugin-next.patch"\n`;
+      }
+      if (applicationEnvironments || isViteSecurityProfileRecipe(profile, recipeVersion)) {
+        workspaceSource = workspaceSource.replace("minimumReleaseAgeExclude:\n", 'minimumReleaseAgeExclude:\n  - "vite@8.2.4"\n');
+        workspaceSource = workspaceSource.replace("overrides:\n", 'overrides:\n  "vite@>=8.2.0 <8.2.4": "8.2.4"\n  "vite@8.2.4>rolldown": "1.2.5"\n  "vite@8.2.4>postcss": "8.5.26"\n');
       }
       return { path: file.path, content: encoder.encode(workspaceSource) };
     }

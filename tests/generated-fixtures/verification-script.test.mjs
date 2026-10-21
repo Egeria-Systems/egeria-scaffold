@@ -415,58 +415,58 @@ test("fixture inspection accepts only the exact portable generated trees", async
       {
         identifier: "portfolio",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-0.11.3",
+        relativeRoot: "fixtures/generated/portfolio-0.11.4",
       },
       {
         identifier: "portfolio-calendly",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-calendly-0.11.3",
+        relativeRoot: "fixtures/generated/portfolio-calendly-0.11.4",
       },
       {
         identifier: "site",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-0.12.3",
+        relativeRoot: "fixtures/generated/site-0.12.4",
       },
       {
         identifier: "site-multilingual",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-0.12.3",
+        relativeRoot: "fixtures/generated/site-multilingual-0.12.4",
       },
       {
         identifier: "site-multilingual-analytics",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.3",
+        relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.4",
       },
       {
         identifier: "app",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-0.2.3",
+        relativeRoot: "fixtures/generated/app-0.2.4",
       },
       {
         identifier: "app-all-optional-integrations",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.3",
+        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.4",
       },
       {
         identifier: "app-persistence", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-0.2.3",
+        relativeRoot: "fixtures/generated/app-persistence-0.2.4",
       },
       {
         identifier: "portfolio-email", profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-email-0.11.3",
+        relativeRoot: "fixtures/generated/portfolio-email-0.11.4",
       },
       {
         identifier: "app-persistence-email", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-email-0.2.3",
+        relativeRoot: "fixtures/generated/app-persistence-email-0.2.4",
       },
-      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.12.3" },
+      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.12.4" },
     ],
   );
 
   for (const contract of generatedFixtureContracts) {
     assert.equal(
       contract.expectedRecipeVersion,
-      contract.profile === "app" ? "0.2.3" : contract.profile === "site" ? "0.12.3" : "0.11.3",
+      contract.profile === "app" ? "0.2.4" : contract.profile === "site" ? "0.12.4" : "0.11.4",
     );
     assert.equal(contract.expectedStandardsVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.6.0" : "0.5.0");
     assert.equal(contract.expectedObservabilityVersion, "0.3.0");
@@ -2027,6 +2027,11 @@ test("active fixture inspection refuses retained dependency cohorts", async () =
         "FIXTURE_INVENTORY_INVALID",
       );
     }
+    const literalLintRoot = `${identifier}-${retainedRecipe.replace(/2$/u, "3")}`;
+    await expectFixtureError(
+      () => inspectGeneratedFixture(resolve(repositoryRoot, "fixtures/generated", literalLintRoot), identifier),
+      "FIXTURE_WORKSPACE_POLICY_INVALID",
+    );
   }
 });
 

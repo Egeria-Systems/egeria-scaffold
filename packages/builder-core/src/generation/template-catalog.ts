@@ -350,7 +350,7 @@ function remapSourceIssue(
 export function createTemplateCatalog(
   profile: ProfileIdentifier,
   includeBookingCalendly = false,
-  recipeVersion = profile === "app" ? "0.2.3" : profile === "site" ? "0.12.3" : "0.11.3",
+  recipeVersion = profile === "app" ? "0.2.4" : profile === "site" ? "0.12.4" : "0.11.4",
   includeMultilingual = false,
   includeAnalytics = false,
   includeApplicationPersistence = false,
@@ -361,8 +361,8 @@ export function createTemplateCatalog(
   backgroundJobVersion: "0.1.0" | "0.2.0" = "0.2.0",
   applicationEnvironments = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
-  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.2" || recipeVersion === "0.2.3" || (applicationEnvironments && recipeVersion === "0.3.0"));
-  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.2" || recipeVersion === "0.12.3" || (applicationEnvironments && recipeVersion === "0.13.0")));
+  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.2" || recipeVersion === "0.2.3" || recipeVersion === "0.2.4" || (applicationEnvironments && recipeVersion === "0.3.0"));
+  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.2" || recipeVersion === "0.12.3" || recipeVersion === "0.12.4" || (applicationEnvironments && recipeVersion === "0.13.0")));
   const literalLintRoots = applicationEnvironments || isLiteralLintProfileRecipe(profile, recipeVersion);
   const dependencySecurity = literalLintRoots || (profile === "portfolio" && recipeVersion === "0.11.2") ||
     (profile === "site" && recipeVersion === "0.12.2") || (profile === "app" && recipeVersion === "0.2.2");

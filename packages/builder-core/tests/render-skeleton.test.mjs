@@ -126,9 +126,12 @@ test("application environment dependency policy preserves retained graphs and co
     delete retainedOverrides["sharp@>=0.35.0 <0.35.4"];
     assert.deepEqual(candidateWorkspace, {
       ...currentWorkspace,
-      minimumReleaseAgeExclude: [...currentWorkspace.minimumReleaseAgeExclude.filter(value => value !== "fast-uri@3.1.6"), "undici@7.29.1", "undici@8.10.2"],
+      minimumReleaseAgeExclude: ["vite@8.2.4", ...currentWorkspace.minimumReleaseAgeExclude.filter(value => value !== "fast-uri@3.1.6"), "undici@7.29.1", "undici@8.10.2"],
       overrides: {
         ...retainedOverrides,
+        "vite@>=8.2.0 <8.2.4": "8.2.4",
+        "vite@8.2.4>rolldown": "1.2.5",
+        "vite@8.2.4>postcss": "8.5.26",
         "fast-uri@": "3.1.8",
         "miniflare>undici": "7.29.1",
         "jsdom>undici": "8.10.2",
@@ -202,7 +205,7 @@ test("app generation preserves production-site bytes across all optional subsets
     { context: retainedRenderingContext, recipe: "0.1.0", standards: "0.4.0", appVitest: "4.1.11", siteVitest: "4.1.10" },
     { context: { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: createVitestFiveProfileRecipes() }, recipe: "0.2.0", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
     { context: { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: core.createDependencySecurityProfileRecipes() }, recipe: "0.2.2", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
-    { context: undefined, recipe: "0.2.3", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
+    { context: undefined, recipe: "0.2.4", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
   ]) {
     const renderSkeleton = (request) => core.renderSkeleton(request, generation.context);
     for (let subset = 0; subset < 8; subset += 1) {
@@ -6384,5 +6387,48 @@ test("security dependency policy shares exact reviewed patches with environment 
     assert.equal(policy.resolutionMode, "time-based");
     assert.equal(current.project.schemaVersion, "1.0.0");
     assert.equal(candidate.project.schemaVersion, "2.0.0");
+  }
+});
+
+test("Vite security successors preserve installed cohorts and select exact dependency policy and locks", async () => {
+  const core = await import("../dist/index.js");
+  const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
+  const { createLiteralLintProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+  const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
+  const recipes = { portfolio: "0.11.4", site: "0.12.4", app: "0.2.4" };
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
+      const request = { profile, projectName: "vite-security-example", displayName: "Vite Security Example", packageVersions: core.verifiedCapabilityPackageVersions, ...options };
+      const context = createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true);
+      const current = assertSuccess(await core.renderSkeleton(request, context));
+      assert.equal(current.project.recipeVersion, recipes[profile]);
+      const retainedContext = { ...context, profiles: createLiteralLintProfileRecipes() };
+      const retained = assertSuccess(await core.renderSkeleton(request, retainedContext));
+      assert.deepEqual(current.files.filter(({ path }) => path !== "pnpm-workspace.yaml"), retained.files.filter(({ path }) => path !== "pnpm-workspace.yaml"));
+      assert.deepEqual(core.createInstalledManifest(current.resolved), core.createInstalledManifest(retained.resolved));
+      const policy = parseGeneratedYaml(current.files, "pnpm-workspace.yaml");
+      const oldPolicy = parseGeneratedYaml(retained.files, "pnpm-workspace.yaml");
+      assert.deepEqual(policy, {
+        ...oldPolicy,
+        minimumReleaseAgeExclude: ["vite@8.2.4", ...oldPolicy.minimumReleaseAgeExclude],
+        overrides: { ...oldPolicy.overrides, "vite@>=8.2.0 <8.2.4": "8.2.4", "vite@8.2.4>rolldown": "1.2.5", "vite@8.2.4>postcss": "8.5.26" },
+      });
+      const manifest = parseGeneratedJson(current.files, "apps/web/package.json");
+      const foundation = manifest.dependencies.effect !== undefined;
+      const lock = options.applicationPersistence ? "app-0.2.4-persistence"
+        : profile === "app" || (profile === "site" && foundation) ? "app-0.2.4"
+        : profile === "portfolio" && foundation ? "portfolio-0.11.4-foundation"
+        : profile + "-" + recipes[profile];
+      assert.equal(resolveRecipeLockfileVersion(current.project, manifest), lock);
+      assert.equal(resolveRecipeLockfileVersion(retained.project, manifest), lock.replace(/4(?=-|$)/u, "3"));
+      const lockfile = parseDocument(await readFile(new URL("../lockfiles/web-recipe-" + lock + "/pnpm-lock.yaml", import.meta.url), "utf8")).toJS();
+      assert.deepEqual(lockfile.overrides, policy.overrides);
+      for (const [rendered, selectedContext] of [[current, context], [retained, retainedContext]]) {
+        const managedSurfaces = assertSuccess(core.materializeInstalledSurfaces({ files: new Map(rendered.files.map(({ path, content }) => [path, content])), surfaces: rendered.surfaces }));
+        const state = { origin: { profile, recipeVersion: rendered.project.recipeVersion }, installedCapabilities: core.createInstalledManifest(rendered.resolved), managedSurfaces };
+        assert.deepEqual(assertSuccess(createVerifiedProjectSnapshot(rendered.project, state)).renderingContext, selectedContext);
+      }
+      assert.equal(resolveRecipeLockfileVersion({ ...current.project, recipeVersion: profile === "app" ? "0.12.4" : "0.2.4" }, manifest), undefined);
+    }
   }
 });

@@ -7,7 +7,7 @@ import { createGenerationRenderingContext, verifiedCapabilityPackageVersions } f
 import { createInMemoryRepositoryReader } from "../dist/repository/repository-reader.js";
 const decoder = new TextDecoder();
 const request = { profile: "app", projectName: "test-app", displayName: "Test app", packageVersions: verifiedCapabilityPackageVersions };
-const { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+const { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes, createViteSecurityProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
 const retainedContext = (persistence = false) => ({ ...createGenerationRenderingContext(persistence), profiles: createVitestFiveProfileRecipes() });
 const ordinary = (await renderSkeleton(request, retainedContext())).value;
 const persistent = (await renderSkeleton({ ...request, applicationPersistence: true }, retainedContext(true))).value;
@@ -66,6 +66,7 @@ test("historical and security dependency replacement refuses swapped source lock
     { profiles: createVitestFiveProfileRecipes(), ordinary: "web-recipe-app-0.2.0", persistent: "web-application-persistence" },
     { profiles: createDependencySecurityProfileRecipes(), ordinary: "web-recipe-app-0.2.2", persistent: "web-recipe-app-0.2.2-persistence" },
     { profiles: createLiteralLintProfileRecipes(), ordinary: "web-recipe-app-0.2.3", persistent: "web-recipe-app-0.2.3-persistence" },
+    { profiles: createViteSecurityProfileRecipes(), ordinary: "web-recipe-app-0.2.4", persistent: "web-recipe-app-0.2.4-persistence" },
   ];
   for (const [index, cohort] of cases.entries()) {
     const context = persistence => ({ ...createGenerationRenderingContext(persistence), profiles: cohort.profiles });
@@ -74,7 +75,7 @@ test("historical and security dependency replacement refuses swapped source lock
     assert.equal(currentOrdinary.ok, true);
     assert.equal(currentPersistent.ok, true);
     const expectedNext = index === 0 ? "16.3.3" : "16.3.8";
-    assert.equal(currentOrdinary.value.project.recipeVersion, ["0.2.0", "0.2.2", "0.2.3"][index]);
+    assert.equal(currentOrdinary.value.project.recipeVersion, ["0.2.0", "0.2.2", "0.2.3", "0.2.4"][index]);
     assert.equal(currentPersistent.value.project.recipeVersion, currentOrdinary.value.project.recipeVersion);
     assert.equal(manifest(currentOrdinary.value).dependencies.next, expectedNext);
     assert.equal(manifest(currentPersistent.value).dependencies.next, expectedNext);

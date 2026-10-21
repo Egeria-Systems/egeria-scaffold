@@ -19,13 +19,14 @@ import { delimiter, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { createGenerationRenderingContext } from "../../../packages/builder-core/dist/catalog/verified-package-versions.js";
-import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../../../packages/builder-core/dist/profiles/profile-recipes.js";
+import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes, createViteSecurityProfileRecipes } from "../../../packages/builder-core/dist/profiles/profile-recipes.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../../../packages/builder-core/dist/generation/recipe-lockfiles.js";
 import { generatedFixtureContracts } from "../../../scripts/verify-generated-skeletons.mjs";
 const lifecycleCohorts = [
   { label: "Vitest five", generation: "vitest-five", profiles: createVitestFiveProfileRecipes(), portfolio: "0.11.0", site: "0.12.0", app: "0.2.0", portfolioFoundation: "portfolio-foundation" },
   { label: "dependency-security", generation: "dependency-security", profiles: createDependencySecurityProfileRecipes(), portfolio: "0.11.2", site: "0.12.2", app: "0.2.2", portfolioFoundation: "portfolio-0.11.2-foundation" },
   { label: "literal-lint", generation: "literal-lint", profiles: createLiteralLintProfileRecipes(), portfolio: "0.11.3", site: "0.12.3", app: "0.2.3", portfolioFoundation: "portfolio-0.11.3-foundation" },
+  { label: "vite-security", generation: "vite-security", profiles: createViteSecurityProfileRecipes(), portfolio: "0.11.4", site: "0.12.4", app: "0.2.4", portfolioFoundation: "portfolio-0.11.4-foundation" },
 ];
 
 
@@ -736,12 +737,14 @@ test("retained CLI fixture setup removes successor-only managed patches", async 
     await assert.rejects(lstat(join(root, "patches/next-eslint-plugin-next.patch")), { code: "ENOENT" });
   };
   await withGeneratedFixture(assertNoPatch);
-  for (const cohort of lifecycleCohorts.filter(({ generation }) => generation !== "literal-lint")) {
+  for (const cohort of lifecycleCohorts.filter(({ generation }) => !["literal-lint", "vite-security"].includes(generation))) {
     await withGitFixture("portfolio", async ({ linked }) => assertNoPatch(linked), { generation: cohort.generation });
   }
-  await withGitFixture("portfolio", async ({ linked }) => {
-    assert.equal((await lstat(join(linked, "patches/next-eslint-plugin-next.patch"))).isFile(), true);
-  }, { generation: "literal-lint" });
+  for (const generation of ["literal-lint", "vite-security"]) {
+    await withGitFixture("portfolio", async ({ linked }) => {
+      assert.equal((await lstat(join(linked, "patches/next-eslint-plugin-next.patch"))).isFile(), true);
+    }, { generation });
+  }
 });
 
 async function withGeneratedFixture(run, profile = "portfolio") {
@@ -1414,7 +1417,7 @@ test("app profile creation parses existing options independently and delegates g
       assert.equal(captured.standard.length, 1);
       const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8")));
       assert.equal(project.originProfile, "app");
-      assert.equal(project.recipeVersion, "0.2.3");
+      assert.equal(project.recipeVersion, "0.2.4");
       assert.deepEqual(project.capabilitySettings, allOptionals ? {
         "booking-calendly": planSettings, analytics: analyticsSettings,
       } : {});
@@ -7264,6 +7267,7 @@ for (const generation of [
   { name: "current", generation: "vitest-five", recipe: "0.2.0", vitest: "5.0.0", catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
   { name: "dependency-security", generation: "dependency-security", recipe: "0.2.2", vitest: "5.0.0", catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
   { name: "literal-lint", generation: "literal-lint", recipe: "0.2.3", vitest: "5.0.0", catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
+  { name: "vite-security", generation: "vite-security", recipe: "0.2.4", vitest: "5.0.0", catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
 ]) {
   test(`compiled ${generation.name} app optional lifecycle completes production verification`, { timeout: 1_800_000 }, async (context) => {
     await withGitFixture("app", async ({ linked, primary }) => {

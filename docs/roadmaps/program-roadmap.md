@@ -168,7 +168,7 @@ P3C began after P3B closed and did not reopen or weaken P3 or P3B. P3C strengthe
 
 ## P4 — App foundation
 
-The current generation boundary implements internal hybrid `app-foundation@0.1.0` and `app@0.2.3`, whose exact recipe is `app-foundation@0.1.0 + site-routing@0.4.0`. App project/state parsing, deterministic rendering, and state-last new-directory generation retain the complete production-site experience and independently support every subset of Calendly, multilingual, and analytics without automatically adding stateful backend infrastructure.
+The current generation boundary implements internal hybrid `app-foundation@0.1.0` and `app@0.2.4`, whose exact recipe is `app-foundation@0.1.0 + site-routing@0.4.0`. App project/state parsing, deterministic rendering, and state-last new-directory generation retain the complete production-site experience and independently support every subset of Calendly, multilingual, and analytics without automatically adding stateful backend infrastructure.
 
 The generated app pins `effect@4.0.0-rc.112` directly and confines it to application, infrastructure, composition, and delivery server modules. Request context stays explicit; an application-owned build-information service receives Cloudflare or in-memory Layers; delivery runs one lazy program once and interprets defect before interruption, interruption before recognized typed failure, and unrecognized or mixed residual failure as unexpected. Pure interruption uses the native abort, `deployment-cloudflare` alone owns `enable_request_signal`, cancellation claims exclude already-started provider work, and the initial application has no retry.
 

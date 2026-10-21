@@ -11,7 +11,7 @@ import { stringifyCanonicalJson } from "../dist/serialization/canonical-json.js"
 import { persistenceGenerationVerificationChecks } from "../dist/contracts/generation-verification.js";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes, createViteSecurityProfileRecipes } from "../dist/profiles/profile-recipes.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -28,6 +28,7 @@ const cohorts = [
   { profiles: createVitestFiveProfileRecipes(), recipe: "0.2.0", appLock: "web-recipe-app-0.2.0" },
   { profiles: createDependencySecurityProfileRecipes(), recipe: "0.2.2", appLock: "web-recipe-app-0.2.2" },
   { profiles: createLiteralLintProfileRecipes(), recipe: "0.2.3", appLock: "web-recipe-app-0.2.3" },
+  { profiles: createViteSecurityProfileRecipes(), recipe: "0.2.4", appLock: "web-recipe-app-0.2.4" },
 ];
 
 async function repository(options = {}) {

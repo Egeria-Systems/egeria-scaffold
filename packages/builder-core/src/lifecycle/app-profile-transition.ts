@@ -117,6 +117,22 @@ export const literalLintAppTransitionVisualInputCandidate = Object.freeze({
     "analytics+booking-calendly+multilingual": "sha256:743f8334dd26261a81ed31c6fb2d9f07af359f9f7258d0f926aa7c4ba6a89f24",
   }),
 });
+// Fixed Vite security candidate only; separate exact-manifest human review
+// is required before these inputs may enter the admitted record array.
+export const viteSecurityAppTransitionVisualInputCandidate = Object.freeze({
+  targetLockfileFingerprint: "sha256:6b119f067ef4647b1e9147899ef10e7df91b2eb2d25aeba78de85d5522f6b0c6",
+  baselines: appTransitionVisualInputRecord.baselines,
+  subsets: Object.freeze({
+    none: "sha256:a7252bf88c3630bc041ef8f24c3a991bca762ca415d48ddd6df61a631a04faac",
+    "booking-calendly": "sha256:96a32a8fd7fa0fc44745b5891ce57ef5efc34a1fd8485b72d326f03449e60294",
+    multilingual: "sha256:03cf3dc4bd784de07c3f21a81977944744baf6756d3a7283aa3563fb37d1d85a",
+    "booking-calendly+multilingual": "sha256:8f2ba5eef94570d02054e5983b442ede23ae6bee4465bb5dacb8d021ef62deeb",
+    analytics: "sha256:be86927b9d6ee2df47b7504dd848648912562ff4a28cbdd5898dd45310ed57e7",
+    "analytics+booking-calendly": "sha256:729a87959cb4ddbf44ca2b450f31a52bef16dfe5af96c6060b4c7553c347d9a9",
+    "analytics+multilingual": "sha256:66ab3ce5dcfc84bfbbbe1cc79b1926f6a2390c026efb81bdb8566ead727d669d",
+    "analytics+booking-calendly+multilingual": "sha256:5156b57ac0088c5c703a3163160281894a8442508aadda4b1ffcc5bb5e6fcbd7",
+  }),
+});
 export function verifyAppTransitionVisualInputRecord(input: Readonly<{
   optionalCapabilities: readonly string[];
   influencingFingerprints: readonly AppTransitionPathFingerprint[];

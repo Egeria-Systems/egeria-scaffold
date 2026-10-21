@@ -46,7 +46,7 @@ test("app transition visual producer exposes bounded candidate, comparison, and 
   assert.equal(typeof module.verifyAppTransitionVisuals, "function");
   assert.deepEqual(module.parseAppTransitionVisualArguments([]), { mode: "compare" });
   assert.deepEqual(module.parseAppTransitionVisualArguments(["--", "--candidates"]), { mode: "candidates" });
-  for (const recipeVersion of ["0.2.2", "0.2.3"]) {
+  for (const recipeVersion of ["0.2.2", "0.2.3", "0.2.4"]) {
     assert.deepEqual(module.parseAppTransitionVisualArguments(["--candidates", `--app-recipe-version=${recipeVersion}`]), { mode: "candidates", recipeVersion });
   }
   const digest = "a".repeat(64);
@@ -309,7 +309,7 @@ test("visual capture stabilizes and saves before screenshot comparison and prese
   }
 });
 
-for (const preparation of ["synthetic", "security", "literal-lint"])
+for (const preparation of ["synthetic", "security", "literal-lint", "vite-security"])
 test(`${preparation} visual targets use exact production files, run non-update captures twice, and preserve process receipts`, async (t) => {
   const h = await harness(t);
   const spec = await readFile(new URL("../../packages/builder-core/templates/common/apps/web/tests/visual/home-visual.spec.ts", import.meta.url), "utf8");
@@ -318,7 +318,7 @@ test(`${preparation} visual targets use exact production files, run non-update c
   const commands = [];
   let ownedProject;
   const repositoryRoot = preparation !== "synthetic" ? fileURLToPath(new URL("../", producer)) : h.root;
-  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot, artifactDirectory, recipeVersion: preparation === "literal-lint" ? "0.2.3" : "0.2.2" }, {
+  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot, artifactDirectory, recipeVersion: preparation === "vite-security" ? "0.2.4" : preparation === "literal-lint" ? "0.2.3" : "0.2.2" }, {
     ...(preparation === "synthetic" ? { prepareProject: async () => ({ request: {}, sourceProject: {}, targetProject: {}, files: [
       { path: "apps/web/tests/visual/home-visual.spec.ts", content: Buffer.from(spec) },
       ...Object.entries(h.images).map(([viewport, content]) => ({ path: `apps/web/tests/visual/home-visual.spec.ts-snapshots/home-${viewport}-chromium-linux.png`, content })),
@@ -345,11 +345,11 @@ test(`${preparation} visual targets use exact production files, run non-update c
   });
   if (preparation !== "synthetic") {
     assert.equal(result.project.sourceProject.schemaVersion, "1.0.0");
-    assert.equal(result.project.sourceProject.recipeVersion, preparation === "literal-lint" ? "0.11.3" : "0.11.2");
+    assert.equal(result.project.sourceProject.recipeVersion, preparation === "vite-security" ? "0.11.4" : preparation === "literal-lint" ? "0.11.3" : "0.11.2");
     assert.equal(result.project.targetProject.schemaVersion, "1.0.0");
-    assert.equal(result.project.targetProject.recipeVersion, preparation === "literal-lint" ? "0.2.3" : "0.2.2");
-    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, preparation === "literal-lint" ? "34be78bdb6d3f8a2b1c02cd2f58fadff1d3a90b14395da5ff5a2c9c72bddfbe6" : "71c4d59802625006860409d6298e3bd13963089fc55260350ad4c262dd216067");
-    if (preparation === "literal-lint") assert.ok(result.influencingFingerprints.some(({ path }) => path === "patches/next-eslint-plugin-next.patch"));
+    assert.equal(result.project.targetProject.recipeVersion, preparation === "vite-security" ? "0.2.4" : preparation === "literal-lint" ? "0.2.3" : "0.2.2");
+    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, preparation === "vite-security" ? "6b119f067ef4647b1e9147899ef10e7df91b2eb2d25aeba78de85d5522f6b0c6" : preparation === "literal-lint" ? "34be78bdb6d3f8a2b1c02cd2f58fadff1d3a90b14395da5ff5a2c9c72bddfbe6" : "71c4d59802625006860409d6298e3bd13963089fc55260350ad4c262dd216067");
+    if (["literal-lint", "vite-security"].includes(preparation)) assert.ok(result.influencingFingerprints.some(({ path }) => path === "patches/next-eslint-plugin-next.patch"));
   }
   assert.equal(commands.filter(({ arguments: args }) => args.includes("test:visual")).length, 2);
   assert.equal(commands.some(({ arguments: args }) => args.some(value => value.includes("update-snapshots"))), false);

@@ -813,7 +813,7 @@ export type AppProfileTransitionPlan = Readonly<{
   }>;
   target: Readonly<{
     profile: "app";
-    recipeVersion: "0.1.0" | "0.2.0" | "0.2.2" | "0.2.3";
+    recipeVersion: "0.1.0" | "0.2.0" | "0.2.2" | "0.2.3" | "0.2.4";
     capabilities: readonly ProfileTransitionCapabilitySubject[];
   }>;
   actions: readonly AppTransitionDisposition[];
@@ -854,7 +854,7 @@ async function readReviewedAppTransitionVisualEvidence(input: Readonly<{
     return undefined;
   }
   const optionalCapabilities = input.source.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
-  const targetLockfileFingerprint = fingerprintFileContent(new Uint8Array(await readFile(createRecipeLockfileUrl(input.target.project.recipeVersion === "0.2.3" ? "app-0.2.3" : input.target.project.recipeVersion === "0.2.2" ? "app-0.2.2" : input.target.project.recipeVersion === "0.2.0" ? "app-0.2.0" : "app-0.1.0"))));
+  const targetLockfileFingerprint = fingerprintFileContent(new Uint8Array(await readFile(createRecipeLockfileUrl(input.target.project.recipeVersion === "0.2.4" ? "app-0.2.4" : input.target.project.recipeVersion === "0.2.3" ? "app-0.2.3" : input.target.project.recipeVersion === "0.2.2" ? "app-0.2.2" : input.target.project.recipeVersion === "0.2.0" ? "app-0.2.0" : "app-0.1.0"))));
   const inputRecord = verifyAppTransitionVisualInputRecord({
     optionalCapabilities,
     influencingFingerprints: canonical.value.influencingFingerprints,
@@ -922,7 +922,7 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
   }
   const renderingContext = snapshot.value.renderingContext;
   const targetRecipeVersion = snapshot.value.profiles.find(({ identifier }) => identifier === "app")?.recipeVersion;
-  if (targetRecipeVersion !== "0.1.0" && targetRecipeVersion !== "0.2.0" && targetRecipeVersion !== "0.2.2" && targetRecipeVersion !== "0.2.3") {
+  if (targetRecipeVersion !== "0.1.0" && targetRecipeVersion !== "0.2.0" && targetRecipeVersion !== "0.2.2" && targetRecipeVersion !== "0.2.3" && targetRecipeVersion !== "0.2.4") {
     return planningFailure("PROFILE_TRANSITION_EDGE_MISSING");
   }
   const edge = resolveSupportedProfileTransition({

@@ -208,9 +208,20 @@ test("application environment lock selection uses its own matching dependency gr
     const identity = { originProfile: profile, recipeVersion: version };
     const manifest = { dependencies: { next, ...(profile === "app" ? { effect: "4.0.0-rc.112" } : {}) }, devDependencies: { "eslint-config-next": eslint, vitest: "5.0.0" } };
     assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), lock);
+    if (profile !== "app") {
+      const foundation = { ...manifest, dependencies: { ...manifest.dependencies, effect: "4.0.0-rc.112" } };
+      assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, foundation), profile === "portfolio" ? "portfolio-0.11.4-foundation" : "app-0.2.4");
+    } else {
+      const persistence = {
+        ...manifest,
+        dependencies: { ...manifest.dependencies, "drizzle-orm": "0.45.2" },
+        devDependencies: { ...manifest.devDependencies, "drizzle-kit": "0.31.10", "@cloudflare/workers-types": "5.20260730.1" },
+      };
+      assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, persistence), "app-0.2.4-persistence");
+    }
     for (const dependencies of [
       { ...manifest.dependencies, next: "16.3.2" },
-      { ...manifest.dependencies, effect: profile === "app" ? "4.0.0-rc.111" : "4.0.0-rc.112" },
+      { ...manifest.dependencies, effect: "4.0.0-rc.111" },
       { ...manifest.dependencies, "drizzle-orm": "0.45.2" },
     ]) assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...manifest, dependencies }), undefined);
   }
@@ -295,7 +306,7 @@ test("app generation requires its complete verification vector before state or d
         assert.equal(await exists(destination), false);
       } else {
         const generated = assertSuccess(result);
-        assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.2.3" });
+        assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.2.4" });
         assert.equal(JSON.parse(await readFile(join(destination, "apps/web/package.json"), "utf8")).dependencies.next, "16.3.8");
         assert.equal(generated.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.3.8"));
         assert.deepEqual(generated.state.lastSuccessfulVerification.checks,
@@ -376,7 +387,7 @@ test("persistence generation requires binding checks before state or destination
         assert.equal(await exists(destination), false);
       } else {
         const generated = assertSuccess(result);
-        assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.2.3" });
+        assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.2.4" });
         assert.equal(JSON.parse(await readFile(join(destination, "apps/web/package.json"), "utf8")).dependencies.next, "16.3.8");
         assert.equal(generated.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.3.8"));
         assert.deepEqual(generated.state.lastSuccessfulVerification.checks, ["contracts", "pre-state-inference", ...checks, "post-state-inference"]);
@@ -1414,7 +1425,7 @@ test("portfolio and site generation writes exact state-last repositories", async
       });
       assert.equal(
         generated.state.origin.recipeVersion,
-        profile === "portfolio" ? "0.11.3" : "0.12.3",
+        profile === "portfolio" ? "0.11.4" : "0.12.4",
       );
       assert.equal(
         generated.state.managedSurfaces.length,
@@ -2244,18 +2255,18 @@ test("public generation validates and projects contact settings before writes", 
 
 test("security lock selection requires complete exact recipe manifests", async () => {
   for (const [profile, options, expected] of [
-    ["portfolio", {}, "portfolio-0.11.3"],
-    ["site", {}, "site-0.12.3"],
-    ["app", {}, "app-0.2.3"],
-    ["app", { applicationPersistence: true }, "app-0.2.3-persistence"],
-    ["portfolio", { transactionalEmailResend: true }, "portfolio-0.11.3-foundation"],
-    ["site", { transactionalEmailResend: true }, "app-0.2.3"],
+    ["portfolio", {}, "portfolio-0.11.4"],
+    ["site", {}, "site-0.12.4"],
+    ["app", {}, "app-0.2.4"],
+    ["app", { applicationPersistence: true }, "app-0.2.4-persistence"],
+    ["portfolio", { transactionalEmailResend: true }, "portfolio-0.11.4-foundation"],
+    ["site", { transactionalEmailResend: true }, "app-0.2.4"],
   ]) {
     const rendered = assertSuccess(await core.renderSkeleton({ profile, projectName: "security-graph", displayName: "Security Graph", packageVersions: core.verifiedCapabilityPackageVersions, ...options }));
     const manifestBytes = rendered.files.find(({ path }) => path === "apps/web/package.json").content;
     const manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, { portfolio: "0.11.3", site: "0.12.3", app: "0.2.3" }[profile]);
+    assert.equal(rendered.project.recipeVersion, { portfolio: "0.11.4", site: "0.12.4", app: "0.2.4" }[profile]);
     assert.equal(manifest.dependencies.next, "16.3.8");
     assert.equal(manifest.devDependencies["eslint-config-next"], profile === "portfolio" ? "16.3.0" : "16.3.3");
     assert.equal(manifest.devDependencies.vitest, "5.0.0");

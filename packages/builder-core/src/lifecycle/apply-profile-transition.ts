@@ -141,7 +141,7 @@ export type ProfileTransitionExecutionResult =
           fromProfile: "portfolio" | "site";
           fromRecipeVersion: string;
           toProfile: "site" | "app";
-          toRecipeVersion: "0.10.0" | "0.1.0" | "0.2.0" | "0.2.2" | "0.2.3";
+          toRecipeVersion: "0.10.0" | "0.1.0" | "0.2.0" | "0.2.2" | "0.2.3" | "0.2.4";
         }>;
         migration:
           | typeof historicalMigrationIdentifier
@@ -154,7 +154,9 @@ export type ProfileTransitionExecutionResult =
           | "transition-portfolio-0-11-2-to-app-0-2-2"
           | "transition-site-0-12-2-to-app-0-2-2"
           | "transition-portfolio-0-11-3-to-app-0-2-3"
-          | "transition-site-0-12-3-to-app-0-2-3";
+          | "transition-site-0-12-3-to-app-0-2-3"
+          | "transition-portfolio-0-11-4-to-app-0-2-4"
+          | "transition-site-0-12-4-to-app-0-2-4";
         changedPaths: readonly string[];
         verificationChecks:
           | typeof profileTransitionVerificationChecks
@@ -830,7 +832,11 @@ export async function applyProfileTransition(input: Readonly<{
   const plan = planResult.value;
   const app = plan.target.profile === "app";
   const migrationIdentifier = app
-    ? plan.target.recipeVersion === "0.2.3"
+    ? plan.target.recipeVersion === "0.2.4"
+      ? plan.source.profile === "portfolio"
+        ? "transition-portfolio-0-11-4-to-app-0-2-4"
+        : "transition-site-0-12-4-to-app-0-2-4"
+      : plan.target.recipeVersion === "0.2.3"
       ? plan.source.profile === "portfolio"
         ? "transition-portfolio-0-11-3-to-app-0-2-3"
         : "transition-site-0-12-3-to-app-0-2-3"
@@ -1021,7 +1027,7 @@ export async function applyProfileTransition(input: Readonly<{
   const targetCatalog = createCapabilityCatalogSnapshot(
     verifiedCapabilityPackageVersions,
     app
-      ? plan.target.recipeVersion === "0.2.0" || plan.target.recipeVersion === "0.2.2" || plan.target.recipeVersion === "0.2.3"
+      ? plan.target.recipeVersion === "0.2.0" || plan.target.recipeVersion === "0.2.2" || plan.target.recipeVersion === "0.2.3" || plan.target.recipeVersion === "0.2.4"
         ? vitestFiveCapabilityCatalogSnapshot
         : vitestFourCapabilityCatalogSnapshot
       : { standards: "0.4.0" },

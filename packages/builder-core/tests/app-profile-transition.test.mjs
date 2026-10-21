@@ -585,3 +585,49 @@ test("literal lint transitions require exact same-cohort endpoints", async () =>
     assert.equal(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion.replace(/3$/u, "2"), toProfile: "app", toRecipeVersion: "0.2.3" }).ok, false);
   }
 });
+
+test("Vite security incoming transitions admit only exact same-cohort endpoints", async () => {
+  const { resolveSupportedProfileTransition } = await import("../dist/lifecycle/supported-profile-transitions.js");
+  for (const [profile, recipeVersion, retainedRecipe] of [["portfolio", "0.11.4", "0.11.3"], ["site", "0.12.4", "0.12.3"]]) {
+    const edge = resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion: "0.2.4" });
+    assert.deepEqual(edge, { ok: true, value: { source: { profile, recipeVersion }, target: { profile: "app", recipeVersion: "0.2.4" } } });
+    for (const [source, target] of [[recipeVersion, "0.2.3"], [retainedRecipe, "0.2.4"]]) {
+      assert.deepEqual(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: source, toProfile: "app", toRecipeVersion: target }), { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" });
+    }
+  }
+});
+
+test("Vite security visual candidate binds every subset without admitting portfolio transitions", async () => {
+  const policy = await import("../dist/lifecycle/app-profile-transition.js");
+  const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
+  const { createViteSecurityProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+  const validators = await loadAppTransitionContentValidators();
+  const context = { ...createGenerationRenderingContext(), profiles: createViteSecurityProfileRecipes() };
+  const subsets = {};
+  const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.2.4/pnpm-lock.yaml", import.meta.url))));
+  for (let subset = 0; subset < 8; subset++) {
+    const request = {
+      ...policy.appTransitionVisualProject, packageVersions: core.verifiedCapabilityPackageVersions,
+      ...(subset & 1 ? { bookingCalendly: policy.appTransitionVisualBookingSettings } : {}),
+      ...(subset & 2 ? { multilingual: true } : {}),
+      ...(subset & 4 ? { analytics: policy.appTransitionVisualAnalyticsSettings } : {}),
+    };
+    const source = await core.renderSkeleton({ ...request, profile: "portfolio" }, context);
+    const target = await core.renderSkeleton({ ...request, profile: "app" }, context);
+    assert.equal(source.ok, true); assert.equal(target.ok, true);
+    const currentFiles = new Map(source.value.files.map(({ path, content }) => [path, content]));
+    const before = [...currentFiles].map(([path, content]) => [path, Buffer.from(content)]);
+    const prepared = policy.prepareAppProfileTransition({ source: source.value, target: target.value, currentFiles, validators });
+    assert.equal(prepared.ok, true, JSON.stringify(prepared));
+    const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
+    subsets[[...optionalCapabilities].sort().join("+") || "none"] = core.fingerprintJsonValue(prepared.value.influencingFingerprints);
+    const refused = policy.verifyAppTransitionVisualInputRecord({ optionalCapabilities, influencingFingerprints: prepared.value.influencingFingerprints, targetLockfileFingerprint });
+    assert.equal(refused.ok, false);
+    assert.equal(refused.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
+    assert.deepEqual([...currentFiles].map(([path, content]) => [path, Buffer.from(content)]), before);
+  }
+  const candidate = policy.viteSecurityAppTransitionVisualInputCandidate;
+  assert.deepEqual(candidate, { targetLockfileFingerprint, baselines: policy.appTransitionVisualInputRecord.baselines, subsets });
+  assert.equal(Object.isFrozen(candidate), true);
+  assert.equal(Object.isFrozen(candidate.subsets), true);
+});
